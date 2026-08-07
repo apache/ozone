@@ -17,10 +17,7 @@
 
 package org.apache.hadoop.ozone;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
@@ -30,45 +27,34 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_D
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.net.ServerSocketUtil.getPort;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
-import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.slf4j.event.Level.INFO;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.PrivilegedExceptionAction;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
-import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -78,7 +64,6 @@ import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
@@ -92,6 +77,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.KerberosTests;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -105,7 +91,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test class to for security enabled Ozone cluster.
  */
-public final class TestDelegationToken {
+public class TestDelegationToken extends KerberosTests {
 
   private static final String TEST_USER = "testUgiUser@EXAMPLE.COM";
   private static final String COMPONENT = "test";
@@ -116,22 +102,22 @@ public final class TestDelegationToken {
 
   @TempDir
   private Path folder;
-  @TempDir
-  private File workDir;
 
-  private MiniKdc miniKdc;
-  private OzoneConfiguration conf;
-  private File scmKeytab;
-  private File spnegoKeytab;
-  private File omKeyTab;
-  private File testUserKeytab;
-  private String testUserPrincipal;
   private StorageContainerManager scm;
   private OzoneManager om;
-  private String host;
   private String clusterId = UUID.randomUUID().toString();
   private String scmId = UUID.randomUUID().toString();
   private OzoneManagerProtocolClientSideTranslatorPB omClient;
+
+  @Override
+  protected boolean useSharedServicePrincipal() {
+    return false;
+  }
+
+  @Override
+  protected boolean enableSecurityAuthorizationByDefault() {
+    return false;
+  }
 
   public static Stream<Boolean> options() {
     return Stream.of(false, true);
@@ -145,7 +131,8 @@ public final class TestDelegationToken {
   @BeforeEach
   public void init() {
     try {
-      conf = new OzoneConfiguration();
+      initKerberos();
+      OzoneConfiguration conf = getConf();
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
       conf.setInt(OZONE_SCM_CLIENT_PORT_KEY,
@@ -161,12 +148,7 @@ public final class TestDelegationToken {
       final String path = folder.resolve("om-meta").toString();
       Path metaDirPath = Paths.get(path, "om-meta");
       conf.set(OZONE_METADATA_DIRS, metaDirPath.toString());
-      conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-      conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
 
-      startMiniKdc();
-      setSecureConfig();
-      createCredentialsInKDC();
       generateKeyPair();
     } catch (Exception e) {
       LOG.error("Failed to initialize TestSecureOzoneCluster", e);
@@ -187,66 +169,8 @@ public final class TestDelegationToken {
     }
   }
 
-  private void createCredentialsInKDC() throws Exception {
-    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-    SCMHTTPServerConfig httpServerConfig =
-        conf.getObject(SCMHTTPServerConfig.class);
-    createPrincipal(scmKeytab, scmConfig.getKerberosPrincipal());
-    createPrincipal(spnegoKeytab, httpServerConfig.getKerberosPrincipal());
-    createPrincipal(testUserKeytab, testUserPrincipal);
-    createPrincipal(omKeyTab,
-        conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
-  }
-
-  private void createPrincipal(File keytab, String... principal)
-      throws Exception {
-    miniKdc.createPrincipal(keytab, principal);
-  }
-
-  private void startMiniKdc() throws Exception {
-    Properties securityProperties = MiniKdc.createConf();
-    miniKdc = new MiniKdc(securityProperties, workDir);
-    miniKdc.start();
-  }
-
-  private void stopMiniKdc() {
-    miniKdc.stop();
-  }
-
-  private void setSecureConfig() throws IOException {
-    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    host = InetAddress.getLocalHost().getCanonicalHostName()
-        .toLowerCase();
-
-    conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
-
-    String curUser = UserGroupInformation.getCurrentUser().getUserName();
-    conf.set(OZONE_ADMINISTRATORS, curUser);
-
-    String realm = miniKdc.getRealm();
-    String hostAndRealm = host + "@" + realm;
-    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
-    conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_SCM/" + hostAndRealm);
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/" + hostAndRealm);
-    conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_OM/" + hostAndRealm);
-
-    scmKeytab = new File(workDir, "scm.keytab");
-    spnegoKeytab = new File(workDir, "http.keytab");
-    omKeyTab = new File(workDir, "om.keytab");
-    testUserKeytab = new File(workDir, "testuser.keytab");
-    testUserPrincipal = "test@" + realm;
-
-    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
-        scmKeytab.getAbsolutePath());
-    conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY,
-        spnegoKeytab.getAbsolutePath());
-    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
-        omKeyTab.getAbsolutePath());
-    conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE,
-        spnegoKeytab.getAbsolutePath());
-  }
-
   private void initSCM() throws IOException {
+    OzoneConfiguration conf = getConf();
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     scmStore.setClusterId(clusterId);
     scmStore.setScmId(scmId);
@@ -271,6 +195,7 @@ public final class TestDelegationToken {
   @ParameterizedTest
   @MethodSource("options")
   public void testDelegationToken(boolean useIp) throws Exception {
+    OzoneConfiguration conf = getConf();
     initSCM();
     scm = HddsTestUtils.getScmSimple(conf);
     scm.start();
@@ -425,7 +350,7 @@ public final class TestDelegationToken {
     omClient.close();
     UserGroupInformation.setLoginUser(ugi);
     omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-        OmTransportFactory.create(conf, ugi, null),
+        OmTransportFactory.create(getConf(), ugi, null),
         RandomStringUtils.secure().nextAscii(5));
     Token<OzoneTokenIdentifier> seedToken =
         omClient.getDelegationToken(new Text("om"));
@@ -469,7 +394,7 @@ public final class TestDelegationToken {
   }
 
   private void generateKeyPair() throws Exception {
-    SecurityConfig securityConfig = new SecurityConfig(conf);
+    SecurityConfig securityConfig = new SecurityConfig(getConf());
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGenerator.generateKey();
     KeyStorage keyStorage = new KeyStorage(securityConfig, COMPONENT);
@@ -484,10 +409,9 @@ public final class TestDelegationToken {
     omStore.initialize();
 
     // OM uses scm/host@EXAMPLE.COM to access SCM
-    config.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
-        "scm/" + host + "@" + miniKdc.getRealm());
-    omKeyTab = new File(workDir, "scm.keytab");
-    config.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, omKeyTab.getAbsolutePath());
+    config.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, getOzonePrincipal());
+    config.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
+        getOzoneKeytab().getAbsolutePath());
 
     OzoneManager.setTestSecureOmFlag(true);
     om = OzoneManager.createOm(config);
