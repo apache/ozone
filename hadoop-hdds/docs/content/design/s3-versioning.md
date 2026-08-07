@@ -211,11 +211,16 @@ Built-in bucket-level controls: `maxVersions` (default 100, 0 = unlimited; marke
 count toward the limit), `noncurrentVersionExpiration` (opt-in), and
 expired-delete-marker cleanup (enabled by default: when only a marker remains,
 the whole key is removed) — all enforced by a new **VersionCleanupService**
-following the `KeyDeletingService` pattern. A per-bucket `maxVersionsPolicy`
-selects between `TRIM` (default: reclaim oldest-first, asynchronously rather than
-inside the write transaction) and `REJECT` (the write fails instead and the
-operator chooses what to delete; opt-in, since S3 has no error code for the
-condition). All versions count against the bucket space quota;
+following the `KeyDeletingService` pattern. Versions beyond `maxVersions` are
+reclaimed oldest-first, asynchronously rather than inside the write transaction,
+so the cost of a version write does not grow with the number of versions the key
+already has. An earlier draft also offered a `REJECT` policy that failed the
+write instead; it is dropped. S3 has no error code for the condition and no
+client retries on it, so a default limit enforced that way would break unmodified
+S3 tooling after `maxVersions` overwrites of one key — and reclaiming is what
+S3's own lifecycle rules do. Expiration counts from the moment the version that
+superseded this one was committed, as Lifecycle's `NoncurrentDays` does, not from
+when the version itself was written. All versions count against the bucket space quota;
 version count, marker count, and noncurrent bytes are exposed via
 `ozone sh bucket info` and Recon. `maxVersions` is documented as an Ozone
 extension over S3 semantics (comparable to Lifecycle `NewerNoncurrentVersions`).
@@ -230,14 +235,28 @@ creation is rejected on an ENABLED or SUSPENDED bucket, and enabling versioning
 or moving SUSPENDED → ENABLED is rejected while any snapshot exists in the
 bucket's path chain, following linked buckets to their source. SUSPENDED is
 covered along with ENABLED because a suspended bucket still holds noncurrent
-versions. ENABLED → SUSPENDED stays allowed, so a bucket that reached a mixed
-state before the checks existed can at least stop accumulating versions; for such
-buckets reclamation falls back to the conservative rule of holding deleted
-versions until every snapshot of that bucket is purged. Rejections return
-NOT_SUPPORTED_OPERATION with an explanatory message. An OM config key, false by
-default and documented as unsafe, lifts the checks so that integration tests for
-the work described below can be written against a real mixed bucket. The rest of
-this section is the design that lifts the restriction for good.
+versions. ENABLED → SUSPENDED stays allowed even with snapshots present: it only
+reduces exposure, and a client must always be able to stop creating versions. So
+is setting the status a bucket already has, since an S3 client re-sending
+`PutBucketVersioning` must not fail against a bucket already in that state.
+Neither check is latched — once the last snapshot is purged, versioning can be
+enabled or resumed normally. Rejections return NOT_SUPPORTED_OPERATION with an
+explanatory message.
+
+The checks are exhaustive rather than best-effort, so a mixed bucket cannot
+arise on a released cluster: versioning is gated on `OMLayoutFeature`
+finalization, an OM that predates the feature cannot set a versioning status at
+all, and the two checks are enforced when the transaction applies rather than in
+preExecute, so Ratis orders them against each other and neither can slip past
+the other. There is correspondingly **no migration path and no legacy mixed
+state to be conservative about** — an earlier draft of this document assumed one.
+
+The single exception is an OM config key, false by default and documented as
+unsafe, which lifts both checks so that integration tests for the work described
+below can be written against a real mixed bucket. On a cluster running with that
+key, reclamation is *not* snapshot-aware and the data-loss path below is live;
+that is the point of marking it unsafe. The rest of this section is the design
+that lifts the restriction for good.
 
 A snapshot checkpoints the entire OM RocksDB, so versionedKeyTable is captured
 automatically along with the bucket's versioning status: a snapshot holds the
@@ -377,8 +396,8 @@ until it lands.
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion, quota accounting |
 | T4 Read / permanent delete / promotion | `?versionId=` reads including null-slot addressing, reporting a delete-marker-addressed read as a condition distinct from not-found; permanent delete by versionId with quota accounting; version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys |
-| T6 Reclamation | VersionCleanupService, `maxVersions` with the `TRIM` / `REJECT` policy, expired marker cleanup |
-| T7 Snapshot exclusion | OM-side rejection matrix for snapshot creation and versioning state transitions with linked-bucket recursion, dev-only opt-in config key, conservative reclamation for buckets already in a mixed state before the checks landed |
+| T6 Reclamation | VersionCleanupService, `maxVersions` trimming oldest-first, noncurrent expiration, expired marker cleanup |
+| T7 Snapshot exclusion | OM-side rejection matrix for snapshot creation and versioning state transitions, applied to the source of a linked bucket and enforced at apply time so the two directions cannot race; dev-only opt-in config key |
 | T8 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, batch delete |
 | T9 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
 | T10 Quota and observability | quota edges + QuotaRepair, Recon / metrics |
@@ -392,8 +411,9 @@ ceph/s3-tests; performance benchmarks asserting no regression with versioning of
 and O(1) write latency with it on. The snapshot
 integration tests belong with the snapshot work and are deferred with it.
 
-Open questions tracked for implementation: the `maxVersions` default and cluster
-cap; obfuscation of the external versionId encoding, and how a pinned first version
+Open questions tracked for implementation: whether an operator should be able to
+cap `maxVersions` cluster-wide, over and above the per-bucket setting and the
+cluster default; obfuscation of the external versionId encoding, and how a pinned first version
 is rendered; whether changing `ozone.om.versioning.version-id-generator` should take
 effect without an OM restart, and the operational procedure for keys already written
 under the previous generator; `PutBucketVersioning(Suspended)` on a never-versioned
