@@ -5306,4 +5306,23 @@
       delays the new numbering on the affected keys rather than disordering them.
     </description>
   </property>
+  <property>
+    <name>ozone.om.snapshot.versioning.coexistence.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      UNSAFE, FOR TESTING ONLY. Do not enable on a production cluster.
+
+      When false, the default, OM refuses to create a snapshot of a bucket that has S3 object
+      versioning enabled or suspended, and refuses to enable or resume versioning on a bucket that
+      still has snapshots. The two features cannot be combined safely yet: a snapshot shares blocks
+      with the active object store and keeps them only because key reclamation skips what a previous
+      snapshot references, and that lookup is not version-aware, so reclaiming a noncurrent version
+      can delete blocks a snapshot still points at.
+
+      Setting this to true lifts those checks so that the integration tests for snapshot-aware
+      version reclamation can be written against a real mixed-state bucket. On such a bucket, data
+      loss is possible.
+    </description>
+  </property>
 </configuration>
