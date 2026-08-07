@@ -366,7 +366,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     }
   }
 
-  BlockOutputStreamEntry getCurrentStreamEntry() {
+  synchronized BlockOutputStreamEntry getCurrentStreamEntry() {
     if (streamEntries.isEmpty() || streamEntries.size() <= currentStreamIndex) {
       return null;
     } else {
@@ -405,7 +405,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return bufferPool.computeBufferData();
   }
 
-  void cleanup() {
+  synchronized void cleanup() {
     if (excludeList != null) {
       excludeList.clear();
     }
@@ -426,7 +426,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return excludeList;
   }
 
-  boolean isEmpty() {
+  synchronized boolean isEmpty() {
     return streamEntries.isEmpty();
   }
 
