@@ -37,7 +37,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -55,6 +54,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
+import org.apache.ozone.test.TestEntry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -134,9 +134,9 @@ public class TestECMisReplicationCheckHandler {
         new ContainerPlacementStatusDefault(4, 5, 9));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5));
+        new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+        new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+        new TestEntry<>(IN_SERVICE, 5));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -180,9 +180,9 @@ public class TestECMisReplicationCheckHandler {
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5));
+        new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+        new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+        new TestEntry<>(IN_SERVICE, 5));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -225,9 +225,9 @@ public class TestECMisReplicationCheckHandler {
     });
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5));
+        new TestEntry<>(IN_SERVICE, 1), new TestEntry<>(IN_SERVICE, 2),
+        new TestEntry<>(IN_SERVICE, 3), new TestEntry<>(IN_SERVICE, 4),
+        new TestEntry<>(IN_SERVICE, 5));
     ContainerReplica unhealthyReplica =
         createContainerReplica(container.containerID(), 1, IN_SERVICE,
             State.UNHEALTHY);

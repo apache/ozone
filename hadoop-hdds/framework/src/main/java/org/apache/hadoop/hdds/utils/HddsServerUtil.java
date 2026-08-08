@@ -85,7 +85,7 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.validator.routines.InetAddressValidator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -434,7 +434,6 @@ public final class HddsServerUtil {
     long heartbeatThreadFrequencyMs = getScmheartbeatCheckerInterval(conf);
 
     long heartbeatIntervalMs = getScmHeartbeatInterval(conf);
-
 
     // Make sure that StaleNodeInterval is configured way above the frequency
     // at which we run the heartbeat thread.
@@ -926,9 +925,10 @@ public final class HddsServerUtil {
    * Null if there is any wrongly configured SCM address. Note that the returned collection
    * might not be ordered the same way as the requested SCM node IDs
    */
-  public static Collection<Pair<String, HostAndPort>> getSCMAddressForDatanodes(
+  public static Collection<ScmNodeAddress> getSCMAddressForDatanodes(
       ConfigurationSource conf, String scmServiceId, Set<String> scmNodeIds) {
-    Collection<Pair<String, HostAndPort>> scmNodeAddress = new HashSet<>(scmNodeIds.size());
+    Collection<ScmNodeAddress> scmNodeAddresses =
+        new HashSet<>(scmNodeIds.size());
     for (String scmNodeId : scmNodeIds) {
       String addressKey = ConfUtils.addKeySuffixes(
           OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
@@ -942,9 +942,10 @@ public final class HddsServerUtil {
           OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
           OZONE_SCM_DATANODE_PORT_DEFAULT);
 
-      scmNodeAddress.add(Pair.of(scmNodeId, new HostAndPort(scmAddress, scmDatanodePort)));
+      scmNodeAddresses.add(new ScmNodeAddress(
+          scmNodeId, new HostAndPort(scmAddress, scmDatanodePort)));
     }
-    return scmNodeAddress;
+    return scmNodeAddresses;
   }
 
   /**

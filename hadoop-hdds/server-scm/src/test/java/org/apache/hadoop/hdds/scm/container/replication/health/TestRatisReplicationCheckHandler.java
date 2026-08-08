@@ -41,7 +41,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -69,6 +68,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.ozone.test.TestEntry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -220,8 +220,8 @@ public class TestRatisReplicationCheckHandler {
   public void testUnderReplicatedDueToOutOfService() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 0), Pair.of(DECOMMISSIONING, 0),
-        Pair.of(DECOMMISSIONED, 0));
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(DECOMMISSIONING, 0),
+        new TestEntry<>(DECOMMISSIONED, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container);
@@ -243,11 +243,12 @@ public class TestRatisReplicationCheckHandler {
   @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#outOfServiceStates")
   void testUnderReplicatedDueToAllOutOfService(
       HddsProtos.NodeOperationalState state) {
-    Pair<HddsProtos.NodeOperationalState, Integer> pair = Pair.of(state, 0);
+    TestEntry<HddsProtos.NodeOperationalState, Integer> nodeState =
+        new TestEntry<>(state, 0);
 
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        pair, pair, pair);
+        nodeState, nodeState, nodeState);
 
     ContainerCheckRequest checkRequest = requestBuilder
         .setContainerReplicas(replicas)
@@ -275,8 +276,8 @@ public class TestRatisReplicationCheckHandler {
   public void testUnderReplicatedDueToOutOfServiceFixedWithPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
-        Pair.of(DECOMMISSIONED, 0));
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(IN_SERVICE, 0),
+        new TestEntry<>(DECOMMISSIONED, 0));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
@@ -304,7 +305,7 @@ public class TestRatisReplicationCheckHandler {
   public void testUnderReplicatedDueToOutOfServiceAndMissing() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 0), Pair.of(DECOMMISSIONED, 0));
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(DECOMMISSIONED, 0));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
@@ -450,10 +451,10 @@ public class TestRatisReplicationCheckHandler {
   public void testOverReplicatedContainer() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
-        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
-        Pair.of(IN_SERVICE, 0),
-        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(IN_SERVICE, 0),
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(IN_SERVICE, 0),
+        new TestEntry<>(IN_SERVICE, 0),
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(IN_SERVICE, 0));
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
@@ -666,8 +667,8 @@ public class TestRatisReplicationCheckHandler {
   public void testOverReplicatedContainerFixedByPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
-        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(IN_SERVICE, 0),
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(IN_SERVICE, 0));
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
@@ -695,9 +696,9 @@ public class TestRatisReplicationCheckHandler {
   public void testOverReplicatedContainerWithMaintenance() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
-        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
-        Pair.of(IN_MAINTENANCE, 0), Pair.of(DECOMMISSIONED, 0));
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(IN_SERVICE, 0),
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(IN_SERVICE, 0),
+        new TestEntry<>(IN_MAINTENANCE, 0), new TestEntry<>(DECOMMISSIONED, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container);
@@ -718,9 +719,9 @@ public class TestRatisReplicationCheckHandler {
   public void testOverReplicatedContainerDueToMaintenanceIsHealthy() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
-        Pair.of(IN_SERVICE, 0), Pair.of(IN_MAINTENANCE, 0),
-        Pair.of(IN_MAINTENANCE, 0));
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(IN_SERVICE, 0),
+        new TestEntry<>(IN_SERVICE, 0), new TestEntry<>(IN_MAINTENANCE, 0),
+        new TestEntry<>(IN_MAINTENANCE, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container);

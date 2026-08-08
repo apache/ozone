@@ -29,12 +29,12 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -112,6 +112,53 @@ public class NodeDecommissionManager {
         throw new InvalidHostStringException(
             "Unable to parse the host string " + rawHostname, e);
       }
+    }
+  }
+
+  /**
+   * A datanode and the timestamp of its last heartbeat.
+   */
+  private static final class HeartbeatInfo {
+    private final DatanodeDetails datanodeDetails;
+    private final long lastHeartbeat;
+
+    private HeartbeatInfo(DatanodeDetails datanodeDetails, long lastHeartbeat) {
+      this.datanodeDetails = datanodeDetails;
+      this.lastHeartbeat = lastHeartbeat;
+    }
+
+    private DatanodeDetails getDatanodeDetails() {
+      return datanodeDetails;
+    }
+
+    private long getLastHeartbeat() {
+      return lastHeartbeat;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof HeartbeatInfo)) {
+        return false;
+      }
+      HeartbeatInfo that = (HeartbeatInfo) other;
+      return lastHeartbeat == that.lastHeartbeat
+          && Objects.equals(datanodeDetails, that.datanodeDetails);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(datanodeDetails, lastHeartbeat);
+    }
+
+    @Override
+    public String toString() {
+      return "HeartbeatInfo{"
+          + "datanodeDetails=" + datanodeDetails
+          + ", lastHeartbeat=" + lastHeartbeat
+          + '}';
     }
   }
 
@@ -230,18 +277,18 @@ public class NodeDecommissionManager {
     if (dns.size() < 2) {
       return dns.isEmpty() ? null : dns.get(0);
     }
-    List<Pair<DatanodeDetails, Long>> dnsWithHeartbeat = dns.stream()
-        .map(dn -> Pair.of(dn, nodeManager.getLastHeartbeat(dn)))
-        .sorted(Comparator.comparingLong(Pair::getRight))
+    List<HeartbeatInfo> dnsWithHeartbeat = dns.stream()
+        .map(dn -> new HeartbeatInfo(dn, nodeManager.getLastHeartbeat(dn)))
+        .sorted(Comparator.comparingLong(HeartbeatInfo::getLastHeartbeat))
         .collect(Collectors.toList());
     // The last element should have the largest (newest) heartbeat. But also
     // check it is not identical to the last but 1 element, as then we cannot
     // determine which node to decommission.
-    Pair<DatanodeDetails, Long> last = dnsWithHeartbeat.get(
+    HeartbeatInfo last = dnsWithHeartbeat.get(
         dnsWithHeartbeat.size() - 1);
-    if (last.getRight() > dnsWithHeartbeat.get(
-        dnsWithHeartbeat.size() - 2).getRight()) {
-      return last.getLeft();
+    if (last.getLastHeartbeat() > dnsWithHeartbeat.get(
+        dnsWithHeartbeat.size() - 2).getLastHeartbeat()) {
+      return last.getDatanodeDetails();
     }
     return null;
   }

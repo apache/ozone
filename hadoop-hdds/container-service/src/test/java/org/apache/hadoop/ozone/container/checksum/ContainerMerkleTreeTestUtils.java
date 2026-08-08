@@ -36,7 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -183,9 +182,9 @@ public final class ContainerMerkleTreeTestUtils {
   }
 
   /**
-   * Returns a Pair of merkle tree and the expected container diff for that merkle tree.
+   * Returns the merkle tree and expected diff for that tree.
    */
-  public static Pair<ContainerProtos.ContainerMerkleTree, ContainerDiffReport>
+  public static ContainerDiffResult
       buildTestTreeWithMismatches(ContainerMerkleTreeWriter originalTree, int numMissingBlocks, int numMissingChunks,
                                   int numCorruptChunks) {
 
@@ -196,7 +195,7 @@ public final class ContainerMerkleTreeTestUtils {
     introduceMissingChunks(treeBuilder, numMissingChunks, diff);
     introduceCorruptChunks(treeBuilder, numCorruptChunks, diff);
     ContainerProtos.ContainerMerkleTree build = treeBuilder.build();
-    return Pair.of(build, diff);
+    return new ContainerDiffResult(build, diff);
   }
 
   /**
@@ -420,5 +419,35 @@ public final class ContainerMerkleTreeTestUtils {
     blockData.addChunk(buildChunk(config, 1, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
     blockData.addChunk(buildChunk(config, 2, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
     return blockData;
+  }
+
+  /**
+   * Result of building a test merkle tree with mismatches.
+   */
+  public static final class ContainerDiffResult {
+    private final ContainerProtos.ContainerMerkleTree tree;
+    private final ContainerDiffReport diff;
+
+    private ContainerDiffResult(ContainerProtos.ContainerMerkleTree tree,
+        ContainerDiffReport diff) {
+      this.tree = tree;
+      this.diff = diff;
+    }
+
+    public ContainerProtos.ContainerMerkleTree getTree() {
+      return tree;
+    }
+
+    public ContainerDiffReport getDiff() {
+      return diff;
+    }
+
+    @Override
+    public String toString() {
+      return "ContainerDiffResult{"
+          + "tree=" + tree
+          + ", diff=" + diff
+          + '}';
+    }
   }
 }

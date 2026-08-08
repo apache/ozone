@@ -67,7 +67,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
@@ -1092,10 +1091,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     if (!shouldRun()) {
       return;
     }
-    Pair<Set<String>, List<byte[]>> fileNodeToKeyPair =
+    OlderFileNodes fileNodeToKeyPair =
         getOlderFileNodes();
-    Set<String> lastCompactionSstFiles = fileNodeToKeyPair.getLeft();
-    List<byte[]> keysToRemove = fileNodeToKeyPair.getRight();
+    Set<String> lastCompactionSstFiles = fileNodeToKeyPair.lastCompactionSstFiles;
+    List<byte[]> keysToRemove = fileNodeToKeyPair.keysToRemove;
 
     Set<String> sstFileNodesRemoved =
         pruneSstFileNodesFromDag(lastCompactionSstFiles);
@@ -1117,7 +1116,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Returns the list of input files from the compaction entries which are
    * older than the maximum allowed in the compaction DAG.
    */
-  private synchronized Pair<Set<String>, List<byte[]>> getOlderFileNodes() {
+  private synchronized OlderFileNodes getOlderFileNodes() {
     long compactionLogPruneStartTime = System.currentTimeMillis();
     Set<String> compactionNodes = new HashSet<>();
     List<byte[]> keysToRemove = new ArrayList<>();
@@ -1146,7 +1145,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       // TODO: Handle this properly before merging the PR.
       throw new RuntimeException(exception);
     }
-    return Pair.of(compactionNodes, keysToRemove);
+    return new OlderFileNodes(compactionNodes, keysToRemove);
   }
 
   private synchronized void removeKeyFromCompactionLogTable(
@@ -1364,16 +1363,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private void removeValueFromSSTFile(ManagedOptions options, String sstFilePath, File prunedFile) throws IOException {
     try (ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader(options, sstFilePath, SST_READ_AHEAD_SIZE);
-         ManagedRawSSTFileIterator<Pair<CodecBuffer, Integer>> itr = sstFileReader.newIterator(
-             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
+        ManagedRawSSTFileIterator<CodecBufferType> itr = sstFileReader.newIterator(
+             keyValue -> new CodecBufferType(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
          RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(prunedFile);
          CodecBuffer emptyCodecBuffer = CodecBuffer.getEmptyBuffer()) {
       while (itr.hasNext()) {
-        Pair<CodecBuffer, Integer> keyValue = itr.next();
-        if (keyValue.getValue() == 0) {
-          sstFileWriter.delete(keyValue.getKey());
+        CodecBufferType keyValue = itr.next();
+        if (keyValue.getType() == 0) {
+          sstFileWriter.delete(keyValue.getCodecBuffer());
         } else {
-          sstFileWriter.put(keyValue.getKey(), emptyCodecBuffer);
+          sstFileWriter.put(keyValue.getCodecBuffer(), emptyCodecBuffer);
         }
       }
     }
@@ -1462,5 +1461,66 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @VisibleForTesting
   public SSTFilePruningMetrics getPruningMetrics() {
     return sstFilePruningMetrics;
+  }
+
+  /**
+   * SST files that belong to the older compaction level and their keys.
+   */
+  private static final class OlderFileNodes {
+    private final Set<String> lastCompactionSstFiles;
+    private final List<byte[]> keysToRemove;
+
+    private OlderFileNodes(Set<String> lastCompactionSstFiles,
+                           List<byte[]> keysToRemove) {
+      this.lastCompactionSstFiles = lastCompactionSstFiles;
+      this.keysToRemove = keysToRemove;
+    }
+  }
+
+  /**
+   * A codec buffer paired with its encoded value type.
+   */
+  private static final class CodecBufferType {
+    private final CodecBuffer codecBuffer;
+    private final int type;
+
+    private CodecBufferType(CodecBuffer codecBuffer, int type) {
+      this.codecBuffer = codecBuffer;
+      this.type = type;
+    }
+
+    private CodecBuffer getCodecBuffer() {
+      return codecBuffer;
+    }
+
+    private int getType() {
+      return type;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof CodecBufferType)) {
+        return false;
+      }
+      CodecBufferType that = (CodecBufferType) other;
+      return type == that.type
+          && Objects.equals(codecBuffer, that.codecBuffer);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(codecBuffer, type);
+    }
+
+    @Override
+    public String toString() {
+      return "CodecBufferType{"
+          + "codecBuffer=" + codecBuffer
+          + ", type=" + type
+          + '}';
+    }
   }
 }

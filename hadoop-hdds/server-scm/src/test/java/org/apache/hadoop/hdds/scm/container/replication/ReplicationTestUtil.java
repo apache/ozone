@@ -33,7 +33,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -59,6 +58,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.TestEntry;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.mockito.stubbing.Answer;
 
@@ -72,18 +72,18 @@ public final class ReplicationTestUtil {
 
   @SafeVarargs
   public static Set<ContainerReplica> createReplicas(ContainerID containerID,
-      Pair<HddsProtos.NodeOperationalState, Integer>... nodes) {
+      TestEntry<HddsProtos.NodeOperationalState, Integer>... nodes) {
     return createReplicas(containerID, CLOSED, nodes);
   }
 
   @SafeVarargs
   public static Set<ContainerReplica> createReplicas(ContainerID containerID,
       ContainerReplicaProto.State replicaState,
-      Pair<HddsProtos.NodeOperationalState, Integer>... nodes) {
+      TestEntry<HddsProtos.NodeOperationalState, Integer>... nodes) {
     Set<ContainerReplica> replicas = new HashSet<>();
-    for (Pair<HddsProtos.NodeOperationalState, Integer> p : nodes) {
+    for (TestEntry<HddsProtos.NodeOperationalState, Integer> p : nodes) {
       replicas.add(createContainerReplica(
-          containerID, p.getRight(), p.getLeft(), replicaState));
+          containerID, p.getValue(), p.getKey(), replicaState));
     }
     return replicas;
   }
@@ -151,12 +151,12 @@ public final class ReplicationTestUtil {
 
   public static Set<ContainerReplica> createReplicasWithOriginAndOpState(
       ContainerID containerID, ContainerReplicaProto.State replicaState,
-      Pair<DatanodeID, HddsProtos.NodeOperationalState>... nodes) {
+      TestEntry<DatanodeID, HddsProtos.NodeOperationalState>... nodes) {
     Set<ContainerReplica> replicas = new HashSet<>();
-    for (Pair<DatanodeID, HddsProtos.NodeOperationalState> i : nodes) {
+    for (TestEntry<DatanodeID, HddsProtos.NodeOperationalState> i : nodes) {
       replicas.add(createContainerReplica(
-          containerID, 0, i.getRight(), replicaState, 123L, 1234L,
-          MockDatanodeDetails.randomDatanodeDetails(), i.getLeft()));
+          containerID, 0, i.getValue(), replicaState, 123L, 1234L,
+          MockDatanodeDetails.randomDatanodeDetails(), i.getKey()));
     }
     return replicas;
   }
@@ -291,7 +291,7 @@ public final class ReplicationTestUtil {
 
   @SafeVarargs
   public static Set<ContainerReplica> createReplicas(
-      Pair<HddsProtos.NodeOperationalState, Integer>... states) {
+      TestEntry<HddsProtos.NodeOperationalState, Integer>... states) {
     return createReplicas(CLOSED,
         states);
   }
@@ -299,11 +299,11 @@ public final class ReplicationTestUtil {
   @SafeVarargs
   public static Set<ContainerReplica> createReplicas(
       ContainerReplicaProto.State replicaState,
-      Pair<HddsProtos.NodeOperationalState, Integer>... states) {
+      TestEntry<HddsProtos.NodeOperationalState, Integer>... states) {
     Set<ContainerReplica> replica = new HashSet<>();
-    for (Pair<HddsProtos.NodeOperationalState, Integer> s : states) {
-      replica.add(createContainerReplica(ContainerID.valueOf(1), s.getRight(),
-          s.getLeft(), replicaState));
+    for (TestEntry<HddsProtos.NodeOperationalState, Integer> s : states) {
+      replica.add(createContainerReplica(ContainerID.valueOf(1), s.getValue(),
+          s.getKey(), replicaState));
     }
     return replica;
   }
@@ -447,7 +447,7 @@ public final class ReplicationTestUtil {
    *                        to false, instead of creating the replicate command.
    */
   public static void mockRMSendThrottleReplicateCommand(ReplicationManager mock,
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent,
+      Set<TestEntry<DatanodeDetails, SCMCommand<?>>> commandsSent,
       AtomicBoolean throwOverloaded)
       throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
@@ -461,7 +461,7 @@ public final class ReplicationTestUtil {
           .toTarget(containerInfo.getContainerID(),
               invocationOnMock.getArgument(2));
       command.setReplicaIndex(invocationOnMock.getArgument(3));
-      commandsSent.add(Pair.of(sources.get(0), command));
+      commandsSent.add(new TestEntry<>(sources.get(0), command));
       return null;
     }).when(mock).sendThrottledReplicationCommand(
         any(ContainerInfo.class), anyList(), any(DatanodeDetails.class), anyInt());
@@ -479,7 +479,7 @@ public final class ReplicationTestUtil {
    */
   public static void mockSendThrottledReconstructionCommand(
       ReplicationManager mock,
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent,
+      Set<TestEntry<DatanodeDetails, SCMCommand<?>>> commandsSent,
       AtomicBoolean throwOverloaded)
       throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
@@ -488,7 +488,7 @@ public final class ReplicationTestUtil {
         throw new CommandTargetOverloadedException("Overloaded");
       }
       ReconstructECContainersCommand cmd = invocationOnMock.getArgument(1);
-      commandsSent.add(Pair.of(cmd.getTargetDatanodes().get(0), cmd));
+      commandsSent.add(new TestEntry<>(cmd.getTargetDatanodes().get(0), cmd));
       return null;
     }).when(mock).sendThrottledReconstructionCommand(any(ContainerInfo.class), any());
   }
@@ -501,12 +501,12 @@ public final class ReplicationTestUtil {
    * @param commandsSent Set to add the command to rather than sending it.
    */
   public static void mockRMSendDatanodeCommand(ReplicationManager mock,
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      Set<TestEntry<DatanodeDetails, SCMCommand<?>>> commandsSent)
       throws NotLeaderException {
     doAnswer((Answer<Void>) invocationOnMock -> {
       DatanodeDetails target = invocationOnMock.getArgument(2);
       SCMCommand<?> command = invocationOnMock.getArgument(0);
-      commandsSent.add(Pair.of(target, command));
+      commandsSent.add(new TestEntry<>(target, command));
       return null;
     }).when(mock).sendDatanodeCommand(any(), any(), any());
   }
@@ -519,7 +519,7 @@ public final class ReplicationTestUtil {
    * @param commandsSent Set to add the command to rather than sending it.
    */
   public static void mockRMSendDeleteCommand(ReplicationManager mock,
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      Set<TestEntry<DatanodeDetails, SCMCommand<?>>> commandsSent)
       throws NotLeaderException {
     doAnswer((Answer<Void>) invocationOnMock -> {
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
@@ -529,7 +529,7 @@ public final class ReplicationTestUtil {
       DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
           containerInfo.getContainerID(), forceDelete);
       deleteCommand.setReplicaIndex(replicaIndex);
-      commandsSent.add(Pair.of(target, deleteCommand));
+      commandsSent.add(new TestEntry<>(target, deleteCommand));
       return null;
     }).when(mock).sendDeleteCommand(any(), anyInt(), any(), anyBoolean());
   }
@@ -542,7 +542,7 @@ public final class ReplicationTestUtil {
    * @param commandsSent Set to add the command to rather than sending it.
    */
   public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
-                                                      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+                                                      Set<TestEntry<DatanodeDetails, SCMCommand<?>>> commandsSent)
       throws NotLeaderException, CommandTargetOverloadedException {
     mockRMSendThrottledDeleteCommand(mock, commandsSent, new AtomicBoolean(false));
   }
@@ -558,7 +558,7 @@ public final class ReplicationTestUtil {
    *                        to false, instead of creating the replicate command.
    */
   public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent, AtomicBoolean throwOverloaded)
+      Set<TestEntry<DatanodeDetails, SCMCommand<?>>> commandsSent, AtomicBoolean throwOverloaded)
       throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
       if (throwOverloaded.get()) {
@@ -572,7 +572,7 @@ public final class ReplicationTestUtil {
       DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
           containerInfo.getContainerID(), forceDelete);
       deleteCommand.setReplicaIndex(replicaIndex);
-      commandsSent.add(Pair.of(target, deleteCommand));
+      commandsSent.add(new TestEntry<>(target, deleteCommand));
       return null;
     }).when(mock)
         .sendThrottledDeleteCommand(any(), anyInt(), any(), anyBoolean());

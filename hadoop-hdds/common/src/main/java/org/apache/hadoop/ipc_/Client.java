@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ipc_;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.security.AccessControlException;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
@@ -333,7 +332,7 @@ public class Client implements AutoCloseable {
     private IOException closeException; // close reason
 
     private final Thread rpcRequestThread;
-    private final SynchronousQueue<Pair<Call, ResponseBuffer>> rpcRequestQueue =
+    private final SynchronousQueue<RpcRequest> rpcRequestQueue =
         new SynchronousQueue<>(true);
 
     private AtomicReference<Thread> connectingThread = new AtomicReference<>();
@@ -1048,15 +1047,15 @@ public class Client implements AutoCloseable {
         while (!shouldCloseConnection.get()) {
           ResponseBuffer buf = null;
           try {
-            Pair<Call, ResponseBuffer> pair =
+            RpcRequest rpcRequest =
                 rpcRequestQueue.poll(maxIdleTime, TimeUnit.MILLISECONDS);
-            if (pair == null || shouldCloseConnection.get()) {
+            if (rpcRequest == null || shouldCloseConnection.get()) {
               continue;
             }
-            buf = pair.getRight();
+            buf = rpcRequest.buffer;
             synchronized (ipcStreams.out) {
               if (LOG.isDebugEnabled()) {
-                Call call = pair.getLeft();
+                Call call = rpcRequest.call;
                 LOG.debug(getName() + "{} sending #{} {}", getName(), call.id,
                     call.rpcRequest);
               }
@@ -1115,9 +1114,22 @@ public class Client implements AutoCloseable {
       // prevent a race condition between checking the shouldCloseConnection
       // and the stopping of the polling thread
       while (!shouldCloseConnection.get()) {
-        if (rpcRequestQueue.offer(Pair.of(call, buf), 1, TimeUnit.SECONDS)) {
+        if (rpcRequestQueue.offer(new RpcRequest(call, buf), 1, TimeUnit.SECONDS)) {
           break;
         }
+      }
+    }
+
+    /**
+     * A queued RPC call and its response buffer.
+     */
+    private final class RpcRequest {
+      private final Call call;
+      private final ResponseBuffer buffer;
+
+      private RpcRequest(Call call, ResponseBuffer buffer) {
+        this.call = call;
+        this.buffer = buffer;
       }
     }
 
@@ -1552,7 +1564,6 @@ public class Client implements AutoCloseable {
 
       this.address = address;
     }
-
 
     Class<?> getProtocol() {
       return protocol;

@@ -23,11 +23,11 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.SafeModeRuleStatus;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
@@ -165,7 +165,8 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
       }
 
       if (isVerbose()) {
-        Map<String, Pair<Boolean, String>> rules = scmClient.getSafeModeRuleStatuses();
+        Map<String, SafeModeRuleStatus> rules =
+            scmClient.getSafeModeRuleStatuses();
         if (rules != null && !rules.isEmpty()) {
           printSafeModeRules(rules);
         }
@@ -209,11 +210,11 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     }
   }
   
-  private void printSafeModeRules(Map<String, Pair<Boolean, String>> rules) {
-    for (Map.Entry<String, Pair<Boolean, String>> entry : rules.entrySet()) {
-      Pair<Boolean, String> value = entry.getValue();
+  private void printSafeModeRules(Map<String, SafeModeRuleStatus> rules) {
+    for (Map.Entry<String, SafeModeRuleStatus> entry : rules.entrySet()) {
+      SafeModeRuleStatus value = entry.getValue();
       System.out.printf("validated:%s, %s, %s%n",
-          value.getLeft(), entry.getKey(), value.getRight());
+          value.isValidated(), entry.getKey(), value.getStatusText());
     }
   }
 }

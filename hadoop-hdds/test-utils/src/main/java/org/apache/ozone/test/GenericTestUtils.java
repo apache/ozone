@@ -43,7 +43,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CharSequenceInputStream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -221,8 +220,8 @@ public abstract class GenericTestUtils {
 
   public static <K, V> Map<V, K> getReverseMap(Map<K, List<V>> map) {
     return map.entrySet().stream().flatMap(entry -> entry.getValue().stream()
-            .map(v -> Pair.of(v, entry.getKey())))
-            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+            .map(v -> new TestEntry<>(v, entry.getKey())))
+            .collect(Collectors.toMap(TestEntry::getKey, TestEntry::getValue));
   }
 
   /**

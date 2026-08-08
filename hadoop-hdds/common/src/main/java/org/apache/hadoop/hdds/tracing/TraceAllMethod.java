@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * A Java proxy invocation handler to trace all the methods of the delegate
@@ -38,7 +37,7 @@ public class TraceAllMethod<T> implements InvocationHandler {
   /**
    * Cache for all the method objects of the delegate class.
    */
-  private final Map<String, Map<Class<?>[], Pair<Boolean, Method>>> methods = new HashMap<>();
+  private final Map<String, Map<Class<?>[], DelegatedMethodInfo>> methods = new HashMap<>();
   private final T delegate;
 
   private final String name;
@@ -52,19 +51,19 @@ public class TraceAllMethod<T> implements InvocationHandler {
       }
       boolean shouldSkip = method.isAnnotationPresent(SkipTracing.class);
       methods.computeIfAbsent(method.getName(), any -> new HashMap<>())
-          .put(method.getParameterTypes(), Pair.of(shouldSkip, method));
+          .put(method.getParameterTypes(), new DelegatedMethodInfo(shouldSkip, method));
     }
   }
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args)
       throws Throwable {
-    Pair<Boolean, Method> methodInfo = findDelegatedMethod(method);
+    DelegatedMethodInfo methodInfo = findDelegatedMethod(method);
     if (methodInfo == null) {
       throw new NoSuchMethodException("Method not found: " + method.getName());
     }
-    boolean shouldSkip = methodInfo.getLeft();
-    Method delegateMethod = methodInfo.getRight();
+    boolean shouldSkip = methodInfo.shouldSkip;
+    Method delegateMethod = methodInfo.delegateMethod;
     if (shouldSkip) {
       try {
         return delegateMethod.invoke(delegate, args);
@@ -90,13 +89,26 @@ public class TraceAllMethod<T> implements InvocationHandler {
     }
   }
 
-  private Pair<Boolean, Method> findDelegatedMethod(Method method) {
-    for (Entry<Class<?>[], Pair<Boolean, Method>> entry : methods.getOrDefault(
+  private DelegatedMethodInfo findDelegatedMethod(Method method) {
+    for (Entry<Class<?>[], DelegatedMethodInfo> entry : methods.getOrDefault(
         method.getName(), emptyMap()).entrySet()) {
       if (Arrays.equals(entry.getKey(), method.getParameterTypes())) {
         return entry.getValue();
       }
     }
     return null;
+  }
+
+  /**
+   * Whether a method should be skipped and the delegate method to invoke.
+   */
+  private static final class DelegatedMethodInfo {
+    private final boolean shouldSkip;
+    private final Method delegateMethod;
+
+    private DelegatedMethodInfo(boolean shouldSkip, Method delegateMethod) {
+      this.shouldSkip = shouldSkip;
+      this.delegateMethod = delegateMethod;
+    }
   }
 }

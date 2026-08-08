@@ -44,7 +44,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -70,6 +69,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.MockClock;
+import org.apache.ozone.test.TestEntry;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -101,7 +101,7 @@ public class TestReplicationManagerScenarios {
   private Map<ContainerID, Set<ContainerReplica>> containerReplicaMap;
   private Set<ContainerInfo> containerInfoSet;
   private ContainerReplicaPendingOps containerReplicaPendingOps;
-  private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
+  private Set<TestEntry<DatanodeID, SCMCommand<?>>> commandsSent;
 
   private OzoneConfiguration configuration;
   private ContainerManager containerManager;
@@ -178,7 +178,7 @@ public class TestReplicationManagerScenarios {
     commandsSent = new HashSet<>();
     eventPublisher = mock(EventPublisher.class);
     doAnswer(invocation -> {
-      commandsSent.add(Pair.of(invocation.getArgument(0),
+      commandsSent.add(new TestEntry<>(invocation.getArgument(0),
           invocation.getArgument(1)));
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
@@ -332,8 +332,8 @@ public class TestReplicationManagerScenarios {
     // datanodes.
     for (ExpectedCommands expectedCommand : expectedCommands) {
       boolean found = false;
-      for (Pair<DatanodeID, SCMCommand<?>> command : commandsSent) {
-        if (command.getRight().getType() == expectedCommand.getType()) {
+      for (TestEntry<DatanodeID, SCMCommand<?>> command : commandsSent) {
+        if (command.getValue().getType() == expectedCommand.getType()) {
           if (expectedCommand.hasExpectedDatanode()) {
             // We need to assert against the command the datanode is sent to
             DatanodeDetails commandDatanode = findDatanode(command.getKey());
