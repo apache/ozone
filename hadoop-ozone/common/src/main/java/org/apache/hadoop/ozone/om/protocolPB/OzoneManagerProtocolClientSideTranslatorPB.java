@@ -763,15 +763,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
 
     req.setKeyArgs(keyArgs.build());
+    req.setDerivedKeyPiggyBacking(args.isDerivedKeyPiggyBacking());
 
     OMRequest omRequest = createOMRequest(Type.CreateKey)
         .setCreateKeyRequest(req)
         .build();
 
     CreateKeyResponse keyResponse = handleSubmitRequestAndSCMSafeModeRetry(omRequest).getCreateKeyResponse();
-    return new OpenKeySession(keyResponse.getID(),
+    OpenKeySession openKeySession = new OpenKeySession(keyResponse.getID(),
         OmKeyInfo.getFromProtobuf(keyResponse.getKeyInfo()),
         keyResponse.getOpenVersion());
+    if (keyResponse.hasDerivedKey()) {
+      openKeySession.setDerivedKey(keyResponse.getDerivedKey().asReadOnlyByteBuffer());
+    }
+    return openKeySession;
   }
 
   private OMResponse handleError(OMResponse resp) throws OMException {
