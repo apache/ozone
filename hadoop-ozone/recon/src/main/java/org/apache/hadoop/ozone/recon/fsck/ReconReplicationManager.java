@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.fsck;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -359,11 +358,10 @@ public class ReconReplicationManager extends ReplicationManager {
     for (int from = 0; from < allContainers.size(); from += PERSIST_CHUNK_SIZE) {
       int to = Math.min(from + PERSIST_CHUNK_SIZE, allContainers.size());
       List<Long> chunkContainerIds = collectContainerIds(allContainers, from, to);
-      Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState =
-          healthSchemaManager.getExistingInStateSinceByContainerIds(chunkContainerIds);
+      Map<ContainerStateKey, ContainerHealthSchemaManager.UnhealthyContainerRecord>
+          existingInStateSinceByContainerAndState =
+          healthSchemaManager.getExistingUnhealthyRecordsByContainerIds(chunkContainerIds);
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert = new ArrayList<>();
-      List<Long> existingContainerIdsToDelete =
-          collectExistingContainerIds(existingInStateSinceByContainerAndState);
       ProcessingStats chunkStats = new ProcessingStats();
       Set<Long> negativeSizeRecorded = new HashSet<>();
 
@@ -415,9 +413,9 @@ public class ReconReplicationManager extends ReplicationManager {
       }
 
       recordsToInsert = healthSchemaManager.applyExistingInStateSince(
-          recordsToInsert, chunkContainerIds);
+          recordsToInsert, existingInStateSinceByContainerAndState);
       totalStats.add(chunkStats);
-      persistUnhealthyRecords(existingContainerIdsToDelete, recordsToInsert);
+      persistUnhealthyRecords(existingInStateSinceByContainerAndState, recordsToInsert);
     }
 
     LOG.info("Stored {} MISSING, {} EMPTY_MISSING, {} UNDER_REPLICATED, " +
@@ -496,12 +494,12 @@ public class ReconReplicationManager extends ReplicationManager {
   }
 
   private void persistUnhealthyRecords(
-      List<Long> containerIdsToDelete,
-      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert) {
-    LOG.info("Replacing unhealthy container records atomically: deleteRowsFor={} containers, insert={}",
-        containerIdsToDelete.size(), recordsToInsert.size());
-    healthSchemaManager.replaceUnhealthyContainerRecordsAtomically(
-        containerIdsToDelete, recordsToInsert);
+      Map<ContainerStateKey, ContainerHealthSchemaManager.UnhealthyContainerRecord> existingByKey,
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToSync) {
+    LOG.info("Syncing unhealthy container records: existing={}, desired={}",
+        existingByKey.size(), recordsToSync.size());
+    healthSchemaManager.syncUnhealthyContainerRecordsAtomically(
+        existingByKey, recordsToSync);
   }
 
   private boolean isEmptyMissing(ContainerInfo container) {
@@ -575,17 +573,6 @@ public class ReconReplicationManager extends ReplicationManager {
     default:
       return false;
     }
-  }
-
-  private List<Long> collectExistingContainerIds(
-      Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState) {
-    if (existingInStateSinceByContainerAndState.isEmpty()) {
-      return Collections.emptyList();
-    }
-    Set<Long> existingContainerIds = new HashSet<>();
-    existingInStateSinceByContainerAndState.keySet()
-        .forEach(key -> existingContainerIds.add(key.getContainerId()));
-    return new ArrayList<>(existingContainerIds);
   }
 
   private static final class ProcessingStats {
