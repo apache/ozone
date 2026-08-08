@@ -444,6 +444,25 @@ function check_needs_pmd() {
 
     start_end::group_end
 }
+function check_needs_infer() {
+    start_end::group_start "Check if infer is needed"
+    local pattern_array=(
+        "^.inferconfig$"
+        "^hadoop-ozone/dev-support/checks/infer.sh$"
+        "^hadoop-ozone/dev-support/checks/install/infer.sh$"
+        "^.github/workflows/infer.yml$"
+        "pom.xml$"
+        "src/..../java$"
+    )
+    filter_changed_files
+
+    if [[ ${match_count} != "0" ]]; then
+        add_basic_check infer
+    fi
+
+    start_end::group_end
+}
+
 
 # Counts other files which do not need to trigger any functional test
 # (i.e. no compose/integration/kubernetes)
@@ -462,6 +481,7 @@ function get_count_misc_files() {
         "\.bats$"
         "\.txt$"
         "\.md$"
+        ".inferconfig$"
         "findbugsExcludeFile.xml"
         "pmd-ruleset.xml"
         "/NOTICE$"
@@ -582,5 +602,6 @@ check_needs_checkstyle
 check_needs_docs
 check_needs_findbugs
 check_needs_pmd
+check_needs_infer
 calculate_test_types_to_run
 set_outputs

@@ -1,0 +1,70 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: infer
+
+on:
+  push:
+    branches:
+      - master
+      - 'HDDS-*'
+      - 'HDDS/**'
+    paths:
+      - '**/pom.xml'
+      - '**/src/main/java/**'
+      - '.inferconfig'
+      - 'hadoop-ozone/dev-support/checks/infer.sh'
+      - 'hadoop-ozone/dev-support/checks/install/infer.sh'
+      - '.github/workflows/infer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  infer:
+    name: infer
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 60
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Setup java 25
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+      - name: Run Infer analysis
+        run: hadoop-ozone/dev-support/checks/infer.sh
+      - name: Upload Infer report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: infer-report
+          path: |
+            target/infer/report.txt
+            target/infer/output.log
+            target/infer/summary.txt
+            target/infer/failures
+        continue-on-error: true
+      - name: Summary of failures
+        if: ${{ failure() }}
+        run: |
+          if [[ -s "target/infer/summary.md" ]]; then
+            cat target/infer/summary.md >> $GITHUB_STEP_SUMMARY
+          fi
+          hadoop-ozone/dev-support/checks/_summary.sh target/infer/summary.txt

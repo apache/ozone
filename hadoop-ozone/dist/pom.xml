@@ -208,6 +208,7 @@
             <configuration>
               <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib</outputDirectory>
               <includeScope>runtime</includeScope>
+              <excludeArtifactIds>infer-annotation</excludeArtifactIds>
             </configuration>
           </execution>
         </executions>

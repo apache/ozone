@@ -2312,6 +2312,7 @@
               <outputDirectory>${project.build.directory}/share/ozone/lib</outputDirectory>
               <includeScope>runtime</includeScope>
               <skip>${classpath.skip}</skip>
+              <excludeArtifactIds>infer-annotation</excludeArtifactIds>
             </configuration>
           </execution>
         </executions>
