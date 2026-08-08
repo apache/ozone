@@ -2205,9 +2205,8 @@ public class KeyManagerImpl implements KeyManager {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
     if (refreshPipelineInfo) {
-      // refreshPipeline flag check has been removed as part of
-      // https://issues.apache.org/jira/browse/HDDS-3658.
-      // Please refer this jira for more details.
+      // listStatusLight callers set this flag to false so that lightweight
+      // listings remain metadata-only and avoid SCM-backed pipeline refresh.
       refreshPipelineFromCache(keyInfoList);
     }
 
