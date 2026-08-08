@@ -113,6 +113,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   private OzoneConfiguration conf;
   private final SCMConfigurator scmConfigurator;
+  // Whether to assert no metrics sources leak on shutdown.  Tests running
+  // multiple clusters concurrently disable this via the builder.
+  private boolean metricsLeakAssertEnabled = true;
   private StorageContainerManager scm;
   private OzoneManager ozoneManager;
   private final List<HddsDatanodeService> hddsDatanodes;
@@ -163,6 +166,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   protected void setConf(OzoneConfiguration newConf) {
     this.conf = newConf;
+  }
+
+  void setMetricsLeakAssertEnabled(boolean enabled) {
+    this.metricsLeakAssertEnabled = enabled;
   }
 
   public void waitForSCMToBeReady() throws TimeoutException,
@@ -390,8 +397,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       stop();
       FileUtils.deleteDirectory(baseDir);
       ContainerCache.getInstance(conf).shutdownCache();
-      DefaultMetricsSystem.shutdown();
+      // RocksDB object leaks are often the root cause; check them first.
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
+      // Assert before tearing down the metrics system: Hadoop does not clear
+      // allSources on shutdown, but checking before shutdown makes the
+      // assertion independent of that behavior.  Tests running multiple
+      // clusters concurrently disable this because the registry is JVM-wide.
+      if (metricsLeakAssertEnabled) {
+        MetricsLeakAssertion.assertNoLeaks();
+      }
+      DefaultMetricsSystem.shutdown();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
     }
@@ -526,6 +541,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
             scmConfigurator, om, scm,
             hddsDatanodes, getServices());
+        cluster.setMetricsLeakAssertEnabled(metricsLeakAssertEnabled);
         cluster.startServices();
 
         cluster.setCAClient(certClient);
@@ -617,6 +633,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
           numOfDatanodes >= 3 ? 3 : 1);
+      // Enable metrics percentile collection so that the quantile code paths
+      // are exercised by every integration test.
+      conf.setIfUnset(OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY, "60,300");
+      conf.setIfUnset(OzoneConfigKeys.OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY, "60,300");
+      conf.setIfUnset(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY, "60,300");
+      conf.setIfUnset(HddsConfigKeys.OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY, "60,300");
 
       configureHostAndRackTopology();
     }
