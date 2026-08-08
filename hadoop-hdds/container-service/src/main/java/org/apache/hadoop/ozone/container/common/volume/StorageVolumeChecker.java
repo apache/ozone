@@ -106,8 +106,13 @@ public class StorageVolumeChecker {
    */
   public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
       String threadNamePrefix) {
+    this(conf, timer, threadNamePrefix, null);
+  }
 
-    metrics = BackgroundVolumeScannerMetrics.create();
+  public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
+      String threadNamePrefix, String metricsSourceComponent) {
+
+    metrics = BackgroundVolumeScannerMetrics.create(metricsSourceComponent);
 
     this.timer = timer;
 
