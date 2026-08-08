@@ -18,7 +18,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { AxiosPostHelper } from '@/utils/axiosRequestHelper';
-import { ChatMessage, ChatbotChatRequest, ChatbotChatResponse, ChatbotErrorResponse } from '@/v2/types/chatbot.types';
+import { ChatMessage, ChatbotChatRequest, ChatbotChatResponse, ChatbotErrorResponse, ChatbotHistoryTurn } from '@/v2/types/chatbot.types';
 import {
   CHATBOT_ENDPOINTS,
   DEFAULT_MODEL_SENTINEL,
@@ -49,7 +49,12 @@ export const useChat = () => {
   const controllerRef = useRef<AbortController | undefined>();
   const timerRef = useRef<NodeJS.Timeout | undefined>();
 
+  // Mirror of `messages` so sendMessage (whose deps intentionally exclude
+  // `messages`) can read the current conversation without becoming stale.
+  const messagesRef = useRef<ChatMessage[]>(messages);
+
   useEffect(() => {
+    messagesRef.current = messages;
     sessionStorage.setItem('recon_ai_messages', JSON.stringify(messages));
   }, [messages]);
 
@@ -118,6 +123,18 @@ export const useChat = () => {
     const requestBody: ChatbotChatRequest = {
       query: query.trim()
     };
+
+    // Attach the prior turns (from before this question) as conversation history
+    // so the server can resolve references like "that bucket" / "show me more".
+    // Read from the ref to avoid a stale closure; the current question is sent
+    // separately as `query`, not duplicated here. The server trims/validates it.
+    const history: ChatbotHistoryTurn[] = messagesRef.current.map(msg => ({
+      role: msg.role,
+      content: msg.text
+    }));
+    if (history.length > 0) {
+      requestBody.history = history;
+    }
 
     if (provider && provider !== DEFAULT_MODEL_SENTINEL) {
       requestBody.provider = provider;
