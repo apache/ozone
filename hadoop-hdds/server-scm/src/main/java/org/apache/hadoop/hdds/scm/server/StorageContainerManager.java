@@ -90,6 +90,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
+import org.apache.hadoop.hdds.scm.container.export.ContainerExportManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
@@ -282,6 +283,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private ReplicationManager replicationManager;
 
+  private final ContainerExportManager containerExportManager;
+
   private SCMSafeModeManager scmSafeModeManager;
   private SCMCertificateClient scmCertificateClient;
   private RootCARotationManager rootCARotationManager;
@@ -435,6 +438,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
     initializeSystemManagers(conf, configurator);
+
+    containerExportManager = new ContainerExportManager(
+        containerManager, this::checkLeader, conf, getScmId());
+    containerExportManager.start();
 
     if (isSecretKeyEnable(securityConfig)) {
       secretKeyManagerService = new SecretKeyManagerService(scmContext, conf,
@@ -1679,6 +1686,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     stopReplicationManager();
 
+    containerExportManager.shutdown();
+
     try {
       LOG.info("Stopping the Datanode Admin Monitor.");
       scmDecommissionManager.stop();
@@ -1928,6 +1937,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public ReplicationManager getReplicationManager() {
     return replicationManager;
+  }
+
+  public ContainerExportManager getContainerExportManager() {
+    return containerExportManager;
   }
 
   public PlacementPolicy getContainerPlacementPolicy() {

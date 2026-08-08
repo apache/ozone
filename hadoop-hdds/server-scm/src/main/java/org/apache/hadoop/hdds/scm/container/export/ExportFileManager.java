@@ -17,21 +17,34 @@
 
 package org.apache.hadoop.hdds.scm.container.export;
 
+import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.EXPORT_SUBDIR;
+
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.zip.GZIPOutputStream;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.ozone.util.UUIDUtil;
 import org.apache.ratis.util.AtomicFileOutputStream;
 import org.slf4j.Logger;
@@ -61,14 +74,15 @@ import org.slf4j.LoggerFactory;
  * </pre>
  *
  * <p><b>Incomplete work</b> ({@code export_{jobId}/} and {@code .tar.gz.tmp}) is removed by
- * {@link #cleanupFailedJob(Path, File)} on failure or cancel, and by {@link #start()} for every
+ * {@link #cleanupFailedJob(ExportJob.Id, String)} on failure or cancel, and by {@link #start()} for every
  * leftover directory and temp file after SCM restart. Completed {@code .tar.gz} files are kept.
  *
  * <p><b>Completed {@code .tar.gz}</b> remains on disk until the export manager evicts it
  * ({@code maxTerminalJobs} in {@code ContainerExportManager}) via {@link #deleteExportTar(String)}.
  *
- * <p><b>SCM restart:</b> in-memory job status is lost. {@link #start()} clears incomplete work;
- * {@link #listCompletedArchivePaths()} returns existing {@code tarPath} values (oldest first);
+ * <p><b>SCM restart:</b> in-memory job status is lost. {@link #start()} acquires the export
+ * directory lock and clears incomplete work.
+ * {@link #listCompletedArchivePaths()} returns existing {@code tarPath} values (oldest first).
  * {@link #jobIdFromArchiveFileName(String)} parses {@code jobId} for terminal-job rebuild in
  * {@code ContainerExportManager}.
  */
@@ -82,6 +96,8 @@ final class ExportFileManager {
   static final String EXPORT_ARCHIVE_TMP_SUFFIX = EXPORT_ARCHIVE_SUFFIX + AtomicFileOutputStream.TMP_EXTENSION;
   static final String EXPORT_LOCK_NAME = "in_use.lock";
   private static final int ARCHIVE_TIMESTAMP_LENGTH = 16;
+  private static final DateTimeFormatter ARCHIVE_TIMESTAMP_FORMAT =
+      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
 
   private final String exportDirectory;
   private FileLock exportDirectoryLock;
@@ -90,12 +106,18 @@ final class ExportFileManager {
     this.exportDirectory = Objects.requireNonNull(exportDirectory, "exportDirectory == null");
   }
 
+  static String resolveExportDirectory(OzoneConfiguration conf) {
+    File scmDbDir = ServerUtils.getScmDbDir(conf);
+    return new File(scmDbDir, EXPORT_SUBDIR).getAbsolutePath();
+  }
+
   String getExportDirectory() {
     return exportDirectory;
   }
 
   void start() throws IOException {
     Files.createDirectories(Paths.get(exportDirectory));
+    lock();
     removeIncompleteWorkOnStartup();
   }
 
@@ -128,6 +150,10 @@ final class ExportFileManager {
     exportDirectoryLock = null;
   }
 
+  String resolveArchivePath(ExportScope scope, Instant submissionTime, ExportJob.Id jobId) {
+    return resolveArchiveFile(scope, ARCHIVE_TIMESTAMP_FORMAT.format(submissionTime), jobId).getAbsolutePath();
+  }
+
   File resolveArchiveFile(ExportScope scope, String archiveTimestamp, ExportJob.Id jobId) {
     return new File(exportDirectory, String.format("container-ids_%s_%s%s%s%s",
         scope.getValue(), archiveTimestamp, EXPORT_ARCHIVE_JOB_INFIX, jobId.getValue(), EXPORT_ARCHIVE_SUFFIX));
@@ -135,6 +161,46 @@ final class ExportFileManager {
 
   File resolveArchiveTempFile(ExportScope scope, String archiveTimestamp, ExportJob.Id jobId) {
     return AtomicFileOutputStream.getTemporaryFile(resolveArchiveFile(scope, archiveTimestamp, jobId));
+  }
+
+  void createJobDirectory(ExportJob.Id jobId) throws IOException {
+    Files.createDirectories(jobDirectory(jobId));
+  }
+
+  BufferedWriter newShardWriter(ExportJob.Id jobId, String shardFileName) throws IOException {
+    return Files.newBufferedWriter(jobDirectory(jobId).resolve(shardFileName), StandardCharsets.UTF_8);
+  }
+
+  void writeArchive(ExportJob.Id jobId, String archivePath) throws IOException {
+    Path jobDir = jobDirectory(jobId);
+    File[] shards = jobDir.toFile().listFiles((dir, name) -> name.endsWith(".txt"));
+    if (shards == null || shards.length == 0) {
+      throw new IOException("No shard files found for export job " + jobId);
+    }
+    Arrays.sort(shards, Comparator.comparing(File::getName));
+    File archiveFile = new File(archivePath);
+    try (AtomicFileOutputStream atomicOut = new AtomicFileOutputStream(archiveFile);
+         GZIPOutputStream gzipOut = new GZIPOutputStream(atomicOut);
+         ArchiveOutputStream<TarArchiveEntry> tarOut = Archiver.tar(gzipOut)) {
+      for (File shard : shards) {
+        Archiver.includeFile(shard, shard.getName(), tarOut);
+      }
+    }
+  }
+
+  void deleteJobDirectory(ExportJob.Id jobId) throws IOException {
+    Path jobDir = jobDirectory(jobId);
+    if (Files.exists(jobDir)) {
+      FileUtils.deleteDirectory(jobDir.toFile());
+    }
+  }
+
+  long getArchiveLength(String archivePath) {
+    if (archivePath == null) {
+      return 0L;
+    }
+    File archive = new File(archivePath);
+    return archive.isFile() ? archive.length() : 0L;
   }
 
   /**
@@ -190,13 +256,17 @@ final class ExportFileManager {
     FileUtils.deleteQuietly(AtomicFileOutputStream.getTemporaryFile(archive));
   }
 
-  void cleanupFailedJob(Path jobDir, File archiveFile) {
-    if (jobDir != null) {
-      FileUtils.deleteQuietly(jobDir.toFile());
+  void cleanupFailedJob(ExportJob.Id jobId, String archivePath) {
+    FileUtils.deleteQuietly(jobDirectory(jobId).toFile());
+    if (archivePath != null) {
+      File archive = new File(archivePath);
+      FileUtils.deleteQuietly(archive);
+      FileUtils.deleteQuietly(AtomicFileOutputStream.getTemporaryFile(archive));
     }
-    if (archiveFile != null) {
-      FileUtils.deleteQuietly(AtomicFileOutputStream.getTemporaryFile(archiveFile));
-    }
+  }
+
+  private Path jobDirectory(ExportJob.Id jobId) {
+    return Paths.get(exportDirectory, exportJobDirName(jobId));
   }
 
   private void removeIncompleteWorkOnStartup() {
