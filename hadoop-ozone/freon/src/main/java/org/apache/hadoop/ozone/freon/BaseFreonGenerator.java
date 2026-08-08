@@ -82,7 +82,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
 
   private static final int CHECK_INTERVAL_MILLIS = 100;
 
-  private static final String DIGEST_ALGORITHM = "MD5";
+  static final String DIGEST_ALGORITHM = "MD5";
 
   private static final Pattern ENV_VARIABLE_IN_PATTERN =
       Pattern.compile("__(.+?)__");
