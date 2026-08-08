@@ -107,6 +107,7 @@ public class ContainerBalancerTask implements Runnable {
 
   private Set<DatanodeDetails> selectedTargets;
   private Set<DatanodeDetails> selectedSources;
+  private final Set<ContainerID> excludeContainersNotFound = new HashSet<>();
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
   private Map<ContainerMoveSelection, CompletableFuture<MoveManager.MoveResult>>
@@ -632,7 +633,7 @@ public class ContainerBalancerTask implements Runnable {
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
         nodeManager, replicationManager, containerManager, findSourceStrategy,
-        containerToSourceMap);
+        containerToSourceMap, excludeContainersNotFound);
     return true;
   }
 
@@ -737,8 +738,8 @@ public class ContainerBalancerTask implements Runnable {
           "starting a container move", containerID, e);
       // add source back to queue as a different container can be selected in next run.
       findSourceStrategy.addBackSourceDataNode(source);
-      // exclude the container which caused failure of move to avoid error in next run.
-      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
+      // exclude the permanently missing container across balancer iterations.
+      selectionCriteria.addToExcludeNotFoundContainers(moveSelection.getContainerID());
       return false;
     }
     LOG.info("ContainerBalancer is trying to move container {} with size " +
@@ -1029,8 +1030,8 @@ public class ContainerBalancerTask implements Runnable {
           containerID, e);
       // add source back to queue as a different container can be selected in next run.
       findSourceStrategy.addBackSourceDataNode(source);
-      // exclude the container which caused failure of move to avoid error in next run.
-      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
+      // exclude the permanently missing container across balancer iterations.
+      selectionCriteria.addToExcludeNotFoundContainers(moveSelection.getContainerID());
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     } catch (NodeNotFoundException e) {
