@@ -2552,6 +2552,44 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       }
     }
 
+    /**
+     * upload via presigned PUT URL while sending an unsigned x-amz-acl header.
+     */
+    @Test
+    public void testPresignedUrlPutObjectWithUnsignedXAmzAcl() throws Exception {
+      final String keyName = getKeyName();
+
+      GeneratePresignedUrlRequest generatePresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName)
+              .withMethod(HttpMethod.PUT)
+              .withExpiration(expiration);
+      URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+      Map<String, List<String>> headers = new HashMap<>();
+      headers.put("content-type", Collections.singletonList("application/octet-stream"));
+      headers.put("x-amz-acl", Collections.singletonList("public-read"));
+
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "PUT",
+            headers, CONTENT.getBytes(StandardCharsets.UTF_8));
+        assertEquals(200, connection.getResponseCode(),
+            "Presigned PUT with unsigned x-amz-acl should return 200 OK");
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
+
+      assertTrue(s3Client.doesObjectExist(BUCKET_NAME, keyName),
+          "Object uploaded via presigned PUT should exist");
+      S3Object s3Object = s3Client.getObject(BUCKET_NAME, keyName);
+      try (S3ObjectInputStream inputStream = s3Object.getObjectContent()) {
+        assertEquals(CONTENT, IOUtils.toString(inputStream, StandardCharsets.UTF_8),
+            "Downloaded content should match uploaded content");
+      }
+    }
+
     @Test
     public void testPresignedUrlPutSingleChunkWithWrongSha256() throws Exception {
       final String keyName = getKeyName();

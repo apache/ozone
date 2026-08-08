@@ -358,12 +358,20 @@ public final class StringToSignProducer {
   private static void validateCanonicalHeaders(
       String canonicalHeaders,
       Map<String, String> headers,
-      Boolean unsignedPaylod
+      boolean unsignedPayload
   ) throws OS3Exception {
     if (!canonicalHeaders.contains(HOST + ":")) {
       LOG.error("The SignedHeaders list must include HTTP Host header");
       throw newError(S3_AUTHINFO_CREATION_ERROR);
     }
+    // For presigned (query-string) authentication, only the explicitly listed
+    // SignedHeaders need to appear in the canonical request.  Any x-amz-*
+    // headers the HTTP client adds to the request do NOT need to be signed.
+    // Enforce the x-amz-* check only for header-based (Authorization header) auth.
+    if (unsignedPayload) {
+      return;
+    }
+
     for (String header : headers.keySet().stream()
         .filter(s -> s.startsWith("x-amz-"))
         .collect(Collectors.toSet())) {
