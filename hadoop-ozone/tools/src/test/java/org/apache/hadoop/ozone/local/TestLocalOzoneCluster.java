@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.local;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY;
@@ -42,10 +43,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Properties;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -143,6 +148,27 @@ class TestLocalOzoneCluster {
       assertSame(first, second);
       assertEquals(first.getScmPort(), second.getScmPort());
       assertEquals(first.getOmPort(), second.getOmPort());
+    }
+  }
+
+  @Test
+  void retryAfterFailedPrepareDoesNotRepeatDiscardedKeys() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_REPLICATION, ReplicationFactor.THREE.name());
+    // Duplicate ports fail in configureOm(), after configureLocalDefaults() has recorded the
+    // override, so the second attempt re-runs the recording.
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            tempDir.resolve("local-ozone"))
+        .setScmPort(9860)
+        .setOmPort(9860)
+        .build();
+
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, seed)) {
+      assertThrows(IOException.class, cluster::prepareConfiguration);
+      assertThrows(IOException.class, cluster::prepareConfiguration);
+
+      assertEquals(singletonList(OZONE_REPLICATION),
+          cluster.getDiscardedUserConfigKeys());
     }
   }
 
@@ -347,6 +373,79 @@ class TestLocalOzoneCluster {
     assertEquals("Datanode count " + (LocalOzoneCluster.MAX_DATANODES + 1)
         + " exceeds the local maximum of " + LocalOzoneCluster.MAX_DATANODES
         + "; each datanode reserves 8 local ports.", error.getMessage());
+  }
+
+  @Test
+  void tooManyDatanodesIsRejectedBeforeFormatDeletesDataDir() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    Path marker = writeMarker(dataDir, "keep me");
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setFormatMode(LocalOzoneClusterConfig.FormatMode.ALWAYS)
+        .setDatanodes(LocalOzoneCluster.MAX_DATANODES + 1)
+        .build();
+
+    assertPrepareFails(config);
+
+    assertTrue(Files.exists(marker),
+        "format ALWAYS must not delete the data dir for a run that cannot start");
+  }
+
+  @Test
+  void forcedLocalDefaultWarnsAboutDiscardedUserValue() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_REPLICATION, ReplicationFactor.THREE.name());
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+        tempDir.resolve("local-ozone")).build();
+
+    LogCapturer logs = LogCapturer.captureLogs(LocalOzoneCluster.class);
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, seed)) {
+      cluster.prepareConfiguration();
+
+      assertTrue(logs.getOutput().contains(OZONE_REPLICATION), logs.getOutput());
+      assertTrue(logs.getOutput().contains(ReplicationFactor.THREE.name()),
+          logs.getOutput());
+      // The CLI repeats these, because the log above is off by default for ozone local.
+      assertEquals(singletonList(OZONE_REPLICATION),
+          cluster.getDiscardedUserConfigKeys());
+    } finally {
+      logs.stopCapturing();
+    }
+  }
+
+  @Test
+  void forcedLocalDefaultIsQuietWhenUserConfiguredNothing() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+        tempDir.resolve("local-ozone")).build();
+
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config,
+        new OzoneConfiguration())) {
+      cluster.prepareConfiguration();
+
+      assertTrue(cluster.getDiscardedUserConfigKeys().isEmpty(),
+          cluster.getDiscardedUserConfigKeys().toString());
+    }
+  }
+
+  @Test
+  void readinessTimeoutNamesTheUnmetCondition() {
+    TimeoutException error = assertThrows(TimeoutException.class,
+        () -> LocalOzoneCluster.waitForReadiness(() -> "only 1 of 3 datanodes have registered",
+            "Ozone cluster", Duration.ofMillis(1)));
+
+    assertTrue(error.getMessage().contains("only 1 of 3 datanodes have registered"),
+        error.getMessage());
+    assertTrue(error.getMessage().contains("Ozone cluster"), error.getMessage());
+  }
+
+  @Test
+  void readinessReturnsOnceBlockerReportsReady() throws Exception {
+    AtomicInteger attempts = new AtomicInteger();
+
+    LocalOzoneCluster.waitForReadiness(
+        () -> attempts.incrementAndGet() < 2 ? "not yet" : null, "Ozone cluster",
+        Duration.ofSeconds(30));
+
+    assertEquals(2, attempts.get());
   }
 
   @Test
