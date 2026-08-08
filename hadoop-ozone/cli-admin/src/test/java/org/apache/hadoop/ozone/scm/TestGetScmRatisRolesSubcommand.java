@@ -61,4 +61,28 @@ public class TestGetScmRatisRolesSubcommand {
     }
   }
 
+  @Test
+  public void testGetScmHARatisRolesIPv6() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--table");
+
+    List<String> result = new ArrayList<>();
+    result.add("[2001:db8::1]:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:[2001:db8:0:0:0:0:0:1]");
+    result.add("[2001:db8::2]:9894:FOLLOWER:61b1c8e5-da40-4567-8a17-96a0234ba14e:[2001:db8:0:0:0:0:0:2]");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      assertThat(capture.getOutput()).contains("2001:db8::1");
+      assertThat(capture.getOutput()).contains("9894");
+      assertThat(capture.getOutput()).contains("LEADER");
+      assertThat(capture.getOutput()).contains("e428ca07-b2a3-4756-bf9b-a4abb033c7d1");
+      assertThat(capture.getOutput()).contains("FOLLOWER");
+    }
+  }
+
 }
