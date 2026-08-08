@@ -712,4 +712,83 @@ class TestContainerBalancerSubCommand {
         .contains(ITERATION_2_COMPLETED_OUTPUT)
         .doesNotContain(ITERATION_3_COMPLETED_OUTPUT);
   }
+
+  @Test
+  void testContainerBalancerStatusVerboseShowsFailureBreakdown() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
+            .setIterationNumber(1)
+            .setIterationResult("ITERATION_COMPLETED")
+            .setIterationDuration(120L)
+            .setContainerMovesScheduled(5)
+            .setContainerMovesCompleted(3)
+            .setContainerMovesFailed(1)
+            .setContainerMovesTimeout(2)
+            .addContainerMoveFailuresByReason(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureSummaryProto.newBuilder()
+                    .setReason("REPLICATION_FAIL_TIME_OUT")
+                    .setCount(2)
+                    .build())
+            .addContainerMoveFailuresByReason(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureSummaryProto.newBuilder()
+                    .setReason("PRE_MOVE_CONTAINER_NOT_FOUND")
+                    .setCount(1)
+                    .build())
+            .addContainerMoveFailureDetails(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
+                    .setContainerId(42)
+                    .setSourceDatanodeUuid("source-uuid-1")
+                    .setTargetDatanodeUuid("target-uuid-1")
+                    .setReason("REPLICATION_FAIL_TIME_OUT")
+                    .build())
+            .addContainerMoveFailureDetails(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
+                    .setContainerId(43)
+                    .setSourceDatanodeUuid("source-uuid-2")
+                    .setTargetDatanodeUuid("target-uuid-2")
+                    .setReason("REPLICATION_FAIL_TIME_OUT")
+                    .build())
+            .addContainerMoveFailureDetails(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
+                    .setContainerId(44)
+                    .setSourceDatanodeUuid("source-uuid-3")
+                    .setTargetDatanodeUuid("target-uuid-3")
+                    .setReason("PRE_MOVE_CONTAINER_NOT_FOUND")
+                    .build())
+            .build();
+
+    long stoppedAt = OffsetDateTime.now().toEpochSecond();
+    ContainerBalancerStatusInfoProto statusInfo = ContainerBalancerStatusInfoProto.newBuilder()
+        .setStartedAt(stoppedAt - 600)
+        .setStoppedAt(stoppedAt)
+        .setStopReason("USER_REQUESTED")
+        .setStopMessage("Stopped by user request.")
+        .setConfiguration(config.toProtobufBuilder().setShouldRun(false))
+        .addIterationsStatusInfo(iteration)
+        .build();
+
+    when(scmClient.getContainerBalancerStatusInfo())
+        .thenReturn(ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setIsRunning(false)
+            .setContainerBalancerStatusInfo(statusInfo)
+            .build());
+
+    verbose.set(true);
+    statusCmd.execute(scmClient);
+
+    assertThat(out.get())
+        .contains("Failure breakdown")
+        .contains("REPLICATION_FAIL_TIME_OUT")
+        .contains("PRE_MOVE_CONTAINER_NOT_FOUND")
+        .contains("Failed move details")
+        .contains("container 42")
+        .contains("container 43")
+        .contains("container 44")
+        .contains("source-uuid-1")
+        .contains("target-uuid-1")
+        .contains("source-uuid-3")
+        .contains("target-uuid-3");
+  }
 }

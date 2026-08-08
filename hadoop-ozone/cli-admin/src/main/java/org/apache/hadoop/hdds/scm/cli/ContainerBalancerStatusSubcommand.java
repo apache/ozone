@@ -27,13 +27,19 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerMoveFailureSummaryProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import picocli.CommandLine;
@@ -232,6 +238,11 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     if (leavingDataNodeList.isEmpty()) {
       leavingDataNodeList = " -" + System.lineSeparator();
     }
+    String failureBreakdown = formatFailureBreakdown(
+        iterationStatusInfo.getContainerMoveFailuresByReasonList());
+    String failureDetails = formatFailureDetails(
+        iterationStatusInfo.getContainerMoveFailuresByReasonList(),
+        iterationStatusInfo.getContainerMoveFailureDetailsList());
     return String.format(
             "%-50s %s%n" +
                     "%-50s %s%n" +
@@ -243,6 +254,8 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
+                    "%s" +
+                    "%s" +
                     "%-50s %n%s" +
                     "%-50s %n%s",
             "Key", "Value",
@@ -256,8 +269,74 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             "Already moved containers", containerMovesCompleted,
             "Failed to move containers", containerMovesFailed,
             "Failed to move containers by timeout", containerMovesTimeout,
+            failureBreakdown,
+            failureDetails,
             "Entered data to nodes", enteringDataNodeList,
             "Exited data from nodes", leavingDataNodeList);
+  }
+
+  private String formatFailureBreakdown(List<ContainerMoveFailureSummaryProto> summaries) {
+    List<ContainerMoveFailureSummaryProto> sortedSummaries = summaries.stream()
+        .sorted(Comparator.comparingLong(ContainerMoveFailureSummaryProto::getCount).reversed()
+            .thenComparing(ContainerMoveFailureSummaryProto::getReason))
+        .collect(Collectors.toList());
+    if (sortedSummaries.isEmpty()) {
+      return "";
+    }
+    StringBuilder builder = new StringBuilder();
+    builder.append(String.format("%-50s %n", "Failure breakdown"));
+    for (ContainerMoveFailureSummaryProto summary : sortedSummaries) {
+      builder.append(String.format("  %-48s %d%n", summary.getReason(), summary.getCount()));
+    }
+    return builder.toString();
+  }
+
+  private String formatFailureDetails(List<ContainerMoveFailureSummaryProto> summaries,
+                                      List<ContainerMoveFailureDetailProto> failureDetails) {
+    if (failureDetails.isEmpty()) {
+      return "";
+    }
+
+    Map<String, List<ContainerMoveFailureDetailProto>> detailsByReason = new LinkedHashMap<>();
+    for (ContainerMoveFailureDetailProto detail : failureDetails) {
+      detailsByReason.computeIfAbsent(detail.getReason(), ignored -> new ArrayList<>())
+          .add(detail);
+    }
+
+    long totalFailures = summaries.stream()
+        .mapToLong(ContainerMoveFailureSummaryProto::getCount)
+        .sum();
+    int shownDetails = failureDetails.size();
+
+    StringBuilder builder = new StringBuilder();
+    builder.append(String.format("%-50s %n", "Failed move details"));
+    if (totalFailures > shownDetails) {
+      builder.append(String.format("  (Showing %d of %d failures)%n", shownDetails, totalFailures));
+    }
+
+    summaries.stream()
+        .sorted(Comparator.comparingLong(ContainerMoveFailureSummaryProto::getCount).reversed()
+            .thenComparing(ContainerMoveFailureSummaryProto::getReason))
+        .filter(summary -> detailsByReason.containsKey(summary.getReason()))
+        .forEach(summary -> {
+          String reason = summary.getReason();
+          List<ContainerMoveFailureDetailProto> reasonDetails = detailsByReason.get(reason);
+          long reasonTotal = summary.getCount();
+          if (reasonTotal > reasonDetails.size()) {
+            builder.append(String.format("  %s (showing %d of %d)%n",
+                reason, reasonDetails.size(), reasonTotal));
+          } else {
+            builder.append(String.format("  %s%n", reason));
+          }
+          for (ContainerMoveFailureDetailProto detail : reasonDetails) {
+            builder.append(String.format("    container %d  source %s  target %s%n",
+                detail.getContainerId(),
+                detail.getSourceDatanodeUuid(),
+                detail.getTargetDatanodeUuid()));
+          }
+        });
+
+    return builder.toString();
   }
 
 }

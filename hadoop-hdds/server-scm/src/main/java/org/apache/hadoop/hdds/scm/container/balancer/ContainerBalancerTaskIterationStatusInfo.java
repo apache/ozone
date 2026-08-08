@@ -107,6 +107,22 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
+   * Get failure counts grouped by reason for this iteration.
+   * @return map of reason to count
+   */
+  public Map<String, Long> getFailuresByReason() {
+    return containerMoveInfo.getFailuresByReason();
+  }
+
+  /**
+   * Get details of individual failed container moves in this iteration.
+   * @return list of failure details, may be capped
+   */
+  public List<ContainerMoveFailureDetail> getFailureDetails() {
+    return containerMoveInfo.getFailureDetails();
+  }
+
+  /**
    * Get a map of the node IDs and the corresponding data sizes moved to each node.
    * @return nodeId to size entering from node map
    */
@@ -151,7 +167,42 @@ public class ContainerBalancerTaskIterationStatusInfo {
         .addAllSizeLeavingNodes(
             mapToProtoNodeTransferInfo(getSizeLeavingNodes())
         )
+        .addAllContainerMoveFailuresByReason(
+            mapToProtoFailureSummary(getFailuresByReason())
+        )
+        .addAllContainerMoveFailureDetails(
+            mapToProtoFailureDetails(getFailureDetails())
+        )
         .build();
+  }
+
+  private List<StorageContainerLocationProtocolProtos.ContainerMoveFailureSummaryProto> mapToProtoFailureSummary(
+      Map<String, Long> failuresByReason) {
+    return failuresByReason.entrySet().stream()
+        .sorted((left, right) -> {
+          int countCompare = Long.compare(right.getValue(), left.getValue());
+          if (countCompare != 0) {
+            return countCompare;
+          }
+          return left.getKey().compareTo(right.getKey());
+        })
+        .map(entry -> StorageContainerLocationProtocolProtos.ContainerMoveFailureSummaryProto.newBuilder()
+            .setReason(entry.getKey())
+            .setCount(entry.getValue())
+            .build())
+        .collect(Collectors.toList());
+  }
+
+  private List<StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto> mapToProtoFailureDetails(
+      List<ContainerMoveFailureDetail> failureDetails) {
+    return failureDetails.stream()
+        .map(detail -> StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
+            .setContainerId(detail.getContainerId())
+            .setSourceDatanodeUuid(detail.getSourceDatanodeUuid())
+            .setTargetDatanodeUuid(detail.getTargetDatanodeUuid())
+            .setReason(detail.getReason())
+            .build())
+        .collect(Collectors.toList());
   }
 
   /**
