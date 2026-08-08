@@ -620,18 +620,147 @@ public class TestOzoneManagerStateMachine {
     assertTermIndex(1, 1, sm.getLastAppliedTermIndex());
 
     OMMetadataManager metaMgr = mock(OMMetadataManager.class);
-    @SuppressWarnings("unchecked")
-    Table<String, TransactionInfo> txnTable = mock(Table.class);
     DBStore store = mock(DBStore.class);
     when(om.getMetadataManager()).thenReturn(metaMgr);
-    when(metaMgr.getTransactionInfoTable()).thenReturn(txnTable);
     when(metaMgr.getStore()).thenReturn(store);
+    stubPersistIfNewerAsAccepting();
 
     long snapshotIndex = sm.takeSnapshot();
 
     assertEquals(1, snapshotIndex);
     verify(store).flushDB();
     verify(om).setTransactionInfo(any(TransactionInfo.class));
+  }
+
+  /**
+   * Makes the mocked double buffer behave as if nothing newer were stored, so the candidate the
+   * state machine computes is the one that gets persisted and returned.
+   */
+  private void stubPersistIfNewerAsAccepting() throws IOException {
+    when(doubleBuffer.persistIfNewer(any(TransactionInfo.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+  }
+
+  /**
+   * The double buffer commits the transaction data and TRANSACTION_INFO_KEY in one batch and
+   * only advances the state machine's applied index afterwards, so a snapshot taken in that
+   * gap computes its index from a value that lags what is already durable. Writing it must not
+   * move the stored index backwards: the DB would then hold data its own watermark disclaims,
+   * and a restart would replay transactions the DB already contains. See HDDS-16092.
+   */
+  @Test
+  public void testTakeSnapshotDoesNotLowerPersistedTransactionInfo(@TempDir Path tmpDir)
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, tmpDir.toAbsolutePath().toString());
+    OzoneManager realishOm = mock(OzoneManager.class);
+    when(realishOm.getConfiguration()).thenReturn(conf);
+    when(realishOm.getConfig()).thenReturn(conf.getObject(OmConfig.class));
+    OMMetadataManager realMetaMgr = new OmMetadataManagerImpl(conf, realishOm);
+    try {
+      when(realishOm.getMetadataManager()).thenReturn(realMetaMgr);
+      // Not started: the flush daemon plays no part here, only the persist path does.
+      OzoneManagerDoubleBuffer realBuffer = OzoneManagerDoubleBuffer.newBuilder()
+          .setOmMetadataManager(realMetaMgr)
+          .setMaxUnFlushedTransactionCount(1)
+          .build();
+
+      // A batch committed transactions up to index 105 and is blocked before advancing the
+      // state machine's applied index, which still reads 100.
+      TransactionInfo flushed = TransactionInfo.valueOf(TermIndex.valueOf(1, 105));
+      realMetaMgr.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, flushed);
+
+      OzoneManagerStateMachine testSm =
+          new OzoneManagerStateMachine(realishOm, realBuffer, handler, executor, null);
+      testSm.updateLastAppliedTermIndex(TermIndex.valueOf(1, 100));
+
+      long snapshotIndex = testSm.takeSnapshot();
+
+      assertEquals(flushed,
+          realMetaMgr.getTransactionInfoTable().get(OzoneConsts.TRANSACTION_INFO_KEY),
+          "takeSnapshot must not lower the persisted transaction info");
+
+      // The in-memory copy is what getLatestSnapshot() reports to Ratis, so it must not
+      // disagree with the DB either.
+      ArgumentCaptor<TransactionInfo> published =
+          ArgumentCaptor.forClass(TransactionInfo.class);
+      verify(realishOm).setTransactionInfo(published.capture());
+      assertEquals(flushed, published.getValue());
+      assertEquals(105, snapshotIndex);
+    } finally {
+      realMetaMgr.stop();
+    }
+  }
+
+  /**
+   * The guard added for HDDS-16092 must not stop a snapshot from advancing the stored index
+   * when its own value is the newer one -- that is the whole point of the write.
+   */
+  @Test
+  public void testTakeSnapshotAdvancesPersistedTransactionInfo(@TempDir Path tmpDir)
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, tmpDir.toAbsolutePath().toString());
+    OzoneManager realishOm = mock(OzoneManager.class);
+    when(realishOm.getConfiguration()).thenReturn(conf);
+    when(realishOm.getConfig()).thenReturn(conf.getObject(OmConfig.class));
+    OMMetadataManager realMetaMgr = new OmMetadataManagerImpl(conf, realishOm);
+    try {
+      when(realishOm.getMetadataManager()).thenReturn(realMetaMgr);
+      // Not started: the flush daemon plays no part here, only the persist path does.
+      OzoneManagerDoubleBuffer realBuffer = OzoneManagerDoubleBuffer.newBuilder()
+          .setOmMetadataManager(realMetaMgr)
+          .setMaxUnFlushedTransactionCount(1)
+          .build();
+
+      realMetaMgr.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY,
+          TransactionInfo.valueOf(TermIndex.valueOf(1, 50)));
+
+      OzoneManagerStateMachine testSm =
+          new OzoneManagerStateMachine(realishOm, realBuffer, handler, executor, null);
+      testSm.updateLastAppliedTermIndex(TermIndex.valueOf(1, 100));
+
+      long snapshotIndex = testSm.takeSnapshot();
+
+      assertEquals(TransactionInfo.valueOf(TermIndex.valueOf(1, 100)),
+          realMetaMgr.getTransactionInfoTable().get(OzoneConsts.TRANSACTION_INFO_KEY));
+      assertEquals(100, snapshotIndex);
+    } finally {
+      realMetaMgr.stop();
+    }
+  }
+
+  /**
+   * With nothing stored yet the snapshot's value is the only candidate and must be written.
+   */
+  @Test
+  public void testTakeSnapshotWritesWhenNothingPersisted(@TempDir Path tmpDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, tmpDir.toAbsolutePath().toString());
+    OzoneManager realishOm = mock(OzoneManager.class);
+    when(realishOm.getConfiguration()).thenReturn(conf);
+    when(realishOm.getConfig()).thenReturn(conf.getObject(OmConfig.class));
+    OMMetadataManager realMetaMgr = new OmMetadataManagerImpl(conf, realishOm);
+    try {
+      when(realishOm.getMetadataManager()).thenReturn(realMetaMgr);
+      // Not started: the flush daemon plays no part here, only the persist path does.
+      OzoneManagerDoubleBuffer realBuffer = OzoneManagerDoubleBuffer.newBuilder()
+          .setOmMetadataManager(realMetaMgr)
+          .setMaxUnFlushedTransactionCount(1)
+          .build();
+
+      OzoneManagerStateMachine testSm =
+          new OzoneManagerStateMachine(realishOm, realBuffer, handler, executor, null);
+      testSm.updateLastAppliedTermIndex(TermIndex.valueOf(2, 7));
+
+      long snapshotIndex = testSm.takeSnapshot();
+
+      assertEquals(TransactionInfo.valueOf(TermIndex.valueOf(2, 7)),
+          realMetaMgr.getTransactionInfoTable().get(OzoneConsts.TRANSACTION_INFO_KEY));
+      assertEquals(7, snapshotIndex);
+    } finally {
+      realMetaMgr.stop();
+    }
   }
 
   @Test
@@ -652,12 +781,10 @@ public class TestOzoneManagerStateMachine {
     }).when(doubleBuffer).awaitFlush();
 
     OMMetadataManager metaMgr = mock(OMMetadataManager.class);
-    @SuppressWarnings("unchecked")
-    Table<String, TransactionInfo> txnTable = mock(Table.class);
     DBStore store = mock(DBStore.class);
     when(om.getMetadataManager()).thenReturn(metaMgr);
-    when(metaMgr.getTransactionInfoTable()).thenReturn(txnTable);
     when(metaMgr.getStore()).thenReturn(store);
+    stubPersistIfNewerAsAccepting();
 
     long snapshotIndex = sm.takeSnapshot();
 

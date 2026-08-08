@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -101,6 +102,23 @@ public final class OzoneManagerDoubleBuffer {
   private final AtomicLong flushedTransactionCount = new AtomicLong();
   /** The number of flush iterations (for testing and debug only). */
   private final AtomicLong flushIterations = new AtomicLong();
+
+  /**
+   * Orders the two writers of {@link org.apache.hadoop.ozone.OzoneConsts#TRANSACTION_INFO_KEY}:
+   * the batch commit in {@link #flushBatch} and {@link #persistIfNewer}. The commit publishes a
+   * batch of transactions together with the index describing them, while the state machine
+   * derives its own index from a field this class only advances once that commit has returned.
+   * Unordered, a snapshot taken in between can store an index lower than the data already in the
+   * DB, leaving a watermark that disclaims committed transactions.
+   */
+  private final Object transactionInfoLock = new Object();
+
+  /**
+   * Runs inside {@link #persistIfNewer} between reading the stored transaction info and writing
+   * the candidate. Lets a test attempt a batch commit in exactly that window, which is the one
+   * {@link #transactionInfoLock} has to close. No-op in production.
+   */
+  private volatile Runnable afterTransactionInfoRead = () -> { };
 
   /** Entry for {@link #currentBuffer} and {@link #readyBuffer}. */
   private static class Entry {
@@ -351,6 +369,38 @@ public final class OzoneManagerDoubleBuffer {
     }
   }
 
+  /**
+   * Stores {@code candidate} as the transaction info unless what is already stored is at or ahead
+   * of it, and returns the value stored when this method returns.
+   * <p>
+   * Every write of this key that is not part of a batch commit must come through here. The stored
+   * index states which transactions the DB contains, so lowering it would make a restart replay
+   * transactions that are already applied.
+   *
+   * @return the stored transaction info, never null
+   */
+  TransactionInfo persistIfNewer(TransactionInfo candidate) throws IOException {
+    synchronized (transactionInfoLock) {
+      final Table<String, TransactionInfo> table = omMetadataManager.getTransactionInfoTable();
+      // Skip the table cache, as TransactionInfo.readTransactionInfo does for this same key. The
+      // value this compares against is written by a batch commit, which does not populate the
+      // cache; reading through the cache would risk comparing against a stale value and writing
+      // the lower index anyway, which is the whole defect.
+      final TransactionInfo stored = table.getSkipCache(TRANSACTION_INFO_KEY);
+      afterTransactionInfoRead.run();
+      if (stored != null && stored.compareTo(candidate) >= 0) {
+        return stored;
+      }
+      table.put(TRANSACTION_INFO_KEY, candidate);
+      return candidate;
+    }
+  }
+
+  @VisibleForTesting
+  void setAfterTransactionInfoRead(Runnable hook) {
+    this.afterTransactionInfoRead = hook;
+  }
+
   private void flushBatch(Queue<Entry> buffer) throws IOException {
     Map<String, List<Long>> cleanupEpochs = new HashMap<>();
     // Commit transaction info to DB.
@@ -376,9 +426,14 @@ public final class OzoneManagerDoubleBuffer {
               batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(lastTransaction)));
 
       long startTime = Time.monotonicNow();
-      flushBatchWithTrace(lastTraceId, buffer.size(),
-          () -> omMetadataManager.getStore()
-              .commitBatchOperation(batchOperation));
+      // The commit is the point where this batch's transactions and the index describing them
+      // both become visible, so it is what persistIfNewer has to be ordered against. Only the
+      // flush daemon commits and snapshots are rare, so the lock is all but uncontended.
+      synchronized (transactionInfoLock) {
+        flushBatchWithTrace(lastTraceId, buffer.size(),
+            () -> omMetadataManager.getStore()
+                .commitBatchOperation(batchOperation));
+      }
 
       metrics.updateFlushTime(Time.monotonicNow() - startTime);
     }
