@@ -41,7 +41,7 @@ class TestLocalOzoneClusterConfig {
         config.getFormatMode());
     assertEquals(1, config.getDatanodes());
     assertEquals("127.0.0.1", config.getHost());
-    assertEquals("0.0.0.0", config.getBindHost());
+    assertEquals("127.0.0.1", config.getBindHost());
     assertEquals(0, config.getScmPort());
     assertEquals(0, config.getOmPort());
     assertEquals(0, config.getS3gPort());

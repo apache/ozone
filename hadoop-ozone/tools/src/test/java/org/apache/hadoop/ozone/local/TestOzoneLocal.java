@@ -18,18 +18,23 @@
 package org.apache.hadoop.ozone.local;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
@@ -93,7 +98,7 @@ class TestOzoneLocal {
   @Test
   void runCommandStartsRuntimeAndPrintsStartupSummary() throws Exception {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
-    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862);
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "http://localhost:9878");
     TestableRunCommand command = new TestableRunCommand(runtime);
     CommandLine commandLine = new CommandLine(command);
     commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
@@ -108,18 +113,96 @@ class TestOzoneLocal {
     assertTrue(text.contains("Local Ozone is running from"), text);
     assertTrue(text.contains("SCM RPC: localhost:9860"), text);
     assertTrue(text.contains("OM RPC: localhost:9862"), text);
+    assertTrue(text.contains("S3 endpoint: http://localhost:9878"), text);
+    assertTrue(text.contains("AWS_ACCESS_KEY_ID=" + LocalOzoneClusterConfig.DEFAULT_S3_ACCESS_KEY), text);
+    assertTrue(text.contains("AWS_SECRET_ACCESS_KEY=" + LocalOzoneClusterConfig.DEFAULT_S3_SECRET_KEY), text);
+    assertTrue(text.contains("AWS_REGION=" + LocalOzoneClusterConfig.DEFAULT_S3_REGION), text);
+    assertTrue(text.contains("AWS_ENDPOINT_URL_S3=http://localhost:9878"), text);
+    assertTrue(text.contains("aws configure set default.s3.addressing_style path"), text);
+    assertTrue(text.contains("Press Ctrl+C to stop."), text);
+  }
+
+  @Test
+  void runCommandOmitsS3SummaryWhenS3gDisabled() throws Exception {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
+    TestableRunCommand command = new TestableRunCommand(runtime);
+    CommandLine commandLine = new CommandLine(command);
+    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
+        true));
+
+    int exitCode = commandLine.execute("--no-s3g");
+
+    assertEquals(0, exitCode);
+    String text = out.toString(UTF_8.name());
+    assertFalse(text.contains("S3 endpoint:"), text);
+    assertFalse(text.contains("AWS_ACCESS_KEY_ID="), text);
     assertTrue(text.contains("Press Ctrl+C to stop."), text);
   }
 
   @Test
   void runCommandClosesRuntimeWhenStartupFails() {
-    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862);
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
     runtime.failStart = true;
     TestableRunCommand command = new TestableRunCommand(runtime);
 
     int exitCode = new CommandLine(command).execute();
 
     assertEquals(1, exitCode);
+    assertTrue(runtime.closed);
+  }
+
+  @Test
+  void runCommandReportsDiscardedConfigToStdErr() throws Exception {
+    ByteArrayOutputStream err = new ByteArrayOutputStream();
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
+    runtime.discardedUserConfigKeys = singletonList("ozone.replication");
+    TestableRunCommand command = new TestableRunCommand(runtime);
+    CommandLine commandLine = new CommandLine(command);
+    commandLine.setErr(new PrintWriter(new OutputStreamWriter(err, UTF_8), true));
+
+    int exitCode = commandLine.execute();
+
+    assertEquals(0, exitCode);
+    // Service logging is off by default for this command, so the CLI has to say it itself.
+    assertTrue(err.toString(UTF_8.name()).contains("ozone.replication"),
+        err.toString(UTF_8.name()));
+  }
+
+  @Test
+  void runCommandReportsDiscardedConfigWhenStartupFails() throws Exception {
+    ByteArrayOutputStream err = new ByteArrayOutputStream();
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
+    runtime.failStart = true;
+    runtime.discardedUserConfigKeys = singletonList("ozone.replication");
+    TestableRunCommand command = new TestableRunCommand(runtime);
+    CommandLine commandLine = new CommandLine(command);
+    commandLine.setErr(new PrintWriter(new OutputStreamWriter(err, UTF_8), true));
+
+    int exitCode = commandLine.execute();
+
+    assertEquals(1, exitCode);
+    // A discarded override can be the very setting that made startup fail, so it is reported
+    // even on the failure path.
+    assertTrue(err.toString(UTF_8.name()).contains("ozone.replication"),
+        err.toString(UTF_8.name()));
+  }
+
+  @Test
+  void runCommandStartupFailureReportsCauseAndHowToGetDetail() {
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
+    runtime.failStart = true;
+    TestableRunCommand command = new TestableRunCommand(runtime);
+    new CommandLine(command).parseArgs();
+
+    IOException error = assertThrows(IOException.class, command::call);
+
+    // GenericCli prints only the first line of the message, so it has to carry the cause itself.
+    String message = error.getMessage();
+    assertTrue(message.contains("startup failed"), message);
+    assertTrue(message.contains("--loglevel INFO"), message);
+    assertTrue(message.contains("--verbose"), message);
+    assertInstanceOf(IllegalStateException.class, error.getCause());
     assertTrue(runtime.closed);
   }
 
@@ -165,7 +248,7 @@ class TestOzoneLocal {
         config.getFormatMode());
     assertEquals(1, config.getDatanodes());
     assertEquals("127.0.0.1", config.getHost());
-    assertEquals("0.0.0.0", config.getBindHost());
+    assertEquals("127.0.0.1", config.getBindHost());
     assertEquals(0, config.getScmPort());
     assertEquals(0, config.getOmPort());
     assertEquals(0, config.getS3gPort());
@@ -184,7 +267,7 @@ class TestOzoneLocal {
         "--format", "always",
         "--datanodes", "3",
         "--host", "cli-host",
-        "--bind-host", "127.0.0.1",
+        "--bind-host", "0.0.0.0",
         "--scm-port", "200",
         "--om-port", "201",
         "--s3g-port", "202",
@@ -201,7 +284,7 @@ class TestOzoneLocal {
         config.getFormatMode());
     assertEquals(3, config.getDatanodes());
     assertEquals("cli-host", config.getHost());
-    assertEquals("127.0.0.1", config.getBindHost());
+    assertEquals("0.0.0.0", config.getBindHost());
     assertEquals(200, config.getScmPort());
     assertEquals(201, config.getOmPort());
     assertEquals(202, config.getS3gPort());
@@ -250,12 +333,33 @@ class TestOzoneLocal {
 
   @Test
   void resolveConfigRejectsInvalidDuration() {
-    assertParseError("--startup-timeout", "forever", "--startup-timeout");
+    // Pins the value echo: picocli's wrapper already names the option, so asserting on the
+    // option alone would pass even if the converter dropped the value from its message.
+    assertParseError("--startup-timeout", "forever", "Invalid duration 'forever'");
   }
 
   @Test
   void resolveConfigRejectsNonPositiveDuration() {
     assertConfigError("--startup-timeout", "0s", "--startup-timeout");
+  }
+
+  @Test
+  void resolveConfigRejectsDurationWithoutTimeUnit() {
+    // Without the unit check this parses as 120 milliseconds, so the run dies with an unrelated
+    // timeout instead of telling the user the value was misread. Asserts the quoted value: the
+    // bare digits also occur in the static "like 120s" hint, which would mask a dropped echo.
+    assertParseError("--startup-timeout", "120", "Missing time unit in '120'");
+  }
+
+  @Test
+  void resolveConfigAcceptsHadoopStyleMinutes() {
+    assertEquals(Duration.ofMinutes(2), resolve("--startup-timeout", "2m")
+        .getStartupTimeout());
+  }
+
+  @Test
+  void invalidFormatModeMessageNamesOffendingValue() {
+    assertParseError("--format", "sometimes", "sometimes");
   }
 
   @Test
@@ -362,14 +466,17 @@ class TestOzoneLocal {
     private final String displayHost;
     private final int scmPort;
     private final int omPort;
+    private final String s3Endpoint;
     private boolean failStart;
     private boolean started;
+    private List<String> discardedUserConfigKeys = emptyList();
     private boolean closed;
 
-    private StubRuntime(String displayHost, int scmPort, int omPort) {
+    private StubRuntime(String displayHost, int scmPort, int omPort, String s3Endpoint) {
       this.displayHost = displayHost;
       this.scmPort = scmPort;
       this.omPort = omPort;
+      this.s3Endpoint = s3Endpoint;
     }
 
     @Override
@@ -402,7 +509,12 @@ class TestOzoneLocal {
 
     @Override
     public String getS3Endpoint() {
-      return "";
+      return s3Endpoint;
+    }
+
+    @Override
+    public List<String> getDiscardedUserConfigKeys() {
+      return discardedUserConfigKeys;
     }
 
     @Override

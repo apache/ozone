@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.s3;
 
-import com.google.common.annotations.VisibleForTesting;
 import javax.enterprise.inject.Produces;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
@@ -39,17 +38,15 @@ public final class OzoneConfigurationHolder {
     return configuration;
   }
 
-  @VisibleForTesting
   public static void setConfiguration(
       OzoneConfiguration conf) {
-    // Nullity check is used in case the configuration was already set
-    // in the MiniOzoneCluster
+    // Nullity check is used in case the configuration was already set by a
+    // same-JVM launcher (MiniOzoneCluster or ozone local)
     if (configuration == null) {
       OzoneConfigurationHolder.configuration = conf;
     }
   }
 
-  @VisibleForTesting
   public static void resetConfiguration() {
     configuration = null;
   }
