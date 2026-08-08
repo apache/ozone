@@ -4643,6 +4643,14 @@
         "quotaInNamespace": 50000,
         "owner": "testuser",
         "bucketLayout": "OBJECT_STORE",
+        "replicationConfigInfo": {
+          "type": "RATIS",
+          "replicationConfig": {
+            "replicationType": "RATIS",
+            "replicationFactor": "THREE",
+            "requiredNodes": 3
+          }
+        },
         "acls": [
           {
             "type": "USER",
@@ -4669,6 +4677,17 @@
         "quotaInNamespace": 10000,
         "owner": "testuser2",
         "bucketLayout": "LEGACY",
+        "replicationConfigInfo": {
+          "type": "EC",
+          "replicationConfig": {
+            "replicationType": "EC",
+            "codec": "RS",
+            "data": 6,
+            "parity": 3,
+            "ecChunkSize": 1048576,
+            "requiredNodes": 9
+          }
+        },
         "acls": [
           {
             "type": "GROUP",
@@ -4737,6 +4756,14 @@
         "quotaInNamespace": -1,
         "owner": "testuser3",
         "bucketLayout": "OBJECT_STORE",
+        "replicationConfigInfo": {
+          "type": "STAND_ALONE",
+          "replicationConfig": {
+            "replicationType": "STANDALONE",
+            "replicationFactor": "ONE",
+            "requiredNodes": 1
+          }
+        },
         "acls": [
           {
             "type": "GROUP",

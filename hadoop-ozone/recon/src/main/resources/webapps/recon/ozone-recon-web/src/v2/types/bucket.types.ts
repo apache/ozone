@@ -37,6 +37,37 @@ export const BucketLayoutTypeList = [
 export type BucketLayout = typeof BucketLayoutTypeList[number];
 
 
+// Corresponds to the serialized org.apache.hadoop.hdds.client.RatisReplicationConfig
+// and StandaloneReplicationConfig. The latter serializes its replicationType as
+// STANDALONE, while the enum name used elsewhere is STAND_ALONE, so both spellings
+// can reach the UI.
+type BucketRatisReplicationConfig = {
+  replicationType: 'RATIS' | 'STAND_ALONE' | 'STANDALONE';
+  replicationFactor: string;
+  requiredNodes: number;
+}
+
+// Corresponds to the serialized org.apache.hadoop.hdds.client.ECReplicationConfig
+type BucketECReplicationConfig = {
+  replicationType: 'EC';
+  codec: string;
+  data: number;
+  parity: number;
+  ecChunkSize: number;
+  requiredNodes: number;
+}
+
+type BucketReplicationInfo =
+  | BucketRatisReplicationConfig
+  | BucketECReplicationConfig;
+
+// Corresponds to the serialized org.apache.hadoop.hdds.client.DefaultReplicationConfig
+// returned by the Recon bucket endpoint (BucketObjectDBInfo#replicationConfigInfo)
+export type BucketReplicationConfig = {
+  type: string;
+  replicationConfig?: BucketReplicationInfo | null;
+}
+
 export type Bucket = {
   volumeName: string;
   name: string;
@@ -53,6 +84,7 @@ export type Bucket = {
   owner: string;
   acls?: Acl[];
   bucketLayout: BucketLayout;
+  replicationConfigInfo?: BucketReplicationConfig | null;
 }
 
 export type BucketResponse = {
