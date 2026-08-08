@@ -76,14 +76,25 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * HDDS-13217: verify snapshot checkpoint DB content is preserved across defrag iterations.
+ * HDDS-13217: verify that snapshot checkpoint DB content is preserved across defrag iterations.
  *
- * <p>After defrag compacts a snapshot checkpoint (S' = compact(S)), the on-disk metadata for that
- * bucket prefix in the defragged checkpoint must still match the original checkpoint taken at
- * snapshot creation time (version 0).
+ * <p>After defrag compacts a snapshot checkpoint, the bucket-prefix metadata in the defragged
+ * checkpoint must still match the checkpoint taken at snapshot creation time (version 0).
+ * Version-0 directories are removed by defrag, so baselines are captured before the first defrag
+ * pass and compared against the active snapshot afterward.
  *
- * <p>Version-0 checkpoint directories are removed after defrag, so baselines are captured before
- * the first defrag iteration and compared against the active snapshot after defrag completes.
+ * <p>{@link #testSnapshotCheckpointContentPreservedAcrossDefragIterations()} runs both HDDS-13217
+ * scenarios on OBS and FSO buckets:
+ * <ol>
+ *   <li>Create S1, S2, and S3 with insert, overwrite, and delete deltas between snapshots,
+ *       run defrag, and verify each snapshot still matches its version-0 baseline.</li>
+ *   <li>Delete the middle snapshot (S2), run defrag again, and verify the remaining snapshot
+ *       (S3) still matches its baseline.</li>
+ * </ol>
+ *
+ * <p>OBS checks {@code keyTable}; FSO checks {@code fileTable} and {@code directoryTable}.
+ * A fresh cluster is started between the two layouts to avoid interference on the snapshot
+ * defrag chain.
  */
 public class TestOmSnapshotCheckpointDbContent {
 
@@ -110,8 +121,9 @@ public class TestOmSnapshotCheckpointDbContent {
 
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
-    // Disable background defrag; this test drives defrag manually via triggerSnapshotDefrag().
-    conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, -1);
+    // Keep background defrag idle during the test; manual triggerSnapshotDefrag() still requires
+    // the service to be initialized (interval must be > 0).
+    conf.setTimeDuration(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, 2, TimeUnit.HOURS);
     conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 10);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
 
