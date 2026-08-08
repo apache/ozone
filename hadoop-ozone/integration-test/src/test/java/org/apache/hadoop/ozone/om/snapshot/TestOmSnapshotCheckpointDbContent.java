@@ -110,7 +110,8 @@ public class TestOmSnapshotCheckpointDbContent {
 
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
-    conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, 7200);
+    // Disable background defrag; this test drives defrag manually via triggerSnapshotDefrag().
+    conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, -1);
     conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 10);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
 
@@ -300,19 +301,26 @@ public class TestOmSnapshotCheckpointDbContent {
   private void triggerDefragUntilDone(List<SnapshotInfo> snapshots)
       throws TimeoutException, InterruptedException {
     OzoneManager om = cluster.getOzoneManager();
+    GenericTestUtils.waitFor(() -> {
+      if (areAllSnapshotsDefragComplete(snapshots)) {
+        return true;
+      }
+      try {
+        om.triggerSnapshotDefrag(false);
+      } catch (IOException e) {
+        return false;
+      }
+      return areAllSnapshotsDefragComplete(snapshots);
+    }, 2000, DEFRAG_WAIT_MS);
+  }
+
+  private boolean areAllSnapshotsDefragComplete(List<SnapshotInfo> snapshots) {
     for (SnapshotInfo snapshotInfo : snapshots) {
-      GenericTestUtils.waitFor(() -> {
-        if (isSnapshotDefragComplete(snapshotInfo)) {
-          return true;
-        }
-        try {
-          om.triggerSnapshotDefrag(false);
-        } catch (IOException e) {
-          return false;
-        }
-        return isSnapshotDefragComplete(snapshotInfo);
-      }, 2000, DEFRAG_WAIT_MS);
+      if (!isSnapshotDefragComplete(snapshotInfo)) {
+        return false;
+      }
     }
+    return true;
   }
 
   private boolean isSnapshotDefragComplete(SnapshotInfo snapshotInfo) {
