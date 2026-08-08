@@ -37,12 +37,15 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRemove
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
+import org.apache.hadoop.hdds.scm.server.SCMSecurityProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,9 +82,22 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   public SCMSecurityResponse submitRequest(RpcController controller,
       SCMSecurityRequest request) throws ServiceException {
     if (!scm.checkLeader()) {
-      RatisUtil.checkRatisException(
-          scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
-          scm.getSecurityProtocolRpcPort(), scm.getScmId(), scm.getHostname(), ROLE_TYPE);
+      NotLeaderException nle =
+          scm.getScmHAManager().getRatisServer().triggerNotLeaderException();
+      boolean isRenew = request.getCmdType() == Type.GetSCMCertificate
+          && request.getGetSCMCertificateRequest().getRenew();
+      boolean isLeaderlessScmCertBypass =
+          request.getCmdType() == Type.GetSCMCertificate && !isRenew
+              && SCMSecurityProtocolServer.isLeaderlessPrimaryScmSigner(scm, nle, isRenew,
+                  request.getGetSCMCertificateRequest().getScmDetails().getScmNodeId());
+      if (isLeaderlessScmCertBypass) {
+        LOG.warn("Bypassing leadership check for leaderless primary SCM certificate signing " +
+                "request from SCM node {}",
+            request.getGetSCMCertificateRequest().getScmDetails().getScmNodeId());
+      } else {
+        RatisUtil.checkRatisException(nle,
+            scm.getSecurityProtocolRpcPort(), scm.getScmId(), scm.getHostname(), ROLE_TYPE);
+      }
     }
     return dispatcher.processRequest(request, this::processRequest,
         request.getCmdType(), request.getTraceID());

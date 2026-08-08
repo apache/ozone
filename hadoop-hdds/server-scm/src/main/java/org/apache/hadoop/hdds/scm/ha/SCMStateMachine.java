@@ -93,6 +93,11 @@ public class SCMStateMachine extends BaseStateMachine {
   // would never be reached. Set only while not yet ready; -1 means uncaptured.
   private volatile long leaderCommitIndexOnStart = -1L;
 
+  // Whether a Ratis leader has been observed at any point since this SCM process started.
+  // Never reset: it distinguishes an SCM that has not yet joined a working quorum from one
+  // that is merely between leaders. See SCMSecurityProtocolServer#isLeaderlessPrimaryScmSigner.
+  private volatile boolean leaderEverKnown;
+
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
     this.scm = scm;
@@ -117,6 +122,14 @@ public class SCMStateMachine extends BaseStateMachine {
   public SCMStateMachine() {
     isInitialized = false;
     this.metrics = null;
+  }
+
+  /**
+   * @return true iff a Ratis leader has been observed since this SCM process started. False means
+   *     this SCM has never been part of a working quorum, not merely that it is between leaders.
+   */
+  public boolean isLeaderEverKnown() {
+    return leaderEverKnown;
   }
 
   private void addRatisEvent(String message) {
@@ -284,6 +297,8 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
                                   RaftPeerId newLeaderId) {
+    // A leader exists regardless of whether this state machine is initialized yet.
+    leaderEverKnown = true;
     if (!isInitialized) {
       return;
     }
@@ -373,6 +388,9 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyTermIndexUpdated(long term, long index) {
+
+    // Committed entries can only come from a leader.
+    leaderEverKnown = true;
 
     // We need to call updateLastApplied here because now in ratis when a
     // node becomes leader, it is checking stateMachineIndex >=
