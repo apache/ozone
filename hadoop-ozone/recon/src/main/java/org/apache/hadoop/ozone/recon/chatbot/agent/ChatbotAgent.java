@@ -68,9 +68,6 @@ public class ChatbotAgent {
   // The connection to Gemini/OpenAI
   private static final String LIST_KEYS_TOOL = "api_v1_keys_listKeys";
 
-  // Max reply length (output tokens) per LLM call. Generous fixed ceiling: reasoning
-  // models need headroom for internal thinking, and providers bill actual usage.
-  private static final int MAX_TOKENS = 16384;
   private final LLMClient llmClient;
   private final ReconQueryExecutor reconQueryExecutor;
   private final ReconApiAllowlist reconApiAllowlist;
@@ -92,6 +89,11 @@ public class ChatbotAgent {
   private final int maxToolCalls;
 
   private final boolean requireSafeScope;
+
+  // Max reply length (output tokens) sent to the provider per LLM call. Configurable
+  // because provider output caps differ (e.g. Claude Sonnet is 8192 without an
+  // output-extending beta); reasoning models may need it raised.
+  private final int maxTokens;
 
   // Builds the client-supplied conversation-history context block (V1 memory).
   private final ChatHistoryBuilder historyBuilder;
@@ -143,6 +145,9 @@ public class ChatbotAgent {
     this.requireSafeScope = configuration.getBoolean(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE_DEFAULT);
+    this.maxTokens = configuration.getInt(
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOKENS,
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOKENS_DEFAULT);
 
     LOG.info("ChatbotAgent initialized with requireSafeScope={}", requireSafeScope);
   }
@@ -309,7 +314,7 @@ public class ChatbotAgent {
 
     // --- 2. CONFIGURE GENERATION SETTINGS ---
     // Temperature 0.1: very low creativity — we want strict, deterministic tool selection.
-    GenParams params = new GenParams(0.1, MAX_TOKENS);
+    GenParams params = new GenParams(0.1, maxTokens);
 
     // --- 3. SEND TO LLM WITH TOOL SPECS ---
     // Attach all allowed Recon API tools so the LLM can pick which one to invoke.
@@ -439,7 +444,7 @@ public class ChatbotAgent {
     messages.add(new ChatMessage("user", userPrompt));
 
     // Temperature 0.3 allows a tiny bit more natural/human-like language creativity.
-    GenParams params = new GenParams(0.3, MAX_TOKENS);
+    GenParams params = new GenParams(0.3, maxTokens);
 
     try {
       LLMResponse response = llmClient.chatCompletion(messages, model, provider, params, null);

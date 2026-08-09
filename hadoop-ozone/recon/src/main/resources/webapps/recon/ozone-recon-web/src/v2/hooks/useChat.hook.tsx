@@ -55,7 +55,12 @@ export const useChat = () => {
 
   useEffect(() => {
     messagesRef.current = messages;
-    sessionStorage.setItem('recon_ai_messages', JSON.stringify(messages));
+    try {
+      sessionStorage.setItem('recon_ai_messages', JSON.stringify(messages));
+    } catch (e) {
+      // Best-effort persistence — ignore quota-exceeded/serialization errors.
+      console.warn('Failed to persist chat messages to sessionStorage', e);
+    }
   }, [messages]);
 
   const startTimer = useCallback(() => {
@@ -128,7 +133,9 @@ export const useChat = () => {
     // so the server can resolve references like "that bucket" / "show me more".
     // Read from the ref to avoid a stale closure; the current question is sent
     // separately as `query`, not duplicated here. The server trims/validates it.
-    const history: ChatbotHistoryTurn[] = messagesRef.current.map(msg => ({
+    // Cap client-side to the last 10 turns: the server keeps ~8, so sending more
+    // just grows the upload for data it immediately discards.
+    const history: ChatbotHistoryTurn[] = messagesRef.current.slice(-10).map(msg => ({
       role: msg.role,
       content: msg.text
     }));
