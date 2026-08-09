@@ -42,6 +42,12 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_WORKERS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_WORKERS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_ENABLED;
@@ -117,7 +123,6 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -126,6 +131,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -176,6 +182,7 @@ import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
@@ -223,6 +230,7 @@ public class KeyManagerImpl implements KeyManager {
   private BackgroundService multipartUploadCleanupService;
   private DNSToSwitchMapping dnsToSwitchMapping;
   private CompactionService compactionService;
+  private KeyLifecycleService keyLifecycleService;
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, OMPerformanceMetrics metrics) {
@@ -326,9 +334,7 @@ public class KeyManagerImpl implements KeyManager {
       startSnapshotDefragService(configuration);
     }
 
-    if (snapshotDeletingService == null &&
-        ozoneManager.isFilesystemSnapshotEnabled()) {
-
+    if (snapshotDeletingService == null && ozoneManager.isFilesystemSnapshotEnabled()) {
       long snapshotServiceInterval = configuration.getTimeDuration(
           OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
           OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL_DEFAULT,
@@ -339,8 +345,7 @@ public class KeyManagerImpl implements KeyManager {
           TimeUnit.MILLISECONDS);
       try {
         snapshotDeletingService = new SnapshotDeletingService(
-            snapshotServiceInterval, snapshotServiceTimeout,
-            ozoneManager);
+            snapshotServiceInterval, snapshotServiceTimeout, ozoneManager);
         snapshotDeletingService.start();
       } catch (IOException e) {
         LOG.error("Error starting Snapshot Deleting Service", e);
@@ -360,6 +365,18 @@ public class KeyManagerImpl implements KeyManager {
           serviceInterval, TimeUnit.MILLISECONDS, serviceTimeout,
           ozoneManager, configuration);
       multipartUploadCleanupService.start();
+    }
+
+    if (keyLifecycleService == null) {
+      long lifecycleServiceInterval = configuration.getTimeDuration(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL,
+          OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+      long lifecycleServiceTimeout = configuration.getTimeDuration(OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT,
+          OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+      int lifecycleServiceWorkerSize = configuration.getInt(OZONE_KEY_LIFECYCLE_SERVICE_WORKERS,
+          OZONE_KEY_LIFECYCLE_SERVICE_WORKERS_DEFAULT);
+      keyLifecycleService = new KeyLifecycleService(ozoneManager, this, lifecycleServiceInterval,
+          lifecycleServiceTimeout, lifecycleServiceWorkerSize, configuration);
+      keyLifecycleService.start();
     }
 
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
@@ -516,6 +533,10 @@ public class KeyManagerImpl implements KeyManager {
     if (compactionService != null) {
       compactionService.shutdown();
       compactionService = null;
+    }
+    if (keyLifecycleService != null) {
+      keyLifecycleService.shutdown();
+      keyLifecycleService = null;
     }
   }
 
@@ -1064,6 +1085,11 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public CompactionService getCompactionService() {
     return compactionService;
+  }
+
+  @Override
+  public KeyLifecycleService getKeyLifecycleService() {
+    return keyLifecycleService;
   }
 
   public boolean isSstFilteringSvcEnabled() {
@@ -2236,7 +2262,12 @@ public class KeyManagerImpl implements KeyManager {
           List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
           if (sortedNodes == null) {
             sortedNodes = sortDatanodes(nodes, clientMachine);
-            if (sortedNodes != null) {
+            // Cache only a freshly sorted order, not an input list returned
+            // unchanged when no sort happens: that order is per-pipeline and must
+            // not be reused for another pipeline with the same node set. The read
+            // sort always returns a new list, so this never skips caching here; it
+            // keeps the pattern identical to the write path.
+            if (sortedNodes != null && sortedNodes != nodes) {
               sortedPipelines.put(uuidSet, sortedNodes);
             }
           } else if (LOG.isDebugEnabled()) {
@@ -2254,32 +2285,87 @@ public class KeyManagerImpl implements KeyManager {
   @VisibleForTesting
   public List<? extends DatanodeDetails> sortDatanodes(List<? extends DatanodeDetails> nodes,
                                              String clientMachine) {
-    final Node client = getClientNode(clientMachine, nodes);
-    return ozoneManager.getClusterMap()
-        .sortByDistanceCost(client, nodes, nodes.size());
+    final NetworkTopology clusterMap = ozoneManager.getClusterMap();
+    final Node client = getClientNode(clientMachine, nodes, clusterMap);
+    return clusterMap.sortByDistanceCost(client, nodes, nodes.size());
+  }
+
+  @Override
+  public List<? extends DatanodeDetails> sortDatanodesForWrite(
+      List<? extends DatanodeDetails> nodes, String clientMachine, NetworkTopology clusterMap) {
+    Preconditions.checkArgument(!StringUtils.isEmpty(clientMachine),
+        "clientMachine is empty");
+    Objects.requireNonNull(clusterMap, "clusterMap is null");
+    return captureLatencyNs(
+        metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
+          final Node client = getClientNode(clientMachine, nodes, clusterMap);
+          if (client == null) {
+            // Preserve pipeline order for writes: the first node is the write
+            // primary, so do not shuffle when the client cannot be resolved.
+            return nodes;
+          }
+          return sortByClusterMapDistance(clusterMap, client, nodes);
+        });
+  }
+
+  @Override
+  public boolean isSortDatanodesForWriteEnabled() {
+    return ozoneManager.getConfig().isSortDatanodesForWriteEnabled();
+  }
+
+  /**
+   * Sort a pipeline's nodes by topology distance to the client. The nodes come
+   * from SCM over RPC, so they are deserialized {@link DatanodeDetails} with no
+   * parent/level: the topology treats them as unknown (distance
+   * {@link Integer#MAX_VALUE}) and the order comes out random. Look each node
+   * up in OM's cluster map to get the topology-linked instance, sort those,
+   * then map the order back to the original nodes.
+   */
+  private List<? extends DatanodeDetails> sortByClusterMapDistance(
+      NetworkTopology clusterMap, Node client,
+      List<? extends DatanodeDetails> nodes) {
+    final List<Node> topologyNodes = new ArrayList<>(nodes.size());
+    final Map<String, DatanodeDetails> nodeByPath = new HashMap<>();
+    for (DatanodeDetails node : nodes) {
+      final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
+      if (resolved == null) {
+        return nodes;
+      }
+      topologyNodes.add(resolved);
+      nodeByPath.put(resolved.getNetworkFullPath(), node);
+    }
+    final List<Node> sorted =
+        clusterMap.sortByDistanceCost(client, topologyNodes, topologyNodes.size());
+    final List<DatanodeDetails> result = new ArrayList<>(sorted.size());
+    for (Node node : sorted) {
+      result.add(nodeByPath.get(node.getNetworkFullPath()));
+    }
+    return result;
   }
 
   private Node getClientNode(String clientMachine,
-                             List<? extends DatanodeDetails> nodes) {
-    List<DatanodeDetails> matchingNodes = new ArrayList<>();
-    boolean useHostname = ozoneManager.getConfiguration().getBoolean(
-        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
-        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+      List<? extends DatanodeDetails> nodes, NetworkTopology clusterMap) {
     for (DatanodeDetails node : nodes) {
-      if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
-          clientMachine)) {
-        matchingNodes.add(node);
+      // Match by either IP or hostname, like SCM's getNodesByAddress. clientMachine
+      // may be a hostname on the read path; the streaming-write remoteAddress is
+      // typically an IP. Matching both covers use.datanode.hostname either way.
+      if (clientMachine.equals(node.getIpAddress())
+          || clientMachine.equals(node.getHostName())) {
+        // The pipeline nodes are RPC-deserialized and not linked into OM's
+        // cluster map; prefer the map's instance so distance can be computed.
+        final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
+        return resolved != null ? resolved : node;
       }
     }
-    return !matchingNodes.isEmpty() ? matchingNodes.get(0) :
-        getOtherNode(clientMachine);
+    return getOtherNode(clientMachine, clusterMap);
   }
 
-  private Node getOtherNode(String clientMachine) {
+  private Node getOtherNode(String clientMachine,
+                            NetworkTopology clusterMap) {
     try {
       String clientLocation = resolveNodeLocation(clientMachine);
       if (clientLocation != null) {
-        Node rack = ozoneManager.getClusterMap().getNode(clientLocation);
+        Node rack = clusterMap.getNode(clientLocation);
         if (rack instanceof InnerNode) {
           return new NodeImpl(clientMachine, clientLocation,
               (InnerNode) rack, rack.getLevel() + 1,

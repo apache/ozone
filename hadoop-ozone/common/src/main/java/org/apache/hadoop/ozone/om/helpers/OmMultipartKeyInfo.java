@@ -41,8 +41,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKey
  * upload part information of the key.
  */
 public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject<OmMultipartKeyInfo> {
-  public static final byte LEGACY_SCHEMA_VERSION = 0;
-  public static final byte SPLIT_PARTS_TABLE_SCHEMA_VERSION = 1;
+  // This stores the schema version of the multipart key.
+  // 0 - Legacy Schema -> Uses the same table to store the multipart part info
+  // 1 - New Schema -> Uses a separate table to store the multipart part info
+  public static final int LEGACY_SCHEMA_VERSION = 0;
+  public static final int SPLIT_PARTS_TABLE_SCHEMA_VERSION = 1;
 
   private static final Codec<OmMultipartKeyInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(MultipartKeyInfo.getDefaultInstance()),
@@ -87,10 +90,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
    */
   private final long parentID;
 
-  // This stores the schema version of the multipart key.
-  // 0 - Legacy Schema -> Uses the same table to store the multipart part info
-  // 1 - New Schema -> Uses a separate table to store the multipart part info
-  private final byte schemaVersion;
+  private final int schemaVersion;
 
   public static Codec<OmMultipartKeyInfo> getCodec() {
     return CODEC;
@@ -275,7 +275,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     return replicationConfig;
   }
 
-  public byte getSchemaVersion() {
+  public int getSchemaVersion() {
     return schemaVersion;
   }
 
@@ -297,7 +297,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     private final AclListBuilder acls;
     private final TreeMap<Integer, PartKeyInfo> partKeyInfoList;
     private long parentID;
-    private byte schemaVersion;
+    private int schemaVersion;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -410,8 +410,8 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       return this;
     }
 
-    public Builder setSchemaVersion(byte schemaVersion) {
-      this.schemaVersion = schemaVersion;
+    public Builder setSchemaVersion(int schemaVersion) {
+      this.schemaVersion = validateAndConvertSchemaVersion(schemaVersion);
       return this;
     }
 
@@ -457,7 +457,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
         .setObjectID(multipartKeyInfo.getObjectID())
         .setUpdateID(multipartKeyInfo.getUpdateID())
         .setParentID(multipartKeyInfo.getParentID())
-        .setSchemaVersion((byte) multipartKeyInfo.getSchemaVersion());
+        .setSchemaVersion(validateAndConvertSchemaVersion(multipartKeyInfo.getSchemaVersion()));
   }
 
   /**
@@ -514,6 +514,14 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       builder.addAllPartKeyInfoList(partKeyInfoMap);
     }
     return builder.build();
+  }
+
+  private static int validateAndConvertSchemaVersion(int schemaVersion) {
+    if (schemaVersion != LEGACY_SCHEMA_VERSION && schemaVersion != SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+      throw new IllegalArgumentException("Unsupported schemaVersion: "
+          + schemaVersion + ". Expected one of [0, 1].");
+    }
+    return schemaVersion;
   }
 
   @Override
