@@ -298,6 +298,8 @@ public final class HddsUtils {
     Preconditions.checkArgument(!hostPort.isEmpty(),
         "Malformed role string (empty host:port): %s", roleString);
     HostAndPort hp = HostAndPort.fromString(hostPort);
+    Preconditions.checkArgument(hp.hasPort(),
+        "Malformed role string (missing port): %s", roleString);
     String host = hp.getHost();
     String port = String.valueOf(hp.getPort());
 
