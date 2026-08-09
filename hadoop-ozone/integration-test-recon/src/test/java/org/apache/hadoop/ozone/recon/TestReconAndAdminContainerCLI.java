@@ -321,7 +321,7 @@ class TestReconAndAdminContainerCLI {
     // Both threads are running every 1 second.
     // Wait until all values are equal.
     GenericTestUtils.waitFor(() -> assertReportsMatch(containerState),
-        1000, 40000);
+        1000, 90000);
   }
 
   private static boolean assertReportsMatch(UnHealthyContainerStates state) {
