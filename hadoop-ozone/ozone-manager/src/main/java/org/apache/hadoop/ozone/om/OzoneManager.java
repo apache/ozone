@@ -104,6 +104,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERM
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_NOT_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGroupIdFromOmServiceId;
 import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_SECRET_STORAGE_TYPE;
@@ -4387,7 +4388,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (oldOmMetadataManagerStopped) {
         time = Time.monotonicNow();
         reloadOMState();
-        setTransactionInfo(TransactionInfo.valueOf(termIndex));
+        // Ratis may read this field through getLatestSnapshot() when decideVote()
+        // obtains the last entry. Publish the position used to unpause. After a failed
+        // DB replacement, these values still identify the restored pre-install state.
+        setTransactionInfo(TransactionInfo.valueOf(term, lastAppliedIndex));
         omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
         newMetadataManagerStarted = true;
         LOG.info("Reloaded OM state with Term: {} and Index: {}. Spend {} ms",
@@ -4754,14 +4758,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Return true, if the current OM node is leader and in ready state to
-   * process the requests.
+   * Returns true if the current OM node is leader and in ready state to
+   * process requests.
    *
    * If ratis is not enabled, then it always returns true.
    */
   public boolean isLeaderReady() {
     final OzoneManagerRatisServer ratisServer = omRatisServer;
     return ratisServer != null && ratisServer.getLeaderStatus() == LEADER_AND_READY;
+  }
+
+  /**
+   * Returns true if the current OM node is leader.
+   * Note that it also returns true if the OM is leader but is not ready.
+   */
+  public boolean isLeader() {
+    final OzoneManagerRatisServer ratisServer = omRatisServer;
+    if (ratisServer == null) {
+      LOG.warn("OM Ratis server is not initialized; treating this OM as non-leader");
+      return false;
+    }
+
+    final OzoneManagerRatisServer.RaftServerStatus leaderStatus =
+        ratisServer.getLeaderStatus();
+    return leaderStatus == LEADER_AND_READY
+        || leaderStatus == LEADER_AND_NOT_READY;
   }
 
   /**
