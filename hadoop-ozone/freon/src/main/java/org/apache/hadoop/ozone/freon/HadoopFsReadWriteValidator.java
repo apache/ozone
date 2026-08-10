@@ -67,14 +67,6 @@ import picocli.CommandLine.Option;
 public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     implements Callable<Void> {
 
-  /**
-   * Upper bound on the number of paths a thread tracks for read-back. It caps
-   * memory use for large runs: once a thread has written more paths than this,
-   * validation covers a moving sample of its recent writes, and the files
-   * dropped from the sample still exist on the FS.
-   */
-  private static final int MAX_HISTORY_PER_THREAD = 1000;
-
   @Option(names = {"-s", "--size"},
       description = "Size of the generated files. " +
           StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
@@ -92,6 +84,13 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       defaultValue = "4096")
   private int copyBufferSize;
 
+  @Option(names = {"--max-tracked-files"},
+      description = "Maximum number of files a thread keeps the checksum of, and can therefore read back. Once a "
+          + "thread writes more distinct files than this, validation covers a moving sample of its writes; the "
+          + "files dropped from the sample stay on the file system.",
+      defaultValue = "10000")
+  private int maxTrackedFiles;
+
   private ContentGenerator contentGenerator;
 
   private Timer writeTimer;
@@ -99,7 +98,7 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
   private Timer readTimer;
 
   private final ThreadLocal<ThreadHistory> threadHistory =
-      ThreadLocal.withInitial(ThreadHistory::new);
+      ThreadLocal.withInitial(() -> new ThreadHistory(maxTrackedFiles));
 
   @Override
   public Void call() throws Exception {
@@ -112,6 +111,9 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     if (bufferSize <= 0 || copyBufferSize <= 0) {
       throw new IllegalArgumentException(
           "--buffer and --copy-buffer must be positive");
+    }
+    if (maxTrackedFiles <= 0) {
+      throw new IllegalArgumentException("--max-tracked-files must be positive");
     }
 
     FileSystem fileSystem = getFileSystem();
@@ -191,13 +193,18 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
   /**
    * Per-thread record of the files written and the latest checksum of each.
    * Paths are reused across a run, so it is keyed by path (an overwrite updates
-   * the checksum) and stays naturally bounded, with a hard cap for very large
-   * runs.
+   * the checksum) and stays naturally bounded, with --max-tracked-files as the
+   * hard cap for very large runs.
    */
   private static final class ThreadHistory {
+    private final int maxTracked;
     private long markerSeq;
     private final Map<Path, Long> checksums = new HashMap<>();
     private final List<Path> paths = new ArrayList<>();
+
+    private ThreadHistory(int maxTracked) {
+      this.maxTracked = maxTracked;
+    }
 
     private long nextMarker() {
       return markerSeq++;
@@ -207,7 +214,7 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       if (checksums.put(path, checksum) != null) {
         return;                        // existing path, checksum just updated
       }
-      if (paths.size() < MAX_HISTORY_PER_THREAD) {
+      if (paths.size() < maxTracked) {
         paths.add(path);
       } else {
         // Bound memory by dropping a random tracked path (file stays on FS).
