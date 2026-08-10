@@ -612,6 +612,9 @@ message FinalizeUpgradeRequestProto {
 message FinalizeUpgradeResponseProto {
 }
 
+// Request from an SCM leader to a peer SCM to read its local upgrade status.
+// The resulting status returned currently only contains the SCM's software version to use in pre-finalization
+// safety checks.
 message GetPeerUpgradeStatusRequestProto {
 }
 
