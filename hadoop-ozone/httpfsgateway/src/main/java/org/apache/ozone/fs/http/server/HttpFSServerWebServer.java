@@ -174,9 +174,6 @@ public class HttpFSServerWebServer {
 
   public void stop() throws Exception {
     httpServer.stop();
-    if (prometheusMetricsSink != null) {
-      DefaultMetricsSystem.instance().unregisterSource("prometheus");
-    }
   }
 
   public URL getUrl() {
