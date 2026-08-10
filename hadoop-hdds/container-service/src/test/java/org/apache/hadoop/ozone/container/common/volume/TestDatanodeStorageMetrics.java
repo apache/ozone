@@ -23,9 +23,9 @@ import static org.mockito.Mockito.when;
 
 import java.util.UUID;
 import org.apache.hadoop.metrics2.AbstractMetric;
+import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.impl.MetricsRecordImpl;
-import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.junit.jupiter.api.Test;
@@ -105,15 +105,16 @@ class TestDatanodeStorageMetrics {
     // unregistered the base name, leaking every datanode past the first.
     boolean prev = DefaultMetricsSystem.inMiniClusterMode();
     DefaultMetricsSystem.setMiniClusterMode(true);
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    String uuidA = "dn-" + UUID.randomUUID();
+    String uuidB = "dn-" + UUID.randomUUID();
+    String nameA = DatanodeStorageMetrics.SOURCE_NAME + '-' + uuidA;
+    String nameB = DatanodeStorageMetrics.SOURCE_NAME + '-' + uuidB;
+    DatanodeStorageMetrics a = null;
+    DatanodeStorageMetrics b = null;
     try {
-      MetricsSystemImpl ms = (MetricsSystemImpl) DefaultMetricsSystem.instance();
-      String uuidA = "dn-" + UUID.randomUUID();
-      String uuidB = "dn-" + UUID.randomUUID();
-      String nameA = DatanodeStorageMetrics.SOURCE_NAME + '-' + uuidA;
-      String nameB = DatanodeStorageMetrics.SOURCE_NAME + '-' + uuidB;
-
-      DatanodeStorageMetrics a = DatanodeStorageMetrics.create(mockVolumeSet(uuidA));
-      DatanodeStorageMetrics b = DatanodeStorageMetrics.create(mockVolumeSet(uuidB));
+      a = DatanodeStorageMetrics.create(mockVolumeSet(uuidA));
+      b = DatanodeStorageMetrics.create(mockVolumeSet(uuidB));
       assertThat(ms.getSource(nameA)).isNotNull();
       assertThat(ms.getSource(nameB)).isNotNull();
 
@@ -122,6 +123,14 @@ class TestDatanodeStorageMetrics {
       assertThat(ms.getSource(nameA)).isNull();
       assertThat(ms.getSource(nameB)).isNull();
     } finally {
+      // Do not leak sources into other tests if an assertion above fails.
+      // unregister() is idempotent, so a repeat after the happy path is a no-op.
+      if (a != null) {
+        a.unregister();
+      }
+      if (b != null) {
+        b.unregister();
+      }
       DefaultMetricsSystem.setMiniClusterMode(prev);
     }
   }
