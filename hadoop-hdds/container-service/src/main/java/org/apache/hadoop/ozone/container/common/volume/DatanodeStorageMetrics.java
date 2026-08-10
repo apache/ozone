@@ -34,6 +34,9 @@ import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
  * This is the same scope as the {@code storageReport} entries produced by
  * {@code OzoneContainer.getNodeReport()}; meta and DB volumes are excluded.
  * Registered as {@code Hadoop:service=HddsDatanode,name=DatanodeStorageMetrics}.
+ * In mini-cluster mode, where many datanodes share one metrics system, the name
+ * is suffixed with the datanode UUID ({@code DatanodeStorageMetrics-<uuid>}) so
+ * registration and unregistration stay unique per datanode.
  */
 @Metrics(about = "Ozone DataNode node-level storage totals",
     context = OzoneConsts.OZONE)

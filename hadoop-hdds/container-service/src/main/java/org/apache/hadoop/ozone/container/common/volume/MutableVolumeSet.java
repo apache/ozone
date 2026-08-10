@@ -408,7 +408,15 @@ public class MutableVolumeSet implements VolumeSet {
   public StorageLocationReport[] getStorageReport() {
     this.readLock();
     try {
-      return buildStorageReport();
+      StorageLocationReport[] reports = new StorageLocationReport[volumeMap.size() + failedVolumeMap.size()];
+      int counter = 0;
+      for (StorageVolume volume : volumeMap.values()) {
+        reports[counter++] = volume.getReport();
+      }
+      for (StorageVolume volume : failedVolumeMap.values()) {
+        reports[counter++] = volume.getReport();
+      }
+      return reports;
     } finally {
       this.readUnlock();
     }
@@ -428,10 +436,8 @@ public class MutableVolumeSet implements VolumeSet {
    * deadlock the whole metrics system.
    */
   public StorageLocationReport[] getStorageReportSnapshot() {
-    return buildStorageReport();
-  }
-
-  private StorageLocationReport[] buildStorageReport() {
+    // No lock is held, so the map sizes can change concurrently; collect into a
+    // list instead of indexing into a pre-sized array.
     List<StorageLocationReport> reports = new ArrayList<>(volumeMap.size() + failedVolumeMap.size());
     for (StorageVolume volume : volumeMap.values()) {
       reports.add(volume.getReport());
