@@ -240,13 +240,11 @@ public class TestDecommissionAndMaintenance {
     // In the EC case, there should be 5 online
     waitForContainerReplicas(ecContainer, 5);
 
-    cluster.restartHddsDatanode(dnIndex, false);
-    waitForDnToReachHealthState(nm, toDecommission, HEALTHY);
-    DatanodeDetails restarted = nm.getNode(dnID);
+    cluster.restartHddsDatanode(dnIndex, true);
     scmClient.recommissionNodes(Arrays.asList(
-        getDNHostAndPort(restarted)));
-    waitForDnToReachOpState(nm, restarted, IN_SERVICE);
-    waitForDnToReachPersistedOpState(restarted, IN_SERVICE);
+        getDNHostAndPort(toDecommission)));
+    waitForDnToReachOpState(nm, toDecommission, IN_SERVICE);
+    waitForDnToReachPersistedOpState(toDecommission, IN_SERVICE);
   }
 
   @Test
@@ -488,7 +486,7 @@ public class TestDecommissionAndMaintenance {
     // has, then the SCM state should be used and the DN state updated.
     waitForDnToReachHealthState(nm, newDn, HEALTHY);
     waitForDnToReachOpState(nm, newDn, IN_SERVICE);
-    waitForDnToReachPersistedOpState(newDn, IN_SERVICE);
+    waitForDnToReachPersistedOpState(dn, IN_SERVICE);
   }
 
   @Test
