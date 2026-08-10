@@ -99,16 +99,16 @@ public class GetObjectAttributesResponse {
     private boolean truncated;
 
     @XmlElement(name = "MaxParts")
-    private int maxParts;
+    private Integer maxParts;
 
     @XmlElement(name = "PartNumberMarker")
-    private int partNumberMarker;
+    private Integer partNumberMarker;
 
     @XmlElement(name = "NextPartNumberMarker")
-    private int nextPartNumberMarker;
+    private Integer nextPartNumberMarker;
 
     @XmlElement(name = "PartsCount")
-    private int partsCount;
+    private Integer partsCount;
 
     @XmlElement(name = "Part")
     private List<Part> parts = new ArrayList<>();
@@ -121,35 +121,35 @@ public class GetObjectAttributesResponse {
       this.truncated = truncated;
     }
 
-    public int getMaxParts() {
+    public Integer getMaxParts() {
       return maxParts;
     }
 
-    public void setMaxParts(int maxParts) {
+    public void setMaxParts(Integer maxParts) {
       this.maxParts = maxParts;
     }
 
-    public int getPartNumberMarker() {
+    public Integer getPartNumberMarker() {
       return partNumberMarker;
     }
 
-    public void setPartNumberMarker(int partNumberMarker) {
+    public void setPartNumberMarker(Integer partNumberMarker) {
       this.partNumberMarker = partNumberMarker;
     }
 
-    public int getNextPartNumberMarker() {
+    public Integer getNextPartNumberMarker() {
       return nextPartNumberMarker;
     }
 
-    public void setNextPartNumberMarker(int nextPartNumberMarker) {
+    public void setNextPartNumberMarker(Integer nextPartNumberMarker) {
       this.nextPartNumberMarker = nextPartNumberMarker;
     }
 
-    public int getPartsCount() {
+    public Integer getPartsCount() {
       return partsCount;
     }
 
-    public void setPartsCount(int partsCount) {
+    public void setPartsCount(Integer partsCount) {
       this.partsCount = partsCount;
     }
 
