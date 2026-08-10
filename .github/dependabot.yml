@@ -15,23 +15,69 @@
 version: 2
 updates:
   - package-ecosystem: maven
+    open-pull-requests-limit: 5
     directory: "/"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "com.fasterxml.jackson:*"
+        versions:
+          - "2.22" # not LTS
+      - dependency-name: "com.github.ekryd.sortpom:sortpom-maven-plugin"
+        versions:
+          - ">=3.1.0" # requires Java 11
+      - dependency-name: "com.github.spotbugs:spotbugs-maven-plugin"
+        versions:
+          - ">=4.0.0.0" # too many new warnings
+          - ">=4.9.0.0" # requires Java 11
+      - dependency-name: "com.googlecode.maven-download-plugin:download-maven-plugin"
+        versions:
+          - ">=1.10.0" # requires Java 11
+      - dependency-name: "dev.langchain4j:*"
+        versions:
+          - ">=0.36.0" # requires Java 17
+      - dependency-name: "info.picocli:*"
+        versions:
+          - "4.7.6" # bug https://github.com/remkop/picocli/issues/2309
+          - "4.7.7" # bug https://github.com/remkop/picocli/issues/2407
+      - dependency-name: "io.netty:*"
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: "org.apache.derby:derby"
+        versions:
+          - "<10.17.1.0" # CVE-2022-46337 https://issues.apache.org/jira/browse/DERBY-7147
+          - ">=10.17.1.0" # requires Java 21
+      - dependency-name: "org.apache.hadoop:*" # using multiple versions
+      - dependency-name: "org.apache.iceberg:*"
+        versions:
+          - ">=1.11.0" # requires Java 17
+      - dependency-name: "org.apache.parquet:*" # update in sync with iceberg
+      - dependency-name: "org.apache.rat:apache-rat-plugin"
+        versions:
+          - "0.17" # bug https://issues.apache.org/jira/browse/RAT-476
+          - ">=0.18" # requires Java 17
+      - dependency-name: "org.aspectj:*" # using multiple versions
+      - dependency-name: "org.jgrapht"
+        versions:
+          - ">=1.5.0" # requires Java 11
+      - dependency-name: "org.jooq:*"
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: "org.mockito:mockito-core"
+        versions:
+          - ">=5.0.0" # requires Java 11
+      - dependency-name: "org.rocksdb:*"
+        update-types: ["version-update:semver-minor"]
     schedule:
-      interval: "weekly"
-      day: "saturday"
-      time: "07:00" # UTC
+      interval: "cron"
+      cronjob: "0 5 * * 0,6"
     cooldown:
       default-days: 7
     pull-request-branch-name:
       separator: "-"
   - package-ecosystem: "github-actions"
+    open-pull-requests-limit: 5
     directory: "/"
     schedule:
-      # 'daily' only runs on weekdays
       interval: "cron"
-      cronjob: "15 6 * * *"
+      cronjob: "0 6 * * 0,6"
     cooldown:
       default-days: 7

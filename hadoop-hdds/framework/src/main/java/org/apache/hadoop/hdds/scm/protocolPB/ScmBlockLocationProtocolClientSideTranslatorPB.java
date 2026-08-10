@@ -66,7 +66,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
 import org.apache.hadoop.ozone.ClientVersion;

@@ -98,7 +98,7 @@ public class TestECPipelineProvider {
 
     when(nodeManager.getNodeStatus(any()))
         .thenReturn(NodeStatus.inServiceHealthy());
-    when(nodeManager.getDatanodeInfo(any()))
+    when(nodeManager.getNode(any()))
         .thenAnswer(invocation -> createDatanodeInfo(invocation.getArgument(0)));
   }
 

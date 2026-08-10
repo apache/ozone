@@ -21,11 +21,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_GAP;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.recon.TestReconEndpointUtil.getReconWebAddress;
+import static org.apache.hadoop.ozone.recon.ReconEndpointTestUtil.getReconWebAddress;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -51,6 +50,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -64,7 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.recon.api.DataNodeMetricsService;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
@@ -146,7 +146,6 @@ public abstract class AbstractTestStorageDistributionEndpoint {
     conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, TimeUnit.MILLISECONDS);
-    conf.setLong(OZONE_SCM_HA_RATIS_SNAPSHOT_GAP, 1L);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 50, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL, 500, TimeUnit.MILLISECONDS);
@@ -158,7 +157,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
     conf.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
 
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
-    dnConf.setBlockDeletionInterval(Duration.ofMillis(30000));
+    dnConf.setBlockDeletionInterval(Duration.ofMillis(5000));
     conf.setFromObject(dnConf);
 
     recon = new ReconService(conf);
@@ -209,14 +208,16 @@ public abstract class AbstractTestStorageDistributionEndpoint {
         .createMultipartKey(volumeName, bucketName, "mpukey1",
             100L, 1, multipartInfo.getUploadID());
     partStream.write(new byte[100]);
+    partStream.getMetadata().put(OzoneConsts.ETAG, "mpukey1-part1-etag");
     partStream.close();
   }
 
   protected boolean verifyStorageDistributionAfterKeyCreation() {
     try {
+      syncDataFromOM();
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(STORAGE_DIST_ENDPOINT);
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
       StorageCapacityDistributionResponse storageResponse =
           MAPPER.readValue(response, StorageCapacityDistributionResponse.class);
 
@@ -280,7 +281,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
       syncDataFromOM();
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=om");
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
       Map<String, Number> pendingDeletionMap = MAPPER.readValue(response, Map.class);
       assertEquals(300L, pendingDeletionMap.get("totalSize").longValue());
       assertEquals(300L, pendingDeletionMap.get("pendingDirectorySize").longValue() +
@@ -296,7 +297,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
     try {
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=scm");
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
       ScmPendingDeletion pendingDeletion = MAPPER.readValue(response, ScmPendingDeletion.class);
       assertEquals(300, pendingDeletion.getTotalReplicatedBlockSize());
       assertEquals(100, pendingDeletion.getTotalBlocksize());
@@ -313,9 +314,9 @@ public abstract class AbstractTestStorageDistributionEndpoint {
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-      DataNodeMetricsServiceResponse pendingDeletion =
-          MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
+      DataNodeMetricsCompleteResponse pendingDeletion =
+          MAPPER.readValue(response, DataNodeMetricsCompleteResponse.class);
       assertNotNull(pendingDeletion);
       assertEquals(300, pendingDeletion.getTotalPendingDeletionSize());
       assertEquals(DataNodeMetricsService.MetricCollectionStatus.FINISHED, pendingDeletion.getStatus());
@@ -336,9 +337,9 @@ public abstract class AbstractTestStorageDistributionEndpoint {
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-      DataNodeMetricsServiceResponse pendingDeletion =
-          MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
+      DataNodeMetricsCompleteResponse pendingDeletion =
+          MAPPER.readValue(response, DataNodeMetricsCompleteResponse.class);
       assertNotNull(pendingDeletion);
       assertEquals(0, pendingDeletion.getTotalPendingDeletionSize());
       assertEquals(DataNodeMetricsService.MetricCollectionStatus.FINISHED, pendingDeletion.getStatus());
@@ -358,9 +359,9 @@ public abstract class AbstractTestStorageDistributionEndpoint {
     try {
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
-      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-      DataNodeMetricsServiceResponse pendingDeletion =
-          MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+      String response = ReconEndpointTestUtil.makeHttpCall(conf, urlBuilder);
+      DataNodeMetricsCompleteResponse pendingDeletion =
+          MAPPER.readValue(response, DataNodeMetricsCompleteResponse.class);
       assertNotNull(pendingDeletion);
       assertEquals(1, pendingDeletion.getTotalNodeQueryFailures());
       assertTrue(pendingDeletion.getPendingDeletionPerDataNode()

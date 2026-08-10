@@ -100,6 +100,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconcileContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOpsSubscriber;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerEventHandler;
@@ -483,6 +484,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     moveManager = new MoveManager(replicationManager, containerManager);
     containerReplicaPendingOps.registerSubscriber(moveManager);
+    if (scmNodeManager instanceof ContainerReplicaPendingOpsSubscriber) {
+      containerReplicaPendingOps.registerSubscriber(
+          (ContainerReplicaPendingOpsSubscriber) scmNodeManager);
+    }
     containerBalancer = new ContainerBalancer(this);
 
     // Emit initial safe mode status, as now handlers are registered.
@@ -1594,8 +1599,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     getBlockProtocolServer().start();
 
-    // start datanode protocol server
-    getDatanodeProtocolServer().start();
+    // In HA mode, defer starting the datanode protocol server until the SCM
+    // state machine has caught up with the leader's committed log entries
+    // (see SCMStateMachine#tryStartDNServerAndRefreshSafeMode). In non-HA mode
+    // there is no Ratis state machine, so start it here as before.
+    if (!scmStorageConfig.isSCMHAEnabled()) {
+      getDatanodeProtocolServer().start();
+    }
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
       persistSCMCertificates();
@@ -2250,6 +2260,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public String getHostname() {
     return scmHostName;
+  }
+
+  @Override
+  public String getRatisEvents() {
+    return metrics != null ? metrics.getRatisEvents() : "";
   }
 
   public Collection<String> getScmAdminUsernames() {

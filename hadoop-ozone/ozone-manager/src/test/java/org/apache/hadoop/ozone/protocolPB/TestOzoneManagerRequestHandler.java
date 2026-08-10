@@ -149,6 +149,89 @@ public class TestOzoneManagerRequestHandler {
     }
   }
 
+  /**
+   * getFileStatus must forward the headOp flag from the request KeyArgs into
+   * the OmKeyArgs handed to the OM, and must drop the (unrefreshed) block
+   * locations from a head-op response so it stays small (HDDS-15678).
+   */
+  @Test
+  public void getFileStatusForwardsHeadOpAndStripsLocations() throws IOException {
+    for (boolean headOp : new boolean[] {true, false}) {
+      OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+      OzoneManager ozoneManager = requestHandler.getOzoneManager();
+
+      OzoneFileStatus status = Mockito.mock(OzoneFileStatus.class);
+      OzoneManagerProtocolProtos.OzoneFileStatusProto proto =
+          OzoneManagerProtocolProtos.OzoneFileStatusProto.newBuilder()
+              .setKeyInfo(OzoneManagerProtocolProtos.KeyInfo.newBuilder()
+                  .setVolumeName("volume").setBucketName("bucket")
+                  .setKeyName("key").setDataSize(0)
+                  .setType(HddsProtos.ReplicationType.RATIS)
+                  .setCreationTime(0).setModificationTime(0)
+                  .addKeyLocationList(
+                      OzoneManagerProtocolProtos.KeyLocationList.newBuilder()
+                          .setVersion(0).build())
+                  .build())
+              .build();
+      Mockito.when(status.getProtobuf(Mockito.anyInt())).thenReturn(proto);
+      ArgumentCaptor<OmKeyArgs> captor = ArgumentCaptor.forClass(OmKeyArgs.class);
+      Mockito.when(ozoneManager.getFileStatus(captor.capture())).thenReturn(status);
+
+      OzoneManagerProtocolProtos.OMRequest request =
+          Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+      Mockito.when(request.getTraceID()).thenReturn("traceId");
+      Mockito.when(request.getCmdType())
+          .thenReturn(OzoneManagerProtocolProtos.Type.GetFileStatus);
+      Mockito.when(request.getGetFileStatusRequest()).thenReturn(
+          OzoneManagerProtocolProtos.GetFileStatusRequest.newBuilder()
+              .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                  .setVolumeName("volume").setBucketName("bucket")
+                  .setKeyName("key").setHeadOp(headOp).build())
+              .build());
+
+      OzoneManagerProtocolProtos.OMResponse response =
+          requestHandler.handleReadRequest(request);
+
+      Assertions.assertEquals(headOp, captor.getValue().isHeadOp());
+      int locations = response.getGetFileStatusResponse().getStatus()
+          .getKeyInfo().getKeyLocationListCount();
+      // headOp -> block locations stripped; otherwise retained.
+      Assertions.assertEquals(headOp ? 0 : 1, locations);
+    }
+  }
+
+  /**
+   * A head-op status with no keyInfo (defensive) must be returned unchanged.
+   */
+  @Test
+  public void getFileStatusHeadOpWithoutKeyInfoIsNoop() throws IOException {
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+    OzoneManager ozoneManager = requestHandler.getOzoneManager();
+
+    OzoneFileStatus status = Mockito.mock(OzoneFileStatus.class);
+    Mockito.when(status.getProtobuf(Mockito.anyInt())).thenReturn(
+        OzoneManagerProtocolProtos.OzoneFileStatusProto.newBuilder()
+            .setIsDirectory(true).build());
+    Mockito.when(ozoneManager.getFileStatus(Mockito.any())).thenReturn(status);
+
+    OzoneManagerProtocolProtos.OMRequest request =
+        Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+    Mockito.when(request.getTraceID()).thenReturn("traceId");
+    Mockito.when(request.getCmdType())
+        .thenReturn(OzoneManagerProtocolProtos.Type.GetFileStatus);
+    Mockito.when(request.getGetFileStatusRequest()).thenReturn(
+        OzoneManagerProtocolProtos.GetFileStatusRequest.newBuilder()
+            .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                .setVolumeName("volume").setBucketName("bucket")
+                .setKeyName("key").setHeadOp(true).build())
+            .build());
+
+    OzoneManagerProtocolProtos.OMResponse response =
+        requestHandler.handleReadRequest(request);
+    Assertions.assertFalse(
+        response.getGetFileStatusResponse().getStatus().hasKeyInfo());
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {0, 9, 10, 11, 50})
   public void testListKeysResponseSize(int resultSize) throws IOException {

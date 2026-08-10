@@ -99,4 +99,19 @@ public class TestBaseInsightSubCommand {
     assertEquals("https://om-host:" + OMConfigKeys.OZONE_OM_HTTPS_BIND_PORT_DEFAULT,
         command.getHost(conf, new Component(Type.OM, null)));
   }
+
+  @Test
+  public void testFallbackToIpv6RpcAddress() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, "HTTP_ONLY");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "[2001:db8::1]:9860");
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "[2001:db8::2]:9862");
+
+    BaseInsightSubCommand command = new BaseInsightSubCommand();
+
+    assertEquals("http://[2001:db8::1]:" + ScmConfigKeys.OZONE_SCM_HTTP_BIND_PORT_DEFAULT,
+        command.getHost(conf, new Component(Type.SCM, null)));
+    assertEquals("http://[2001:db8::2]:" + OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DEFAULT,
+        command.getHost(conf, new Component(Type.OM, null)));
+  }
 }

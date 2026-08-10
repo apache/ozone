@@ -42,7 +42,7 @@ public final class NodeUtils {
       List<DatanodeDetails> dns, NodeManager nodeManager) {
     List<Set<StorageType>> dnStorageTypes = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
-      DatanodeInfo datanodeInfo = nodeManager.getDatanodeInfo(dn);
+      DatanodeInfo datanodeInfo = nodeManager.getNode(dn.getID());
       if (datanodeInfo == null) {
         throw new IllegalStateException("Cannot get Datanode : " + dn.getUuidString() + " Info");
       }
