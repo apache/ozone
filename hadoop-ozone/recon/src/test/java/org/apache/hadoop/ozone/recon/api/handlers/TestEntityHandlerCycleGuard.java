@@ -19,13 +19,17 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.AbstractSet;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -39,9 +43,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Tests that the recursive NSSummary tree walks in {@link EntityHandler}
- * tolerate a corrupted (self-referencing / cyclic) tree instead of crashing
- * Recon with a {@link StackOverflowError}.
+ * Tests that the NSSummary tree walks in {@link EntityHandler} tolerate a
+ * corrupted (self-referencing / cyclic) tree instead of crashing Recon with a
+ * {@link StackOverflowError}.
  */
 public class TestEntityHandlerCycleGuard {
 
@@ -132,6 +136,52 @@ public class TestEntityHandlerCycleGuard {
     EntityHandler handler = newHandler();
     assertEquals(3, handler.getTotalDirCount(1L));
     assertThat(handler.getTotalFileSizeDist(1L)[0]).isEqualTo(4);
+  }
+
+  @Test
+  @Timeout(30)
+  public void testWideTreeIsTraversedIncrementally() throws IOException {
+    int childCount = 10_000;
+    AtomicInteger generatedChildren = new AtomicInteger();
+    AtomicInteger childLookups = new AtomicInteger();
+    Set<Long> children = new AbstractSet<Long>() {
+      @Override
+      public Iterator<Long> iterator() {
+        return new Iterator<Long>() {
+          private long nextId = 2;
+
+          @Override
+          public boolean hasNext() {
+            return nextId <= childCount + 1L;
+          }
+
+          @Override
+          public Long next() {
+            assertEquals(childLookups.get(), generatedChildren.get(),
+                "Tree walk buffered child IDs before reading their NSSummary");
+            generatedChildren.incrementAndGet();
+            return nextId++;
+          }
+        };
+      }
+
+      @Override
+      public int size() {
+        return childCount;
+      }
+    };
+
+    when(nsSummaryManager.getNSSummary(anyLong())).thenAnswer(invocation -> {
+      long objectId = invocation.getArgument(0);
+      if (objectId == 1L) {
+        return nsSummary(0, 0L, children);
+      }
+      childLookups.incrementAndGet();
+      return null;
+    });
+
+    assertEquals(childCount, newHandler().getTotalDirCount(1L));
+    assertEquals(childCount, childLookups.get());
   }
 
   private static Set<Long> newSet(Long... ids) {

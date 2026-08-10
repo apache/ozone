@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -213,76 +215,109 @@ public abstract class EntityHandler {
    */
   protected int[] getTotalFileSizeDist(long objectId) throws IOException {
     int[] res = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
-    // Iterative traversal with a visited-set cycle guard. A corrupted NSSummary
-    // tree (e.g. a directory listing itself or an ancestor as a child) would
-    // otherwise recurse forever and crash Recon with a StackOverflowError.
-    Set<Long> visited = new HashSet<>();
-    Deque<Long> stack = new ArrayDeque<>();
-    stack.push(objectId);
-    visited.add(objectId);
-    boolean cycleLogged = false;
-    while (!stack.isEmpty()) {
-      NSSummary nsSummary =
-          reconNamespaceSummaryManager.getNSSummary(stack.pop());
-      if (nsSummary == null) {
-        continue;
-      }
+    walkNSSummaryTree(objectId, nsSummary -> {
       int[] fileSizeBucket = nsSummary.getFileSizeBucket();
       for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         res[i] += fileSizeBucket[i];
       }
-      for (long childId : nsSummary.getChildDir()) {
-        if (visited.add(childId)) {
-          stack.push(childId);
-        } else if (!cycleLogged) {
-          logNSSummaryCycle(childId);
-          cycleLogged = true;
-        }
-      }
-    }
+    });
     return res;
   }
 
   protected int getTotalDirCount(long objectId) throws IOException {
-    // Iterative traversal with a visited-set cycle guard to survive a corrupted
-    // NSSummary tree; see getTotalFileSizeDist for details. Each directory is
-    // counted at most once, so a self-referencing child cannot inflate the
-    // count or cause infinite recursion.
-    Set<Long> visited = new HashSet<>();
-    Deque<Long> stack = new ArrayDeque<>();
-    stack.push(objectId);
-    visited.add(objectId);
-    boolean cycleLogged = false;
-    while (!stack.isEmpty()) {
-      NSSummary nsSummary =
-          getReconNamespaceSummaryManager().getNSSummary(stack.pop());
-      if (nsSummary == null) {
-        continue;
-      }
-      for (long subdir : nsSummary.getChildDir()) {
-        if (visited.add(subdir)) {
-          stack.push(subdir);
-        } else if (!cycleLogged) {
-          logNSSummaryCycle(subdir);
-          cycleLogged = true;
-        }
-      }
-    }
-    // Exclude the starting object itself from the subdirectory count.
-    return visited.size() - 1;
+    return walkNSSummaryTree(objectId, null);
   }
 
   /**
-   * Warn that the NSSummary tree references the same object more than once (a
-   * self/ancestor loop or shared child), which indicates the persisted
-   * NSSummary data is corrupted. The walk de-duplicates such nodes so the
-   * request still completes; this surfaces the corruption to operators. Callers
-   * invoke this at most once per walk.
+   * Walk the NSSummary tree without retaining every object ID. Each stack frame
+   * keeps one child iterator, so live memory is proportional to tree depth
+   * instead of the number of directories. The ancestor set prevents a corrupt
+   * child reference from walking back into the active path.
+   *
+   * @param objectId root object ID
+   * @param summaryConsumer optional consumer for each available NSSummary
+   * @return number of reachable subdirectory references
+   * @throws IOException if an NSSummary cannot be read
+   */
+  private int walkNSSummaryTree(long objectId,
+      Consumer<NSSummary> summaryConsumer) throws IOException {
+    NSSummary rootSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    if (rootSummary == null) {
+      return 0;
+    }
+    if (summaryConsumer != null) {
+      summaryConsumer.accept(rootSummary);
+    }
+
+    Set<Long> ancestors = new HashSet<>();
+    Deque<NSSummaryTraversalFrame> stack = new ArrayDeque<>();
+    ancestors.add(objectId);
+    stack.push(new NSSummaryTraversalFrame(objectId,
+        rootSummary.getChildDir().iterator()));
+    int totalDirCount = 0;
+    boolean cycleLogged = false;
+    while (!stack.isEmpty()) {
+      NSSummaryTraversalFrame frame = stack.peek();
+      if (!frame.getChildIterator().hasNext()) {
+        stack.pop();
+        ancestors.remove(frame.getObjectId());
+        continue;
+      }
+
+      long childId = frame.getChildIterator().next();
+      if (ancestors.contains(childId)) {
+        if (!cycleLogged) {
+          logNSSummaryCycle(childId);
+          cycleLogged = true;
+        }
+        continue;
+      }
+
+      totalDirCount++;
+      NSSummary childSummary =
+          reconNamespaceSummaryManager.getNSSummary(childId);
+      if (childSummary == null) {
+        continue;
+      }
+      if (summaryConsumer != null) {
+        summaryConsumer.accept(childSummary);
+      }
+      ancestors.add(childId);
+      stack.push(new NSSummaryTraversalFrame(childId,
+          childSummary.getChildDir().iterator()));
+    }
+    return totalDirCount;
+  }
+
+  /**
+   * Warn that the NSSummary tree contains a self or ancestor loop. The walk
+   * skips the cyclic edge so the request still completes and operators can see
+   * that the persisted NSSummary data may be corrupted. Callers invoke this at
+   * most once per walk.
    */
   private void logNSSummaryCycle(long objectId) {
-    LOG.warn("Detected a repeated reference to object {} while walking the " +
-        "NSSummary tree under {}; returning a de-duplicated result. The " +
+    LOG.warn("Detected a cycle through object {} while walking the " +
+        "NSSummary tree under {}; skipping the cyclic reference. The " +
         "NSSummary data may be corrupted.", objectId, getNormalizedPath());
+  }
+
+  private static final class NSSummaryTraversalFrame {
+    private final long objectId;
+    private final Iterator<Long> childIterator;
+
+    private NSSummaryTraversalFrame(long objectId,
+        Iterator<Long> childIterator) {
+      this.objectId = objectId;
+      this.childIterator = childIterator;
+    }
+
+    private long getObjectId() {
+      return objectId;
+    }
+
+    private Iterator<Long> getChildIterator() {
+      return childIterator;
+    }
   }
 
   /**
