@@ -31,6 +31,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.ozone.util.PerformanceMetrics;
@@ -70,6 +71,10 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   // RootEndpoint
   private @Metric MutableCounterLong listS3BucketsSuccess;
   private @Metric MutableCounterLong listS3BucketsFailure;
+
+  // Gateway-wide: S3 operations being processed, held until the response is
+  // fully sent (in-flight). A gauge, so it can rise and fall.
+  private @Metric MutableGaugeLong pendingOperations;
 
   // ObjectEndpoint
   private @Metric MutableCounterLong createMultipartKeySuccess;
@@ -390,6 +395,9 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     listS3BucketsSuccessLatencyNs.snapshot(recordBuilder, true);
     listS3BucketsFailure.snapshot(recordBuilder, true);
     listS3BucketsFailureLatencyNs.snapshot(recordBuilder, true);
+
+    // Gateway-wide
+    pendingOperations.snapshot(recordBuilder, true);
 
     // ObjectEndpoint
     createMultipartKeySuccess.snapshot(recordBuilder, true);
@@ -765,6 +773,18 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
 
   public long getHeadBucketSuccess() {
     return headBucketSuccess.value();
+  }
+
+  public void incrPendingOperations() {
+    pendingOperations.incr();
+  }
+
+  public void decrPendingOperations() {
+    pendingOperations.decr();
+  }
+
+  public long getPendingOperations() {
+    return pendingOperations.value();
   }
 
   public long getHeadKeySuccess() {
