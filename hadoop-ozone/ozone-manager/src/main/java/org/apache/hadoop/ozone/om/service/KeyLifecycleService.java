@@ -1151,19 +1151,9 @@ public class KeyLifecycleService extends BackgroundService {
             }
 
             if (openKeyInfo == null) {
-              for (OmLCRule rule : ruleList) {
-                if (!rule.isTagEnable() && passesAgeAndPrefix(upload, keyName, rule)) {
-                  matchingRule = rule;
-                  break;
-                }
-              }
-              if (matchingRule == null) {
-                LOG.debug("Orphan multipart upload {}/{}/{} has no open key and no tag-free rule matches, skipping",
-                    volumeName, bucketName, keyName);
-                continue;
-              }
-              LOG.debug("Orphan multipart upload {}/{}/{} matched rule '{}' without open key, scheduling abort",
-                  volumeName, bucketName, keyName, matchingRule.getId());
+              LOG.debug("Orphan multipart upload {}/{}/{} matched only tag-requiring rules, skipping",
+                  volumeName, bucketName, keyName);
+              continue;
             } else {
               for (OmLCRule rule : ruleList) {
                 if (passesAgeAndPrefix(upload, keyName, rule) && rule.isTagEnable()) {
