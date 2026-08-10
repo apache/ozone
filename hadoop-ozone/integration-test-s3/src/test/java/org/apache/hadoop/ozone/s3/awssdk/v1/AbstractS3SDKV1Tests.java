@@ -1755,6 +1755,30 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testListObjectsV2FetchOwner() {
+    final String bucketName = getBucketName("fetch-owner");
+    final String keyName = getKeyName("obj");
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, RandomStringUtils.secure().nextAlphanumeric(5));
+
+    ListObjectsV2Result defaultResponse = s3Client.listObjectsV2(
+        new ListObjectsV2Request().withBucketName(bucketName));
+    assertThat(defaultResponse.getObjectSummaries()).isNotEmpty();
+    assertNull(defaultResponse.getObjectSummaries().get(0).getOwner());
+
+    ListObjectsV2Result falseResponse = s3Client.listObjectsV2(
+        new ListObjectsV2Request().withBucketName(bucketName).withFetchOwner(false));
+    assertNull(falseResponse.getObjectSummaries().get(0).getOwner());
+
+    ListObjectsV2Result trueResponse = s3Client.listObjectsV2(
+        new ListObjectsV2Request().withBucketName(bucketName).withFetchOwner(true));
+    Owner owner = trueResponse.getObjectSummaries().get(0).getOwner();
+    assertNotNull(owner);
+    assertNotNull(owner.getDisplayName());
+    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, owner.getId());
+  }
+
+  @Test
   public void testHighLevelMultipartUpload(@TempDir Path tempDir) throws Exception {
     TransferManager tm = TransferManagerBuilder.standard()
         .withS3Client(s3Client)
@@ -2223,8 +2247,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     // Test delete lifecycle for a bucket, while doesn't have lifecycle
     assertNull(s3Client.getBucketLifecycleConfiguration(bucketName));
-    assertThrows(AmazonServiceException.class,
-        () -> s3Client.deleteBucketLifecycleConfiguration(bucketName));
+    // Idempotent delete: no exception expected even without an existing config
+    s3Client.deleteBucketLifecycleConfiguration(bucketName);
 
     // First create a lifecycle configuration
     BucketLifecycleConfiguration configuration = new BucketLifecycleConfiguration();
@@ -2495,6 +2519,36 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
         IOUtils.copy(s3is, bos);
         assertEquals(CONTENT, bos.toString("UTF-8"));
       }
+    }
+
+    @Test
+    public void testPresignedUrlGetObjectTorrentNotImplemented() throws Exception {
+      final String keyName = getKeyName();
+
+      InputStream is = new ByteArrayInputStream(CONTENT.getBytes(StandardCharsets.UTF_8));
+      s3Client.putObject(BUCKET_NAME, keyName, is, new ObjectMetadata());
+
+      // AmazonS3 (SDK v1) has no getObjectTorrent API, so exercise the same HTTP behavior
+      // via a presigned URL with the torrent query parameter, as with other request shapes
+      // the typed v1 API doesn't expose.
+      GeneratePresignedUrlRequest generatePresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.GET).withExpiration(expiration);
+      generatePresignedUrlRequest.addRequestParameter("torrent", "");
+      URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "GET", null, null);
+        assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, connection.getResponseCode());
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
+
+      // object must be untouched
+      ObjectMetadata metadata = s3Client.getObjectMetadata(BUCKET_NAME, keyName);
+      assertEquals(CONTENT.length(), metadata.getContentLength());
     }
 
     @Test

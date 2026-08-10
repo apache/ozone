@@ -104,6 +104,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERM
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_NOT_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGroupIdFromOmServiceId;
 import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_SECRET_STORAGE_TYPE;
@@ -212,6 +213,7 @@ import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -499,6 +501,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isStrictS3;
   private final boolean isS3STSEnabled;
   private ExitManager exitManager;
+  /** Test-only hook to fail a checkpoint-install DB backup part way through. */
+  private FaultInjector checkpointBackupInjector;
 
   private OzoneManagerPrepareState prepareState;
 
@@ -4321,9 +4325,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException if download or cleanup fails
    */
   public synchronized TermIndex installSnapshotFromLeader(String leaderId) throws IOException {
-    if (!isRunning() || testInstallSnapshot) {
-      LOG.warn("OzoneManager is not in running state, state {}. Abort install snapshot from Leader.",
-          omState);
+    if (!isRunningOrBootstrapping() || testInstallSnapshot) {
+      LOG.warn("OzoneManager is not in running state nor bootstrapping, state {}. "
+          + "Abort install snapshot from Leader.", omState);
       return null;
     }
 
@@ -4367,6 +4371,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       cleanupCheckpoint(omDBCheckpoint);
     }
     return termIndex;
+  }
+
+  private boolean isRunningOrBootstrapping() {
+    return omState == State.RUNNING || omState == State.BOOTSTRAPPING;
   }
 
   private void cleanupCheckpoint(DBCheckpoint omDBCheckpoint) throws IOException {
@@ -4500,7 +4508,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (oldOmMetadataManagerStopped) {
         time = Time.monotonicNow();
         reloadOMState();
-        setTransactionInfo(TransactionInfo.valueOf(termIndex));
+        // Ratis may read this field through getLatestSnapshot() when decideVote()
+        // obtains the last entry. Publish the position used to unpause. After a failed
+        // DB replacement, these values still identify the restored pre-install state.
+        setTransactionInfo(TransactionInfo.valueOf(term, lastAppliedIndex));
         omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
         newMetadataManagerStarted = true;
         LOG.info("Reloaded OM state with Term: {} and Index: {}. Spend {} ms",
@@ -4622,10 +4633,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           Path existingItem = dbDir.toPath().resolve(itemName);
           if (Files.exists(existingItem)) {
             Path backupTarget = dbBackupDir.toPath().resolve(itemName);
+            if (checkpointBackupInjector != null) {
+              checkpointBackupInjector.pause();
+            }
             Files.move(existingItem, backupTarget);
             backedUpItems.add(itemName);
           }
         }
+      } catch (IOException e) {
+        // Failing part way through leaves dbDir missing every item already moved into
+        // dbBackupDir. Put them back before propagating: the caller reloads the DB on
+        // this path, and RocksDB would otherwise re-create the missing om.db empty.
+        LOG.error("Failed to back up existing DB contents from {} to {}. " +
+                "Restoring from backup.",
+            dbDir, dbBackupDir, e);
+        restoreFromBackup(dbDir, dbBackupDir, backedUpItems);
+        throw e;
       }
     }
 
@@ -4687,38 +4710,54 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to move checkpoint data from {} to {}. " +
               "Restoring from backup.",
           checkpointLocation, dbDir, e);
-      // Rollback: restore only the items that were backed up
-      try {
-        // Delete only the items that were replaced
-        for (String itemName : backedUpItems) {
-          Path targetPath = dbDir.toPath().resolve(itemName);
-          if (Files.exists(targetPath)) {
-            if (Files.isDirectory(targetPath)) {
-              FileUtil.fullyDelete(targetPath.toFile());
-            } else {
-              Files.delete(targetPath);
-            }
-          }
-        }
-        // Restore from backup - only restore items that were backed up
-        if (dbBackupDir.exists() && dbBackupDir.isDirectory()) {
-          File[] backupContents = dbBackupDir.listFiles();
-          if (backupContents != null) {
-            for (File backupItem : backupContents) {
-              String itemName = backupItem.getName();
-              if (backedUpItems.contains(itemName)) {
-                Path targetPath = dbDir.toPath().resolve(itemName);
-                Files.move(backupItem.toPath(), targetPath);
-              }
-            }
-          }
-        }
-        Files.deleteIfExists(markerFile);
-      } catch (IOException ex) {
-        String errorMsg = "Failed to restore from backup. OM is in an inconsistent state.";
-        exitManager.exitSystem(1, errorMsg, ex, LOG);
-      }
+      restoreFromBackup(dbDir, dbBackupDir, backedUpItems);
       throw e;
+    }
+  }
+
+  /**
+   * Rolls dbDir back to the state captured in dbBackupDir, restoring only the items
+   * recorded in backedUpItems and clearing the transient marker. Exits the OM if the
+   * restore itself fails, since dbDir is then neither the old state nor the checkpoint.
+   *
+   * @param dbDir target directory to restore into
+   * @param dbBackupDir backup directory holding the original state
+   * @param backedUpItems names of the items that were backed up
+   * @throws IOException if the exit manager declines to terminate the process
+   */
+  private void restoreFromBackup(File dbDir, File dbBackupDir, Set<String> backedUpItems)
+      throws IOException {
+    Path markerFile = new File(dbDir, DB_TRANSIENT_MARKER).toPath();
+    // Rollback: restore only the items that were backed up
+    try {
+      // Delete only the items that were replaced
+      for (String itemName : backedUpItems) {
+        Path targetPath = dbDir.toPath().resolve(itemName);
+        if (Files.exists(targetPath)) {
+          if (Files.isDirectory(targetPath)) {
+            FileUtil.fullyDelete(targetPath.toFile());
+          } else {
+            Files.delete(targetPath);
+          }
+        }
+      }
+      // Restore from backup - only restore items that were backed up
+      if (dbBackupDir.exists() && dbBackupDir.isDirectory()) {
+        File[] backupContents = dbBackupDir.listFiles();
+        if (backupContents != null) {
+          for (File backupItem : backupContents) {
+            String itemName = backupItem.getName();
+            if (backedUpItems.contains(itemName)) {
+              Path targetPath = dbDir.toPath().resolve(itemName);
+              Files.move(backupItem.toPath(), targetPath);
+            }
+          }
+        }
+      }
+      Files.deleteIfExists(markerFile);
+    } catch (IOException ex) {
+      String errorMsg = "Failed to restore from backup. OM is in an inconsistent state.";
+      exitManager.exitSystem(1, errorMsg, ex, LOG);
     }
   }
 
@@ -4839,14 +4878,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Return true, if the current OM node is leader and in ready state to
-   * process the requests.
+   * Returns true if the current OM node is leader and in ready state to
+   * process requests.
    *
    * If ratis is not enabled, then it always returns true.
    */
   public boolean isLeaderReady() {
     final OzoneManagerRatisServer ratisServer = omRatisServer;
     return ratisServer != null && ratisServer.getLeaderStatus() == LEADER_AND_READY;
+  }
+
+  /**
+   * Returns true if the current OM node is leader.
+   * Note that it also returns true if the OM is leader but is not ready.
+   */
+  public boolean isLeader() {
+    final OzoneManagerRatisServer ratisServer = omRatisServer;
+    if (ratisServer == null) {
+      LOG.warn("OM Ratis server is not initialized; treating this OM as non-leader");
+      return false;
+    }
+
+    final OzoneManagerRatisServer.RaftServerStatus leaderStatus =
+        ratisServer.getLeaderStatus();
+    return leaderStatus == LEADER_AND_READY
+        || leaderStatus == LEADER_AND_NOT_READY;
   }
 
   /**
@@ -5132,6 +5188,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         Pair.of(info.getSourceVolume(), info.getSourceBucket()),
         visited, userGroupInformation, remoteAddress, hostName,
         allowDanglingBuckets, aclEnabled);
+  }
+
+  @VisibleForTesting
+  void setCheckpointBackupInjector(FaultInjector injector) {
+    checkpointBackupInjector = injector;
   }
 
   @VisibleForTesting

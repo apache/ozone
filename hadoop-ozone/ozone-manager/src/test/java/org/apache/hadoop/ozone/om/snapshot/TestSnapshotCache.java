@@ -518,7 +518,15 @@ class TestSnapshotCache {
 
   private static IOzoneManagerLock newAcquiringLock() {
     IOzoneManagerLock acquiringLock = mock(IOzoneManagerLock.class);
+    when(acquiringLock.acquireReadLock(eq(SNAPSHOT_DB_LOCK), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.acquireReadLock(eq(SNAPSHOT_DB_LOCK), any(String.class), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.acquireReadLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseReadLock(eq(SNAPSHOT_DB_LOCK), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseReadLock(eq(SNAPSHOT_DB_LOCK), any(String.class), any(String.class)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.releaseReadLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
@@ -526,7 +534,15 @@ class TestSnapshotCache {
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.releaseResourceWriteLock(eq(SNAPSHOT_DB_LOCK)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
+    when(acquiringLock.acquireWriteLock(eq(SNAPSHOT_DB_LOCK), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.acquireWriteLock(eq(SNAPSHOT_DB_LOCK), any(String.class), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.acquireWriteLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseWriteLock(eq(SNAPSHOT_DB_LOCK), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseWriteLock(eq(SNAPSHOT_DB_LOCK), any(String.class), any(String.class)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.releaseWriteLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);

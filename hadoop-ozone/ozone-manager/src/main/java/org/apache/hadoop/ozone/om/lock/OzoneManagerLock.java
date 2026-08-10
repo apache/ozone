@@ -24,26 +24,27 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.EnumMap;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.RandomAccess;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Function;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.StreamSupport;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.CompositeKey;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.CollectionUtils;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,11 +124,11 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     private ReentrantReadWriteLock getLockForTesting(Resource resource, String... keys) {
       final R r = Preconditions.assertInstanceOf(resource, tracker.getResourceClass());
-      return getLock(r, keys);
+      return getLockWithCombinedKey(r, CompositeKey.combineKeys(keys));
     }
 
-    private ReentrantReadWriteLock getLock(R r, String... keys) {
-      return lockMap.get(r).get(CompositeKey.combineKeys(keys));
+    private ReentrantReadWriteLock getLockWithCombinedKey(R r, Object combinedKey) {
+      return lockMap.get(r).get(combinedKey);
     }
 
     private void acquireLock(R resource, boolean isRead, ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
@@ -140,24 +141,38 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       }
     }
 
-    OMLockDetails acquire(Resource resource, boolean isRead,
-        Function<Striped<ReentrantReadWriteLock>, Iterable<ReentrantReadWriteLock>> getLocks) {
+    private OMLockDetails acquireImpl(Resource resource, BiConsumer<R, Long> acquireLockMethod) {
       final R r = assertAcquire(resource);
       final long startWaitingTimeNanos = Time.monotonicNowNanos();
-      for (ReentrantReadWriteLock lock : getLocks.apply(lockMap.get(r))) {
+      acquireLockMethod.accept(r, startWaitingTimeNanos);
+      return tracker.lockResource(r);
+    }
+
+    private OMLockDetails acquireOne(Resource resource, boolean isRead, Object combinedKey) {
+      return acquireImpl(resource, (r, startWaitingTimeNanos) -> {
+        final ReentrantReadWriteLock lock = getLockWithCombinedKey(r, combinedKey);
         acquireLock(r, isRead, lock, startWaitingTimeNanos);
-      }
-      return tracker.lockResource(r);
+      });
     }
 
-    OMLockDetails acquire(Resource resource, boolean isRead, String... keys) {
-      final R r = assertAcquire(resource);
-      final long startWaitingTimeNanos = Time.monotonicNowNanos();
-      acquireLock(r, isRead, getLock(r, keys), startWaitingTimeNanos);
-      return tracker.lockResource(r);
+    private OMLockDetails acquireAll(Resource resource) {
+      return acquireImpl(resource, (r, startWaitingTimeNanos) -> {
+        final Striped<ReentrantReadWriteLock> striped = lockMap.get(r);
+        for (int i = 0; i < striped.size(); i++) {
+          acquireLock(r, false, striped.getAt(i), startWaitingTimeNanos);
+        }
+      });
     }
 
-    void releaseLock(R resource, boolean isRead, ReentrantReadWriteLock lock) {
+    private OMLockDetails acquireSelected(Resource resource, boolean isRead, Iterable<String[]> keys) {
+      return acquireImpl(resource, (r, startWaitingTimeNanos) -> {
+        for (ReentrantReadWriteLock lock : bulkGetForAcquire(lockMap.get(r), keys)) {
+          acquireLock(r, isRead, lock, startWaitingTimeNanos);
+        }
+      });
+    }
+
+    private void releaseLock(R resource, boolean isRead, ReentrantReadWriteLock lock) {
       if (isRead) {
         lock.readLock().unlock();
         updateReadUnlockMetrics(resource, tracker, lock);
@@ -168,27 +183,36 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       }
     }
 
-    OMLockDetails release(Resource resource, boolean isRead, String... keys) {
+    private OMLockDetails releaseImpl(Resource resource, Consumer<R> releaseLockMethod) {
       final R r = Preconditions.assertInstanceOf(resource, tracker.getResourceClass());
       tracker.clearLockDetails();
-      final ReentrantReadWriteLock lock = getLock(r, keys);
-      releaseLock(r, isRead, lock);
+      releaseLockMethod.accept(r);
       return tracker.unlockResource(r);
     }
 
-    private OMLockDetails release(Resource resource, boolean isRead,
-        Function<Striped<ReentrantReadWriteLock>, Iterable<ReentrantReadWriteLock>> getLock) {
-      final R r = Preconditions.assertInstanceOf(resource, tracker.getResourceClass());
-      tracker.clearLockDetails();
-      final Iterable<ReentrantReadWriteLock> i = getLock.apply(lockMap.get(r));
-      final List<ReentrantReadWriteLock> locks = StreamSupport.stream(i.spliterator(), false)
-          .collect(Collectors.toList());
-      // Release locks in reverse order.
-      Collections.reverse(locks);
-      for (ReentrantReadWriteLock lock : locks) {
+    private OMLockDetails releaseOne(Resource resource, boolean isRead, Object combinedKey) {
+      return releaseImpl(resource, r -> {
+        final ReentrantReadWriteLock lock = getLockWithCombinedKey(r, combinedKey);
         releaseLock(r, isRead, lock);
-      }
-      return tracker.unlockResource(r);
+      });
+    }
+
+    private OMLockDetails releaseAll(Resource resource) {
+      return releaseImpl(resource, r -> {
+        final Striped<ReentrantReadWriteLock> striped = lockMap.get(r);
+        // Release locks in reverse order.
+        for (int i = striped.size() - 1; i >= 0; i--) {
+          releaseLock(r, false, striped.getAt(i));
+        }
+      });
+    }
+
+    private OMLockDetails releaseSelected(Resource resource, boolean isRead, Iterable<String[]> keys) {
+      return releaseImpl(resource, r -> {
+        for (ReentrantReadWriteLock lock : bulkGetForRelease(lockMap.get(r), keys)) {
+          releaseLock(r, isRead, lock);
+        }
+      });
     }
 
     List<String> getCurrentLocks() {
@@ -237,88 +261,91 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return SimpleStriped.readWriteLock(size, fair);
   }
 
-  private Iterable<ReentrantReadWriteLock> getAllLocks(Striped<ReentrantReadWriteLock> striped) {
-    return IntStream.range(0, striped.size()).mapToObj(striped::getAt).collect(Collectors.toList());
+  /** @return locks in ascending order for acquire. */
+  static Iterable<ReentrantReadWriteLock> bulkGetForAcquire(
+      Striped<ReentrantReadWriteLock> striped, Iterable<String[]> keys) {
+    return striped.bulkGet(CollectionUtils.as(keys, CompositeKey::combineKeys)); // no copying
   }
 
-  private Iterable<ReentrantReadWriteLock> bulkGetLock(Striped<ReentrantReadWriteLock> striped,
-      Collection<String[]> keys) {
-    List<Object> lockKeys = new ArrayList<>(keys.size());
-    for (String[] key : keys) {
-      if (Objects.nonNull(key)) {
-        lockKeys.add(CompositeKey.combineKeys(key));
+  /** @return locks in descending order for release. */
+  static Iterable<ReentrantReadWriteLock> bulkGetForRelease(
+      Striped<ReentrantReadWriteLock> striped, Iterable<String[]> keys) {
+    final Iterable<ReentrantReadWriteLock> iterable = bulkGetForAcquire(striped, keys);
+
+    // although the return type of Striped.bulkGet(..) is Iterable, its implementation currently returns an ArrayList.
+    if (iterable instanceof List && iterable instanceof RandomAccess) {
+      final List<ReentrantReadWriteLock> list = (List<ReentrantReadWriteLock>) iterable;
+      // return in descending order
+      return () -> new Iterator<ReentrantReadWriteLock>() {
+        private int i = list.size() - 1;
+
+        @Override
+        public boolean hasNext() {
+          return i >= 0;
+        }
+
+        @Override
+        public ReentrantReadWriteLock next() {
+          return list.get(i--);
+        }
+      };
+    }
+
+    // use Deque
+    final Deque<ReentrantReadWriteLock> deque;
+    if (iterable instanceof Deque) {
+      deque = (Deque<ReentrantReadWriteLock>) iterable;
+    } else {
+      // fallback copying to a list
+      deque = new LinkedList<>();
+      for (ReentrantReadWriteLock lock : iterable) {
+        deque.add(lock);
       }
     }
-    return striped.bulkGet(lockKeys);
+    return deque::descendingIterator;
   }
 
-  /**
-   * Acquire read lock on resource.
-   *
-   * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
-   * thread acquiring lock again is allowed.
-   *
-   * For USER_LOCK, PREFIX_LOCK, S3_SECRET_LOCK type resource, same thread
-   * acquiring lock again is not allowed.
-   *
-   * Special Note for USER_LOCK: Single thread can acquire single user lock/
-   * multi user lock. But not both at the same time.
-   * @param resource - Type of the resource.
-   * @param keys - Resource names on which user want to acquire lock.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
+  @Override
+  public OMLockDetails acquireReadLock(Resource resource, String key) {
+    return getResourceLocks(resource)
+        .acquireOne(resource, true, key);
+  }
+
+  @Override
+  public OMLockDetails acquireReadLock(Resource resource, String key1, String key2) {
+    return getResourceLocks(resource)
+        .acquireOne(resource, true, CompositeKey.combineTwoKeys(key1, key2));
+  }
+
   @Override
   public OMLockDetails acquireReadLock(Resource resource, String... keys) {
+    Preconditions.assertTrue(keys.length > 2);
     return getResourceLocks(resource)
-        .acquire(resource, true, keys);
+        .acquireOne(resource, true, CompositeKey.combineMultiKeys(keys));
   }
 
-  /**
-   * Acquire read locks on a list of resources.
-   *
-   * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
-   * thread acquiring lock again is allowed.
-   *
-   * For USER_LOCK, PREFIX_LOCK, S3_SECRET_LOCK type resource, same thread
-   * acquiring lock again is not allowed.
-   *
-   * Special Note for USER_LOCK: Single thread can acquire single user lock/
-   * multi user lock. But not both at the same time.
-   * @param resource - Type of the resource.
-   * @param keys - A list of Resource names on which user want to acquire locks.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
   @Override
-  public OMLockDetails acquireReadLocks(Resource resource, Collection<String[]> keys) {
+  public OMLockDetails acquireReadLocks(Resource resource, Iterable<String[]> keys) {
     return getResourceLocks(resource)
-        .acquire(resource, true, striped -> bulkGetLock(striped, keys));
+        .acquireSelected(resource, true, keys);
   }
 
-  /**
-   * Acquire write lock on resource.
-   *
-   * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
-   * thread acquiring lock again is allowed.
-   *
-   * For USER_LOCK, PREFIX_LOCK, S3_SECRET_LOCK type resource, same thread
-   * acquiring lock again is not allowed.
-   *
-   * Special Note for USER_LOCK: Single thread can acquire single user lock/
-   * multi user lock. But not both at the same time.
-   * @param resource - Type of the resource.
-   * @param keys - Resource names on which user want to acquire lock.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
+  @Override
+  public OMLockDetails acquireWriteLock(Resource resource, String key) {
+    return getResourceLocks(resource)
+        .acquireOne(resource, false, key);
+  }
+
+  @Override
+  public OMLockDetails acquireWriteLock(Resource resource, String key1, String key2) {
+    return getResourceLocks(resource)
+        .acquireOne(resource, false, CompositeKey.combineTwoKeys(key1, key2));
+  }
+
   @Override
   public OMLockDetails acquireWriteLock(Resource resource, String... keys) {
     return getResourceLocks(resource)
-        .acquire(resource, false, keys);
+        .acquireOne(resource, false, CompositeKey.combineMultiKeys(keys));
   }
 
   /**
@@ -339,9 +366,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails acquireWriteLocks(Resource resource, Collection<String[]> keys) {
+  public OMLockDetails acquireWriteLocks(Resource resource, Iterable<String[]> keys) {
     return getResourceLocks(resource)
-        .acquire(resource, false, striped -> bulkGetLock(striped, keys));
+        .acquireSelected(resource, false, keys);
   }
 
   /**
@@ -352,7 +379,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @Override
   public OMLockDetails acquireResourceWriteLock(Resource resource) {
     return getResourceLocks(resource)
-        .acquire(resource, false, this::getAllLocks);
+        .acquireAll(resource);
   }
 
   private void updateReadLockMetrics(Resource resource, ResourceLockTracker<? extends Resource> tracker,
@@ -421,19 +448,22 @@ public class OzoneManagerLock implements IOzoneManagerLock {
         Arrays.asList(new String[] {firstUser}, new String[] {secondUser}));
   }
 
+  @Override
+  public OMLockDetails releaseWriteLock(Resource resource, String key) {
+    return getResourceLocks(resource)
+        .releaseOne(resource, false, key);
+  }
 
-  /**
-   * Release write lock on resource.
-   * @param resource - Type of the resource.
-   * @param keys - Resource names on which user want to acquire lock.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
+  @Override
+  public OMLockDetails releaseWriteLock(Resource resource, String key1, String key2) {
+    return getResourceLocks(resource)
+        .releaseOne(resource, false, CompositeKey.combineTwoKeys(key1, key2));
+  }
+
   @Override
   public OMLockDetails releaseWriteLock(Resource resource, String... keys) {
     return getResourceLocks(resource)
-        .release(resource, false, keys);
+        .releaseOne(resource, false, CompositeKey.combineMultiKeys(keys));
   }
 
   /**
@@ -445,9 +475,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails releaseWriteLocks(Resource resource, Collection<String[]> keys) {
+  public OMLockDetails releaseWriteLocks(Resource resource, Iterable<String[]> keys) {
     return getResourceLocks(resource)
-        .release(resource, false, striped -> bulkGetLock(striped, keys));
+        .releaseSelected(resource, false, keys);
   }
 
   /**
@@ -458,21 +488,25 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @Override
   public OMLockDetails releaseResourceWriteLock(Resource resource) {
     return getResourceLocks(resource)
-        .release(resource, false, this::getAllLocks);
+        .releaseAll(resource);
   }
 
-  /**
-   * Release read lock on resource.
-   * @param resource - Type of the resource.
-   * @param keys - Resource names on which user want to acquire lock.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
+  @Override
+  public OMLockDetails releaseReadLock(Resource resource, String key) {
+    return getResourceLocks(resource)
+        .releaseOne(resource, true, key);
+  }
+
+  @Override
+  public OMLockDetails releaseReadLock(Resource resource, String key1, String key2) {
+    return getResourceLocks(resource)
+        .releaseOne(resource, true, CompositeKey.combineTwoKeys(key1, key2));
+  }
+
   @Override
   public OMLockDetails releaseReadLock(Resource resource, String... keys) {
     return getResourceLocks(resource)
-        .release(resource, true, keys);
+        .releaseOne(resource, true, CompositeKey.combineMultiKeys(keys));
   }
 
   /**
@@ -484,9 +518,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public OMLockDetails releaseReadLocks(Resource resource, Collection<String[]> keys) {
+  public OMLockDetails releaseReadLocks(Resource resource, Iterable<String[]> keys) {
     return getResourceLocks(resource)
-        .release(resource, true, striped -> bulkGetLock(striped, keys));
+        .releaseSelected(resource, true, keys);
   }
 
   private void updateReadUnlockMetrics(Resource resource, ResourceLockTracker<? extends Resource> tracker,

@@ -112,7 +112,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
     String prefix = queryParams().get(QueryParams.PREFIX, "");
     String startAfter = queryParams().get(QueryParams.START_AFTER);
-
+    boolean includeOwner = shouldIncludeOwnerInListResponse();
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
     // AWS S3 treats an empty continuation-token as no token: list from the
     // start and echo the empty token back (see setContinueToken below).
@@ -143,7 +143,6 @@ public class BucketEndpoint extends BucketOperationHandler {
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
 
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
-
     } catch (OMException ex) {
       getMetrics().updateGetBucketFailureStats(context.getStartNanos());
       handleOMException(ex, bucketName, prefix);
@@ -212,11 +211,13 @@ public class BucketEndpoint extends BucketOperationHandler {
             } else {
               // means our key is matched with prefix if prefix is given and it
               // does not have any common prefix.
-              addKey(response, next);
+              addKey(response, next, includeOwner);
               count++;
             }
           } else {
-            addKey(response, next);
+            // means our key is matched with prefix if prefix is given and it
+            // does not have any common prefix.
+            addKey(response, next, includeOwner);
             count++;
           }
 
@@ -400,7 +401,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     return result;
   }
 
-  private void addKey(ListObjectResponse response, OzoneKey next) {
+  private void addKey(ListObjectResponse response, OzoneKey next, boolean includeOwner) {
     KeyMetadata keyMetadata = new KeyMetadata();
     keyMetadata.setKey(EncodingTypeObject.createNullable(next.getName(),
         response.getEncodingType()));
@@ -412,8 +413,9 @@ public class BucketEndpoint extends BucketOperationHandler {
     keyMetadata.setStorageClass(S3StorageType.fromReplicationConfig(
         next.getReplicationConfig()).toString());
     keyMetadata.setLastModified(next.getModificationTime());
-    String displayName = next.getOwner();
-    keyMetadata.setOwner(S3Owner.of(displayName));
+    if (includeOwner) {
+      keyMetadata.setOwner(S3Owner.of(next.getOwner()));
+    }
     response.addKey(keyMetadata);
   }
 
@@ -432,6 +434,7 @@ public class BucketEndpoint extends BucketOperationHandler {
         .add(new BucketAclHandler())
         .add(new ListMultipartUploadsHandler())
         .add(new BucketTaggingHandler())
+        .add(new BucketLifecycleHandler())
         .add(new BucketCrudHandler())
         .add(this)
         .build();
@@ -465,4 +468,9 @@ public class BucketEndpoint extends BucketOperationHandler {
     }
   }
 
+  private boolean shouldIncludeOwnerInListResponse() {
+    int listType = queryParams().getInt(QueryParams.LIST_TYPE, 1);
+    boolean fetchOwner = queryParams().getBoolean(QueryParams.FETCH_OWNER, false);
+    return listType != 2 || fetchOwner;
+  }
 }
