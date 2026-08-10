@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.admin.scm;
 
+import com.google.common.net.HostAndPort;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -75,7 +76,13 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
           String[] roleItems = HddsUtils.parseRatisRoleString(role);
           formattingCLIUtils.addLine(roleItems);
         } catch (IllegalArgumentException e) {
-          formattingCLIUtils.addLine(new String[]{role, "", "", "", ""});
+          try {
+            HostAndPort hp = HostAndPort.fromString(role);
+            String port = hp.hasPort() ? String.valueOf(hp.getPort()) : "";
+            formattingCLIUtils.addLine(new String[]{hp.getHost(), port, "", "", ""});
+          } catch (IllegalArgumentException ex) {
+            formattingCLIUtils.addLine(new String[]{role, "", "", "", ""});
+          }
         }
       }
       System.out.println(formattingCLIUtils.render());
@@ -100,8 +107,15 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
         roleDetails.put("InetAddress", fields[4]);
         allRoles.put(fields[0], roleDetails);
       } catch (IllegalArgumentException e) {
-        roleDetails.put("address", role);
-        allRoles.put(role, roleDetails);
+        try {
+          HostAndPort hp = HostAndPort.fromString(role);
+          String addr = hp.hasPort() ? HddsUtils.getHostPortString(hp.getHost(), hp.getPort()) : hp.getHost();
+          roleDetails.put("address", addr);
+          allRoles.put(hp.getHost(), roleDetails);
+        } catch (IllegalArgumentException ex) {
+          roleDetails.put("address", role);
+          allRoles.put(role, roleDetails);
+        }
       }
     }
     return allRoles;
