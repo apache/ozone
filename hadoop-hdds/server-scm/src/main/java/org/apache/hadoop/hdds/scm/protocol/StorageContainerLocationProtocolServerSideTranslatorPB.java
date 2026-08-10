@@ -774,10 +774,20 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setQueryUpgradeStatusResponse(getQueryUpgradeStatus(request.getQueryUpgradeStatusRequest()))
             .build();
       case FinalizeUpgrade:
-        impl.finalizeUpgrade();
+        if (request.getFinalizeUpgradeRequest().getForce()) {
+          impl.forceFinalizeUpgrade();
+        } else {
+          impl.finalizeUpgrade();
+        }
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
+            .build();
+      case GetPeerUpgradeStatus:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetPeerUpgradeStatusResponse(getPeerUpgradeStatus(request.getGetPeerUpgradeStatusRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -1129,6 +1139,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return StorageContainerLocationProtocolProtos.QueryUpgradeStatusResponseProto
         .newBuilder()
         .setStatus(response)
+        .build();
+  }
+
+  public StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusResponseProto getPeerUpgradeStatus(
+      StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusRequestProto request) throws IOException {
+
+    return StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusResponseProto
+        .newBuilder()
+        .setScmSoftwareVersion(impl.getPeerUpgradeStatus().serialize())
         .build();
   }
 
