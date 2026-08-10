@@ -58,6 +58,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -846,6 +847,91 @@ class TestKeyDeletingService extends OzoneTestBase {
           assertEquals(expected * 3, snapshotInfo.getExclusiveReplicatedSize());
         }
       }
+    }
+  }
+
+  @Nested
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  class SnapshotDbHandleLifecycle {
+
+    @BeforeAll
+    void setup(@TempDir File testDir) throws Exception {
+      scmBlockTestingClient = new ScmBlockLocationTestingClient(null, null, 0);
+      createConfig(testDir);
+      createSubject();
+      keyDeletingService.shutdown();
+    }
+
+    @AfterAll
+    void cleanup() {
+      if (om.stop()) {
+        om.join();
+      }
+    }
+
+    @Test
+    @DisplayName("KeyDeletingService should close the snapshot DB handle before submitting an OM request")
+    void testSnapshotDbHandleClosedBeforeSubmit() throws Exception {
+      String volumeName = getTestName();
+      String bucketName = uniqueObjectName("bucket");
+      String snapshotName = uniqueObjectName("snap");
+      createVolumeAndBucket(volumeName, bucketName, false);
+      writeClient.createSnapshot(volumeName, bucketName, snapshotName);
+      om.awaitDoubleBufferFlush();
+
+      String snapshotKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName);
+      SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable().get(snapshotKey);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }, 100, 10000);
+      snapshotInfo.setDeepCleanedDeletedDir(true);
+
+      OzoneManager ozoneManager = Mockito.spy(om);
+      OmSnapshotManager omSnapshotManager = Mockito.spy(om.getOmSnapshotManager());
+      when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
+
+      AtomicBoolean snapshotDbHandleClosed = new AtomicBoolean();
+      doAnswer(invocation -> {
+        UncheckedAutoCloseableSupplier<OmSnapshot> delegate =
+            (UncheckedAutoCloseableSupplier<OmSnapshot>) invocation.callRealMethod();
+        return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
+          @Override
+          public OmSnapshot get() {
+            return delegate.get();
+          }
+
+          @Override
+          public void close() {
+            delegate.close();
+            snapshotDbHandleClosed.set(true);
+          }
+        };
+      }).when(omSnapshotManager).getActiveSnapshot(volumeName, bucketName, snapshotName);
+
+      AtomicBoolean requestSubmitted = new AtomicBoolean();
+      KeyDeletingService service = new KeyDeletingService(ozoneManager, scmBlockTestingClient, 10000,
+          100000, conf, 1, true) {
+        @Override
+        protected OzoneManagerProtocolProtos.OMResponse submitRequest(
+            OzoneManagerProtocolProtos.OMRequest omRequest) {
+          assertTrue(snapshotDbHandleClosed.get(), "Snapshot DB handle must be closed before submitting to Ratis");
+          requestSubmitted.set(true);
+          return OzoneManagerProtocolProtos.OMResponse.newBuilder()
+              .setCmdType(omRequest.getCmdType())
+              .setStatus(OzoneManagerProtocolProtos.Status.OK)
+              .setSuccess(true)
+              .build();
+        }
+      };
+      service.shutdown();
+
+      service.new KeyDeletingTask(snapshotInfo.getSnapshotId()).call();
+
+      assertTrue(requestSubmitted.get());
     }
   }
 
