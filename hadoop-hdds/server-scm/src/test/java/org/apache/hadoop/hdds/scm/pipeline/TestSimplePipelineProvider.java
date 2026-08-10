@@ -190,7 +190,7 @@ public class TestSimplePipelineProvider {
     }
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(nodes);
-    when(nodeManager.getDatanodeInfo(any()))
+    when(nodeManager.getNode(any()))
         .thenAnswer(invocation -> invocation.getArgument(0));
     when(pipelineStateManager.getPipelines(
             any(ReplicationConfig.class)))

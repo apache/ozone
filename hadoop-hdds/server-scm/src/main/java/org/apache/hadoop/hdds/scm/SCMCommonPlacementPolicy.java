@@ -282,7 +282,7 @@ public abstract class SCMCommonPlacementPolicy implements
       StorageType storageType)
       throws SCMException {
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
-        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, storageType))
+        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, storageType, nodeManager))
         .collect(Collectors.toList());
 
     if (nodesWithSpace.size() < nodesRequired) {
@@ -300,22 +300,42 @@ public abstract class SCMCommonPlacementPolicy implements
   }
 
   /**
-   * Returns true if this node has enough space to meet our requirement.
+   * Returns true if this node has enough space to satisfy the placement request.
    *
-   * @param datanodeDetails DatanodeDetails
-   * @return true if we have enough space.
+   * <p>Data-space is checked via {@link NodeManager#hasAvailableSpace}, which
+   * delegates to {@link org.apache.hadoop.hdds.scm.node.PendingContainerTracker}
+   * and accounts for both current disk usage and in-flight allocations.
+   * The check always uses {@code maxContainerSize} as the unit of allocation,
+   * regardless of the actual container's used bytes.
+   *
+   * @param datanodeDetails the datanode to evaluate
+   * @param metadataSizeRequired minimum metadata volume space required in bytes
+   * @param nodeManager used to check slot availability via PendingContainerTracker
+   * @return true if the datanode has both an available data slot and enough metadata space
    */
   public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
                                        long metadataSizeRequired,
-                                       long dataSizeRequired, StorageType storageType) {
+                                       long dataSizeRequired, StorageType storageType,
+                                       NodeManager nodeManager) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
-    boolean enoughForData = false;
     boolean enoughForMeta = false;
 
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
 
-    if (dataSizeRequired > 0) {
+    // Data-space check: use PendingContainerTracker slot availability.
+    // This accounts for both current disk usage and in-flight allocations.
+    // Always slot-based (maxContainerSize unit).
+    if (!nodeManager.hasAvailableSpace(datanodeInfo, storageType)) {
+      LOG.debug("Datanode {} has no available container slots.", datanodeDetails);
+      return false;
+    }
+
+    // Tier-aware data check (StorageType feature): when a specific storageType is
+    // requested, ensure the node has a volume of that tier with enough usable space.
+    // When storageType is null (any tier), rely on the slot check above (master behavior).
+    boolean enoughForData = false;
+    if (dataSizeRequired > 0 && storageType != null) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
         boolean matchesTier = StorageTypeUtils.getFromProtobuf(
             reportProto.getStorageType()).equals(storageType);
@@ -422,6 +442,18 @@ public abstract class SCMCommonPlacementPolicy implements
    * @return The max number of replicas per rack
    */
   protected int getMaxReplicasPerRack(int numReplicas, int numberOfRacks) {
+    if (numberOfRacks <= 0) {
+      // No rack information means there is no per-rack constraint to
+      // enforce. Callers are expected to short-circuit before reaching
+      // here, but guard the divide site against transient empty-topology
+      // windows (HDDS-15350). The WARN makes the silent path observable;
+      // configure log4j appender-side filtering if it floods.
+      LOG.warn("Empty rack topology in placement validation: numReplicas={} "
+          + "numberOfRacks={}; returning numReplicas to avoid divide-by-zero "
+          + "(HDDS-15350).",
+          numReplicas, numberOfRacks);
+      return numReplicas;
+    }
     return numReplicas / numberOfRacks
             + Math.min(numReplicas % numberOfRacks, 1);
   }
@@ -447,7 +479,16 @@ public abstract class SCMCommonPlacementPolicy implements
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     // We have a network topology so calculate if it is satisfied or not.
     int requiredRacks = getRequiredRackCount(replicas, 0);
-    if (topology == null || replicas == 1 || requiredRacks == 1) {
+    // The leaf nodes are all at max level, so the number of nodes at
+    // maxLevel - 1 is the rack count. Compute up front so we can
+    // short-circuit when the topology has no rack information, which
+    // would otherwise reach getMaxReplicasPerRack with numberOfRacks
+    // == 0 (HDDS-15350: transient empty-topology window during a DN
+    // decommission crashed the ReplicationMonitor with "/ by zero").
+    final int numRacks = topology == null ? 0
+        : topology.getNumOfNodes(topology.getMaxLevel() - 1);
+    if (topology == null || replicas == 1 || requiredRacks <= 1
+        || numRacks <= 0) {
       if (!dns.isEmpty()) {
         // placement is always satisfied if there is at least one DN.
         return validPlacement;
@@ -482,10 +523,6 @@ public abstract class SCMCommonPlacementPolicy implements
             Function.identity(),
             Collectors.reducing(0, e -> 1, Integer::sum)))
         .values());
-    final int maxLevel = topology.getMaxLevel();
-    // The leaf nodes are all at max level, so the number of nodes at
-    // leafLevel - 1 is the rack count
-    int numRacks = topology.getNumOfNodes(maxLevel - 1);
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }
@@ -533,8 +570,8 @@ public abstract class SCMCommonPlacementPolicy implements
       return false;
     }
     NodeStatus nodeStatus = datanodeInfo.getNodeStatus();
-    if (nodeStatus.isNodeWritable() &&
-        (hasEnoughSpace(datanodeInfo, metadataSizeRequired, dataSizeRequired, storageType))) {
+    if (nodeStatus.isNodeWritable() && (hasEnoughSpace(datanodeInfo,
+        metadataSizeRequired, dataSizeRequired, storageType, nodeManager))) {
       LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
               "required data size is {} and NodeStatus is {}",
           datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);

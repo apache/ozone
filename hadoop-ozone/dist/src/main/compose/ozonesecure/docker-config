@@ -24,6 +24,7 @@ OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
 OZONE-SITE.XML_ozone.scm.http-address=scm:9876
 OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.block.size=1MB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.ec.pipeline.minimum=1
@@ -49,8 +50,7 @@ OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.acl.enabled=true
 OZONE-SITE.XML_ozone.acl.authorizer.class=org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
-OZONE-SITE.XML_ozone.administrators="testuser,recon,om"
-OZONE-SITE.XML_ozone.s3.administrators="testuser,recon,om"
+OZONE-SITE.XML_ozone.administrators="testuser,recon,om,hadoop"
 OZONE-SITE.XML_ozone.recon.administrators="testuser2"
 OZONE-SITE.XML_ozone.s3.administrators="testuser,s3g"
 
@@ -125,15 +125,6 @@ CORE-SITE.XML_hadoop.http.authentication.type=kerberos
 CORE-SITE.XML_hadoop.http.authentication.kerberos.principal=HTTP/ozone@EXAMPLE.COM
 CORE-SITE.XML_hadoop.http.authentication.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
 
-
-CORE-SITE.XML_hadoop.security.authorization=true
-HADOOP-POLICY.XML_ozone.om.security.client.protocol.acl=*
-HADOOP-POLICY.XML_hdds.security.client.datanode.container.protocol.acl=*
-HADOOP-POLICY.XML_hdds.security.client.scm.container.protocol.acl=*
-HADOOP-POLICY.XML_hdds.security.client.scm.block.protocol.acl=*
-HADOOP-POLICY.XML_hdds.security.client.scm.certificate.protocol.acl=*
-HADOOP-POLICY.XML_ozone.security.reconfigure.protocol.acl=*
-
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 
@@ -189,3 +180,29 @@ OZONE-SITE.XML_ozone.om.tenant.dev.skip.ranger=true
 
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
+
+# Recon AI Chatbot — DISABLED by default.
+#
+# WARNING: The plaintext API key approach shown below is for LOCAL DOCKER
+# TESTING ONLY. It must NOT be used on production clusters because plaintext
+# keys are exposed via 'hadoop conf | grep api.key' and via Recon's /conf HTTP
+# endpoint. For production clusters, store the key in a Hadoop JCEKS credential
+# store instead (see ozone-site.xml.template for full setup instructions).
+#
+# To enable the chatbot locally for testing:
+#   1. Uncomment ONE block below (direct provider or gateway).
+#   2. Replace the placeholder key with a real key.
+#   3. Never commit a real key to git — rotate it immediately if you do.
+#
+# --- Direct provider (Gemini example; OpenAI and Anthropic are also supported) ---
+# OZONE-SITE.XML_ozone.recon.chatbot.enabled=true
+# OZONE-SITE.XML_ozone.recon.chatbot.provider=gemini
+# OZONE-SITE.XML_ozone.recon.chatbot.gemini.api.key=YOUR_GEMINI_API_KEY_HERE
+#
+# --- OpenAI-compatible gateway (LiteLLM etc.) — one door for all models ---
+# OZONE-SITE.XML_ozone.recon.chatbot.enabled=true
+# OZONE-SITE.XML_ozone.recon.chatbot.provider=gateway
+# OZONE-SITE.XML_ozone.recon.chatbot.gateway.base.url=https://your-gateway/v1
+# OZONE-SITE.XML_ozone.recon.chatbot.gateway.api.key=YOUR_GATEWAY_KEY_HERE
+# OZONE-SITE.XML_ozone.recon.chatbot.gateway.models=gpt-4.1,claude-sonnet,gemini-2.5-flash
+# OZONE-SITE.XML_ozone.recon.chatbot.default.model=claude-sonnet

@@ -36,10 +36,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachHealthState;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachPersistedOpState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachHealthState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachPersistedOpState;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -71,9 +71,9 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -158,7 +158,7 @@ class TestReplicationManagerIntegration {
 
     client = cluster.newClient();
     scmClient = new ContainerOperationClient(cluster.getConf());
-    bucket = TestDataUtil.createVolumeAndBucket(client);
+    bucket = DataTestUtil.createVolumeAndBucket(client);
   }
 
   @AfterEach
@@ -179,7 +179,7 @@ class TestReplicationManagerIntegration {
   public void testClosedContainerReplicationWhenNodeDies()
       throws Exception {
     String keyName = "key-" + UUID.randomUUID();
-    TestDataUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
+    DataTestUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
         "this is the content".getBytes(StandardCharsets.UTF_8));
 
     // Get the container ID for the key
@@ -227,7 +227,7 @@ class TestReplicationManagerIntegration {
       throws Exception {
 
     String keyName = "key-" + UUID.randomUUID();
-    TestDataUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
+    DataTestUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
         "this is the content".getBytes(StandardCharsets.UTF_8));
 
     OzoneKeyDetails key = bucket.getKey(keyName);
@@ -278,7 +278,7 @@ class TestReplicationManagerIntegration {
   @Test
   public void testDeadMaintenanceNodeAndDecommission() throws Exception {
     String keyName = "key-" + UUID.randomUUID();
-    TestDataUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
+    DataTestUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
         "this is the content".getBytes(StandardCharsets.UTF_8));
 
     OzoneKeyDetails key = bucket.getKey(keyName);
@@ -322,7 +322,7 @@ class TestReplicationManagerIntegration {
   @Test
   public void testOneDeadMaintenanceNodeAndOneLiveMaintenanceNodeAndOneDecommissionNode() throws Exception {
     String keyName = "key-" + UUID.randomUUID();
-    TestDataUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
+    DataTestUtil.createKey(bucket, keyName, RATIS_REPLICATION_CONFIG,
         "this is the content".getBytes(StandardCharsets.UTF_8));
 
     OzoneKeyDetails key = bucket.getKey(keyName);

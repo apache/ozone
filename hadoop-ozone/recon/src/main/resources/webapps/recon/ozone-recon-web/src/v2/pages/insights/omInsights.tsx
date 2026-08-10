@@ -118,7 +118,7 @@ const OMDBInsights: React.FC<{}> = () => {
     </div>
     <div style={{ padding: '24px' }}>
       <div className='content-div'>
-        <Tabs defaultActiveKey={activeTab ?? '1'}>
+        <Tabs defaultActiveKey={activeTab ?? '1'} destroyInactiveTabPane>
           <Tabs.TabPane key='1' tab={
             <label>
               Container Mismatch Info

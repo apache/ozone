@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.invoker.RootCARotationHandlerInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
@@ -227,7 +228,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
       final RootCARotationHandler impl =
           new RootCARotationHandlerImpl(scm, rootCARotationManager);
 
-      return ratisServer.getProxyHandler(RootCARotationHandler.class, impl);
+      return ratisServer.getProxyHandler(new RootCARotationHandlerInvoker(impl, ratisServer));
     }
   }
 }

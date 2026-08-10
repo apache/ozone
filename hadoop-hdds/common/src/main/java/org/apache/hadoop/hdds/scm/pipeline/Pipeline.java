@@ -581,6 +581,7 @@ public final class Pipeline {
       b.append(" {").append(datanodeDetails)
           .append(", ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails)).append("},");
     }
+
     b.append(']')
         .append(", ReplicationConfig: ").append(replicationConfig)
         .append(", State:").append(getPipelineState())

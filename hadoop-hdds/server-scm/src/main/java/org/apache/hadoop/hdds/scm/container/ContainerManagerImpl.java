@@ -17,14 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Objects;
 import java.util.Random;
@@ -44,10 +41,10 @@ import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,9 +136,10 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public List<ContainerID> getContainerIDs(final ContainerID startID,
                                            final int count,
-                                           final LifeCycleState state) {
+                                           final LifeCycleState state,
+                                           final ContainerHealthState healthState) {
     scmContainerManagerMetrics.incNumListContainersOps();
-    return containerStateManager.getContainerIDs(state, startID, count);
+    return containerStateManager.getContainerIDs(state, healthState, startID, count);
   }
 
   @Override
@@ -243,18 +241,19 @@ public class ContainerManagerImpl implements ContainerManager {
                                           final String owner,
                                           StorageTier storageTier)
       throws IOException {
-    if (!pipelineManager.hasEnoughSpace(pipeline)) {
-      LOG.debug("Cannot allocate a new container because pipeline {} does not have enough space.", pipeline);
-      return null;
-    }
-
-    final long uniqueId = sequenceIdGen.getNextId(CONTAINER_ID);
+    final long uniqueId = sequenceIdGen.getNextId(SequenceIdType.containerId);
     Preconditions.checkState(uniqueId > 0,
         "Cannot allocate container, negative container id" +
             " generated. %s.", uniqueId);
     Objects.requireNonNull(storageTier,
         "Cannot allocate container, StorageTier cannot be null.");
     final ContainerID containerID = ContainerID.valueOf(uniqueId);
+
+    if (!pipelineManager.checkSpaceAndRecordAllocation(pipeline, containerID)) {
+      LOG.debug("Cannot allocate a new container because pipeline {} does not have enough space.", pipeline);
+      return null;
+    }
+
     final ContainerInfoProto.Builder containerInfoBuilder = ContainerInfoProto
         .newBuilder()
         .setState(LifeCycleState.OPEN)
@@ -264,7 +263,6 @@ public class ContainerManagerImpl implements ContainerManager {
         .setStateEnterTime(Time.now())
         .setOwner(owner)
         .setContainerID(containerID.getId())
-        .setDeleteTransactionId(0)
         .setReplicationType(pipeline.getType())
         .setStorageTier(storageTier.toProto());
 
@@ -277,15 +275,13 @@ public class ContainerManagerImpl implements ContainerManager {
     }
 
     containerStateManager.addContainer(containerInfoBuilder.build());
-    pipelineManager.recordPendingAllocation(pipeline, containerID);
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
     return containerStateManager.getContainer(containerID);
   }
 
   @Override
   public void updateContainerState(final ContainerID cid,
-                                   final LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException {
+                                   final LifeCycleEvent event) throws IOException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {
@@ -364,12 +360,6 @@ public class ContainerManagerImpl implements ContainerManager {
     } else {
       throw new ContainerNotFoundException(cid);
     }
-  }
-
-  @Override
-  public void updateDeleteTransactionId(
-      final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
-    containerStateManager.updateDeleteTransactionId(deleteTransactionMap);
   }
 
   @Override

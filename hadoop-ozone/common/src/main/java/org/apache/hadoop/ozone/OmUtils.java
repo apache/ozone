@@ -259,8 +259,12 @@ public final class OmUtils {
       // keeping it here for compatibility
     case GetSnapshotInfo:
     case GetObjectTagging:
+    case GetBucketTagging:
+      return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -322,6 +326,13 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case PutBucketTagging:
+    case DeleteBucketTagging:
+    case SetLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
+    case SaveLifecycleScanState:
+      return false;
     case UnknownCommand:
       return false;
     case EchoRPC:
@@ -376,6 +387,10 @@ public final class OmUtils {
     case GetKeyInfo:
     case GetSnapshotInfo:
     case GetObjectTagging:
+    case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
+      return true;
+    case GetBucketTagging:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -437,6 +452,8 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case PutBucketTagging:
+    case DeleteBucketTagging:
     case ServiceList: // OM leader should have the most up-to-date OM service list info
     case RangerBGSync: // Ranger Background Sync task is only run on leader
     case SnapshotDiff:
@@ -452,6 +469,10 @@ public final class OmUtils {
     case GetQuotaRepairStatus:
       // Quota repair lifecycle request should be initiated by the leader
     case DBUpdates: // We are currently only interested on the leader DB info
+    case SetLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
+    case SaveLifecycleScanState:
     case UnknownCommand:
       return false;
     case EchoRPC:
@@ -1079,9 +1100,10 @@ public final class OmUtils {
   public static boolean isBucketSnapshotIndicator(String key) {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
-  
+
   public static List<List<String>> format(
-          List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
+      List<ServiceInfo> nodes, int port, String leaderId,
+      String localNodeId, String localLeaderStatus) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
@@ -1089,18 +1111,25 @@ public final class OmUtils {
         .sorted(Comparator.comparing(ServiceInfo::getHostname))
         .collect(Collectors.toList());
     for (ServiceInfo info : omNodes) {
-      // Printing only the OM's running
-      if (info.getNodeType() == HddsProtos.NodeType.OM) {
-        String role = info.getOmRoleInfo().getNodeId().equals(leaderId)
-                      ? "LEADER" : "FOLLOWER";
-        List<String> omInfo = new ArrayList<>();
-        omInfo.add(info.getHostname());
-        omInfo.add(info.getOmRoleInfo().getNodeId());
-        omInfo.add(String.valueOf(port));
-        omInfo.add(role);
-        omInfo.add(leaderReadiness);
-        omInfoList.add(omInfo);
+      String nodeId = info.getOmRoleInfo().getNodeId();
+      boolean isLeaderNode = nodeId.equals(leaderId);
+      boolean isLocalNode = nodeId.equals(localNodeId);
+      String role = info.getOmRoleInfo().getServerRole();
+
+      String displayValue;
+      if (isLeaderNode && isLocalNode) {
+        displayValue = localLeaderStatus;
+      } else {
+        displayValue = role;
       }
+
+      List<String> omInfo = new ArrayList<>();
+      omInfo.add(info.getHostname());
+      omInfo.add(nodeId);
+      omInfo.add(String.valueOf(port));
+      omInfo.add(role);
+      omInfo.add(displayValue);
+      omInfoList.add(omInfo);
     }
     return omInfoList;
   }

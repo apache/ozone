@@ -126,6 +126,19 @@ wait_for_safemode_exit(){
   execute_commands_in_container ${SCM} "$cmd"
 }
 
+## @description wait until RATIS/THREE pipeline exists (or 180 seconds)
+wait_for_pipeline() {
+  RETRY_ATTEMPTS=60 retry assert_pipeline_exists
+}
+
+## @description check if RATIS/THREE pipeline exists; note: does not kinit
+assert_pipeline_exists() {
+  local cmd="ozone admin pipeline list --state OPEN --filter-by-factor THREE --json | jq -r 'length'"
+  local -i count
+  count=$(execute_commands_in_container ${SCM} "${cmd}")
+  [[ $count -gt 0 ]]
+}
+
 ## @description wait until OM leader is elected (or 120 seconds)
 wait_for_om_leader() {
   if [[ -z "${OM_SERVICE_ID:-}" ]]; then
@@ -179,7 +192,9 @@ start_docker_env(){
 
   docker-compose --ansi never down --remove-orphans
 
-  retry docker-compose --ansi never pull
+  if [[ "${CI:-}" == "true" ]]; then
+    retry docker-compose --ansi never pull || true
+  fi
 
   opts=""
   if has_scalable_datanode; then
@@ -252,6 +267,8 @@ execute_robot_test(){
       -v OM_HA_PARAM:"${OM_HA_PARAM}" \
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
+      -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
+      -v SHORT_CIRCUIT_READ_ENABLED:"${SHORT_CIRCUIT_READ_ENABLED:-false}" \
       -v SCM:"${SCM}" \
       ${ARGUMENTS[@]-} --log NONE --report NONE --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
@@ -276,8 +293,8 @@ reorder_om_nodes() {
 
   if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
     for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om'); do
-      docker exec "${c}" bash -c \
-        "if [[ -f /etc/hadoop/ozone-site.xml ]]; then \
+      docker exec "${c}" sh -c \
+        "if [ -f /etc/hadoop/ozone-site.xml ]; then \
           sed -i -e 's/om1,om2,om3/${new_order}/' /etc/hadoop/ozone-site.xml; \
           echo 'Replaced OM order with ${new_order} in ${c}'; \
         fi"
@@ -288,7 +305,7 @@ reorder_om_nodes() {
 ## @description Create stack dump of each java process in each container
 create_stack_dumps() {
   local c pid procname
-  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm); do
+  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm | grep -v -e prometheus); do
     while read -r pid procname; do
       echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
       docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"

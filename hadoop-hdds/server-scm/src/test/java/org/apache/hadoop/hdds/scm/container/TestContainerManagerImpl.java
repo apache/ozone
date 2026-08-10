@@ -61,7 +61,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -105,7 +104,9 @@ public class TestContainerManagerImpl {
     pipelineManager = spy(base);
 
     // Default: allow allocation in tests unless a test overrides it.
-    doReturn(true).when(pipelineManager).hasEnoughSpace(any(Pipeline.class));
+    // Allocation uses checkSpaceAndRecordAllocation
+    doReturn(true).when(pipelineManager)
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         ReplicationFactor.THREE), StorageTier.getDefaultTier());
@@ -135,7 +136,7 @@ public class TestContainerManagerImpl {
     assertEquals(1, containerManager.getContainers().size());
     assertNotNull(containerManager.getContainer(
         container.containerID()));
-    verify(pipelineManager).recordPendingAllocation(
+    verify(pipelineManager).checkSpaceAndRecordAllocation(
         any(Pipeline.class), eq(container.containerID()));
   }
 
@@ -145,11 +146,12 @@ public class TestContainerManagerImpl {
    */
   @Test
   public void testGetMatchingContainerReturnsNullWhenNotEnoughSpaceInDatanodes() throws IOException {
-    doReturn(false).when(pipelineManager).hasEnoughSpace(any());
+    doReturn(false).when(pipelineManager)
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
     Pipeline pipeline = pipelineManager.getPipelines().iterator().next();
-    // MockPipelineManager#hasEnoughSpace always returns false
+    // MockPipelineManager#checkSpaceAndRecordAllocation always returns false
     // the pipeline has no existing containers, so a new container gets allocated in getMatchingContainer
     ContainerInfo container = containerManager
         .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet(), StorageTier.getDefaultTier());
@@ -168,10 +170,10 @@ public class TestContainerManagerImpl {
   public void testGetMatchingContainerReturnsContainerWhenEnoughSpaceInDatanodes() throws IOException {
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
 
-    // create a spy to mock hasEnoughSpace to always return true
+    // create a spy to mock checkSpaceAndRecordAllocation to always return true
     PipelineManager spyPipelineManager = spy(pipelineManager);
     doReturn(true).when(spyPipelineManager)
-        .hasEnoughSpace(any(Pipeline.class));
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     // create a new ContainerManager using the spy
     File tempDir = new File(testDir, "tempDir");
@@ -217,7 +219,7 @@ public class TestContainerManagerImpl {
   @EnumSource(value = HddsProtos.LifeCycleState.class,
       names = {"DELETING", "DELETED"})
   void testTransitionDeletingOrDeletedToTargetState(HddsProtos.LifeCycleState desiredState)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     // Allocate OPEN Ratis and Ec containers, and do a series of state changes to transition them to DELETING / DELETED
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(

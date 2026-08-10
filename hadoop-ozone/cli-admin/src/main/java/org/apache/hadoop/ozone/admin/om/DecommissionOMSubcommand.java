@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
@@ -43,8 +44,8 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "decommission",
     customSynopsis = "ozone admin om decommission --service-id=<om-service-id> " +
-        "-nodeid=<decommission-om-node-id> " +
-        "-hostname=<decommission-om-node-address> [options]",
+        "--nodeid=<decommission-om-node-id> " +
+        "--node-host-address=<decommission-om-node-address> [options]",
     description = "Decommission an OzoneManager. Ensure that the node being " +
         "decommissioned is shutdown first." +
         "%nNote - Add the node to be decommissioned to " +
@@ -67,12 +68,12 @@ public class DecommissionOMSubcommand implements Callable<Void> {
   @CommandLine.Mixin
   private OmAddressOptions.MandatoryServiceIdMixin omServiceOption;
 
-  @CommandLine.Option(names = {"-nodeid", "--nodeid"},
+  @CommandLine.Option(names = {"--nodeid"},
       description = "NodeID of the OM to be decommissioned.",
       required = true)
   private String decommNodeId;
 
-  @CommandLine.Option(names = {"-hostname", "--node-host-address"},
+  @CommandLine.Option(names = {"--node-host-address"},
       description = "Host name/address of the OM to be decommissioned.",
       required = true)
   private String hostname;
@@ -134,7 +135,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
 
     hostInetAddress = InetAddress.getByName(hostname);
     InetAddress rpcAddressFromConfig = InetAddress.getByName(
-        rpcAddrStr.split(":")[0]);
+        HddsUtils.getHostName(rpcAddrStr).orElse(""));
 
     if (!hostInetAddress.equals(rpcAddressFromConfig)) {
       throw new IOException("OM " + decommNodeId + "'s host address in " +
