@@ -498,6 +498,7 @@ public class TestContainerBalancerTask {
     DatanodeUsageInfo sourceNode = nodesInCluster.get(nodesInCluster.size() - 1);
     ContainerManager containerManager = scm.getContainerManager();
     final ContainerID[] missingContainerId = new ContainerID[1];
+    final AtomicInteger getContainerCallsInLaterIterations = new AtomicInteger(0);
 
     // Container exists during candidate selection; after it is first selected for
     // move, SCM can no longer find it (simulates container deleted mid-balance).
@@ -507,8 +508,12 @@ public class TestContainerBalancerTask {
           ContainerID containerId = invocation.getArgument(0);
           if (missingContainerId[0] == null) {
             missingContainerId[0] = containerId;
-            doThrow(ContainerNotFoundException.newInstanceForTesting())
-                .when(containerManager).getContainer(containerId);
+            doAnswer(inv -> {
+              if (containerBalancerTask.getMetrics().getNumIterations() >= 1) {
+                getContainerCallsInLaterIterations.incrementAndGet();
+              }
+              throw ContainerNotFoundException.newInstanceForTesting();
+            }).when(containerManager).getContainer(containerId);
             doThrow(ContainerNotFoundException.newInstanceForTesting())
                 .when(containerManager).getContainerReplicas(containerId);
             cidToInfoMap.remove(containerId);
@@ -536,6 +541,10 @@ public class TestContainerBalancerTask {
     assertTrue(containerBalancerTask.getSelectionCriteria()
             .getExcludeNotFoundContainers().contains(notFoundId),
         "Missing container should be in the cross-iteration exclude set");
+
+    // iteration 2 must not probe the missing container again.
+    assertEquals(0, getContainerCallsInLaterIterations.get(),
+        "Iteration 2 must not call getContainer for the not-found container");
 
     ArgumentCaptor<ContainerID> containerCaptor = ArgumentCaptor.forClass(ContainerID.class);
     verify(moveManager, atLeast(1)).move(containerCaptor.capture(),

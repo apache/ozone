@@ -1202,6 +1202,7 @@ public class ContainerBalancerTask implements Runnable {
       LOG.warn("Could not find Container {} while matching source and " +
               "target nodes in ContainerBalancer",
           moveSelection.getContainerID(), e);
+      selectionCriteria.addToExcludeNotFoundContainers(moveSelection.getContainerID());
       return;
     }
     long size = container.getUsedBytes();
