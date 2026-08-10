@@ -24,7 +24,6 @@ import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -181,8 +180,8 @@ class TestContainerBalancerMoveFailureBreakdown {
 
   private static void assertBreakdownTotalsMatchHeadlineCounters(
       ContainerBalancerTaskIterationStatusInfo iteration) {
-    long breakdownTotal = iteration.getFailuresByReason().values().stream()
-        .mapToLong(Long::longValue)
+    long breakdownTotal = iteration.getFailures().stream()
+        .mapToLong(ContainerMoveFailureDetail::getCount)
         .sum();
     long headlineTotal = iteration.getContainerMovesFailed() + iteration.getContainerMovesTimeout();
     assertEquals(headlineTotal, breakdownTotal,
@@ -191,18 +190,15 @@ class TestContainerBalancerMoveFailureBreakdown {
 
   private static void assertFailureBreakdown(
       ContainerBalancerTaskIterationStatusInfo iteration, String expectedReason) {
-    Map<String, Long> failuresByReason = iteration.getFailuresByReason();
-    assertThat(failuresByReason).as("failure breakdown").containsKey(expectedReason);
-    assertThat(failuresByReason.get(expectedReason)).isGreaterThanOrEqualTo(1L);
-
-    List<ContainerMoveFailureDetail> details = iteration.getFailureDetails();
-    assertThat(details).isNotEmpty();
-    assertThat(details.stream().anyMatch(detail ->
-        expectedReason.equals(detail.getReason())
-            && detail.getContainerId() > 0
-            && detail.getSourceDatanodeUuid() != null
-            && !detail.getSourceDatanodeUuid().isEmpty()
-            && detail.getTargetDatanodeUuid() != null
-            && !detail.getTargetDatanodeUuid().isEmpty())).isTrue();
+    List<ContainerMoveFailureDetail> failures = iteration.getFailures();
+    assertThat(failures).as("failure details").isNotEmpty();
+    ContainerMoveFailureDetail detail = failures.stream()
+        .filter(f -> expectedReason.equals(f.getReason()))
+        .findFirst()
+        .orElse(null);
+    assertThat(detail).as("failure detail for reason " + expectedReason).isNotNull();
+    assertThat(detail.getCount()).isGreaterThanOrEqualTo(1L);
+    assertThat(detail.getSourceFailureCounts()).isNotEmpty();
+    assertThat(detail.getTargetFailureCounts()).isNotEmpty();
   }
 }

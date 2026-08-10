@@ -23,70 +23,47 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 /**
- * Tracks per-iteration container move failures by reason and optional details.
+ * Tracks per-iteration container move failures by reason and per-datanode counts.
  */
 public final class ContainerMoveFailureTracker {
-  public static final int DEFAULT_MAX_FAILURE_DETAILS = 100;
-  public static final int DEFAULT_MAX_FAILURE_DETAILS_PER_REASON = 10;
-
-  private final int maxFailureDetails;
-  private final int maxFailureDetailsPerReason;
   private final Map<String, Long> failuresByReason = new HashMap<>();
-  private final Map<String, Integer> failureDetailCountByReason = new HashMap<>();
-  private final List<ContainerMoveFailureDetail> failureDetails = new ArrayList<>();
+  private final Map<String, Map<String, Long>> sourceFailureCountsByReason = new HashMap<>();
+  private final Map<String, Map<String, Long>> targetFailureCountsByReason = new HashMap<>();
 
-  public ContainerMoveFailureTracker() {
-    this(DEFAULT_MAX_FAILURE_DETAILS, DEFAULT_MAX_FAILURE_DETAILS_PER_REASON);
+  public synchronized void recordFailure(MoveManager.MoveResult result, DatanodeDetails source,
+                                         DatanodeDetails target) {
+    recordFailure(result.name(), source, target);
   }
 
-  public ContainerMoveFailureTracker(int maxFailureDetails, int maxFailureDetailsPerReason) {
-    this.maxFailureDetails = maxFailureDetails;
-    this.maxFailureDetailsPerReason = Math.min(maxFailureDetailsPerReason, maxFailureDetails);
-  }
-
-  public synchronized void recordFailure(MoveManager.MoveResult result, ContainerID containerId,
-      DatanodeDetails source, DatanodeDetails target) {
-    recordFailure(result.name(), containerId, source, target);
-  }
-
-  public synchronized void recordFailure(String reason, ContainerID containerId,
-      DatanodeDetails source, DatanodeDetails target) {
+  public synchronized void recordFailure(String reason, DatanodeDetails source, DatanodeDetails target) {
     failuresByReason.merge(reason, 1L, Long::sum);
-    if (shouldRecordFailureDetail(reason)) {
-      failureDetails.add(new ContainerMoveFailureDetail(
-          containerId.getId(),
-          source.getUuidString(),
-          target.getUuidString(),
-          reason));
-      failureDetailCountByReason.merge(reason, 1, Integer::sum);
+    if (source != null) {
+      sourceFailureCountsByReason.computeIfAbsent(reason, k -> new HashMap<>())
+          .merge(source.getUuidString(), 1L, Long::sum);
     }
-  }
-
-  private boolean shouldRecordFailureDetail(String reason) {
-    if (failureDetails.size() >= maxFailureDetails) {
-      return false;
+    if (target != null) {
+      targetFailureCountsByReason.computeIfAbsent(reason, k -> new HashMap<>())
+          .merge(target.getUuidString(), 1L, Long::sum);
     }
-    int reasonDetailCount = failureDetailCountByReason.getOrDefault(reason, 0);
-    if (reasonDetailCount == 0) {
-      return true;
-    }
-    return reasonDetailCount < maxFailureDetailsPerReason;
   }
 
   public synchronized void reset() {
     failuresByReason.clear();
-    failureDetailCountByReason.clear();
-    failureDetails.clear();
+    sourceFailureCountsByReason.clear();
+    targetFailureCountsByReason.clear();
   }
 
-  public synchronized Map<String, Long> getFailuresByReason() {
-    return Collections.unmodifiableMap(new HashMap<>(failuresByReason));
-  }
-
-  public synchronized List<ContainerMoveFailureDetail> getFailureDetails() {
-    return Collections.unmodifiableList(new ArrayList<>(failureDetails));
+  public synchronized List<ContainerMoveFailureDetail> getFailures() {
+    List<ContainerMoveFailureDetail> result = new ArrayList<>();
+    for (Map.Entry<String, Long> entry : failuresByReason.entrySet()) {
+      String reason = entry.getKey();
+      long count = entry.getValue();
+      Map<String, Long> srcCounts = sourceFailureCountsByReason.getOrDefault(reason, Collections.emptyMap());
+      Map<String, Long> tgtCounts = targetFailureCountsByReason.getOrDefault(reason, Collections.emptyMap());
+      result.add(new ContainerMoveFailureDetail(reason, count, new HashMap<>(srcCounts), new HashMap<>(tgtCounts)));
+    }
+    return result;
   }
 }

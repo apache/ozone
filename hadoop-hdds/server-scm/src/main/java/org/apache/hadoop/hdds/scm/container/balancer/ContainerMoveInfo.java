@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Information about moving containers.
@@ -28,18 +27,15 @@ public class ContainerMoveInfo {
   private final long containerMovesCompleted;
   private final long containerMovesFailed;
   private final long containerMovesTimeout;
-  private final Map<String, Long> failuresByReason;
-  private final List<ContainerMoveFailureDetail> failureDetails;
+  private final List<ContainerMoveFailureDetail> failures;
 
   public ContainerMoveInfo(long containerMovesScheduled, long containerMovesCompleted, long containerMovesFailed,
-                           long containerMovesTimeout, Map<String, Long> failuresByReason,
-                           List<ContainerMoveFailureDetail> failureDetails) {
+                           long containerMovesTimeout, List<ContainerMoveFailureDetail> failures) {
     this.containerMovesScheduled = containerMovesScheduled;
     this.containerMovesCompleted = containerMovesCompleted;
     this.containerMovesFailed = containerMovesFailed;
     this.containerMovesTimeout = containerMovesTimeout;
-    this.failuresByReason = failuresByReason;
-    this.failureDetails = failureDetails;
+    this.failures = failures;
   }
 
   public ContainerMoveInfo(ContainerBalancerMetrics metrics, ContainerMoveFailureTracker failureTracker) {
@@ -47,8 +43,7 @@ public class ContainerMoveInfo {
     this.containerMovesCompleted = metrics.getNumContainerMovesCompletedInLatestIteration();
     this.containerMovesFailed = metrics.getNumContainerMovesFailedInLatestIteration();
     this.containerMovesTimeout = metrics.getNumContainerMovesTimeoutInLatestIteration();
-    this.failuresByReason = failureTracker.getFailuresByReason();
-    this.failureDetails = failureTracker.getFailureDetails();
+    this.failures = failureTracker.getFailures();
   }
 
   public long getContainerMovesScheduled() {
@@ -67,11 +62,7 @@ public class ContainerMoveInfo {
     return containerMovesTimeout;
   }
 
-  public Map<String, Long> getFailuresByReason() {
-    return failuresByReason;
-  }
-
-  public List<ContainerMoveFailureDetail> getFailureDetails() {
-    return failureDetails;
+  public List<ContainerMoveFailureDetail> getFailures() {
+    return failures;
   }
 }

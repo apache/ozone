@@ -17,36 +17,39 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import java.util.Collections;
+import java.util.Map;
+
 /**
- * Details about a single failed container move in a balancer iteration.
+ * Per-reason container move failure summary with per-datanode failure counts.
  */
 public final class ContainerMoveFailureDetail {
-  private final long containerId;
-  private final String sourceDatanodeUuid;
-  private final String targetDatanodeUuid;
   private final String reason;
+  private final long count;
+  private final Map<String, Long> sourceFailureCounts;
+  private final Map<String, Long> targetFailureCounts;
 
-  public ContainerMoveFailureDetail(long containerId, String sourceDatanodeUuid,
-      String targetDatanodeUuid, String reason) {
-    this.containerId = containerId;
-    this.sourceDatanodeUuid = sourceDatanodeUuid;
-    this.targetDatanodeUuid = targetDatanodeUuid;
+  public ContainerMoveFailureDetail(String reason, long count,
+      Map<String, Long> sourceFailureCounts, Map<String, Long> targetFailureCounts) {
     this.reason = reason;
-  }
-
-  public long getContainerId() {
-    return containerId;
-  }
-
-  public String getSourceDatanodeUuid() {
-    return sourceDatanodeUuid;
-  }
-
-  public String getTargetDatanodeUuid() {
-    return targetDatanodeUuid;
+    this.count = count;
+    this.sourceFailureCounts = Collections.unmodifiableMap(sourceFailureCounts);
+    this.targetFailureCounts = Collections.unmodifiableMap(targetFailureCounts);
   }
 
   public String getReason() {
     return reason;
+  }
+
+  public long getCount() {
+    return count;
+  }
+
+  public Map<String, Long> getSourceFailureCounts() {
+    return sourceFailureCounts;
+  }
+
+  public Map<String, Long> getTargetFailureCounts() {
+    return targetFailureCounts;
   }
 }

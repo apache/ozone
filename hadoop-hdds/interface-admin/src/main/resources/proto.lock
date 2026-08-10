@@ -2342,20 +2342,14 @@
               },
               {
                 "id": 12,
-                "name": "containerMoveFailuresByReason",
-                "type": "ContainerMoveFailureSummaryProto",
-                "is_repeated": true
-              },
-              {
-                "id": 13,
-                "name": "containerMoveFailureDetails",
+                "name": "containerMoveFailures",
                 "type": "ContainerMoveFailureDetailProto",
                 "is_repeated": true
               }
             ]
           },
           {
-            "name": "ContainerMoveFailureSummaryProto",
+            "name": "ContainerMoveFailureDetailProto",
             "fields": [
               {
                 "id": 1,
@@ -2368,34 +2362,34 @@
                 "name": "count",
                 "type": "int64",
                 "optional": true
+              },
+              {
+                "id": 3,
+                "name": "sourceFailureCounts",
+                "type": "NodeFailureCountProto",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "targetFailureCounts",
+                "type": "NodeFailureCountProto",
+                "is_repeated": true
               }
             ]
           },
           {
-            "name": "ContainerMoveFailureDetailProto",
+            "name": "NodeFailureCountProto",
             "fields": [
               {
                 "id": 1,
-                "name": "containerId",
-                "type": "uint64",
+                "name": "datanodeUuid",
+                "type": "string",
                 "optional": true
               },
               {
                 "id": 2,
-                "name": "sourceDatanodeUuid",
-                "type": "string",
-                "optional": true
-              },
-              {
-                "id": 3,
-                "name": "targetDatanodeUuid",
-                "type": "string",
-                "optional": true
-              },
-              {
-                "id": 4,
-                "name": "reason",
-                "type": "string",
+                "name": "count",
+                "type": "int64",
                 "optional": true
               }
             ]

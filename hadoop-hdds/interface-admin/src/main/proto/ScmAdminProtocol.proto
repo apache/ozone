@@ -675,20 +675,19 @@ message ContainerBalancerTaskIterationStatusInfoProto {
   repeated NodeTransferInfoProto sizeEnteringNodes = 9;
   repeated NodeTransferInfoProto sizeLeavingNodes = 10;
   optional int64 iterationDuration = 11;
-  repeated ContainerMoveFailureSummaryProto containerMoveFailuresByReason = 12;
-  repeated ContainerMoveFailureDetailProto containerMoveFailureDetails = 13;
-}
-
-message ContainerMoveFailureSummaryProto {
-  optional string reason = 1;
-  optional int64 count = 2;
+  repeated ContainerMoveFailureDetailProto containerMoveFailures = 12;
 }
 
 message ContainerMoveFailureDetailProto {
-  optional uint64 containerId = 1;
-  optional string sourceDatanodeUuid = 2;
-  optional string targetDatanodeUuid = 3;
-  optional string reason = 4;
+  optional string reason = 1;
+  optional int64 count = 2;
+  repeated NodeFailureCountProto sourceFailureCounts = 3;
+  repeated NodeFailureCountProto targetFailureCounts = 4;
+}
+
+message NodeFailureCountProto {
+  optional string datanodeUuid = 1;
+  optional int64 count = 2;
 }
 
 message NodeTransferInfoProto {

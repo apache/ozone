@@ -726,36 +726,33 @@ class TestContainerBalancerSubCommand {
             .setContainerMovesCompleted(3)
             .setContainerMovesFailed(1)
             .setContainerMovesTimeout(2)
-            .addContainerMoveFailuresByReason(
-                StorageContainerLocationProtocolProtos.ContainerMoveFailureSummaryProto.newBuilder()
+            .addContainerMoveFailures(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
                     .setReason("REPLICATION_FAIL_TIME_OUT")
                     .setCount(2)
+                    .addSourceFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("source-uuid-1").setCount(1).build())
+                    .addSourceFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("source-uuid-2").setCount(1).build())
+                    .addTargetFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("target-uuid-1").setCount(1).build())
+                    .addTargetFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("target-uuid-2").setCount(1).build())
                     .build())
-            .addContainerMoveFailuresByReason(
-                StorageContainerLocationProtocolProtos.ContainerMoveFailureSummaryProto.newBuilder()
+            .addContainerMoveFailures(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
                     .setReason("PRE_MOVE_CONTAINER_NOT_FOUND")
                     .setCount(1)
-                    .build())
-            .addContainerMoveFailureDetails(
-                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
-                    .setContainerId(42)
-                    .setSourceDatanodeUuid("source-uuid-1")
-                    .setTargetDatanodeUuid("target-uuid-1")
-                    .setReason("REPLICATION_FAIL_TIME_OUT")
-                    .build())
-            .addContainerMoveFailureDetails(
-                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
-                    .setContainerId(43)
-                    .setSourceDatanodeUuid("source-uuid-2")
-                    .setTargetDatanodeUuid("target-uuid-2")
-                    .setReason("REPLICATION_FAIL_TIME_OUT")
-                    .build())
-            .addContainerMoveFailureDetails(
-                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
-                    .setContainerId(44)
-                    .setSourceDatanodeUuid("source-uuid-3")
-                    .setTargetDatanodeUuid("target-uuid-3")
-                    .setReason("PRE_MOVE_CONTAINER_NOT_FOUND")
+                    .addSourceFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("source-uuid-3").setCount(1).build())
+                    .addTargetFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("target-uuid-3").setCount(1).build())
                     .build())
             .build();
 
@@ -779,16 +776,14 @@ class TestContainerBalancerSubCommand {
     statusCmd.execute(scmClient);
 
     assertThat(out.get())
-        .contains("Failure breakdown")
+        .contains("Failed container moves")
         .contains("REPLICATION_FAIL_TIME_OUT")
         .contains("PRE_MOVE_CONTAINER_NOT_FOUND")
-        .contains("Failed move details")
-        .contains("container 42")
-        .contains("container 43")
-        .contains("container 44")
         .contains("source-uuid-1")
         .contains("target-uuid-1")
         .contains("source-uuid-3")
-        .contains("target-uuid-3");
+        .contains("target-uuid-3")
+        .doesNotContain("Failure breakdown")
+        .doesNotContain("Failed move details");
   }
 }

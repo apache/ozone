@@ -861,7 +861,7 @@ public class ContainerBalancerTask implements Runnable {
         DatanodeDetails target = moveSelection.getTargetNode();
         LOG.warn("Container move timed out for container {} from source {}" +
                 " to target {}.", containerID, source, target);
-        moveFailureTracker.recordFailure(reason, containerID, source, target);
+        moveFailureTracker.recordFailure(reason, source, target);
         entry.getValue().cancel(true);
         numCancelled += 1;
       }
@@ -1017,7 +1017,7 @@ public class ContainerBalancerTask implements Runnable {
                 moveSelection.getTargetNode(), ex);
             metrics.incrementNumContainerMovesFailedInLatestIteration(1);
             moveFailureTracker.recordFailure(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR,
-                containerID, source, moveSelection.getTargetNode());
+                source, moveSelection.getTargetNode());
           }
         } else {
           if (result == MoveManager.MoveResult.COMPLETED) {
@@ -1031,7 +1031,7 @@ public class ContainerBalancerTask implements Runnable {
                     " {} failed: {}",
                 moveSelection.getContainerID(), source,
                 moveSelection.getTargetNode(), result);
-            moveFailureTracker.recordFailure(result, containerID, source, moveSelection.getTargetNode());
+            moveFailureTracker.recordFailure(result, source, moveSelection.getTargetNode());
           }
         }
       });
@@ -1044,19 +1044,19 @@ public class ContainerBalancerTask implements Runnable {
       selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_CONTAINER_NOT_FOUND.name(),
-          containerID, source, moveSelection.getTargetNode());
+          source, moveSelection.getTargetNode());
       return false;
     } catch (NodeNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_NODE_NOT_FOUND.name(),
-          containerID, source, moveSelection.getTargetNode());
+          source, moveSelection.getTargetNode());
       return false;
     } catch (ContainerReplicaNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_REPLICA_NOT_FOUND.name(),
-          containerID, source, moveSelection.getTargetNode());
+          source, moveSelection.getTargetNode());
       // add source back to queue for replica not found only
       // the container is not excluded as it is a replica related failure
       findSourceStrategy.addBackSourceDataNode(source);
