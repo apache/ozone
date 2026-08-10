@@ -63,8 +63,8 @@ The proposal uses an incremental approach:
 - Change rack or network-topology semantics, or add IPv6 CIDR routing logic to SCM.
 - Change existing bind defaults from `0.0.0.0` to `::`.
 - Prefer raw IP literals over DNS names for Kerberos or TLS identities.
-- Support link-local or scoped IPv6 addresses as persistent cluster identities. Scope identifiers are interface-local
-  and are not valid X.509 IP subject alternative names.
+- Link-local and scoped IPv6 addresses are not supported as persistent cluster identities. Advertised endpoint settings
+  reject them because scope identifiers are interface-local and cannot be encoded in X.509 IP subject alternative names.
 - Replace every address string with a new Protobuf type in the first delivery.
 - Guarantee IPv6 support in applications or network services outside the Apache Ozone project. Ozone will document and
   test the public integration points that it uses.
@@ -95,6 +95,8 @@ Text boundaries must follow these rules:
 - **URI authority:** Accept and emit an RFC-compliant authority, including `[ipv6]:port`.
 - **HTTP `Host` header:** Accept a DNS name, IPv4 literal, `[ipv6]`, or `[ipv6]:port`. Remove brackets before subsequent
   matching.
+- **Scoped IPv6:** Reject an address containing a zone identifier, such as `fe80::1%eth0`, in every advertised endpoint
+  setting. Do not strip the identifier and advertise the remaining address.
 - **In-memory endpoint:** Keep the host and port as separate values. Combine them only when crossing a text boundary.
 
 An unbracketed IPv6 literal followed by a port is ambiguous and will not be an accepted endpoint form. Code must not use
@@ -107,12 +109,12 @@ authority.
 
 ## JVM and listener behavior
 
-Ozone no longer sets `java.net.preferIPv4Stack=true` by default. Operators and tests can still set it explicitly when
-IPv4-only behavior is required.
+The implementation described by this proposal will stop setting `java.net.preferIPv4Stack=true` by default. Operators
+and tests will still be able to set it explicitly when IPv4-only behavior is required.
 
-Existing listener defaults remain unchanged. An operator opts into an IPv6 listener by setting the applicable bind-host
-property to an IPv6 address or to `::`. Code must construct listeners from separate host and port values rather than
-first constructing an authority string.
+Existing listener defaults will remain unchanged. Operators will opt into an IPv6 listener by setting the applicable
+bind-host property to an IPv6 address or to `::`. Code must construct listeners from separate host and port values
+rather than first constructing an authority string.
 
 Binding to `::` does not provide the same dual-stack behavior on every operating system. The result depends on the
 operating system and its `IPV6_V6ONLY` behavior. The deployment guide will describe this dependency, and the test
@@ -121,7 +123,8 @@ proof of IPv4 reachability.
 
 Bind addresses and advertised addresses are different concepts. Wildcard addresses such as `0.0.0.0` and `::` are
 suitable listener values but must not be advertised as peer or client endpoints, Kerberos principals, or certificate
-identities. Services will continue to advertise a routable DNS name or address.
+identities. Services will continue to advertise a routable DNS name or unscoped address. Configuration validation will
+reject scoped advertised addresses before startup, registration, or publication.
 
 ## Service workstreams
 
@@ -140,9 +143,9 @@ The existing SCM Ratis role response is a colon-delimited string. The first deli
 brackets IPv6 address fields, with one shared parser used by all Ozone consumers. IPv4 and DNS output remains unchanged.
 Before IPv6 is activated, every consumer of this response must use the new parser.
 
-A later cleanup may add a structured, additive Protobuf field. Such a change would dual-populate the legacy and
-structured fields, make new clients prefer the structured field, and retain legacy fallback for the compatibility
-window. It is not required for the initial IPv6 delivery.
+Ozone will retain this bracketed legacy representation after IPv6 support lands. A structured Protobuf field will be
+considered only when a separate API requirement justifies it. Any such field must be additive, dual-populated with the
+legacy field, and introduced with client preference and fallback rules for the compatibility window.
 
 ### OM and OzoneFS
 
@@ -194,6 +197,11 @@ must round-trip DNS, IPv4, and IPv6 token services without ambiguous colon parsi
 Hadoop version, IPv6 support will require either a Hadoop fix or hostname-based token services; the failure will not be
 hidden by Ozone-specific parsing.
 
+Hadoop RPC service authorization and proxy-user authorization also evaluate the client address. Exact IPv6 addresses,
+DNS names, and wildcard host rules can use Hadoop's existing `MachineList` address matching. IPv6 CIDR rules cannot:
+`MachineList` delegates CIDR parsing to the IPv4-only Commons Net `SubnetUtils`. Secure IPv6 qualification must consume
+a Hadoop fix for IPv6 CIDR ranges so existing address-based security policies retain equivalent behavior.
+
 ### TLS and certificate enrollment
 
 Ozone's automatic certificate enrollment must distinguish listener addresses from certificate identities. Automatic
@@ -205,6 +213,18 @@ Tests must use certificates with real DNS or IPv6 IP subject alternative names a
 Authority overrides such as `localhost` can test transport setup, but they do not qualify IPv6 identity handling. The
 secure matrix will cover relevant Hadoop RPC, gRPC, Ratis, HTTP, and HTTPS channels, including certificate renewal and
 trust reload.
+
+### Secure HTTP clients
+
+OM and Recon checkpoint transfer, KMS access, and some administrative HTTP clients use Hadoop's `URLConnectionFactory`
+or `SSLFactory`. `URLConnectionFactory` can open a correctly bracketed IPv6 URL, but Hadoop's default
+`SSLHostnameVerifier` only reads DNS subject alternative names. It ignores an X.509 IP address subject alternative name
+and receives a bracketed host from an IPv6 URL. A certificate containing the correct IPv6 IP subject alternative name
+therefore cannot satisfy normal Hadoop HTTPS endpoint verification.
+
+The Hadoop verifier must support IPv4 and IPv6 IP subject alternative names before Ozone qualifies literal HTTPS
+endpoints. DNS names with matching DNS subject alternative names remain a temporary configuration path, not a substitute
+for that fix.
 
 ## Compatibility and upgrade
 
@@ -222,32 +242,106 @@ bare literal. Ozone will reject ambiguous values instead of guessing where an IP
 ## Dependency requirements
 
 Ozone depends on Apache Hadoop and Apache Ratis for address handling in several protocols and tools. Qualification tests
-will run against the exact dependency versions selected by the Ozone build.
-
-- Hadoop `NetUtils`, RPC, and delegation-token helpers must parse and format bracketed IPv6 endpoints consistently.
-- The Ratis version must contain IPv6-safe peer parsing, including the Ratis shell path tracked by RATIS-2592, or Ozone
-  must avoid the affected path.
-- The supported JDK must provide the expected resolver, socket, and TLS behavior in each network profile.
+will run against the exact dependency versions selected by the Ozone build. As of 2026-08-10, that build selects Hadoop
+3.4.3. The dependency gates below are based on Hadoop releases through 3.5.0 and current Hadoop trunk.
 
 A dependency failure is not considered fixed merely because an Ozone wrapper accepts the same input. The complete
-producer-to-consumer path must round-trip the endpoint.
+producer-to-consumer path must round-trip the endpoint. Jira resolution state and code on a development branch are also
+insufficient: the required commit must be present in the Hadoop release consumed by Ozone.
+
+### P0: Hadoop release blockers
+
+P0 items block the baseline secure IPv6 exit criteria and must be submitted upstream early enough to enter a Hadoop
+release that Ozone can consume.
+
+- **Endpoint parsing and token services:** Hadoop `NetUtils` and `SecurityUtil` must agree on bracketed IPv6 hosts in
+  both resolver modes. `SecurityUtil.buildTokenService` must produce a value that `SecurityUtil.getTokenServiceAddr` can
+  decode for both settings of `hadoop.security.token.service.use_ip`. Ozone uses these paths for OM HA addresses,
+  OzoneFS delegation tokens, and token selection in its Hadoop RPC and SASL stack.
+- **Secure HTTP literal verification:** Hadoop `SSLHostnameVerifier` must normalize a bracketed IPv6 URL host and
+  validate X.509 IP address subject alternative names. This blocks normal HTTPS verification for literal OM and Recon
+  checkpoint URLs and for literal KMS endpoints.
+
+No Hadoop release through 3.5.0, and no commit on current Hadoop trunk, satisfies the endpoint and token-service or
+literal HTTPS gates. `SecurityUtil.buildTokenService` still emits `host + ":" + port`, while its decoder treats the
+result as an authority. Both `use_ip=true` and an IPv6 literal used with `use_ip=false` fail to round-trip. The
+`use_ip=false` path also exposes an incompatibility between the bracketed host returned by `NetUtils` and
+`SecurityUtil.QualifiedHostResolver`.
+
+HADOOP-12491 and HADOOP-17542 contain earlier IPv6 changes on nontrunk Hadoop branches, but their implementing commits
+are not in the release tags inspected here or in current trunk. Neither issue covers the complete token-service or HTTPS
+verification requirement. New Hadoop subtasks under HADOOP-11890 are required for these P0 gates.
+
+### P1: Hadoop feature gates
+
+P1 items block a named Ozone feature or supported configuration. They should proceed in parallel with P0 work because
+they still depend on a Hadoop release.
+
+- **Automatic service hostname discovery:** OM, SCM, and datanodes call `HddsUtils.getHostName`, which delegates to
+  Hadoop `DNS.getDefaultHost` when no hostname is configured. Hadoop `DNS.reverseDns` still constructs only an IPv4
+  `in-addr.arpa` query and can fail while examining an IPv6 interface. Explicit hostnames avoid this path, but automatic
+  discovery requires IPv6 `ip6.arpa` support. HADOOP-3619 describes the defect but was resolved without a trunk fix.
+- **KMS and transparent data encryption:** Ozone OM and clients use Hadoop `KMSUtil`, `KeyProvider`, and
+  `KMSClientProvider`. The KMS provider still separates its authority with `split(":")`, so a literal IPv6 KMS authority
+  fails before connection. It also inherits the P0 token-service and HTTPS-verifier defects. DNS with an AAAA record and
+  `use_ip=false` is only a temporary configuration path. HADOOP-12491 contains nontrunk candidate work but does not
+  provide a released fix.
+- **Address-based RPC security rules:** Ozone's Hadoop RPC stack uses Hadoop `ServiceAuthorizationManager`,
+  `ProxyUsers`, `SaslPropertiesResolver`, and `MachineList`. Exact IPv6 addresses and DNS names resolve to `InetAddress`
+  and can be matched, but IPv6 CIDR entries are unsupported because `MachineList` uses the IPv4-only `SubnetUtils`. This
+  also affects the optional `WhitelistBasedResolver` for per-address SASL protection. A new Hadoop issue is needed to
+  provide IPv6 CIDR parity for these existing security controls.
+
+### Hadoop uses that require validation but not another known upstream fix
+
+- Ozone carries its own copy of Hadoop RPC. Socket connection and listener code uses `InetSocketAddress`; the known
+  release dependency is the P0 `NetUtils` and `SecurityUtil` behavior. No separate production RPC change was identified;
+  Hadoop RPC still needs an IPv6 stress test against the selected dependency version.
+- OM and Recon use HDFS `URLConnectionFactory` for checkpoint downloads. Its URL connection path accepts a bracketed
+  IPv6 URL. Qualification still depends on the P0 HTTPS verifier and on Kerberos SPNEGO using a stable DNS principal.
+- Ozone uses Hadoop Metrics2 for source registration. The default file sink has no network-address dependency. Optional
+  Ganglia server lists use `NetUtils`, while StatsD and Graphite use separate host and port settings. Network sinks need
+  tests after the P0 helper changes, but no additional Hadoop defect is established here.
+- SCM uses Hadoop `DNSToSwitchMapping` and `ScriptBasedMapping`. The script implementation passes each address as one
+  process argument and does not split it on colons. The operator's topology script must accept IPv6 input; this is a
+  configuration and validation requirement rather than a known Hadoop release blocker.
+- OzoneFS extends Hadoop `FileSystem` and `DelegateToFileSystem`, not `ChecksumFileSystem`. HADOOP-17845 is therefore
+  not an Ozone IPv6 prerequisite. OzoneFS still inherits the P0 delegation-token behavior through its canonical service.
+
+### Ozone-owned boundaries
+
+Direct Ozone uses of `NetUtils.createSocketAddr` and `NetUtils.getHostPortString`, URI construction, advertised service
+addresses, failover metadata, and command output remain Ozone work. They can use the common Ozone bracket-aware helper
+without waiting for a Hadoop release, provided the complete path does not later re-enter an unsafe Hadoop helper.
+
+Ozone also carries its own `HttpServer2` implementation, so HADOOP-19695 does not make Ozone HTTP listeners IPv6-safe.
+Listener construction, published HTTP addresses, Prometheus and JMX URLs, and copied RPC address display are Ozone-owned
+changes. The Ratis version must separately contain IPv6-safe peer parsing, including the shell path tracked by
+RATIS-2592, or Ozone must avoid that path. The supported JDK must provide the expected resolver, socket, and TLS
+behavior in every network profile.
 
 ## Validation and exit criteria
 
 ### Unit and component tests
 
-Tests will cover DNS names, IPv4, `[::1]:port`, global IPv6 literals, `::`, malformed authorities, and host-only values.
-They will exercise the production code path selected by each input, not only a standalone parser.
+Tests will cover DNS names, IPv4, `[::1]:port`, global IPv6 literals, `::`, scoped IPv6 rejection, malformed
+authorities, and host-only values. They will exercise the production code path selected by each input, not only a
+standalone parser.
 
 Required coverage includes:
 
 - common host and port helpers;
 - listener construction and advertised-address selection;
+- rejection of scoped addresses in every configured, discovered, and published advertised-endpoint path;
 - SCM Ratis roles, leader suggestions, and failover;
 - OzoneFS and S3 Gateway authority parsing;
 - administrative and Recon clients;
 - certificate subject alternative name selection and endpoint verification;
-- delegation-token service construction and decoding; and
+- delegation-token service construction and decoding;
+- automatic hostname discovery with IPv6 forward and reverse DNS;
+- KMS provider creation, encrypted-key access, and KMS delegation-token lifecycle;
+- service, proxy-user, and SASL policy selection with exact IPv6, DNS, and IPv6 CIDR rules;
+- HTTPS and SPNEGO checkpoint download by OM and Recon; and
 - metrics URL construction and collection.
 
 ### End-to-end matrix
@@ -310,33 +404,36 @@ only by changing socket construction.
 Implementation is tracked under [HDDS-15763](https://issues.apache.org/jira/browse/HDDS-15763). Work is divided into
 independently reviewable changes:
 
-1. Remove the forced IPv4 JVM preference and establish common bracket-aware helpers.
-2. Fix Ratis peer construction, SCM Ratis role parsing, leader suggestions, and administrative consumers.
-3. Fix OzoneFS, S3 Gateway, OM, datanode, Recon, HTTP, and metrics boundaries.
-4. Complete secure-mode handling for certificate identities, Kerberos, and delegation-token services, including any
-   required Hadoop or Ratis update.
-5. Add required dual-stack and IPv6-only CI scenarios and publish operator documentation.
+1. File the P0 and P1 Hadoop issues, land the P0 changes upstream, and select the first Hadoop release that contains
+   them.
+2. Remove the forced IPv4 JVM preference and establish common bracket-aware Ozone helpers.
+3. Fix Ratis peer construction, SCM Ratis role parsing, leader suggestions, and administrative consumers.
+4. Fix OzoneFS, S3 Gateway, OM, datanode, Recon, HTTP, KMS, authorization, and metrics boundaries.
+5. Complete secure-mode handling for certificate identities, Kerberos, delegation tokens, HTTPS, and any required Ratis
+   update.
+6. Add required dual-stack and IPv6-only CI scenarios and publish operator documentation.
 
 The umbrella tracks work items HDDS-9894, HDDS-15768, HDDS-15772, HDDS-15773, HDDS-15774, HDDS-15775, HDDS-15776,
-HDDS-15777, HDDS-15779, HDDS-15780, and HDDS-15895. Each change will test its changed behavior. The final CI
-and documentation work will verify the combined behavior rather than infer support from the individual patches.
+HDDS-15777, HDDS-15779, HDDS-15780, and HDDS-15895. Each change will test its changed behavior. The final CI and
+documentation work will verify the combined behavior rather than infer support from the individual patches.
 
 # Open questions
 
-- Should Ozone add a structured SCM role response after IPv6 support lands, or retain the bracketed legacy
-  representation until another API change requires it?
-- Which CI environment can provide the required IPv6-only network, secure services, and enough datanodes for HA and
+- Given that GitHub-hosted runners currently do not provide native IPv6 connectivity, which self-hosted or dedicated CI
+  environment can provide the required IPv6-only network, secure services, and enough datanodes for HA and
   erasure-coding reconstruction?
-- Should support for scoped IPv6 endpoints be rejected explicitly in all advertised-address settings, or only
-  documented as unsupported?
-- Which Hadoop version first provides the required IPv6 delegation-token service round-trip behavior for both
-  token-service modes?
 
 # References
 
 - [HDDS-15763: Ozone IPv6 support](https://issues.apache.org/jira/browse/HDDS-15763)
 - [HDDS-9894: IPv6 address checks for certificate requests](https://issues.apache.org/jira/browse/HDDS-9894)
+- [HADOOP-11890: Hadoop IPv6 support umbrella](https://issues.apache.org/jira/browse/HADOOP-11890)
+- [HADOOP-3619: IPv6 reverse DNS failure](https://issues.apache.org/jira/browse/HADOOP-3619)
+- [HADOOP-12491: IPv6-unsafe Hadoop Common parsing](https://issues.apache.org/jira/browse/HADOOP-12491)
+- [HADOOP-17542: IPv6 parsing in NetUtils](https://issues.apache.org/jira/browse/HADOOP-17542)
+- [HADOOP-19695: IPv6 support in Hadoop HttpServer2](https://issues.apache.org/jira/browse/HADOOP-19695)
 - [RATIS-2592: IPv6-safe Ratis peer-address parsing](https://issues.apache.org/jira/browse/RATIS-2592)
+- [actions/runner-images#668: IPv6 on GitHub-hosted runners](https://github.com/actions/runner-images/issues/668)
 - [RFC 3986: Uniform Resource Identifier](https://www.rfc-editor.org/rfc/rfc3986)
 - [RFC 4291: IPv6 Addressing Architecture](https://www.rfc-editor.org/rfc/rfc4291)
 - [RFC 9844: Entering IPv6 Zone Identifiers in User Interfaces](https://www.rfc-editor.org/rfc/rfc9844)
