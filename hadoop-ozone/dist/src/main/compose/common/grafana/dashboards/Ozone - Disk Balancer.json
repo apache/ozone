@@ -495,7 +495,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (instance) (clamp_min(sum by (instance, storagedirectory) ({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode\"}) - avg by (instance) (sum by (instance, storagedirectory) ({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode\"})), 0))",
+          "expr": "sum by (instance) (clamp_min(sum by (instance, storagedirectory) ({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode\"}) - on(instance) group_left avg by (instance) (sum by (instance, storagedirectory) ({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode\"})), 0))",
           "instant": true,
           "refId": "A"
         }
@@ -560,7 +560,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(sum by (instance) (clamp_min(sum by (instance, storagedirectory) ({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode\"}) - avg by (instance) (sum by (instance, storagedirectory) ({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode\"})), 0)) / clamp_min(sum(rate(disk_balancer_service_metrics_success_bytes{instance=~\"$datanode\"}[5m])), 1)) / 60",
+          "expr": "(sum by (instance) (clamp_min(sum by (instance, storagedirectory) ({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode\"}) - on(instance) group_left avg by (instance) (sum by (instance, storagedirectory) ({__name__=~\"volume_info_metrics_.*_ozone_used\", instance=~\"$datanode\"})), 0)) / clamp_min(sum(rate(disk_balancer_service_metrics_success_bytes{instance=~\"$datanode\"}[5m])), 1)) / 60",
           "instant": true,
           "refId": "A"
         }
