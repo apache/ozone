@@ -144,6 +144,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectTaggingResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.LifecycleExpiration;
 import software.amazon.awssdk.services.s3.model.LifecycleRule;
 import software.amazon.awssdk.services.s3.model.LifecycleRuleAndOperator;
 import software.amazon.awssdk.services.s3.model.LifecycleRuleFilter;
@@ -2402,6 +2403,160 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         b -> b.bucket(bucketName).key(snapshotKey));
 
     assertEquals(content, snapshotResponse.asUtf8String());
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationCreateSuccessfully() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    LifecycleRule rule1 = LifecycleRule.builder()
+        .id("expire-logs-after-365-days")
+        .prefix("logs/")
+        .status(ExpirationStatus.ENABLED)
+        .expiration(LifecycleExpiration.builder().days(365).build())
+        .build();
+
+    BucketLifecycleConfiguration configuration = BucketLifecycleConfiguration.builder()
+        .rules(rule1)
+        .build();
+
+    // Set lifecycle configuration
+    s3Client.putBucketLifecycleConfiguration(b -> b
+        .bucket(bucketName)
+        .lifecycleConfiguration(configuration));
+
+    // Verify the configuration was set
+    GetBucketLifecycleConfigurationResponse response =
+        s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName));
+    List<LifecycleRule> rules = response.rules();
+    assertEquals(1, rules.size());
+
+    // Verify rule 1
+    LifecycleRule retrievedRule1 = rules.get(0);
+    assertEquals("expire-logs-after-365-days", retrievedRule1.id());
+    assertEquals("logs/", retrievedRule1.prefix());
+    assertEquals(ExpirationStatus.ENABLED, retrievedRule1.status());
+    assertEquals(365, retrievedRule1.expiration().days());
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationCreationFailed() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Test 1: Invalid configuration (no prefix, filter, or expiration)
+    LifecycleRule rule = LifecycleRule.builder()
+        .id("invalid")
+        .status(ExpirationStatus.ENABLED)
+        .build();
+    BucketLifecycleConfiguration configuration = BucketLifecycleConfiguration.builder()
+        .rules(rule)
+        .build();
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.putBucketLifecycleConfiguration(b -> b
+            .bucket(bucketName)
+            .lifecycleConfiguration(configuration)));
+    assertEquals(400, exception.statusCode());
+    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), exception.awsErrorDetails().errorCode());
+
+    // Test 2: Non-existent bucket
+    final String nonExistentBucket = getBucketName("nonexistent");
+    LifecycleRule validRule = LifecycleRule.builder()
+        .id("test-rule")
+        .prefix("test/")
+        .status(ExpirationStatus.ENABLED)
+        .expiration(LifecycleExpiration.builder().days(30).build())
+        .build();
+    BucketLifecycleConfiguration validConfig = BucketLifecycleConfiguration.builder()
+        .rules(validRule)
+        .build();
+
+    S3Exception exception2 = assertThrows(S3Exception.class,
+        () -> s3Client.putBucketLifecycleConfiguration(b -> b
+            .bucket(nonExistentBucket)
+            .lifecycleConfiguration(validConfig)));
+    assertEquals(404, exception2.statusCode());
+    assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), exception2.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationDelete() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Test delete lifecycle for a bucket, while it doesn't have lifecycle
+    assertThrows(S3Exception.class,
+        () -> s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName)));
+    // Idempotent delete: no exception expected even without an existing config
+    s3Client.deleteBucketLifecycle(b -> b.bucket(bucketName));
+
+    // First create a lifecycle configuration
+    LifecycleRule rule = LifecycleRule.builder()
+        .id("test-rule")
+        .prefix("test/")
+        .status(ExpirationStatus.ENABLED)
+        .expiration(LifecycleExpiration.builder().days(30).build())
+        .build();
+    BucketLifecycleConfiguration configuration = BucketLifecycleConfiguration.builder()
+        .rules(rule)
+        .build();
+
+    s3Client.putBucketLifecycleConfiguration(b -> b
+        .bucket(bucketName)
+        .lifecycleConfiguration(configuration));
+    // Verify it exists
+    GetBucketLifecycleConfigurationResponse response =
+        s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName));
+    assertEquals(1, response.rules().size());
+    // Delete the lifecycle configuration
+    s3Client.deleteBucketLifecycle(b -> b.bucket(bucketName));
+    assertThrows(S3Exception.class,
+        () -> s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName)));
+    // Test delete on non-existent bucket
+    final String nonExistentBucket = getBucketName("nonexistent");
+    assertThrows(S3Exception.class,
+        () -> s3Client.deleteBucketLifecycle(b -> b.bucket(nonExistentBucket)));
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationGet() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Test get on bucket without lifecycle configuration
+    assertThrows(S3Exception.class,
+        () -> s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName)));
+
+    // Create a comprehensive lifecycle configuration
+    LifecycleRule rule1 = LifecycleRule.builder()
+        .id("expire-old-files")
+        .prefix("old/")
+        .status(ExpirationStatus.ENABLED)
+        .expiration(LifecycleExpiration.builder().days(365).build())
+        .build();
+    BucketLifecycleConfiguration configuration = BucketLifecycleConfiguration.builder()
+        .rules(rule1)
+        .build();
+
+    // Set the configuration
+    s3Client.putBucketLifecycleConfiguration(b -> b
+        .bucket(bucketName)
+        .lifecycleConfiguration(configuration));
+
+    // Get and verify the configuration
+    GetBucketLifecycleConfigurationResponse response =
+        s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName));
+    List<LifecycleRule> rules = response.rules();
+    assertEquals(1, rules.size());
+
+    // Verify first rule
+    LifecycleRule retrievedRule1 = rules.get(0);
+    assertEquals("expire-old-files", retrievedRule1.id());
+    assertEquals("old/", retrievedRule1.prefix());
+    assertEquals(ExpirationStatus.ENABLED, retrievedRule1.status());
+    assertEquals(365, retrievedRule1.expiration().days());
   }
 
   @Test
