@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 
 /**
  * Node-level storage totals for a DataNode, aggregated over its HDDS data volumes only
- * ({@code VolumeType.DATA_VOLUME}) via {@link MutableVolumeSet#getStorageReport()}.
+ * ({@code VolumeType.DATA_VOLUME}) via {@link MutableVolumeSet#getStorageReportSnapshot()}.
  * This is the same scope as the {@code storageReport} entries produced by
  * {@code OzoneContainer.getNodeReport()}; meta and DB volumes are excluded.
  * Registered as {@code Hadoop:service=HddsDatanode,name=DatanodeStorageMetrics}.
@@ -53,10 +53,22 @@ public final class DatanodeStorageMetrics implements MetricsSource {
 
   private final MetricsRegistry registry;
   private final MutableVolumeSet volumeSet;
+  private final String sourceName;
 
   private DatanodeStorageMetrics(MutableVolumeSet volumeSet) {
     this.volumeSet = volumeSet;
-    this.registry = new MetricsRegistry(SOURCE_NAME);
+    // In mini-cluster mode many datanodes share one metrics system, so the
+    // metrics system uniquifies the constant source name on registration
+    // (DatanodeStorageMetrics-1, -2, ...). Unregistering by the constant base
+    // name would then leak every source past the first, and each leaked source
+    // pins a shut-down datanode's MutableVolumeSet. Make the name unique per
+    // datanode up front so register and unregister stay symmetric. In
+    // production there is one instance per JVM, so keep the plain name for
+    // stable JMX and Prometheus metric names.
+    this.sourceName = DefaultMetricsSystem.inMiniClusterMode()
+        ? SOURCE_NAME + '-' + volumeSet.getDatanodeUuid()
+        : SOURCE_NAME;
+    this.registry = new MetricsRegistry(sourceName);
   }
 
   /**
@@ -65,8 +77,8 @@ public final class DatanodeStorageMetrics implements MetricsSource {
    */
   public static DatanodeStorageMetrics create(MutableVolumeSet volumeSet) {
     DatanodeStorageMetrics datanodeStorageMetrics = new DatanodeStorageMetrics(volumeSet);
-    DefaultMetricsSystem.instance().register(
-        SOURCE_NAME, "DataNode node-level storage totals", datanodeStorageMetrics);
+    DefaultMetricsSystem.instance().register(datanodeStorageMetrics.sourceName,
+        "DataNode node-level storage totals", datanodeStorageMetrics);
     return datanodeStorageMetrics;
   }
 
@@ -74,7 +86,7 @@ public final class DatanodeStorageMetrics implements MetricsSource {
    * Unregisters this source from the Metrics2 system.
    */
   public void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   /**
@@ -83,12 +95,17 @@ public final class DatanodeStorageMetrics implements MetricsSource {
    */
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    MetricsRecordBuilder builder = collector.addRecord(SOURCE_NAME);
+    MetricsRecordBuilder builder = collector.addRecord(sourceName);
     registry.snapshot(builder, all);
 
     long capacity = 0L;
     long used = 0L;
-    for (StorageLocationReport report : volumeSet.getStorageReport()) {
+    // getMetrics() runs while the DefaultMetricsSystem monitor is held. Read a
+    // lock-free snapshot instead of getStorageReport(), which takes the
+    // volume-set lock: a volume-failure handler holds that lock while
+    // unregistering volume metrics (which needs the same monitor), so locking
+    // here can deadlock the metrics system.
+    for (StorageLocationReport report : volumeSet.getStorageReportSnapshot()) {
       capacity = Math.addExact(capacity, report.getCapacity());
       used = Math.addExact(used, report.getScmUsed());
     }

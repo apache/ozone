@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -407,18 +408,42 @@ public class MutableVolumeSet implements VolumeSet {
   public StorageLocationReport[] getStorageReport() {
     this.readLock();
     try {
-      StorageLocationReport[] reports = new StorageLocationReport[volumeMap.size() + failedVolumeMap.size()];
-      int counter = 0;
-      for (StorageVolume volume : volumeMap.values()) {
-        reports[counter++] = volume.getReport();
-      }
-      for (StorageVolume volume : failedVolumeMap.values()) {
-        reports[counter++] = volume.getReport();
-      }
-      return reports;
+      return buildStorageReport();
     } finally {
       this.readUnlock();
     }
+  }
+
+  /**
+   * Lock-free variant of {@link #getStorageReport()}. Both {@code volumeMap}
+   * and {@code failedVolumeMap} are {@link ConcurrentHashMap}s, so this returns
+   * a weakly-consistent snapshot (mirroring {@link #getVolumesList()}) without
+   * acquiring the volume-set lock.
+   *
+   * <p>Use this from callers that must not block on the volume-set lock. In
+   * particular, metrics sampling runs while the {@code DefaultMetricsSystem}
+   * monitor is held, and a volume-failure handler holds the volume-set write
+   * lock while unregistering volume metrics (which needs that same monitor);
+   * acquiring the volume-set lock from the sampling thread can therefore
+   * deadlock the whole metrics system.
+   */
+  public StorageLocationReport[] getStorageReportSnapshot() {
+    return buildStorageReport();
+  }
+
+  private StorageLocationReport[] buildStorageReport() {
+    List<StorageLocationReport> reports = new ArrayList<>(volumeMap.size() + failedVolumeMap.size());
+    for (StorageVolume volume : volumeMap.values()) {
+      reports.add(volume.getReport());
+    }
+    for (StorageVolume volume : failedVolumeMap.values()) {
+      reports.add(volume.getReport());
+    }
+    return reports.toArray(new StorageLocationReport[0]);
+  }
+
+  public String getDatanodeUuid() {
+    return datanodeUuid;
   }
 
   public StorageVolume.VolumeType getVolumeType() {

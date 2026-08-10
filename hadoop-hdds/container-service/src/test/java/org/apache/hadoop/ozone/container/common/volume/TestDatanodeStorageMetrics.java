@@ -21,9 +21,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.UUID;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.impl.MetricsRecordImpl;
+import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.junit.jupiter.api.Test;
 
@@ -51,7 +54,7 @@ class TestDatanodeStorageMetrics {
         .build();
 
     MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
-    when(volumeSet.getStorageReport())
+    when(volumeSet.getStorageReportSnapshot())
         .thenReturn(new StorageLocationReport[]{vol1, vol2});
 
     DatanodeStorageMetrics metrics = DatanodeStorageMetrics.create(volumeSet);
@@ -78,7 +81,7 @@ class TestDatanodeStorageMetrics {
   void testZeroCapacityReturnsZeroPercentage() {
     // No volumes → capacity=0, used=0; OzoneUsedPercentage must be 0.0, not NaN.
     MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
-    when(volumeSet.getStorageReport()).thenReturn(new StorageLocationReport[0]);
+    when(volumeSet.getStorageReportSnapshot()).thenReturn(new StorageLocationReport[0]);
 
     DatanodeStorageMetrics metrics = DatanodeStorageMetrics.create(volumeSet);
     try {
@@ -92,6 +95,42 @@ class TestDatanodeStorageMetrics {
     } finally {
       metrics.unregister();
     }
+  }
+
+  @Test
+  void testNoSourceLeakInMiniClusterMode() {
+    // In mini-cluster mode many datanodes share one metrics system. Register
+    // and unregister must be symmetric so no source (and its pinned volume set)
+    // leaks. The pre-fix code registered a constant name (uniquified to -N) but
+    // unregistered the base name, leaking every datanode past the first.
+    boolean prev = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    try {
+      MetricsSystemImpl ms = (MetricsSystemImpl) DefaultMetricsSystem.instance();
+      String uuidA = "dn-" + UUID.randomUUID();
+      String uuidB = "dn-" + UUID.randomUUID();
+      String nameA = DatanodeStorageMetrics.SOURCE_NAME + '-' + uuidA;
+      String nameB = DatanodeStorageMetrics.SOURCE_NAME + '-' + uuidB;
+
+      DatanodeStorageMetrics a = DatanodeStorageMetrics.create(mockVolumeSet(uuidA));
+      DatanodeStorageMetrics b = DatanodeStorageMetrics.create(mockVolumeSet(uuidB));
+      assertThat(ms.getSource(nameA)).isNotNull();
+      assertThat(ms.getSource(nameB)).isNotNull();
+
+      a.unregister();
+      b.unregister();
+      assertThat(ms.getSource(nameA)).isNull();
+      assertThat(ms.getSource(nameB)).isNull();
+    } finally {
+      DefaultMetricsSystem.setMiniClusterMode(prev);
+    }
+  }
+
+  private static MutableVolumeSet mockVolumeSet(String datanodeUuid) {
+    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    when(volumeSet.getDatanodeUuid()).thenReturn(datanodeUuid);
+    when(volumeSet.getStorageReportSnapshot()).thenReturn(new StorageLocationReport[0]);
+    return volumeSet;
   }
 
   private static long findLong(Iterable<AbstractMetric> metrics, String name) {
