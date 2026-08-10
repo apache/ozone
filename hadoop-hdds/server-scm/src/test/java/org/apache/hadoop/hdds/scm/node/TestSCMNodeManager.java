@@ -780,8 +780,8 @@ public class TestSCMNodeManager {
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, interval,
         MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, interval, MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 2, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 300, MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 600, MILLISECONDS);
 
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
