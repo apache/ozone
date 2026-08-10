@@ -405,6 +405,16 @@ public class MutableVolumeSet implements VolumeSet {
     return hasEnoughVolumes;
   }
 
+  /**
+   * Returns a consistent snapshot of the storage reports under the volume-set
+   * read lock.
+   *
+   * <p>Do not call this from metrics collection (or any caller that may hold the
+   * {@code DefaultMetricsSystem} monitor): a volume-failure handler holds the
+   * volume-set write lock while unregistering volume metrics under that same
+   * monitor, so taking the read lock here can deadlock the metrics system. Use
+   * {@link #getStorageReportSnapshot()} from those paths instead.
+   */
   public StorageLocationReport[] getStorageReport() {
     this.readLock();
     try {
