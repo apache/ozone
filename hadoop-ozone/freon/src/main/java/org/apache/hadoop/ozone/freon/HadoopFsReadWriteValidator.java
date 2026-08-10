@@ -125,8 +125,9 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       contentGenerator = new ContentGenerator(
           fileSize.toBytes() - Long.BYTES, bufferSize, copyBufferSize);
 
+      // not "file-read": dfsv uses that name for a read without the digest
       writeTimer = getMetrics().timer("file-write");
-      readTimer = getMetrics().timer("file-read");
+      readTimer = getMetrics().timer("file-read-validate");
 
       runTests(this::writeAndValidate);
     } finally {
