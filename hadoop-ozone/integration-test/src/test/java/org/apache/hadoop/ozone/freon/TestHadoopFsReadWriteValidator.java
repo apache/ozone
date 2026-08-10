@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.freon;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.net.URI;
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import picocli.CommandLine;
 
 /**
  * Test for HadoopFsReadWriteValidator.
@@ -91,6 +93,59 @@ public abstract class TestHadoopFsReadWriteValidator implements NonHATests.TestC
       FileStatus[] files =
           fileSystem.listStatus(new Path(rootPath + "/" + prefix));
       assertEquals(fileCount, files.length, "Unexpected number of files");
+      for (FileStatus file : files) {
+        assertEquals(fileSize, file.getLen(),
+            "Unexpected file size: " + file.getPath());
+      }
+    }
+  }
+
+  /**
+   * A time-based run reuses its paths, so the read-back validates overwritten
+   * files.  A count-based run uses each path once and never gets there.
+   */
+  @ParameterizedTest
+  @EnumSource(names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
+  public void testValidateOverwrittenPaths(BucketLayout layout) throws Exception {
+    String volumeName = "vol-" + UUID.randomUUID();
+    String bucketName = "bucket1";
+    String prefix = "dfsrw-duration";
+    int threads = 2;
+    int pathsPerThread = 4;
+    long fileSize = 1024;
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName,
+        BucketArgs.newBuilder().setBucketLayout(layout).build());
+
+    String rootPath = OZONE_URI_SCHEME + "://" + bucketName + "." + volumeName;
+    String om = cluster().getConf().get(OZONE_OM_ADDRESS_KEY);
+    CommandLine cmd = new Freon().getCmd();
+    int exitCode = cmd.execute(
+        "-D", OZONE_OM_ADDRESS_KEY + "=" + om,
+        "dfsrw",
+        "--duration", "3s",
+        "-n", String.valueOf(pathsPerThread),
+        "-t", String.valueOf(threads),
+        "-s", fileSize + "B",
+        "-p", prefix,
+        "-r", rootPath
+    );
+    assertEquals(0, exitCode, "Freon dfsrw command failed");
+
+    BaseFreonGenerator subject = (BaseFreonGenerator)
+        cmd.getParseResult().subcommand().commandSpec().userObject();
+    int maxPaths = threads * pathsPerThread;
+
+    // more successful tasks than paths means overwritten files were validated
+    assertThat(subject.getSuccessCount()).isGreaterThan(maxPaths);
+
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
+    try (FileSystem fileSystem = FileSystem.get(URI.create(rootPath), conf)) {
+      FileStatus[] files =
+          fileSystem.listStatus(new Path(rootPath + "/" + prefix));
+      assertThat(files.length).isLessThanOrEqualTo(maxPaths);
       for (FileStatus file : files) {
         assertEquals(fileSize, file.getLen(),
             "Unexpected file size: " + file.getPath());
