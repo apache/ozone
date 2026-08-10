@@ -36,12 +36,12 @@ public final class ExportJob {
   private final String timestamp;
   private final ContainerID startContainerId;
   private final ExportSizing sizing;
-  private volatile String tarPath;
-  private volatile ExecutionState executionState = ExecutionState.RUNNING;
-  private volatile long totalRows;
-  private volatile long startTimeNs;
-  private volatile long endTimeNs;
-  private volatile String errorMessage;
+  private String tarPath;
+  private ExecutionState executionState = ExecutionState.RUNNING;
+  private long totalRows;
+  private long startTimeNs;
+  private long endTimeNs;
+  private String errorMessage;
 
   /**
    * Unique job identifier.
@@ -99,40 +99,23 @@ public final class ExportJob {
     }
 
     public ExecutionState getExecutionState() {
-      return executionState;
-    }
-
-    public LifeCycleState getLifeCycleState() {
-      return scope.getLifeCycleState();
-    }
-
-    public ContainerHealthState getHealthState() {
-      return scope.getHealthState();
+      return ExportJob.this.getExecutionState();
     }
 
     public long getTotalRows() {
-      return totalRows;
+      return ExportJob.this.getTotalRows();
     }
 
     public long getElapsedMs() {
-      if (startTimeNs <= 0) {
-        return 0;
-      }
-      long endNs = endTimeNs > 0 ? endTimeNs : System.nanoTime();
-      return TimeUnit.NANOSECONDS.toMillis(endNs - startTimeNs);
+      return ExportJob.this.getElapsedMs();
     }
 
     public String getTarPath() {
-      return tarPath;
+      return ExportJob.this.getTarPath();
     }
 
     public String getErrorMessage() {
-      return errorMessage;
-    }
-
-    public boolean isTerminal() {
-      return executionState == ExecutionState.SUCCEEDED
-          || executionState == ExecutionState.FAILED;
+      return ExportJob.this.getErrorMessage();
     }
   }
 
@@ -140,9 +123,19 @@ public final class ExportJob {
    * Job execution state.
    */
   public enum ExecutionState {
-    RUNNING,
-    SUCCEEDED,
-    FAILED
+    RUNNING(false),
+    SUCCEEDED(true),
+    FAILED(true);
+
+    private final boolean terminal;
+
+    ExecutionState(boolean terminal) {
+      this.terminal = terminal;
+    }
+
+    public boolean isTerminal() {
+      return terminal;
+    }
   }
 
   ExportJob(Id id, ExportScope scope, String timestamp, String tarPath, ContainerID startContainerId,
@@ -157,10 +150,6 @@ public final class ExportJob {
 
   Id getId() {
     return id;
-  }
-
-  ExportScope getScope() {
-    return scope;
   }
 
   String getTimestamp() {
@@ -191,44 +180,66 @@ public final class ExportJob {
     return sizing.getShardSize();
   }
 
-  ExecutionState getExecutionState() {
-    return executionState;
-  }
-
-  void setExecutionState(ExecutionState newState) {
-    this.executionState = newState;
-    if ((newState == ExecutionState.SUCCEEDED || newState == ExecutionState.FAILED)
-        && endTimeNs == 0) {
-      this.endTimeNs = System.nanoTime();
-    }
-  }
-
-  long getEndTimeNs() {
-    return endTimeNs;
-  }
-
-  long getTotalRows() {
-    return totalRows;
-  }
-
-  void setTotalRows(long rows) {
-    this.totalRows = rows;
-  }
-
-  void setStartTimeNs(long startTimeNs) {
-    this.startTimeNs = startTimeNs;
-  }
-
-  void setErrorMessage(String message) {
-    this.errorMessage = message;
-  }
-
-  String getTarPath() {
+  synchronized String getTarPath() {
     return tarPath;
   }
 
-  void setTarPath(String path) {
-    this.tarPath = path;
+  synchronized ExecutionState getExecutionState() {
+    return executionState;
+  }
+
+  synchronized long getEndTimeNs() {
+    return endTimeNs;
+  }
+
+  synchronized long getTotalRows() {
+    return totalRows;
+  }
+
+  synchronized long getElapsedMs() {
+    if (startTimeNs <= 0) {
+      return 0;
+    }
+    long endNs = endTimeNs > 0 ? endTimeNs : System.nanoTime();
+    return TimeUnit.NANOSECONDS.toMillis(endNs - startTimeNs);
+  }
+
+  synchronized String getErrorMessage() {
+    return errorMessage;
+  }
+
+  synchronized void startExecution() {
+    if (executionState.isTerminal()) {
+      throw new IllegalStateException("Export job " + id + " is already terminal: " + executionState);
+    }
+    startTimeNs = System.nanoTime();
+  }
+
+  synchronized void updateTotalRows(long rows) {
+    totalRows = rows;
+  }
+
+  synchronized void completeWithNoMatches() {
+    tarPath = null;
+    transitionToTerminal(ExecutionState.SUCCEEDED);
+  }
+
+  synchronized void completeWithArchive(String archivePath) {
+    tarPath = archivePath;
+    transitionToTerminal(ExecutionState.SUCCEEDED);
+  }
+
+  synchronized void fail(String message) {
+    errorMessage = message;
+    transitionToTerminal(ExecutionState.FAILED);
+  }
+
+  private synchronized void transitionToTerminal(ExecutionState terminalState) {
+    if (executionState.isTerminal()) {
+      throw new IllegalStateException("Export job " + id + " is already terminal: " + executionState);
+    }
+    executionState = terminalState;
+    endTimeNs = System.nanoTime();
   }
 
   Status toStatus() {
@@ -238,10 +249,6 @@ public final class ExportJob {
   String shardFileName(int partIndex) {
     return String.format("container-ids_%s_%s_part%03d.txt",
         scope.getValue(), timestamp, partIndex);
-  }
-
-  String shardEntryName(int partIndex) {
-    return shardFileName(partIndex);
   }
 
   void writeMetadataHeader(BufferedWriter writer, int partNumber, ContainerID shardStartContainerId)

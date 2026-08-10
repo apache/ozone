@@ -349,7 +349,7 @@ public class TestContainerExportManager {
   private ExportJob.Status waitForTerminal(ExportJob.Id jobId) throws Exception {
     GenericTestUtils.waitFor(() -> {
       ExportJob.Status status = exportManager.getExportStatus(jobId);
-      return status != null && status.isTerminal();
+      return status != null && status.getExecutionState().isTerminal();
     }, 100, 30_000);
     return exportManager.getExportStatus(jobId);
   }

@@ -61,7 +61,7 @@ import org.slf4j.LoggerFactory;
  * created only after all shards are written. The export manager writes
  * {@code container-ids_{scope}_{timestamp}_job{jobId}.tar.gz.tmp} and atomically renames it to
  * {@code .tar.gz} on close ({@link AtomicFileOutputStream}), so a partial {@code .tar.gz} is
- * never visible. {@link #lock()} uses {@code in_use.lock} to exclude concurrent writers.
+ * never visible. {@link #start()} acquires {@code in_use.lock} to exclude concurrent writers.
  *
  * <pre>
  * {exportDirectory}/
@@ -83,8 +83,6 @@ import org.slf4j.LoggerFactory;
  * <p><b>SCM restart:</b> in-memory job status is lost. {@link #start()} acquires the export
  * directory lock and clears incomplete work.
  * {@link #listCompletedArchivePaths()} returns existing {@code tarPath} values (oldest first).
- * {@link #jobIdFromArchiveFileName(String)} parses {@code jobId} for terminal-job rebuild in
- * {@code ContainerExportManager}.
  */
 final class ExportFileManager {
 
@@ -98,6 +96,8 @@ final class ExportFileManager {
   private static final int ARCHIVE_TIMESTAMP_LENGTH = 16;
   private static final DateTimeFormatter ARCHIVE_TIMESTAMP_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
+  private static final DateTimeFormatter METADATA_TIMESTAMP_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC);
 
   private final String exportDirectory;
   private FileLock exportDirectoryLock;
@@ -121,7 +121,7 @@ final class ExportFileManager {
     removeIncompleteWorkOnStartup();
   }
 
-  void lock() throws IOException {
+  private void lock() throws IOException {
     if (exportDirectoryLock != null) {
       return;
     }
@@ -220,6 +220,10 @@ final class ExportFileManager {
       archivePaths.add(archive.getAbsolutePath());
     }
     return archivePaths;
+  }
+
+  static String formatMetadataTimestamp(Instant submissionTime) {
+    return METADATA_TIMESTAMP_FORMAT.format(submissionTime);
   }
 
   static String archiveTimestampFromArchiveFileName(String fileName) {

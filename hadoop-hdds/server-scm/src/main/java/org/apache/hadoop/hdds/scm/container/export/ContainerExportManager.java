@@ -23,8 +23,6 @@ import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.DEFAULT_S
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.Deque;
@@ -65,9 +63,6 @@ public class ContainerExportManager {
   //TODO: make ozone.scm.container.export.max.terminal.jobs configurable.
   private static final int DEFAULT_MAX_TERMINAL_JOBS = 10;
   private static final long SHUTDOWN_TIMEOUT_MS = 5_000;
-
-  private static final DateTimeFormatter METADATA_TIMESTAMP_FORMAT =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC);
 
   private final Map<ExportJob.Id, ExportJob> jobMap = new ConcurrentHashMap<>();
   private final Deque<String> completedArchivePaths = new ArrayDeque<>();
@@ -154,7 +149,7 @@ public class ContainerExportManager {
 
     ExportScope scope = ExportScope.of(lifeCycleState, healthState);
     Instant now = Instant.now();
-    String metadataTimestamp = METADATA_TIMESTAMP_FORMAT.format(now);
+    String metadataTimestamp = ExportFileManager.formatMetadataTimestamp(now);
     String tarPath = fileManager.resolveArchivePath(scope, now, jobId);
 
     ExportJob job = new ExportJob(jobId, scope, metadataTimestamp, tarPath, start, sizing);
@@ -211,7 +206,7 @@ public class ContainerExportManager {
 
   private void evictOldTerminalJobs() {
     List<Map.Entry<ExportJob.Id, ExportJob>> terminalJobs = jobMap.entrySet().stream()
-        .filter(e -> e.getValue().getExecutionState() != ExportJob.ExecutionState.RUNNING)
+        .filter(e -> e.getValue().getExecutionState().isTerminal())
         .sorted(Comparator.comparingLong(e -> e.getValue().getEndTimeNs()))
         .collect(Collectors.toList());
     int excess = terminalJobs.size() - maxTerminalJobs;
@@ -247,12 +242,10 @@ public class ContainerExportManager {
   private void executeExport(ExportJob job) {
     String jobIdValue = job.getId().getValue();
     String archivePath = job.getTarPath();
-    job.setStartTimeNs(System.nanoTime());
-    boolean succeeded = false;
+    job.startExecution();
 
     try {
       fileManager.createJobDirectory(job.getId());
-      job.setExecutionState(ExportJob.ExecutionState.RUNNING);
 
       ContainerID cursor = job.getStartContainerId();
       int fileIndex = 1;
@@ -297,7 +290,7 @@ public class ContainerExportManager {
             buf.append(containerId.getProtobuf().getId()).append('\n');
             totalRows++;
             recordsInCurrentFile++;
-            job.setTotalRows(totalRows);
+            job.updateTotalRows(totalRows);
 
             if (recordsInCurrentFile >= job.getShardSize()) {
               writer.write(buf.toString());
@@ -324,43 +317,37 @@ public class ContainerExportManager {
       }
 
       if (totalRows == 0) {
-        job.setTarPath(null);
-        job.setExecutionState(ExportJob.ExecutionState.SUCCEEDED);
+        job.completeWithNoMatches();
         LOG.info("Export job {} completed with zero matching containers", jobIdValue);
       } else {
         fileManager.writeArchive(job.getId(), archivePath);
-        job.setTarPath(archivePath);
-        job.setExecutionState(ExportJob.ExecutionState.SUCCEEDED);
+        job.completeWithArchive(archivePath);
         completedArchivePaths.addLast(archivePath);
         LOG.info("Export job {} completed ({} rows, archive={}).",
             jobIdValue, totalRows, archivePath);
       }
       fileManager.deleteJobDirectory(job.getId());
-      succeeded = true;
     } catch (InterruptedException e) {
-      job.setExecutionState(ExportJob.ExecutionState.FAILED);
-      job.setErrorMessage(e.getMessage());
+      job.fail(e.getMessage());
       fileManager.cleanupFailedJob(job.getId(), archivePath);
       LOG.info("Export job {} was cancelled", jobIdValue);
       Thread.currentThread().interrupt();
     } catch (IOException | RuntimeException e) {
-      succeeded = false;
-      job.setExecutionState(ExportJob.ExecutionState.FAILED);
-      job.setErrorMessage(e.getMessage() != null ? e.getMessage() : e.toString());
+      job.fail(e.getMessage() != null ? e.getMessage() : e.toString());
       fileManager.cleanupFailedJob(job.getId(), archivePath);
       LOG.error("Export job {} failed", jobIdValue, e);
     } finally {
       runningJobId.compareAndSet(job.getId(), null);
       if (metrics != null) {
-        if (succeeded) {
+        ExportJob.ExecutionState state = job.getExecutionState();
+        if (state == ExportJob.ExecutionState.SUCCEEDED) {
           metrics.incrExportJobsSucceeded();
           metrics.recordLastSuccessfulExport(job.getTotalRows(), fileManager.getArchiveLength(archivePath));
-        } else if (job.getExecutionState() == ExportJob.ExecutionState.FAILED) {
+        } else if (state == ExportJob.ExecutionState.FAILED) {
           metrics.incrExportJobsFailed();
         }
       }
-      if (job.getExecutionState() == ExportJob.ExecutionState.SUCCEEDED
-          || job.getExecutionState() == ExportJob.ExecutionState.FAILED) {
+      if (job.getExecutionState().isTerminal()) {
         evictOldTerminalJobs();
       }
     }
