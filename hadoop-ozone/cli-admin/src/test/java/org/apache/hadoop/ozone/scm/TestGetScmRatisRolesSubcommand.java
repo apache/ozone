@@ -62,6 +62,26 @@ public class TestGetScmRatisRolesSubcommand {
   }
 
   @Test
+  public void testGetScmRolesNonRatisShortString() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--table");
+
+    List<String> result = new ArrayList<>();
+    result.add("host:9894");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      assertThat(capture.getOutput()).contains("host");
+      assertThat(capture.getOutput()).contains("9894");
+    }
+  }
+
+  @Test
   public void testGetScmHARatisRolesIPv6() throws Exception {
     GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
     ScmClient client = mock(ScmClient.class);
