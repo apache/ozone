@@ -1177,8 +1177,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     Set<String> referencedFiles = compactionDag.getCompactionMap().keySet();
     Set<String> orphanedFiles = new HashSet<>();
     try (Stream<Path> pathStream = Files.list(sstBackupDirPath)) {
-      pathStream.filter(path -> path.getFileName().toString().toLowerCase()
-              .endsWith(SST_FILE_EXTENSION))
+      pathStream.filter(path -> path.getFileName().toString().endsWith(SST_FILE_EXTENSION))
           .forEach(path -> {
             String fileName = FilenameUtils.getBaseName(path.getFileName().toString());
             if (!referencedFiles.contains(fileName)) {
@@ -1199,6 +1198,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       removeSstFiles(orphanedFiles);
     } catch (InterruptedException e) {
       LOG.warn("Failed to remove orphaned SST backup files", e);
+      Thread.currentThread().interrupt();
     }
   }
 
