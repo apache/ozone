@@ -312,13 +312,17 @@ public class S3LifecycleConfiguration {
    * @return OmLCRule internal rule representation
    */
   private OmLCRule convertToOmRule(Rule rule) throws OMException, OS3Exception {
-    if (rule.getStatus() == null || rule.getStatus().isEmpty()) {
+    String status = rule.getStatus();
+    if (status == null || status.isEmpty()) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML,
           "The Status element is required in LifecycleConfiguration");
     }
+    if (!"Enabled".equals(status) && !"Disabled".equals(status)) {
+      throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML);
+    }
 
     OmLCRule.Builder builder = new OmLCRule.Builder()
-        .setEnabled("Enabled".equals(rule.getStatus()))
+        .setEnabled("Enabled".equals(status))
         .setId(rule.getId())
         .setPrefix(rule.getPrefix());
 
