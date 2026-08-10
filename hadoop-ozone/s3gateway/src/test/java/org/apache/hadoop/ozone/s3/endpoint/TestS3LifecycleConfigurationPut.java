@@ -182,7 +182,7 @@ public class TestS3LifecycleConfigurationPut {
 
   @Test
   public void testPutValidLifecycleConfiguration() throws Exception {
-    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", onePrefix()).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", withStatus("Enabled")).getStatus());
     assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", withStatus("Disabled")).getStatus());
     assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", emptyPrefix()).getStatus());
     assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", oneTag()).getStatus());
