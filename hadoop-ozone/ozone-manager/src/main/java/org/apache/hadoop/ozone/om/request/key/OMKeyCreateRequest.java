@@ -498,6 +498,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         LOG.warn("Derived key piggyback requested but token type is {}, " +
                 "not S3AUTHINFO. Derived key will not be returned.",
             s3Token.getTokenType());
+        return builder;
       }
       byte[] derivedKey = ozoneManager.getS3DerivedKey(s3Token.getAwsAccessId(), s3Token.getStrToSign());
       builder.setDerivedKey(ByteString.copyFrom(derivedKey));
