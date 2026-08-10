@@ -889,6 +889,7 @@ class TestKeyDeletingService extends OzoneTestBase {
         }
       }, 100, 10000);
       snapshotInfo.setDeepCleanedDeletedDir(true);
+      metadataManager.getSnapshotInfoTable().put(snapshotKey, snapshotInfo);
 
       OzoneManager ozoneManager = Mockito.spy(om);
       OmSnapshotManager omSnapshotManager = Mockito.spy(om.getOmSnapshotManager());
