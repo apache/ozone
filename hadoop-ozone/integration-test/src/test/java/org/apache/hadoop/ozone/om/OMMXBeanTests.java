@@ -18,8 +18,12 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.lang.management.ManagementFactory;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import org.apache.ozone.test.NonHATests;
@@ -64,7 +68,20 @@ public abstract class OMMXBeanTests implements NonHATests.TestCase {
     String rocksDbDirectory = (String) mbs.getAttribute(bean, "RocksDbDirectory");
     assertEquals(om.getRocksDbDirectory(), rocksDbDirectory);
 
+    Object ratisRolesAttribute = mbs.getAttribute(bean, "RatisRoles");
+    assertNotNull(ratisRolesAttribute);
+    assertEquals(om.getRatisRoles(), toRatisRolesList(ratisRolesAttribute));
+
     String ratisEvents = (String) mbs.getAttribute(bean, "RatisEvents");
     assertEquals(om.getRatisEvents(), ratisEvents);
+  }
+
+  private static List<List<String>> toRatisRolesList(Object ratisRolesAttribute) {
+    String[][] ratisRolesArray = (String[][]) ratisRolesAttribute;
+    List<List<String>> ratisRoles = new ArrayList<>();
+    for (String[] row : ratisRolesArray) {
+      ratisRoles.add(Arrays.asList(row));
+    }
+    return ratisRoles;
   }
 }
