@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.admin.scm.GetScmRatisRolesSubcommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
@@ -62,7 +63,7 @@ public class TestGetScmRatisRolesSubcommand {
   }
 
   @Test
-  public void testGetScmRolesNonRatisShortString() throws Exception {
+  public void testGetScmRolesNonRatisShortStringTable() throws Exception {
     GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
     ScmClient client = mock(ScmClient.class);
     CommandLine c = new CommandLine(cmd);
@@ -76,8 +77,28 @@ public class TestGetScmRatisRolesSubcommand {
     try (GenericTestUtils.SystemOutCapturer capture =
         new GenericTestUtils.SystemOutCapturer()) {
       cmd.execute(client);
-      assertThat(capture.getOutput()).contains("host");
-      assertThat(capture.getOutput()).contains("9894");
+      assertThat(capture.getOutput())
+          .containsPattern("\\|\\s+host\\s+\\|\\s+9894\\s+\\|");
+    }
+  }
+
+  @Test
+  public void testGetScmRolesNonRatisShortStringJson() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+
+    List<String> result = new ArrayList<>();
+    result.add("host:9894");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      assertThat(JsonUtils.readTree(capture.getOutput())).isEqualTo(
+          JsonUtils.readTree("{\"host\":{\"address\":\"host:9894\"}}"));
     }
   }
 
