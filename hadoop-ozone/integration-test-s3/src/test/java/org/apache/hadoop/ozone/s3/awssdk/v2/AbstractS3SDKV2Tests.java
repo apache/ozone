@@ -158,6 +158,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.ListPartsRequest;
+import software.amazon.awssdk.services.s3.model.MetadataDirective;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutBucketAclRequest;
@@ -638,6 +639,26 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(400, exception.statusCode());
     assertEquals(S3ErrorTable.INVALID_URI.getCode(), exception.awsErrorDetails().errorCode());
     assertEquals(S3ErrorTable.INVALID_URI.getErrorMessage(), exception.awsErrorDetails().errorMessage());
+  }
+
+  @Test
+  public void testGetObjectTorrentNotImplemented() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectTorrent(b -> b.bucket(bucketName).key(keyName)));
+
+    assertEquals(501, exception.statusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), exception.awsErrorDetails().errorCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getErrorMessage(), exception.awsErrorDetails().errorMessage());
+
+    // object must be untouched
+    HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals(content.length(), headObjectResponse.contentLength());
   }
 
   @Test
@@ -1130,6 +1151,30 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(S3SDKTestUtils.S3_SPECIAL_KEY_NAMES, listedKeys);
   }
 
+  @Test
+  public void testListObjectsV2FetchOwner() {
+    final String bucketName = getBucketName("fetch-owner");
+    final String keyName = getKeyName("obj");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("x"));
+
+    ListObjectsV2Response defaultResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).build());
+    assertThat(defaultResponse.contents()).isNotEmpty();
+    assertNull(defaultResponse.contents().get(0).owner());
+
+    ListObjectsV2Response falseResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).fetchOwner(false).build());
+    assertNull(falseResponse.contents().get(0).owner());
+
+    ListObjectsV2Response trueResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).fetchOwner(true).build());
+    assertNotNull(trueResponse.contents().get(0).owner());
+    assertNotNull(trueResponse.contents().get(0).owner().displayName());
+    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, trueResponse.contents().get(0).owner().id());
+  }
+
   private void testListObjectsMany(boolean isListV2) throws Exception {
     final String bucketName = getBucketName();
     s3Client.createBucket(b -> b.bucket(bucketName));
@@ -1256,6 +1301,40 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     CopyObjectResponse copyObjectResponse = s3Client.copyObject(copyReq);
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", copyObjectResponse.copyObjectResult().eTag());
+  }
+
+  @Test
+  public void testCopyObjectToSelfWithMetadataReplace() {
+    final String bucketName = getBucketName();
+    final String key = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(key).metadata(Collections.singletonMap("meta1", "v1")),
+        RequestBody.fromString(content));
+
+    // Copying an object onto itself is allowed when the metadata is replaced.
+    CopyObjectRequest copyReq = CopyObjectRequest.builder()
+        .sourceBucket(bucketName)
+        .sourceKey(key)
+        .destinationBucket(bucketName)
+        .destinationKey(key)
+        .metadataDirective(MetadataDirective.REPLACE)
+        .metadata(Collections.singletonMap("meta2", "v2"))
+        .build();
+
+    CopyObjectResponse copyObjectResponse = assertDoesNotThrow(() -> s3Client.copyObject(copyReq));
+    assertNotNull(copyObjectResponse.copyObjectResult().eTag());
+
+    // The metadata was replaced in place: the new entry is present and the old one is gone.
+    HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(key));
+    assertThat(head.metadata())
+        .containsEntry("meta2", "v2")
+        .doesNotContainKey("meta1");
+
+    // The object is still readable with its original content after the in-place copy.
+    ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(key));
+    assertEquals(content, objectBytes.asUtf8String());
   }
 
   @Test

@@ -124,11 +124,11 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     private ReentrantReadWriteLock getLockForTesting(Resource resource, String... keys) {
       final R r = Preconditions.assertInstanceOf(resource, tracker.getResourceClass());
-      return getLock(r, keys);
+      return getLockWithCombinedKey(r, CompositeKey.combineKeys(keys));
     }
 
-    private ReentrantReadWriteLock getLock(R r, String... keys) {
-      return lockMap.get(r).get(CompositeKey.combineKeys(keys));
+    private ReentrantReadWriteLock getLockWithCombinedKey(R r, Object combinedKey) {
+      return lockMap.get(r).get(combinedKey);
     }
 
     private void acquireLock(R resource, boolean isRead, ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
@@ -148,9 +148,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       return tracker.lockResource(r);
     }
 
-    private OMLockDetails acquireOne(Resource resource, boolean isRead, String... keys) {
+    private OMLockDetails acquireOne(Resource resource, boolean isRead, Object combinedKey) {
       return acquireImpl(resource, (r, startWaitingTimeNanos) -> {
-        final ReentrantReadWriteLock lock = getLock(r, keys);
+        final ReentrantReadWriteLock lock = getLockWithCombinedKey(r, combinedKey);
         acquireLock(r, isRead, lock, startWaitingTimeNanos);
       });
     }
@@ -190,9 +190,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       return tracker.unlockResource(r);
     }
 
-    private OMLockDetails releaseOne(Resource resource, boolean isRead, String... keys) {
+    private OMLockDetails releaseOne(Resource resource, boolean isRead, Object combinedKey) {
       return releaseImpl(resource, r -> {
-        final ReentrantReadWriteLock lock = getLock(r, keys);
+        final ReentrantReadWriteLock lock = getLockWithCombinedKey(r, combinedKey);
         releaseLock(r, isRead, lock);
       });
     }
@@ -305,73 +305,47 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return deque::descendingIterator;
   }
 
-  /**
-   * Acquire read lock on resource.
-   *
-   * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
-   * thread acquiring lock again is allowed.
-   *
-   * For USER_LOCK, PREFIX_LOCK, S3_SECRET_LOCK type resource, same thread
-   * acquiring lock again is not allowed.
-   *
-   * Special Note for USER_LOCK: Single thread can acquire single user lock/
-   * multi user lock. But not both at the same time.
-   * @param resource - Type of the resource.
-   * @param keys - Resource names on which user want to acquire lock.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
   @Override
-  public OMLockDetails acquireReadLock(Resource resource, String... keys) {
+  public OMLockDetails acquireReadLock(Resource resource, String key) {
     return getResourceLocks(resource)
-        .acquireOne(resource, true, keys);
+        .acquireOne(resource, true, key);
   }
 
-  /**
-   * Acquire read locks on a list of resources.
-   *
-   * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
-   * thread acquiring lock again is allowed.
-   *
-   * For USER_LOCK, PREFIX_LOCK, S3_SECRET_LOCK type resource, same thread
-   * acquiring lock again is not allowed.
-   *
-   * Special Note for USER_LOCK: Single thread can acquire single user lock/
-   * multi user lock. But not both at the same time.
-   * @param resource - Type of the resource.
-   * @param keys - A list of Resource names on which user want to acquire locks.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
+  @Override
+  public OMLockDetails acquireReadLock(Resource resource, String key1, String key2) {
+    return getResourceLocks(resource)
+        .acquireOne(resource, true, CompositeKey.combineTwoKeys(key1, key2));
+  }
+
+  @Override
+  public OMLockDetails acquireReadLock(Resource resource, String... keys) {
+    Preconditions.assertTrue(keys.length > 2);
+    return getResourceLocks(resource)
+        .acquireOne(resource, true, CompositeKey.combineMultiKeys(keys));
+  }
+
   @Override
   public OMLockDetails acquireReadLocks(Resource resource, Iterable<String[]> keys) {
     return getResourceLocks(resource)
         .acquireSelected(resource, true, keys);
   }
 
-  /**
-   * Acquire write lock on resource.
-   *
-   * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
-   * thread acquiring lock again is allowed.
-   *
-   * For USER_LOCK, PREFIX_LOCK, S3_SECRET_LOCK type resource, same thread
-   * acquiring lock again is not allowed.
-   *
-   * Special Note for USER_LOCK: Single thread can acquire single user lock/
-   * multi user lock. But not both at the same time.
-   * @param resource - Type of the resource.
-   * @param keys - Resource names on which user want to acquire lock.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
+  @Override
+  public OMLockDetails acquireWriteLock(Resource resource, String key) {
+    return getResourceLocks(resource)
+        .acquireOne(resource, false, key);
+  }
+
+  @Override
+  public OMLockDetails acquireWriteLock(Resource resource, String key1, String key2) {
+    return getResourceLocks(resource)
+        .acquireOne(resource, false, CompositeKey.combineTwoKeys(key1, key2));
+  }
+
   @Override
   public OMLockDetails acquireWriteLock(Resource resource, String... keys) {
     return getResourceLocks(resource)
-        .acquireOne(resource, false, keys);
+        .acquireOne(resource, false, CompositeKey.combineMultiKeys(keys));
   }
 
   /**
@@ -474,19 +448,22 @@ public class OzoneManagerLock implements IOzoneManagerLock {
         Arrays.asList(new String[] {firstUser}, new String[] {secondUser}));
   }
 
+  @Override
+  public OMLockDetails releaseWriteLock(Resource resource, String key) {
+    return getResourceLocks(resource)
+        .releaseOne(resource, false, key);
+  }
 
-  /**
-   * Release write lock on resource.
-   * @param resource - Type of the resource.
-   * @param keys - Resource names on which user want to acquire lock.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
+  @Override
+  public OMLockDetails releaseWriteLock(Resource resource, String key1, String key2) {
+    return getResourceLocks(resource)
+        .releaseOne(resource, false, CompositeKey.combineTwoKeys(key1, key2));
+  }
+
   @Override
   public OMLockDetails releaseWriteLock(Resource resource, String... keys) {
     return getResourceLocks(resource)
-        .releaseOne(resource, false, keys);
+        .releaseOne(resource, false, CompositeKey.combineMultiKeys(keys));
   }
 
   /**
@@ -514,18 +491,22 @@ public class OzoneManagerLock implements IOzoneManagerLock {
         .releaseAll(resource);
   }
 
-  /**
-   * Release read lock on resource.
-   * @param resource - Type of the resource.
-   * @param keys - Resource names on which user want to acquire lock.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
+  @Override
+  public OMLockDetails releaseReadLock(Resource resource, String key) {
+    return getResourceLocks(resource)
+        .releaseOne(resource, true, key);
+  }
+
+  @Override
+  public OMLockDetails releaseReadLock(Resource resource, String key1, String key2) {
+    return getResourceLocks(resource)
+        .releaseOne(resource, true, CompositeKey.combineTwoKeys(key1, key2));
+  }
+
   @Override
   public OMLockDetails releaseReadLock(Resource resource, String... keys) {
     return getResourceLocks(resource)
-        .releaseOne(resource, true, keys);
+        .releaseOne(resource, true, CompositeKey.combineMultiKeys(keys));
   }
 
   /**

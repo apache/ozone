@@ -149,6 +149,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   protected void init() {
     super.init();
     ObjectOperationHandler chain = ObjectOperationHandlerChain.newBuilder(this)
+        .add(new ObjectGetTorrentHandler())
         .add(new ObjectAclHandler())
         .add(new ObjectTaggingHandler())
         .add(new MultipartKeyHandler())
@@ -1160,13 +1161,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);
+      // Metadata directive is read up front: a self-copy is legal when metadata
+      // is being replaced (x-amz-metadata-directive: REPLACE).
+      String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
+      boolean replacingMetadata = CopyDirective.REPLACE.name().equals(metadataCopyDirective);
+
       // Checking whether we trying to copying to it self.
-      if (sourceBucket.equals(destBucket) && sourceKey
-          .equals(destkey)) {
-        // When copying to same storage type when storage type is provided,
-        // we should not throw exception, as aws cli checks if any of the
-        // options like storage type are provided or not when source and
-        // dest are given same
+      if (sourceBucket.equals(destBucket) && sourceKey.equals(destkey)
+          && !replacingMetadata) {
+        // Self-copy without a metadata replacement. AWS still allows it
+        // when a storage class is provided (aws cli passes storage type), so
+        // only the default-storage-type case is rejected.
         if (storageTypeDefault) {
           OS3Exception ex = newError(S3ErrorTable.INVALID_REQUEST, copyHeader);
           ex.setErrorMessage("This copy request is illegal because it is " +
@@ -1214,7 +1219,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       // Custom metadata in copyObject with metadata directive
       Map<String, String> customMetadata;
-      String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
       if (StringUtils.isEmpty(metadataCopyDirective) || metadataCopyDirective.equals(CopyDirective.COPY.name())) {
         // The custom metadata will be copied from the source key
         customMetadata = sourceKeyDetails.getMetadata();
