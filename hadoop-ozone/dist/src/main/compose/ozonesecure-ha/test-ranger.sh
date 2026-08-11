@@ -20,6 +20,24 @@
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
+# Load FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION from .env without overriding other env.
+# Ranger reads this value from install.properties (not process env), but we allow
+# controlling the mounted install.properties via .env.
+if [[ -z "${FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION:-}" ]] && [[ -f "${COMPOSE_DIR}/.env" ]]; then
+  _ff_from_dotenv="$(
+    (
+      set -a
+      # shellcheck source=/dev/null
+      source "${COMPOSE_DIR}/.env"
+      echo "${FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION:-}"
+    ) 2>/dev/null
+  )"
+  if [[ -n "${_ff_from_dotenv}" ]]; then
+    export FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION="${_ff_from_dotenv}"
+  fi
+  unset _ff_from_dotenv
+fi
+
 if [[ -z "${RANGER_VERSION:-}" ]]; then
   export RANGER_VERSION="${ranger.version}"
 fi
@@ -43,6 +61,27 @@ download_and_verify_apache_release "ranger/${RANGER_VERSION}/apache-ranger-${RAN
 tar -C "${DOWNLOAD_DIR}" -x -z -f "${DOWNLOAD_DIR}/apache-ranger-${RANGER_VERSION}.tar.gz"
 export RANGER_SOURCE_DIR="${DOWNLOAD_DIR}/apache-ranger-${RANGER_VERSION}"
 chmod -R a+rX "${RANGER_SOURCE_DIR}"
+export RANGER_INIT_POSTGRES_SH="${RANGER_SOURCE_DIR}/dev-support/ranger-docker/scripts/rdbms/init_postgres.sh"
+
+# Create a temp install.properties so we can override feature flags from .env.
+RANGER_ADMIN_INSTALL_PROPERTIES_SRC="${RANGER_SOURCE_DIR}/dev-support/ranger-docker/scripts/admin/ranger-admin-install-postgres.properties"
+RANGER_ADMIN_INSTALL_PROPERTIES="$(mktemp "${DOWNLOAD_DIR%/}/ranger-admin-install-postgres.XXXXXX")"
+cp -f "${RANGER_ADMIN_INSTALL_PROPERTIES_SRC}" "${RANGER_ADMIN_INSTALL_PROPERTIES}"
+chmod a+r "${RANGER_ADMIN_INSTALL_PROPERTIES}"
+
+_ff="$(echo "${FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION:-false}" | tr '[:upper:]' '[:lower:]')"
+if [[ "${_ff}" != "true" ]]; then
+  _ff="false"
+fi
+if grep -Eq '^[[:space:]]*#?[[:space:]]*FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION=' "${RANGER_ADMIN_INSTALL_PROPERTIES}"; then
+  perl -pi -e "s@^[[:space:]]*#?[[:space:]]*FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION=.*@FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION=${_ff}@g" \
+    "${RANGER_ADMIN_INSTALL_PROPERTIES}"
+else
+  printf '\nFF_ENABLE_OZONE_ACTION_MATCHES_CONDITION=%s\n' "${_ff}" >> "${RANGER_ADMIN_INSTALL_PROPERTIES}"
+fi
+unset _ff
+
+export RANGER_ADMIN_INSTALL_PROPERTIES
 
 # Ranger docker support scripts moved between releases (eg: from config/*.sh to scripts/**).
 # Ensure we don't fail if a glob doesn't match, but still make init scripts executable when present.

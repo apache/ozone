@@ -17,7 +17,9 @@
 x-om-ranger-config:
   &om-ranger-config
     environment:
-      OZONE_MANAGER_CLASSPATH: "/opt/ranger/ozone-plugin/lib/libext/*:/opt/ozone/conf"
+      # Ranger 2.8.x+ ozone-plugin tarball: jars live under lib/libext/ and
+      # lib/libext/ranger-ozone-plugin-impl/ (ranger-audit-dest-solr-*.jar is in the impl dir).
+      OZONE_MANAGER_CLASSPATH: "/opt/ranger/ozone-plugin/lib/libext/*:/opt/ranger/ozone-plugin/lib/libext/ranger-ozone-plugin-impl/*:/opt/ozone/conf"
       OZONE-SITE.XML_ozone.acl.authorizer.class: "org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer"
       OZONE-SITE.XML_ozone.om.multitenancy.enabled: "true"
       OZONE-SITE.XML_ozone.om.ranger.https-address: "http://ranger:6080"
@@ -37,7 +39,10 @@ x-om-ranger-config:
       - ${RANGER_OZONE_PLUGIN_DIR}:/opt/ranger/ozone-plugin
     tmpfs:
       - /opt/ozone/conf
-    command: bash -c "sudo --preserve-env /opt/ranger/ozone-plugin/enable-ozone-plugin.sh && /opt/hadoop/bin/ozone om"
+    # JDK17+ no longer ships javax.annotation, but the Ranger Ozone plugin's Jersey2
+    # client needs javax.annotation.Priority. Copy the jar into the plugin impl dir
+    # so the isolated RangerPluginClassLoader can find it.
+    command: bash -c 'sudo mkdir -p /opt/ranger/ozone-plugin/lib/libext/ranger-ozone-plugin-impl && for j in /opt/hadoop/share/ozone/lib/javax.annotation-api-*.jar; do [ -e "$$j" ] || continue; sudo cp -n "$$j" /opt/ranger/ozone-plugin/lib/libext/ranger-ozone-plugin-impl/; done && sudo --preserve-env /opt/ranger/ozone-plugin/enable-ozone-plugin.sh && exec /opt/hadoop/bin/ozone om'
 
 services:
   om1:
