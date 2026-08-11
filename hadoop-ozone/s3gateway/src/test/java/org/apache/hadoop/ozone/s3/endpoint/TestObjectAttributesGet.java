@@ -153,7 +153,7 @@ public class TestObjectAttributesGet {
   public void testWhenKeyIsDirectoryAndKeyPathDoesNotEndWithASlash() throws Exception {
     final String keyPath = "keyDir";
     OzoneConfiguration config = new OzoneConfiguration();
-    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    config.setBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, true);
     rest.setOzoneConfiguration(config);
     bucket.createDirectory(keyPath);
 
@@ -165,7 +165,7 @@ public class TestObjectAttributesGet {
   public void testWhenKeyIsDirectoryAndKeyPathEndsWithASlash() throws Exception {
     final String keyPath = "keyDir/";
     OzoneConfiguration config = new OzoneConfiguration();
-    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    config.setBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, true);
     rest.setOzoneConfiguration(config);
     bucket.createDirectory(keyPath);
 
