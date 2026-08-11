@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Acl;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.ranger.RangerClient;
 import org.apache.ranger.RangerServiceException;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,13 +57,15 @@ class TestRangerClientMultiTenantAccessControllerMockClient {
   @BeforeEach
   public void setUpMocks() throws Exception {
     rangerClient = mock(RangerClient.class);
-
+    
     MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
     conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY, "https://localhost:6182/");
     conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/_HOST@EXAMPLE.COM");
     conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, "/path/to/ozone.keytab");
 
+    // Initialize Kerberos name rules before creating the controller
+    KerberosName.setRules(conf.get("hadoop.security.auth_to_local", "DEFAULT"));
     accessController = new RangerClientMultiTenantAccessController(conf);
 
     Field clientField = RangerClientMultiTenantAccessController.class.getDeclaredField("client");
