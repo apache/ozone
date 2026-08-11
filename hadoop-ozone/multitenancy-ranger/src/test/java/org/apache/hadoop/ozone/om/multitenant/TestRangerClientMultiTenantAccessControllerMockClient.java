@@ -57,7 +57,6 @@ class TestRangerClientMultiTenantAccessControllerMockClient {
   @BeforeEach
   public void setUpMocks() throws Exception {
     rangerClient = mock(RangerClient.class);
-    
     MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
     conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY, "https://localhost:6182/");
     conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
