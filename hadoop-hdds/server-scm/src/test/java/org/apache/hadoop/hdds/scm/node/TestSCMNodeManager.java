@@ -147,6 +147,11 @@ public class TestSCMNodeManager {
   private SCMContext scmContext;
 
   private static final int MAX_LV = HDDSLayoutVersionManager.maxLayoutVersion();
+  // Max time to wait for a node to reach an expected state.
+  private static final int WAIT_FOR_TIMEOUT_MS = 10 * 1000;
+  // Stale-node window used by testScmClusterIsInExpectedState1; the sleeps in
+  // that test are expressed as fractions of it.
+  private static final int STALE_INTERVAL_MS = 1000;
   private static final LayoutVersionProto LARGER_SLV_LAYOUT_PROTO =
       toLayoutVersionProto(MAX_LV, MAX_LV + 1);
   private static final LayoutVersionProto SMALLER_MLV_LAYOUT_PROTO =
@@ -801,7 +806,7 @@ public class TestSCMNodeManager {
           nodeManager.processHeartbeat(dn);
         }
         return nodeManager.getNodeCount(NodeStatus.inServiceStale()) == 1;
-      }, interval, 10 * 1000);
+      }, interval, WAIT_FOR_TIMEOUT_MS);
 
       List<DatanodeDetails> staleNodeList =
           nodeManager.getNodes(NodeStatus.inServiceStale());
@@ -821,7 +826,7 @@ public class TestSCMNodeManager {
           nodeManager.processHeartbeat(dn);
         }
         return nodeManager.getNodeCount(NodeStatus.inServiceDead()) == 1;
-      }, interval, 10 * 1000);
+      }, interval, WAIT_FOR_TIMEOUT_MS);
 
       // the stale node has moved on to dead
       staleNodeList = nodeManager.getNodes(NodeStatus.inServiceStale());
@@ -1263,7 +1268,7 @@ public class TestSCMNodeManager {
        * interval. Which means that no node is heartbeating. All nodes should
        * move to Stale.
        */
-      Thread.sleep(1000);
+      Thread.sleep(STALE_INTERVAL_MS);
       assertEquals(3, nodeManager.getAllNodes().size());
       assertEquals(3, nodeManager.getNodeCount(NodeStatus.inServiceStale()));
 
@@ -1280,9 +1285,9 @@ public class TestSCMNodeManager {
       nodeManager.processHeartbeat(staleNode);
       nodeManager.processHeartbeat(deadNode);
 
-      Thread.sleep(500);
+      Thread.sleep(STALE_INTERVAL_MS / 2);
       nodeManager.processHeartbeat(healthyNode);
-      Thread.sleep(667);
+      Thread.sleep(2 * STALE_INTERVAL_MS / 3);
       assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
 
@@ -1304,9 +1309,9 @@ public class TestSCMNodeManager {
 
       nodeManager.processHeartbeat(healthyNode);
       nodeManager.processHeartbeat(staleNode);
-      Thread.sleep(500);
+      Thread.sleep(STALE_INTERVAL_MS / 2);
       nodeManager.processHeartbeat(healthyNode);
-      Thread.sleep(667);
+      Thread.sleep(2 * STALE_INTERVAL_MS / 3);
 
       // ~1.17 seconds have elapsed for stale node, so it moves into Stale.
       // ~2.33 seconds have elapsed for dead node, so it moves into dead.
