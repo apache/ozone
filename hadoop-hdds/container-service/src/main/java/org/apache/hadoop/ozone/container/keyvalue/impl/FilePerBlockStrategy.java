@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SHORT_CIRCUIT_FD_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
@@ -57,6 +58,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.util.Shell;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
@@ -250,6 +252,25 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   @Override
+  public RandomAccessFile getShortCircuitFd(Container container, BlockID blockID) throws StorageContainerException {
+    checkLayoutVersion(container);
+    final File chunkFile = getChunkFile(container, blockID);
+    try {
+      if (!Shell.WINDOWS) {
+        RandomAccessFile rf = new RandomAccessFile(chunkFile, "r");
+        return rf;
+      } else {
+        throw new StorageContainerException("Operation is not supported for platform "
+            + System.getProperty("os.name"), UNSUPPORTED_REQUEST);
+      }
+    } catch (Exception e) {
+      LOG.warn("getShortCircuitFds failed", e);
+      throw new StorageContainerException("getShortCircuitFds " +
+          "for short-circuit local reads failed", GET_SHORT_CIRCUIT_FD_FAILED);
+    }
+  }
+
+  @Override
   public void deleteChunk(Container container, BlockID blockID, ChunkInfo info)
       throws StorageContainerException {
     deleteChunk(container, blockID, info, true);
@@ -414,5 +435,4 @@ public class FilePerBlockStrategy implements ChunkManager {
       }
     }
   }
-
 }

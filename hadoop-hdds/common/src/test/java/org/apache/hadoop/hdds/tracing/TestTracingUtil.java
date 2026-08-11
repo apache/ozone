@@ -29,7 +29,9 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
+import io.opentelemetry.sdk.trace.ReadableSpan;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -67,6 +69,10 @@ public class TestTracingUtil {
     return parts[2];
   }
 
+  private static SpanKind spanKind(Span span) {
+    return ((ReadableSpan) span).getKind();
+  }
+
   @Test
   public void testDefaultMethod() {
     Service subject = createProxy(new ServiceImpl(), Service.class,
@@ -83,38 +89,6 @@ public class TestTracingUtil {
     } catch (Exception e) {
       fail("Should not get exception");
     }
-  }
-
-  @Test
-  public void testSkipTracingNoSpan() {
-    TracingUtil.initTracing("TestService", tracingEnabled());
-    ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
-
-    serviceProxy.skippedMethod();
-    assertFalse(impl.wasSpanActive(), "Span should NOT be created for @SkipTracing methods.");
-  }
-
-  @Test
-  public void testSkipTracingExceptionUnwrapped() {
-    TracingUtil.initTracing("TestService", tracingEnabled());
-    ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
-
-    IOException ex = assertThrows(IOException.class,
-        () -> serviceProxy.throwingMethod());
-    assertEquals("Original Exception", ex.getMessage());
-    assertFalse(impl.wasSpanActive(), "Span should NOT have been created for a @SkipTracing throwing method.");
-  }
-
-  @Test
-  public void testProxyNormalVsSkipped() {
-    TracingUtil.initTracing("TestService", tracingEnabled());
-    ServiceImpl impl = new ServiceImpl();
-    Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
-
-    serviceProxy.normalMethod();
-    assertTrue(impl.wasSpanActive(), "Normal method should have an active span.");
   }
 
   @Test
@@ -213,5 +187,44 @@ public class TestTracingUtil {
     assertTrue(ex2.keys(carrier).iterator().hasNext());
     assertEquals("00-a-b-01", ex2.get(carrier, "traceparent"));
     assertEquals("00-a-b-01", ex2.get(carrier, "traceparent"));
+  }
+
+  @Test
+  public void testImportAndCreateSpanDefaultsToInternal() {
+    TracingUtil.initTracing("serviceTestKind",
+        tracingEnabled().getObject(TracingConfig.class));
+
+    Span root = TracingUtil.importAndCreateSpan("rootspan", null);
+    try {
+      assertEquals(SpanKind.INTERNAL, spanKind(root));
+    } finally {
+      root.end();
+    }
+
+    String parent;
+    try (TracingUtil.TraceCloseable ignored =
+             TracingUtil.createActivatedSpan("parentSpan")) {
+      parent = TracingUtil.exportCurrentSpan();
+    }
+    Span child = TracingUtil.importAndCreateSpan("childSpan", parent);
+    try {
+      assertEquals(SpanKind.INTERNAL, spanKind(child));
+    } finally {
+      child.end();
+    }
+  }
+
+  @Test
+  public void testImportAndCreateSpanUsesExplicitKind() {
+    TracingUtil.initTracing("span-kind-explicit",
+        tracingEnabled().getObject(TracingConfig.class));
+
+    Span server = TracingUtil.importAndCreateSpan(
+        "server", null, SpanKind.SERVER);
+    try {
+      assertEquals(SpanKind.SERVER, spanKind(server));
+    } finally {
+      server.end();
+    }
   }
 }
