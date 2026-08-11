@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -100,6 +102,8 @@ public class TestEntityHandlerCycleGuard {
     assertEquals(0, handler.getTotalDirCount(1L));
     int[] dist = handler.getTotalFileSizeDist(1L);
     assertEquals(2, dist[0]);
+    verify(nsSummaryManager, times(2))
+        .recordNSSummaryInvalidTreeDetection();
   }
 
   @Test
@@ -118,6 +122,8 @@ public class TestEntityHandlerCycleGuard {
     assertEquals(2, handler.getTotalDirCount(1L));
     // Each distinct directory contributes its file count exactly once.
     assertEquals(3, handler.getTotalFileSizeDist(1L)[0]);
+    verify(nsSummaryManager, times(2))
+        .recordNSSummaryInvalidTreeDetection();
   }
 
   @Test

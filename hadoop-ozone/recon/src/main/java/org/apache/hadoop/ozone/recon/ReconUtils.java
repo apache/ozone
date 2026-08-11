@@ -808,6 +808,7 @@ public class ReconUtils {
         if (visited.add(childId)) {
           stack.push(childId);
         } else if (!cycleLogged) {
+          reconNamespaceSummaryManager.recordNSSummaryInvalidTreeDetection();
           log.warn("Detected a repeated reference to object {} while walking " +
               "the NSSummary tree under object {} (volume {}, bucket {}); the " +
               "NSSummary data may be corrupted.", childId, parentId, volumeID,

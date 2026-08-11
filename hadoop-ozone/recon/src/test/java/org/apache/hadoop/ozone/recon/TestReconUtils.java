@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -205,6 +206,7 @@ public class TestReconUtils {
     // once. The traversal root (1) must be excluded and no child dropped, so
     // assert the exact "/volumeId/bucketId/objectId" subpaths (in any order).
     assertThat(subPaths).containsExactlyInAnyOrder("/100/200/2", "/100/200/3");
+    verify(nsSummaryManager).recordNSSummaryInvalidTreeDetection();
   }
 
   private static NSSummary nsSummaryWithChildren(Long... childIds) {

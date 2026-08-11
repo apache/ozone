@@ -296,6 +296,7 @@ public abstract class EntityHandler {
    * most once per walk.
    */
   private void logNSSummaryCycle(long objectId) {
+    reconNamespaceSummaryManager.recordNSSummaryInvalidTreeDetection();
     LOG.warn("Detected a cycle through object {} while walking the " +
         "NSSummary tree under {}; skipping the cyclic reference. The " +
         "NSSummary data may be corrupted.", objectId, getNormalizedPath());
