@@ -65,7 +65,9 @@ class TestRangerClientMultiTenantAccessControllerMockClient {
     conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, "/path/to/ozone.keytab");
 
     // Initialize Kerberos name rules before creating the controller
-    KerberosName.setRules(conf.get("hadoop.security.auth_to_local", "DEFAULT"));
+    KerberosName.setRules(
+        "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
+           "DEFAULT");
     accessController = new RangerClientMultiTenantAccessController(conf);
 
     Field clientField = RangerClientMultiTenantAccessController.class.getDeclaredField("client");
