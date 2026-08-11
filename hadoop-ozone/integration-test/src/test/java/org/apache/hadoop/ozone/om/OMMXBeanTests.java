@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.lang.management.ManagementFactory;
@@ -68,20 +69,20 @@ public abstract class OMMXBeanTests implements NonHATests.TestCase {
     String rocksDbDirectory = (String) mbs.getAttribute(bean, "RocksDbDirectory");
     assertEquals(om.getRocksDbDirectory(), rocksDbDirectory);
 
-    Object ratisRolesAttribute = mbs.getAttribute(bean, "RatisRoles");
-    assertNotNull(ratisRolesAttribute);
-    assertEquals(om.getRatisRoles(), toRatisRolesList(ratisRolesAttribute));
+    Object ratisRoles = mbs.getAttribute(bean, "RatisRoles");
+    assertNotNull(ratisRoles);
+    assertEquals(om.getRatisRoles(), toRatisRolesList(ratisRoles));
 
     String ratisEvents = (String) mbs.getAttribute(bean, "RatisEvents");
     assertEquals(om.getRatisEvents(), ratisEvents);
   }
 
-  private static List<List<String>> toRatisRolesList(Object ratisRolesAttribute) {
-    String[][] ratisRolesArray = (String[][]) ratisRolesAttribute;
-    List<List<String>> ratisRoles = new ArrayList<>();
+  private static List<List<String>> toRatisRolesList(Object ratisRoles) {
+    String[][] ratisRolesArray = assertInstanceOf(String[][].class, ratisRoles);
+    List<List<String>> ratisRolesList = new ArrayList<>();
     for (String[] row : ratisRolesArray) {
-      ratisRoles.add(Arrays.asList(row));
+      ratisRolesList.add(Arrays.asList(row));
     }
-    return ratisRoles;
+    return ratisRolesList;
   }
 }
