@@ -149,13 +149,26 @@ Ozone will retain this bracketed legacy representation after IPv6 support lands.
 considered only when a separate API requirement justifies it. Any such field must be additive, dual-populated with the
 legacy field, and introduced with client preference and fallback rules for the compatibility window.
 
-Existing SCM and OM HA Ratis groups must keep their group IDs, peer IDs, logs, and storage during migration. Stable DNS
-names can keep the peer address text unchanged while operators change DNS records to IPv6. If the group stores IPv4
-literals, migration must update the Ratis peer configuration with the same peer IDs and new IPv6 addresses. A change to
-`ozone-site.xml` alone is not sufficient because Ratis recovers the peer configuration from its log.
+Existing SCM and OM HA Ratis groups must retain their group IDs, peer IDs, Ratis storage, and committed state during
+migration. Normal Ratis log compaction can continue. Stable DNS names can keep the peer address text unchanged while
+operators change DNS records to IPv6.
 
-Datanode Ratis pipelines have a different rule. When a datanode address changes, SCM closes the affected pipelines and
-creates replacements. The datanode UUID and container data do not change.
+IPv4 literal peers need a different path. Ratis 3.2.1 and current Ratis master treat a configuration with the same peer
+IDs and new addresses as unchanged. [RATIS-2082](https://issues.apache.org/jira/browse/RATIS-2082) tracks this
+limitation. Ratis writes committed configurations to persistent metadata and loads that metadata at startup. Changing
+`ozone-site.xml` does not update the stored peer addresses. In-place migration of an HA group that stores IPv4 literals
+therefore requires a Ratis fix and an Ozone administration command.
+
+After those changes are available, operators will keep the old IPv4 addresses reachable while all peers start IPv6
+listeners. They will verify IPv6 reachability, submit one Ratis configuration with the same peer IDs and new IPv6
+addresses, and wait for the configuration to commit. They will then update `ozone-site.xml` on every peer and verify the
+group, leader election, and failover. Rollback will submit the old addresses before IPv4 connectivity is removed. The
+procedure will not edit the Ratis log or storage files directly.
+
+Datanode Ratis pipelines have a different rule. When a datanode address changes, SCM finalizes and closes open
+containers on the affected pipelines, deletes those pipelines, and creates replacements. Existing container replicas and
+the datanode UUID remain. Operators will migrate datanodes in bounded batches so that SCM has enough healthy datanodes
+to create replacement pipelines. Tests must cover active writes, client retries, container closure, and data integrity.
 
 ### OM and OzoneFS
 
@@ -250,10 +263,10 @@ until IPv6 listeners, advertised endpoints, security services, and clients have 
 after all Ozone services, command-line clients, and relevant filesystem clients can use IPv6.
 
 A datanode retains its persisted UUID when its IP address or hostname changes. When it re-registers, SCM updates the
-existing datanode and closes stale pipelines so that replacement pipelines can be created.
-`hdds.datanode.use.datanode.hostname=true` can simplify the transition by using stable DNS names for datanode
-data-transfer and Ratis endpoints, but it is not an identity or IPv6 requirement. Qualification will cover both
-settings.
+existing datanode. SCM then finalizes and closes open containers on stale pipelines, removes those pipelines, and
+creates replacements. Existing container replicas remain. `hdds.datanode.use.datanode.hostname=true` can simplify the
+transition by using stable DNS names for datanode data-transfer and Ratis endpoints, but it is not an identity or IPv6
+requirement. Qualification will cover both settings.
 
 IPv6-specific endpoint text is new input. Older clients may not understand bracketed literals or may select IPv6 after a
 DNS AAAA record is added. IPv6 activation must therefore wait until all relevant clients have been upgraded.
@@ -265,11 +278,12 @@ bare literal. Ozone will reject ambiguous values instead of guessing where an IP
 
 Ozone depends on Apache Hadoop and Apache Ratis for address handling in several protocols and tools. Qualification tests
 will run against the exact dependency versions selected by the Ozone build. As of 2026-08-10, that build selects Hadoop
-3.4.3. The dependency gates below are based on Hadoop releases through 3.5.0 and current Hadoop trunk.
+3.4.3 and Ratis 3.2.1. The dependency gates below are based on Hadoop releases through 3.5.0, Hadoop trunk, and Ratis
+master.
 
 A dependency failure is not considered fixed merely because an Ozone wrapper accepts the same input. The complete
 producer-to-consumer path must round-trip the endpoint. Jira resolution state and code on a development branch are also
-insufficient: the required commit must be present in the Hadoop release consumed by Ozone.
+insufficient: the required commit must be present in a dependency release consumed by Ozone.
 
 ### P0: Hadoop release blockers
 
@@ -314,6 +328,13 @@ they still depend on a Hadoop release.
   also affects the optional `WhitelistBasedResolver` for per-address SASL protection. A new Hadoop issue is needed to
   provide IPv6 CIDR parity for these existing security controls.
 
+### P1: Ratis migration gate
+
+- **HA peer address migration:** Ratis 3.2.1 and current Ratis master do not persist an address-only configuration
+  change when the peer IDs stay the same. Stable DNS names avoid the need to change the stored peer addresses. Migration
+  from stored IPv4 literals requires the fix tracked by RATIS-2082 and an Ozone administration command that submits and
+  verifies the new addresses without changing the peer IDs or group ID.
+
 ### Hadoop uses that require validation but not another known upstream fix
 
 - Ozone carries its own copy of Hadoop RPC. Socket connection and listener code uses `InetSocketAddress`; the known
@@ -355,7 +376,9 @@ Required coverage includes:
 - common host and port helpers;
 - listener construction and advertised-address selection;
 - rejection of scoped addresses in every configured, discovered, and published advertised-endpoint path;
+- SCM and OM same-peer-ID Ratis address updates and rollback;
 - SCM Ratis roles, leader suggestions, and failover;
+- datanode address changes, container closure, pipeline replacement, and client retry;
 - OzoneFS and S3 Gateway authority parsing;
 - administrative and Recon clients;
 - certificate subject alternative name selection and endpoint verification;
@@ -378,8 +401,9 @@ Required coverage includes:
 - **HA and failure handling:** SCM and OM leader changes, suggested-leader handling, client failover, Ratis role
   reporting, and Recon access preserve valid IPv6 endpoints.
 - **Existing-cluster migration:** Starting from an IPv4 configuration, complete the supported non-rolling upgrade and
-  migrate through dual-stack to IPv6-only. Preserve SCM and OM Ratis IDs, logs, and storage. Test stable DNS and address
-  updates that keep the same peer IDs for IPv4 literal peers. Validate datanode UUID retention, pipeline replacement,
+  migrate through dual-stack to IPv6-only. Preserve SCM and OM group IDs, peer IDs, Ratis storage, and committed state.
+  Test stable DNS and address updates that keep the same peer IDs for IPv4 literal peers. Migrate datanodes in bounded
+  batches and validate UUID retention, container closure, pipeline replacement, active writes, retries, data integrity,
   and rollback to IPv4 before the final cutover.
 - **Erasure coding:** An EC bucket completes write, read, degraded read, and reconstruction with IPv6-reachable
   datanodes and the expected topology placement.
@@ -430,14 +454,16 @@ only by changing socket construction.
 Implementation is tracked under [HDDS-15763](https://issues.apache.org/jira/browse/HDDS-15763). Work is divided into
 independently reviewable changes:
 
-1. File the P0 and P1 Hadoop issues, land the P0 changes upstream, and select the first Hadoop release that contains
-   them.
+1. File the required Hadoop and Ratis issues, land the dependency changes upstream, and select the first releases that
+   contain them.
 2. Remove the forced IPv4 JVM preference and establish common bracket-aware Ozone helpers.
-3. Fix Ratis peer construction, SCM Ratis role parsing, leader suggestions, and administrative consumers.
+3. Fix Ratis peer construction, SCM Ratis role parsing, leader suggestions, and administrative consumers. After
+   RATIS-2082 is fixed, add an administration command for same-peer-ID HA address updates.
 4. Fix OzoneFS, S3 Gateway, OM, datanode, Recon, HTTP, KMS, authorization, and metrics boundaries.
 5. Complete secure-mode handling for certificate identities, Kerberos, delegation tokens, HTTPS, and any required Ratis
    update.
-6. Add required dual-stack and IPv6-only CI scenarios and publish operator documentation.
+6. Add dual-stack, IPv6-only, and existing-cluster migration scenarios, including rollback, and publish operator
+   documentation.
 
 The umbrella tracks work items HDDS-9894, HDDS-15768, HDDS-15772, HDDS-15773, HDDS-15774, HDDS-15775, HDDS-15776,
 HDDS-15777, HDDS-15779, HDDS-15780, and HDDS-15895. Each change will test its changed behavior. The final CI and
@@ -459,6 +485,7 @@ documentation work will verify the combined behavior rather than infer support f
 - [HADOOP-12491: IPv6-unsafe Hadoop Common parsing](https://issues.apache.org/jira/browse/HADOOP-12491)
 - [HADOOP-17542: IPv6 parsing in NetUtils](https://issues.apache.org/jira/browse/HADOOP-17542)
 - [HADOOP-19695: IPv6 support in Hadoop HttpServer2](https://issues.apache.org/jira/browse/HADOOP-19695)
+- [RATIS-2082: Raft peer equality must include the address](https://issues.apache.org/jira/browse/RATIS-2082)
 - [RATIS-2592: IPv6-safe Ratis peer-address parsing](https://issues.apache.org/jira/browse/RATIS-2592)
 - [actions/runner-images#668: IPv6 on GitHub-hosted runners](https://github.com/actions/runner-images/issues/668)
 - [RFC 3986: Uniform Resource Identifier](https://www.rfc-editor.org/rfc/rfc3986)
