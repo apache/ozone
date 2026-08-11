@@ -198,9 +198,7 @@ class TestSnapDiffDependencyGraph {
   @Test
   void testDeleteAndRecreateWithDescendantCreate() {
     // DELETE A + CREATE A (new objectId) + CREATE A/child under recreated A.
-    // The old code mis-treated CREATE A/child's to-snapshot path as a
-    // from-snapshot path and added a spurious CREATE A/child -> DELETE A edge,
-    // producing a cycle on legitimate input.
+    // CREATE A/child is a new to-snapshot key and must still follow CREATE A.
     List<SnapDiffDependencyEntry> entries = Arrays.asList(
         entry(1L, 0L, DELETE, "A"),
         entry(2L, 0L, CREATE, "A"),
@@ -211,6 +209,48 @@ class TestSnapDiffDependencyGraph {
         indexOf(ordered, CREATE, "A"));
     assertBefore(ordered, indexOf(ordered, CREATE, "A"),
         indexOf(ordered, CREATE, "A/child"));
+  }
+
+  @Test
+  void testDeleteAndRecreateWithOldTreeChildModifyAndRename() {
+    // DELETE A + CREATE A while a child is MODIFY+RENAME under the old A path.
+    // Child ops are from-snapshot; CREATE A must not pull them after itself.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, DELETE, "A"),
+        entry(2L, 0L, CREATE, "A"),
+        entry(3L, 1L, RENAME, "A/child", "A/renamed"),
+        entry(3L, 1L, MODIFY, "A/child"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, MODIFY, "A/child"),
+        indexOf(ordered, RENAME, "A/child"));
+    assertBefore(ordered, indexOf(ordered, RENAME, "A/child"),
+        indexOf(ordered, DELETE, "A"));
+    assertBefore(ordered, indexOf(ordered, DELETE, "A"),
+        indexOf(ordered, CREATE, "A"));
+  }
+
+  @Test
+  void testDeleteAndRecreateNestedPathWithDescendantRecreate() {
+    // Both A and A/B are replaced; CREATE A/B/leaf is still a new to-snapshot
+    // key and must follow CREATE A and CREATE A/B.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, DELETE, "A"),
+        entry(2L, 0L, CREATE, "A"),
+        entry(3L, 1L, DELETE, "A/B"),
+        entry(4L, 2L, CREATE, "A/B"),
+        entry(5L, 4L, CREATE, "A/B/leaf"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, DELETE, "A/B"),
+        indexOf(ordered, DELETE, "A"));
+    assertBefore(ordered, indexOf(ordered, DELETE, "A"),
+        indexOf(ordered, CREATE, "A"));
+    assertBefore(ordered, indexOf(ordered, CREATE, "A"),
+        indexOf(ordered, CREATE, "A/B"));
+    assertBefore(ordered, indexOf(ordered, CREATE, "A/B"),
+        indexOf(ordered, CREATE, "A/B/leaf"));
+
   }
 
   @Test

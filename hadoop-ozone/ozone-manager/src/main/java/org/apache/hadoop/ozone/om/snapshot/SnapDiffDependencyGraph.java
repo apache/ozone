@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,10 @@ import org.slf4j.LoggerFactory;
  * Directed graph of snapshot diff entries and Kahn topological sort for
  * dependency-ordered report emission.
  *
+ * <p>Entries must satisfy the path namespace contract in
+ * {@link SnapDiffDependencyEntry}. DELETE and MODIFY paths are from-snapshot,
+ * CREATE paths are to-snapshot, and RENAME carries both.
+ *
  * <p>Dependency rules encoded by edges (edge {@code u -> v} means {@code u}
  * must appear before {@code v}):
  * <ul>
@@ -47,7 +52,9 @@ import org.slf4j.LoggerFactory;
  *       on a strict source-path prefix. CREATE is omitted because its source
  *       path is a to-snapshot path, not a from-snapshot path.</li>
  *   <li>Ancestor CREATE/RENAME(target) before descendant CREATE/RENAME/MODIFY
- *       on a strict to-snapshot path prefix.</li>
+ *       on a strict to-snapshot path prefix, except when the ancestor path is
+ *       replaced (both DELETE and CREATE appear at the same path) and the
+ *       descendant is a from-snapshot MODIFY/RENAME under that path.</li>
  *   <li>DELETE before CREATE/RENAME(target) that targets the same path.</li>
  *   <li>RENAME(source) before CREATE that reuses the rename source path.</li>
  *   <li>RENAME(source) before RENAME(target) that reuses the same path, so a
@@ -95,7 +102,7 @@ public final class SnapDiffDependencyGraph {
 
   /**
    * @throws IllegalStateException if entries contain a RENAME target path that
-   *     matches a CREATE path, or if dependency edges form a cycle
+   *     matches a CREATE path
    */
   public SnapDiffDependencyGraph(List<SnapDiffDependencyEntry> entries) {
     Objects.requireNonNull(entries, "entries");
@@ -327,12 +334,16 @@ public final class SnapDiffDependencyGraph {
     validateRenameTargetDoesNotMatchCreatePath(renameNodesByTargetPath,
         createNodesByPath);
 
+    Set<String> replacedPaths =
+        buildReplacedPaths(deleteNodesByPath, createNodesByPath);
+
     addPathConflictEdges(deleteNodesByPath, createNodesByPath,
         renameNodesByTargetPath);
     addRenameBeforeCreateEdges(renameNodesBySourcePath, createNodesByPath);
     addRenameChainEdges(renameNodesBySourcePath, renameNodesByTargetPath);
     addPathPrefixFromSnapshotEdges(deleteNodesByPath, renameNodesBySourcePath);
-    addPathPrefixToSnapshotEdges(createNodesByPath, renameNodesByTargetPath);
+    addPathPrefixToSnapshotEdges(createNodesByPath, renameNodesByTargetPath,
+        replacedPaths);
 
     buildObjectIdGroups(renameCount);
     addIntraObjectRenameEdges();
@@ -586,10 +597,19 @@ public final class SnapDiffDependencyGraph {
   /**
    * To-snapshot path-prefix edges. A descendant CREATE/RENAME/MODIFY cannot be
    * applied until ancestor directories exist on the to-snapshot side.
+   *
+   * <p>When a path appears in both {@code deleteNodesByPath} and
+   * {@code createNodesByPath} it is a <em>replaced</em> path (old object
+   * deleted, new object created at the same path). A CREATE at a replaced path
+   * must not order from-snapshot MODIFY/RENAME descendants that still live
+   * under the old tree, or a cycle appears (CREATE {@code ->} child {@code ->}
+   * DELETE {@code ->} CREATE). Pure CREATE descendants (new to-snapshot keys)
+   * still depend on the ancestor CREATE.
    */
   private void addPathPrefixToSnapshotEdges(
       Map<String, Integer> createNodesByPath,
-      Map<String, Integer> renameNodesByTargetPath) {
+      Map<String, Integer> renameNodesByTargetPath,
+      Set<String> replacedPaths) {
     for (int nodeId = 0; nodeId < nodes.size(); nodeId++) {
       SnapDiffDependencyEntry entry = nodes.get(nodeId);
       if (entry.isDelete()) {
@@ -602,16 +622,62 @@ public final class SnapDiffDependencyGraph {
       final int toNodeId = nodeId;
       forEachStrictPrefix(toSnapshotPath, ancestorPath -> {
         Integer ancestorCreateNodeId = createNodesByPath.get(ancestorPath);
-        if (ancestorCreateNodeId != null) {
+        if (ancestorCreateNodeId != null
+            && !shouldSkipReplacedPathToSnapshotEdge(ancestorPath,
+            replacedPaths, entry)) {
           addEdge(ancestorCreateNodeId, toNodeId);
         }
         Integer ancestorRenameNodeId =
             renameNodesByTargetPath.get(ancestorPath);
-        if (ancestorRenameNodeId != null) {
+        if (ancestorRenameNodeId != null
+            && !shouldSkipReplacedPathToSnapshotEdge(ancestorPath,
+            replacedPaths, entry)) {
           addEdge(ancestorRenameNodeId, toNodeId);
         }
       });
     }
+  }
+
+  /**
+   * Paths that are deleted and re-created (new objectId) in the same diff.
+   */
+  private static Set<String> buildReplacedPaths(
+      Map<String, Integer> deleteNodesByPath,
+      Map<String, Integer> createNodesByPath) {
+    Set<String> replacedPaths =
+        new HashSet<>(expectedHashMapCapacity(createNodesByPath.size()));
+    for (String path : createNodesByPath.keySet()) {
+      if (deleteNodesByPath.containsKey(path)) {
+        replacedPaths.add(path);
+      }
+    }
+    return replacedPaths;
+  }
+
+  /**
+   * Skip {@code ancestorPath -> descendant} to-snapshot prefix edges when the
+   * ancestor path is replaced and the descendant is a from-snapshot
+   * MODIFY/RENAME still reported under the old tree at that path.
+   */
+  private static boolean shouldSkipReplacedPathToSnapshotEdge(
+      String ancestorPath,
+      Set<String> replacedPaths,
+      SnapDiffDependencyEntry descendant) {
+    if (!replacedPaths.contains(ancestorPath)) {
+      return false;
+    }
+    DiffType diffType = descendant.getDiffType();
+    if (diffType != DiffType.MODIFY && diffType != DiffType.RENAME) {
+      return false;
+    }
+    return isStrictPathPrefix(ancestorPath, descendant.getSourcePath());
+  }
+
+  private static boolean isStrictPathPrefix(String prefix, String path) {
+    if (prefix == null || path == null) {
+      return false;
+    }
+    return path.startsWith(prefix + PATH_SEPARATOR);
   }
 
   private static String getToSnapshotPath(SnapDiffDependencyEntry entry) {

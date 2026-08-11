@@ -26,6 +26,17 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
  * Metadata for a classified snapshot diff entry used to build the dependency
  * graph for dependency-ordered report emission.
  *
+ * <p>Paths in the wrapped {@link DiffReportEntry} must use the snapshot
+ * namespace expected for each diff type. {@link SnapDiffDependencyGraph} does not validate
+ * namespaces; incorrect paths produce wrong edges rather than an error:
+ * <ul>
+ *   <li>DELETE and MODIFY: {@code sourcePath} is the from-snapshot path.</li>
+ *   <li>CREATE: {@code sourcePath} is the to-snapshot path ({@code targetPath}
+ *       is unset).</li>
+ *   <li>RENAME: {@code sourcePath} is the from-snapshot path and
+ *       {@code targetPath} is the to-snapshot path.</li>
+ * </ul>
+ *
  * <p>An entry carries both a source (from-snapshot) and a target (to-snapshot)
  * parent object id. For most diff types these are identical, but a RENAME can
  * move an object between parents, so the two ids may differ:
