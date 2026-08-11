@@ -135,6 +135,7 @@ public class TestBlockDataStreamOutput {
         .setNumDatanodes(5)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setCurrentVersion(DN_OLD_VERSION)
+            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
             .build())
         .build();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
@@ -337,7 +338,7 @@ public class TestBlockDataStreamOutput {
   public void testDatanodeVersion(boolean flushDelay) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
-      // Verify all DNs internally have versions set correctly
+      // Each datanode advertises its own (older) currentVersion internally.
       List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
       for (HddsDatanodeService dn : dns) {
         DatanodeDetails details = dn.getDatanodeDetails();
@@ -350,10 +351,12 @@ public class TestBlockDataStreamOutput {
       KeyDataStreamOutput keyDataStreamOutput = (KeyDataStreamOutput) key.getByteBufStreamOutput();
       BlockDataStreamOutputEntry stream = keyDataStreamOutput.getStreamEntries().get(0);
 
-      // Now check 3 DNs in a random pipeline returns the correct DN versions
+      // The cluster is finalized for ZDU, so the pipeline SCM returns on block allocation
+      // stamps each member's currentVersion with the lowest apparent version across the
+      // pipeline, which here is the software version the datanodes have finalized to.
       List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
       for (DatanodeDetails details : streamDnDetails) {
-        assertEquals(DN_OLD_VERSION,
+        assertEquals(HDDSVersion.SOFTWARE_VERSION,
             HDDSVersion.deserialize(details.getCurrentVersion()));
       }
     }

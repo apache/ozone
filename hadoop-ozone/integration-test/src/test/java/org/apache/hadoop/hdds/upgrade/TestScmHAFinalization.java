@@ -167,7 +167,8 @@ public class TestScmHAFinalization {
     }
 
     // Wait for finalization from the client perspective.
-    scmClient.finalizeUpgrade();
+    // Force finalize skips the peer version checks that require all peers to be active.
+    scmClient.forceFinalizeUpgrade();
     HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
     // Wait for two running SCMs to finish finalization.
     waitForScmsToFinalize(activeScms);

@@ -91,6 +91,7 @@ message ScmContainerLocationRequest {
   optional SuppressContainerRequestProto suppressContainerRequest = 52;
   optional QueryUpgradeStatusRequestProto queryUpgradeStatusRequest = 53;
   optional FinalizeUpgradeRequestProto finalizeUpgradeRequest = 54;
+  optional GetPeerUpgradeStatusRequestProto getPeerUpgradeStatusRequest = 55;
 }
 
 message ScmContainerLocationResponse {
@@ -153,6 +154,7 @@ message ScmContainerLocationResponse {
   optional SuppressContainerResponseProto suppressContainerResponse = 52;
   optional QueryUpgradeStatusResponseProto queryUpgradeStatusResponse = 53;
   optional FinalizeUpgradeResponseProto finalizeUpgradeResponse = 54;
+  optional GetPeerUpgradeStatusResponseProto getPeerUpgradeStatusResponse = 55;
 
   enum Status {
     OK = 1;
@@ -214,6 +216,7 @@ enum Type {
   SuppressContainer = 48;
   QueryUpgradeStatus = 49;
   FinalizeUpgrade = 50;
+  GetPeerUpgradeStatus = 51;
 }
 
 /**
@@ -603,9 +606,21 @@ message QueryUpgradeStatusResponseProto {
 }
 
 message FinalizeUpgradeRequestProto {
+  optional bool force = 1 [default = false];
 }
 
 message FinalizeUpgradeResponseProto {
+}
+
+// Request from an SCM leader to a peer SCM to read its local upgrade status.
+// The resulting status returned currently only contains the SCM's software version to use in pre-finalization
+// safety checks.
+message GetPeerUpgradeStatusRequestProto {
+}
+
+message GetPeerUpgradeStatusResponseProto {
+  // Serialized HDDSVersion.SOFTWARE_VERSION of the responding SCM binary.
+  optional int32 scmSoftwareVersion = 1;
 }
 
 message ContainerTokenSecretProto {
