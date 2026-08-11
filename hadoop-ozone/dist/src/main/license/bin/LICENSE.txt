@@ -373,8 +373,6 @@ Apache License 2.0
    javax.enterprise:cdi-api
    javax.inject:javax.inject
    log4j:apache-log4j-extras
-   net.java.dev.jna:jna
-   net.java.dev.jna:jna-platform
    org.apache.avro:avro
    org.apache.commons:commons-compress
    org.apache.commons:commons-configuration2
@@ -430,6 +428,7 @@ Apache License 2.0
    org.apache.parquet:parquet-variant
    org.apache.ranger:ranger-audit-core
    org.apache.ranger:ranger-authz-api
+   org.apache.ranger:ranger-common-utils
    org.apache.ranger:ranger-intg
    org.apache.ranger:ranger-plugin-classloader
    org.apache.ranger:ranger-plugin-common
@@ -484,7 +483,6 @@ MIT
    com.bettercloud:vault-java-driver
    com.github.jnr:jnr-x86asm
    com.knuddels:jtokkit
-   com.kstruct:gethostname4j
    org.bouncycastle:bcpkix-jdk18on
    org.bouncycastle:bcprov-jdk18on
    org.bouncycastle:bcutil-jdk18on
