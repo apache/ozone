@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -446,16 +446,12 @@ public class MutableVolumeSet implements VolumeSet {
    * deadlock the whole metrics system.
    */
   public StorageLocationReport[] getStorageReportSnapshot() {
-    // No lock is held, so the map sizes can change concurrently; collect into a
-    // list instead of indexing into a pre-sized array.
-    List<StorageLocationReport> reports = new ArrayList<>(volumeMap.size() + failedVolumeMap.size());
-    for (StorageVolume volume : volumeMap.values()) {
-      reports.add(volume.getReport());
-    }
-    for (StorageVolume volume : failedVolumeMap.values()) {
-      reports.add(volume.getReport());
-    }
-    return reports.toArray(new StorageLocationReport[0]);
+    // volumeMap and failedVolumeMap are ConcurrentHashMaps; their value streams
+    // are weakly consistent, so no lock is needed here (same guarantee as
+    // getVolumesList()).
+    return Stream.concat(volumeMap.values().stream(), failedVolumeMap.values().stream())
+        .map(StorageVolume::getReport)
+        .toArray(StorageLocationReport[]::new);
   }
 
   public String getDatanodeUuid() {
