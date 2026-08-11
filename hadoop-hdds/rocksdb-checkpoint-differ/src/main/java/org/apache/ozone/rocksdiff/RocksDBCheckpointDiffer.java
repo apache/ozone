@@ -692,15 +692,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     synchronized (this) {
       preconditionChecksForLoadAllCompactionLogs();
       addEntriesFromLogFilesToDagAndCompactionLogTable();
-      loadCompactionDagFromDB();
-      cleanupOrphanedSstBackupFiles();
+      Set<String> referencedInputSstFiles = loadCompactionDagFromDB();
+      cleanupOrphanedSstBackupFiles(referencedInputSstFiles);
     }
   }
 
   /**
    * Read a compactionLofTable and create entries in the dags.
    */
-  private void loadCompactionDagFromDB() {
+  private Set<String> loadCompactionDagFromDB() {
+    Set<String> inputSstFilesFromCompactionLog = new HashSet<>();
     try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
         activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
       managedRocksIterator.get().seekToFirst();
@@ -708,6 +709,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         byte[] value = managedRocksIterator.get().value();
         CompactionLogEntry compactionLogEntry =
             CompactionLogEntry.getFromProtobuf(CompactionLogEntryProto.parseFrom(value));
+        compactionLogEntry.getInputFileInfoList()
+            .forEach(inputFile -> inputSstFilesFromCompactionLog.add(inputFile.getFileName()));
         compactionDag.populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
             compactionLogEntry.getOutputFileInfoList(), compactionLogEntry.getDbSequenceNumber());
         // Add the compaction log entry to the prune queue so that the backup input sst files can be pruned.
@@ -723,6 +726,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         sstFilePruningMetrics.updateQueueSize(pruneQueue.size());
       }
     }
+    return inputSstFilesFromCompactionLog;
   }
 
   private void preconditionChecksForLoadAllCompactionLogs() {
@@ -1168,19 +1172,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * the compaction did not complete (for example, due to an OM crash/restart).
    */
   @VisibleForTesting
-  void cleanupOrphanedSstBackupFiles() {
+  void cleanupOrphanedSstBackupFiles(Set<String> referencedInputSstFiles) {
     Path sstBackupDirPath = Paths.get(sstBackupDir);
     if (!Files.isDirectory(sstBackupDirPath)) {
       return;
     }
 
-    Set<String> referencedFiles = compactionDag.getCompactionMap().keySet();
     Set<String> orphanedFiles = new HashSet<>();
     try (Stream<Path> pathStream = Files.list(sstBackupDirPath)) {
       pathStream.filter(path -> path.getFileName().toString().endsWith(SST_FILE_EXTENSION))
           .forEach(path -> {
             String fileName = FilenameUtils.getBaseName(path.getFileName().toString());
-            if (!referencedFiles.contains(fileName)) {
+            if (!referencedInputSstFiles.contains(fileName)) {
               orphanedFiles.add(fileName);
             }
           });

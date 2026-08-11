@@ -1566,11 +1566,15 @@ public class TestRocksDBCheckpointDiffer {
     rocksDBCheckpointDiffer.addToCompactionLogTable(compactionLogEntry);
 
     createFileWithContext(sstBackUpDir + "/000078" + SST_FILE_EXTENSION, "tracked");
+    // 000081 is a logged output that simulates an input hard-linked by a subsequent compaction
+    // that terminated before its log entry was written.
+    createFileWithContext(sstBackUpDir + "/000081" + SST_FILE_EXTENSION, "logged-output");
     createFileWithContext(sstBackUpDir + "/000099" + SST_FILE_EXTENSION, "orphan");
 
     rocksDBCheckpointDiffer.loadAllCompactionLogs();
 
     assertTrue(Files.exists(sstBackUpDir.toPath().resolve("000078" + SST_FILE_EXTENSION)));
+    assertFalse(Files.exists(sstBackUpDir.toPath().resolve("000081" + SST_FILE_EXTENSION)));
     assertFalse(Files.exists(sstBackUpDir.toPath().resolve("000099" + SST_FILE_EXTENSION)));
   }
 
