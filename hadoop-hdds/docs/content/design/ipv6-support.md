@@ -62,6 +62,8 @@ The proposal uses an incremental approach:
 
 - Change rack or network-topology semantics, or add IPv6 CIDR routing logic to SCM.
 - Change existing bind defaults from `0.0.0.0` to `::`.
+- Use address-family translation or tunneling as a substitute for native IPv6 connectivity, including NAT64/DNS64 and
+  IPv4-over-IPv6.
 - Prefer raw IP literals over DNS names for Kerberos or TLS identities.
 - Link-local and scoped IPv6 addresses are not supported as persistent cluster identities. Advertised endpoint settings
   reject them because scope identifiers are interface-local and cannot be encoded in X.509 IP subject alternative names.
@@ -147,6 +149,14 @@ Ozone will retain this bracketed legacy representation after IPv6 support lands.
 considered only when a separate API requirement justifies it. Any such field must be additive, dual-populated with the
 legacy field, and introduced with client preference and fallback rules for the compatibility window.
 
+Existing SCM and OM HA Ratis groups must keep their group IDs, peer IDs, logs, and storage during migration. Stable DNS
+names can keep the peer address text unchanged while operators change DNS records to IPv6. If the group stores IPv4
+literals, migration must update the Ratis peer configuration with the same peer IDs and new IPv6 addresses. A change to
+`ozone-site.xml` alone is not sufficient because Ratis recovers the peer configuration from its log.
+
+Datanode Ratis pipelines have a different rule. When a datanode address changes, SCM closes the affected pipelines and
+creates replacements. The datanode UUID and container data do not change.
+
 ### OM and OzoneFS
 
 OM RPC addresses, HA failover, service discovery, and OzoneFS URI parsing must support bracketed IPv6 authorities. The
@@ -231,10 +241,22 @@ for that fix.
 The initial delivery does not require a metadata layout or Protobuf schema change. Existing IPv4 and DNS configuration
 remains valid, and default bind addresses remain unchanged.
 
-IPv6-specific endpoint text is new input. Older components may not understand bracketed literals or may select IPv6
-after a DNS AAAA record is added. During a rolling upgrade, operators must continue to use an address family understood
-by all running components and clients. IPv6-only addresses and IPv6 activation must be introduced only after all Ozone
-services, command-line clients, and relevant filesystem clients have been upgraded.
+Ozone supports non-rolling software upgrades. An existing cluster must first use that procedure to install an
+IPv6-capable release while retaining its IPv4 configuration. This requires a maintenance window; this proposal does not
+guarantee a zero-downtime software upgrade or address-family migration.
+
+After the upgrade, operators can migrate from IPv4 through dual-stack to IPv6-only. IPv4 endpoints must remain usable
+until IPv6 listeners, advertised endpoints, security services, and clients have been validated. IPv4 can be removed only
+after all Ozone services, command-line clients, and relevant filesystem clients can use IPv6.
+
+A datanode retains its persisted UUID when its IP address or hostname changes. When it re-registers, SCM updates the
+existing datanode and closes stale pipelines so that replacement pipelines can be created.
+`hdds.datanode.use.datanode.hostname=true` can simplify the transition by using stable DNS names for datanode
+data-transfer and Ratis endpoints, but it is not an identity or IPv6 requirement. Qualification will cover both
+settings.
+
+IPv6-specific endpoint text is new input. Older clients may not understand bracketed literals or may select IPv6 after a
+DNS AAAA record is added. IPv6 activation must therefore wait until all relevant clients have been upgraded.
 
 For settings that combine a host and port, the accepted IPv6 literal form is `[ipv6]:port`. Host-only properties use a
 bare literal. Ozone will reject ambiguous values instead of guessing where an IPv6 address ends and a port begins.
@@ -355,6 +377,10 @@ Required coverage includes:
   checks, certificate renewal, and authenticated HTTP endpoints pass without an IPv4 fallback.
 - **HA and failure handling:** SCM and OM leader changes, suggested-leader handling, client failover, Ratis role
   reporting, and Recon access preserve valid IPv6 endpoints.
+- **Existing-cluster migration:** Starting from an IPv4 configuration, complete the supported non-rolling upgrade and
+  migrate through dual-stack to IPv6-only. Preserve SCM and OM Ratis IDs, logs, and storage. Test stable DNS and address
+  updates that keep the same peer IDs for IPv4 literal peers. Validate datanode UUID retention, pipeline replacement,
+  and rollback to IPv4 before the final cutover.
 - **Erasure coding:** An EC bucket completes write, read, degraded read, and reconstruction with IPv6-reachable
   datanodes and the expected topology placement.
 
@@ -427,6 +453,7 @@ documentation work will verify the combined behavior rather than infer support f
 
 - [HDDS-15763: Ozone IPv6 support](https://issues.apache.org/jira/browse/HDDS-15763)
 - [HDDS-9894: IPv6 address checks for certificate requests](https://issues.apache.org/jira/browse/HDDS-9894)
+- [Ozone non-rolling upgrades and downgrades]({{< ref "feature/Nonrolling-Upgrade.md" >}})
 - [HADOOP-11890: Hadoop IPv6 support umbrella](https://issues.apache.org/jira/browse/HADOOP-11890)
 - [HADOOP-3619: IPv6 reverse DNS failure](https://issues.apache.org/jira/browse/HADOOP-3619)
 - [HADOOP-12491: IPv6-unsafe Hadoop Common parsing](https://issues.apache.org/jira/browse/HADOOP-12491)
