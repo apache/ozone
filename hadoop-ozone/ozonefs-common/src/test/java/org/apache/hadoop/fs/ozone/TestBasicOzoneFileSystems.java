@@ -152,9 +152,11 @@ public class TestBasicOzoneFileSystems {
       "ofs://omservice1/, omservice1, -1",
       // service id with an underscore: HostAndPort tolerates it (URI.getHost does not)
       "ofs://om_service/, om_service, -1",
-      // IPv6 literal authority, with and without a port; the literal stays bracketed
-      "ofs://[::1]:9862/, [::1], 9862",
-      "ofs://[2001:db8::1]/, [2001:db8::1], -1",
+      // IPv6 literal authority, with and without a port; the bare literal is
+      // passed to the adapter (which re-brackets it), while the filesystem URI
+      // keeps the bracketed authority.
+      "ofs://[::1]:9862/, ::1, 9862",
+      "ofs://[2001:db8::1]/, 2001:db8::1, -1",
   })
   public void testRootedAuthorityParsing(String uri, String expectedHost,
       int expectedPort) throws Exception {

@@ -169,10 +169,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT, e);
     }
     int omPort = hostAndPort.hasPort() ? hostAndPort.getPort() : -1;
+    // Pass the bare host; the adapter builds the OM address via
+    // getHostPortString, which brackets IPv6 literals.
     String host = hostAndPort.getHost();
-    // Keep IPv6 literals bracketed so the downstream host:port assembly that
-    // builds the OM address stays unambiguous.
-    String omHostOrServiceId = host.contains(":") ? "[" + host + "]" : host;
 
     try {
       uri = new URIBuilder().setScheme(OZONE_OFS_URI_SCHEME)
@@ -183,7 +182,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       ConfigurationSource source = getConfSource();
       this.hsyncEnabled = OzoneFSUtils.canEnableHsync(source, true);
       LOG.debug("hsyncEnabled = {}", hsyncEnabled);
-      this.adapter = createAdapter(source, omHostOrServiceId, omPort);
+      this.adapter = createAdapter(source, host, omPort);
       this.adapterImpl = (BasicRootedOzoneClientAdapterImpl) this.adapter;
 
       try {
