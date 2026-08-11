@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.proxy;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.net.InetAddresses;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -29,8 +30,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
@@ -266,27 +269,57 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   }
 
   /**
-   * Resolve the suggested-leader authority to a known SCM nodeId. First try a
-   * DNS-free string match against the cached proxy authorities; only when that
-   * misses (for example a bracketed IPv6 literal, whose cached authority is not
-   * bracketed) fall back to a resolved-address comparison, the one branch that
-   * may perform a DNS lookup. Returns empty when nothing matches or the
-   * authority cannot be parsed.
+   * Find the SCM nodeId whose address matches the suggested-leader authority. Callers hold
+   * the provider monitor, so this must never resolve a name.
    */
   private Optional<String> findSuggestedLeaderNodeId(String suggestedLeader) {
-    Optional<SCMProxyInfo> matchedProxyInfo = scmProxyInfoMap.values().stream().filter(
-        proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress()).equals(suggestedLeader))
-        .findFirst();
-    if (!matchedProxyInfo.isPresent()) {
-      try {
-        InetSocketAddress suggestedLeaderAddress = NetUtils.createSocketAddr(suggestedLeader);
-        matchedProxyInfo = scmProxyInfoMap.values().stream().filter(
-            proxyInfo -> proxyInfo.getAddress().equals(suggestedLeaderAddress)).findFirst();
-      } catch (IllegalArgumentException ex) {
-        getLogger().warn("Ignoring unparseable suggested leader {}", suggestedLeader, ex);
-      }
+    final Optional<String> host;
+    final OptionalInt port;
+    try {
+      host = HddsUtils.getHostName(suggestedLeader);
+      port = HddsUtils.getHostPort(suggestedLeader);
+    } catch (IllegalArgumentException ex) {
+      getLogger().warn("Ignoring unparseable suggested leader {}", suggestedLeader, ex);
+      return Optional.empty();
     }
-    return matchedProxyInfo.map(SCMProxyInfo::getNodeId);
+    if (!host.isPresent() || !port.isPresent()) {
+      return Optional.empty();
+    }
+    return scmProxyInfoMap.values().stream()
+        .filter(proxyInfo -> matchesAuthority(proxyInfo.getAddress(), host.get(), port.getAsInt()))
+        .findFirst()
+        .map(SCMProxyInfo::getNodeId);
+  }
+
+  private static boolean matchesAuthority(InetSocketAddress address, String host, int port) {
+    if (address.getPort() != port) {
+      return false;
+    }
+    // Both getHostString() and getAddress() read what was resolved when the proxy info was
+    // built, so neither triggers a lookup here.
+    String addressHost = address.getHostString();
+    if (addressHost.equalsIgnoreCase(host) || sameIpLiteral(addressHost, host)) {
+      return true;
+    }
+    InetAddress resolved = address.getAddress();
+    return resolved != null && sameIpLiteral(resolved.getHostAddress(), host);
+  }
+
+  /**
+   * Whether two IP literals denote the same address, allowing for different spellings of one
+   * IPv6 address. Scope is compared as text, unlike {@link InetAddress#equals} which drops it,
+   * so fe80::1%1 and fe80::1%2 differ, and so do %2 and %eth0 for the same interface.
+   */
+  private static boolean sameIpLiteral(String host, String otherHost) {
+    int mark = host.indexOf('%');
+    int otherMark = otherHost.indexOf('%');
+    String scope = mark < 0 ? "" : host.substring(mark + 1);
+    String otherScope = otherMark < 0 ? "" : otherHost.substring(otherMark + 1);
+    String ip = mark < 0 ? host : host.substring(0, mark);
+    String otherIp = otherMark < 0 ? otherHost : otherHost.substring(0, otherMark);
+    return scope.equals(otherScope)
+        && InetAddresses.isInetAddress(ip) && InetAddresses.isInetAddress(otherIp)
+        && InetAddresses.forString(ip).equals(InetAddresses.forString(otherIp));
   }
 
   @Override
