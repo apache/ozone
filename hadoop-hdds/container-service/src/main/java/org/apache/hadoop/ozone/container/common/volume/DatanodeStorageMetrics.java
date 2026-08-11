@@ -58,19 +58,9 @@ public final class DatanodeStorageMetrics implements MetricsSource {
   private final MutableVolumeSet volumeSet;
   private final String sourceName;
 
-  private DatanodeStorageMetrics(MutableVolumeSet volumeSet) {
+  private DatanodeStorageMetrics(MutableVolumeSet volumeSet, String sourceName) {
     this.volumeSet = volumeSet;
-    // In mini-cluster mode many datanodes share one metrics system, so the
-    // metrics system uniquifies the constant source name on registration
-    // (DatanodeStorageMetrics-1, -2, ...). Unregistering by the constant base
-    // name would then leak every source past the first, and each leaked source
-    // pins a shut-down datanode's MutableVolumeSet. Make the name unique per
-    // datanode up front so register and unregister stay symmetric. In
-    // production there is one instance per JVM, so keep the plain name for
-    // stable JMX and Prometheus metric names.
-    this.sourceName = DefaultMetricsSystem.inMiniClusterMode()
-        ? SOURCE_NAME + '-' + volumeSet.getDatanodeUuid()
-        : SOURCE_NAME;
+    this.sourceName = sourceName;
     this.registry = new MetricsRegistry(sourceName);
   }
 
@@ -79,8 +69,19 @@ public final class DatanodeStorageMetrics implements MetricsSource {
    * with the default Metrics2 system.
    */
   public static DatanodeStorageMetrics create(MutableVolumeSet volumeSet) {
-    DatanodeStorageMetrics datanodeStorageMetrics = new DatanodeStorageMetrics(volumeSet);
-    DefaultMetricsSystem.instance().register(datanodeStorageMetrics.sourceName,
+    // In mini-cluster mode many datanodes share one metrics system, so the
+    // metrics system uniquifies the constant source name on registration
+    // (DatanodeStorageMetrics-1, -2, ...). Unregistering by the constant base
+    // name would then leak every source past the first, and each leaked source
+    // pins a shut-down datanode's MutableVolumeSet. Make the name unique per
+    // datanode up front so register and unregister stay symmetric. In
+    // production there is one instance per JVM, so keep the plain name for
+    // stable JMX and Prometheus metric names.
+    String sourceName = DefaultMetricsSystem.inMiniClusterMode()
+        ? SOURCE_NAME + '-' + volumeSet.getDatanodeUuid()
+        : SOURCE_NAME;
+    DatanodeStorageMetrics datanodeStorageMetrics = new DatanodeStorageMetrics(volumeSet, sourceName);
+    DefaultMetricsSystem.instance().register(sourceName,
         "DataNode node-level storage totals", datanodeStorageMetrics);
     return datanodeStorageMetrics;
   }
