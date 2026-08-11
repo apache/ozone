@@ -1733,11 +1733,17 @@ public class TestSnapshotDiffManager {
             null,
             Sets.newHashSet(dirA.getObjectID(), fileUnderDirB.getObjectID())),
         Arguments.of(
-            "missing parent in map retains delete when ancestor chain is broken",
+            "broken parent chain in live directory graph skips delete from report",
             Collections.singletonList(fileA),
             Collections.emptySet(),
             ImmutableMap.of(102L, 101L),
-            Sets.newHashSet(fileA.getObjectID())));
+            Collections.emptySet()),
+        Arguments.of(
+            "delete with parent absent from live directory graph is skipped",
+            Collections.singletonList(newDeletedFile(104L, 999L)),
+            Collections.emptySet(),
+            null,
+            Collections.emptySet()));
   }
 
   @Test

@@ -1359,7 +1359,9 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   /**
    * Returns whether any ancestor of the given parent is a deleted directory.
    * The walk stops at renamed directories because their descendant deletes are
-   * not subsumed by a deleted ancestor above them.
+   * not subsumed by a deleted ancestor above them. Returns true when the parent
+   * chain cannot be resolved in the live from-snapshot directory graph, so the
+   * delete entry can be skipped from the final report.
    *
    * @param objectIdToParentId from-snapshot directory parent graph keyed by stable
    *     objectId; must not be the to-snapshot graph
@@ -1406,8 +1408,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       }
       Long nextParent = objectIdToParentId.get(current);
       if (nextParent == null) {
-        result = false;
-        ancestorMemo.put(current, false);
+        result = true;
+        ancestorMemo.put(current, true);
         break;
       }
       path.add(current);
