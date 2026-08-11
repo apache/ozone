@@ -228,12 +228,13 @@ public class TestECPipelineProvider {
     return replicas;
   }
 
-  private DatanodeInfo createDatanodeInfo(DatanodeDetails dn) {
+  private DatanodeInfo createDatanodeInfo(DatanodeID id) {
+    DatanodeDetails dn = MockDatanodeDetails.createDatanodeDetails(id);
     DatanodeInfo datanodeInfo = new DatanodeInfo(dn,
         NodeStatus.inServiceHealthy(), null,
         HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     datanodeInfo.updateStorageReports(Collections.singletonList(
-        HddsTestUtils.createStorageReport(dn.getID(),
+        HddsTestUtils.createStorageReport(id,
             "/data-" + dn.getUuidString(), 100)));
     return datanodeInfo;
   }
