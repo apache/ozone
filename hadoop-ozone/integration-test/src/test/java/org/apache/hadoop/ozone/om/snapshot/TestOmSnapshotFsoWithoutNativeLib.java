@@ -22,7 +22,7 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMI
 /**
  * Test OmSnapshot for FSO bucket type when native lib is disabled.
  */
-public class TestOmSnapshotFsoWithoutNativeLib extends TestOmSnapshot {
+public class TestOmSnapshotFsoWithoutNativeLib extends OmSnapshotTests {
 
   public TestOmSnapshotFsoWithoutNativeLib() throws Exception {
     super(FILE_SYSTEM_OPTIMIZED, false, false, true, false);

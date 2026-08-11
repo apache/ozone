@@ -508,14 +508,14 @@ public class TestBlockDeletion {
         containerInfos.get(0).getContainerID());
     // Before restart container state is non-empty
     assertFalse(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
     // Restart DataNode
     cluster.restartHddsDatanode(0, true);
 
     // After restart also container state remains non-empty.
     assertFalse(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
 
     // Delete key
@@ -535,14 +535,14 @@ public class TestBlockDeletion {
 
     // Container state should be empty now as key got deleted
     assertTrue(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
 
     // Restart DataNode
     cluster.restartHddsDatanode(0, true);
     // Container state should be empty even after restart
     assertTrue(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
 
     GenericTestUtils.waitFor(() -> {

@@ -101,6 +101,12 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   private @Metric MutableCounterLong putObjectTaggingFailure;
   private @Metric MutableCounterLong deleteObjectTaggingSuccess;
   private @Metric MutableCounterLong deleteObjectTaggingFailure;
+  private @Metric MutableCounterLong getBucketTaggingSuccess;
+  private @Metric MutableCounterLong getBucketTaggingFailure;
+  private @Metric MutableCounterLong putBucketTaggingSuccess;
+  private @Metric MutableCounterLong putBucketTaggingFailure;
+  private @Metric MutableCounterLong deleteBucketTaggingSuccess;
+  private @Metric MutableCounterLong deleteBucketTaggingFailure;
   private @Metric MutableCounterLong putObjectAclSuccess;
   private @Metric MutableCounterLong putObjectAclFailure;
 
@@ -272,6 +278,24 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   @Metric(about = "Latency for failing to delete object tagging of a key in nanoseconds")
   private PerformanceMetrics deleteObjectTaggingFailureLatencyNs;
 
+  @Metric(about = "Latency for successful get bucket tagging in nanoseconds")
+  private PerformanceMetrics getBucketTaggingSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to get bucket tagging in nanoseconds")
+  private PerformanceMetrics getBucketTaggingFailureLatencyNs;
+
+  @Metric(about = "Latency for successful put bucket tagging in nanoseconds")
+  private PerformanceMetrics putBucketTaggingSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to put bucket tagging in nanoseconds")
+  private PerformanceMetrics putBucketTaggingFailureLatencyNs;
+
+  @Metric(about = "Latency for successful delete bucket tagging in nanoseconds")
+  private PerformanceMetrics deleteBucketTaggingSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to delete bucket tagging in nanoseconds")
+  private PerformanceMetrics deleteBucketTaggingFailureLatencyNs;
+
   @Metric(about = "Latency for successfully setting an S3 object ACL " +
       "in nanoseconds")
   private PerformanceMetrics putObjectAclSuccessLatencyNs;
@@ -427,6 +451,18 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     deleteObjectTaggingSuccessLatencyNs.snapshot(recordBuilder, true);
     deleteObjectTaggingFailure.snapshot(recordBuilder, true);
     deleteObjectTaggingFailureLatencyNs.snapshot(recordBuilder, true);
+    getBucketTaggingSuccess.snapshot(recordBuilder, true);
+    getBucketTaggingSuccessLatencyNs.snapshot(recordBuilder, true);
+    getBucketTaggingFailure.snapshot(recordBuilder, true);
+    getBucketTaggingFailureLatencyNs.snapshot(recordBuilder, true);
+    putBucketTaggingSuccess.snapshot(recordBuilder, true);
+    putBucketTaggingSuccessLatencyNs.snapshot(recordBuilder, true);
+    putBucketTaggingFailure.snapshot(recordBuilder, true);
+    putBucketTaggingFailureLatencyNs.snapshot(recordBuilder, true);
+    deleteBucketTaggingSuccess.snapshot(recordBuilder, true);
+    deleteBucketTaggingSuccessLatencyNs.snapshot(recordBuilder, true);
+    deleteBucketTaggingFailure.snapshot(recordBuilder, true);
+    deleteBucketTaggingFailureLatencyNs.snapshot(recordBuilder, true);
     putObjectAclSuccess.snapshot(recordBuilder, true);
     putObjectAclSuccessLatencyNs.snapshot(recordBuilder, true);
     putObjectAclFailure.snapshot(recordBuilder, true);
@@ -682,6 +718,36 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     this.deleteObjectTaggingFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
+  public void updateGetBucketTaggingSuccessStats(long startNanos) {
+    this.getBucketTaggingSuccess.incr();
+    this.getBucketTaggingSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updateGetBucketTaggingFailureStats(long startNanos) {
+    this.getBucketTaggingFailure.incr();
+    this.getBucketTaggingFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updatePutBucketTaggingSuccessStats(long startNanos) {
+    this.putBucketTaggingSuccess.incr();
+    this.putBucketTaggingSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updatePutBucketTaggingFailureStats(long startNanos) {
+    this.putBucketTaggingFailure.incr();
+    this.putBucketTaggingFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updateDeleteBucketTaggingSuccessStats(long startNanos) {
+    this.deleteBucketTaggingSuccess.incr();
+    this.deleteBucketTaggingSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updateDeleteBucketTaggingFailureStats(long startNanos) {
+    this.deleteBucketTaggingFailure.incr();
+    this.deleteBucketTaggingFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
   public void updatePutObjectAclSuccessStats(long startNanos) {
     this.putObjectAclSuccess.incr();
     this.putObjectAclSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
@@ -855,6 +921,30 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
 
   public long getDeleteObjectTaggingFailure() {
     return deleteObjectTaggingFailure.value();
+  }
+
+  public long getGetBucketTaggingSuccess() {
+    return getBucketTaggingSuccess.value();
+  }
+
+  public long getGetBucketTaggingFailure() {
+    return getBucketTaggingFailure.value();
+  }
+
+  public long getPutBucketTaggingSuccess() {
+    return putBucketTaggingSuccess.value();
+  }
+
+  public long getPutBucketTaggingFailure() {
+    return putBucketTaggingFailure.value();
+  }
+
+  public long getDeleteBucketTaggingSuccess() {
+    return deleteBucketTaggingSuccess.value();
+  }
+
+  public long getDeleteBucketTaggingFailure() {
+    return deleteBucketTaggingFailure.value();
   }
 
   private long updateAndGetStats(PerformanceMetrics metric, long startNanos) {

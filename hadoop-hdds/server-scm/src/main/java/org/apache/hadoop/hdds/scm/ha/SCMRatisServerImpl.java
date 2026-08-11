@@ -66,7 +66,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TODO.
+ * Default {@link SCMRatisServer} implementation backed by a Ratis
+ * {@link RaftServer} running the {@link SCMStateMachine}.
  */
 public class SCMRatisServerImpl implements SCMRatisServer {
   private static final Logger LOG =

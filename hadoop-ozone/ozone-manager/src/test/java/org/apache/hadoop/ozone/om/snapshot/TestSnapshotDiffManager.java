@@ -223,6 +223,8 @@ public class TestSnapshotDiffManager {
     codecRegistry = CodecRegistry.newBuilder()
         .addCodec(DiffReportEntry.class, getDiffReportEntryCodec())
         .addCodec(SnapshotDiffJob.class, SnapshotDiffJob.codec())
+        .addCodec(OmKeyInfo.class, OmKeyInfo.getKeyTableCodec())
+        .addCodec(OmDirectoryInfo.class, OmDirectoryInfo.getCodec())
         .build();
   }
 
@@ -1195,28 +1197,35 @@ public class TestSnapshotDiffManager {
         eq(VOLUME_NAME), eq(BUCKET_NAME), anyString(), anyString(),
         eq(false), eq(false));
 
-    if (drainBetweenBatches) {
-      blockWorkers.countDown();
-    }
-
     try {
       List<SnapshotDiffResponse> responses = new ArrayList<>();
       int totalSubmitted = 0;
+      int fullThreadPoolSize = 2 * OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
+      boolean latchOpened = false;
+
       for (int i = 0; i < snapshotInfos.size(); i++) {
         for (int j = i + 1; j < snapshotInfos.size(); j++) {
           String fromSnapshotName = snapshotInfos.get(i).getName();
           String toSnapshotName = snapshotInfos.get(j).getName();
+
+          if (drainBetweenBatches && !latchOpened &&
+              totalSubmitted >= fullThreadPoolSize) {
+            blockWorkers.countDown();
+            latchOpened = true;
+          }
+
+          if (drainBetweenBatches && latchOpened) {
+            final int currentlySubmitted = totalSubmitted;
+            attempt(() -> {
+              if (currentlySubmitted - completedJobs.get() >= fullThreadPoolSize) {
+                throw new RuntimeException("Thread pool is still full");
+              }
+              return null;
+            }, 10000, TimeDuration.valueOf(1, TimeUnit.MILLISECONDS), null, null);
+          }
+
           responses.add(submitJob(spy, fromSnapshotName, toSnapshotName));
           totalSubmitted++;
-        }
-        if (drainBetweenBatches) {
-          final int expected = totalSubmitted;
-          attempt(() -> {
-            if (completedJobs.get() < expected) {
-              throw new IllegalStateException("Waiting for jobs to complete");
-            }
-            return null;
-          }, 50, TimeDuration.valueOf(100, TimeUnit.MILLISECONDS), null, null);
         }
       }
 

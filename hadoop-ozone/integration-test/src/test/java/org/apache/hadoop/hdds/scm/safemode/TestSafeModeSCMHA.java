@@ -91,9 +91,23 @@ public class TestSafeModeSCMHA {
     GenericTestUtils.waitFor(() -> leaderScmStateMachine.getLastAppliedTermIndex().getIndex()
         == followerScmStateMachine.getLastAppliedTermIndex().getIndex(), 1000, 60000);
 
-    // wait for follower to exit safe mode
+    // Wait for the restarted follower to exit safe mode. A live cluster has
+    // ongoing activity that advances the Ratis log and re-drives the follower's
+    // catch-up check (via applyTransaction / notifyTermIndexUpdated); a totally
+    // idle cluster provides no such trigger. Generate some SCM activity by
+    // allocating containers on the leader so the follower catches up, starts its
+    // datanode protocol server and exits safe mode.
     StorageContainerManager newFollowerScm = cluster.restartStorageContainerManager(followerScm, false);
-    GenericTestUtils.waitFor(() -> !newFollowerScm.isInSafeMode(), 1000, 60000);
+    final StorageContainerManager currentLeader = leaderScm;
+    GenericTestUtils.waitFor(() -> {
+      try {
+        currentLeader.getContainerManager().allocateContainer(
+            RatisReplicationConfig.getInstance(THREE), "safemode-test");
+      } catch (Exception e) {
+        // Ignore transient errors while the follower is catching up.
+      }
+      return !newFollowerScm.isInSafeMode();
+    }, 1000, 60000);
   }
 
   private void createTestData(OzoneClient client) throws IOException {

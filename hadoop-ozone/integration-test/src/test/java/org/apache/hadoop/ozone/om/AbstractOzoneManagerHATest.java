@@ -29,6 +29,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -43,6 +45,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -85,6 +88,16 @@ public abstract class AbstractOzoneManagerHATest {
   private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
   private static OzoneClient client;
 
+  /**
+   * Hook for subclasses to apply extra configuration before the cluster is built.
+   * Call {@link #setExtraClusterConfig} in a {@code static {}} block to ensure it runs before {@code @BeforeAll}.
+   */
+  private static Consumer<OzoneConfiguration> extraClusterConfig = c -> { };
+
+  protected static void setExtraClusterConfig(Consumer<OzoneConfiguration> config) {
+    extraClusterConfig = config;
+  }
+
   public MiniOzoneHAClusterImpl getCluster() {
     return cluster;
   }
@@ -126,6 +139,11 @@ public abstract class AbstractOzoneManagerHATest {
   }
 
   protected static void initCluster(boolean followerReadEnabled) throws Exception {
+    initCluster(followerReadEnabled, extraClusterConfig);
+  }
+
+  protected static void initCluster(boolean followerReadEnabled,
+      Consumer<OzoneConfiguration> extraConfig) throws Exception {
     conf = new OzoneConfiguration();
     omServiceId = "om-service-test1";
     conf.setBoolean(OZONE_ACL_ENABLED, true);
@@ -158,6 +176,7 @@ public abstract class AbstractOzoneManagerHATest {
       // Enable the OM follower read.
       omHAConfig.setReadOption("LINEARIZABLE");
       omHAConfig.setReadLeaderLeaseEnabled(true);
+      conf.setBoolean(OZONE_OM_S3_GPRC_SERVER_ENABLED, true);
     }
 
     conf.setFromObject(omHAConfig);
@@ -172,6 +191,8 @@ public abstract class AbstractOzoneManagerHATest {
     // config for key deleting service.
     conf.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "10s");
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");
+
+    extraConfig.accept(conf);
 
     MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
@@ -200,7 +221,7 @@ public abstract class AbstractOzoneManagerHATest {
    * @return the key name.
    */
   public static String createKey(OzoneBucket ozoneBucket) throws IOException {
-    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String keyName = uniqueObjectName("key");
     createKey(ozoneBucket, keyName);
     return keyName;
   }
@@ -214,7 +235,7 @@ public abstract class AbstractOzoneManagerHATest {
   }
 
   public static String createPrefixName() {
-    return "prefix" + RandomStringUtils.secure().nextNumeric(5) + OZONE_URI_DELIMITER;
+    return uniqueObjectName("prefix") + OZONE_URI_DELIMITER;
   }
 
   public static void createPrefix(OzoneObj prefixObj) throws IOException {
@@ -252,7 +273,7 @@ public abstract class AbstractOzoneManagerHATest {
   protected OzoneBucket linkBucket(OzoneBucket srcBuk) throws Exception {
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String linkedVolName = "volume-link-" + RandomStringUtils.secure().nextNumeric(5);
+    String linkedVolName = uniqueObjectName("volume-link-");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -289,7 +310,7 @@ public abstract class AbstractOzoneManagerHATest {
   protected void createVolumeTest(boolean checkSuccess) throws Exception {
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -379,7 +400,7 @@ public abstract class AbstractOzoneManagerHATest {
   protected void createKeyTest(boolean checkSuccess) throws Exception {
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)

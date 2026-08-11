@@ -103,6 +103,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.Stack;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
@@ -156,6 +157,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
@@ -825,7 +827,7 @@ public class KeyManagerImpl implements KeyManager {
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, deletedTable);
-    try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
+    try (TableIterator<String, Table.KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = deletedTable.iterator(bucketPrefix.orElse(""))) {
 
       /* Seeking to the start key if it not null. The next key picked up would be ensured to start with the bucket
@@ -886,7 +888,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private <V, R> List<KeyValue<String, R>> getTableEntries(String startKey,
-          TableIterator<String, ? extends KeyValue<String, V>> tableIterator,
+          TableIterator<String, Table.KeyValue<String, V>> tableIterator,
           Function<V, R> valueFunction,
           CheckedFunction<KeyValue<String, V>, Boolean, IOException> filter,
           int size) throws IOException {
@@ -927,7 +929,7 @@ public class KeyManagerImpl implements KeyManager {
       CheckedFunction<KeyValue<String, String>, Boolean, IOException> filter, int size) throws IOException {
     Table<String, String> snapshotRenamedTable = metadataManager.getSnapshotRenamedTable();
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, snapshotRenamedTable);
-    try (TableIterator<String, ? extends KeyValue<String, String>>
+    try (TableIterator<String, Table.KeyValue<String, String>>
              renamedKeyIter = snapshotRenamedTable.iterator(bucketPrefix.orElse(""))) {
       return getTableEntries(startKey, renamedKeyIter, Function.identity(), filter, size);
     }
@@ -978,7 +980,7 @@ public class KeyManagerImpl implements KeyManager {
       int size) throws IOException {
     Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, deletedTable);
-    try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
+    try (TableIterator<String, Table.KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = deletedTable.iterator(bucketPrefix.orElse(""))) {
       return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, filter, size);
     }
@@ -1138,6 +1140,40 @@ public class KeyManagerImpl implements KeyManager {
         throw new OMException("No Such Multipart upload exists for this key.",
             ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       } else {
+        if (multipartKeyInfo.getSchemaVersion()
+            == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+          SortedMap<Integer, OmMultipartPartInfo> parts =
+              OMMultipartUploadUtils.scanParts(metadataManager, uploadID);
+          List<OmPartInfo> omPartInfoList = new ArrayList<>();
+          int count = 0;
+          for (Map.Entry<Integer, OmMultipartPartInfo> entry
+              : parts.entrySet()) {
+            int partNumber = entry.getKey();
+            if (partNumber <= partNumberMarker) {
+              continue;
+            }
+            if (count == maxParts) {
+              isTruncated = true;
+              break;
+            }
+            OmMultipartPartInfo partInfo = entry.getValue();
+            nextPartNumberMarker = partNumber;
+            omPartInfoList.add(new OmPartInfo(partNumber,
+                partInfo.getPartName(), partInfo.getModificationTime(),
+                partInfo.getDataSize(), partInfo.getETag()));
+            count++;
+          }
+          if (!isTruncated) {
+            nextPartNumberMarker = 0;
+          }
+          OmMultipartUploadListParts listParts =
+              new OmMultipartUploadListParts(
+                  multipartKeyInfo.getReplicationConfig(),
+                  nextPartNumberMarker, isTruncated);
+          listParts.addPartList(omPartInfoList);
+          return listParts;
+        }
+
         Iterator<PartKeyInfo> partKeyInfoMapIterator =
             multipartKeyInfo.getPartKeyInfoMap().iterator();
 
@@ -1631,7 +1667,7 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
 
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>>
         keyTblItr = keyTable.iterator(targetKey)) {
       while (keyTblItr.hasNext()) {
         KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();
@@ -1939,7 +1975,7 @@ public class KeyManagerImpl implements KeyManager {
     String keyArgs = OzoneFSUtils.addTrailingSlashIfNeeded(
         metadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
-    TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> iterator;
+    TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iterator;
     Table<String, OmKeyInfo> keyTable;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
@@ -1996,12 +2032,12 @@ public class KeyManagerImpl implements KeyManager {
     return fileStatusList;
   }
 
-  private TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+  private TableIterator<String, Table.KeyValue<String, OmKeyInfo>>
       getIteratorForKeyInTableCache(
       boolean recursive, String startKey, String volumeName, String bucketName,
       TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
       Table<String, OmKeyInfo> keyTable) throws IOException {
-    TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> iterator;
+    TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iterator;
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
         cacheIter = keyTable.cacheIterator();
     String startCacheKey = metadataManager.getOzoneKey(volumeName, bucketName, startKey);
@@ -2018,8 +2054,7 @@ public class KeyManagerImpl implements KeyManager {
       long numEntries, String volumeName, String bucketName, String keyName,
       TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
       Table<String, OmKeyInfo> keyTable,
-      TableIterator<String,
-          ? extends KeyValue<String, OmKeyInfo>> iterator)
+      TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iterator)
       throws IOException {
     // Then, find key in DB
     String seekKeyInDb =
@@ -2275,7 +2310,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
+  public TableIterator<String, KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
       String volume, String bucket) throws IOException {
     Table<String, OmKeyInfo> deletedDirTable = metadataManager.getDeletedDirTable();
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, deletedDirTable);
@@ -2297,7 +2332,7 @@ public class KeyManagerImpl implements KeyManager {
       throws IOException {
     List<OmKeyInfo> keyInfos = new ArrayList<>();
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId, parentInfo.getObjectID(), "");
-    try (TableIterator<String, ? extends KeyValue<String, T>> iterator = table.iterator(seekFileInDB)) {
+    try (TableIterator<String, Table.KeyValue<String, T>> iterator = table.iterator(seekFileInDB)) {
       while (iterator.hasNext() && remainingNum > 0) {
         KeyValue<String, T> entry = iterator.next();
         KeyValue<String, OmKeyInfo> keyInfo = deleteKeyTransformer.apply(entry);

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone;
 
 import java.util.Arrays;
-import org.apache.hadoop.conf.TestConfigurationFieldsBase;
+import org.apache.hadoop.conf.ConfigurationFieldsTests;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
  */
-public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
+public class TestOzoneConfigurationFields extends ConfigurationFieldsTests {
 
   @Override
   public void initializeMemberVariables() {

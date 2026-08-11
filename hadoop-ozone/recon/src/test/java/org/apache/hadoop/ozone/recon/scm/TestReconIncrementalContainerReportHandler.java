@@ -79,7 +79,7 @@ public class TestReconIncrementalContainerReportHandler
     when(reportMock.getDatanodeDetails()).thenReturn(datanodeDetails);
 
     ContainerWithPipeline containerWithPipeline = getTestContainer(
-        containerID.getId(), OPEN);
+        containerID.getIdForTesting(), OPEN);
     List<ContainerWithPipeline> containerWithPipelineList = new ArrayList<>();
     containerWithPipelineList.add(containerWithPipeline);
     ReconContainerManager containerManager = getContainerManager();
@@ -167,7 +167,7 @@ public class TestReconIncrementalContainerReportHandler
           String.format("Expecting %s in container state for replica state %s",
               expectedState, state));
       verify(containerManager.getScmClient(), never())
-          .getContainerWithPipeline(containerID.getId());
+          .getContainerWithPipeline(containerID.getIdForTesting());
     }
   }
 
@@ -200,7 +200,7 @@ public class TestReconIncrementalContainerReportHandler
           String.format("Expecting %s in container state for replica state %s",
               expectedState, state));
       verify(containerManager.getScmClient(), never())
-          .getContainerWithPipeline(containerID.getId());
+          .getContainerWithPipeline(containerID.getIdForTesting());
     }
   }
 
@@ -269,7 +269,7 @@ public class TestReconIncrementalContainerReportHandler
         IncrementalContainerReportProto.newBuilder();
     final ContainerReplicaProto replicaProto =
         ContainerReplicaProto.newBuilder()
-            .setContainerID(containerId.getId())
+            .setContainerID(containerId.getIdForTesting())
             .setState(state)
             .setOriginNodeId(originNodeId)
             .build();

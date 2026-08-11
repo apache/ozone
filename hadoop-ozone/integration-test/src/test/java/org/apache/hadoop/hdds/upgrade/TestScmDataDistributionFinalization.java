@@ -195,15 +195,15 @@ public class TestScmDataDistributionFinalization {
     assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
     assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
-    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
-    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
     assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
@@ -309,15 +309,15 @@ public class TestScmDataDistributionFinalization {
           }
         });
     finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
     assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
-    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
-    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
     assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 

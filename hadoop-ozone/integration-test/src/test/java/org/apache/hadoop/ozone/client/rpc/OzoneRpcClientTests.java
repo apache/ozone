@@ -55,6 +55,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIS
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -2917,8 +2918,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testListBucket()
       throws IOException {
-    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeB = "vol-b-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeA = uniqueObjectName("vol-a-");
+    String volumeB = uniqueObjectName("vol-b-");
     store.createVolume(volumeA);
     store.createVolume(volumeB);
     OzoneVolume volA = store.getVolume(volumeA);
@@ -3014,10 +3015,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testListKey()
       throws IOException {
-    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeB = "vol-b-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketA = "buc-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketB = "buc-b-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeA = uniqueObjectName("vol-a-");
+    String volumeB = uniqueObjectName("vol-b-");
+    String bucketA = uniqueObjectName("buc-a-");
+    String bucketB = uniqueObjectName("buc-b-");
     store.createVolume(volumeA);
     store.createVolume(volumeB);
     OzoneVolume volA = store.getVolume(volumeA);
@@ -3165,8 +3166,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testListKeyOnEmptyBucket()
       throws IOException {
-    String volume = "vol-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucket = "buc-" + RandomStringUtils.secure().nextNumeric(5);
+    String volume = uniqueObjectName("vol-");
+    String bucket = uniqueObjectName("buc-");
     store.createVolume(volume);
     OzoneVolume vol = store.getVolume(volume);
     vol.createBucket(bucket);
@@ -5166,10 +5167,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testListSnapshot() throws IOException {
-    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeB = "vol-b-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketA = "buc-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketB = "buc-b-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeA = uniqueObjectName("vol-a-");
+    String volumeB = uniqueObjectName("vol-b-");
+    String bucketA = uniqueObjectName("buc-a-");
+    String bucketB = uniqueObjectName("buc-b-");
     store.createVolume(volumeA);
     store.createVolume(volumeB);
     OzoneVolume volA = store.getVolume(volumeA);
@@ -5709,5 +5710,101 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     long currentAllocatedBlocks =
         getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
     assertEquals(initialAllocatedBlocks + 1, currentAllocatedBlocks);
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testPutBucketTagging(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+
+    // initially bucket has no tags
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    assertTrue(bucket.getBucketTagging().isEmpty());
+    Instant modificationTimeBeforePut = bucket.getModificationTime();
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key-1", "tag-value-1");
+    tags.put("tag-key-2", "tag-value-2");
+
+    bucket.putBucketTagging(tags);
+
+    OzoneBucket updatedBucket = volume.getBucket(bucketName);
+    assertEquals(tags.size(), updatedBucket.getBucketTagging().size());
+    assertThat(updatedBucket.getBucketTagging()).containsAllEntriesOf(tags);
+    assertThat(updatedBucket.getModificationTime())
+        .isAfterOrEqualTo(modificationTimeBeforePut);
+
+    // 2nd put should replace the previous tags
+    Map<String, String> secondTags = new HashMap<>();
+    secondTags.put("tag-key-3", "tag-value-3");
+
+    bucket.putBucketTagging(secondTags);
+
+    OzoneBucket updatedBucket2 = volume.getBucket(bucketName);
+    assertEquals(secondTags.size(), updatedBucket2.getBucketTagging().size());
+    assertThat(updatedBucket2.getBucketTagging()).containsAllEntriesOf(secondTags);
+    assertThat(updatedBucket2.getBucketTagging()).doesNotContainKeys("tag-key-1", "tag-key-2");
+    assertThat(updatedBucket2.getModificationTime())
+        .isAfterOrEqualTo(updatedBucket.getModificationTime());
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteBucketTagging(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key-1", "tag-value-1");
+    tags.put("tag-key-2", "tag-value-2");
+
+    bucket.putBucketTagging(tags);
+    OzoneBucket bucketAfterPut = volume.getBucket(bucketName);
+    assertFalse(bucketAfterPut.getBucketTagging().isEmpty());
+
+    bucket.deleteBucketTagging();
+    OzoneBucket updatedBucket = volume.getBucket(bucketName);
+    assertTrue(updatedBucket.getBucketTagging().isEmpty());
+    assertThat(updatedBucket.getModificationTime())
+        .isAfterOrEqualTo(bucketAfterPut.getModificationTime());
+    assertThat(updatedBucket.getBucketTagging()).doesNotContainKeys("tag-key-1", "tag-key-2");
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testGetBucketTagging(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key-1", "tag-value-1");
+    tags.put("tag-key-2", "tag-value-2");
+
+    bucket.putBucketTagging(tags);
+
+    OzoneBucket updatedBucket = volume.getBucket(bucketName);
+    assertEquals(tags.size(), updatedBucket.getBucketTagging().size());
+    assertThat(updatedBucket.getBucketTagging()).containsAllEntriesOf(tags);
   }
 }

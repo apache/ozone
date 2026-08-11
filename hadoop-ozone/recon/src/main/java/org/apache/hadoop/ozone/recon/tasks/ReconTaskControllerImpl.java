@@ -104,7 +104,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private static final int MAX_EVENT_PROCESS_RETRIES = 6;
   private static final long RETRY_DELAY_MS = 2000; // 2 seconds
   // Clock for the retry-delay gate; overridable in tests via the
-  // @VisibleForTesting constructor to drive the gate with a TestClock.
+  // @VisibleForTesting constructor to drive the gate with a MockClock.
   private Clock clock = Clock.systemUTC();
 
   @Inject

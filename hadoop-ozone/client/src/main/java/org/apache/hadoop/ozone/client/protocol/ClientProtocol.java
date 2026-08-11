@@ -988,8 +988,28 @@ public interface ClientProtocol {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
+  default OzoneFileStatus getOzoneFileStatus(String volumeName,
+      String bucketName, String keyName) throws IOException {
+    return getOzoneFileStatus(volumeName, bucketName, keyName, false);
+  }
+
+  /**
+   * Get the Ozone File Status for a particular Ozone key.
+   *
+   * @param volumeName volume name.
+   * @param bucketName bucket name.
+   * @param keyName    key name.
+   * @param headOp     when true, this is a metadata-only (type) check: the OM
+   *                   skips the pipeline refresh (SCM round-trip) and datanode
+   *                   sorting since block locations are not needed.
+   * @return OzoneFileStatus for the key.
+   * @throws OMException if file does not exist
+   *                     if bucket does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   */
   OzoneFileStatus getOzoneFileStatus(String volumeName, String bucketName,
-      String keyName) throws IOException;
+      String keyName, boolean headOp) throws IOException;
 
   /**
    * Creates directory with keyName as the absolute path for the directory.
@@ -1507,4 +1527,31 @@ public interface ClientProtocol {
   void deleteObjectTagging(String volumeName, String bucketName, String keyName)
       throws IOException;
 
+  /**
+   * Gets the tags for an existing bucket.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @return Tags for the specified bucket.
+   * @throws IOException
+   */
+  Map<String, String> getBucketTagging(String volumeName, String bucketName)
+      throws IOException;
+
+  /**
+   * Sets tags on an existing bucket (replaces existing tag set).
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param tags Tags to set on the bucket.
+   * @throws IOException
+   */
+  void putBucketTagging(String volumeName, String bucketName,
+      Map<String, String> tags) throws IOException;
+
+  /**
+   * Removes all tags from the specified bucket.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @throws IOException
+   */
+  void deleteBucketTagging(String volumeName, String bucketName) throws IOException;
 }

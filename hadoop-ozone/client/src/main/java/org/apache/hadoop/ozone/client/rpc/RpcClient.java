@@ -2274,13 +2274,14 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public OzoneFileStatus getOzoneFileStatus(String volumeName,
-      String bucketName, String keyName) throws IOException {
+      String bucketName, String keyName, boolean headOp) throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
+        .setHeadOp(headOp)
         .build();
     return ozoneManagerClient.getFileStatus(keyArgs);
   }
@@ -2892,6 +2893,55 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .build();
     ozoneManagerClient.deleteObjectTagging(keyArgs);
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging(String volumeName, String bucketName)
+      throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 bucket tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs bucketArgs = new OmBucketArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+    return ozoneManagerClient.getBucketTagging(bucketArgs);
+  }
+
+  @Override
+  public void putBucketTagging(String volumeName, String bucketName,
+      Map<String, String> tags) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 bucket tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs bucketArgs = new OmBucketArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .addAllTags(tags)
+        .build();
+    ozoneManagerClient.putBucketTagging(bucketArgs);
+  }
+
+  @Override
+  public void deleteBucketTagging(String volumeName, String bucketName)
+      throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+      throw new IOException("OzoneManager does not support S3 bucket tagging API");
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs bucketArgs = new OmBucketArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+    ozoneManagerClient.deleteBucketTagging(bucketArgs);
   }
 
   private static ExecutorService createThreadPoolExecutor(

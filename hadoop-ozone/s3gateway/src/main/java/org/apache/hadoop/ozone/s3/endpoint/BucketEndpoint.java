@@ -106,7 +106,8 @@ public class BucketEndpoint extends BucketOperationHandler {
   @Override
   Response handleGetRequest(S3RequestContext context, String bucketName) throws IOException, OS3Exception {
     final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
-    final String delimiter = queryParams().get(QueryParams.DELIMITER);
+    final String delimiter = queryParams().containsKey(QueryParams.DELIMITER) ?
+        queryParams().get(QueryParams.DELIMITER) : null;
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
     final String marker = queryParams().get(QueryParams.MARKER);
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
@@ -114,7 +115,11 @@ public class BucketEndpoint extends BucketOperationHandler {
     String startAfter = queryParams().get(QueryParams.START_AFTER);
 
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
-    ContinueToken decodedToken = ContinueToken.decodeFromString(continueToken);
+    // AWS S3 treats an empty continuation-token as no token: list from the
+    // start and echo the empty token back (see setContinueToken below).
+    ContinueToken decodedToken =
+        (continueToken == null || continueToken.isEmpty())
+            ? null : ContinueToken.decodeFromString(continueToken);
     OzoneBucket bucket = null;
 
     try {
@@ -127,7 +132,7 @@ public class BucketEndpoint extends BucketOperationHandler {
 
       // If continuation token and start after both are provided, then we
       // ignore start After
-      String prevKey = continueToken != null ? decodedToken.getLastKey()
+      String prevKey = decodedToken != null ? decodedToken.getLastKey()
           : startAfter;
 
       // If shallow is true, only list immediate children
@@ -157,15 +162,16 @@ public class BucketEndpoint extends BucketOperationHandler {
     if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
     }
-
     // If you specify the encoding-type request parameter,should return
-    // encoded key name values in the following response elements:
-    //   Delimiter, Prefix, Key, and StartAfter.
+    // encoded key name values in the following response elements: Delimiter, Prefix, Key, and StartAfter
     //
     // For detail refer:
     // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html#AmazonS3-ListObjectsV2-response-EncodingType
     ListObjectResponse response = new ListObjectResponse();
-    response.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
+    // AWS omits Delimiter from the response when the client passes delimiter= or does not specify delimiter at all.
+    if (StringUtils.isNotEmpty(delimiter)) {
+      response.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
+    }
     response.setName(bucketName);
     response.setPrefix(EncodingTypeObject.createNullable(prefix, encodingType));
     response.setMarker(marker == null ? "" : marker);
@@ -175,7 +181,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     response.setContinueToken(continueToken);
     response.setStartAfter(EncodingTypeObject.createNullable(startAfter, encodingType));
 
-    String prevDir = continueToken != null ? decodedToken.getLastDir() : null;
+    String prevDir = decodedToken != null ? decodedToken.getLastDir() : null;
     String lastKey = null;
     int count = 0;
     if (maxKeys > 0) {
@@ -424,6 +430,7 @@ public class BucketEndpoint extends BucketOperationHandler {
         .add(new BucketGetLocationHandler())
         .add(new BucketAclHandler())
         .add(new ListMultipartUploadsHandler())
+        .add(new BucketTaggingHandler())
         .add(new BucketCrudHandler())
         .add(this)
         .build();
