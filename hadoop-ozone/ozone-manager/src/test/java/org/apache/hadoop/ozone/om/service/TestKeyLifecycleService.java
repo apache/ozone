@@ -22,7 +22,13 @@ import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.OzoneTrashPolicy.CURRENT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
@@ -3438,6 +3444,65 @@ class TestKeyLifecycleService extends OzoneTestBase {
     assertFalse(overList.isFull());
     assertEquals(0, overList.size());
     assertEquals(0, overList.getPartCount());
+  }
+
+  /**
+   * Regression test: KeyLifecycleService must delete keys even when ozone.acl.enabled=true.
+   * Before the fix, sendDeleteKeysRequestAndClearList submitted DeleteKeys requests without
+   * userInfo (missing preExecute / ugi.doAs), causing UNAUTHORIZED when resolveBucketLink
+   * called createUGIForApi() on the blank-userName request. Uses OBJECT_STORE layout because
+   * that path calls sendDeleteKeysRequestAndClearList directly (not via moveToTrash).
+   */
+  @Nested
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  class WithAclsEnabled {
+
+    @BeforeAll
+    void setup(@TempDir File testDir) throws Exception {
+      scmBlockTestingClient = new ScmBlockLocationTestingClient(null, null, 0);
+      createConfig(testDir);
+      conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
+      conf.setBoolean(OZONE_ACL_ENABLED, true);
+      conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+      conf.setStrings(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+      createSubject();
+      keyDeletingService.suspend();
+      directoryDeletingService.suspend();
+    }
+
+    @AfterAll
+    void cleanup() {
+      if (om != null) {
+        om.stop();
+        om.join();
+      }
+    }
+
+    @Test
+    void testLifecycleDeleteSucceedsWithAclsEnabled()
+        throws IOException, TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(OBJECT_STORE);
+
+      List<OmKeyArgs> keyList = createKeys(volumeName, bucketName, OBJECT_STORE,
+          KEY_COUNT, 1, "key", null);
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(
+          () -> getKeyCount(OBJECT_STORE) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, "key", null, date.toString(), true);
+
+      GenericTestUtils.waitFor(
+          () -> (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(0, getKeyCount(OBJECT_STORE) - initialKeyCount,
+          "Keys should be deleted by lifecycle service but were not — "
+              + "possible UNAUTHORIZED from missing userInfo in DeleteKeys request");
+    }
   }
 
   private static void addSplitSchemaPart(OMMetadataManager omMetadataManager,
