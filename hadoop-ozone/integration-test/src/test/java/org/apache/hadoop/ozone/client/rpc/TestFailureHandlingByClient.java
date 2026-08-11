@@ -61,7 +61,7 @@ import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -384,7 +384,7 @@ public class TestFailureHandlingByClient {
       containerIdList.add(containerId);
 
       // below check will assert if the container does not get closed
-      TestHelper
+      OzoneTestHelper
           .waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
 
       // This write will hit ClosedContainerException and this container should
@@ -437,7 +437,7 @@ public class TestFailureHandlingByClient {
         .getFixedLengthString(keyString, chunkSize);
 
     BlockID blockId;
-    try (OzoneOutputStream key = TestHelper.createKey(keyName, RATIS, blockSize, localObjectStore, volumeName,
+    try (OzoneOutputStream key = OzoneTestHelper.createKey(keyName, RATIS, blockSize, localObjectStore, volumeName,
         bucketName)) {
       // get the name of a valid container
       KeyOutputStream keyOutputStream =
@@ -492,7 +492,7 @@ public class TestFailureHandlingByClient {
         keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0)
             .getBlockID(), blockId);
     assertEquals(3L * data.getBytes(UTF_8).length, keyInfo.getDataSize());
-    TestHelper.validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8),
+    OzoneTestHelper.validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8),
             localObjectStore, volumeName, bucketName);
     IOUtils.closeQuietly(localClient);
   }
@@ -558,12 +558,12 @@ public class TestFailureHandlingByClient {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
-    return TestHelper
+    return OzoneTestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    TestHelper
+    OzoneTestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

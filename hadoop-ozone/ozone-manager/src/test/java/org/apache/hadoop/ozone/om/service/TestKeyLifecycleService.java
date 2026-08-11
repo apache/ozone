@@ -23,6 +23,7 @@ import static org.apache.hadoop.fs.ozone.OzoneTrashPolicy.CURRENT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
@@ -31,6 +32,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVIC
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
@@ -50,10 +52,12 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
@@ -77,6 +81,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -115,12 +120,16 @@ import org.apache.hadoop.ozone.om.helpers.OmLifecycleRuleAndOperator;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -146,6 +155,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -3339,5 +3349,121 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
   public static String uniqueObjectName(String prefix) {
     return prefix + OBJECT_COUNTER.getAndIncrement();
+  }
+
+  @Test
+  public void testPartCountIoExceptionSkipsUploadContinuesBucket(@TempDir File tempDir)
+      throws Exception {
+    OzoneConfiguration omConf = new OzoneConfiguration();
+    omConf.set(OZONE_OM_DB_DIRS, tempDir.getAbsolutePath());
+    OMMetadataManager realMetadataManager = new OmMetadataManagerImpl(omConf, null);
+    try {
+      String uploadA = OMMultipartUploadUtils.getMultipartUploadId();
+      String uploadB = OMMultipartUploadUtils.getMultipartUploadId();
+      String uploadC = OMMultipartUploadUtils.getMultipartUploadId();
+
+      addSplitSchemaPart(realMetadataManager, uploadA, 1);
+      addSplitSchemaPart(realMetadataManager, uploadA, 2);
+      addSplitSchemaPart(realMetadataManager, uploadC, 1);
+
+      // Spy only the lightweight parts table and inject an IOException for
+      // uploadB's prefix scan to simulate a corrupt read; uploadA and uploadC
+      // fall through to the real table with real data. doThrow(...).when(...)
+      // is used (not when(...).thenThrow(...)) so the real iterator() is not
+      // invoked during stubbing, which would leak a native RocksDB iterator
+      // and block getStore().close().
+      Table<OmMultipartPartKey, OmMultipartPartInfo> spyPartsTable =
+          Mockito.spy(realMetadataManager.getMultipartPartsTable());
+      Mockito.doThrow(new RocksDatabaseException("simulated corruption"))
+          .when(spyPartsTable).iterator(eq(OmMultipartPartKey.prefix(uploadB)));
+
+      OMMetadataManager mockMM = Mockito.mock(OMMetadataManager.class);
+      when(mockMM.getMultipartPartsTable()).thenReturn(spyPartsTable);
+
+      assertEquals(2, OMMultipartUploadUtils.countParts(mockMM, uploadA));
+      assertEquals(1, OMMultipartUploadUtils.countParts(mockMM, uploadC));
+      assertThrows(IOException.class,
+          () -> OMMultipartUploadUtils.countParts(mockMM, uploadB));
+
+      KeyLifecycleService.PartCountLimitedList list =
+          new KeyLifecycleService.PartCountLimitedList(10);
+      for (String uploadId : Arrays.asList(uploadA, uploadB, uploadC)) {
+        try {
+          int partCount = OMMultipartUploadUtils.countParts(mockMM, uploadId);
+          list.add(new OmMultipartUpload("v", "b", "k", uploadId), partCount);
+        } catch (IOException e) {
+          // per-MPU skip — bucket loop continues
+        }
+      }
+      // A (2 parts) and C (1 part) are added; B is skipped due to IOException
+      assertEquals(2, list.size()); // uploadA and uploadC only
+      assertEquals(3, list.getPartCount()); // 2 (uploadA) + 1 (uploadC)
+    } finally {
+      realMetadataManager.getStore().close();
+    }
+  }
+
+  @Test
+  public void testPartCountLimitedListBoundaryBehavior() {
+    // Zero-parts upload is addable and does not fill the list
+    KeyLifecycleService.PartCountLimitedList list =
+        new KeyLifecycleService.PartCountLimitedList(5);
+    list.add(new OmMultipartUpload("v", "b", "k", "id1"), 0);
+    assertEquals(1, list.size());
+    assertEquals(0, list.getPartCount());
+    assertFalse(list.isFull());
+    assertFalse(list.isEmpty());
+
+    // Exact boundary: partCount == maxPartCount triggers isFull
+    KeyLifecycleService.PartCountLimitedList exactList =
+        new KeyLifecycleService.PartCountLimitedList(5);
+    exactList.add(new OmMultipartUpload("v", "b", "k", "id2"), 5);
+    assertEquals(1, exactList.size());
+    assertEquals(5, exactList.getPartCount());
+    assertTrue(exactList.isFull());
+
+    // Over boundary: cumulative parts exceed max
+    KeyLifecycleService.PartCountLimitedList overList =
+        new KeyLifecycleService.PartCountLimitedList(5);
+    overList.add(new OmMultipartUpload("v", "b", "k", "id3"), 3);
+    assertFalse(overList.isFull());
+    overList.add(new OmMultipartUpload("v", "b", "k", "id4"), 3);
+    assertTrue(overList.isFull());
+    assertEquals(2, overList.size());
+    assertEquals(6, overList.getPartCount());
+
+    // clear() resets all state
+    overList.clear();
+    assertTrue(overList.isEmpty());
+    assertFalse(overList.isFull());
+    assertEquals(0, overList.size());
+    assertEquals(0, overList.getPartCount());
+  }
+
+  private static void addSplitSchemaPart(OMMetadataManager omMetadataManager,
+      String uploadId, int partNumber) throws IOException {
+    OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(1L, partNumber))
+        .setLength(100)
+        .build();
+    OmKeyLocationInfoGroup locationGroup = new OmKeyLocationInfoGroup(0,
+        Collections.singletonList(locationInfo));
+    String partName = "part-" + partNumber;
+    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setVolumeName("v")
+        .setBucketName("b")
+        .setKeyName("k")
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setDataSize(100L)
+        .setCreationTime(System.currentTimeMillis())
+        .setModificationTime(System.currentTimeMillis())
+        .setObjectID(partNumber)
+        .setUpdateID(partNumber)
+        .addOmKeyLocationInfoGroup(locationGroup)
+        .addMetadata(ETAG, "etag-" + partNumber)
+        .build();
+    OmMultipartPartInfo partInfo = OmMultipartPartInfo.from(partName, partNumber, keyInfo);
+    omMetadataManager.getMultipartPartsTable().put(
+        OmMultipartPartKey.of(uploadId, partNumber), partInfo);
   }
 }

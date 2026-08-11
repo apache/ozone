@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -370,4 +372,27 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return Background service.
    */
   KeyLifecycleService getKeyLifecycleService();
+
+  /**
+   * Sort the datanodes of a write pipeline by network-topology distance to the
+   * client, using OM's locally cached cluster map. Unlike the read-path sort,
+   * the original order is preserved when the client cannot be resolved, because
+   * the first node is used as the streaming-write primary.
+   *
+   * @param nodes the pipeline nodes to sort
+   * @param clientMachine client address (IP or hostname)
+   * @param clusterMap OM's cached cluster map used to resolve topology distance
+   * @return nodes sorted nearest-first, or the original {@code nodes} list
+   *     instance unchanged when sorting is skipped (client unresolved or stale
+   *     topology); callers may use reference equality to detect a skipped sort
+   */
+  List<? extends DatanodeDetails> sortDatanodesForWrite(
+      List<? extends DatanodeDetails> nodes, String clientMachine, NetworkTopology clusterMap);
+
+  /**
+   * @return true if OM should sort the streaming-write pipeline locally
+   *     ({@code ozone.om.block.write.sort.datanodes.enabled}); false to leave
+   *     the sort to SCM.
+   */
+  boolean isSortDatanodesForWriteEnabled();
 }
