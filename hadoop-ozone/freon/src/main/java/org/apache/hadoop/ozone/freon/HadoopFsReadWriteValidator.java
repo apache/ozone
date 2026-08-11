@@ -98,7 +98,7 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
   private Timer readTimer;
 
   private final ThreadLocal<ThreadHistory> threadHistory =
-      ThreadLocal.withInitial(() -> new ThreadHistory(maxTrackedFiles));
+      ThreadLocal.withInitial(() -> new ThreadHistory(maxTrackedFiles, getThreadSequenceId()));
 
   @Override
   public Void call() throws Exception {
@@ -199,16 +199,24 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
    */
   private static final class ThreadHistory {
     private final int maxTracked;
-    private long markerSeq;
+    private final long markerBase;
+    private int markerSeq;
     private final Map<Path, Long> checksums = new HashMap<>();
     private final List<Path> paths = new ArrayList<>();
 
-    private ThreadHistory(int maxTracked) {
+    private ThreadHistory(int maxTracked, long threadSequenceId) {
       this.maxTracked = maxTracked;
+      this.markerBase = threadSequenceId << Integer.SIZE;
     }
 
+    /**
+     * Marker for the next write of this thread. The thread sequence id occupies
+     * the high half so that no two threads ever write the same content, while
+     * successive writes of one thread differ in the low half only, which is
+     * what keeps their CRC32 distinct.
+     */
     private long nextMarker() {
-      return markerSeq++;
+      return markerBase | Integer.toUnsignedLong(markerSeq++);
     }
 
     private void record(Path path, long checksum) {

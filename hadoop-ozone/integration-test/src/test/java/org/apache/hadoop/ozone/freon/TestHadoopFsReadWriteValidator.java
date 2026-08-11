@@ -22,8 +22,16 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
+import java.util.zip.CRC32;
+import java.util.zip.CheckedInputStream;
+import java.util.zip.Checksum;
+import org.apache.commons.io.output.NullOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -93,11 +101,27 @@ public abstract class TestHadoopFsReadWriteValidator implements NonHATests.TestC
       FileStatus[] files =
           fileSystem.listStatus(new Path(rootPath + "/" + prefix));
       assertEquals(fileCount, files.length, "Unexpected number of files");
+      Set<Long> checksums = new HashSet<>();
       for (FileStatus file : files) {
         assertEquals(fileSize, file.getLen(),
             "Unexpected file size: " + file.getPath());
+        checksums.add(checksumOf(fileSystem, file.getPath()));
       }
+      // distinct content across threads, otherwise reading the wrong file would
+      // still validate
+      assertEquals(fileCount, checksums.size(), "Files share their content");
     }
+  }
+
+  private static long checksumOf(FileSystem fileSystem, Path file)
+      throws IOException {
+    Checksum checksum = new CRC32();
+    try (InputStream input =
+        new CheckedInputStream(fileSystem.open(file), checksum)) {
+      // not the hdds IOUtils imported above for closeQuietly
+      org.apache.commons.io.IOUtils.copyLarge(input, NullOutputStream.INSTANCE);
+    }
+    return checksum.getValue();
   }
 
   /**
