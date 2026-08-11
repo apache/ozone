@@ -2477,7 +2477,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         () -> s3Client.putBucketLifecycleConfiguration(b -> b
             .bucket(nonExistentBucket)
             .lifecycleConfiguration(validConfig)));
-    assertEquals(404, exception2.statusCode());
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, exception2.statusCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), exception2.awsErrorDetails().errorCode());
   }
 
@@ -2487,8 +2487,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     s3Client.createBucket(b -> b.bucket(bucketName));
 
     // Test delete lifecycle for a bucket, while it doesn't have lifecycle
-    assertThrows(S3Exception.class,
+    S3Exception noConfig = assertThrows(S3Exception.class,
         () -> s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, noConfig.statusCode());
+    assertEquals(S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION.getCode(), noConfig.awsErrorDetails().errorCode());
     // Idempotent delete: no exception expected even without an existing config
     s3Client.deleteBucketLifecycle(b -> b.bucket(bucketName));
 
@@ -2512,12 +2514,16 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(1, response.rules().size());
     // Delete the lifecycle configuration
     s3Client.deleteBucketLifecycle(b -> b.bucket(bucketName));
-    assertThrows(S3Exception.class,
+    S3Exception afterDelete = assertThrows(S3Exception.class,
         () -> s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, afterDelete.statusCode());
+    assertEquals(S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION.getCode(), afterDelete.awsErrorDetails().errorCode());
     // Test delete on non-existent bucket
     final String nonExistentBucket = getBucketName("nonexistent");
-    assertThrows(S3Exception.class,
+    S3Exception noBucket = assertThrows(S3Exception.class,
         () -> s3Client.deleteBucketLifecycle(b -> b.bucket(nonExistentBucket)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, noBucket.statusCode());
+    assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), noBucket.awsErrorDetails().errorCode());
   }
 
   @Test
@@ -2526,8 +2532,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     s3Client.createBucket(b -> b.bucket(bucketName));
 
     // Test get on bucket without lifecycle configuration
-    assertThrows(S3Exception.class,
+    S3Exception noConfig = assertThrows(S3Exception.class,
         () -> s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, noConfig.statusCode());
+    assertEquals(S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION.getCode(), noConfig.awsErrorDetails().errorCode());
 
     // Create a comprehensive lifecycle configuration
     LifecycleRule rule1 = LifecycleRule.builder()
