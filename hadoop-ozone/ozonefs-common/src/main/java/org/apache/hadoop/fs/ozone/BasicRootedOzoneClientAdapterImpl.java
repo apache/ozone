@@ -760,9 +760,15 @@ public class BasicRootedOzoneClientAdapterImpl
             }
           } else {
             Path userTrash = new Path(trashRoot, username);
-            if (fs.exists(userTrash) &&
-                fs.getFileStatus(userTrash).isDirectory()) {
-              ret.add(fs.getFileStatus(userTrash));
+            // Fetch the status once instead of exists() + two getFileStatus()
+            // calls for the same path.
+            try {
+              FileStatus userTrashStatus = fs.getFileStatus(userTrash);
+              if (userTrashStatus.isDirectory()) {
+                ret.add(userTrashStatus);
+              }
+            } catch (FileNotFoundException ignored) {
+              // No trash root for this user.
             }
           }
         }

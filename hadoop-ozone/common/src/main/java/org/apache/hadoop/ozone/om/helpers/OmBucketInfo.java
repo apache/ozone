@@ -397,6 +397,31 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   }
 
   /**
+   * Returns a copy of this bucket with operational properties taken from
+   * {@code source}. Link identity fields (volume, name, owner, source path,
+   * ACLs, timestamps, object/update IDs) are unchanged.
+   *
+   * <p>When adding new operational bucket fields, update this method if they
+   * should be resolved from a link's source bucket.
+   */
+  public OmBucketInfo withOperationalPropertiesFrom(OmBucketInfo source) {
+    return toBuilder()
+        .setDefaultReplicationConfig(source.getDefaultReplicationConfig())
+        .setIsVersionEnabled(source.getIsVersionEnabled())
+        .setStorageType(source.getStorageType())
+        .setQuotaInBytes(source.getQuotaInBytes())
+        .setQuotaInNamespace(source.getQuotaInNamespace())
+        .setUsedBytes(source.getUsedBytes())
+        .setUsedNamespace(source.getUsedNamespace())
+        .setSnapshotUsedBytes(source.getSnapshotUsedBytes())
+        .setSnapshotUsedNamespace(source.getSnapshotUsedNamespace())
+        .addAllMetadata(source.getMetadata())
+        .setBucketLayout(source.getBucketLayout())
+        .setTags(source.getTags())
+        .build();
+  }
+
+  /**
    * Builder for OmBucketInfo.
    */
   public static class Builder extends WithObjectID.Builder<OmBucketInfo> {

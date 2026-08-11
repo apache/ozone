@@ -35,12 +35,14 @@ import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigString
 import static org.apache.hadoop.net.ServerSocketUtil.getPort;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -262,7 +264,9 @@ public final class TestDelegationToken {
    * 3. Client can authenticate using token.
    * 4. Delegation token renewal without Kerberos auth fails.
    * 5. Test success of token cancellation.
-   * 5. Test failure of token cancellation.
+   * 6. Test failure of token cancellation.
+   * 7. Test delegation token renewal failures (expired maxDate, non-matching
+   *    renewer, tampered token).
    */
   @ParameterizedTest
   @MethodSource("options")
@@ -276,6 +280,10 @@ public final class TestDelegationToken {
     LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.class);
     GenericTestUtils.setLogLevel(Server.class, INFO);
     SecurityUtil.setTokenServiceUseIp(useIp);
+
+    // Generous token lifetime so the renewal-failure cases below do not race
+    // token expiry.
+    conf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, 60 * 1000L);
 
     // Setup secure OM for start
     setupOm(conf);
@@ -398,10 +406,66 @@ public final class TestDelegationToken {
       assertEquals(TOKEN_ERROR_OTHER, ex.getResult());
       assertThat(ex.getMessage()).contains("Cancel delegation token failed");
       assertThat(logs.getOutput()).contains("Auth failed for");
+
+      // Case 7: Delegation token renewal failures.
+      assertDelegationTokenRenewalFailures(ugi, omLogs);
     } finally {
       om.stop();
       om.join();
     }
+  }
+
+  /**
+   * Exercises the delegation token renewal failure paths against the running
+   * OM. Reconnects via Kerberos and seeds a fresh token, then verifies renewal
+   * fails for an expired maxDate, a non-matching renewer, and a tampered token.
+   */
+  private void assertDelegationTokenRenewalFailures(
+      UserGroupInformation ugi, LogCapturer omLogs) throws Exception {
+    omClient.close();
+    UserGroupInformation.setLoginUser(ugi);
+    omClient = new OzoneManagerProtocolClientSideTranslatorPB(
+        OmTransportFactory.create(conf, ugi, null),
+        RandomStringUtils.secure().nextAscii(5));
+    Token<OzoneTokenIdentifier> seedToken =
+        omClient.getDelegationToken(new Text("om"));
+
+    // 1. When token maxExpiryTime exceeds (maxDate in the past).
+    OzoneTokenIdentifier expiredId = OzoneTokenIdentifier.readProtoBuf(
+        seedToken.getIdentifier());
+    expiredId.setMaxDate(System.currentTimeMillis() - 1000);
+    Token<OzoneTokenIdentifier> expiredToken = new Token<>(
+        expiredId.getBytes(), seedToken.getPassword(), seedToken.getKind(),
+        seedToken.getService());
+    OMException ex = assertThrows(OMException.class,
+        () -> omClient.renewDelegationToken(expiredToken));
+    assertEquals(TOKEN_EXPIRED, ex.getResult());
+    omLogs.clearOutput();
+
+    // 2. When renewer doesn't match (implicitly covers when renewer is
+    // null or empty).
+    Token<OzoneTokenIdentifier> token2 = omClient.getDelegationToken(
+        new Text("randomService"));
+    assertNotNull(token2);
+    ex = assertThrows(OMException.class,
+        () -> omClient.renewDelegationToken(token2));
+    assertThat(ex).hasMessageContaining("Delegation token renewal failed");
+    assertThat(omLogs.getOutput()).contains(" with non-matching renewer randomService");
+    omLogs.clearOutput();
+
+    // 3. Tampered token that can't be found in cache.
+    OzoneTokenIdentifier tokenId = OzoneTokenIdentifier.readProtoBuf(
+        seedToken.getIdentifier());
+    tokenId.setRenewer(new Text("om"));
+    tokenId.setMaxDate(System.currentTimeMillis() * 2);
+    Token<OzoneTokenIdentifier> tamperedToken = new Token<>(
+        tokenId.getBytes(), token2.getPassword(), token2.getKind(),
+        token2.getService());
+    ex = assertThrows(OMException.class,
+        () -> omClient.renewDelegationToken(tamperedToken));
+    assertThat(ex).hasMessageContaining("Delegation token renewal failed");
+    assertThat(omLogs.getOutput()).contains("can't be found in cache");
+    omLogs.clearOutput();
   }
 
   private void generateKeyPair() throws Exception {

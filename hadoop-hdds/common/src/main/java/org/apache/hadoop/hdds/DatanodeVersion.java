@@ -36,6 +36,8 @@ public enum DatanodeVersion implements ComponentVersion {
   STREAM_BLOCK_SUPPORT(3,
       "This version has support for reading a block by streaming chunks."),
 
+  SHORT_CIRCUIT_READS(4, "Version with short-circuit read support."),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 
