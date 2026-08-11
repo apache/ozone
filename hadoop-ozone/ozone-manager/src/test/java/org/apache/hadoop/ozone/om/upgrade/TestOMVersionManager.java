@@ -213,6 +213,26 @@ class TestOMVersionManager extends AbstractComponentVersionManagerTest {
     }
   }
 
+  @Test
+  public void testGetVersionForClientWhenFinalized() throws Exception {
+    // Apparent version >= ZDU (finalized) reports the apparent version itself.
+    try (OMVersionManager versionManager = createManager(ZDU.serialize())) {
+      assertEquals(ZDU, versionManager.getVersionForClient());
+    }
+
+    try (OMVersionManager versionManager = createManager(SOFTWARE_VERSION.serialize())) {
+      assertEquals(SOFTWARE_VERSION, versionManager.getVersionForClient());
+    }
+  }
+
+  @Test
+  public void testGetVersionForClientWhenPreZdu() throws Exception {
+    // A pre-ZDU apparent version clamps to the last pre-ZDU client version.
+    try (OMVersionManager versionManager = createManager(INITIAL_VERSION.serialize())) {
+      assertEquals(OzoneManagerVersion.S3_BUCKET_TAGGING_API, versionManager.getVersionForClient());
+    }
+  }
+
   private OMStorage newOmStorage(int apparentVersion)
       throws IOException {
     // Reinitialize the configuration to point to a new unique storage location.

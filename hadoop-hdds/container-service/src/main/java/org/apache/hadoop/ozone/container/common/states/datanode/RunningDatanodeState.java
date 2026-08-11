@@ -157,7 +157,6 @@ public class RunningDatanodeState implements DatanodeState {
       return HeartbeatEndpointTask.newBuilder()
           .setConfig(conf)
           .setEndpointStateMachine(endpoint)
-          .setDatanodeDetails(context.getParent().getDatanodeDetails())
           .setContext(context)
           .build();
     default:

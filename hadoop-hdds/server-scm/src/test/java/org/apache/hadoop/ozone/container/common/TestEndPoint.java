@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeleteBlocksCommandProto;
@@ -619,8 +618,6 @@ public class TestEndPoint {
         randomDatanodeDetails(), conf);
         EndpointStateMachine rpcEndPoint =
             createEndpoint(conf, scmAddress, rpcTimeout)) {
-      HddsProtos.DatanodeDetailsProto datanodeDetailsProto =
-          randomDatanodeDetails().getProtoBufMessage();
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
 
       final StateContext stateContext =
@@ -629,9 +626,7 @@ public class TestEndPoint {
 
       HeartbeatEndpointTask endpointTask =
           new HeartbeatEndpointTask(rpcEndPoint, conf, stateContext);
-      endpointTask.setDatanodeDetailsProto(datanodeDetailsProto);
       endpointTask.call();
-      assertNotNull(endpointTask.getDatanodeDetailsProto());
 
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndPoint.getState());
       return stateContext;

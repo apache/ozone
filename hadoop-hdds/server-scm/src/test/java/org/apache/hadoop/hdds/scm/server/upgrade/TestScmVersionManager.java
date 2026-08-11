@@ -58,7 +58,6 @@ import org.apache.hadoop.hdds.upgrade.ScmUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.ScmUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.AbstractComponentVersionManagerTest;
 import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
-import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,7 +99,7 @@ class TestScmVersionManager extends AbstractComponentVersionManagerTest {
   }
 
   @Override
-  protected ComponentVersionManager createManager(int serializedApparentVersion) throws IOException {
+  protected ScmVersionManager createManager(int serializedApparentVersion) throws IOException {
     return createManager(serializedApparentVersion, HashMap::new);
   }
 
@@ -218,6 +217,26 @@ class TestScmVersionManager extends AbstractComponentVersionManagerTest {
       assertEquals(INITIAL_VERSION, versionManager.getApparentVersion());
       assertEquals(INITIAL_VERSION.serialize(), versionManager.getPersistedApparentVersion());
       assertEquals(INITIAL_VERSION.serialize(), storage.getApparentVersion());
+    }
+  }
+
+  @Test
+  public void testGetVersionForClientWhenFinalized() throws Exception {
+    // Apparent version >= ZDU (finalized) reports the apparent version itself.
+    try (ScmVersionManager versionManager = createManager(HDDSVersion.ZDU.serialize())) {
+      assertEquals(HDDSVersion.ZDU, versionManager.getVersionForClient());
+    }
+
+    try (ScmVersionManager versionManager = createManager(HDDSVersion.SOFTWARE_VERSION.serialize())) {
+      assertEquals(HDDSVersion.SOFTWARE_VERSION, versionManager.getVersionForClient());
+    }
+  }
+
+  @Test
+  public void testGetVersionForClientWhenPreZdu() throws Exception {
+    // A pre-ZDU apparent version clamps to the last pre-ZDU wire version.
+    try (ScmVersionManager versionManager = createManager(INITIAL_VERSION.serialize())) {
+      assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT, versionManager.getVersionForClient());
     }
   }
 
