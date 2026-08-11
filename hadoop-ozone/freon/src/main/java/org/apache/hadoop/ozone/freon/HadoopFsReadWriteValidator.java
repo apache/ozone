@@ -70,18 +70,18 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
   @Option(names = {"-s", "--size"},
       description = "Size of the generated files. " +
           StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
-      defaultValue = "10KB",
+      defaultValue = "16KB",
       converter = StorageSizeConverter.class)
   private StorageSize fileSize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used to generate the file content.",
-      defaultValue = "10240")
+      defaultValue = "16384")
   private int bufferSize;
 
   @Option(names = {"--copy-buffer"},
       description = "Size of bytes written to or read from the file in one operation.",
-      defaultValue = "4096")
+      defaultValue = "16384")
   private int copyBufferSize;
 
   @Option(names = {"--max-tracked-files"},
