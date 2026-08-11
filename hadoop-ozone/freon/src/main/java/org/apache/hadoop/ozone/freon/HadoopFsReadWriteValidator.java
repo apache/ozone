@@ -84,13 +84,6 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       defaultValue = "16384")
   private int copyBufferSize;
 
-  @Option(names = {"--max-tracked-files"},
-      description = "Maximum number of files a thread keeps the checksum of, and can therefore read back. Once a "
-          + "thread writes more distinct files than this, validation covers a moving sample of its writes; the "
-          + "files dropped from the sample stay on the file system.",
-      defaultValue = "10000")
-  private int maxTrackedFiles;
-
   private ContentGenerator contentGenerator;
 
   private Timer writeTimer;
@@ -98,7 +91,7 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
   private Timer readTimer;
 
   private final ThreadLocal<ThreadHistory> threadHistory =
-      ThreadLocal.withInitial(() -> new ThreadHistory(maxTrackedFiles, getThreadSequenceId()));
+      ThreadLocal.withInitial(() -> new ThreadHistory(getThreadSequenceId()));
 
   @Override
   public Void call() throws Exception {
@@ -111,9 +104,6 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     if (bufferSize <= 0 || copyBufferSize <= 0) {
       throw new IllegalArgumentException(
           "--buffer and --copy-buffer must be positive");
-    }
-    if (maxTrackedFiles <= 0) {
-      throw new IllegalArgumentException("--max-tracked-files must be positive");
     }
 
     FileSystem fileSystem = getFileSystem();
@@ -143,10 +133,11 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     long marker = history.nextMarker();
 
     long checksum = writeTimer.time(() -> writeFile(file, marker));
-    history.record(file, checksum);
+    history.record(counter, checksum);
 
-    Path target = history.randomPath();
-    long expected = history.checksumOf(target);
+    long readCounter = history.randomCounter();
+    Path target = objectPath(readCounter);
+    long expected = history.checksumOf(readCounter);
     long actual = readTimer.time(() -> readChecksum(target));
 
     if (expected != actual) {
@@ -193,19 +184,19 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
 
   /**
    * Per-thread record of the files written and the latest checksum of each.
-   * Paths are reused across a run, so it is keyed by path (an overwrite updates
-   * the checksum) and stays naturally bounded, with --max-tracked-files as the
-   * hard cap for very large runs.
+   * Freon reuses its counters across a run, so it is keyed by counter (an
+   * overwrite updates the checksum) and holds one entry per file the thread
+   * wrote. The counter is kept rather than the {@link Path} it maps to, which
+   * {@link #objectPath} rebuilds on demand, so the entries stay small enough to
+   * cover every file even for very large runs.
    */
   private static final class ThreadHistory {
-    private final int maxTracked;
     private final long markerBase;
     private int markerSeq;
-    private final Map<Path, Long> checksums = new HashMap<>();
-    private final List<Path> paths = new ArrayList<>();
+    private final Map<Long, Long> checksums = new HashMap<>();
+    private final List<Long> counters = new ArrayList<>();
 
-    private ThreadHistory(int maxTracked, long threadSequenceId) {
-      this.maxTracked = maxTracked;
+    private ThreadHistory(long threadSequenceId) {
       this.markerBase = threadSequenceId << Integer.SIZE;
     }
 
@@ -219,25 +210,19 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       return markerBase | Integer.toUnsignedLong(markerSeq++);
     }
 
-    private void record(Path path, long checksum) {
-      if (checksums.put(path, checksum) != null) {
-        return;                        // existing path, checksum just updated
-      }
-      if (paths.size() < maxTracked) {
-        paths.add(path);
-      } else {
-        // Bound memory by dropping a random tracked path (file stays on FS).
-        int idx = ThreadLocalRandom.current().nextInt(paths.size());
-        checksums.remove(paths.set(idx, path));
+    private void record(long counter, long checksum) {
+      Long key = counter;
+      if (checksums.put(key, checksum) == null) {
+        counters.add(key);
       }
     }
 
-    private Path randomPath() {
-      return paths.get(ThreadLocalRandom.current().nextInt(paths.size()));
+    private long randomCounter() {
+      return counters.get(ThreadLocalRandom.current().nextInt(counters.size()));
     }
 
-    private long checksumOf(Path path) {
-      return checksums.get(path);
+    private long checksumOf(long counter) {
+      return checksums.get(counter);
     }
   }
 }
