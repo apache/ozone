@@ -55,6 +55,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.ozone.test.LambdaTestUtils.await;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -87,6 +88,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -114,10 +116,10 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -261,7 +263,7 @@ public abstract class OmSnapshotTests {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBucket);
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBucket);
     if (createLinkedBucket) {
       this.linkedBuckets.put(ozoneBucket.getName(), ozoneBucket.getSourceBucket());
     }
@@ -282,7 +284,7 @@ public abstract class OmSnapshotTests {
     if (createLinkedBucket) {
       String sourceBucketName = linkedBuckets.computeIfAbsent(bucketVal, (k) -> bucketVal + counter.incrementAndGet());
       volume.createBucket(sourceBucketName);
-      TestDataUtil.createLinkedBucket(client, volume.getName(), sourceBucketName, bucketVal);
+      DataTestUtil.createLinkedBucket(client, volume.getName(), sourceBucketName, bucketVal);
       this.linkedBuckets.put(bucketVal, sourceBucketName);
     } else {
       volume.createBucket(bucketVal);
@@ -650,7 +652,7 @@ public abstract class OmSnapshotTests {
    */
   @Test
   public void testSnapDiffHandlingReclaimWithLatestUse() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String testVolumeName = uniqueObjectName("vol");
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -688,7 +690,7 @@ public abstract class OmSnapshotTests {
    */
   @Test
   public void testSnapDiffHandlingReclaimWithPreviousUse() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String testVolumeName = uniqueObjectName("vol");
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -735,7 +737,7 @@ public abstract class OmSnapshotTests {
    */
   @Test
   public void testSnapDiffReclaimWithKeyRecreation() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String testVolumeName = uniqueObjectName("vol");
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -789,7 +791,7 @@ public abstract class OmSnapshotTests {
    */
   @Test
   public void testSnapDiffReclaimWithKeyRename() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String testVolumeName = uniqueObjectName("vol");
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -1669,7 +1671,7 @@ public abstract class OmSnapshotTests {
    */
   @Test
   public void testSnapDiffWithKeyOverwrite() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String testVolumeName = uniqueObjectName("vol");
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -1758,8 +1760,8 @@ public abstract class OmSnapshotTests {
   @Test
   public void testListSnapshotDiffWithInvalidParameters()
       throws Exception {
-    String volume = "vol-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucket = "buck-" + RandomStringUtils.secure().nextNumeric(5);
+    String volume = uniqueObjectName("vol-");
+    String bucket = uniqueObjectName("buck-");
 
     String volErrorMessage = "Volume not found: " + volume;
 
@@ -1781,14 +1783,14 @@ public abstract class OmSnapshotTests {
 
     OzoneBucket ozBucket = ozVolume.getBucket(bucket);
     // Create keys and take snapshots.
-    String key1 = "key-1-" + RandomStringUtils.secure().nextNumeric(5);
+    String key1 = uniqueObjectName("key-1-");
     createFileKey(ozBucket, key1);
-    String snap1 = "snap-1-" + RandomStringUtils.secure().nextNumeric(5);
+    String snap1 = uniqueObjectName("snap-1-");
     createSnapshot(volume, bucket, snap1);
 
-    String key2 = "key-2-" + RandomStringUtils.secure().nextNumeric(5);
+    String key2 = uniqueObjectName("key-2-");
     createFileKey(ozBucket, key2);
-    String snap2 = "snap-2-" + RandomStringUtils.secure().nextNumeric(5);
+    String snap2 = uniqueObjectName("snap-2-");
     createSnapshot(volume, bucket, snap2);
 
     store.snapshotDiff(volume, bucket, snap1, snap2, null, 0,
@@ -2082,8 +2084,8 @@ public abstract class OmSnapshotTests {
   // in_progress when it restarts.
   @Test
   public void testSnapshotDiffWhenOmRestart() throws Exception {
-    String snapshot1 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
-    String snapshot2 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String snapshot1 = uniqueObjectName("snap-");
+    String snapshot2 = uniqueObjectName("snap-");
     createSnapshots(snapshot1, snapshot2);
 
     SnapshotDiffResponse response = store.snapshotDiff(volumeName, bucketName,
@@ -2127,8 +2129,8 @@ public abstract class OmSnapshotTests {
   public void testSnapshotDiffWhenOmRestartAndReportIsPartiallyFetched()
       throws Exception {
     int pageSize = 10;
-    String snapshot1 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
-    String snapshot2 = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String snapshot1 = uniqueObjectName("snap-");
+    String snapshot2 = uniqueObjectName("snap-");
     createSnapshots(snapshot1, snapshot2);
 
     SnapshotDiffReportOzone diffReport = fetchReportPage(volumeName,
@@ -2209,8 +2211,8 @@ public abstract class OmSnapshotTests {
   @Test
   @Slow("HDDS-9299")
   public void testDayWeekMonthSnapshotCreationAndExpiration() throws Exception {
-    String volumeA = "vol-a-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketA = "buc-a-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeA = uniqueObjectName("vol-a-");
+    String bucketA = uniqueObjectName("buc-a-");
     store.createVolume(volumeA);
     OzoneVolume volA = store.getVolume(volumeA);
     createBucket(volA, bucketA);
@@ -2416,10 +2418,10 @@ public abstract class OmSnapshotTests {
   @Test
   public void testSnapshotCompactionDag() throws Exception {
     assumeCanonicalConfig(true);
-    String volume1 = "volume-1-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucket1 = "bucket-1-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucket2 = "bucket-2-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucket3 = "bucket-3-" + RandomStringUtils.secure().nextNumeric(5);
+    String volume1 = uniqueObjectName("volume-1-");
+    String bucket1 = uniqueObjectName("bucket-1-");
+    String bucket2 = uniqueObjectName("bucket-2-");
+    String bucket3 = uniqueObjectName("bucket-3-");
 
     store.createVolume(volume1);
     OzoneVolume ozoneVolume = store.getVolume(volume1);
@@ -3260,18 +3262,21 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         regularPartsKey, regularPart.length, 1, regularMpuInfo.getUploadID())) {
       stream.write(regularPart);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(regularPart));
     }
 
     byte[] streamPart = "stream data".getBytes(UTF_8);
     try (OzoneDataStreamOutput streamOut = bucket.createMultipartStreamKey(
         streamPartsKey, streamPart.length, 1, streamMpuInfo.getUploadID())) {
       streamOut.write(streamPart);
+      streamOut.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(streamPart));
     }
 
     byte[] mixedPart = "mixed data".getBytes(UTF_8);
     try (OzoneOutputStream mixedStream = bucket.createMultipartKey(
         mixedPartsKey, mixedPart.length, 1, mixedMpuInfo.getUploadID())) {
       mixedStream.write(mixedPart);
+      mixedStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(mixedPart));
     }
 
     assertEquals(1,
@@ -3321,14 +3326,17 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream part1Stream = bucket.createMultipartKey(
         partialAbortKey, part1Data.length, 1, partialInfo.getUploadID())) {
       part1Stream.write(part1Data);
+      part1Stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part1Data));
     }
     try (OzoneOutputStream part2Stream = bucket.createMultipartKey(
         partialAbortKey, part2Data.length, 2, partialInfo.getUploadID())) {
       part2Stream.write(part2Data);
+      part2Stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part2Data));
     }
     try (OzoneDataStreamOutput part3Stream = bucket.createMultipartStreamKey(
         partialAbortKey, part3Data.length, 3, partialInfo.getUploadID())) {
       part3Stream.write(part3Data);
+      part3Stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part3Data));
     }
 
     OzoneMultipartUploadPartListParts partsList = bucket.listParts(
@@ -3347,10 +3355,12 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         multiAbortKey1, part1Data.length, 1, multiInfo1.getUploadID())) {
       stream.write(part1Data);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part1Data));
     }
     try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
         multiAbortKey2, part2Data.length, 1, multiInfo2.getUploadID())) {
       stream.write(part2Data);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part2Data));
     }
 
     bucket.abortMultipartUpload(multiAbortKey1, multiInfo1.getUploadID());
@@ -3397,10 +3407,12 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         mpuKey1, regularData1.length, 1, mpuInfo1.getUploadID())) {
       stream.write(regularData1);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(regularData1));
     }
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         mpuKey1, regularData2.length, 2, mpuInfo1.getUploadID())) {
       stream.write(regularData2);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(regularData2));
     }
 
     byte[] streamData1 = "Stream multipart data 1".getBytes(UTF_8);
@@ -3409,10 +3421,12 @@ public abstract class OmSnapshotTests {
     try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
         mpuKey2, streamData1.length, 1, mpuInfo2.getUploadID())) {
       stream.write(streamData1);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(streamData1));
     }
     try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
         mpuKey2, streamData2.length, 2, mpuInfo2.getUploadID())) {
       stream.write(streamData2);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(streamData2));
     }
 
 
@@ -3422,10 +3436,12 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         mpuKey3, mixedRegular.length, 1, mpuInfo3.getUploadID())) {
       stream.write(mixedRegular);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(mixedRegular));
     }
     try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
         mpuKey3, mixedStream.length, 2, mpuInfo3.getUploadID())) {
       stream.write(mixedStream);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(mixedStream));
     }
 
     assertEquals(2,
@@ -3469,6 +3485,7 @@ public abstract class OmSnapshotTests {
     byte[] partData = createLargePartData(data, MIN_PART_SIZE);
     OzoneOutputStream partStream = bucket.createMultipartKey(keyName, partData.length, 1, uploadId);
     partStream.write(partData);
+    partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     partStream.close();
 
     OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 100);
@@ -3490,6 +3507,7 @@ public abstract class OmSnapshotTests {
       try (OzoneOutputStream partStream = bucket.createMultipartKey(
           keyName, partData.length, partNum, uploadId)) {
         partStream.write(partData);
+        partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
       }
     }
 
@@ -3513,12 +3531,14 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream partStream = bucket.createMultipartKey(
         keyName, part1Data.length, 1, uploadId)) {
       partStream.write(part1Data);
+      partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part1Data));
     }
 
     byte[] part2Data = createLargePartData(streamData, MIN_PART_SIZE);
     try (OzoneDataStreamOutput partStream = bucket.createMultipartStreamKey(
         keyName, part2Data.length, 2, uploadId)) {
       partStream.write(part2Data);
+      partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part2Data));
     }
 
     OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 2);
@@ -3546,6 +3566,7 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream partStream = bucket.createMultipartKey(
         keyName, partData.length, 1, uploadId)) {
       partStream.write(partData);
+      partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     }
 
     OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 1);
@@ -3565,6 +3586,7 @@ public abstract class OmSnapshotTests {
     byte[] partData = createLargePartData("MPU with metadata and tags", MIN_PART_SIZE);
     OzoneOutputStream partStream = bucket.createMultipartKey(keyName, partData.length, 1, uploadId);
     partStream.write(partData);
+    partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     partStream.close();
 
     OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 100);

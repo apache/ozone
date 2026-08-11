@@ -144,8 +144,7 @@ public final class OMMultipartUploadUtils {
     }
 
     OmMultipartPartKey prefix = OmMultipartPartKey.prefix(uploadId);
-    try (TableIterator<OmMultipartPartKey,
-        ? extends Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo>>
+    try (TableIterator<OmMultipartPartKey, Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo>>
         iterator = omMetadataManager.getMultipartPartsTable().iterator(prefix)) {
       while (iterator.hasNext()) {
         Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo> kv = iterator.next();
@@ -164,6 +163,16 @@ public final class OMMultipartUploadUtils {
 
     parts.values().removeIf(Objects::isNull);
     return parts;
+  }
+
+  /**
+   * Count the multipart parts belonging to a given upload in the split
+   * multipartPartsTable, honouring cache tombstones and pending commits. The
+   * count therefore matches the set of parts a subsequent abort/cleanup would
+   * process, which makes it suitable for batch sizing.
+   */
+  public static int countParts(OMMetadataManager omMetadataManager, String uploadId) throws IOException {
+    return scanParts(omMetadataManager, uploadId).size();
   }
 
   public static List<OmMultipartPartKey> getPartKeys(String uploadId,

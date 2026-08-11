@@ -79,6 +79,7 @@ public class LangChain4jDispatcher implements LLMClient {
   private static final String PROVIDER_OPENAI = "openai";
   private static final String PROVIDER_GEMINI = "gemini";
   private static final String PROVIDER_ANTHROPIC = "anthropic";
+  private static final String PROVIDER_GATEWAY = "gateway";
 
   private final OzoneConfiguration configuration;
   private final CredentialHelper credentialHelper;
@@ -146,6 +147,12 @@ public class LangChain4jDispatcher implements LLMClient {
       supportedModels.put("anthropic", parseModelList(configuration,
           ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_MODELS,
           ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_MODELS_DEFAULT));
+    }
+    if (!credentialHelper.getSecret(
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_API_KEY).isEmpty()) {
+      supportedModels.put("gateway", parseModelList(configuration,
+          ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_MODELS,
+          ""));
     }
 
     this.routing = new LlmRouting(defaultProvider, defaultModel, supportedModels);
@@ -363,9 +370,29 @@ public class LangChain4jDispatcher implements LLMClient {
       return buildGeminiModel(model, temperature, maxTokens);
     case PROVIDER_ANTHROPIC:
       return buildAnthropicModel(model, temperature, maxTokens);
+    case PROVIDER_GATEWAY:
+      return buildGatewayModel(model, temperature, maxTokens);
     default:
       throw new LLMException("Unknown or unconfigured provider: '" + provider + "'");
     }
+  }
+
+  private ChatLanguageModel buildGatewayModel(String model, double temperature, int maxTokens)
+      throws LLMException {
+    String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_API_KEY, "gateway");
+    String baseUrl = configuration.get(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_BASE_URL);
+    if (StringUtils.isBlank(baseUrl)) {
+      throw new LLMException(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_BASE_URL
+          + " must be set when using the gateway provider.");
+    }
+
+    OpenAiChatModel.OpenAiChatModelBuilder builder = OpenAiChatModel.builder()
+        .apiKey(key)
+        .modelName(model)
+        .baseUrl(baseUrl)
+        .timeout(timeout);
+    applyGenerationParams(builder, temperature, maxTokens);
+    return builder.build();
   }
 
   private ChatLanguageModel buildOpenAiModel(String model, double temperature, int maxTokens)

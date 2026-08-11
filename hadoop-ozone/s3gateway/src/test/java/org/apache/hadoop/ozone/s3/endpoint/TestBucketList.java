@@ -700,6 +700,43 @@ public class TestBucketList {
         "response must not use the non-AWS <continueToken> element");
   }
 
+  @Test
+  public void listObjectOwnerOmittedForListV2ByDefault() throws OS3Exception, IOException {
+    OzoneClient client = createClientWithKeys("key1", "key2");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(client).build();
+
+    endpoint.queryParamsForTest().setInt(QueryParams.LIST_TYPE, 2);
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertEquals(2, response.getContents().size());
+    assertNull(response.getContents().get(0).getOwner());
+    assertNull(response.getContents().get(1).getOwner());
+  }
+
+  @Test
+  public void listObjectOwnerOmittedForListV2WhenFetchOwnerFalse() throws OS3Exception, IOException {
+    OzoneClient client = createClientWithKeys("key1");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(client).build();
+
+    endpoint.queryParamsForTest().setInt(QueryParams.LIST_TYPE, 2);
+    endpoint.queryParamsForTest().set(QueryParams.FETCH_OWNER, "false");
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertNull(response.getContents().get(0).getOwner());
+  }
+
+  @Test
+  public void listObjectOwnerIncludedForListV2WhenFetchOwnerTrue() throws OS3Exception, IOException {
+    OzoneClient client = createClientWithKeys("key1");
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(client).build();
+
+    endpoint.queryParamsForTest().setInt(QueryParams.LIST_TYPE, 2);
+    endpoint.queryParamsForTest().set(QueryParams.FETCH_OWNER, "true");
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
+
+    assertNotNull(response.getContents().get(0).getOwner());
+  }
+
   private OzoneClient createClientWithKeys(String... keys) throws IOException {
     OzoneClient client = new OzoneClientStub();
 
