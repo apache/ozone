@@ -34,10 +34,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachHealthState;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachPersistedOpState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachHealthState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachPersistedOpState;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -73,10 +74,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
@@ -148,7 +150,10 @@ public class TestDecommissionAndMaintenance {
     conf.setFromObject(replicationConf);
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(DATANODE_COUNT);
+        .setNumDatanodes(DATANODE_COUNT)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setLayoutVersion(maxLayoutVersion())
+            .build());
 
     clusterProvider = new MiniOzoneClusterProvider(builder, 9);
   }
@@ -165,7 +170,7 @@ public class TestDecommissionAndMaintenance {
     cluster = clusterProvider.provide();
     setManagers();
     client = cluster.newClient();
-    bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
+    bucket = DataTestUtil.createVolumeAndBucket(client, volName, bucketName);
     scmClient = new ContainerOperationClient(cluster.getConf());
   }
 
@@ -503,7 +508,7 @@ public class TestDecommissionAndMaintenance {
     replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
-        .map(TestNodeUtil::getDNHostAndPort)
+        .map(NodeTestUtil::getDNHostAndPort)
         .collect(Collectors.toList()), 0, true);
 
     // Ensure all 3 DNs go to maintenance
@@ -537,14 +542,14 @@ public class TestDecommissionAndMaintenance {
         .limit(2)
         .collect(Collectors.toList());
     scmClient.startMaintenanceNodes(ecMaintenance.stream()
-        .map(TestNodeUtil::getDNHostAndPort)
+        .map(NodeTestUtil::getDNHostAndPort)
         .collect(Collectors.toList()), 0, true);
     for (DatanodeDetails dn : ecMaintenance) {
       waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     }
     assertThat(cm.getContainerReplicas(ecContainer.containerID()).size()).isGreaterThanOrEqualTo(6);
     scmClient.recommissionNodes(ecMaintenance.stream()
-        .map(TestNodeUtil::getDNHostAndPort)
+        .map(NodeTestUtil::getDNHostAndPort)
         .collect(Collectors.toList()));
     // Ensure the 2 DNs go to IN_SERVICE
     for (DatanodeDetails dn : ecMaintenance) {
@@ -571,7 +576,7 @@ public class TestDecommissionAndMaintenance {
     replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
-        .map(TestNodeUtil::getDNHostAndPort)
+        .map(NodeTestUtil::getDNHostAndPort)
         .collect(Collectors.toList()), 0, true);
 
     // Ensure all 3 DNs go to entering_maintenance
@@ -831,7 +836,7 @@ public class TestDecommissionAndMaintenance {
   private void generateData(int keyCount, String keyPrefix,
       ReplicationConfig replicationConfig) throws IOException {
     for (int i = 0; i < keyCount; i++) {
-      TestDataUtil.createKey(bucket, keyPrefix + i, replicationConfig,
+      DataTestUtil.createKey(bucket, keyPrefix + i, replicationConfig,
           "this is the content".getBytes(StandardCharsets.UTF_8));
     }
   }

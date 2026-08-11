@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIREC
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
@@ -37,10 +38,12 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.MP_PARTS_COUNT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_MATCH_PATTERN;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.normalizeContentEncoding;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
@@ -57,6 +60,7 @@ import java.time.ZonedDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -145,6 +149,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   protected void init() {
     super.init();
     ObjectOperationHandler chain = ObjectOperationHandlerChain.newBuilder(this)
+        .add(new ObjectGetTorrentHandler())
         .add(new ObjectAclHandler())
         .add(new ObjectTaggingHandler())
         .add(new MultipartKeyHandler())
@@ -269,6 +274,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
       putContentType(customMetadata);
+      putStandardObjectHeaders(customMetadata);
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
       long putLength;
@@ -361,6 +367,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   ) throws IOException, OS3Exception {
     ObjectRequestContext context = new ObjectRequestContext(S3GAction.GET_KEY, bucketName);
     try {
+      validateObjectKeyUri(keyPath);
       return handler.handleGetRequest(context, keyPath);
     } catch (OMException ex) {
       throw newError(bucketName, keyPath, ex);
@@ -372,6 +379,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       throws IOException, OS3Exception {
 
     final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    // A negative part number is not a valid part; reject it as InvalidArgument.
+    if (partNumber < 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
 
     final long startNanos = context.getStartNanos();
     final PerformanceStringBuilder perf = context.getPerf();
@@ -472,18 +483,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       responseBuilder.header(HttpHeaders.CONTENT_TYPE, contentType);
 
       for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
-        String headerValue = getHeaders().getHeaderString(entry.getKey());
-        String queryValue = queryParams.getFirst(entry.getValue());
-        if (queryValue != null) {
-          headerValue = queryValue;
-        }
-        if (headerValue != null) {
-          responseBuilder.header(entry.getKey(), headerValue);
-        }
+        addStoredObjectHeader(responseBuilder, keyDetails, queryParams, entry.getKey(),
+            entry.getValue());
       }
 
       addLastModifiedDate(responseBuilder, keyDetails);
       addTagCountIfAny(responseBuilder, keyDetails);
+      addCustomMetadataHeaders(responseBuilder, keyDetails);
 
       long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(startNanos);
       perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -519,6 +525,45 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
   }
 
+  /**
+   * Store standard S3 object headers from the PUT request in key metadata.
+   */
+  private void putStandardObjectHeaders(Map<String, String> metadata) {
+    for (String headerName : overrideQueryParameter.keySet()) {
+      String value = getHeaders().getHeaderString(headerName);
+      if (HttpHeaders.CONTENT_ENCODING.equals(headerName)) {
+        value = normalizeContentEncoding(value);
+      }
+      if (value != null) {
+        metadata.put(headerName, value);
+      }
+    }
+  }
+
+  private void addStoredObjectHeader(ResponseBuilder responseBuilder, OzoneKey key,
+      MultivaluedMap<String, String> queryParams, String headerName,
+      String responseOverrideParam) {
+    String headerValue = queryParams.getFirst(responseOverrideParam);
+    if (headerValue == null) {
+      headerValue = key.getMetadata().get(headerName);
+    }
+    if (HttpHeaders.CONTENT_ENCODING.equals(headerName)) {
+      headerValue = normalizeContentEncoding(headerValue);
+    }
+    if (headerValue != null) {
+      responseBuilder.header(headerName, headerValue);
+    }
+  }
+
+  private void addStoredObjectHeaders(ResponseBuilder responseBuilder, OzoneKey key) {
+    MultivaluedMap<String, String> queryParams =
+        getContext().getUriInfo().getQueryParameters();
+    for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
+      addStoredObjectHeader(responseBuilder, key, queryParams, entry.getKey(),
+          entry.getValue());
+    }
+  }
+
   /** Returns the object's stored Content-Type, or the default if absent. */
   private static String contentTypeOf(OzoneKey key) {
     String contentType = key.getMetadata().get(HttpHeaders.CONTENT_TYPE);
@@ -533,6 +578,28 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     if (!key.getTags().isEmpty()) {
       responseBuilder
           .header(TAG_COUNT_HEADER, key.getTags().size());
+    }
+  }
+
+  /**
+   * Guarantees that an S3-originated multipart upload part carries an ETag
+   * before it is committed. S3 requires every uploaded part to have an ETag
+   * (see UploadPart and CompleteMultipartUpload), and all S3 gateway
+   * part-write paths stamp the MD5 of the part as its ETag. This pre-commit
+   * check enforces that invariant so no S3 part can be committed without one
+   * (e.g. an UploadPartCopy whose source key has no ETag).
+   *
+   * <p>Note: the Ozone Manager also enforces a mandatory ETag server-side for
+   * every committed part (in the split parts-table schema) for ALL clients,
+   * not just S3. This gateway-side check is an earlier, S3-native failure so
+   * the client gets a clean S3 error instead of an OM INVALID_REQUEST.
+   */
+  private static void requirePartETag(Map<String, String> metadata)
+      throws IOException {
+    if (metadata == null
+        || StringUtils.isBlank(metadata.get(OzoneConsts.ETAG))) {
+      throw new IOException(
+          "S3 multipart upload part cannot be committed without an ETag");
     }
   }
 
@@ -562,6 +629,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       @PathParam(PATH) String keyPath) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_KEY;
+    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    // A negative part number is not a valid part; reject it as InvalidArgument.
+    if (partNumber < 0) {
+      throw newError(INVALID_ARGUMENT, String.valueOf(partNumber));
+    }
 
     OzoneKey key;
     try {
@@ -569,7 +641,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         OzoneBucket bucket = getVolume().getBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
-      key = getClientProtocol().headS3Object(bucketName, keyPath);
+      // A partNumber is validated against the object's parts and yields the
+      // metadata of that part; an out-of-range part throws InvalidPart.
+      key = (partNumber != 0) ?
+          getClientProtocol().headS3Object(bucketName, keyPath, partNumber) :
+          getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
@@ -603,6 +679,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         .header(HttpHeaders.CONTENT_TYPE, contentTypeOf(key))
         .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
     addEntityTagHeader(response, key);
+    addStoredObjectHeaders(response, key);
 
     addLastModifiedDate(response, key);
     addTagCountIfAny(response, key);
@@ -716,6 +793,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
       putContentType(customMetadata);
+      putStandardObjectHeaders(customMetadata);
 
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
@@ -759,17 +837,22 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     final String uploadID = queryParams().get(QueryParams.UPLOAD_ID, "");
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
-    OzoneVolume volume = getVolume();
-    // Using LinkedHashMap to preserve ordering of parts list.
-    Map<Integer, String> partsMap = new LinkedHashMap<>();
     List<CompleteMultipartUploadRequest.Part> partList =
         multipartUploadRequest.getPartList();
+    // Using LinkedHashMap to preserve ordering of parts list.
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
 
     S3ConditionalRequest.WriteConditions writeConditions =
         S3ConditionalRequest.parseWriteConditions(getHeaders(), key);
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
+      // Reject an empty part list before contacting OM.
+      if (partList == null || partList.isEmpty()) {
+        throw newError(MALFORMED_XML, key);
+      }
+
+      OzoneVolume volume = getVolume();
       OzoneBucket ozoneBucket = volume.getBucket(bucket);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucket, ozoneBucket.getOwner());
 
@@ -807,12 +890,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       getMetrics().updateCompleteMultipartUploadFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
-      } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
-        OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
-        os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
-            "when calling the CompleteMultipartUpload operation: You must " +
-            "specify at least one part");
-        throw os3Exception;
       } else if (ex.getResult() == ResultCodes.NOT_A_FILE) {
         OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
@@ -891,11 +968,22 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             getHeaders().getHeaderString(COPY_SOURCE_HEADER_RANGE);
         RangeHeader rangeHeader = null;
         if (range != null) {
-          rangeHeader = RangeHeaderParserUtil.parseRangeHeader(range, 0);
+          Matcher matcher = RANGE_HEADER_MATCH_PATTERN.matcher(range);
+          if (!matcher.matches()
+              || matcher.group("start").isEmpty()
+              || matcher.group("end").isEmpty()) {
+            throw newError(S3ErrorTable.INVALID_ARGUMENT, range);
+          }
+          long startOffset = Long.parseLong(matcher.group("start"));
+          long endOffset = Long.parseLong(matcher.group("end"));
+          long sourceSize = sourceKeyDetails.getDataSize();
+          if (startOffset > endOffset || endOffset >= sourceSize) {
+            throw newError(S3ErrorTable.INVALID_RANGE, range);
+          }
+          rangeHeader = new RangeHeader(startOffset, endOffset, false, false);
           // When copy Range, the size of the target key is the
           // length specified by COPY_SOURCE_HEADER_RANGE.
-          length = rangeHeader.getEndOffset() -
-              rangeHeader.getStartOffset() + 1;
+          length = endOffset - startOffset + 1;
         } else {
           length = sourceKeyDetails.getDataSize();
         }
@@ -936,6 +1024,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             if (raw != null) {
               writeGuard.getMetadata().put(OzoneConsts.ETAG, stripQuotes(raw));
             }
+            writeGuard.addPreCommit(
+                () -> requirePartETag(writeGuard.getMetadata()));
             outputStream = ozoneOutputStream;
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
@@ -960,6 +1050,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             writeGuard.addPreCommit(checkContentMD5Hook);
           }
           writeGuard.getMetadata().put(OzoneConsts.ETAG, md5Hash);
+          writeGuard.addPreCommit(
+              () -> requirePartETag(writeGuard.getMetadata()));
           outputStream = ozoneOutputStream;
         }
         getMetrics().incPutKeySuccessLength(putLength);
@@ -1069,13 +1161,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);
+      // Metadata directive is read up front: a self-copy is legal when metadata
+      // is being replaced (x-amz-metadata-directive: REPLACE).
+      String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
+      boolean replacingMetadata = CopyDirective.REPLACE.name().equals(metadataCopyDirective);
+
       // Checking whether we trying to copying to it self.
-      if (sourceBucket.equals(destBucket) && sourceKey
-          .equals(destkey)) {
-        // When copying to same storage type when storage type is provided,
-        // we should not throw exception, as aws cli checks if any of the
-        // options like storage type are provided or not when source and
-        // dest are given same
+      if (sourceBucket.equals(destBucket) && sourceKey.equals(destkey)
+          && !replacingMetadata) {
+        // Self-copy without a metadata replacement. AWS still allows it
+        // when a storage class is provided (aws cli passes storage type), so
+        // only the default-storage-type case is rejected.
         if (storageTypeDefault) {
           OS3Exception ex = newError(S3ErrorTable.INVALID_REQUEST, copyHeader);
           ex.setErrorMessage("This copy request is illegal because it is " +
@@ -1123,15 +1219,15 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       // Custom metadata in copyObject with metadata directive
       Map<String, String> customMetadata;
-      String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
       if (StringUtils.isEmpty(metadataCopyDirective) || metadataCopyDirective.equals(CopyDirective.COPY.name())) {
         // The custom metadata will be copied from the source key
         customMetadata = sourceKeyDetails.getMetadata();
       } else if (metadataCopyDirective.equals(CopyDirective.REPLACE.name())) {
         // Replace the metadata with the metadata form the request headers
         customMetadata = getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
-        // REPLACE: Content-Type comes from the request, not the source.
+        // REPLACE: Content-Type and standard object headers come from the request.
         putContentType(customMetadata);
+        putStandardObjectHeaders(customMetadata);
       } else {
         OS3Exception ex = newError(INVALID_ARGUMENT, metadataCopyDirective);
         ex.setErrorMessage("An error occurred (InvalidArgument) " +

@@ -64,7 +64,23 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-container-service</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-framework</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-scm</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-manager</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
@@ -81,6 +97,11 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-annotation-processing</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <!-- required for @MetaInfServices at compile-time, but not at runtime -->
@@ -158,6 +179,11 @@
         <configuration>
           <annotationProcessorPaths>
             <path>
+              <groupId>org.apache.ozone</groupId>
+              <artifactId>hdds-annotation-processing</artifactId>
+              <version>${hdds.version}</version>
+            </path>
+            <path>
               <groupId>org.kohsuke.metainf-services</groupId>
               <artifactId>metainf-services</artifactId>
               <version>${metainf-services.version}</version>
@@ -170,6 +196,7 @@
           </annotationProcessorPaths>
           <annotationProcessors>
             <annotationProcessor>org.kohsuke.metainf_services.AnnotationProcessorImpl</annotationProcessor>
+            <annotationProcessor>org.apache.ozone.annotations.CliOptionStyleProcessor</annotationProcessor>
             <annotationProcessor>picocli.codegen.aot.graalvm.processor.NativeImageConfigGeneratorProcessor</annotationProcessor>
           </annotationProcessors>
         </configuration>

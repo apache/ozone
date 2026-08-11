@@ -56,54 +56,107 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    if (verboseWithHistory && !isVerbose()) {
+      System.err.println("Warning: -H/--history has no effect without -v/--verbose.");
+    }
     ContainerBalancerStatusInfoResponseProto response = scmClient.getContainerBalancerStatusInfo();
     boolean isRunning = response.getIsRunning();
     ContainerBalancerStatusInfoProto balancerStatusInfo = response.getContainerBalancerStatusInfo();
     if (isRunning) {
-      Instant startedAtInstant = Instant.ofEpochSecond(balancerStatusInfo.getStartedAt());
-      LocalDateTime dateTime =
-          LocalDateTime.ofInstant(startedAtInstant, ZoneId.systemDefault());
       System.out.println("ContainerBalancer is Running.");
-
-      if (isVerbose()) {
-        System.out.printf("Started at: %s %s%n",
-            dateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
-            dateTime.toLocalTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
-        Duration balancingDuration = Duration.between(startedAtInstant, OffsetDateTime.now());
-        System.out.printf("Balancing duration: %s%n%n", getPrettyDuration(balancingDuration));
-        System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
-        List<ContainerBalancerTaskIterationStatusInfoProto> iterationsStatusInfoList
-            = balancerStatusInfo.getIterationsStatusInfoList();
-
-        System.out.println("Current iteration info:");
-        ContainerBalancerTaskIterationStatusInfoProto currentIterationStatistic = iterationsStatusInfoList.stream()
-            .filter(it -> it.getIterationResult().isEmpty())
-            .findFirst()
-            .orElse(null);
-        if (currentIterationStatistic == null) {
-          System.out.println("-");
-          System.out.println();
-        } else {
-          System.out.println(
-              getPrettyIterationStatusInfo(currentIterationStatistic)
-          );
-        }
-
-
-        if (verboseWithHistory) {
-          System.out.println("Iteration history list:");
-          System.out.println(
-              iterationsStatusInfoList
-                  .stream()
-                  .filter(it -> !it.getIterationResult().isEmpty())
-                  .map(this::getPrettyIterationStatusInfo)
-                  .collect(Collectors.joining(System.lineSeparator()))
-          );
-        }
-      }
-
+    } else if (response.hasContainerBalancerStatusInfo()) {
+      System.out.println("ContainerBalancer is Not Running.");
+      printStopReasonAndMessage(balancerStatusInfo);
     } else {
       System.out.println("ContainerBalancer is Not Running.");
+    }
+
+    if (isVerbose() && response.hasContainerBalancerStatusInfo()) {
+      printVerboseStatusInfo(balancerStatusInfo, isRunning);
+    }
+  }
+
+  private void printVerboseStatusInfo(ContainerBalancerStatusInfoProto balancerStatusInfo, boolean isRunning) {
+    Instant startedAtInstant = Instant.ofEpochSecond(balancerStatusInfo.getStartedAt());
+    LocalDateTime startedAtDateTime =
+        LocalDateTime.ofInstant(startedAtInstant, ZoneId.systemDefault());
+    System.out.printf("Started at: %s %s%n",
+        startedAtDateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
+        startedAtDateTime.toLocalTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
+
+    Instant endInstant = balancerStatusInfo.hasStoppedAt()
+        ? Instant.ofEpochSecond(balancerStatusInfo.getStoppedAt())
+        : OffsetDateTime.now().toInstant();
+    if (balancerStatusInfo.hasStoppedAt()) {
+      LocalDateTime stoppedAtDateTime =
+          LocalDateTime.ofInstant(endInstant, ZoneId.systemDefault());
+      System.out.printf("Stopped at: %s %s%n",
+          stoppedAtDateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
+          stoppedAtDateTime.toLocalTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
+    }
+    Duration balancingDuration = Duration.between(startedAtInstant, endInstant);
+    System.out.printf("Balancing duration: %s%n%n", getPrettyDuration(balancingDuration));
+    System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
+    List<ContainerBalancerTaskIterationStatusInfoProto> iterationsStatusInfoList = 
+        balancerStatusInfo.getIterationsStatusInfoList();
+
+    ContainerBalancerTaskIterationStatusInfoProto lastIterationStatistic = null;
+    if (isRunning) {
+      System.out.println("Current iteration info:");
+      ContainerBalancerTaskIterationStatusInfoProto currentIterationStatistic = iterationsStatusInfoList.stream()
+          .filter(it -> it.getIterationResult().isEmpty())
+          .findFirst()
+          .orElse(null);
+      if (currentIterationStatistic == null) {
+        System.out.println("-");
+        System.out.println();
+      } else {
+        System.out.println(
+            getPrettyIterationStatusInfo(currentIterationStatistic)
+        );
+      }
+    } else {
+      System.out.println("Last iteration info:");
+      lastIterationStatistic = iterationsStatusInfoList.stream()
+          .filter(it -> !it.getIterationResult().isEmpty())
+          .reduce((first, second) -> second)
+          .orElse(null);
+      if (lastIterationStatistic == null) {
+        System.out.println("-");
+        System.out.println();
+      } else {
+        System.out.println(
+            getPrettyIterationStatusInfo(lastIterationStatistic)
+        );
+      }
+    }
+
+    if (verboseWithHistory) {
+      System.out.println("Completed iteration history:");
+      final int lastCompletedIterationNumber = lastIterationStatistic == null
+          ? -1
+          : lastIterationStatistic.getIterationNumber();
+      String history = iterationsStatusInfoList
+          .stream()
+          .filter(it -> !it.getIterationResult().isEmpty())
+          .filter(it -> isRunning || it.getIterationNumber() != lastCompletedIterationNumber)
+          .map(this::getPrettyIterationStatusInfo)
+          .collect(Collectors.joining(System.lineSeparator()));
+      if (history.isEmpty()) {
+        System.out.println("-");
+      } else {
+        System.out.println(history);
+      }
+      System.out.println();
+    }
+  }
+
+  private void printStopReasonAndMessage(ContainerBalancerStatusInfoProto balancerStatusInfo) {
+    if (balancerStatusInfo.hasStopReason()) {
+      System.out.printf("Stop reason: %s%n", balancerStatusInfo.getStopReason());
+    }
+    if (balancerStatusInfo.hasStopMessage()) {
+      System.out.printf("Message: %s%n", balancerStatusInfo.getStopMessage());
     }
   }
 

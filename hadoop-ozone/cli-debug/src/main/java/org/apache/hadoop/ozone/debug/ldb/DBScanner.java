@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.debug.ldb;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.SERVICE_NAME;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.STATEFUL_SERVICE_CONFIG;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
@@ -43,6 +42,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -57,9 +57,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.security.RootCARotationManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -94,6 +97,12 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
   private static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
   private static final String SCHEMA_V3 = "V3";
+
+  private static final List<StatefulServiceDefinition<?>> STATEFUL_SERVICE_DEFINITIONS = Arrays.asList(
+      ContainerBalancer.SERVICE_DEFINITION,
+      DeletedBlockLogStateManagerImpl.SERVICE_DEFINITION,
+      RootCARotationManager.SERVICE_DEFINITION
+  );
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -727,6 +736,9 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
           }
         }
 
+        final boolean statefulServiceConfig =
+            dbColumnFamilyDefinition.getName().equals(STATEFUL_SERVICE_CONFIG.getName());
+
         for (ByteArrayKeyValue byteArrayKeyValue : batch) {
           StringBuilder sb = new StringBuilder();
           if (!(sequenceId == FIRST_SEQUENCE_ID && results.isEmpty())) {
@@ -734,8 +746,9 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
             // one, to ensure valid JSON format.
             sb.append(", ");
           }
-          Object key = dbColumnFamilyDefinition.getKeyCodec()
-              .fromPersistedFormat(byteArrayKeyValue.getKey());
+          Object key = withKey || statefulServiceConfig
+              ? dbColumnFamilyDefinition.getKeyCodec().fromPersistedFormat(byteArrayKeyValue.getKey())
+              : null;
           if (withKey) {
             if (schemaV3) {
               int index =
@@ -747,8 +760,8 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
                 exception = true;
                 break;
               }
-              String cid = key.toString().substring(0, index);
-              String blockId = key.toString().substring(index);
+              String cid = keyStr.substring(0, index);
+              String blockId = keyStr.substring(index);
               sb.append(writer.writeValueAsString(LongCodec.get()
                   .fromPersistedFormat(
                       FixedLengthStringCodec.string2Bytes(cid)) +
@@ -762,7 +775,9 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
           Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(byteArrayKeyValue.getValue());
 
-          o = parseStatefulServiceConfig(key, o, dbColumnFamilyDefinition);
+          if (statefulServiceConfig) {
+            o = parseStatefulServiceConfig(key, o);
+          }
 
           if (valueFields != null) {
             Map<String, Object> filteredValue = new HashMap<>();
@@ -835,16 +850,22 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     }
   }
 
-  private Object parseStatefulServiceConfig(Object key, Object value, DBColumnFamilyDefinition dbColumnFamily) {
-    if (dbColumnFamily.getName().equals(STATEFUL_SERVICE_CONFIG.getName()) && key.equals(SERVICE_NAME) &&
-        value instanceof ByteString) {
-      try {
-        return HddsProtos.DeletedBlocksTransactionSummary.parseFrom((ByteString) value);
-      } catch (IOException e) {
-        LOG.error("Failed to parse {} for key {}", STATEFUL_SERVICE_CONFIG.getName(), SERVICE_NAME, e);
-      }
+  private static Object parseStatefulServiceConfig(Object key, Object value) {
+    if (!(value instanceof ByteString)) {
+      return value;
     }
-    return value;
+    try {
+      for (StatefulServiceDefinition<?> def : STATEFUL_SERVICE_DEFINITIONS) {
+        if (Objects.equals(key, def.getServiceName())) {
+          return def.deserialize((ByteString) value);
+        }
+      }
+      LOG.info("Unknown {} key {}", STATEFUL_SERVICE_CONFIG.getName(), key);
+      return value;
+    } catch (IOException e) {
+      LOG.error("Failed to parse {} for key {}", STATEFUL_SERVICE_CONFIG.getName(), key, e);
+      return value;
+    }
   }
 
   private static class ByteArrayKeyValue {

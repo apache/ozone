@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -38,7 +39,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -60,9 +60,9 @@ import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -124,14 +124,14 @@ public class TestScmSafeMode {
 
   @Test
   void testSafeModeOperations() throws Exception {
-    TestDataUtil.createKeys(cluster, 100);
+    DataTestUtil.createKeys(cluster, 100);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000);
 
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
-    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
+    String keyName = uniqueObjectName("key");
 
     ObjectStore store = client.getObjectStore();
     store.createVolume(volumeName);
@@ -204,7 +204,7 @@ public class TestScmSafeMode {
     cluster = builder.build();
     cluster.waitForClusterToBeReady();
     final StorageContainerManager scm = cluster.getStorageContainerManager();
-    TestDataUtil.createKeys(cluster, 100);
+    DataTestUtil.createKeys(cluster, 100);
     GenericTestUtils.waitFor(() -> scm.getContainerManager().getContainers().size() >= 3,
         100, 1000 * 30);
 
@@ -233,7 +233,7 @@ public class TestScmSafeMode {
     assertFalse(cluster.getStorageContainerManager().isInSafeMode());
 
     // Test2: Test safe mode  when containers are there in system.
-    TestDataUtil.createKeys(cluster, 100 * 2);
+    DataTestUtil.createKeys(cluster, 100 * 2);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000 * 30);
@@ -304,7 +304,7 @@ public class TestScmSafeMode {
     cluster.waitTobeOutOfSafeMode();
     assertFalse(scm.isInSafeMode());
 
-    TestDataUtil.createKeys(cluster, 10);
+    DataTestUtil.createKeys(cluster, 10);
     SCMClientProtocolServer clientProtocolServer = cluster
         .getStorageContainerManager().getClientProtocolServer();
     assertFalse((scm.getClientProtocolServer()).getSafeModeStatus());
