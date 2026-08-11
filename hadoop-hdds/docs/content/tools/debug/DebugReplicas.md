@@ -71,6 +71,7 @@ Verify data across replicas. There are multiple checks available, which can be s
 ```bash 
 Usage: ozone debug replicas verify [-hV] [--all-results] [--verbose]
                                    [--container-cache-size=<containerCacheSize>]
+                                   [--refresh-container-locations-from-scm]
                                     [-id=<scmServiceId>] [--scm=<scm>]
                                    ([--checksums] [--block-existence]
                                    [--container-state]) <uri>
@@ -109,6 +110,13 @@ failed checks.
       --container-state   Check the container and replica states. Containers in
                             [DELETING, DELETED] states, or it's replicas in
                             [DELETED, UNHEALTHY, INVALID] states fail the check.
+      --refresh-container-locations-from-scm
+                          Force OM to refresh container locations from SCM
+                            before returning key info. This can slow down
+                            verification but may avoid stale location results
+                            from OM cache.
+      --refresh-from-scm  Short alias for
+                            --refresh-container-locations-from-scm.
   -h, --help              Show this help message and exit.
       -id, --service-id=<scmServiceId>
                           ServiceId of SCM HA Cluster
