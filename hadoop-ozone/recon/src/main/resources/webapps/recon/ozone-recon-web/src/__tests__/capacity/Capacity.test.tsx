@@ -18,7 +18,7 @@
 
 import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 
 import Capacity from '@/v2/pages/capacity/capacity';
 import { capacityServer } from '@tests/mocks/capacityMocks/capacityServer';
@@ -103,19 +103,17 @@ describe('Capacity Page', () => {
 
   test('defaults to the first available datanode when the first datanode reports -1 (offline/unreachable)', async () => {
     capacityServer.use(
-      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
-        const component = req.url.searchParams.get('component');
+      http.get('api/v1/pendingDeletion', ({ request }) => {
+        const url = new URL(request.url);
+        const component = url.searchParams.get('component');
         if (component === 'dn') {
-          return res(
-            ctx.status(200),
-            ctx.json({
-              ...mockResponses.DnPendingDeletion,
-              pendingDeletionPerDataNode: [
-                { hostName: 'dn-1', datanodeUuid: 'uuid-1', pendingBlockSize: -1 },
-                { hostName: 'dn-2', datanodeUuid: 'uuid-2', pendingBlockSize: 2048 }
-              ]
-            })
-          );
+          return HttpResponse.json({
+            ...mockResponses.DnPendingDeletion,
+            pendingDeletionPerDataNode: [
+              { hostName: 'dn-1', datanodeUuid: 'uuid-1', pendingBlockSize: -1 },
+              { hostName: 'dn-2', datanodeUuid: 'uuid-2', pendingBlockSize: 2048 }
+            ]
+          });
         }
         const map: Record<string, object> = {
           scm: mockResponses.ScmPendingDeletion,
@@ -123,8 +121,8 @@ describe('Capacity Page', () => {
         };
         const body = component ? map[component] : undefined;
         return body
-          ? res(ctx.status(200), ctx.json(body))
-          : res(ctx.status(400), ctx.json({ message: 'Unsupported pending deletion component.' }));
+          ? HttpResponse.json(body)
+          : HttpResponse.json({ message: 'Unsupported pending deletion component.' }, { status: 400 });
       })
     );
 
@@ -155,19 +153,17 @@ describe('Capacity Page', () => {
 
   test('shows error card instead of outdated data when every datanode reports -1 (offline/unreachable)', async () => {
     capacityServer.use(
-      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
-        const component = req.url.searchParams.get('component');
+      http.get('api/v1/pendingDeletion', ({ request }) => {
+        const url = new URL(request.url);
+        const component = url.searchParams.get('component');
         if (component === 'dn') {
-          return res(
-            ctx.status(200),
-            ctx.json({
-              ...mockResponses.DnPendingDeletion,
-              pendingDeletionPerDataNode: [
-                { hostName: 'dn-1', datanodeUuid: 'uuid-1', pendingBlockSize: -1 },
-                { hostName: 'dn-2', datanodeUuid: 'uuid-2', pendingBlockSize: -1 }
-              ]
-            })
-          );
+          return HttpResponse.json({
+            ...mockResponses.DnPendingDeletion,
+            pendingDeletionPerDataNode: [
+              { hostName: 'dn-1', datanodeUuid: 'uuid-1', pendingBlockSize: -1 },
+              { hostName: 'dn-2', datanodeUuid: 'uuid-2', pendingBlockSize: -1 }
+            ]
+          });
         }
         const map: Record<string, object> = {
           scm: mockResponses.ScmPendingDeletion,
@@ -175,8 +171,8 @@ describe('Capacity Page', () => {
         };
         const body = component ? map[component] : undefined;
         return body
-          ? res(ctx.status(200), ctx.json(body))
-          : res(ctx.status(400), ctx.json({ message: 'Unsupported pending deletion component.' }));
+          ? HttpResponse.json(body)
+          : HttpResponse.json({ message: 'Unsupported pending deletion component.' }, { status: 400 });
       })
     );
 
@@ -204,33 +200,24 @@ describe('Capacity Page', () => {
 
   test('shows scm-only error state when SCM pending deletion returns sentinel failure values', async () => {
     capacityServer.use(
-      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
-        const component = req.url.searchParams.get('component');
+      http.get('/api/v1/pendingDeletion', ({ request }) => {
+        const url = new URL(request.url);
+        const component = url.searchParams.get('component');
         switch (component) {
         case 'scm':
-          return res(
-            ctx.status(200),
-            ctx.json({
-              totalBlocksize: -1,
-              totalReplicatedBlockSize: -1,
-              totalBlocksCount: -1
-            })
-          );
+          return HttpResponse.json({
+            totalBlocksize: -1,
+            totalReplicatedBlockSize: -1,
+            totalBlocksCount: -1,
+          });
         case 'om':
-          return res(
-            ctx.status(200),
-            ctx.json(mockResponses.OmPendingDeletion)
-          );
+          return HttpResponse.json(mockResponses.OmPendingDeletion);
         case 'dn':
-          return res(
-            ctx.status(200),
-            ctx.json(mockResponses.DnPendingDeletion)
-          );
+          return HttpResponse.json(mockResponses.DnPendingDeletion);
         default:
-          return res(
-            ctx.status(400),
-            ctx.json({ message: 'Unsupported pending deletion component.' })
-          );
+          return HttpResponse.json({
+            message: 'Unsupported pending deletion component.',
+          }, { status: 400 });
         }
       })
     );
@@ -282,47 +269,35 @@ describe('Capacity Page', () => {
     let pendingDeletionLimitParam: string | null = null;
 
     capacityServer.use(
-      rest.get('api/v1/storageDistribution', (req, res, ctx) => {
-        return res(
-          ctx.status(200),
-          ctx.json({
-            ...mockResponses.StorageDistribution,
-            dataNodeUsage: allDataNodeUsage
-          })
-        );
+      http.get('api/v1/storageDistribution', () => {
+        return HttpResponse.json({
+          ...mockResponses.StorageDistribution,
+          dataNodeUsage: allDataNodeUsage
+        });
       }),
-      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
-        const component = req.url.searchParams.get('component');
+      http.get('api/v1/pendingDeletion', ({ request }) => {
+        const url = new URL(request.url);
+        const component = url.searchParams.get('component');
         switch (component) {
         case 'scm':
-          return res(
-            ctx.status(200),
-            ctx.json(mockResponses.ScmPendingDeletion)
-          );
+          return HttpResponse.json(mockResponses.ScmPendingDeletion);
         case 'om':
-          return res(
-            ctx.status(200),
-            ctx.json(mockResponses.OmPendingDeletion)
-          );
+          return HttpResponse.json(mockResponses.OmPendingDeletion);
         case 'dn':
-          pendingDeletionLimitParam = req.url.searchParams.get('limit');
-          return res(
-            ctx.status(200),
-            ctx.json({
-              status: 'FINISHED',
-              totalPendingDeletionSize: pendingDeletionPerDataNode.reduce(
-                (total, datanode) => total + datanode.pendingBlockSize,
-                0
-              ),
-              pendingDeletionPerDataNode,
-              totalNodesQueried: totalDatanodes,
-              totalNodeQueriesFailed: 0
-            })
-          );
+          pendingDeletionLimitParam = url.searchParams.get('limit');
+          return HttpResponse.json({
+            status: 'FINISHED',
+            totalPendingDeletionSize: pendingDeletionPerDataNode.reduce(
+              (total, datanode) => total + datanode.pendingBlockSize,
+              0
+            ),
+            pendingDeletionPerDataNode,
+            totalNodesQueried: totalDatanodes,
+            totalNodeQueriesFailed: 0
+          });
         default:
-          return res(
-            ctx.status(400),
-            ctx.json({ message: 'Unsupported pending deletion component.' })
+          return HttpResponse.json(
+            { message: 'Unsupported pending deletion component.' }, { status: 400 }
           );
         }
       })
@@ -382,29 +357,27 @@ describe('Capacity Page', () => {
   const setupCountingHandlers = (dnStatuses: string[]) => {
     const counts: EndpointCounts = { storage: 0, scm: 0, om: 0, dn: 0 };
     capacityServer.use(
-      rest.get('api/v1/storageDistribution', (_req, res, ctx) => {
+      http.get('api/v1/storageDistribution', () => {
         counts.storage++;
-        return res(ctx.status(200), ctx.json(mockResponses.StorageDistribution));
+        return HttpResponse.json(mockResponses.StorageDistribution);
       }),
-      rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
-        const component = req.url.searchParams.get('component');
+      http.get('api/v1/pendingDeletion', ({ request }) => {
+        const url = new URL(request.url);
+        const component = url.searchParams.get('component');
         if (component === 'dn') {
           const status = dnStatuses[Math.min(counts.dn, dnStatuses.length - 1)];
           counts.dn++;
-          return res(
-            ctx.status(200),
-            ctx.json({ ...mockResponses.DnPendingDeletion, status })
-          );
+          return HttpResponse.json({ ...mockResponses.DnPendingDeletion, status });
         }
         if (component === 'scm') {
           counts.scm++;
-          return res(ctx.status(200), ctx.json(mockResponses.ScmPendingDeletion));
+          return HttpResponse.json(mockResponses.ScmPendingDeletion);
         }
         if (component === 'om') {
           counts.om++;
-          return res(ctx.status(200), ctx.json(mockResponses.OmPendingDeletion));
+          return HttpResponse.json(mockResponses.OmPendingDeletion);
         }
-        return res(ctx.status(400), ctx.json({ message: 'Unsupported pending deletion component.' }));
+        return HttpResponse.json({ message: 'Unsupported pending deletion component.' },  { status: 400 });
       })
     );
     return counts;

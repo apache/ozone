@@ -37,7 +37,10 @@ import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
+import java.util.OptionalInt;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
@@ -150,32 +153,28 @@ public final class ReconEndpointTestUtil {
       protocol = HTTPS_SCHEME;
       host = conf.get(OZONE_RECON_HTTPS_ADDRESS_KEY,
           OZONE_RECON_HTTPS_ADDRESS_DEFAULT);
-      isHostDefault = getHostOnly(host).equals(
-          getHostOnly(OZONE_RECON_HTTPS_ADDRESS_DEFAULT));
+      isHostDefault = HddsUtils.getHostName(host)
+          .equals(HddsUtils.getHostName(OZONE_RECON_HTTPS_ADDRESS_DEFAULT));
     } else {
       protocol = HTTP_SCHEME;
       host = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY,
           OZONE_RECON_HTTP_ADDRESS_DEFAULT);
-      isHostDefault = getHostOnly(host).equals(
-          getHostOnly(OZONE_RECON_HTTP_ADDRESS_DEFAULT));
+      isHostDefault = HddsUtils.getHostName(host)
+          .equals(HddsUtils.getHostName(OZONE_RECON_HTTP_ADDRESS_DEFAULT));
     }
 
     if (isHostDefault) {
       // Fallback to <Recon RPC host name>:<Recon http(s) address port>
       final String rpcHost =
           conf.get(OZONE_RECON_ADDRESS_KEY, OZONE_RECON_ADDRESS_DEFAULT);
-      host = getHostOnly(rpcHost) + ":" + getPort(host);
+      Optional<String> rpcHostName = HddsUtils.getHostName(rpcHost);
+      OptionalInt port = HddsUtils.getHostPort(host);
+      if (rpcHostName.isPresent() && port.isPresent()) {
+        host = HddsUtils.getHostPortString(rpcHostName.get(), port.getAsInt());
+      }
     }
 
     return protocol + "://" + host;
-  }
-
-  public static String getHostOnly(String host) {
-    return host.split(":", 2)[0];
-  }
-
-  public static String getPort(String host) {
-    return host.split(":", 2)[1];
   }
 
   public static boolean isHTTPSEnabled(OzoneConfiguration conf) {

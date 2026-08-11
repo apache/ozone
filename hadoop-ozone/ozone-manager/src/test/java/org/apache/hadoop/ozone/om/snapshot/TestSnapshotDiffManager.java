@@ -1679,6 +1679,112 @@ public class TestSnapshotDiffManager {
         .containsExactlyElementsOf(expectedEntries);
   }
 
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("filterTopLevelDeletedEntryScenarios")
+  public void testFilterTopLevelDeletedEntries(
+      String scenarioDescription,
+      List<WithParentObjectId> deletedEntries,
+      Set<Long> renamedDirectoryIds,
+      Map<Long, Long> objectIdToParentId,
+      Set<Long> expectedObjectIds) {
+    long bucketObjectId = 0L;
+    Map<Long, Long> parentMap = objectIdToParentId != null
+        ? objectIdToParentId
+        : buildDirATreeParentMap(bucketObjectId);
+
+    List<WithParentObjectId> filteredDeletes = snapshotDiffManager
+        .filterTopLevelDeletedEntries(deletedEntries, OmDirectoryInfo.class::isInstance,
+            parentMap, renamedDirectoryIds, bucketObjectId);
+
+    assertThat(filteredDeletes)
+        .extracting(WithParentObjectId::getObjectID)
+        .containsExactlyInAnyOrderElementsOf(expectedObjectIds);
+  }
+
+  private static Stream<Arguments> filterTopLevelDeletedEntryScenarios() {
+    long bucketObjectId = 0L;
+    OmDirectoryInfo dirA = newDeletedDir(100L, bucketObjectId);
+    OmDirectoryInfo dirB = newDeletedDir(101L, 100L);
+    OmDirectoryInfo dirC = newDeletedDir(102L, 101L);
+    OmDirectoryInfo dirD = newDeletedDir(103L, 101L);
+    OmKeyInfo fileA = newDeletedFile(104L, 102L);
+    OmKeyInfo fileUnderDirB = newDeletedFile(105L, 101L);
+    return Stream.of(
+        Arguments.of(
+            "full candidate set keeps only top-level deleted dirA",
+            Arrays.asList(dirA, dirB, dirC, fileA, dirD),
+            Collections.emptySet(),
+            null,
+            Sets.newHashSet(dirA.getObjectID())),
+        Arguments.of(
+            "partial DAG candidates with dirA dirD and fileA keep only dirA",
+            Arrays.asList(dirA, dirD, fileA),
+            Collections.emptySet(),
+            null,
+            Sets.newHashSet(dirA.getObjectID())),
+        Arguments.of(
+            "deleted dirB with partial candidates keeps only dirB",
+            Arrays.asList(dirB, dirD, fileA),
+            Collections.emptySet(),
+            null,
+            Sets.newHashSet(dirB.getObjectID())),
+        Arguments.of(
+            "sibling deleted dirs dirD and dirC suppress fileA under deleted dirC",
+            Arrays.asList(dirD, dirC, fileA),
+            Collections.emptySet(),
+            null,
+            Sets.newHashSet(dirD.getObjectID(), dirC.getObjectID())),
+        Arguments.of(
+            "unrelated deleted dirD and fileA are both kept",
+            Arrays.asList(dirD, fileA),
+            Collections.emptySet(),
+            null,
+            Sets.newHashSet(dirD.getObjectID(), fileA.getObjectID())),
+        Arguments.of(
+            "renamed dirB retains file delete when dirA is also deleted",
+            Arrays.asList(dirA, fileUnderDirB),
+            Sets.newHashSet(dirB.getObjectID()),
+            null,
+            Sets.newHashSet(dirA.getObjectID(), fileUnderDirB.getObjectID())),
+        Arguments.of(
+            "broken parent chain in live directory graph skips delete from report",
+            Collections.singletonList(fileA),
+            Collections.emptySet(),
+            ImmutableMap.of(102L, 101L),
+            Collections.emptySet()),
+        Arguments.of(
+            "delete with parent absent from live directory graph is skipped",
+            Collections.singletonList(newDeletedFile(104L, 999L)),
+            Collections.emptySet(),
+            null,
+            Collections.emptySet()));
+  }
+
+  @Test
+  public void testFilterTopLevelDeletedEntriesRejectsNullArguments() {
+    long bucketObjectId = 0L;
+    OmDirectoryInfo dirA = newDeletedDir(100L, bucketObjectId);
+    List<OmDirectoryInfo> deletedEntries = Collections.singletonList(dirA);
+
+    assertThrows(NullPointerException.class, () -> snapshotDiffManager
+        .filterTopLevelDeletedEntries(deletedEntries, OmDirectoryInfo.class::isInstance,
+            null, Collections.emptySet(), bucketObjectId));
+    assertThrows(NullPointerException.class, () -> snapshotDiffManager
+        .filterTopLevelDeletedEntries(deletedEntries, OmDirectoryInfo.class::isInstance,
+            Collections.emptyMap(), null, bucketObjectId));
+  }
+
+  private static Map<Long, Long> buildDirATreeParentMap(long bucketObjectId) {
+    return ImmutableMap.<Long, Long>builder()
+        .put(100L, bucketObjectId)
+        .put(101L, 100L)
+        .put(102L, 101L)
+        .put(103L, 101L)
+        .put(104L, 102L)
+        .put(105L, 101L)
+        .build();
+  }
+
   @ParameterizedTest
   @EnumSource(value = SnapshotDiffResponse.SubStatus.class,
       names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO", "OBJECT_ID_MAP_GEN_FSO_DIR",
@@ -1711,6 +1817,28 @@ public class TestSnapshotDiffManager {
         ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, "", 1000);
     assertEquals(IN_PROGRESS, response.getJobStatus());
     assertEquals(SnapshotDiffResponse.SubStatus.PATH_RESOLUTION_FSO, response.getSubStatus());
+  }
+
+  private static OmDirectoryInfo newDeletedDir(long objectId, long parentId) {
+    return OmDirectoryInfo.newBuilder()
+        .setObjectID(objectId)
+        .setParentObjectID(parentId)
+        .setName("dir-" + objectId)
+        .setOwner("test")
+        .setCreationTime(0L)
+        .setModificationTime(0L)
+        .build();
+  }
+
+  private static OmKeyInfo newDeletedFile(long objectId, long parentId) {
+    return new OmKeyInfo.Builder()
+        .setObjectID(objectId)
+        .setParentObjectID(parentId)
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName("file-" + objectId)
+        .setReplicationConfig(new ECReplicationConfig(3, 2))
+        .build();
   }
 
 }

@@ -320,7 +320,7 @@ public class SCMHANodeDetails {
     return builder.build();
   }
 
-  private static void throwConfException(String message, String... arguments)
+  private static void throwConfException(String message, Object... arguments)
       throws IllegalArgumentException {
     String exceptionMsg = String.format(message, arguments);
     LOG.error(exceptionMsg);

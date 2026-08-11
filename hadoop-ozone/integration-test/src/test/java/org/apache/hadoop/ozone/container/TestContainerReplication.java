@@ -25,9 +25,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.container.TestHelper.isContainerClosed;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.isContainerClosed;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.waitForContainerClose;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.waitForReplicaCount;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
