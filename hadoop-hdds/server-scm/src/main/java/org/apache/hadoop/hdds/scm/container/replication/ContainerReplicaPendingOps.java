@@ -303,18 +303,9 @@ public class ContainerReplicaPendingOps {
   }
 
   /**
-   * Handle a failure report for a failed replication or reconstruction (ADD)
-   * command from a datanode. This is called by
-   * {@code ReplicationStatusHandler} for FAILED
-   * {@code replicateContainerCommand} and {@code reconstructECContainersCommand}
-   * statuses; DELETE command IDs are never routed here by the current
-   * command-status tracking path.
-   *
-   * <p>The matched op is removed from the pending list and its counter
-   * decremented so the inflight quota is freed immediately instead of waiting
-   * for the event timeout. For ADD ops the scheduled container size is also
-   * released. Subscribers are notified with timedOut=true, and removing the op
-   * makes the container eligible for re-evaluation on the next ReplicationManager cycle.
+   * Removes the pending ops of a replication or reconstruction command the datanode reported as
+   * failed, so the inflight quota is freed immediately instead of at the event timeout. Subscribers
+   * are notified with timedOut=true so ReplicationManager re-evaluates the container.
    *
    * @param cmdId the id of the failed command, as reported by the datanode
    */
@@ -342,6 +333,7 @@ public class ContainerReplicaPendingOps {
           }
           decrementCounter(op.getOpType(), op.getReplicaIndex());
           commandIdToContainer.remove(cmdId);
+          updateFailureMetrics(op);
           failedOps.add(op);
         }
       }
@@ -353,8 +345,18 @@ public class ContainerReplicaPendingOps {
     }
     if (!failedOps.isEmpty()) {
       // Failures reuse timedOut=true so ReplicationManager re-evaluates like an expired op.
-      // Timeout metrics are not updated here.
       notifySubscribers(failedOps, containerID, true);
+    }
+  }
+
+  // Reported failures used to be counted as timeouts; they are counted separately now.
+  private void updateFailureMetrics(ContainerReplicaOp op) {
+    if (op.getOpType() == ADD && isMetricsNotNull()) {
+      if (isEC(op.getReplicaIndex())) {
+        replicationMetrics.incrEcReplicaCreateFailedTotal();
+      } else {
+        replicationMetrics.incrReplicaCreateFailedTotal();
+      }
     }
   }
 

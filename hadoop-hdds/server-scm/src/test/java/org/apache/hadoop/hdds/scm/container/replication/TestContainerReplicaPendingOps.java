@@ -534,7 +534,7 @@ public class TestContainerReplicaPendingOps {
   }
 
   @Test
-  public void failedAddCommandRemovesPendingOpAndDecrementsCount() {
+  public void testFailedAddCommandRemovesPendingOp() {
     ContainerID containerID = ContainerID.valueOf(1);
     SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
     pendingOps.scheduleAddReplica(containerID, dn1, 0, cmd,
@@ -548,13 +548,40 @@ public class TestContainerReplicaPendingOps {
   }
 
   @Test
-  public void failedCommandWithUnknownIdIsNoOp() {
+  public void testFailedAddCommandIsCountedSeparatelyFromTimeout() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, cmd,
+        clock.millis() + 60000, 1000L, clock.millis());
+
+    pendingOps.onReplicationCommandFailed(cmd.getId());
+
+    assertEquals(1, metrics.getReplicaCreateFailedTotal());
+    assertEquals(0, metrics.getReplicaCreateTimeoutTotal());
+  }
+
+  @Test
+  public void testFailedEcAddCommandIncrementsEcFailedCount() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
+    pendingOps.scheduleAddReplica(containerID, dn1, 1, cmd,
+        clock.millis() + 60000, 1000L, clock.millis());
+
+    pendingOps.onReplicationCommandFailed(cmd.getId());
+
+    assertEquals(1, metrics.getEcReplicaCreateFailedTotal());
+    assertEquals(0, metrics.getReplicaCreateFailedTotal());
+    assertEquals(0, metrics.getEcReplicaCreateTimeoutTotal());
+  }
+
+  @Test
+  public void testFailedCommandWithUnknownIdIsNoOp() {
     pendingOps.onReplicationCommandFailed(999999L);
     assertEquals(0, pendingOps.getPendingOpCount(ADD));
   }
 
   @Test
-  public void completedOpKeepsCommandIndexForSiblingOps() {
+  public void testCompletedOpKeepsCommandIndexForSiblingOps() {
     ContainerID containerID = ContainerID.valueOf(1);
     SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
     pendingOps.scheduleAddReplica(containerID, dn1, 1, cmd,
@@ -570,7 +597,7 @@ public class TestContainerReplicaPendingOps {
   }
 
   @Test
-  public void expiredOpKeepsCommandIndexForSiblingOps() {
+  public void testExpiredOpKeepsCommandIndexForSiblingOps() {
     ContainerID containerID = ContainerID.valueOf(1);
     SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
     pendingOps.scheduleAddReplica(containerID, dn1, 1, cmd,
