@@ -24,13 +24,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,8 +103,13 @@ public final class CommandDispatcher {
         LOG.error("Exception while handle command, ", ex);
         if (StateContext.isReplicationCommand(command.getType())) {
           // The handler threw before the task reached the replication supervisor, so nothing else
-          // will report an outcome. Drain the PENDING entry to stop it being resent forever.
-          context.updateCommandStatus(command.getId(), CommandStatus::markAsFailed);
+          // will report an outcome. Drain the PENDING entry to stop it being resent forever, but
+          // leave a status the supervisor already reported alone.
+          context.updateCommandStatus(command.getId(), cmdStatus -> {
+            if (cmdStatus.getStatus() == Status.PENDING) {
+              cmdStatus.markAsFailed();
+            }
+          });
         }
       }
     } else {
