@@ -297,8 +297,8 @@ public final class SnapDiffDependencyGraph {
     int createCount = 0;
     int deleteCount = 0;
     int renameCount = 0;
-    for (int i = 0; i < nodes.size(); i++) {
-      DiffType diffType = nodes.get(i).getDiffType();
+    for (SnapDiffDependencyEntry entry : nodes) {
+      DiffType diffType = entry.getDiffType();
       if (diffType == DiffType.DELETE) {
         deleteCount++;
       } else if (diffType == DiffType.CREATE) {
@@ -355,8 +355,8 @@ public final class SnapDiffDependencyGraph {
     // Path strings were cached on each entry so that repeated edge-building
     // passes did not re-decode. The graph no longer reads them once edges
     // are built; drop the caches to reclaim per-entry heap.
-    for (int i = 0; i < nodes.size(); i++) {
-      nodes.get(i).clearPathCache();
+    for (SnapDiffDependencyEntry entry : nodes) {
+      entry.clearPathCache();
     }
   }
 
