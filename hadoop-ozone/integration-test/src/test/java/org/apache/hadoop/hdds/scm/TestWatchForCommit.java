@@ -294,6 +294,9 @@ public class TestWatchForCommit {
       } else if (follower == null && RatisTestHelper.isRatisFollower(dn, pipeline)) {
         follower = details;
       }
+      if (leader != null && follower != null) {
+        break;
+      }
     }
     assertNotNull(leader, "No Ratis leader found in pipeline " + pipeline.getId());
     assertNotNull(follower, "No Ratis follower found in pipeline " + pipeline.getId());
