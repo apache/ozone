@@ -29,6 +29,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -59,7 +60,7 @@ import org.junit.jupiter.api.Test;
  * Tests SCMStateMachine events and deferred datanode-server startup.
  */
 public class TestSCMStateMachine {
-  private static final long RETRY_INTERVAL_MS = 100L;
+  private static final Duration RETRY_INTERVAL = Duration.ofMillis(100);
 
   private final AtomicBoolean commitIndexAvailable = new AtomicBoolean();
   private final AtomicBoolean scmStopped = new AtomicBoolean();
@@ -108,7 +109,7 @@ public class TestSCMStateMachine {
     when(buffer.getLatestTrxInfo()).thenReturn(
         TransactionInfo.valueOf(TermIndex.valueOf(0, 0)));
 
-    stateMachine = new SCMStateMachine(scm, buffer, RETRY_INTERVAL_MS);
+    stateMachine = new SCMStateMachine(scm, buffer, RETRY_INTERVAL);
   }
 
   @AfterEach
@@ -150,7 +151,7 @@ public class TestSCMStateMachine {
 
     stateMachine.notifyLeaderChanged(memberId(), leaderId);
 
-    verify(datanodeProtocolServer, after(RETRY_INTERVAL_MS * 3).never()).start();
+    verify(datanodeProtocolServer, after(RETRY_INTERVAL.toMillis() * 3).never()).start();
     lastAppliedIndex.set(5L);
     verify(datanodeProtocolServer, timeout(2000)).start();
     verify(safeModeManager, timeout(2000)).refreshAndValidate();
@@ -178,7 +179,7 @@ public class TestSCMStateMachine {
 
     assertThat(stateMachine.isDNServerStartRetryStopped()).isTrue();
     commitIndexAvailable.set(true);
-    verify(datanodeProtocolServer, after(RETRY_INTERVAL_MS * 2).never()).start();
+    verify(datanodeProtocolServer, after(RETRY_INTERVAL.toMillis() * 2).never()).start();
   }
 
   @Test
