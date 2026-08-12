@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -86,8 +87,9 @@ public class SCMStateMachine extends BaseStateMachine {
 
   // Interval for the fallback retry that starts the deferred datanode-server on
   // a follower (see retryStartDNServerUntilReady).
-  private static final long DN_SERVER_START_RETRY_INTERVAL_MS = 1000L;
-  private final long dnServerStartRetryIntervalMs;
+  private static final Duration DN_SERVER_START_RETRY_INTERVAL =
+      Duration.ofSeconds(1);
+  private final Duration dnServerStartRetryInterval;
 
   // Periodically retries the deferred datanode-server start on a follower so an
   // idle cluster (no new transactions, only Ratis heartbeats) still exits safe
@@ -108,17 +110,17 @@ public class SCMStateMachine extends BaseStateMachine {
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
-    this(scm, buffer, DN_SERVER_START_RETRY_INTERVAL_MS);
+    this(scm, buffer, DN_SERVER_START_RETRY_INTERVAL);
   }
 
   @VisibleForTesting
   SCMStateMachine(final StorageContainerManager scm,
-      SCMHADBTransactionBuffer buffer, long retryIntervalMs) {
+      SCMHADBTransactionBuffer buffer, Duration retryInterval) {
     this.scm = scm;
     this.invokers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
     this.metrics = scm.getMetrics();
-    this.dnServerStartRetryIntervalMs = retryIntervalMs;
+    this.dnServerStartRetryInterval = retryInterval;
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
     if (!latestTrxInfo.isDefault()) {
       updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
@@ -142,7 +144,7 @@ public class SCMStateMachine extends BaseStateMachine {
   public SCMStateMachine() {
     isInitialized = false;
     this.metrics = null;
-    this.dnServerStartRetryIntervalMs = DN_SERVER_START_RETRY_INTERVAL_MS;
+    this.dnServerStartRetryInterval = DN_SERVER_START_RETRY_INTERVAL;
   }
 
   private void addRatisEvent(String message) {
@@ -490,7 +492,8 @@ public class SCMStateMachine extends BaseStateMachine {
       return;
     }
     dnServerStartRetryFuture = dnServerStartRetryExecutor.schedule(
-        this::retryStartDNServerUntilReady, dnServerStartRetryIntervalMs, TimeUnit.MILLISECONDS);
+        this::retryStartDNServerUntilReady,
+        dnServerStartRetryInterval.toMillis(), TimeUnit.MILLISECONDS);
   }
 
   public void stopDNServerStartRetry() {
