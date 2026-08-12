@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.tracing.InternalSpanKind;
 import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -302,6 +303,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @throws IOException if an I/O error occurs
    */
   @Override
+  @InternalSpanKind
   public void close() throws IOException {
     //transport is not reusable
     transport.close();
@@ -1468,12 +1470,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OzoneManagerProtocolProtos.SnapshotDiffResponse diffResponse =
         omResponse.getSnapshotDiffResponse();
 
-    return new SnapshotDiffResponse(SnapshotDiffReportOzone.fromProtobuf(
-        diffResponse.getSnapshotDiffReport()),
+    SnapshotDiffResponse result = new SnapshotDiffResponse(
+        SnapshotDiffReportOzone.fromProtobuf(diffResponse.getSnapshotDiffReport()),
         JobStatus.fromProtobuf(diffResponse.getJobStatus()),
         diffResponse.getWaitTimeInMs(),
         diffResponse.getReason(),
         reportOnly);
+    if (diffResponse.hasSubStatus()) {
+      result.setSubStatus(SnapshotDiffResponse.SubStatus.fromProtoBuf(diffResponse.getSubStatus()));
+      if (diffResponse.hasProgressPercent()) {
+        result.setProgressPercent(diffResponse.getProgressPercent());
+      }
+    }
+    return result;
   }
 
   /**
@@ -2191,6 +2200,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  @SkipTracing
   public ThreadLocal<S3Auth> getS3CredentialsProvider() {
     return this.threadLocalS3Auth;
   }
