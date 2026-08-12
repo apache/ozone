@@ -269,8 +269,8 @@ public class Checksum {
   }
 
   /**
-   * @implNote The position of {@code data}'s underlying buffers is not
-   * advanced by this method - both the no-cache and cache paths slice via
+   * This method does not advance the positions of {@code data}'s underlying
+   * buffers. Both the no-cache and cache paths slice via
    * {@link ByteBuffer#duplicate()}.
    */
   public ChecksumData computeChecksum(ChunkBuffer data, boolean useCache)
