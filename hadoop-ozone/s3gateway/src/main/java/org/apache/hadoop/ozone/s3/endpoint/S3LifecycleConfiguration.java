@@ -299,9 +299,9 @@ public class S3LifecycleConfiguration {
       if (ex.getCause() instanceof OMException) {
         throw (OMException) ex.getCause();
       }
-      throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, ozoneBucket.getName(), ex);
     } catch (IllegalStateException ex) {
-      throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, ozoneBucket.getName(), ex);
     }
   }
 

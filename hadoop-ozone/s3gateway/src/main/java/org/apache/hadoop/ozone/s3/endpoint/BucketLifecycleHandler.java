@@ -140,6 +140,14 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     } catch (WebApplicationException ex) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName);
     } catch (OMException ex) {
+      // Both the rule validation in toOmLifecycleConfiguration and OM's own checks in
+      // setLifecycleConfiguration reject with INVALID_REQUEST, which the shared translation reports
+      // as InvalidRequest. S3 expects InvalidArgument for a rejected lifecycle configuration, so the
+      // whole path is remapped. This also covers OM-only checks such as bucket layout mismatch, which
+      // has no AWS equivalent.
+      if (ex.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, bucketName, ex);
+      }
       throw S3ErrorTable.newError(bucketName, ex);
     }
     return Response.ok().build();
