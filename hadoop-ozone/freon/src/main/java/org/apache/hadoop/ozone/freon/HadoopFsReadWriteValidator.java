@@ -84,6 +84,14 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       defaultValue = "16384")
   private int copyBufferSize;
 
+  @Option(names = {"--max-files-per-thread"},
+      description = "Maximum number of distinct files a thread writes. On reaching it the thread wraps around and "
+          + "overwrites the files it already wrote, which bounds the memory it needs to keep a checksum for every "
+          + "file it leaves behind. The number of writes and reads is unaffected; raise this to trade memory for "
+          + "more distinct files, at the cost of overwriting fewer of them.",
+      defaultValue = "10000")
+  private int maxFilesPerThread;
+
   private ContentGenerator contentGenerator;
 
   private Timer writeTimer;
@@ -103,6 +111,10 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     if (bufferSize <= 0 || copyBufferSize <= 0) {
       throw new IllegalArgumentException(
           "--buffer and --copy-buffer must be positive");
+    }
+    if (maxFilesPerThread <= 0) {
+      throw new IllegalArgumentException(
+          "--max-files-per-thread must be positive");
     }
 
     super.init();
@@ -130,7 +142,8 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
 
   private void writeAndValidate(long counter) throws Exception {
     ThreadHistory history = threadHistory.get();
-    Path file = objectPath(counter);
+    long fileId = counter % maxFilesPerThread;
+    Path file = objectPath(fileId);
     long marker = history.nextMarker();
 
     long checksum;
@@ -140,14 +153,14 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       // create() has already truncated the file, so whatever checksum the path
       // had no longer describes it. Keeping it would report the next read of
       // this path as corruption, which --fail-at-end would surface.
-      history.forget(counter);
+      history.forget(fileId);
       throw e;
     }
-    history.record(counter, checksum);
+    history.record(fileId, checksum);
 
-    long readCounter = history.randomCounter();
-    Path target = objectPath(readCounter);
-    long expected = history.checksumOf(readCounter);
+    long readId = history.randomFileId();
+    Path target = objectPath(readId);
+    long expected = history.checksumOf(readId);
     long actual = readTimer.time(() -> readChecksum(target));
 
     if (expected != actual) {
@@ -158,12 +171,12 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
 
   /**
    * Path of the file for the given counter. The thread sequence id is part of
-   * the path so each worker owns a private namespace; in --duration runs paths
-   * are reused, and this keeps one thread from overwriting a file another
-   * thread is reading back.
+   * the path so each worker owns a private namespace; paths are reused once a
+   * thread has written --max-files-per-thread of them, and this keeps one
+   * thread from overwriting a file another thread is reading back.
    */
-  private Path objectPath(long counter) {
-    return new Path(getRootPath() + "/" + generateObjectName(counter)
+  private Path objectPath(long fileId) {
+    return new Path(getRootPath() + "/" + generateObjectName(fileId)
         + "-t" + getThreadSequenceId());
   }
 
@@ -193,18 +206,17 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
   }
 
   /**
-   * Per-thread record of the files written and the latest checksum of each.
-   * Freon reuses its counters across a run, so it is keyed by counter (an
-   * overwrite updates the checksum) and holds one entry per file the thread
-   * wrote. The counter is kept rather than the {@link Path} it maps to, which
-   * {@link #objectPath} rebuilds on demand, so the entries stay small enough to
-   * cover every file even for very large runs.
+   * Per-thread record of the files written and the latest checksum of each. It
+   * is keyed by file id (an overwrite updates the checksum), so it holds one
+   * entry per file the thread wrote and never more than
+   * --max-files-per-thread. The id is kept rather than the {@link Path} it maps
+   * to, which {@link #objectPath} rebuilds on demand.
    */
   private static final class ThreadHistory {
     private final long markerBase;
     private int markerSeq;
     private final Map<Long, Long> checksums = new HashMap<>();
-    private final List<Long> counters = new ArrayList<>();
+    private final List<Long> fileIds = new ArrayList<>();
 
     private ThreadHistory(long threadSequenceId) {
       this.markerBase = threadSequenceId << Integer.SIZE;
@@ -220,27 +232,27 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       return markerBase | Integer.toUnsignedLong(markerSeq++);
     }
 
-    private void record(long counter, long checksum) {
-      Long key = counter;
+    private void record(long fileId, long checksum) {
+      Long key = fileId;
       if (checksums.put(key, checksum) == null) {
-        counters.add(key);
+        fileIds.add(key);
       }
     }
 
-    /** Drop a path whose content is no longer known. */
-    private void forget(long counter) {
-      Long key = counter;
+    /** Drop a file whose content is no longer known. */
+    private void forget(long fileId) {
+      Long key = fileId;
       if (checksums.remove(key) != null) {
-        counters.remove(key);          // error path, so the scan is affordable
+        fileIds.remove(key);           // error path, so the scan is affordable
       }
     }
 
-    private long randomCounter() {
-      return counters.get(ThreadLocalRandom.current().nextInt(counters.size()));
+    private long randomFileId() {
+      return fileIds.get(ThreadLocalRandom.current().nextInt(fileIds.size()));
     }
 
-    private long checksumOf(long counter) {
-      return checksums.get(counter);
+    private long checksumOf(long fileId) {
+      return checksums.get(fileId);
     }
   }
 }

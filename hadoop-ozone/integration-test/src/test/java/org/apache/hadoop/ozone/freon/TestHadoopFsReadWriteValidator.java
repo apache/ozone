@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import picocli.CommandLine;
@@ -122,6 +123,54 @@ public abstract class TestHadoopFsReadWriteValidator implements NonHATests.TestC
       org.apache.commons.io.IOUtils.copyLarge(input, NullOutputStream.INSTANCE);
     }
     return checksum.getValue();
+  }
+
+  /**
+   * Once a thread has written --max-files-per-thread files its paths wrap, so
+   * the run keeps writing without leaving files it has no checksum for.  The
+   * wrap is layout independent, so one layout covers it.
+   */
+  @Test
+  public void testPathsWrapAtMaxFilesPerThread() throws Exception {
+    String volumeName = "vol-" + UUID.randomUUID();
+    String bucketName = "bucket1";
+    String prefix = "dfsrw-wrap";
+    int fileCount = 20;
+    int maxFilesPerThread = 5;
+    long fileSize = 1024;
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName, BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED).build());
+
+    String rootPath = OZONE_URI_SCHEME + "://" + bucketName + "." + volumeName;
+    String om = cluster().getConf().get(OZONE_OM_ADDRESS_KEY);
+    CommandLine cmd = new Freon().getCmd();
+    int exitCode = cmd.execute(
+        "-D", OZONE_OM_ADDRESS_KEY + "=" + om,
+        "dfsrw",
+        "-n", String.valueOf(fileCount),
+        "-t", "1",
+        "-s", fileSize + "B",
+        "--max-files-per-thread", String.valueOf(maxFilesPerThread),
+        "-p", prefix,
+        "-r", rootPath
+    );
+    assertEquals(0, exitCode, "Freon dfsrw command failed");
+
+    // every write still ran and validated, but they landed on wrapped paths
+    BaseFreonGenerator subject = (BaseFreonGenerator)
+        cmd.getParseResult().subcommand().commandSpec().userObject();
+    assertEquals(fileCount, subject.getSuccessCount());
+
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
+    try (FileSystem fileSystem = FileSystem.get(URI.create(rootPath), conf)) {
+      FileStatus[] files =
+          fileSystem.listStatus(new Path(rootPath + "/" + prefix));
+      assertEquals(maxFilesPerThread, files.length,
+          "Paths did not wrap at --max-files-per-thread");
+    }
   }
 
   /**
