@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
@@ -82,6 +84,16 @@ public class SCMStateMachine extends BaseStateMachine {
   private final boolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
+  // Interval for the fallback retry that starts the deferred datanode-server on
+  // a follower (see retryStartDNServerUntilReady).
+  private static final long DN_SERVER_START_RETRY_INTERVAL_MS = 1000L;
+
+  // Periodically retries the deferred datanode-server start on a follower so an
+  // idle cluster (no new transactions, only Ratis heartbeats) still exits safe
+  // mode once catch-up becomes observable. Self-cancels after the server starts.
+  private ScheduledExecutorService dnServerStartRetryExecutor;
+  private ScheduledFuture<?> dnServerStartRetryFuture;
+
   private DBCheckpoint installingDBCheckpoint = null;
   private List<ManagedSecretKey> installingSecretKeys = null;
 
@@ -111,6 +123,14 @@ public class SCMStateMachine extends BaseStateMachine {
             .setNameFormat(scm.threadNamePrefix() + "SCMInstallSnapshot-%d")
             .build()
     );
+    this.dnServerStartRetryExecutor = HadoopExecutors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder()
+            .setNameFormat(scm.threadNamePrefix() + "SCMDNServerStartRetry-%d")
+            .setDaemon(true)
+            .build());
+    this.dnServerStartRetryFuture = dnServerStartRetryExecutor.scheduleWithFixedDelay(
+        this::retryStartDNServerUntilReady, DN_SERVER_START_RETRY_INTERVAL_MS,
+        DN_SERVER_START_RETRY_INTERVAL_MS, TimeUnit.MILLISECONDS);
     isInitialized = true;
   }
 
@@ -427,6 +447,42 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   /**
+   * Periodic fallback for the deferred datanode-server start on a follower. The
+   * Ratis callbacks ({@code applyTransaction}, {@code notifyTermIndexUpdated},
+   * {@code notifyLeaderChanged}) only fire on new activity, so on an idle
+   * cluster a restarted follower can miss the moment the leader's committed
+   * index becomes observable (it is not yet known when {@code notifyLeaderChanged}
+   * fires) and never start its datanode server, leaving it stuck in safe mode.
+   * This re-checks until the server starts, then cancels itself. Starting stays
+   * gated by the same {@link #tryStartDNServerAndRefreshSafeMode()} predicate, so
+   * it cannot start the server before genuine catch-up.
+   */
+  private void retryStartDNServerUntilReady() {
+    if (isStateMachineReady.get()) {
+      cancelDNServerStartRetry();
+      return;
+    }
+    try {
+      tryStartDNServerAndRefreshSafeMode();
+    } catch (Exception e) {
+      // Never let a transient failure (e.g. SCM not fully wired up yet during
+      // startup) kill the scheduled task; log and retry on the next tick.
+      LOG.warn("Retry of deferred datanode-server start failed; will retry", e);
+      return;
+    }
+    if (isStateMachineReady.get()) {
+      cancelDNServerStartRetry();
+    }
+  }
+
+  private void cancelDNServerStartRetry() {
+    ScheduledFuture<?> future = dnServerStartRetryFuture;
+    if (future != null) {
+      future.cancel(false);
+    }
+  }
+
+  /**
    * @return true if this follower's last applied index has reached the leader's
    * committed index captured when it (re)joined, i.e. all transactions the
    * leader had committed at that point have been replayed. Comparing against a
@@ -569,6 +625,8 @@ public class SCMStateMachine extends BaseStateMachine {
       transactionBuffer.close();
       HadoopExecutors.
           shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+      HadoopExecutors.
+          shutdown(dnServerStartRetryExecutor, LOG, 5, TimeUnit.SECONDS);
     } else if (!scm.isStopped()) {
       scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
     }
