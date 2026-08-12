@@ -152,6 +152,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         .add(new ObjectGetTorrentHandler())
         .add(new ObjectAclHandler())
         .add(new ObjectTaggingHandler())
+        .add(new ObjectAttributesHandler())
         .add(new MultipartKeyHandler())
         .add(this)
         .build();
@@ -396,7 +397,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
           getClientProtocol().getS3KeyDetails(bucketName, keyPath);
 
-      isFile(keyPath, keyDetails);
+      validateFileKey(keyPath, keyDetails);
 
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
           getHeaders(), keyPath, keyDetails, S3ConditionalRequest.PreconditionContext.READ);
@@ -647,7 +648,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getClientProtocol().headS3Object(bucketName, keyPath, partNumber) :
           getClientProtocol().headS3Object(bucketName, keyPath);
 
-      isFile(keyPath, key);
+      validateFileKey(keyPath, key);
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
           getHeaders(), keyPath, key, S3ConditionalRequest.PreconditionContext.READ);
       if (conditionalResponse != null) {
@@ -687,22 +688,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     getMetrics().updateHeadKeySuccessStats(startNanos);
     auditReadSuccess(s3GAction);
     return response.build();
-  }
-
-  private void isFile(String keyPath, OzoneKey key) throws OMException {
-    /*
-      Necessary for directories in buckets with FSO layout.
-      Intended for apps which use Hadoop S3A.
-      Example of such app is Trino (through Hive connector).
-     */
-    boolean isFsoDirCreationEnabled = getOzoneConfiguration()
-        .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-            OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT);
-    if (isFsoDirCreationEnabled &&
-        !key.isFile() &&
-        !keyPath.endsWith("/")) {
-      throw new OMException(ResultCodes.KEY_NOT_FOUND);
-    }
   }
 
   /**
