@@ -123,7 +123,12 @@ public class TestDatanodeStorageMetricsIntegration {
    * Each call re-reads the underlying storage reports — do not mix values
    * from different calls when checking invariants across gauges.
    */
-  private static MetricsRecordBuilder storageMetrics() {
-    return getMetrics(DatanodeStorageMetrics.SOURCE_NAME);
+  private MetricsRecordBuilder storageMetrics() {
+    // In mini-cluster mode the source name is made unique per datanode (to keep
+    // metrics registration and unregistration symmetric and avoid the
+    // shared-JVM source leak), so look it up by the per-datanode name.
+    MutableVolumeSet volumeSet = cluster.getHddsDatanodes().get(0)
+        .getDatanodeStateMachine().getContainer().getVolumeSet();
+    return getMetrics(DatanodeStorageMetrics.SOURCE_NAME + '-' + volumeSet.getDatanodeUuid());
   }
 }

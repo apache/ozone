@@ -944,6 +944,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Return bucket info for the specified bucket.
+   * <p>
+   * The returned {@link OmBucketInfo} is the cached instance, returned by
+   * reference. A caller that mutates it (for example quota accounting) before a
+   * point where the request may still fail must first take a
+   * {@link OmBucketInfo#copyObject()} and publish that copy only on success,
+   * otherwise a failed request leaks the mutation into the cache.
    */
   @Nullable
   public static OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
