@@ -148,6 +148,27 @@ public class TestOmBucketInfo {
   }
 
   @Test
+  public void testWithOperationalPropertiesFromCopiesEncryptionInfo() {
+    BucketEncryptionKeyInfo encryptionKeyInfo =
+        new BucketEncryptionKeyInfo.Builder().setKeyName("key1").build();
+    OmBucketInfo source = OmBucketInfo.newBuilder()
+        .setVolumeName("vol1")
+        .setBucketName("source")
+        .setBucketEncryptionKey(encryptionKeyInfo)
+        .build();
+    OmBucketInfo link = OmBucketInfo.newBuilder()
+        .setVolumeName("vol1")
+        .setBucketName("link")
+        .setSourceVolume("vol1")
+        .setSourceBucket("source")
+        .build();
+
+    OmBucketInfo resolvedLink = link.withOperationalPropertiesFrom(source);
+
+    assertEquals(encryptionKeyInfo, resolvedLink.getEncryptionKeyInfo());
+  }
+
+  @Test
   public void getProtobufMessageEC() {
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setBucketName("bucket").setVolumeName("vol1")
