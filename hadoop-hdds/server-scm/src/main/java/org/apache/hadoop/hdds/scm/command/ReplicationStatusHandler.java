@@ -27,26 +27,23 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Handles REPLICATION_STATUS events by clearing failed pending ops.
- * Only the leader SCM processes these events; followers skip them.
  */
 public class ReplicationStatusHandler implements EventHandler<ReplicationStatus> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ReplicationStatusHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ReplicationStatusHandler.class);
 
   private final ContainerReplicaPendingOps containerReplicaPendingOps;
   private final SCMContext scmContext;
 
-  public ReplicationStatusHandler(ContainerReplicaPendingOps containerReplicaPendingOps,
-      SCMContext scmContext) {
+  public ReplicationStatusHandler(ContainerReplicaPendingOps containerReplicaPendingOps, SCMContext scmContext) {
     this.containerReplicaPendingOps = containerReplicaPendingOps;
     this.scmContext = scmContext;
   }
 
   @Override
   public void onMessage(ReplicationStatus status, EventPublisher publisher) {
-    if (!scmContext.isLeader()) {
-      LOG.info("Skip processing replication status since current SCM is not leader.");
+    if (!scmContext.isLeaderReady() || scmContext.isInSafeMode()) {
+      // same condition in ReplicationManager, which owns the pending ops being cleared
       return;
     }
     LOG.debug("Processing {} failed replication command statuses from datanode {}.",

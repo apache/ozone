@@ -88,7 +88,7 @@ public class TestCommandStatusReportHandler implements EventPublisher {
   }
 
   @Test
-  public void replicationFailureFiresReplicationStatusEvent() {
+  public void testReplicationFailureFiresReplicationStatusEvent() {
     CommandStatus failedReplication = CommandStatus.newBuilder()
         .setCmdId(HddsIdFactory.getLongId())
         .setStatus(CommandStatus.Status.FAILED)

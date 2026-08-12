@@ -41,7 +41,7 @@ public class TestReplicationStatusHandler {
   @Test
   public void leaderClearsReplicaPendingOp() {
     SCMContext scmContext = mock(SCMContext.class);
-    when(scmContext.isLeader()).thenReturn(true);
+    when(scmContext.isLeaderReady()).thenReturn(true);
     ContainerReplicaPendingOps pendingOps = mock(ContainerReplicaPendingOps.class);
     EventPublisher publisher = mock(EventPublisher.class);
 
@@ -64,7 +64,7 @@ public class TestReplicationStatusHandler {
   @Test
   public void followerSkipsClearingReplicaPendingOp() {
     SCMContext scmContext = mock(SCMContext.class);
-    when(scmContext.isLeader()).thenReturn(false);
+    when(scmContext.isLeaderReady()).thenReturn(false);
     ContainerReplicaPendingOps pendingOps = mock(ContainerReplicaPendingOps.class);
     EventPublisher publisher = mock(EventPublisher.class);
 
