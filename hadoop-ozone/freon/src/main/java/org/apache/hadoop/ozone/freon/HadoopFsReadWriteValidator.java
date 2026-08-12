@@ -95,8 +95,7 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
 
   @Override
   public Void call() throws Exception {
-    super.init();
-
+    // before init(), which already starts the HTTP server and the progress bar
     if (fileSize.toBytes() < Long.BYTES) {
       throw new IllegalArgumentException(
           "--size must be at least " + Long.BYTES + " bytes");
@@ -105,6 +104,8 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       throw new IllegalArgumentException(
           "--buffer and --copy-buffer must be positive");
     }
+
+    super.init();
 
     FileSystem fileSystem = getFileSystem();
     try {
@@ -132,7 +133,16 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     Path file = objectPath(counter);
     long marker = history.nextMarker();
 
-    long checksum = writeTimer.time(() -> writeFile(file, marker));
+    long checksum;
+    try {
+      checksum = writeTimer.time(() -> writeFile(file, marker));
+    } catch (Exception e) {
+      // create() has already truncated the file, so whatever checksum the path
+      // had no longer describes it. Keeping it would report the next read of
+      // this path as corruption, which --fail-at-end would surface.
+      history.forget(counter);
+      throw e;
+    }
     history.record(counter, checksum);
 
     long readCounter = history.randomCounter();
@@ -214,6 +224,14 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       Long key = counter;
       if (checksums.put(key, checksum) == null) {
         counters.add(key);
+      }
+    }
+
+    /** Drop a path whose content is no longer known. */
+    private void forget(long counter) {
+      Long key = counter;
+      if (checksums.remove(key) != null) {
+        counters.remove(key);          // error path, so the scan is affordable
       }
     }
 

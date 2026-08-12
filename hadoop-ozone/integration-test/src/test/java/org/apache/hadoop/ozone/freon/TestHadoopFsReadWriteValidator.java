@@ -162,7 +162,8 @@ public abstract class TestHadoopFsReadWriteValidator implements NonHATests.TestC
         cmd.getParseResult().subcommand().commandSpec().userObject();
     int maxPaths = threads * pathsPerThread;
 
-    // more successful tasks than paths means overwritten files were validated
+    // more successful tasks than paths means paths were overwritten, and a
+    // successful task is one whose read-back matched
     assertThat(subject.getSuccessCount()).isGreaterThan(maxPaths);
 
     OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
