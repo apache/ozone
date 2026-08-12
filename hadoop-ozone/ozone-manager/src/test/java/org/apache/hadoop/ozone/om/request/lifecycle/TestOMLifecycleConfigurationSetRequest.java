@@ -436,4 +436,18 @@ public class TestOMLifecycleConfigurationSetRequest extends
     OMRequest result = setRequest.preExecute(ozoneManager);
     assertNotNull(result);
   }
+
+  @Test
+  public void testPreExecuteSkipsDisabledAbortMpuRule() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    // daysAfterInitiation == 60 would normally be rejected, but the rule is disabled.
+    OMRequest request = setLifecycleConfigurationRequestWithAbortMpu(volumeName, bucketName, 60, false);
+    OMLifecycleConfigurationSetRequest setRequest =
+        new OMLifecycleConfigurationSetRequest(request);
+
+    // Disabled rules must not trigger the threshold check.
+    OMRequest result = setRequest.preExecute(ozoneManager);
+    assertNotNull(result);
+  }
 }

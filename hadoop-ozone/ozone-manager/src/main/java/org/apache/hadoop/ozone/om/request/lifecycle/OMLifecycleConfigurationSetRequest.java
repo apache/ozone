@@ -222,13 +222,17 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
         OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD,
         OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
         TimeUnit.MILLISECONDS);
-    long expireThresholdDays = TimeUnit.MILLISECONDS.toDays(expireThresholdMillis);
 
     for (LifecycleRule rule : config.getRulesList()) {
+      if (!rule.getEnabled()) {
+        continue;
+      }
       for (LifecycleAction action : rule.getActionList()) {
         if (action.hasAbortIncompleteMultipartUpload()) {
           int daysAfterInitiation = action.getAbortIncompleteMultipartUpload().getDaysAfterInitiation();
-          if (daysAfterInitiation >= expireThresholdDays) {
+          long daysAfterInitiationMillis = TimeUnit.DAYS.toMillis(daysAfterInitiation);
+          if (daysAfterInitiationMillis >= expireThresholdMillis) {
+            long expireThresholdDays = TimeUnit.MILLISECONDS.toDays(expireThresholdMillis);
             throw new OMException(
                 "Invalid lifecycle configuration: rule '" + rule.getId() + "' has an " +
                 "AbortIncompleteMultipartUpload action with daysAfterInitiation=" + daysAfterInitiation +
@@ -238,7 +242,7 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
                 ozoneManager.getConfiguration().get(
                     OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD,
                     OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT) +
-                "). The MultipartUploadCleanupService will abort the upload before the " +
+                "). The MultipartUploadCleanupService will clean up the upload before the " +
                 "lifecycle rule fires, making the rule ineffective. " +
                 "Set daysAfterInitiation to a value less than " + expireThresholdDays +
                 " day(s), or increase " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + ".",

@@ -159,6 +159,15 @@ public class TestOMLifecycleConfigurationRequest {
    */
   public OMRequest setLifecycleConfigurationRequestWithAbortMpu(
       String volumeName, String bucketName, int daysAfterInitiation) {
+    return setLifecycleConfigurationRequestWithAbortMpu(volumeName, bucketName, daysAfterInitiation, true);
+  }
+
+  /**
+   * Builds a SetLifecycleConfiguration request with a single AbortIncompleteMultipartUpload rule,
+   * with configurable enabled state.
+   */
+  public OMRequest setLifecycleConfigurationRequestWithAbortMpu(
+      String volumeName, String bucketName, int daysAfterInitiation, boolean enabled) {
     LifecycleConfiguration lcc = LifecycleConfiguration.newBuilder()
         .setBucketLayout(BucketLayoutProto.OBJECT_STORE)
         .setCreationTime(System.currentTimeMillis())
@@ -166,7 +175,7 @@ public class TestOMLifecycleConfigurationRequest {
         .setBucket(bucketName)
         .addRules(LifecycleRule.newBuilder()
             .setId(RandomStringUtils.randomAlphabetic(32))
-            .setEnabled(true)
+            .setEnabled(enabled)
             .addAction(LifecycleAction.newBuilder()
                 .setAbortIncompleteMultipartUpload(
                     AbortIncompleteMultipartUpload.newBuilder()
