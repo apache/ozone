@@ -1443,7 +1443,6 @@ public class KeyLifecycleService extends BackgroundService {
           LOG.debug("request size {} for {} keys", deleteKeysRequest.getSerializedSize(), keyCount);
 
           if (deleteKeysRequest.getSerializedSize() < ratisByteLimit) {
-            // perform preExecute as ratis submit does not perform preExecute
             OMRequest omRequestRaw = OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
                 .setVersion(ClientVersion.CURRENT_VERSION)
@@ -1458,6 +1457,7 @@ public class KeyLifecycleService extends BackgroundService {
               response = ugi.doAs(new PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>() {
                 @Override
                 public OzoneManagerProtocolProtos.OMResponse run() throws Exception {
+                  // perform preExecute as ratis submit does not perform preExecute
                   OMRequest omRequest = omClientRequest.preExecute(getOzoneManager());
                   return OzoneManagerRatisUtils.submitRequest(
                       getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
@@ -1695,6 +1695,7 @@ public class KeyLifecycleService extends BackgroundService {
     return ozoneTrash != null ? ozoneTrash : ozoneManager.getOzoneTrash();
   }
 
+  @VisibleForTesting
   public void setOzoneTrash(OzoneTrash ozoneTrash) {
     this.ozoneTrash = ozoneTrash;
   }

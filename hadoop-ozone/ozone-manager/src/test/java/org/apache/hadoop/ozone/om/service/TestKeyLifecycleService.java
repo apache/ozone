@@ -3447,11 +3447,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
   }
 
   /**
-   * Regression test: KeyLifecycleService must delete keys even when ozone.acl.enabled=true.
-   * Before the fix, sendDeleteKeysRequestAndClearList submitted DeleteKeys requests without
-   * userInfo (missing preExecute / ugi.doAs), causing UNAUTHORIZED when resolveBucketLink
-   * called createUGIForApi() on the blank-userName request. Uses OBJECT_STORE layout because
-   * that path calls sendDeleteKeysRequestAndClearList directly (not via moveToTrash).
+   * Tests when security is enabled.
    */
   @Nested
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -3502,6 +3498,30 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(0, getKeyCount(OBJECT_STORE) - initialKeyCount,
           "Keys should be deleted by lifecycle service but were not — "
               + "possible UNAUTHORIZED from missing userInfo in DeleteKeys request");
+    }
+
+    @Test
+    void testMoveToTrashWithAclsEnabled()
+        throws IOException, TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, KEY_COUNT, 1, "key", null);
+      assertEquals(KEY_COUNT, keyList.size());
+      final float trashInterval = 0.5f;
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>) () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
+      GenericTestUtils.waitFor(
+          () -> (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
     }
   }
 
