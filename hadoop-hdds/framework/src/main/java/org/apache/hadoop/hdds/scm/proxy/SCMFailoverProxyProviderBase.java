@@ -298,11 +298,23 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     // Both getHostString() and getAddress() read what was resolved when the proxy info was
     // built, so neither triggers a lookup here.
     String addressHost = address.getHostString();
-    if (addressHost.equalsIgnoreCase(host) || sameIpLiteral(addressHost, host)) {
+    if (sameHost(addressHost, host)) {
       return true;
     }
     InetAddress resolved = address.getAddress();
     return resolved != null && sameIpLiteral(resolved.getHostAddress(), host);
+  }
+
+  /**
+   * Whether two authority hosts denote the same SCM. Names are matched case-insensitively as DNS
+   * requires, while IP literals go through {@link #sameIpLiteral} so that an IPv6 zone keeps its
+   * case: eth0 and ETH0 are different interfaces.
+   */
+  private static boolean sameHost(String addressHost, String host) {
+    if (isIpLiteral(addressHost) || isIpLiteral(host)) {
+      return sameIpLiteral(addressHost, host);
+    }
+    return addressHost.equalsIgnoreCase(host);
   }
 
   /**
@@ -311,15 +323,25 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
    * so fe80::1%1 and fe80::1%2 differ, and so do %2 and %eth0 for the same interface.
    */
   private static boolean sameIpLiteral(String host, String otherHost) {
-    int mark = host.indexOf('%');
-    int otherMark = otherHost.indexOf('%');
-    String scope = mark < 0 ? "" : host.substring(mark + 1);
-    String otherScope = otherMark < 0 ? "" : otherHost.substring(otherMark + 1);
-    String ip = mark < 0 ? host : host.substring(0, mark);
-    String otherIp = otherMark < 0 ? otherHost : otherHost.substring(0, otherMark);
-    return scope.equals(otherScope)
+    String ip = stripScope(host);
+    String otherIp = stripScope(otherHost);
+    return scopeOf(host).equals(scopeOf(otherHost))
         && InetAddresses.isInetAddress(ip) && InetAddresses.isInetAddress(otherIp)
         && InetAddresses.forString(ip).equals(InetAddresses.forString(otherIp));
+  }
+
+  private static boolean isIpLiteral(String host) {
+    return InetAddresses.isInetAddress(stripScope(host));
+  }
+
+  private static String stripScope(String host) {
+    int mark = host.indexOf('%');
+    return mark < 0 ? host : host.substring(0, mark);
+  }
+
+  private static String scopeOf(String host) {
+    int mark = host.indexOf('%');
+    return mark < 0 ? "" : host.substring(mark + 1);
   }
 
   @Override

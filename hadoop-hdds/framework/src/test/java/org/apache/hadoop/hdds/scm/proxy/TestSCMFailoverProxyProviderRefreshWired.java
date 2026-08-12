@@ -200,6 +200,25 @@ public class TestSCMFailoverProxyProviderRefreshWired {
   }
 
   @Test
+  public void testSuggestedLeaderDistinguishesIpv6ZoneNameCase() {
+    SCMBlockLocationFailoverProxyProvider provider = newThreeNodeProvider();
+    // As above, but the scope is an interface name. Interface names are case-sensitive, so a
+    // case-insensitive host comparison matches one of the ETH0 nodes instead of scm3.
+    int port = proxyInfoOf(provider, SCM_NODE_3).getAddress().getPort();
+    for (SCMProxyInfo proxyInfo : new ArrayList<>(provider.getSCMProxyInfoList())) {
+      String host = SCM_NODE_3.equals(proxyInfo.getNodeId()) ? "fe80::1%eth0" : "fe80::1%ETH0";
+      provider.replaceProxyInfoForTest(proxyInfo.getNodeId(),
+          new SCMProxyInfo(proxyInfo.getServiceId(), proxyInfo.getNodeId(),
+              InetSocketAddress.createUnresolved(host, port)));
+    }
+
+    failoverWith(provider, notLeader("[fe80::1%eth0]:" + port));
+
+    assertEquals(SCM_NODE_3, provider.getCurrentProxySCMNodeId(),
+        "a differing IPv6 zone name must not be treated as the same SCM");
+  }
+
+  @Test
   public void testSuggestedLeaderMatchesResolvedAddressOfHostname() throws Exception {
     SCMBlockLocationFailoverProxyProvider provider = newThreeNodeProvider();
     SCMProxyInfo leaderProxy = proxyInfoOf(provider, SCM_NODE_3);
