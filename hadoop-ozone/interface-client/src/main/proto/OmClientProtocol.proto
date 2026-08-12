@@ -2254,8 +2254,11 @@ message SnapshotDiffResponse {
       SST_FILE_DELTA_DAG_WALK = 1;
       SST_FILE_DELTA_FULL_DIFF = 2;
       OBJECT_ID_MAP_GEN_OBS = 3;
-      OBJECT_ID_MAP_GEN_FSO = 4;
+      OBJECT_ID_MAP_GEN_FSO = 4 [deprecated = true];
       DIFF_REPORT_GEN = 5;
+      PATH_RESOLUTION_FSO = 6;
+      OBJECT_ID_MAP_GEN_FSO_FILE = 7;
+      OBJECT_ID_MAP_GEN_FSO_DIR = 8;
   }
 
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
@@ -2263,6 +2266,7 @@ message SnapshotDiffResponse {
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
   optional SubStatus subStatus = 5;
+  optional double progressPercent = 6;
 }
 
 message SubmitSnapshotDiffResponse {
