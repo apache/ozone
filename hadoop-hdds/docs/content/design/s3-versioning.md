@@ -180,7 +180,8 @@ between two versioned writes is not the oldest one;
   otherwise move the current version into versionedKeyTable, write the new record
   into keyTable as current, and delete the old null record (if any) from
   versionedKeyTable, blocks to deletedTable in both cases. Versions accumulated
-  while Enabled are unaffected. **PUT (Unversioned)**: unchanged from today.
+  while Enabled are unaffected. 
+- **PUT (Unversioned)**: unchanged from today.
 - **GET/HEAD**: without versionId, read keyTable; a current delete marker returns
   404 with `x-amz-delete-marker: true`. With versionId, check the current version
   first, then point-look-up versionedKeyTable; if the addressed version is a delete
@@ -227,91 +228,8 @@ extension over S3 semantics (comparable to Lifecycle `NewerNoncurrentVersions`).
 
 ## Interaction with Ozone snapshots
 
-**The first version does not allow both features on the same bucket.** The
-version-aware reclamation described in this section is deferred past it, and
-without that lookup the gap below is a data-loss path rather than a rough edge,
-so OM enforces the exclusion instead of documenting an expectation: snapshot
-creation is rejected on an ENABLED or SUSPENDED bucket, and enabling versioning
-or moving SUSPENDED → ENABLED is rejected while any snapshot exists in the
-bucket's path chain, following linked buckets to their source. SUSPENDED is
-covered along with ENABLED because a suspended bucket still holds noncurrent
-versions. ENABLED → SUSPENDED stays allowed even with snapshots present: it only
-reduces exposure, and a client must always be able to stop creating versions. So
-is setting the status a bucket already has, since an S3 client re-sending
-`PutBucketVersioning` must not fail against a bucket already in that state.
-Neither check is latched — once the last snapshot is purged, versioning can be
-enabled or resumed normally. Rejections return NOT_SUPPORTED_OPERATION with an
-explanatory message.
-
-The checks are exhaustive rather than best-effort, so a mixed bucket cannot
-arise on a released cluster: versioning is gated on `OMLayoutFeature`
-finalization, an OM that predates the feature cannot set a versioning status at
-all, and the two checks are enforced when the transaction applies rather than in
-preExecute, so Ratis orders them against each other and neither can slip past
-the other. There is correspondingly **no migration path and no legacy mixed
-state to be conservative about** — an earlier draft of this document assumed one.
-
-The single exception is an OM config key, false by default and documented as
-unsafe, which lifts both checks so that integration tests for the work described
-below can be written against a real mixed bucket. On a cluster running with that
-key, reclamation is *not* snapshot-aware and the data-loss path below is live;
-that is the point of marking it unsafe. The rest of this section is the design
-that lifts the restriction for good.
-
-A snapshot checkpoints the entire OM RocksDB, so versionedKeyTable is captured
-automatically along with the bucket's versioning status: a snapshot holds the
-complete version history as of its creation. Snapshot creation and deletion need
-no change — `SnapshotDeletingService` moves only deletedTable, deletedDirTable
-and snapshotRenamedTable entries between snapshots, and permanently deleted
-versions travel through deletedTable, the path already used when an overwrite
-reclaims the previous blocks. Multiple versions of one key queued for deletion
-share a deletedTable entry, which is a `RepeatedOmKeyInfo` list evaluated one
-record at a time, so no new structure is required there either.
-
-What does change is **block reclamation**. Snapshots share physical blocks with
-the active object store, so a snapshot keeps its data only because
-`KeyDeletingService` refuses to reclaim blocks that a previous snapshot still
-references. That decision is made per deletedTable record by
-`ReclaimableKeyFilter`, which resolves the key's path in the previous snapshot
-and looks it up **in keyTable only**
-(`KeyManagerImpl.getPreviousSnapshotOzoneKeyInfo`), then compares objectID and
-block locations. With versioning a key's live records span two tables, so the
-lookup misses: permanently deleting a noncurrent version resolves to whatever is
-current in the previous snapshot — a different record with different blocks —
-which reads as "not present in the previous snapshot", i.e. reclaimable. Blocks
-a snapshot still points at would be deleted. objectID does not rescue the
-comparison either way: `prepareFileInfo` keeps it stable across a key's versions,
-so it matches while the block lists do not.
-
-The fix is to make that lookup version-aware. A record carrying a `versionId`
-resolves to the exact dbKey `/{volume}/{bucket}/{keyName}\x00{MAX - versionId}` in
-the previous snapshot's versionedKeyTable, falling back to keyTable when that
-version was current there. Because versionId is frozen at creation and never
-reused, this is an exact point lookup that *replaces* — rather than extends — the
-objectID-plus-block-list heuristic for versioned buckets. The same lookup feeds
-`calculateExclusiveSize`, keeping snapshot exclusive-size reporting correct for
-noncurrent versions.
-
-This makes deletedTable the single choke point for version reclamation: every
-path that removes a version permanently — `DELETE ?versionId=`, the suspended
-null-slot overwrite, and VersionCleanupService — writes the record to deletedTable
-and lets KeyDeletingService apply the snapshot-aware filter. None of them may
-reclaim blocks directly.
-
-Snapshot diff remains a **current-version diff**; versionedKeyTable is
-deliberately not added to it. keyTable still holds exactly one record per key, so
-diff cost and semantics do not change as versions accumulate. One rule does need
-stating: **a key whose current version is a delete marker counts as absent**.
-Without it a delete surfaces as a MODIFY (if the marker carries the key's
-objectID) or as a DELETE plus a phantom CREATE (if it carries a new one), instead
-of the DELETE users expect; restoring an object by removing its marker reports
-CREATE correspondingly.
-
-Reads inside a snapshot go through `OmSnapshot`, which implements
-`IOmMetadataReader`, whose `lookupKey(OmKeyArgs)` has no version dimension.
-`?versionId=` is plumbed through it so versions retained in a snapshot are
-actually readable; `ListObjectVersions` against a snapshot is out of scope for
-the first version.
+* snapshot creation is only allowed on UNVERSIONED bucket
+* bucket versioning is only allowed to be turned on bucket which doesn't have any snapshot created.
 
 ## S3 Gateway and native API surface
 
