@@ -2585,6 +2585,54 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
 
     @Test
+    void testMoveToTrashRenameFailureRetriesWithoutDeleting() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String sourcePrefix = "data/key";
+      final String rulePrefix = "data/";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
+
+      String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
+      List<OmKeyArgs> sourceKeys =
+          createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, 1, 1, sourcePrefix, null);
+      String sourceKey = sourceKeys.get(0).getKeyName();
+
+      String conflictKey = TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner
+          + OM_KEY_PREFIX + CURRENT + OM_KEY_PREFIX + sourceKey;
+      createAndCommitKey(volumeName, bucketName, conflictKey, 1, null);
+      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+
+      final float trashInterval = 0.5f; // 30 seconds
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>)
+              () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      GenericTestUtils.LogCapturer log =
+          GenericTestUtils.LogCapturer.captureLogs(LoggerFactory.getLogger(KeyLifecycleService.class));
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, rulePrefix,
+          null, date.toString(), true);
+
+      try {
+        GenericTestUtils.waitFor(() -> log.getOutput().contains("Failed to move 1 expired key entries to trash"),
+            WAIT_CHECK_INTERVAL, 10000);
+
+        assertEquals(initialRenamedKeyCount, metrics.getNumKeyRenamed().value());
+        assertEquals(initialDeletedKeyCount, getDeletedKeyCount());
+        assertEquals(initialKeyCount, getKeyCount(FILE_SYSTEM_OPTIMIZED));
+
+        getDirectory(volumeName, bucketName, sourceKey);
+        getDirectory(volumeName, bucketName, conflictKey);
+      } finally {
+        deleteLifecyclePolicy(volumeName, bucketName);
+        log.stopCapturing();
+      }
+    }
+
+    @Test
     void testAbortIncompleteMultipartUploadWithFilters() throws Exception {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
