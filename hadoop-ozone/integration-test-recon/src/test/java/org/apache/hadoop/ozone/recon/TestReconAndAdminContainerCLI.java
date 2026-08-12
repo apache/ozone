@@ -67,12 +67,12 @@ import org.apache.hadoop.hdds.scm.node.NodeTestUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -177,7 +177,7 @@ class TestReconAndAdminContainerCLI {
     String volumeName = "vol1";
     String bucketName = "bucket1";
 
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(
         client, volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     String keyNameR3 = "key1";
@@ -208,7 +208,7 @@ class TestReconAndAdminContainerCLI {
     for (DatanodeDetails details : pipeline.getNodes()) {
       cluster.shutdownHddsDatanode(details);
     }
-    TestHelper.waitForReplicaCount(containerID, 0, cluster);
+    OzoneTestHelper.waitForReplicaCount(containerID, 0, cluster);
 
     GenericTestUtils.waitFor(() -> {
       try {
@@ -272,7 +272,7 @@ class TestReconAndAdminContainerCLI {
     // a new replica-copy is made to another node.
     // For maintenance, there is no replica-copy in this case.
     if (!isMaintenance) {
-      TestHelper.waitForReplicaCount(containerIdR3, 4, cluster);
+      OzoneTestHelper.waitForReplicaCount(containerIdR3, 4, cluster);
     }
 
     compareRMReportToReconResponse(underReplicatedState);
@@ -299,7 +299,7 @@ class TestReconAndAdminContainerCLI {
     // There will be a replica copy for both maintenance and decommission.
     // maintenance 3 -> 4, decommission 4 -> 5.
     int expectedReplicaNum = isMaintenance ? 4 : 5;
-    TestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
+    OzoneTestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
@@ -432,7 +432,7 @@ class TestReconAndAdminContainerCLI {
       ReplicationConfig replicationConfig)
       throws IOException {
     byte[] textBytes = "Testing".getBytes(UTF_8);
-    TestDataUtil.createKey(ozoneBucket, keyName, replicationConfig, textBytes);
+    DataTestUtil.createKey(ozoneBucket, keyName, replicationConfig, textBytes);
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
                             .setVolumeName(ozoneBucket.getVolumeName())

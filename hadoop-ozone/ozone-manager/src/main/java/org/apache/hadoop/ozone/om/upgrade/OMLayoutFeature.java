@@ -45,7 +45,8 @@ public enum OMLayoutFeature implements LayoutFeature {
   HBASE_SUPPORT(7, "Full support of hsync, lease recovery and listOpenFiles APIs for HBase"),
   DELEGATION_TOKEN_SYMMETRIC_SIGN(8, "Delegation token signed by symmetric key"),
   SNAPSHOT_DEFRAG(9, "Supporting defragmentation of snapshot"),
-  S3_LIFECYCLE_SUPPORT(10, "S3 bucket lifecycle configuration support");
+  S3_LIFECYCLE_SUPPORT(10, "S3 bucket lifecycle configuration support"),
+  MPU_PARTS_TABLE_SPLIT(11, "Split multipart table into separate table for parts and key");
 
   ///////////////////////////////  /////////////////////////////
 

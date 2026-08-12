@@ -2183,7 +2183,16 @@
     <value>30s</value>
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
-      Timeout for ozone grpc client during read.
+      Timeout for ozone grpc and short-circuit client during read.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.write.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone short-circuit client during write.
     </description>
   </property>
 
@@ -4007,6 +4016,16 @@
   </property>
 
   <property>
+    <name>hdds.heartbeat.address.refresh.missed-count-threshold</name>
+    <value>3</value>
+    <tag>OZONE, DATANODE, HA</tag>
+    <description>Consecutive heartbeat failures the DataNode tolerates
+      against one SCM endpoint before re-resolving its hostname. Only
+      consulted when ozone.client.failover.resolve-needed is true.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
@@ -5240,6 +5259,21 @@
     <description>Maximum number of multipart upload parts (rounded up to complete uploads)
       to abort in a single task when processing AbortIncompleteMultipartUpload
       lifecycle rules.
+    </description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.state.save.interval.ms</name>
+    <value>300000</value>
+    <tag>OZONE</tag>
+    <description>The interval of bucket scan task saves its pointer to DB. Default is 5 mins.</description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.state.save.keys.processed</name>
+    <value>100000</value>
+    <tag>OZONE</tag>
+    <description>Bucket scan task will save its pointer to DB by default every 100000 keys are scanned. Bucket scan
+      pointer save will happen when either ozone.lifecycle.service.state.save.interval.ms or
+      ozone.lifecycle.service.state.save.keys.processed is satisfied.
     </description>
   </property>
 </configuration>

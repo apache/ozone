@@ -144,6 +144,28 @@ public class TestMultipartUploadComplete {
   }
 
   @Test
+  public void testMultipartStoresStandardObjectHeaders() throws Exception {
+    String key = UUID.randomUUID().toString();
+    when(headers.getHeaderString(HttpHeaders.CACHE_CONTROL)).thenReturn("no-cache");
+    when(headers.getHeaderString(HttpHeaders.EXPIRES)).thenReturn("Wed, 21 Oct 2015 07:29:00 GMT");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_ENCODING)).thenReturn("gzip");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LANGUAGE)).thenReturn("en-CA");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_DISPOSITION)).thenReturn("inline");
+
+    String uploadID = initiateMultipartUpload(key);
+    Part part1 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "Multipart Upload 1");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part1));
+
+    Response headResponse = rest.head(OzoneConsts.S3_BUCKET, key);
+    assertEquals("no-cache", headResponse.getHeaderString(HttpHeaders.CACHE_CONTROL));
+    assertEquals("Wed, 21 Oct 2015 07:29:00 GMT",
+        headResponse.getHeaderString(HttpHeaders.EXPIRES));
+    assertEquals("gzip", headResponse.getHeaderString(HttpHeaders.CONTENT_ENCODING));
+    assertEquals("en-CA", headResponse.getHeaderString(HttpHeaders.CONTENT_LANGUAGE));
+    assertEquals("inline", headResponse.getHeaderString(HttpHeaders.CONTENT_DISPOSITION));
+  }
+
+  @Test
   public void testMultipartInvalidPartOrderError() throws Exception {
 
     // Initiate multipart upload

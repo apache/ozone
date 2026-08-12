@@ -81,15 +81,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Helpers for container tests.
  */
-public final class TestHelper {
+public final class OzoneTestHelper {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestHelper.class);
+      LoggerFactory.getLogger(OzoneTestHelper.class);
 
   /**
    * Never constructed.
    */
-  private TestHelper() {
+  private OzoneTestHelper() {
   }
 
   public static boolean isContainerClosed(MiniOzoneCluster cluster,

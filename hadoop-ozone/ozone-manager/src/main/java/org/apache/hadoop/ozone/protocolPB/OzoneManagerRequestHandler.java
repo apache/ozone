@@ -406,11 +406,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             getObjectTagging(request.getGetObjectTaggingRequest());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
         break;
-      case GetBucketTagging:
-        GetBucketTaggingResponse getBucketTaggingResponse =
-            getBucketTagging(request.getGetBucketTaggingRequest());
-        responseBuilder.setGetBucketTaggingResponse(getBucketTaggingResponse);
-        break;
       case GetLifecycleConfiguration:
         GetLifecycleConfigurationResponse getLifecycleConfigurationResponse =
             infoLifecycleConfiguration(
@@ -423,6 +418,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             impl.getLifecycleServiceStatus();
         responseBuilder.setGetLifecycleServiceStatusResponse(
             getLifecycleServiceStatusResponse);
+        break;
+      case GetBucketTagging:
+        GetBucketTaggingResponse getBucketTaggingResponse =
+            getBucketTagging(request.getGetBucketTaggingRequest());
+        responseBuilder.setGetBucketTaggingResponse(getBucketTaggingResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1481,6 +1481,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     if (response.getSnapshotDiffReport() != null) {
       builder.setSnapshotDiffReport(
           response.getSnapshotDiffReport().toProtobuf());
+    }
+    if (response.getSubStatus() != null) {
+      builder.setSubStatus(response.getSubStatus().toProtoBuf());
+      if (response.getSubStatus().hasProgress()) {
+        builder.setProgressPercent(response.getProgressPercent());
+      }
     }
 
     return builder.build();

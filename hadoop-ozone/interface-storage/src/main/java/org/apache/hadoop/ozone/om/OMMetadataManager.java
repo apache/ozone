@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -498,6 +499,13 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   Table<String, CompactionLogEntry> getCompactionLogTable();
 
   Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable();
+
+  /**
+   * Gets the LifecycleScanStateTable.
+   *
+   * @return Table
+   */
+  Table<String, OmLifecycleScanState> getLifecycleScanStateTable();
 
   /**
    * @return list all LifecycleConfigurations.

@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.tracing.InternalSpanKind;
 import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -302,6 +303,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @throws IOException if an I/O error occurs
    */
   @Override
+  @InternalSpanKind
   public void close() throws IOException {
     //transport is not reusable
     transport.close();
@@ -1468,12 +1470,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OzoneManagerProtocolProtos.SnapshotDiffResponse diffResponse =
         omResponse.getSnapshotDiffResponse();
 
-    return new SnapshotDiffResponse(SnapshotDiffReportOzone.fromProtobuf(
-        diffResponse.getSnapshotDiffReport()),
+    SnapshotDiffResponse result = new SnapshotDiffResponse(
+        SnapshotDiffReportOzone.fromProtobuf(diffResponse.getSnapshotDiffReport()),
         JobStatus.fromProtobuf(diffResponse.getJobStatus()),
         diffResponse.getWaitTimeInMs(),
         diffResponse.getReason(),
         reportOnly);
+    if (diffResponse.hasSubStatus()) {
+      result.setSubStatus(SnapshotDiffResponse.SubStatus.fromProtoBuf(diffResponse.getSubStatus()));
+      if (diffResponse.hasProgressPercent()) {
+        result.setProgressPercent(diffResponse.getProgressPercent());
+      }
+    }
+    return result;
   }
 
   /**
@@ -2191,6 +2200,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  @SkipTracing
   public ThreadLocal<S3Auth> getS3CredentialsProvider() {
     return this.threadLocalS3Auth;
   }
@@ -2768,48 +2778,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
-    BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setVolumeName(args.getVolumeName())
-        .setBucketName(args.getBucketName())
-        .build();
-
-    GetBucketTaggingRequest req =
-        GetBucketTaggingRequest.newBuilder()
-            .setBucketArgs(bucketArgs)
-            .build();
-
-    OMRequest omRequest = createOMRequest(Type.GetBucketTagging)
-        .setGetBucketTaggingRequest(req)
-        .build();
-
-    GetBucketTaggingResponse resp =
-        handleError(submitRequest(omRequest)).getGetBucketTaggingResponse();
-
-    return KeyValueUtil.getFromProtobuf(resp.getTagsList());
-  }
-
-  @Override
-  public void putBucketTagging(OmBucketArgs args) throws IOException {
-    BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setVolumeName(args.getVolumeName())
-        .setBucketName(args.getBucketName())
-        .addAllTags(KeyValueUtil.toProtobuf(args.getTags()))
-        .build();
-
-    PutBucketTaggingRequest req =
-        PutBucketTaggingRequest.newBuilder()
-            .setBucketArgs(bucketArgs)
-            .build();
-
-    OMRequest omRequest = createOMRequest(Type.PutBucketTagging)
-        .setPutBucketTaggingRequest(req)
-        .build();
-
-    handleError(submitRequest(omRequest));
-  }
-
-  @Override
   public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
       String bucketName) throws IOException {
     GetLifecycleConfigurationRequest.Builder req =
@@ -2877,19 +2845,42 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void deleteBucketTagging(OmBucketArgs args) throws IOException {
+  public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .build();
 
-    DeleteBucketTaggingRequest req =
-        DeleteBucketTaggingRequest.newBuilder()
+    GetBucketTaggingRequest req =
+        GetBucketTaggingRequest.newBuilder()
             .setBucketArgs(bucketArgs)
             .build();
 
-    OMRequest omRequest = createOMRequest(Type.DeleteBucketTagging)
-        .setDeleteBucketTaggingRequest(req)
+    OMRequest omRequest = createOMRequest(Type.GetBucketTagging)
+        .setGetBucketTaggingRequest(req)
+        .build();
+
+    GetBucketTaggingResponse resp =
+        handleError(submitRequest(omRequest)).getGetBucketTaggingResponse();
+
+    return KeyValueUtil.getFromProtobuf(resp.getTagsList());
+  }
+
+  @Override
+  public void putBucketTagging(OmBucketArgs args) throws IOException {
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .addAllTags(KeyValueUtil.toProtobuf(args.getTags()))
+        .build();
+
+    PutBucketTaggingRequest req =
+        PutBucketTaggingRequest.newBuilder()
+            .setBucketArgs(bucketArgs)
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.PutBucketTagging)
+        .setPutBucketTaggingRequest(req)
         .build();
 
     handleError(submitRequest(omRequest));
@@ -2918,6 +2909,25 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.SetLifecycleServiceStatus)
         .setSetLifecycleServiceStatusRequest(setLifecycleServiceStatusRequest)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public void deleteBucketTagging(OmBucketArgs args) throws IOException {
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .build();
+
+    DeleteBucketTaggingRequest req =
+        DeleteBucketTaggingRequest.newBuilder()
+            .setBucketArgs(bucketArgs)
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.DeleteBucketTagging)
+        .setDeleteBucketTaggingRequest(req)
         .build();
 
     handleError(submitRequest(omRequest));

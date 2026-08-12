@@ -2190,7 +2190,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       List<String> ratisRoles = server.getRatisRoles();
       List<List<String>> result = new ArrayList<>();
       for (String role : ratisRoles) {
-        String[] roleArr = role.split(":");
+        String[] roleArr = HddsUtils.parseRatisRoleString(role);
         List<String> scmInfo = new ArrayList<>();
         // Host Name
         scmInfo.add(roleArr[0]);

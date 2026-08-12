@@ -54,11 +54,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 /**
- * Utility to help to generate test data.
+ * Utility class with helper methods for creating and managing test data in integration tests.
  */
-public final class TestDataUtil {
+public final class DataTestUtil {
 
-  private TestDataUtil() {
+  private DataTestUtil() {
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
