@@ -326,6 +326,7 @@ public final class OzoneConsts {
   public static final String TENANT = "tenant";
   public static final String USER_PREFIX = "userPrefix";
   public static final String REWRITE_GENERATION = "rewriteGeneration";
+  public static final String DELETED_KEY_SOURCE_TYPE = "deletedKeySourceType";
   /** Sentinel generation used to request atomic create-if-not-exists(put if absent) semantics. */
   public static final long EXPECTED_GEN_CREATE_IF_ABSENT = 0L;
   public static final String FROM_SNAPSHOT = "fromSnapshot";

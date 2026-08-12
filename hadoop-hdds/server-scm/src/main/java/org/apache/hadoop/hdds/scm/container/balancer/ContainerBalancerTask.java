@@ -85,7 +85,6 @@ public class ContainerBalancerTask implements Runnable {
   private ContainerBalancer containerBalancer;
   private final SCMContext scmContext;
   private int totalNodesInCluster;
-  private double maxDatanodesRatioToInvolvePerIteration;
   private long maxSizeToMovePerIteration;
   private int countDatanodesInvolvedPerIteration;
   private long sizeScheduledForMoveInLatestIteration;
@@ -537,8 +536,6 @@ public class ContainerBalancerTask implements Runnable {
       return false;
     }
 
-    this.maxDatanodesRatioToInvolvePerIteration =
-        config.getMaxDatanodesRatioToInvolvePerIteration();
     this.maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
 
     this.excludeNodes = config.getExcludeNodes();
@@ -939,7 +936,7 @@ public class ContainerBalancerTask implements Runnable {
   private boolean adaptWhenNearingIterationLimits() {
     // check if we're nearing max datanodes to involve
     int maxDatanodesToInvolve =
-        (int) (maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster);
+        config.computeMaxDatanodesToInvolvePerIteration(totalNodesInCluster);
     if (countDatanodesInvolvedPerIteration + 1 == maxDatanodesToInvolve) {
       /* We're one datanode away from reaching the limit. Restrict potential
       targets to targets that have already been selected.
@@ -966,7 +963,7 @@ public class ContainerBalancerTask implements Runnable {
   private boolean adaptOnReachingIterationLimits() {
     // check if we've reached max datanodes to involve limit
     int maxDatanodesToInvolve =
-        (int) (maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster);
+        config.computeMaxDatanodesToInvolvePerIteration(totalNodesInCluster);
     if (countDatanodesInvolvedPerIteration == maxDatanodesToInvolve) {
       // restrict both to already selected sources and targets
       findTargetStrategy.resetPotentialTargets(selectedTargets);
@@ -1172,14 +1169,7 @@ public class ContainerBalancerTask implements Runnable {
    * @return true if Datanode should be excluded, else false
    */
   private boolean shouldExcludeDatanode(DatanodeDetails datanode) {
-    if (excludeNodes.contains(datanode.getHostName()) ||
-        excludeNodes.contains(datanode.getIpAddress())) {
-      return true;
-    } else if (!includeNodes.isEmpty()) {
-      return !includeNodes.contains(datanode.getHostName()) &&
-          !includeNodes.contains(datanode.getIpAddress());
-    }
-    return false;
+    return ContainerBalancer.shouldExcludeDatanode(datanode, excludeNodes, includeNodes);
   }
 
   /**

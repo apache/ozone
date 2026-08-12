@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -151,7 +151,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
-    TestHelper.waitForPipelineClose(key, cluster, false);
+    OzoneTestHelper.waitForPipelineClose(key, cluster, false);
     key.flush();
     assertInstanceOf(GroupMismatchException.class,
         HddsClientUtils.checkForException(blockOutputStream.getIoException()));
@@ -165,13 +165,13 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
                                       long size) throws Exception {
-    return TestHelper
+    return OzoneTestHelper
         .createKey(keyName, type, ReplicationFactor.ONE,
             size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    TestHelper
+    OzoneTestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

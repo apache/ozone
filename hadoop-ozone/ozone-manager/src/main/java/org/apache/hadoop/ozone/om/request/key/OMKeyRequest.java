@@ -57,11 +57,14 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -69,6 +72,7 @@ import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -189,15 +193,38 @@ public abstract class OMKeyRequest extends OMClientRequest {
       UserInfo userInfo, OzoneManager ozoneManager)
       throws IOException {
     final long scmBlockSize = ozoneManager.getScmBlockSize();
+    final KeyManager keyManager = ozoneManager.getKeyManager();
 
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
     final int numBlocks = (int) Math.min(ozoneManager.getPreallocateBlocksMax(),
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
-    String clientMachine = "";
-    if (shouldSortDatanodes) {
-      clientMachine = userInfo.getRemoteAddress();
+    final String scmClientMachine;
+    final String omClientMachine;
+    // Sorted order cached by datanode set so blocks whose pipelines share the
+    // same datanodes are sorted once (mirrors the read path's caching). Keyed by
+    // the UUID set so it is order-insensitive and dedups across pipelines.
+    final Map<Set<String>, List<? extends DatanodeDetails>> sortedByNodes;
+    final String remoteAddress = userInfo.getRemoteAddress();
+    final NetworkTopology clusterMap = shouldSortDatanodes
+        && keyManager.isSortDatanodesForWriteEnabled()
+        ? ozoneManager.getClusterMapAllowNull() : null;
+    if (!shouldSortDatanodes) {
+      scmClientMachine = "";
+      omClientMachine = "";
+      sortedByNodes = null;
+    } else if (clusterMap != null && !remoteAddress.isEmpty()) {
+      // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
+      scmClientMachine = "";
+      omClientMachine = remoteAddress;
+      sortedByNodes = new HashMap<>();
+    } else {
+      // Sort in SCM (or keep order when remoteAddress is empty, since SCM skips
+      // sorting for an empty client machine).
+      scmClientMachine = remoteAddress;
+      omClientMachine = "";
+      sortedByNodes = null;
     }
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
@@ -205,7 +232,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = ozoneManager.getScmClient().getBlockClient().allocateBlock(
-          scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, clientMachine);
+          scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, scmClientMachine);
     } catch (SCMException ex) {
       ozoneManager.getMetrics().incNumBlockAllocateCallFails();
       if (ex.getResult() == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {
@@ -216,11 +243,30 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
+      Pipeline pipeline = allocatedBlock.getPipeline();
+      if (sortedByNodes != null) {
+        final List<DatanodeDetails> nodes = pipeline.getNodes();
+        final Set<String> uuidSet = nodes.stream()
+            .map(DatanodeDetails::getUuidString).collect(Collectors.toSet());
+        List<? extends DatanodeDetails> sorted = sortedByNodes.get(uuidSet);
+        if (sorted == null) {
+          sorted = keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap);
+          // Cache only a freshly sorted order, not an input list returned
+          // unchanged when the client is unresolved: that order is per-pipeline
+          // and must not be reused for another pipeline with the same node set.
+          if (sorted != nodes) {
+            sortedByNodes.put(uuidSet, sorted);
+          }
+        }
+        if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
+          pipeline = pipeline.copyWithNodesInOrder(sorted);
+        }
+      }
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
           .setBlockID(blockID)
           .setLength(scmBlockSize)
           .setOffset(0)
-          .setPipeline(allocatedBlock.getPipeline());
+          .setPipeline(pipeline);
       if (ozoneManager.isGrpcBlockTokenEnabled()) {
         final Token<OzoneBlockTokenIdentifier> token = ozoneManager.getBlockTokenSecretManager().generateToken(
             remoteUser, blockID, READ_WRITE, scmBlockSize);
@@ -898,6 +944,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Return bucket info for the specified bucket.
+   * <p>
+   * The returned {@link OmBucketInfo} is the cached instance, returned by
+   * reference. A caller that mutates it (for example quota accounting) before a
+   * point where the request may still fail must first take a
+   * {@link OmBucketInfo#copyObject()} and publish that copy only on success,
+   * otherwise a failed request leaks the mutation into the cache.
    */
   @Nullable
   public static OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
