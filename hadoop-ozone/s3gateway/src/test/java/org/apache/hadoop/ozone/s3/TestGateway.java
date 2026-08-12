@@ -19,14 +19,11 @@ package org.apache.hadoop.ozone.s3;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.StringWriter;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
-import org.apache.log4j.Level;
-import org.apache.log4j.PatternLayout;
-import org.apache.log4j.WriterAppender;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,18 +53,8 @@ public class TestGateway {
 
   @Test
   void redirectsJulLogsToSlf4j() {
-    String loggerName = TestGateway.class.getName();
-    Logger julLogger = Logger.getLogger(loggerName);
-    org.apache.log4j.Logger log4jLogger =
-        org.apache.log4j.Logger.getLogger(loggerName);
-    Level originalLevel = log4jLogger.getLevel();
-    boolean originalAdditivity = log4jLogger.getAdditivity();
-    StringWriter output = new StringWriter();
-    WriterAppender appender = new WriterAppender(
-        new PatternLayout("%m%n"), output);
-    log4jLogger.setLevel(Level.WARN);
-    log4jLogger.setAdditivity(false);
-    log4jLogger.addAppender(appender);
+    Logger julLogger = Logger.getLogger(TestGateway.class.getName());
+    LogCapturer logCapturer = LogCapturer.captureLogs(TestGateway.class);
     rootLogger.addHandler(new ConsoleHandler());
 
     try {
@@ -80,12 +67,9 @@ public class TestGateway {
       String message = "JUL warning redirected to the S3 Gateway log";
       julLogger.warning(message);
 
-      assertThat(output.toString()).contains(message);
+      assertThat(logCapturer.getOutput()).contains(message);
     } finally {
-      log4jLogger.removeAppender(appender);
-      appender.close();
-      log4jLogger.setLevel(originalLevel);
-      log4jLogger.setAdditivity(originalAdditivity);
+      logCapturer.stopCapturing();
     }
   }
 
