@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,6 +101,11 @@ public final class CommandDispatcher {
         handler.handle(command, container, context, connectionManager);
       } catch (Exception ex) {
         LOG.error("Exception while handle command, ", ex);
+        if (StateContext.isReplicationCommand(command.getType())) {
+          // The handler threw before the task reached the replication supervisor, so nothing else
+          // will report an outcome. Drain the PENDING entry to stop it being resent forever.
+          context.updateCommandStatus(command.getId(), CommandStatus::markAsFailed);
+        }
       }
     } else {
       LOG.error("Unknown SCM Command queued. There is no handler for this " +

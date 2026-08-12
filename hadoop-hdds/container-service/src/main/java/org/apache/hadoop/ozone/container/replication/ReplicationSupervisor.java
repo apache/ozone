@@ -274,8 +274,7 @@ public final class ReplicationSupervisor {
       initCounters(task);
       addToQueue(task);
     } else {
-      // Queue is full: drain the PENDING status entry so SCM can reschedule promptly.
-      updateCommandStatus(task, CommandStatus::markAsFailed);
+      reportTerminalStatus(task);
     }
   }
 
@@ -310,8 +309,8 @@ public final class ReplicationSupervisor {
 
   private void addToQueue(AbstractReplicationTask task) {
     if (!inFlight.add(task)) {
-      // An equivalent task is already in flight. Drain this command's status without
-      // asking SCM to clear the pending op that represents the running work.
+      // An equivalent task is already in flight and will do the work. EXECUTED drains this
+      // command's own entry without asking SCM to reschedule.
       updateCommandStatus(task, CommandStatus::markAsExecuted);
       return;
     }
@@ -332,8 +331,7 @@ public final class ReplicationSupervisor {
     queuedCounter.get(task.getMetricName()).decrementAndGet();
     inFlight.remove(task);
     decrementTaskCounter(task);
-    // The task never runs, so drain the PENDING status entry to let SCM reschedule promptly.
-    updateCommandStatus(task, CommandStatus::markAsFailed);
+    reportTerminalStatus(task);
   }
 
   private ExecutorService selectExecutor(AbstractReplicationTask task) {
@@ -387,6 +385,19 @@ public final class ReplicationSupervisor {
       return;
     }
     context.updateCommandStatus(cmdId, updater);
+  }
+
+  /**
+   * Reports a terminal status so the PENDING entry drains: EXECUTED when the task needs no retry,
+   * FAILED otherwise so SCM clears the pending op and can reschedule.
+   */
+  private void reportTerminalStatus(AbstractReplicationTask task) {
+    Status status = task.getStatus();
+    if (status == Status.DONE || status == Status.SKIPPED) {
+      updateCommandStatus(task, CommandStatus::markAsExecuted);
+    } else {
+      updateCommandStatus(task, CommandStatus::markAsFailed);
+    }
   }
 
   private void decrementTaskCounter(AbstractReplicationTask task) {
@@ -451,8 +462,7 @@ public final class ReplicationSupervisor {
       queuedCounter.get(task.getMetricName()).decrementAndGet();
       inFlight.remove(task);
       decrementTaskCounter(task);
-      // The task never runs, so drain the PENDING status entry to let SCM reschedule promptly.
-      updateCommandStatus(task, CommandStatus::markAsFailed);
+      reportTerminalStatus(task);
     }
   }
 
@@ -565,8 +575,6 @@ public final class ReplicationSupervisor {
           LOG.info("Ignoring {} since the deadline has passed ({} < {})",
               this, Instant.ofEpochMilli(deadline), Instant.ofEpochMilli(now));
           timeoutCounter.get(task.getMetricName()).incrementAndGet();
-          // FAILED drains the PENDING status entry so SCM can clear and reschedule promptly.
-          updateCommandStatus(task, CommandStatus::markAsFailed);
           return;
         }
 
@@ -576,7 +584,6 @@ public final class ReplicationSupervisor {
           if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {
             LOG.info("Ignoring {} since SCM leader has new term ({} < {})",
                 this, taskTerm, currentTerm.getAsLong());
-            updateCommandStatus(task, CommandStatus::markAsFailed);
             return;
           }
         }
@@ -586,28 +593,23 @@ public final class ReplicationSupervisor {
         if (task.getStatus() == Status.FAILED) {
           LOG.warn("Failed {}", this);
           failureCounter.get(task.getMetricName()).incrementAndGet();
-          updateCommandStatus(task, CommandStatus::markAsFailed);
         } else if (task.getStatus() == Status.DONE) {
           LOG.info("Successful {}", this);
           successCounter.get(task.getMetricName()).incrementAndGet();
-          // Mark EXECUTED (non-PENDING) so CommandStatusReportPublisher drains this entry from the status map.
-          updateCommandStatus(task, CommandStatus::markAsExecuted);
         } else if (task.getStatus() == Status.SKIPPED) {
           LOG.info("Skipped {}", this);
           skippedCounter.get(task.getMetricName()).incrementAndGet();
-          // SKIPPED means the replica already exists; EXECUTED drains the entry.
-          updateCommandStatus(task, CommandStatus::markAsExecuted);
         }
       } catch (Exception e) {
         task.setStatus(Status.FAILED);
         LOG.warn("Failed {}", this, e);
         failureCounter.get(task.getMetricName()).incrementAndGet();
-        updateCommandStatus(task, CommandStatus::markAsFailed);
       } finally {
         queuedCounter.get(task.getMetricName()).decrementAndGet();
         opsLatencyMs.get(task.getMetricName()).add(Time.monotonicNow() - startTime);
         inFlight.remove(task);
         decrementTaskCounter(task);
+        reportTerminalStatus(task);
       }
     }
 
