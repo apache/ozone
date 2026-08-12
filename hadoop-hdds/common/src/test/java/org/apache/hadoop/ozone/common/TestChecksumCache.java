@@ -93,12 +93,37 @@ class TestChecksumCache {
     }
   }
 
+  @ParameterizedTest
+  @EnumSource(value = ChecksumType.class, names = {"CRC32", "CRC32C", "SHA256", "MD5"})
+  void testPartiallyPositionedMultiBufferMatchesDirectChecksum(
+      ChecksumType checksumType) throws Exception {
+    final int bytesPerChecksum = 4;
+    final byte[] data = new byte[11];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+
+    final Checksum direct = new Checksum(checksumType, bytesPerChecksum);
+    final Checksum cached = new Checksum(checksumType, bytesPerChecksum, true);
+    final ChecksumData expected = direct.computeChecksum(partiallyPositioned(data));
+    final ChecksumData actual = cached.computeChecksum(partiallyPositioned(data), true);
+
+    Assertions.assertEquals(expected.getChecksums(), actual.getChecksums());
+  }
+
   private static ChunkBuffer split(byte[] data, int length, int bufferSize) {
     final List<ByteBuffer> buffers = new ArrayList<>();
     for (int offset = 0; offset < length; offset += bufferSize) {
       final int size = Math.min(bufferSize, length - offset);
       buffers.add(ByteBuffer.wrap(data, offset, size).slice());
     }
+    return ChunkBuffer.wrap(buffers);
+  }
+
+  private static ChunkBuffer partiallyPositioned(byte[] data) {
+    final List<ByteBuffer> buffers = new ArrayList<>();
+    buffers.add(ByteBuffer.wrap(data, 3, 4));
+    buffers.add(ByteBuffer.wrap(data, 7, 4).slice());
     return ChunkBuffer.wrap(buffers);
   }
 }

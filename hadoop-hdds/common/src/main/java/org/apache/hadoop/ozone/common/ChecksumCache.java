@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.common;
 
+import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,15 +86,16 @@ public class ChecksumCache {
       throw new IllegalArgumentException("bytesPerChecksum mismatch: cache="
           + bytesPerChecksum + " call=" + chksumSize);
     }
-    final int currChunkLength = data.limit();
+    final int currChunkLength = data.remaining();
 
     if (currChunkLength == prevChunkLength) {
-      LOG.debug("ChunkBuffer data limit same as last time ({}). No new checksums need to be computed", prevChunkLength);
+      LOG.debug("ChunkBuffer data length same as last time ({}). "
+          + "No new checksums need to be computed", prevChunkLength);
       return checksums;
     }
     if (currChunkLength < prevChunkLength) {
       // Indicates a bug: BOS did not clear() the cache before starting a new chunk.
-      throw new IllegalArgumentException("ChunkBuffer data limit (" + currChunkLength + ")"
+      throw new IllegalArgumentException("ChunkBuffer data length (" + currChunkLength + ")"
           + " must not be smaller than last time (" + prevChunkLength + ")");
     }
 
@@ -157,7 +159,9 @@ public class ChecksumCache {
     // i can either point to the last cached element (recompute - the
     // previously-partial trailing window) or one past it (append a new
     // checksum for newly-arrived bytes).
-    assert i == checksums.size() - 1 || i == checksums.size();
+    Preconditions.checkState(
+        i == checksums.size() - 1 || i == checksums.size(),
+        "Unexpected checksum index %s for cache size %s", i, checksums.size());
     if (i == checksums.size()) {
       checksums.add(cs);
     } else {
