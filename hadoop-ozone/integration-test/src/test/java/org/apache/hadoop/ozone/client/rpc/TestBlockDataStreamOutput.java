@@ -69,6 +69,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests BlockDataStreamOutput class.
@@ -288,12 +289,33 @@ public class TestBlockDataStreamOutput {
       assertThat(metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock))
           .isLessThanOrEqualTo(pendingPutBlockCount + 1);
       key.close();
-      // Since data length is 500, first putBlock will be at 400 (flush boundary).
-      // Close commits via WriteAsync PutBlock only when putBlockOnClose is disabled.
-      int expectedPutBlocks = putBlockOnCloseEnabled ? 1 : 2;
-      assertEquals(
-          metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
-          putBlockCount + expectedPutBlocks);
+      // With putBlockOnClose enabled, mid-stream and close PutBlocks use DataStream
+      // (commandAsync and stream append) instead of Raft writeAsync, so client PutBlock
+      // metrics stay unchanged. With the config off, both go through Raft (+2 here).
+      int expectedRaftPutBlocks = putBlockOnCloseEnabled ? 0 : 2;
+      assertEquals(putBlockCount + expectedRaftPutBlocks,
+          metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
+      validateData(client, keyName, data);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testMidStreamFlushPutBlockCommitPath(boolean putBlockOnCloseEnabled)
+      throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), false, putBlockOnCloseEnabled);
+    try (OzoneClient client = newClient(cluster.getConf(), config)) {
+      int dataLength = 500;
+      XceiverClientMetrics metrics = XceiverClientManager.getXceiverClientMetrics();
+      long putBlockCount = metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock);
+      String keyName = getKeyName();
+      OzoneDataStreamOutput key = createKey(client, keyName, dataLength);
+      byte[] data = ContainerTestHelper.generateData(dataLength, false);
+      key.write(ByteBuffer.wrap(data));
+      key.close();
+      int expectedRaftPutBlocks = putBlockOnCloseEnabled ? 0 : 2;
+      assertEquals(putBlockCount + expectedRaftPutBlocks,
+          metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
       validateData(client, keyName, data);
     }
   }
