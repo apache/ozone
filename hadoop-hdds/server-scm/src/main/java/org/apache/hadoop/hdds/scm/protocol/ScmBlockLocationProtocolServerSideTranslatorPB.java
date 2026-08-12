@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
@@ -229,16 +232,33 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       }
       HddsProtos.Pipeline pipelineProto = pipelineProtoCache.get(pipeline.getId());
       if (pipelineProto == null) {
-        ComponentVersion pipelineVersion = ScmVersionManager.computeCommonVersion(pipeline.getNodes());
+        // Pipeline members are frozen copies rebuilt from the replicated pipeline proto, so their currentVersion can
+        // be stale; resolve the authoritative value from the live node registry before computing the minimum.
+        ComponentVersion pipelineVersion = ScmVersionManager.computeCommonVersion(resolveCurrentVersions(pipeline));
         pipelineProto = pipeline.getProtobufMessage(clientVersion, Name.IO_PORTS, pipelineVersion);
         pipelineProtoCache.put(pipeline.getId(), pipelineProto);
       }
       builder.addBlocks(AllocateBlockResponse.newBuilder()
           .setContainerBlockID(block.getBlockID().getProtobuf())
-          .setPipeline(block.getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS)));
+          .setPipeline(pipelineProto));
     }
 
     return builder.build();
+  }
+
+  /**
+   * Resolves each pipeline member's current version from the live node registry, falling back to the pipeline's own
+   * copy when the node is no longer known to SCM.
+   */
+  private List<DatanodeDetails> resolveCurrentVersions(Pipeline pipeline) {
+    NodeManager nodeManager = scm.getScmNodeManager();
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+    List<DatanodeDetails> resolved = new ArrayList<>(nodes.size());
+    for (DatanodeDetails dn : nodes) {
+      DatanodeInfo info = nodeManager.getNode(dn.getID());
+      resolved.add(info != null ? info : dn);
+    }
+    return resolved;
   }
 
   public DeleteScmKeyBlocksResponseProto deleteScmKeyBlocks(

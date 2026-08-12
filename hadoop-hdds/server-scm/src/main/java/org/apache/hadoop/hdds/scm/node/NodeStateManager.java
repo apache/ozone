@@ -38,6 +38,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -315,6 +316,17 @@ public class NodeStateManager implements Runnable, Closeable {
       throws NodeNotFoundException {
     nodeStateMap.getNodeInfo(datanodeDetails.getID())
         .updateLastHeartbeatTime();
+  }
+
+  /**
+   * Updates the current version reported by the node on its heartbeat.
+   *
+   * @throws NodeNotFoundException if the node is not present
+   */
+  public void updateCurrentVersion(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    nodeStateMap.getNodeInfo(datanodeDetails.getID())
+        .updateCurrentVersion(datanodeDetails.getCurrentVersion());
   }
 
   /**

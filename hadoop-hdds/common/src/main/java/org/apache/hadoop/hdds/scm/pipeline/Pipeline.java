@@ -39,7 +39,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -371,12 +370,13 @@ public final class Pipeline {
 
   public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion,
       Set<DatanodeDetails.Port.Name> filterPorts) {
-    return getProtobufMessage(clientVersion, filterPorts, HDDSVersion.SOFTWARE_VERSION);
+    return getProtobufMessage(clientVersion, filterPorts, null);
   }
 
   /**
-   * @param datanodeVersion when non-null, set as the currentVersion on each member proto. Used on the write path
-   *     to advertise a pipeline-wide version that clients should target.
+   * @param datanodeVersion write-path override: when non-null, set as the currentVersion on <b>every</b> member
+   *     proto so clients target a single pipeline-wide version. Read-path callers should use the 1-arg or 2-arg
+   *     overloads, which pass {@code null} and preserve each member's own reported currentVersion.
    */
   public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion, Set<DatanodeDetails.Port.Name> filterPorts,
       ComponentVersion datanodeVersion) {
@@ -384,9 +384,11 @@ public final class Pipeline {
     List<Integer> memberReplicaIndexes = new ArrayList<>();
 
     for (DatanodeDetails dn : nodeStatus.keySet()) {
-      members.add(dn.toProtoBuilder(clientVersion, filterPorts)
-          .setCurrentVersion(datanodeVersion.serialize())
-          .build());
+      HddsProtos.DatanodeDetailsProto.Builder memberBuilder = dn.toProtoBuilder(clientVersion, filterPorts);
+      if (datanodeVersion != null) {
+        memberBuilder.setCurrentVersion(datanodeVersion.serialize());
+      }
+      members.add(memberBuilder.build());
       memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
     }
 
