@@ -49,7 +49,7 @@ public class ReplicationStatusHandler implements EventHandler<ReplicationStatus>
     LOG.debug("Processing {} failed replication command statuses from datanode {}.",
         status.getCmdStatus().size(), status.getDatanodeDetails());
     status.getCmdStatus().forEach(cmdStatus ->
-        containerReplicaPendingOps.onReplicationCommandFailed(cmdStatus.getCmdId()));
+        containerReplicaPendingOps.onReplicationCommandFailed(cmdStatus.getCmdId(), status.getDatanodeDetails()));
   }
 
 }

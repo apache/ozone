@@ -669,6 +669,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
     command.setDeadline(datanodeDeadline);
+    command.setRecipient(target.getID());
     nodeManager.addDatanodeCommand(target.getID(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);

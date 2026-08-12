@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import org.apache.hadoop.hdds.HddsIdFactory;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -51,14 +52,13 @@ public class TestReplicationStatusHandler {
         .setStatus(CommandStatus.Status.FAILED)
         .setType(Type.replicateContainerCommand)
         .build();
-    ReplicationStatus status = new ReplicationStatus(
-        Collections.singletonList(cmdStatus),
-        MockDatanodeDetails.randomDatanodeDetails());
+    DatanodeDetails reporter = MockDatanodeDetails.randomDatanodeDetails();
+    ReplicationStatus status = new ReplicationStatus(Collections.singletonList(cmdStatus), reporter);
 
     ReplicationStatusHandler handler = new ReplicationStatusHandler(pendingOps, scmContext);
     handler.onMessage(status, publisher);
 
-    verify(pendingOps).onReplicationCommandFailed(cmdId);
+    verify(pendingOps).onReplicationCommandFailed(cmdId, reporter);
   }
 
   @Test

@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class to track pending replication operations across the cluster. For
@@ -45,6 +47,8 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  * operations.
  */
 public class ContainerReplicaPendingOps {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerReplicaPendingOps.class);
 
   private static final int RATIS_COUNTER_INDEX = 0;
   private static final int EC_COUNTER_INDEX = 1;
@@ -308,8 +312,9 @@ public class ContainerReplicaPendingOps {
    * are notified with timedOut=true so ReplicationManager re-evaluates the container.
    *
    * @param cmdId the id of the failed command, as reported by the datanode
+   * @param reporter the datanode that reported the failure
    */
-  public void onReplicationCommandFailed(long cmdId) {
+  public void onReplicationCommandFailed(long cmdId, DatanodeDetails reporter) {
     ContainerID containerID = commandIdToContainer.get(cmdId);
     if (containerID == null) {
       // Already completed, already expired, or not a tracked replication op.
@@ -321,22 +326,29 @@ public class ContainerReplicaPendingOps {
     try {
       List<ContainerReplicaOp> ops = pendingOps.get(containerID);
       if (ops == null) {
+        commandIdToContainer.remove(cmdId);
         return;
       }
       Iterator<ContainerReplicaOp> iterator = ops.listIterator();
       while (iterator.hasNext()) {
         ContainerReplicaOp op = iterator.next();
-        if (op.getCommand() != null && op.getCommand().getId() == cmdId) {
-          iterator.remove();
-          if (op.getOpType() == ADD) {
-            releaseScheduledContainerSize(op);
-          }
-          decrementCounter(op.getOpType(), op.getReplicaIndex());
-          commandIdToContainer.remove(cmdId);
-          updateFailureMetrics(op);
-          failedOps.add(op);
+        // Only ADD ops are cleared here. Expired DELETE ops are deliberately kept for resend by
+        // removeExpiredEntries, and a failure report must not bypass that.
+        if (op.getOpType() != ADD || op.getCommand() == null || op.getCommand().getId() != cmdId) {
+          continue;
         }
+        if (!reporter.getID().equals(op.getCommand().getRecipient())) {
+          LOG.warn("Datanode {} reported command {} for container {} as failed, but the command was sent to {}.",
+              reporter, cmdId, containerID, op.getCommand().getRecipient());
+          continue;
+        }
+        iterator.remove();
+        releaseScheduledContainerSize(op);
+        decrementCounter(op.getOpType(), op.getReplicaIndex());
+        updateFailureMetrics(op);
+        failedOps.add(op);
       }
+      removeCommandIndexIfUnused(cmdId, ops);
       if (ops.isEmpty()) {
         pendingOps.remove(containerID);
       }
