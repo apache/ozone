@@ -158,6 +158,7 @@ public class StateContext {
   private final AtomicLong reconHeartbeatFrequency;
 
   private final int maxCommandQueueLimit;
+  private final boolean replicationCommandStatusReportEnabled;
 
   private final String threadNamePrefix;
 
@@ -177,6 +178,7 @@ public class StateContext {
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
     maxCommandQueueLimit = dnConf.getCommandQueueLimit();
+    replicationCommandStatusReportEnabled = dnConf.isReplicationCommandStatusReportEnabled();
     this.state = state;
     this.parentDatanodeStateMachine = parent;
     commandQueue = new LinkedList<>();
@@ -768,8 +770,7 @@ public class StateContext {
         LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
             " stale term {}, latest term {}.",
             command, command.getTerm(), currentTerm);
-        if (command.getType() == SCMCommandProto.Type.replicateContainerCommand
-            || command.getType() == SCMCommandProto.Type.reconstructECContainersCommand) {
+        if (isReplicationCommand(command.getType())) {
           updateCommandStatus(command.getId(), CommandStatus::markAsFailed);
         }
       }
@@ -789,8 +790,7 @@ public class StateContext {
       if (commandQueue.size() >= maxCommandQueueLimit) {
         LOG.warn("Ignore command as command queue crosses max limit {}.",
             maxCommandQueueLimit);
-        if (command.getType() == SCMCommandProto.Type.replicateContainerCommand
-            || command.getType() == SCMCommandProto.Type.reconstructECContainersCommand) {
+        if (isReplicationCommand(command.getType())) {
           addCmdStatus(command);
           updateCommandStatus(command.getId(), CommandStatus::markAsFailed);
         }
@@ -849,6 +849,12 @@ public class StateContext {
     cmdStatusMap.put(key, status);
   }
 
+  /** Command types whose status is tracked as PENDING until the replication supervisor reports an outcome. */
+  public static boolean isReplicationCommand(SCMCommandProto.Type type) {
+    return type == SCMCommandProto.Type.replicateContainerCommand
+        || type == SCMCommandProto.Type.reconstructECContainersCommand;
+  }
+
   /**
    * Adds a {@link CommandStatus} to the State Machine for given SCMCommand.
    *
@@ -862,8 +868,7 @@ public class StateContext {
               .setStatus(Status.PENDING)
               .setType(cmd.getType())
               .build());
-    } else if (cmd.getType() == SCMCommandProto.Type.replicateContainerCommand
-        || cmd.getType() == SCMCommandProto.Type.reconstructECContainersCommand) {
+    } else if (replicationCommandStatusReportEnabled && isReplicationCommand(cmd.getType())) {
       addCmdStatus(cmd.getId(),
           CommandStatusBuilder.newBuilder()
               .setCmdId(cmd.getId())

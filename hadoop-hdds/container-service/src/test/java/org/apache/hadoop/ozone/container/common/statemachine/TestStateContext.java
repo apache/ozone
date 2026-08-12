@@ -757,12 +757,24 @@ public class TestStateContext {
     assertTrue(termOfLeaderSCM.isPresent());
     assertEquals(originalTerm, termOfLeaderSCM.getAsLong());
     assertNull(subject.getNextCommand());
-    assertEquals(FAILED, subject.getCommandStatusMap().get(commandWithNewTerm.getId()).getStatus());
+  }
+
+  @Test
+  public void staleTermCommandIsReportedFailed() throws IOException {
+    StateContext subject = createSubject(statusReportingEnabledConf());
+    SCMCommand<?> staleCommand = someCommand();
+    subject.setTermOfLeaderSCM(2);
+    staleCommand.setTerm(1);
+
+    subject.addCommand(staleCommand);
+
+    assertNull(subject.getNextCommand());
+    assertEquals(FAILED, subject.getCommandStatusMap().get(staleCommand.getId()).getStatus());
   }
 
   @Test
   public void addCmdStatusRegistersPendingForReplication() throws IOException {
-    StateContext ctx = createSubject();
+    StateContext ctx = createSubject(statusReportingEnabledConf());
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(1L, MockDatanodeDetails.randomDatanodeDetails());
     ctx.addCmdStatus(cmd);
@@ -777,6 +789,7 @@ public class TestStateContext {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeConfiguration dnConf = new DatanodeConfiguration();
     dnConf.setCommandQueueLimit(1);
+    dnConf.setReplicationCommandStatusReportEnabled(true);
     conf.setFromObject(dnConf);
     StateContext ctx = createSubject(conf);
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
@@ -789,8 +802,25 @@ public class TestStateContext {
     assertEquals(FAILED, ctx.getCommandStatusMap().get(cmd.getId()).getStatus());
   }
 
+  @Test
+  public void addCmdStatusSkipsReplicationWhenReportingDisabled() throws IOException {
+    StateContext ctx = createSubject(new OzoneConfiguration());
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(1L, MockDatanodeDetails.randomDatanodeDetails());
+    ctx.addCmdStatus(cmd);
+    assertTrue(ctx.getCommandStatusMap().isEmpty());
+  }
+
   private static StateContext createSubject() throws IOException {
     return createSubject(new OzoneConfiguration());
+  }
+
+  private static OzoneConfiguration statusReportingEnabledConf() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeConfiguration dnConf = new DatanodeConfiguration();
+    dnConf.setReplicationCommandStatusReportEnabled(true);
+    conf.setFromObject(dnConf);
+    return conf;
   }
 
   private static StateContext createSubject(OzoneConfiguration conf) throws IOException {
