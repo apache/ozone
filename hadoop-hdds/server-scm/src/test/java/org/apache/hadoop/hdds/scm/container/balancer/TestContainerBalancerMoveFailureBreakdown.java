@@ -20,18 +20,24 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests that {@link ContainerBalancerTask} records failure breakdown and details
@@ -51,8 +57,8 @@ class TestContainerBalancerMoveFailureBreakdown {
     ContainerBalancerTask task = mockedScm.startBalancerTask(buildConfig(mockedScm));
     ContainerBalancerTaskIterationStatusInfo iteration = getCompletedIteration(task);
 
-    assertThat(iteration.getContainerMovesTimeout()).isGreaterThan(0);
-    assertFailureBreakdown(iteration, MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT.name());
+    assertThat(iteration.getContainerMovesTimeout()).isEqualTo(1);
+    assertFailureBreakdown(mockedScm, iteration, MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT.name(), 0);
   }
 
   @Test
@@ -64,8 +70,9 @@ class TestContainerBalancerMoveFailureBreakdown {
     ContainerBalancerTask task = mockedScm.startBalancerTask(buildConfig(mockedScm));
     ContainerBalancerTaskIterationStatusInfo iteration = getCompletedIteration(task);
 
-    assertThat(iteration.getContainerMovesFailed()).isGreaterThan(0);
-    assertFailureBreakdown(iteration, MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE.name());
+    assertThat(iteration.getContainerMovesFailed()).isEqualTo(1);
+    assertFailureBreakdown(mockedScm, iteration,
+            MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE.name(), 0);
   }
 
   @Test
@@ -77,8 +84,8 @@ class TestContainerBalancerMoveFailureBreakdown {
     ContainerBalancerTask task = mockedScm.startBalancerTask(buildConfig(mockedScm));
     ContainerBalancerTaskIterationStatusInfo iteration = getCompletedIteration(task);
 
-    assertThat(iteration.getContainerMovesTimeout()).isGreaterThan(0);
-    assertFailureBreakdown(iteration, MoveManager.MoveResult.DELETION_FAIL_TIME_OUT.name());
+    assertThat(iteration.getContainerMovesTimeout()).isEqualTo(1);
+    assertFailureBreakdown(mockedScm, iteration, MoveManager.MoveResult.DELETION_FAIL_TIME_OUT.name(), 0);
   }
 
   @Test
@@ -87,17 +94,14 @@ class TestContainerBalancerMoveFailureBreakdown {
     MockedSCM mockedScm = createMockedScm();
     ContainerBalancerConfiguration config = buildConfig(mockedScm);
     config.setMoveTimeout(Duration.ofMillis(50));
-
-    when(mockedScm.getMoveManager().move(any(ContainerID.class),
-        any(DatanodeDetails.class), any(DatanodeDetails.class)))
-        .thenAnswer(invocation -> slowMoveFuture(150));
+    mockFirstMoveNeverCompletes(mockedScm);
 
     ContainerBalancerTask task = mockedScm.startBalancerTask(config);
     ContainerBalancerTaskIterationStatusInfo iteration = getCompletedIteration(task);
 
-    assertThat(iteration.getContainerMovesTimeout()).isGreaterThanOrEqualTo(1);
-    assertFailureBreakdown(iteration,
-        ContainerBalancerTask.ContainerMoveFailureReason.ITERATION_MOVE_TIMEOUT.name());
+    assertThat(iteration.getContainerMovesTimeout()).isEqualTo(1);
+    assertFailureBreakdown(mockedScm, iteration,
+            ContainerBalancerTask.ContainerMoveFailureReason.ITERATION_MOVE_TIMEOUT.name(), 0);
   }
 
   @Test
@@ -117,6 +121,8 @@ class TestContainerBalancerMoveFailureBreakdown {
 
     assertThat(iteration.getContainerMovesTimeout()).isEqualTo(1);
     assertThat(iteration.getContainerMovesFailed()).isEqualTo(1);
+    verify(mockedScm.getMoveManager(), atLeast(2)).move(
+            any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class));
     assertBreakdownTotalsMatchHeadlineCounters(iteration);
   }
 
@@ -132,9 +138,57 @@ class TestContainerBalancerMoveFailureBreakdown {
     ContainerBalancerTask task = mockedScm.startBalancerTask(buildConfig(mockedScm));
     ContainerBalancerTaskIterationStatusInfo iteration = getCompletedIteration(task);
 
-    assertThat(iteration.getContainerMovesFailed()).isGreaterThan(0);
-    assertFailureBreakdown(iteration,
-        ContainerBalancerTask.ContainerMoveFailureReason.PRE_MOVE_CONTAINER_NOT_FOUND.name());
+    assertThat(iteration.getContainerMovesFailed()).isEqualTo(1);
+    assertFailureBreakdown(mockedScm, iteration,
+            ContainerBalancerTask.ContainerMoveFailureReason.PRE_MOVE_CONTAINER_NOT_FOUND.name(), 0);
+  }
+
+  @Test
+  void testSameReasonAggregatesSourceFailureCountsFromMultipleSources()
+          throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
+    MockedSCM mockedScm = createMockedScm();
+    ContainerBalancerConfiguration config = buildConfig(mockedScm);
+
+    // Pin two over-utilized sources and one under-utilized target so two different sources are used.
+    DatanodeUsageInfo[] nodes = mockedScm.getCluster().getNodesInCluster();
+    config.setIncludeNodes(
+            nodes[NODE_COUNT - 2].getDatanodeDetails().getHostName() + ","
+                    + nodes[NODE_COUNT - 1].getDatanodeDetails().getHostName() + ","
+                    + nodes[0].getDatanodeDetails().getHostName());
+
+    when(mockedScm.getMoveManager().move(any(ContainerID.class),
+            any(DatanodeDetails.class), any(DatanodeDetails.class)))
+            .thenReturn(CompletableFuture.completedFuture(
+                    MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT))
+            .thenReturn(CompletableFuture.completedFuture(
+                    MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT))
+            .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
+
+    ContainerBalancerTask task = mockedScm.startBalancerTask(config);
+    ContainerBalancerTaskIterationStatusInfo iteration = getCompletedIteration(task);
+
+    assertThat(iteration.getContainerMovesTimeout()).isEqualTo(2);
+
+    ArgumentCaptor<DatanodeDetails> sourceCaptor = ArgumentCaptor.forClass(DatanodeDetails.class);
+    ArgumentCaptor<DatanodeDetails> targetCaptor = ArgumentCaptor.forClass(DatanodeDetails.class);
+    verify(mockedScm.getMoveManager(), atLeast(2)).move(
+            any(ContainerID.class), sourceCaptor.capture(), targetCaptor.capture());
+
+    String sourceUuid1 = sourceCaptor.getAllValues().get(0).getUuidString();
+    String sourceUuid2 = sourceCaptor.getAllValues().get(1).getUuidString();
+    assertThat(sourceUuid1).isNotEqualTo(sourceUuid2);
+
+    String expectedReason = MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT.name();
+    ContainerMoveFailureDetail detail = iteration.getFailures().stream()
+            .filter(f -> expectedReason.equals(f.getReason()))
+            .findFirst()
+            .orElse(null);
+    assertThat(detail).as("failure detail for reason " + expectedReason).isNotNull();
+    assertThat(detail.getCount()).isEqualTo(2L);
+    assertThat(detail.getSourceFailureCounts())
+            .hasSize(2)
+            .containsEntry(sourceUuid1, 1L)
+            .containsEntry(sourceUuid2, 1L);
   }
 
   private static MockedSCM createMockedScm() {
@@ -147,6 +201,19 @@ class TestContainerBalancerMoveFailureBreakdown {
         any(DatanodeDetails.class), any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.completedFuture(failureResult))
         .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
+  }
+
+  private static void mockFirstMoveNeverCompletes(MockedSCM mockedScm)
+          throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
+    AtomicInteger moveInvocations = new AtomicInteger(0);
+    when(mockedScm.getMoveManager().move(any(ContainerID.class),
+            any(DatanodeDetails.class), any(DatanodeDetails.class)))
+            .thenAnswer(invocation -> {
+              if (moveInvocations.getAndIncrement() == 0) {
+                return new CompletableFuture<>();
+              }
+              return CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
+            });
   }
 
   private static ContainerBalancerConfiguration buildConfig(MockedSCM mockedScm) {
@@ -167,17 +234,6 @@ class TestContainerBalancerMoveFailureBreakdown {
     return iteration;
   }
 
-  private static CompletableFuture<MoveManager.MoveResult> slowMoveFuture(int sleepMillis) {
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        Thread.sleep(sleepMillis);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-      return MoveManager.MoveResult.COMPLETED;
-    });
-  }
-
   private static void assertBreakdownTotalsMatchHeadlineCounters(
       ContainerBalancerTaskIterationStatusInfo iteration) {
     long breakdownTotal = iteration.getFailures().stream()
@@ -188,8 +244,18 @@ class TestContainerBalancerMoveFailureBreakdown {
         "sum(failure breakdown) should equal failed + timeout counters");
   }
 
-  private static void assertFailureBreakdown(
-      ContainerBalancerTaskIterationStatusInfo iteration, String expectedReason) {
+  private static void assertFailureBreakdown(MockedSCM mockedScm, ContainerBalancerTaskIterationStatusInfo iteration,
+      String expectedReason, int moveIndex) throws NodeNotFoundException, ContainerReplicaNotFoundException,
+      ContainerNotFoundException {
+    ArgumentCaptor<DatanodeDetails> sourceCaptor = ArgumentCaptor.forClass(DatanodeDetails.class);
+    ArgumentCaptor<DatanodeDetails> targetCaptor = ArgumentCaptor.forClass(DatanodeDetails.class);
+    verify(mockedScm.getMoveManager(), atLeastOnce()).move(
+            any(ContainerID.class), sourceCaptor.capture(), targetCaptor.capture());
+    assertThat(sourceCaptor.getAllValues().size()).isGreaterThan(moveIndex);
+    assertThat(targetCaptor.getAllValues().size()).isGreaterThan(moveIndex);
+    String sourceUuid = sourceCaptor.getAllValues().get(moveIndex).getUuidString();
+    String targetUuid = targetCaptor.getAllValues().get(moveIndex).getUuidString();
+
     List<ContainerMoveFailureDetail> failures = iteration.getFailures();
     assertThat(failures).as("failure details").isNotEmpty();
     ContainerMoveFailureDetail detail = failures.stream()
@@ -197,8 +263,8 @@ class TestContainerBalancerMoveFailureBreakdown {
         .findFirst()
         .orElse(null);
     assertThat(detail).as("failure detail for reason " + expectedReason).isNotNull();
-    assertThat(detail.getCount()).isGreaterThanOrEqualTo(1L);
-    assertThat(detail.getSourceFailureCounts()).isNotEmpty();
-    assertThat(detail.getTargetFailureCounts()).isNotEmpty();
+    assertThat(detail.getCount()).isEqualTo(1L);
+    assertThat(detail.getSourceFailureCounts()).hasSize(1).containsEntry(sourceUuid, 1L);
+    assertThat(detail.getTargetFailureCounts()).hasSize(1).containsEntry(targetUuid, 1L);
   }
 }
