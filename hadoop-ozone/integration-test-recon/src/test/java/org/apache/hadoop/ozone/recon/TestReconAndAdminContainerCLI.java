@@ -116,10 +116,12 @@ class TestReconAndAdminContainerCLI {
   private static final int RM_RECON_COMPARE_STABLE_POLLS = 2;
   /**
    * Max wait for a decommission/maintenance triggered replica copy to be reflected in SCM. The
-   * default {@link OzoneTestHelper#waitForReplicaCount} budget (30s) is not always enough on a
-   * loaded CI runner, which is the recurring flake tracked in HDDS-11128 (see also HDDS-10582).
+   * default {@link OzoneTestHelper#waitForReplicaCount(long, int, MiniOzoneCluster)} budget (30s)
+   * is occasionally not enough on a loaded CI runner (the recurring flake tracked in HDDS-11128,
+   * see also HDDS-10582), so give these waits double the headroom. The happy path returns as soon
+   * as the copy lands.
    */
-  private static final int REPLICA_COPY_WAIT_MS = 120_000;
+  private static final int REPLICA_COPY_WAIT_MS = 60_000;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static ScmClient scmClient;
