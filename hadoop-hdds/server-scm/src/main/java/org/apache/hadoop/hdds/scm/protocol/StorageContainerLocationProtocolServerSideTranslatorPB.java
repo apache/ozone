@@ -35,14 +35,17 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
@@ -147,6 +150,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
@@ -808,7 +812,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     );
     ContainerWithPipeline cp = impl.allocateContainer(replicationConfig, request.getOwner());
     return ContainerResponseProto.newBuilder()
-        .setContainerWithPipeline(cp.getProtobuf(clientVersion))
+        .setContainerWithPipeline(cp.getProtobuf(clientVersion, currentVersions(cp)))
         .setErrorCode(ContainerResponseProto.Error.success)
         .build();
 
@@ -839,7 +843,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     ContainerWithPipeline container = impl
         .getContainerWithPipeline(request.getContainerID());
     return GetContainerWithPipelineResponseProto.newBuilder()
-        .setContainerWithPipeline(container.getProtobuf(clientVersion))
+        .setContainerWithPipeline(container.getProtobuf(clientVersion, currentVersions(container)))
         .build();
   }
 
@@ -852,7 +856,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     GetContainerWithPipelineBatchResponseProto.Builder builder =
         GetContainerWithPipelineBatchResponseProto.newBuilder();
     for (ContainerWithPipeline container : containers) {
-      builder.addContainerWithPipelines(container.getProtobuf(clientVersion));
+      builder.addContainerWithPipelines(container.getProtobuf(clientVersion, currentVersions(container)));
     }
     return builder.build();
   }
@@ -866,9 +870,23 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     GetExistContainerWithPipelinesInBatchResponseProto.Builder builder =
         GetExistContainerWithPipelinesInBatchResponseProto.newBuilder();
     for (ContainerWithPipeline container : containers) {
-      builder.addContainerWithPipelines(container.getProtobuf(clientVersion));
+      builder.addContainerWithPipelines(container.getProtobuf(clientVersion, currentVersions(container)));
     }
     return builder.build();
+  }
+
+  private Map<DatanodeID, ComponentVersion> currentVersions(ContainerWithPipeline containerWithPipeline)
+      throws SCMException {
+    Map<DatanodeID, ComponentVersion> memberVersions = new HashMap<>();
+    for (DatanodeDetails dn : containerWithPipeline.getPipeline().getNodes()) {
+      DatanodeInfo live = scm.getScmNodeManager().getNode(dn.getID());
+      if (live == null) {
+        throw new SCMException("Failed to lookup datanode " + dn + " in NodeManager",
+            SCMException.ResultCodes.NO_SUCH_DATANODE);
+      }
+      memberVersions.put(live.getID(), live.getCurrentVersion());
+    }
+    return memberVersions;
   }
 
   public SCMListContainerResponseProto listContainer(

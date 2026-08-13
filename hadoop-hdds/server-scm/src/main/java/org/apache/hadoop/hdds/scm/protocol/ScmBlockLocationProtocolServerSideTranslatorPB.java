@@ -52,7 +52,6 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
@@ -234,7 +233,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       if (pipelineProto == null) {
         // Pipeline members are frozen copies rebuilt from the replicated pipeline proto, so their currentVersion can
         // be stale; resolve the authoritative value from the live node registry before computing the minimum.
-        ComponentVersion pipelineVersion = ScmVersionManager.computeCommonVersion(resolveCurrentVersions(pipeline));
+        ComponentVersion pipelineVersion = ScmVersionManager.computeCommonVersion(currentNodes(pipeline.getNodes()));
         pipelineProto = pipeline.getProtobufMessage(clientVersion, Name.IO_PORTS, pipelineVersion);
         pipelineProtoCache.put(pipeline.getId(), pipelineProto);
       }
@@ -246,19 +245,17 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     return builder.build();
   }
 
-  /**
-   * Resolves each pipeline member's current version from the live node registry, falling back to the pipeline's own
-   * copy when the node is no longer known to SCM.
-   */
-  private List<DatanodeDetails> resolveCurrentVersions(Pipeline pipeline) {
-    NodeManager nodeManager = scm.getScmNodeManager();
-    List<DatanodeDetails> nodes = pipeline.getNodes();
-    List<DatanodeDetails> resolved = new ArrayList<>(nodes.size());
+  private List<DatanodeDetails> currentNodes(List<DatanodeDetails> nodes) throws SCMException {
+    List<DatanodeDetails> memberVersions = new ArrayList<>();
     for (DatanodeDetails dn : nodes) {
-      DatanodeInfo info = nodeManager.getNode(dn.getID());
-      resolved.add(info != null ? info : dn);
+      DatanodeInfo live = scm.getScmNodeManager().getNode(dn.getID());
+      if (live == null) {
+        throw new SCMException("Failed to lookup datanode " + dn + " in NodeManager",
+            SCMException.ResultCodes.NO_SUCH_DATANODE);
+      }
+      memberVersions.add(live);
     }
-    return resolved;
+    return memberVersions;
   }
 
   public DeleteScmKeyBlocksResponseProto deleteScmKeyBlocks(

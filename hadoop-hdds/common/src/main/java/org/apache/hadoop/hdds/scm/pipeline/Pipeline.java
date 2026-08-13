@@ -365,28 +365,38 @@ public final class Pipeline {
   }
 
   public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion) {
-    return getProtobufMessage(clientVersion, Collections.emptySet());
-  }
-
-  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion,
-      Set<DatanodeDetails.Port.Name> filterPorts) {
-    return getProtobufMessage(clientVersion, filterPorts, null);
+    return getProtobufMessageInternal(clientVersion, Collections.emptySet(), null);
   }
 
   /**
-   * @param datanodeVersion write-path override: when non-null, set as the currentVersion on <b>every</b> member
-   *     proto so clients target a single pipeline-wide version. Read-path callers should use the 1-arg or 2-arg
-   *     overloads, which pass {@code null} and preserve each member's own reported currentVersion.
+   * Write-path override: when {@code datanodeVersion} is non-null it is set as the currentVersion on <b>every</b>
+   * member proto, so clients target a single pipeline-wide version (typically the pipeline minimum).
    */
   public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion, Set<DatanodeDetails.Port.Name> filterPorts,
       ComponentVersion datanodeVersion) {
+    return getProtobufMessageInternal(clientVersion, filterPorts,
+        datanodeVersion == null ? null : nodeId -> datanodeVersion);
+  }
+
+  /**
+   * Read-path override: set each member proto's currentVersion from {@code memberVersions} (keyed by datanode id),
+   * so clients see each datanode's own up-to-date version. Members absent from the map keep their own version.
+   */
+  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion, Set<DatanodeDetails.Port.Name> filterPorts,
+      Map<DatanodeID, ComponentVersion> memberVersions) {
+    return getProtobufMessageInternal(clientVersion, filterPorts,
+        memberVersions == null ? null : memberVersions::get);
+  }
+
+  private HddsProtos.Pipeline getProtobufMessageInternal(ClientVersion clientVersion,
+      Set<DatanodeDetails.Port.Name> filterPorts, Function<DatanodeID, ComponentVersion> versionOverride) {
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     List<Integer> memberReplicaIndexes = new ArrayList<>();
 
     for (DatanodeDetails dn : nodeStatus.keySet()) {
       HddsProtos.DatanodeDetailsProto.Builder memberBuilder = dn.toProtoBuilder(clientVersion, filterPorts);
-      if (datanodeVersion != null) {
-        memberBuilder.setCurrentVersion(datanodeVersion.serialize());
+      if (versionOverride != null) {
+        memberBuilder.setCurrentVersion(versionOverride.apply(dn.getID()).serialize());
       }
       members.add(memberBuilder.build());
       memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
