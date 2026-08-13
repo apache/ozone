@@ -537,7 +537,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
           if (readBlock.hasChunkInfoList()) {
             verifyChecksumForReadBlock(data, checksumData, readBlock);
           } else {
-            throw new IOException("Checksum data is missing for block " + getBlockID());
+            Checksum.verifyChecksum(data, checksumData, 0);
           }
         }
         offerToQueue(readBlock);

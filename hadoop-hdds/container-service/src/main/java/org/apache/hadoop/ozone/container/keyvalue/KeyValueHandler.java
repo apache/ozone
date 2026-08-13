@@ -2300,7 +2300,7 @@ public class KeyValueHandler extends Handler {
     }
     try {
       final long startTime = Time.monotonicNow();
-      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
+      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver);
       KeyValueContainerData containerData = (KeyValueContainerData) kvContainer
           .getContainerData();
       HddsVolume volume = containerData.getVolume();
@@ -2324,7 +2324,7 @@ public class KeyValueHandler extends Handler {
   }
 
   private long readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
-      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean verifyChecksum)
+      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
     int responseDataSize = readBlock.getResponseDataSize();
@@ -2382,16 +2382,16 @@ public class KeyValueHandler extends Handler {
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
         final List<ByteString> checksums = getChecksums(adjustedOffset, readLength,
-            bytesPerChunk, bytesPerChecksum, chunkInfos);
+            bytesPerChunk, chunkInfos);
         LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChunk {}, bytesPerChecksum {}",
             readBlock, adjustedOffset, readLength, bytesPerChunk, bytesPerChecksum);
         checksumData = new ChecksumData(checksumType, bytesPerChecksum, checksums);
-        if (verifyChecksum) {
+        if (validateChunkChecksumData) {
           Checksum.verifyChecksum(buffer.duplicate(), checksumData, 0);
         }
       }
       final ContainerCommandResponseProto response = getReadBlockResponse(
-          request, checksumData, buffer, adjustedOffset, chunkInfos, verifyChecksum);
+          request, checksumData, buffer, adjustedOffset, chunkInfos);
       final int dataLength = response.getReadBlock().getData().size();
       LOG.debug("server onNext response {}: dataLength={}, numChecksums={}",
           numResponses, dataLength, response.getReadBlock().getChecksumData().getChecksumsList().size());
@@ -2425,7 +2425,7 @@ public class KeyValueHandler extends Handler {
     return blockOffset;
   }
 
-  static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChunk, int bytesPerChecksum,
+  static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChecksum,
       final List<ContainerProtos.ChunkInfo> chunks) {
     final List<ByteString> checksums = new ArrayList<>();
 

@@ -347,7 +347,7 @@ public final class ContainerCommandResponseBuilders {
 
   public static ContainerCommandResponseProto getReadBlockResponse(
       ContainerCommandRequestProto request, ChecksumData checksumData,
-      ByteBuffer data, long offset, List<ChunkInfo> chunkInfoList, boolean verifyChecksum) {
+      ByteBuffer data, long offset, List<ChunkInfo> chunkInfoList) {
 
     ContainerProtos.ReadBlockResponseProto response = ReadBlockResponseProto.newBuilder()
         .setChecksumData(checksumData.getProtoBufMessage())

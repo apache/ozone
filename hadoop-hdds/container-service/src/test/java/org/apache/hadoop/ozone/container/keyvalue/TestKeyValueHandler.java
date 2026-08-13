@@ -1210,7 +1210,7 @@ public class TestKeyValueHandler {
     // Read full block (1024 + 10 + 2048)
     long adjustedOffset = getAdjustedOffset(blockOffset1, chunks, bytesPerChecksum);
     assertEquals(0, adjustedOffset);
-    List<ByteString> checksums = KeyValueHandler.getChecksums(adjustedOffset, 3082, bytesPerChunk, bytesPerChecksum, chunks);
+    List<ByteString> checksums = KeyValueHandler.getChecksums(adjustedOffset, 3082, bytesPerChunk, chunks);
     assertEquals(4, checksums.size());
     assertEquals("chk1", checksums.get(0).toStringUtf8());
     assertEquals("chk2", checksums.get(1).toStringUtf8());
@@ -1221,7 +1221,7 @@ public class TestKeyValueHandler {
     // Read from offset 1024
     adjustedOffset = getAdjustedOffset(blockOffset2, chunks, bytesPerChecksum);
     assertEquals(1024, adjustedOffset);
-    checksums = KeyValueHandler.getChecksums(adjustedOffset, 2058, bytesPerChunk, bytesPerChecksum, chunks);
+    checksums = KeyValueHandler.getChecksums(adjustedOffset, 2058, bytesPerChunk, chunks);
     assertEquals(3, checksums.size());
     assertEquals("chk2", checksums.get(0).toStringUtf8());
     assertEquals("chk3-1", checksums.get(1).toStringUtf8());
@@ -1230,7 +1230,7 @@ public class TestKeyValueHandler {
     // Read from offset 2048
     adjustedOffset = getAdjustedOffset(blockOffset3, chunks, bytesPerChecksum);
     assertEquals(1034, adjustedOffset);
-    checksums = KeyValueHandler.getChecksums(adjustedOffset, 1034, bytesPerChunk, bytesPerChecksum, chunks);
+    checksums = KeyValueHandler.getChecksums(adjustedOffset, 1034, bytesPerChunk, chunks);
     assertEquals(2, checksums.size());
     assertEquals("chk3-1", checksums.get(0).toStringUtf8());
     assertEquals("chk3-2", checksums.get(1).toStringUtf8());
@@ -1274,7 +1274,7 @@ public class TestKeyValueHandler {
     // Read full block (1 + 1 = 2 bytes)
     long adjustedOffset = getAdjustedOffset(0, chunks, bytesPerChecksum);
     assertEquals(0, adjustedOffset);
-    List<ByteString> checksums = KeyValueHandler.getChecksums(adjustedOffset, 2, bytesPerChunk, bytesPerChecksum, chunks);
+    List<ByteString> checksums = KeyValueHandler.getChecksums(adjustedOffset, 2, bytesPerChunk, chunks);
     
     // According to the bug report, this should return 2 checksums.
     assertEquals(2, checksums.size());
