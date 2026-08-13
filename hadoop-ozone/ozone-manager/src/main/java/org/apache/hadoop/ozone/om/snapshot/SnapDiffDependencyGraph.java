@@ -53,8 +53,10 @@ import org.slf4j.LoggerFactory;
  *       path is a to-snapshot path, not a from-snapshot path.</li>
  *   <li>Ancestor CREATE/RENAME(target) before descendant CREATE/RENAME/MODIFY
  *       on a strict to-snapshot path prefix, except when the ancestor path is
- *       replaced (both DELETE and CREATE appear at the same path) and the
- *       descendant is a from-snapshot MODIFY/RENAME under that path.</li>
+ *       reoccupied (freed on the from-snapshot side by DELETE or RENAME
+ *       source, and re-occupied on the to-snapshot side by CREATE or RENAME
+ *       target in the same diff) and the descendant is a from-snapshot
+ *       MODIFY/RENAME still reported under that path.</li>
  *   <li>DELETE before CREATE/RENAME(target) that targets the same path.</li>
  *   <li>RENAME(source) before CREATE that reuses the rename source path.</li>
  *   <li>RENAME(source) before RENAME(target) that reuses the same path, so a
@@ -334,8 +336,8 @@ public final class SnapDiffDependencyGraph {
     validateRenameTargetDoesNotMatchCreatePath(renameNodesByTargetPath,
         createNodesByPath);
 
-    Set<String> replacedPaths =
-        buildReplacedPaths(deleteNodesByPath, createNodesByPath);
+    Set<String> reoccupiedPaths = buildReoccupiedPaths(deleteNodesByPath,
+        renameNodesBySourcePath, createNodesByPath, renameNodesByTargetPath);
 
     addPathConflictEdges(deleteNodesByPath, createNodesByPath,
         renameNodesByTargetPath);
@@ -343,7 +345,7 @@ public final class SnapDiffDependencyGraph {
     addRenameChainEdges(renameNodesBySourcePath, renameNodesByTargetPath);
     addPathPrefixFromSnapshotEdges(deleteNodesByPath, renameNodesBySourcePath);
     addPathPrefixToSnapshotEdges(createNodesByPath, renameNodesByTargetPath,
-        replacedPaths);
+        reoccupiedPaths);
 
     buildObjectIdGroups(renameCount);
     addIntraObjectRenameEdges();
@@ -609,7 +611,7 @@ public final class SnapDiffDependencyGraph {
   private void addPathPrefixToSnapshotEdges(
       Map<String, Integer> createNodesByPath,
       Map<String, Integer> renameNodesByTargetPath,
-      Set<String> replacedPaths) {
+      Set<String> reoccupiedPaths) {
     for (int nodeId = 0; nodeId < nodes.size(); nodeId++) {
       SnapDiffDependencyEntry entry = nodes.get(nodeId);
       if (entry.isDelete()) {
@@ -623,15 +625,15 @@ public final class SnapDiffDependencyGraph {
       forEachStrictPrefix(toSnapshotPath, ancestorPath -> {
         Integer ancestorCreateNodeId = createNodesByPath.get(ancestorPath);
         if (ancestorCreateNodeId != null
-            && !shouldSkipReplacedPathToSnapshotEdge(ancestorPath,
-            replacedPaths, entry)) {
+            && !shouldSkipReoccupiedPathToSnapshotEdge(ancestorPath,
+            reoccupiedPaths, entry)) {
           addEdge(ancestorCreateNodeId, toNodeId);
         }
         Integer ancestorRenameNodeId =
             renameNodesByTargetPath.get(ancestorPath);
         if (ancestorRenameNodeId != null
-            && !shouldSkipReplacedPathToSnapshotEdge(ancestorPath,
-            replacedPaths, entry)) {
+            && !shouldSkipReoccupiedPathToSnapshotEdge(ancestorPath,
+            reoccupiedPaths, entry)) {
           addEdge(ancestorRenameNodeId, toNodeId);
         }
       });
@@ -639,31 +641,45 @@ public final class SnapDiffDependencyGraph {
   }
 
   /**
-   * Paths that are deleted and re-created (new objectId) in the same diff.
+   * Paths that are freed on the from-snapshot side (DELETE or RENAME source)
+   * and re-occupied on the to-snapshot side (CREATE or RENAME target) in the
+   * same diff. A from-snapshot MODIFY/RENAME descendant reported under such a
+   * path still lives in the old subtree, so it must not depend on the
+   * to-snapshot occupier of the ancestor path.
    */
-  private static Set<String> buildReplacedPaths(
+  private static Set<String> buildReoccupiedPaths(
       Map<String, Integer> deleteNodesByPath,
-      Map<String, Integer> createNodesByPath) {
-    Set<String> replacedPaths =
-        new HashSet<>(expectedHashMapCapacity(createNodesByPath.size()));
+      Map<String, Integer> renameNodesBySourcePath,
+      Map<String, Integer> createNodesByPath,
+      Map<String, Integer> renameNodesByTargetPath) {
+    int occupierCount = createNodesByPath.size() + renameNodesByTargetPath.size();
+    Set<String> reoccupiedPaths =
+        new HashSet<>(expectedHashMapCapacity(occupierCount));
     for (String path : createNodesByPath.keySet()) {
-      if (deleteNodesByPath.containsKey(path)) {
-        replacedPaths.add(path);
+      if (deleteNodesByPath.containsKey(path)
+          || renameNodesBySourcePath.containsKey(path)) {
+        reoccupiedPaths.add(path);
       }
     }
-    return replacedPaths;
+    for (String path : renameNodesByTargetPath.keySet()) {
+      if (deleteNodesByPath.containsKey(path)
+          || renameNodesBySourcePath.containsKey(path)) {
+        reoccupiedPaths.add(path);
+      }
+    }
+    return reoccupiedPaths;
   }
 
   /**
    * Skip {@code ancestorPath -> descendant} to-snapshot prefix edges when the
-   * ancestor path is replaced and the descendant is a from-snapshot
+   * ancestor path is reoccupied and the descendant is a from-snapshot
    * MODIFY/RENAME still reported under the old tree at that path.
    */
-  private static boolean shouldSkipReplacedPathToSnapshotEdge(
+  private static boolean shouldSkipReoccupiedPathToSnapshotEdge(
       String ancestorPath,
-      Set<String> replacedPaths,
+      Set<String> reoccupiedPaths,
       SnapDiffDependencyEntry descendant) {
-    if (!replacedPaths.contains(ancestorPath)) {
+    if (!reoccupiedPaths.contains(ancestorPath)) {
       return false;
     }
     DiffType diffType = descendant.getDiffType();

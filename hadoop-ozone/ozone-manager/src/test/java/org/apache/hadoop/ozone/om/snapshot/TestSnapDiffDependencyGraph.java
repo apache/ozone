@@ -317,6 +317,95 @@ class TestSnapDiffDependencyGraph {
   }
 
   @Test
+  void testDeleteAndRecreateWithDescendantModify() {
+    // DELETE A + CREATE A (new objectId) + MODIFY A/child on the old subtree.
+    // MODIFY is reported on the from-snapshot path, so A/child lives under the
+    // deleted A, not the recreated A. The to-snapshot prefix edge from the new
+    // CREATE A back to MODIFY A/child must be skipped or the graph cycles.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, DELETE, "A"),
+        entry(2L, 0L, CREATE, "A"),
+        entry(3L, 1L, MODIFY, "A/child"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, MODIFY, "A/child"),
+        indexOf(ordered, DELETE, "A"));
+    assertBefore(ordered, indexOf(ordered, DELETE, "A"),
+        indexOf(ordered, CREATE, "A"));
+  }
+
+  @Test
+  void testDeleteAndRenameTargetReuseWithDescendantModify() {
+    // DELETE A frees A on the from-snap side; RENAME X -> A occupies A on the
+    // to-snap side; MODIFY A/child sits under the deleted A. A is reoccupied,
+    // so the to-snap prefix edge from RENAME(target=A) back to MODIFY A/child
+    // must be skipped.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, DELETE, "A"),
+        entry(2L, 0L, RENAME, "X", "A"),
+        entry(3L, 1L, MODIFY, "A/child"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, MODIFY, "A/child"),
+        indexOf(ordered, DELETE, "A"));
+    assertBefore(ordered, indexOf(ordered, DELETE, "A"),
+        indexOf(ordered, RENAME, "X"));
+  }
+
+  @Test
+  void testRenameSourceReuseByCreateWithDescendantModify() {
+    // RENAME A -> B frees A on the from-snap side; CREATE A occupies A on the
+    // to-snap side; MODIFY A/child sits under the from-snap A (which is being
+    // renamed away). The to-snap CREATE A must not order MODIFY A/child.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, RENAME, "A", "B"),
+        entry(2L, 0L, CREATE, "A"),
+        entry(3L, 1L, MODIFY, "A/child"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, MODIFY, "A/child"),
+        indexOf(ordered, RENAME, "A"));
+    assertBefore(ordered, indexOf(ordered, RENAME, "A"),
+        indexOf(ordered, CREATE, "A"));
+  }
+
+  @Test
+  void testRenameSourceReuseByRenameTargetWithDescendantModify() {
+    // RENAME A -> B frees A; RENAME X -> A occupies A; MODIFY A/child lives
+    // under the from-snap A. A is reoccupied, so the RENAME(X->A) ancestor
+    // edge back to MODIFY A/child must be skipped.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, RENAME, "A", "B"),
+        entry(2L, 0L, RENAME, "X", "A"),
+        entry(3L, 1L, MODIFY, "A/child"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, MODIFY, "A/child"),
+        indexOf(ordered, RENAME, "A"));
+    assertBefore(ordered, indexOf(ordered, RENAME, "A"),
+        indexOf(ordered, RENAME, "X"));
+  }
+
+  @Test
+  void testRenameSourceReuseByRenameTargetWithDescendantRenameOutOfOldPath() {
+    // RENAME A -> B frees A; RENAME X -> A occupies A; RENAME A/child -> Z/child
+    // moves the descendant out from under the reoccupied ancestor. The
+    // descendant's from-snap source A/child forces it before RENAME A -> B,
+    // and its to-snap target is outside A so no reoccupied-path skip is
+    // consulted for that side. Rename chain still orders A -> B before X -> A.
+    List<SnapDiffDependencyEntry> entries = Arrays.asList(
+        entry(1L, 0L, RENAME, "A", "B"),
+        entry(2L, 0L, RENAME, "X", "A"),
+        renameEntry(3L, 1L, 0L, "A/child", "Z/child"));
+
+    List<SnapDiffDependencyEntry> ordered = sort(entries);
+    assertBefore(ordered, indexOf(ordered, RENAME, "A/child"),
+        indexOf(ordered, RENAME, "A"));
+    assertBefore(ordered, indexOf(ordered, RENAME, "A"),
+        indexOf(ordered, RENAME, "X"));
+  }
+
+  @Test
   void testTopologicalSortDetectsLongerRenameCycle() {
     // A three-object rename cycle: A -> B, B -> C, C -> A. Each RENAME source
     // reuses the target path of another, so the rename-chain edges form a
