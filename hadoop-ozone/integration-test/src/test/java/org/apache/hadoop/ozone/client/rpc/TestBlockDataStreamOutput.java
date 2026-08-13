@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -135,7 +136,7 @@ public class TestBlockDataStreamOutput {
         .setNumDatanodes(5)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setCurrentVersion(DN_OLD_VERSION)
-            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION)
             .build())
         .build();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
@@ -356,7 +357,7 @@ public class TestBlockDataStreamOutput {
       // pipeline, which here is the software version the datanodes have finalized to.
       List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
       for (DatanodeDetails details : streamDnDetails) {
-        assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
+        assertEquals(HDDSVersion.ZDU, details.getCurrentVersion());
       }
     }
   }
