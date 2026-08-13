@@ -250,8 +250,7 @@ public class BlockLocationInfo {
         Objects.equals(blockID, that.blockID) &&
         Objects.equals(token, that.token) &&
         Objects.equals(pipeline, that.pipeline) &&
-        Objects.equals(storageTier, that.storageTier) &&
-        Objects.equals(isFallBack, that.isFallBack);
+        Objects.equals(storageTier, that.storageTier);
   }
 
   @Override
