@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -461,12 +462,24 @@ public final class OzoneTestHelper {
 
   public static void waitForReplicaCount(long containerID, int count,
       MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
-    waitForReplicaCount(containerID, count, cluster, 30000);
+    GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
+        200, 30000);
   }
 
-  public static void waitForReplicaCount(long containerID, int count, MiniOzoneCluster cluster, int timeoutMillis)
+  /**
+   * Like {@link #waitForReplicaCount(long, int, MiniOzoneCluster)}, but only returns once
+   * replication has quiesced: no pending add or delete ops remain for the container, so the count
+   * has settled at {@code count} instead of being observed transiently while SCM is still adding or
+   * removing replicas. This removes the race where the count passes through {@code count} between
+   * polls under a loaded runner (HDDS-10582, HDDS-11128).
+   */
+  public static void waitForStableReplicaCount(long containerID, int count, MiniOzoneCluster cluster)
       throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count, 200, timeoutMillis);
+    ReplicationManager replicationManager = cluster.getStorageContainerManager().getReplicationManager();
+    ContainerID cid = ContainerID.valueOf(containerID);
+    GenericTestUtils.waitFor(() ->
+        replicationManager.getPendingReplicationOps(cid).isEmpty() && countReplicas(containerID, cluster) == count,
+        200, 30000);
   }
 
   /**
