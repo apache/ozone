@@ -87,12 +87,12 @@ const REPLICATION_TYPE_LABELS: Record<string, string> = {
   STANDALONE: 'Standalone'
 };
 
-// Mirrors the replication strings Ozone uses elsewhere, e.g. Ratis-3 and RS-6-3-1024k
+// Formats the bucket's default replication configuration for display
 function formatReplicationType(replicationConfigInfo?: BucketReplicationConfig | null) {
   const replicationConfig = replicationConfigInfo?.replicationConfig;
   if (replicationConfig?.replicationType === 'EC') {
     const { codec, data, parity, ecChunkSize } = replicationConfig;
-    return `${codec}-${data}-${parity}-${Math.floor(ecChunkSize / 1024)}k`;
+    return `${codec.toLowerCase()}-${data}-${parity}-${Math.floor(ecChunkSize / 1024)}k`;
   }
   if (replicationConfig) {
     const label = REPLICATION_TYPE_LABELS[replicationConfig.replicationType]

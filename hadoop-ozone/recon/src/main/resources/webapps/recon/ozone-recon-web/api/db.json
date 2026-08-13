@@ -4648,7 +4648,8 @@
           "replicationConfig": {
             "replicationType": "RATIS",
             "replicationFactor": "THREE",
-            "requiredNodes": 3
+            "requiredNodes": 3,
+            "minimumNodes": 1
           }
         },
         "acls": [
@@ -4685,7 +4686,8 @@
             "data": 6,
             "parity": 3,
             "ecChunkSize": 1048576,
-            "requiredNodes": 9
+            "requiredNodes": 9,
+            "minimumNodes": 6
           }
         },
         "acls": [
@@ -4761,7 +4763,8 @@
           "replicationConfig": {
             "replicationType": "STANDALONE",
             "replicationFactor": "ONE",
-            "requiredNodes": 1
+            "requiredNodes": 1,
+            "minimumNodes": 1
           }
         },
         "acls": [

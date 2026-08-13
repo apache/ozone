@@ -70,7 +70,8 @@ describe('BucketsTable Replication Type column', () => {
           replicationConfig: {
             replicationType: 'RATIS',
             replicationFactor: 'THREE',
-            requiredNodes: 3
+            requiredNodes: 3,
+            minimumNodes: 1
           }
         })]}
       />
@@ -79,26 +80,34 @@ describe('BucketsTable Replication Type column', () => {
     expect(screen.getByText('Ratis-3')).toBeInTheDocument();
   });
 
-  test('renders the EC variant for an Erasure Coded bucket', () => {
-    render(
-      <BucketsTable
-        {...defaultProps}
-        data={[getBucketWith('ec-bucket', {
-          type: 'EC',
-          replicationConfig: {
-            replicationType: 'EC',
-            codec: 'RS',
-            data: 6,
-            parity: 3,
-            ecChunkSize: 1048576,
-            requiredNodes: 9
-          }
-        })]}
-      />
-    );
+  test.each([
+    ['RS', 6, 3, 1048576, 'rs-6-3-1024k'],
+    ['RS', 3, 2, 1048576, 'rs-3-2-1024k'],
+    ['RS', 10, 4, 1048576, 'rs-10-4-1024k'],
+    ['XOR', 10, 4, 2097152, 'xor-10-4-2048k']
+  ] as const)(
+    'renders an EC bucket with codec %s, %i data and %i parity and a %i byte chunk as %s',
+    (codec, data, parity, ecChunkSize, expected) => {
+      render(
+        <BucketsTable
+          {...defaultProps}
+          data={[getBucketWith('ec-bucket', {
+            type: 'EC',
+            replicationConfig: {
+              replicationType: 'EC',
+              codec,
+              data,
+              parity,
+              ecChunkSize,
+              requiredNodes: data + parity,
+              minimumNodes: data
+            }
+          })]}
+        />
+      );
 
-    expect(screen.getByText('RS-6-3-1024k')).toBeInTheDocument();
-  });
+      expect(screen.getByText(expected)).toBeInTheDocument();
+    });
 
   test('renders the Standalone variant for a single replica bucket', () => {
     render(
@@ -109,7 +118,8 @@ describe('BucketsTable Replication Type column', () => {
           replicationConfig: {
             replicationType: 'STANDALONE',
             replicationFactor: 'ONE',
-            requiredNodes: 1
+            requiredNodes: 1,
+            minimumNodes: 1
           }
         })]}
       />
@@ -127,7 +137,8 @@ describe('BucketsTable Replication Type column', () => {
           replicationConfig: {
             replicationType: 'STAND_ALONE',
             replicationFactor: 'ONE',
-            requiredNodes: 1
+            requiredNodes: 1,
+            minimumNodes: 1
           }
         })]}
       />

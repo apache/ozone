@@ -119,7 +119,16 @@ export interface EcInfo {
   minimumNodes: number;
 }
 
-export type ReplicationInfo = RatisInfo | EcInfo;
+// StandaloneReplicationConfig serializes its replicationType as STANDALONE,
+// without the underscore used by the ReplicationType enum name STAND_ALONE
+export interface StandaloneInfo {
+  replicationType: 'STANDALONE' | 'STAND_ALONE';
+  replicationFactor: string;
+  requiredNodes: number;
+  minimumNodes: number;
+}
+
+export type ReplicationInfo = RatisInfo | EcInfo | StandaloneInfo;
 
 // Open Keys
 export type OpenKeys = {

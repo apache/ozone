@@ -17,6 +17,7 @@
  */
 
 import { Acl } from "@/v2/types/acl.types";
+import { ReplicationInfo } from '@/v2/types/insights.types';
 import { Option as MultiOption } from "@/v2/components/select/multiSelect";
 
 // Corresponds to OzoneManagerProtocolProtos.StorageTypeProto
@@ -37,35 +38,12 @@ export const BucketLayoutTypeList = [
 export type BucketLayout = typeof BucketLayoutTypeList[number];
 
 
-// Corresponds to the serialized org.apache.hadoop.hdds.client.RatisReplicationConfig
-// and StandaloneReplicationConfig. The latter serializes its replicationType as
-// STANDALONE, while the enum name used elsewhere is STAND_ALONE, so both spellings
-// can reach the UI.
-type BucketRatisReplicationConfig = {
-  replicationType: 'RATIS' | 'STAND_ALONE' | 'STANDALONE';
-  replicationFactor: string;
-  requiredNodes: number;
-}
-
-// Corresponds to the serialized org.apache.hadoop.hdds.client.ECReplicationConfig
-type BucketECReplicationConfig = {
-  replicationType: 'EC';
-  codec: string;
-  data: number;
-  parity: number;
-  ecChunkSize: number;
-  requiredNodes: number;
-}
-
-type BucketReplicationInfo =
-  | BucketRatisReplicationConfig
-  | BucketECReplicationConfig;
-
 // Corresponds to the serialized org.apache.hadoop.hdds.client.DefaultReplicationConfig
-// returned by the Recon bucket endpoint (BucketObjectDBInfo#replicationConfigInfo)
+// returned by the Recon bucket endpoint (BucketObjectDBInfo#replicationConfigInfo).
+// The nested config is the same shape the OM DB insights endpoints return.
 export type BucketReplicationConfig = {
   type: string;
-  replicationConfig?: BucketReplicationInfo | null;
+  replicationConfig?: ReplicationInfo | null;
 }
 
 export type Bucket = {
