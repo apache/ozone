@@ -190,7 +190,6 @@ public class KeyLifecycleService extends BackgroundService {
         StorageUnit.BYTES);
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
-    this.ozoneTrash = ozoneManager.getOzoneTrash();
   }
 
   @Override
@@ -447,8 +446,8 @@ public class KeyLifecycleService extends BackgroundService {
               // If trash is enabled, move files to trash, instead of send delete requests.
               // OBS bucket doesn't support trash.
               if (bucket.getBucketLayout() == OBJECT_STORE) {
-                sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList,
-                    false, scanStateBuilder, true);
+                sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
+                    bucket.getOwner(), expiredKeyList, false, scanStateBuilder, true);
               } else {
                 // handle keys first, then directories
                 handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, true);
@@ -987,8 +986,8 @@ public class KeyLifecycleService extends BackgroundService {
       boolean saved = false;
       if (expiredKeyList != null && !expiredKeyList.isEmpty()) {
         if (bucket.getBucketLayout() == OBJECT_STORE) {
-          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList,
-              false, scanStateBuilder, false);
+          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
+              bucket.getOwner(), expiredKeyList, false, scanStateBuilder, false);
         } else {
           handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, false);
         }
@@ -1348,12 +1347,12 @@ public class KeyLifecycleService extends BackgroundService {
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList,
         boolean dir, OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
-      if (moveToTrashEnabled.get() && bucket.getBucketLayout() != OBJECT_STORE && ozoneTrash != null) {
+      if (moveToTrashEnabled.get() && bucket.getBucketLayout() != OBJECT_STORE && getEffectiveOzoneTrash() != null) {
         moveToTrash(bucket, keysList, dir);
         sendSaveScanStateRequest(scanStateBuilder, scanFinished);
       } else {
-        sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), keysList, dir,
-            scanStateBuilder, scanFinished);
+        sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
+            bucket.getOwner(), keysList, dir, scanStateBuilder, scanFinished);
       }
     }
 
@@ -1393,8 +1392,9 @@ public class KeyLifecycleService extends BackgroundService {
       }
     }
 
-    private void sendDeleteKeysRequestAndClearList(String volume, String bucket, LimitedExpiredObjectList keysList,
-        boolean dir, OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
+    private void sendDeleteKeysRequestAndClearList(String volume, String bucket, String bucketOwner,
+        LimitedExpiredObjectList keysList, boolean dir,
+        OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
       try {
         if (getInjector(1) != null) {
           try {
@@ -1404,6 +1404,7 @@ public class KeyLifecycleService extends BackgroundService {
           }
         }
 
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bucketOwner);
         int batchSize = keyDeleteBatchSize;
         int startIndex = 0;
         for (int i = 0; i < keysList.size();) {
@@ -1442,16 +1443,32 @@ public class KeyLifecycleService extends BackgroundService {
           LOG.debug("request size {} for {} keys", deleteKeysRequest.getSerializedSize(), keyCount);
 
           if (deleteKeysRequest.getSerializedSize() < ratisByteLimit) {
-            // send request out
-            OMRequest omRequest = OMRequest.newBuilder()
+            OMRequest omRequestRaw = OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
                 .setVersion(ClientVersion.CURRENT_VERSION)
                 .setClientId(clientId.toString())
                 .setDeleteKeysRequest(deleteKeysRequest)
                 .build();
             long startTime = System.nanoTime();
-            final OzoneManagerProtocolProtos.OMResponse response = OzoneManagerRatisUtils.submitRequest(
-                getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
+            final OzoneManagerProtocolProtos.OMResponse response;
+            try {
+              final OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(
+                  omRequestRaw, getOzoneManager());
+              response = ugi.doAs(new PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>() {
+                @Override
+                public OzoneManagerProtocolProtos.OMResponse run() throws Exception {
+                  // perform preExecute as ratis submit does not perform preExecute
+                  OMRequest omRequest = omClientRequest.preExecute(getOzoneManager());
+                  return OzoneManagerRatisUtils.submitRequest(
+                      getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
+                }
+              });
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new ServiceException(e);
+            } catch (IOException e) {
+              throw new ServiceException(e);
+            }
             long endTime = System.nanoTime();
             LOG.debug("DeleteKeys request with {} keys cost {} ns", keyCount, endTime - startTime);
             long deletedCount = keyCount;
@@ -1670,9 +1687,12 @@ public class KeyLifecycleService extends BackgroundService {
     this.listMaxSize = size;
   }
 
-  @VisibleForTesting
-  public void setMpuAbortLimitPerTask(int limit) {
-    this.mpuAbortLimitPerTask = limit;
+  // Returns the test-injected OzoneTrash if set, otherwise the live instance
+  // from OzoneManager. This is needed because startTrashEmptier() runs after
+  // keyManager.start() in all OzoneManager startup paths, so the field cannot
+  // be populated eagerly in the constructor.
+  private OzoneTrash getEffectiveOzoneTrash() {
+    return ozoneTrash != null ? ozoneTrash : ozoneManager.getOzoneTrash();
   }
 
   @VisibleForTesting
