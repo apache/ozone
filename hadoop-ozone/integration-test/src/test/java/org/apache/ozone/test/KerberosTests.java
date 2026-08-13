@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTA
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -54,15 +55,15 @@ public abstract class KerberosTests {
 
   private File workDir;
 
-  /** Service keytab (scm.keytab); shared by SCM/OM/DN when useSharedServicePrincipal(). */
+  /** Service keytab (scm.keytab); shared by SCM/OM/DN when using {@link #configureSharedServicePrincipal}. */
   private File ozoneKeytab;
   private File spnegoKeytab;
   private File testUserKeytab;
   private String testUserPrincipal;
-  /** e.g. scm/host@REALM when useSharedServicePrincipal(). */
+  /** e.g. scm/host@REALM. */
   private String ozonePrincipal;
 
-  /** Separate OM keytab, only used when useSharedServicePrincipal() is false. */
+  /** Separate OM keytab, only used with {@link #configureSeparateServicePrincipals}. */
   private File omKeytab;
 
   protected OzoneConfiguration getConf() {
@@ -120,79 +121,89 @@ public abstract class KerberosTests {
   }
 
   protected void setSecureConfig() throws IOException {
-    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+    configureSecurityBasics();
     String host = InetAddress.getLocalHost().getCanonicalHostName()
         .toLowerCase();
+    String hostAndRealm = host + "@" + getRealm();
+    configureSharedServicePrincipal(hostAndRealm);
+    configureSpnegoPrincipal(hostAndRealm);
+    createTestUserCredentials();
+    conf.setBoolean(HADOOP_SECURITY_AUTHORIZATION, true);
+  }
 
+  protected void createCredentialsInKDC() throws Exception {
+    createScmPrincipalCredential();
+    createSpnegoPrincipalCredential();
+    createTestUserPrincipalCredential();
+  }
+
+  protected String getRealm() {
+    return miniKdc.getRealm();
+  }
+
+  /** Security basics common to every subclass's setSecureConfig(). */
+  protected void configureSecurityBasics() throws IOException {
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
-
     String curUser = UserGroupInformation.getCurrentUser().getUserName();
     conf.set(OZONE_ADMINISTRATORS, curUser);
+  }
 
-    String realm = miniKdc.getRealm();
-    String hostAndRealm = host + "@" + realm;
-
+  /** SCM/OM/DN share a single "scm/..." principal and keytab. */
+  protected void configureSharedServicePrincipal(String hostAndRealm) {
+    ozonePrincipal = "scm/" + hostAndRealm;
     ozoneKeytab = new File(workDir, "scm.keytab");
+    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
+    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
+    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
+    conf.set(HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
+    conf.set(HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
+        ozoneKeytab.getAbsolutePath());
+  }
+
+  /** SCM and OM use separate "scm/..." and "om/..." principals and keytabs. */
+  protected void configureSeparateServicePrincipals(String hostAndRealm) {
+    ozonePrincipal = "scm/" + hostAndRealm;
+    ozoneKeytab = new File(workDir, "scm.keytab");
+    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
+    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
+    omKeytab = new File(workDir, "om.keytab");
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/" + hostAndRealm);
+    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, omKeytab.getAbsolutePath());
+  }
+
+  protected void configureSpnegoPrincipal(String hostAndRealm) {
     spnegoKeytab = new File(workDir, "http.keytab");
-
-    if (useSharedServicePrincipal()) {
-      ozonePrincipal = "scm/" + hostAndRealm;
-      conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
-      conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
-      conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
-      conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
-      conf.set(HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
-      conf.set(HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
-          ozoneKeytab.getAbsolutePath());
-    } else {
-      ozonePrincipal = "scm/" + hostAndRealm;
-      conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
-      conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
-      omKeytab = new File(workDir, "om.keytab");
-      conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/" + hostAndRealm);
-      conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, omKeytab.getAbsolutePath());
-    }
-
     conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_SCM/" + hostAndRealm);
     conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_OM/" + hostAndRealm);
     conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY,
         spnegoKeytab.getAbsolutePath());
     conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE,
         spnegoKeytab.getAbsolutePath());
-
-    if (createTestUserPrincipal()) {
-      testUserKeytab = new File(workDir, "testuser.keytab");
-      testUserPrincipal = "test@" + realm;
-    }
-
-    if (enableSecurityAuthorizationByDefault()) {
-      conf.setBoolean(HADOOP_SECURITY_AUTHORIZATION, true);
-    }
   }
 
-  protected void createCredentialsInKDC() throws Exception {
+  protected void createTestUserCredentials() {
+    testUserKeytab = new File(workDir, "testuser.keytab");
+    testUserPrincipal = "test@" + getRealm();
+  }
+
+  protected void createScmPrincipalCredential() throws Exception {
+    createPrincipal(ozoneKeytab, conf.get(HDDS_SCM_KERBEROS_PRINCIPAL_KEY));
+  }
+
+  protected void createOmPrincipalCredential() throws Exception {
+    createPrincipal(omKeytab, conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
+  }
+
+  protected void createSpnegoPrincipalCredential() throws Exception {
     SCMHTTPServerConfig httpServerConfig =
         conf.getObject(SCMHTTPServerConfig.class);
-    createPrincipal(ozoneKeytab, conf.get(HDDS_SCM_KERBEROS_PRINCIPAL_KEY));
-    if (!useSharedServicePrincipal()) {
-      createPrincipal(omKeytab, conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
-    }
     createPrincipal(spnegoKeytab, httpServerConfig.getKerberosPrincipal());
-    if (createTestUserPrincipal()) {
-      createPrincipal(testUserKeytab, testUserPrincipal);
-    }
   }
 
-  /** Whether SCM/OM (and optionally DN) share a single "scm/..." principal and keytab. */
-  protected boolean useSharedServicePrincipal() {
-    return true;
-  }
-
-  protected boolean createTestUserPrincipal() {
-    return true;
-  }
-
-  protected boolean enableSecurityAuthorizationByDefault() {
-    return true;
+  protected void createTestUserPrincipalCredential() throws Exception {
+    createPrincipal(testUserKeytab, testUserPrincipal);
   }
 }

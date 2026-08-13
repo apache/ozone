@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_REMOVER_SCAN_INTERVAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -70,13 +70,18 @@ public class TestSecretKeySnapshot extends KerberosTests {
   private MiniOzoneHAClusterImpl cluster;
 
   @Override
-  protected boolean createTestUserPrincipal() {
-    return false;
+  protected void setSecureConfig() throws IOException {
+    configureSecurityBasics();
+    String host = InetAddress.getLocalHost().getCanonicalHostName().toLowerCase();
+    String hostAndRealm = host + "@" + getRealm();
+    configureSharedServicePrincipal(hostAndRealm);
+    configureSpnegoPrincipal(hostAndRealm);
   }
 
   @Override
-  protected boolean enableSecurityAuthorizationByDefault() {
-    return false;
+  protected void createCredentialsInKDC() throws Exception {
+    createScmPrincipalCredential();
+    createSpnegoPrincipalCredential();
   }
 
   @BeforeEach
@@ -85,7 +90,6 @@ public class TestSecretKeySnapshot extends KerberosTests {
 
     initKerberos();
     OzoneConfiguration conf = getConf();
-    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
 
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);

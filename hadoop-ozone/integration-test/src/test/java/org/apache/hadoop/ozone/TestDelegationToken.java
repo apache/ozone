@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
@@ -110,13 +109,21 @@ public class TestDelegationToken extends KerberosTests {
   private OzoneManagerProtocolClientSideTranslatorPB omClient;
 
   @Override
-  protected boolean useSharedServicePrincipal() {
-    return false;
+  protected void setSecureConfig() throws IOException {
+    configureSecurityBasics();
+    String host = InetAddress.getLocalHost().getCanonicalHostName().toLowerCase();
+    String hostAndRealm = host + "@" + getRealm();
+    configureSeparateServicePrincipals(hostAndRealm);
+    configureSpnegoPrincipal(hostAndRealm);
+    createTestUserCredentials();
   }
 
   @Override
-  protected boolean enableSecurityAuthorizationByDefault() {
-    return false;
+  protected void createCredentialsInKDC() throws Exception {
+    createScmPrincipalCredential();
+    createOmPrincipalCredential();
+    createSpnegoPrincipalCredential();
+    createTestUserPrincipalCredential();
   }
 
   public static Stream<Boolean> options() {
@@ -133,7 +140,6 @@ public class TestDelegationToken extends KerberosTests {
     try {
       initKerberos();
       OzoneConfiguration conf = getConf();
-      conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
       conf.setInt(OZONE_SCM_CLIENT_PORT_KEY,
           getPort(OZONE_SCM_CLIENT_PORT_DEFAULT, 100));

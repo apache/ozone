@@ -191,13 +191,21 @@ class TestSecureOzoneCluster extends KerberosTests {
   private Path omMetaDirPath;
 
   @Override
-  protected boolean useSharedServicePrincipal() {
-    return false;
+  protected void setSecureConfig() throws IOException {
+    configureSecurityBasics();
+    String host = InetAddress.getLocalHost().getCanonicalHostName().toLowerCase();
+    String hostAndRealm = host + "@" + getRealm();
+    configureSeparateServicePrincipals(hostAndRealm);
+    configureSpnegoPrincipal(hostAndRealm);
+    createTestUserCredentials();
   }
 
   @Override
-  protected boolean enableSecurityAuthorizationByDefault() {
-    return false;
+  protected void createCredentialsInKDC() throws Exception {
+    createScmPrincipalCredential();
+    createOmPrincipalCredential();
+    createSpnegoPrincipalCredential();
+    createTestUserPrincipalCredential();
   }
 
   @BeforeAll
@@ -216,7 +224,6 @@ class TestSecureOzoneCluster extends KerberosTests {
   void init() {
     try {
       conf = new OzoneConfiguration(getConf());
-      conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
       conf.setInt(OZONE_SCM_CLIENT_PORT_KEY, getFreePort());
       conf.setInt(OZONE_SCM_DATANODE_PORT_KEY, getFreePort());
