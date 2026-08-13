@@ -1109,65 +1109,53 @@ public class KeyLifecycleService extends BackgroundService {
           upload.setCreationTime(Instant.ofEpochMilli(mpuKeyInfo.getCreationTime()));
           String keyName = upload.getKeyName();
 
-          OmLCRule matchedRuleWithoutTags = null;
-          boolean needsTagMatch = false;
+          OmLCRule matchingRule = null;
+          OmKeyInfo openKeyInfo = null;
+          boolean openKeyFetchAttempted = false;
+          boolean skipUpload = false;
           for (OmLCRule rule : ruleList) {
             if (!passesAgeAndPrefix(upload, keyName, rule)) {
               continue;
             }
             if (!rule.isTagEnable()) {
-              matchedRuleWithoutTags = rule;
+              matchingRule = rule;
               break;
             }
-            needsTagMatch = true;
-          }
-
-          if (matchedRuleWithoutTags == null && !needsTagMatch) {
-            continue;
-          }
-
-          OmLCRule matchingRule = matchedRuleWithoutTags;
-
-          if (matchingRule == null) {
-            String multipartOpenKey;
-            try {
-              multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
-                  volumeName, bucketName, keyName, upload.getUploadId(),
-                  omMetadataManager, bucketInfo.getBucketLayout());
-            } catch (OMException e) {
-              LOG.warn("Failed to get multipart open key for {}/{}/{}, skipping",
-                  volumeName, bucketName, keyName, e);
-              continue;
-            }
-
-            OmKeyInfo openKeyInfo;
-            try {
-              openKeyInfo = omMetadataManager.getOpenKeyTable(bucketInfo.getBucketLayout())
-                  .get(multipartOpenKey);
-            } catch (IOException e) {
-              LOG.warn("Failed to read open key table for {}/{}/{}, skipping",
-                  volumeName, bucketName, keyName, e);
-              continue;
-            }
-
-            if (openKeyInfo == null) {
-              LOG.debug("Orphan multipart upload {}/{}/{} matched only tag-requiring rules, skipping",
-                  volumeName, bucketName, keyName);
-              continue;
-            } else {
-              for (OmLCRule rule : ruleList) {
-                if (passesAgeAndPrefix(upload, keyName, rule) && rule.isTagEnable()) {
-                  OmLCFilter filter = rule.getFilter();
-                  if (filter == null || filter.match(openKeyInfo, keyName)) {
-                    matchingRule = rule;
-                    break;
-                  }
-                }
+            if (!openKeyFetchAttempted) {
+              openKeyFetchAttempted = true;
+              try {
+                String multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
+                    volumeName, bucketName, keyName, upload.getUploadId(),
+                    omMetadataManager, bucketInfo.getBucketLayout());
+                openKeyInfo = omMetadataManager.getOpenKeyTable(
+                    bucketInfo.getBucketLayout()).get(multipartOpenKey);
+              } catch (OMException e) {
+                LOG.warn("Failed to get multipart open key for {}/{}/{}, skipping",
+                    volumeName, bucketName, keyName, e);
+                skipUpload = true;
+                break;
+              } catch (IOException e) {
+                LOG.warn("Failed to read open key table for {}/{}/{}, skipping",
+                    volumeName, bucketName, keyName, e);
+                skipUpload = true;
+                break;
+              }
+              if (openKeyInfo == null) {
+                LOG.debug("Orphan multipart upload {}/{}/{} has no open key entry, skipping tag-requiring rules",
+                    volumeName, bucketName, keyName);
               }
             }
+            if (openKeyInfo == null) {
+              continue;
+            }
+            OmLCFilter filter = rule.getFilter();
+            if (filter == null || filter.match(openKeyInfo, keyName)) {
+              matchingRule = rule;
+              break;
+            }
           }
 
-          if (matchingRule == null) {
+          if (skipUpload || matchingRule == null) {
             continue;
           }
 
