@@ -39,6 +39,8 @@ public enum DatanodeVersion implements ComponentVersion {
       "This version supports Ratis DataStream ReadBlock, including "
           + "group-independent reads for closed containers."),
 
+  SHORT_CIRCUIT_READS(4, "Version with short-circuit read support."),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 

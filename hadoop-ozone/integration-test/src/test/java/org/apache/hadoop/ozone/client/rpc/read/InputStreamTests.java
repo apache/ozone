@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc.read;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
@@ -24,6 +25,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -34,12 +37,13 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 
+// TODO remove this class, set config as default in integration tests
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class InputStreamTests {
 
@@ -51,7 +55,7 @@ abstract class InputStreamTests {
 
   private MiniOzoneCluster cluster;
 
-  protected static MiniOzoneCluster newCluster() throws Exception {
+  protected MiniOzoneCluster newCluster() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
@@ -70,6 +74,7 @@ abstract class InputStreamTests {
         conf.getObject(ReplicationManagerConfiguration.class);
     repConf.setInterval(Duration.ofSeconds(1));
     conf.setFromObject(repConf);
+    setCustomizedProperties(conf);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
@@ -79,12 +84,23 @@ abstract class InputStreamTests {
         .applyTo(conf);
 
     return MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
+        .setNumDatanodes(getDatanodeCount())
         .build();
   }
 
-  static String getNewKeyName() {
+  String getNewKeyName() {
     return UUID.randomUUID().toString();
+  }
+
+  int getDatanodeCount() {
+    return 5;
+  }
+
+  void setCustomizedProperties(OzoneConfiguration configuration) {
+  }
+
+  ReplicationConfig getRepConfig() {
+    return RatisReplicationConfig.getInstance(THREE);
   }
 
   protected void updateConfig(ContainerLayoutVersion layout) {
@@ -112,7 +128,7 @@ abstract class InputStreamTests {
     scm.getContainerManager().getContainers().forEach(container -> {
       if (container.isOpen()) {
         try {
-          TestHelper.waitForContainerClose(getCluster(), container.getContainerID());
+          OzoneTestHelper.waitForContainerClose(getCluster(), container.getContainerID());
         } catch (Exception e) {
           throw new RuntimeException(e);
         }

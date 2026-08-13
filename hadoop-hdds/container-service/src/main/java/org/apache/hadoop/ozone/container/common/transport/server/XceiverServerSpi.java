@@ -93,4 +93,6 @@ public interface XceiverServerSpi {
           IOException {
     return null;
   }
+
+  boolean isStarted();
 }

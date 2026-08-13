@@ -30,6 +30,7 @@ jobs:
         uses: actions/stale@1e223db275d687790206a7acac4d1a11bd6fe629 # v10.4.0
         with:
           stale-pr-label: 'stale'
+          exempt-pr-labels: 'design'
           exempt-draft-pr: false
           days-before-issue-stale: -1
           days-before-pr-stale: 21

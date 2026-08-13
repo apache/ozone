@@ -123,7 +123,6 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -132,6 +131,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -1979,6 +1979,16 @@ public class KeyManagerImpl implements KeyManager {
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, String clientAddress,
       boolean allowPartialPrefixes) throws IOException {
+    return listStatus(args, recursive, startKey, numEntries, clientAddress,
+        allowPartialPrefixes, true);
+  }
+
+  @Override
+  @SuppressWarnings("methodlength")
+  public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
+      String startKey, long numEntries, String clientAddress,
+      boolean allowPartialPrefixes, boolean refreshPipelineInfo)
+      throws IOException {
     Objects.requireNonNull(args, "Key args can not be null");
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
@@ -1997,7 +2007,8 @@ public class KeyManagerImpl implements KeyManager {
       Collection<OzoneFileStatus> statuses =
           statusHelper.listStatusFSO(args, startKey, numEntries,
           clientAddress, allowPartialPrefixes);
-      return buildFinalStatusList(statuses, args, clientAddress);
+      return buildFinalStatusList(statuses, args, clientAddress,
+          refreshPipelineInfo);
     }
 
     // A map sorted by OmKey to combine results from TableCache and DB.
@@ -2065,7 +2076,9 @@ public class KeyManagerImpl implements KeyManager {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
 
-    refreshPipelineFromCache(keyInfoList);
+    if (refreshPipelineInfo) {
+      refreshPipelineFromCache(keyInfoList);
+    }
 
     if (args.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList);
@@ -2169,7 +2182,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private List<OzoneFileStatus> buildFinalStatusList(
       Collection<OzoneFileStatus> statusesCollection, OmKeyArgs omKeyArgs,
-      String clientAddress)
+      String clientAddress, boolean refreshPipelineInfo)
       throws IOException {
     List<OzoneFileStatus> fileStatusFinalList = new ArrayList<>();
     List<OmKeyInfo> keyInfoList = new ArrayList<>();
@@ -2181,19 +2194,21 @@ public class KeyManagerImpl implements KeyManager {
       fileStatusFinalList.add(fileStatus);
     }
     return sortPipelineInfo(fileStatusFinalList, keyInfoList,
-        omKeyArgs, clientAddress);
+        omKeyArgs, clientAddress, refreshPipelineInfo);
   }
 
   private List<OzoneFileStatus> sortPipelineInfo(
       List<OzoneFileStatus> fileStatusFinalList, List<OmKeyInfo> keyInfoList,
-      OmKeyArgs omKeyArgs, String clientAddress) throws IOException {
+      OmKeyArgs omKeyArgs, String clientAddress, boolean refreshPipelineInfo)
+      throws IOException {
     if (omKeyArgs.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
-    // refreshPipeline flag check has been removed as part of
-    // https://issues.apache.org/jira/browse/HDDS-3658.
-    // Please refer this jira for more details.
-    refreshPipelineFromCache(keyInfoList);
+    if (refreshPipelineInfo) {
+      // listStatusLight callers set this flag to false so that lightweight
+      // listings remain metadata-only and avoid SCM-backed pipeline refresh.
+      refreshPipelineFromCache(keyInfoList);
+    }
 
     if (omKeyArgs.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList);
@@ -2262,7 +2277,12 @@ public class KeyManagerImpl implements KeyManager {
           List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
           if (sortedNodes == null) {
             sortedNodes = sortDatanodes(nodes, clientMachine);
-            if (sortedNodes != null) {
+            // Cache only a freshly sorted order, not an input list returned
+            // unchanged when no sort happens: that order is per-pipeline and must
+            // not be reused for another pipeline with the same node set. The read
+            // sort always returns a new list, so this never skips caching here; it
+            // keeps the pattern identical to the write path.
+            if (sortedNodes != null && sortedNodes != nodes) {
               sortedPipelines.put(uuidSet, sortedNodes);
             }
           } else if (LOG.isDebugEnabled()) {
@@ -2280,32 +2300,87 @@ public class KeyManagerImpl implements KeyManager {
   @VisibleForTesting
   public List<? extends DatanodeDetails> sortDatanodes(List<? extends DatanodeDetails> nodes,
                                              String clientMachine) {
-    final Node client = getClientNode(clientMachine, nodes);
-    return ozoneManager.getClusterMap()
-        .sortByDistanceCost(client, nodes, nodes.size());
+    final NetworkTopology clusterMap = ozoneManager.getClusterMap();
+    final Node client = getClientNode(clientMachine, nodes, clusterMap);
+    return clusterMap.sortByDistanceCost(client, nodes, nodes.size());
+  }
+
+  @Override
+  public List<? extends DatanodeDetails> sortDatanodesForWrite(
+      List<? extends DatanodeDetails> nodes, String clientMachine, NetworkTopology clusterMap) {
+    Preconditions.checkArgument(!StringUtils.isEmpty(clientMachine),
+        "clientMachine is empty");
+    Objects.requireNonNull(clusterMap, "clusterMap is null");
+    return captureLatencyNs(
+        metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
+          final Node client = getClientNode(clientMachine, nodes, clusterMap);
+          if (client == null) {
+            // Preserve pipeline order for writes: the first node is the write
+            // primary, so do not shuffle when the client cannot be resolved.
+            return nodes;
+          }
+          return sortByClusterMapDistance(clusterMap, client, nodes);
+        });
+  }
+
+  @Override
+  public boolean isSortDatanodesForWriteEnabled() {
+    return ozoneManager.getConfig().isSortDatanodesForWriteEnabled();
+  }
+
+  /**
+   * Sort a pipeline's nodes by topology distance to the client. The nodes come
+   * from SCM over RPC, so they are deserialized {@link DatanodeDetails} with no
+   * parent/level: the topology treats them as unknown (distance
+   * {@link Integer#MAX_VALUE}) and the order comes out random. Look each node
+   * up in OM's cluster map to get the topology-linked instance, sort those,
+   * then map the order back to the original nodes.
+   */
+  private List<? extends DatanodeDetails> sortByClusterMapDistance(
+      NetworkTopology clusterMap, Node client,
+      List<? extends DatanodeDetails> nodes) {
+    final List<Node> topologyNodes = new ArrayList<>(nodes.size());
+    final Map<String, DatanodeDetails> nodeByPath = new HashMap<>();
+    for (DatanodeDetails node : nodes) {
+      final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
+      if (resolved == null) {
+        return nodes;
+      }
+      topologyNodes.add(resolved);
+      nodeByPath.put(resolved.getNetworkFullPath(), node);
+    }
+    final List<Node> sorted =
+        clusterMap.sortByDistanceCost(client, topologyNodes, topologyNodes.size());
+    final List<DatanodeDetails> result = new ArrayList<>(sorted.size());
+    for (Node node : sorted) {
+      result.add(nodeByPath.get(node.getNetworkFullPath()));
+    }
+    return result;
   }
 
   private Node getClientNode(String clientMachine,
-                             List<? extends DatanodeDetails> nodes) {
-    List<DatanodeDetails> matchingNodes = new ArrayList<>();
-    boolean useHostname = ozoneManager.getConfiguration().getBoolean(
-        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
-        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+      List<? extends DatanodeDetails> nodes, NetworkTopology clusterMap) {
     for (DatanodeDetails node : nodes) {
-      if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
-          clientMachine)) {
-        matchingNodes.add(node);
+      // Match by either IP or hostname, like SCM's getNodesByAddress. clientMachine
+      // may be a hostname on the read path; the streaming-write remoteAddress is
+      // typically an IP. Matching both covers use.datanode.hostname either way.
+      if (clientMachine.equals(node.getIpAddress())
+          || clientMachine.equals(node.getHostName())) {
+        // The pipeline nodes are RPC-deserialized and not linked into OM's
+        // cluster map; prefer the map's instance so distance can be computed.
+        final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
+        return resolved != null ? resolved : node;
       }
     }
-    return !matchingNodes.isEmpty() ? matchingNodes.get(0) :
-        getOtherNode(clientMachine);
+    return getOtherNode(clientMachine, clusterMap);
   }
 
-  private Node getOtherNode(String clientMachine) {
+  private Node getOtherNode(String clientMachine,
+                            NetworkTopology clusterMap) {
     try {
       String clientLocation = resolveNodeLocation(clientMachine);
       if (clientLocation != null) {
-        Node rack = ozoneManager.getClusterMap().getNode(clientLocation);
+        Node rack = clusterMap.getNode(clientLocation);
         if (rack instanceof InnerNode) {
           return new NodeImpl(clientMachine, clientLocation,
               (InnerNode) rack, rack.getLevel() + 1,

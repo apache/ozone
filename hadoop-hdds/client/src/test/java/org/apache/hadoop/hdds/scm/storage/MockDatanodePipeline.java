@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetCommitt
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
+import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
@@ -56,6 +57,7 @@ import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.io.WriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.protocol.RoutingTable;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
  * A stateful test harness that simulates a datanode pipeline for {@link BlockDataStreamOutput} unit tests.
@@ -76,6 +78,7 @@ public class MockDatanodePipeline {
   private final List<byte[]> receivedChunks = Collections.synchronizedList(new ArrayList<>());
   private final List<ContainerCommandRequestProto> receivedPutBlocks = Collections.synchronizedList(new ArrayList<>());
   private final AtomicInteger watchForCommitCount = new AtomicInteger(0);
+  private volatile Type streamInitType;
 
   // Commit tracking
   private final AtomicLong nextLogIndex = new AtomicLong(1);
@@ -120,8 +123,14 @@ public class MockDatanodePipeline {
     // Both overloads must be stubbed: stream(ByteBuffer) and stream(ByteBuffer, RoutingTable) — the pipeline-mode
     // default is true, so the 2-arg overload is what BlockDataStreamOutput.setupStream calls.
     DataStreamApi dataStreamApi = mock(DataStreamApi.class);
-    doReturn(mockDataStreamOutput).when(dataStreamApi).stream(any(ByteBuffer.class));
-    doReturn(mockDataStreamOutput).when(dataStreamApi).stream(any(ByteBuffer.class), any(RoutingTable.class));
+    doAnswer(invocation -> {
+      captureStreamInitType(invocation.getArgument(0));
+      return mockDataStreamOutput;
+    }).when(dataStreamApi).stream(any(ByteBuffer.class));
+    doAnswer(invocation -> {
+      captureStreamInitType(invocation.getArgument(0));
+      return mockDataStreamOutput;
+    }).when(dataStreamApi).stream(any(ByteBuffer.class), any(RoutingTable.class));
     doReturn(dataStreamApi).when(xceiverClient).getDataStreamApi();
 
     // Setup sendCommandAsync (putBlock) behavior
@@ -229,6 +238,10 @@ public class MockDatanodePipeline {
     return watchForCommitCount.get();
   }
 
+  public Type getStreamInitType() {
+    return streamInitType;
+  }
+
   /** Concatenate all received chunks into a single byte array. */
   public byte[] getAllReceivedData() {
     int total = receivedChunks.stream().mapToInt(c -> c.length).sum();
@@ -262,6 +275,18 @@ public class MockDatanodePipeline {
   }
 
   // --- Helpers ---
+
+  private void captureStreamInitType(ByteBuffer buffer) {
+    ByteBuffer dup = buffer.duplicate();
+    byte[] bytes = new byte[dup.remaining()];
+    dup.get(bytes);
+    try {
+      streamInitType = ContainerCommandRequestMessage.toProto(
+          ByteString.copyFrom(bytes), null).getCmdType();
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to decode stream init request", e);
+    }
+  }
 
   private static ContainerCommandResponseProto buildPutBlockResponse(BlockID blockID) {
     return ContainerCommandResponseProto.newBuilder()

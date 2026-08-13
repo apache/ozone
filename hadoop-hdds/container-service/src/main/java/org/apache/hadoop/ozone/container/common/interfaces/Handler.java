@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Collection;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.util.function.CheckedConsumer;
@@ -82,12 +84,25 @@ public abstract class Handler {
       final String datanodeId, final ContainerSet contSet,
       final VolumeSet volumeSet, final VolumeChoosingPolicy volumeChoosingPolicy,
       final ContainerMetrics metrics,
-      IncrementalReportSender<Container> icrSender, ContainerChecksumTreeManager checksumManager) {
+      IncrementalReportSender<Container> icrSender,
+      ContainerChecksumTreeManager checksumManager) {
+    return getHandlerForContainerType(containerType, config, datanodeId, contSet, volumeSet,
+        volumeChoosingPolicy, metrics, icrSender, checksumManager, null);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static Handler getHandlerForContainerType(
+      final ContainerType containerType, final ConfigurationSource config,
+      final String datanodeId, final ContainerSet contSet,
+      final VolumeSet volumeSet, final VolumeChoosingPolicy volumeChoosingPolicy,
+      final ContainerMetrics metrics,
+      IncrementalReportSender<Container> icrSender, ContainerChecksumTreeManager checksumManager,
+      OzoneContainer ozoneContainer) {
     switch (containerType) {
     case KeyValueContainer:
       return new KeyValueHandler(config,
           datanodeId, contSet, volumeSet, volumeChoosingPolicy, metrics,
-          icrSender, Clock.systemUTC(), checksumManager);
+          icrSender, Clock.systemUTC(), checksumManager, ozoneContainer);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
           containerType + "doesn't exist.");
@@ -270,6 +285,9 @@ public abstract class Handler {
     this.clusterId = clusterID;
   }
 
+  public abstract RandomAccessFile getBlockFile(ContainerCommandRequestProto request)
+      throws IOException;
+
   /**
    * Copy container to the destination path.
    */
@@ -286,5 +304,4 @@ public abstract class Handler {
       ContainerCommandRequestProto msg, Container container,
       RandomAccessFileChannel blockFile,
       DataStreamObserver<ReadBlockResponse> streamObserver);
-
 }
