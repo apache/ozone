@@ -66,6 +66,9 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -648,9 +651,36 @@ public class QuotaRepairTask {
     if (haveValue) {
       VALUE value = kv.getValue();
       if (value instanceof OmKeyInfo) {
-        usage.incrSpace(((OmKeyInfo) value).getReplicatedSize());
+        OmKeyInfo keyInfo = (OmKeyInfo) value;
+        if (keyInfo.getKeyLocationVersions().size() > 1) {
+          usage.incrSpace(getRetainedVersionsSize(keyInfo));
+        } else {
+          usage.incrSpace(keyInfo.getReplicatedSize());
+        }
       }
     }
+  }
+
+  /**
+   * Size of every version a key retains. {@code dataSize} covers the latest version only, while versioning keeps
+   * the blocks of all of them, so the recount has to walk the version groups.
+   *
+   * <p>Each version is converted once, as {@link org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest} charges
+   * it at commit time. {@code OMKeyRequest#sumBlockLengths} is not reused here because it converts every block
+   * separately, which for EC adds parity per block and would make repair report more than the bucket was charged.
+   */
+  private static long getRetainedVersionsSize(OmKeyInfo keyInfo) {
+    long replicatedSize = 0;
+    for (OmKeyLocationInfoGroup group : keyInfo.getKeyLocationVersions()) {
+      long versionSize = 0;
+      for (List<OmKeyLocationInfo> locations : group.getLocationLists()) {
+        for (OmKeyLocationInfo location : locations) {
+          versionSize += location.getLength();
+        }
+      }
+      replicatedSize += QuotaUtil.getReplicatedSize(versionSize, keyInfo.getReplicationConfig());
+    }
+    return replicatedSize;
   }
   
   private static synchronized void updateCountToBucketInfo(
