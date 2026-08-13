@@ -1000,7 +1000,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
-  getVolumeIterator() {
+      getVolumeIterator() {
     return volumeTable.cacheIterator();
   }
 

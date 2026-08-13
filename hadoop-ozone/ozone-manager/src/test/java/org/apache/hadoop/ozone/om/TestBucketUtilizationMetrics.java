@@ -113,7 +113,8 @@ public class TestBucketUtilizationMetrics {
   }
 
   private static Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> createMockEntry(String volumeName,
-      String bucketName, long usedBytes, long snapshotUsedBytes, long quotaInBytes, long quotaInNamespace, long usedNamespace) {
+      String bucketName, long usedBytes, long snapshotUsedBytes, long quotaInBytes, long quotaInNamespace,
+      long usedNamespace) {
     Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry = mock(Map.Entry.class);
     CacheValue<OmBucketInfo> cacheValue = mock(CacheValue.class);
     OmBucketInfo bucketInfo = mock(OmBucketInfo.class);
