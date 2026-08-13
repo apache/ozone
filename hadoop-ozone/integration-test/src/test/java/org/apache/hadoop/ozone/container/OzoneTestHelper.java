@@ -461,8 +461,12 @@ public final class OzoneTestHelper {
 
   public static void waitForReplicaCount(long containerID, int count,
       MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
-        200, 30000);
+    waitForReplicaCount(containerID, count, cluster, 30000);
+  }
+
+  public static void waitForReplicaCount(long containerID, int count, MiniOzoneCluster cluster, int timeoutMillis)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count, 200, timeoutMillis);
   }
 
   /**

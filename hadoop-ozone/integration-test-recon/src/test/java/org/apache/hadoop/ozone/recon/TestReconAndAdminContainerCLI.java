@@ -114,6 +114,12 @@ class TestReconAndAdminContainerCLI {
    * are still drifting past each other (HDDS-15223).
    */
   private static final int RM_RECON_COMPARE_STABLE_POLLS = 2;
+  /**
+   * Max wait for a decommission/maintenance triggered replica copy to be reflected in SCM. The
+   * default {@link OzoneTestHelper#waitForReplicaCount} budget (30s) is not always enough on a
+   * loaded CI runner, which is the recurring flake tracked in HDDS-11128 (see also HDDS-10582).
+   */
+  private static final int REPLICA_COPY_WAIT_MS = 120_000;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static ScmClient scmClient;
@@ -272,7 +278,7 @@ class TestReconAndAdminContainerCLI {
     // a new replica-copy is made to another node.
     // For maintenance, there is no replica-copy in this case.
     if (!isMaintenance) {
-      OzoneTestHelper.waitForReplicaCount(containerIdR3, 4, cluster);
+      OzoneTestHelper.waitForReplicaCount(containerIdR3, 4, cluster, REPLICA_COPY_WAIT_MS);
     }
 
     compareRMReportToReconResponse(underReplicatedState);
@@ -299,7 +305,7 @@ class TestReconAndAdminContainerCLI {
     // There will be a replica copy for both maintenance and decommission.
     // maintenance 3 -> 4, decommission 4 -> 5.
     int expectedReplicaNum = isMaintenance ? 4 : 5;
-    OzoneTestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
+    OzoneTestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster, REPLICA_COPY_WAIT_MS);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
