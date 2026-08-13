@@ -603,7 +603,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       }
     }
 
-    builder.setCurrentVersion(currentVersion.serialize());
+    builder.setCurrentVersion(versionOverride != null ? versionOverride.serialize() : currentVersion.serialize());
 
     return builder;
   }
@@ -735,7 +735,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private HDDSVersion initialVersion = HDDSVersion.DEFAULT_VERSION;
-    private HDDSVersion currentVersion = HDDSVersion.SOFTWARE_VERSION;
+    private HDDSVersion currentVersion = HDDSVersion.DEFAULT_VERSION;
 
     /**
      * Default private constructor. To create Builder instance use
