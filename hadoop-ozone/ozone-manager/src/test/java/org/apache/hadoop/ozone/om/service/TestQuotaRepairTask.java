@@ -30,7 +30,10 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -49,6 +52,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -368,9 +372,9 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
   }
 
   /**
-   * EC parity is added per stripe, so converting a version as a whole and converting its blocks one by one give
-   * different totals. {@link OMKeyCommitRequest} converts each commit as a whole, so the recount has to do the
-   * same, otherwise repair would move a counter that live accounting had right.
+   * EC rounds a partial stripe up to a full parity chunk once per conversion, so converting a version as a whole
+   * and converting its blocks one by one give different totals. {@link OMKeyCommitRequest} converts each commit as
+   * a whole, so the recount has to do the same, otherwise repair would move a counter that live accounting had right.
    */
   @Test
   public void testQuotaRepairVersionedBucketWithECKey() throws Exception {
@@ -390,10 +394,41 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     OmBucketInfo live = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(9216, live.getUsedBytes());
 
-    // converting v0's two blocks separately would add parity twice and report 11264 instead
+    // converting v0's two blocks separately would round the partial stripe up twice and report 11264 instead
     OmBucketInfo repaired = runRepair(ref, bucketKey);
-    assertEquals(live.getUsedBytes(), repaired.getUsedBytes(),
+    assertEquals(9216, repaired.getUsedBytes(),
         "repair must reproduce what commit charged, not re-derive it per block");
+    assertEquals(1, repaired.getUsedNamespace());
+  }
+
+  /**
+   * Keys written before HDDS-5472 carry copies of the earlier groups' blocks and were never migrated, so summing
+   * whole groups would charge v0 twice here.
+   */
+  @Test
+  public void testQuotaRepairLegacyKeyWithCopiedVersions() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> ref = mockRatisSubmit();
+    String bucketKey = addVersionedBucket(bucketName);
+
+    List<OmKeyLocationInfo> v0 = blockLocations(0L, 300L);
+    Map<Long, List<OmKeyLocationInfo>> legacyGroup = new HashMap<>();
+    legacyGroup.put(0L, new ArrayList<>(v0));
+    legacyGroup.put(1L, blockLocations(1L, 600L));
+
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            RatisReplicationConfig.getInstance(ONE))
+        .setOmKeyLocationInfos(Arrays.asList(
+            new OmKeyLocationInfoGroup(0L, v0),
+            new OmKeyLocationInfoGroup(1L, legacyGroup)))
+        .setDataSize(600)
+        .setUpdateID(1L)
+        .build();
+    OMRequestTestUtils.addKeyToTable(false, false, omKeyInfo, clientID, 1L, omMetadataManager);
+
+    zeroOutBucketUsedBytes(volumeName, bucketName, 1L);
+
+    OmBucketInfo repaired = runRepair(ref, bucketKey);
+    assertEquals(900, repaired.getUsedBytes(), "the copy of v0 in group 1 must not be charged again");
     assertEquals(1, repaired.getUsedNamespace());
   }
 

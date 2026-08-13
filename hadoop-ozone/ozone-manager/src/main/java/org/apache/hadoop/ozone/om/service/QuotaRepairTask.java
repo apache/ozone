@@ -665,18 +665,19 @@ public class QuotaRepairTask {
    * Size of every version a key retains. {@code dataSize} covers the latest version only, while versioning keeps
    * the blocks of all of them, so the recount has to walk the version groups.
    *
+   * <p>Only the blocks a group created itself count: before HDDS-5472 a group also copied the earlier groups' blocks,
+   * and those keys were never migrated.
+   *
    * <p>Each version is converted once, as {@link org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest} charges
-   * it at commit time. {@code OMKeyRequest#sumBlockLengths} is not reused here because it converts every block
-   * separately, which for EC adds parity per block and would make repair report more than the bucket was charged.
+   * it at commit time. {@code OMKeyRequest#sumBlockLengths} is not reused because it converts every block separately,
+   * which for EC rounds a partial stripe up per block and reports more than the bucket was charged.
    */
   private static long getRetainedVersionsSize(OmKeyInfo keyInfo) {
     long replicatedSize = 0;
     for (OmKeyLocationInfoGroup group : keyInfo.getKeyLocationVersions()) {
       long versionSize = 0;
-      for (List<OmKeyLocationInfo> locations : group.getLocationLists()) {
-        for (OmKeyLocationInfo location : locations) {
-          versionSize += location.getLength();
-        }
+      for (OmKeyLocationInfo location : group.getBlocksLatestVersionOnly()) {
+        versionSize += location.getLength();
       }
       replicatedSize += QuotaUtil.getReplicatedSize(versionSize, keyInfo.getReplicationConfig());
     }
