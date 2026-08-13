@@ -23,14 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.common.collect.ImmutableList;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.security.MessageDigest;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -344,6 +342,7 @@ public class TestStreamRead {
       }
     }
   }
+
   @Test
   void testShiftedChecksumBoundaryVerification() throws Exception {
     final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf(8192);

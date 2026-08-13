@@ -2382,12 +2382,13 @@ public class KeyValueHandler extends Handler {
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
         final List<ByteString> checksums = getChecksums(adjustedOffset, readLength,
-            bytesPerChunk, chunkInfos);
+            bytesPerChecksum, chunkInfos);
         LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChunk {}, bytesPerChecksum {}",
             readBlock, adjustedOffset, readLength, bytesPerChunk, bytesPerChecksum);
         checksumData = new ChecksumData(checksumType, bytesPerChecksum, checksums);
         if (validateChunkChecksumData) {
-          Checksum.verifyChecksum(buffer.duplicate(), checksumData, 0);
+          Checksum.verifyChecksum(
+              buffer.duplicate(), checksumData, adjustedOffset, chunkInfos);
         }
       }
       final ContainerCommandResponseProto response = getReadBlockResponse(

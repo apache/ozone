@@ -1236,7 +1236,8 @@ public class TestKeyValueHandler {
     assertEquals("chk3-2", checksums.get(1).toStringUtf8());
   }
 
-  private static long getAdjustedOffset(long blockOffset, List<ContainerProtos.ChunkInfo> chunks, int bytesPerChecksum) {
+  private static long getAdjustedOffset(
+      long blockOffset, List<ContainerProtos.ChunkInfo> chunks, int bytesPerChecksum) {
     final long chunkRelativeOffset = KeyValueHandler.getChunkRelativeOffset(blockOffset, chunks);
     final long offsetAlignment = chunkRelativeOffset % bytesPerChecksum;
     return blockOffset - offsetAlignment;
