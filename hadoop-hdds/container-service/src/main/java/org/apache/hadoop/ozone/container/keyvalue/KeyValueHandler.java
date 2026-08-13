@@ -2353,12 +2353,13 @@ public class KeyValueHandler extends Handler {
     } else {
       bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
     }
-    // We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
-    // previous checksum boundary.
-    // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
-    // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
-    // it simplifies the code to always do this.
-    final long offsetAlignment = readBlock.getOffset() % bytesPerChecksum;
+    // We have to align the read to checksum boundaries.  Each chunk has its
+    // own checksum grid starting at byte 0 of that chunk, so the alignment
+    // must be relative to the containing chunk rather than a global multiple
+    // of bytesPerChecksum.  If the checksum type is NONE we still align for
+    // simplicity since that case is rare in practice.
+    final long chunkRelativeOffset = getChunkRelativeOffset(readBlock.getOffset(), chunkInfos);
+    final long offsetAlignment = chunkRelativeOffset % bytesPerChecksum;
     long adjustedOffset = readBlock.getOffset() - offsetAlignment;
 
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
@@ -2404,9 +2405,24 @@ public class KeyValueHandler extends Handler {
     return totalDataLength;
   }
 
+  /**
+   * Returns the offset of {@code blockOffset} relative to the start of the
+   * chunk that contains it.
+   */
+  static long getChunkRelativeOffset(long blockOffset, List<ContainerProtos.ChunkInfo> chunkInfos) {
+    long currentChunkOffset = 0;
+    for (ContainerProtos.ChunkInfo chunk : chunkInfos) {
+      long chunkEnd = currentChunkOffset + chunk.getLen();
+      if (blockOffset < chunkEnd) {
+        return blockOffset - currentChunkOffset;
+      }
+      currentChunkOffset = chunkEnd;
+    }
+    return blockOffset;
+  }
+
   static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChunk, int bytesPerChecksum,
       final List<ContainerProtos.ChunkInfo> chunks) {
-    assertSame(0, blockOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
     final List<ByteString> checksums = new ArrayList<>();
 
     long currentChunkOffset = 0;
