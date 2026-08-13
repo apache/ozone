@@ -89,6 +89,7 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -1002,7 +1003,7 @@ public class SCMClientProtocolServer implements
             .orElseThrow(() -> new IOException("Cannot" +
                 " find a new leader to transfer leadership."));
       } else {
-        targetPeerId = RaftPeerId.valueOf(newLeaderId);
+        targetPeerId = resolveTargetPeerId(newLeaderId, group);
       }
       final GrpcTlsConfig tlsConfig =
           createSCMRatisTLSConfig(new SecurityConfig(scm.getConfiguration()),
@@ -1017,6 +1018,23 @@ public class SCMClientProtocolServer implements
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
             SCMAction.TRANSFER_LEADERSHIP, auditMap));
+  }
+
+  /** Resolves the transfer target, which may be given as an SCM UUID or as a configured SCM node id. */
+  private RaftPeerId resolveTargetPeerId(String newLeaderId, RaftGroup group) {
+    final RaftPeerId peerId = RaftPeerId.valueOf(newLeaderId);
+    if (group.getPeer(peerId) != null) {
+      return peerId;
+    }
+    // Raft peer ids are SCM UUIDs, so a node id only matches through its configured Ratis address.
+    return scm.getSCMHANodeDetails().getAllNodeDetails().stream()
+        .filter(node -> newLeaderId.equals(node.getNodeId()))
+        .map(SCMNodeDetails::getRatisHostPortStr)
+        .flatMap(address -> group.getPeers().stream().filter(peer -> address.equals(peer.getAddress())))
+        .map(RaftPeer::getId)
+        .findFirst()
+        // Leave an unmatched id to RatisHelper, which reports the group it did not match.
+        .orElse(peerId);
   }
 
   @Deprecated
