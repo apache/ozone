@@ -2353,13 +2353,13 @@ public class KeyValueHandler extends Handler {
     } else {
       bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
     }
-    // We have to align the read to checksum boundaries.  Each chunk has its
-    // own checksum grid starting at byte 0 of that chunk, so the alignment
-    // must be relative to the containing chunk rather than a global multiple
-    // of bytesPerChecksum.  If the checksum type is NONE we still align for
-    // simplicity since that case is rare in practice.
-    final long chunkRelativeOffset = getChunkRelativeOffset(readBlock.getOffset(), chunkInfos);
-    final long offsetAlignment = chunkRelativeOffset % bytesPerChecksum;
+    long offsetAlignment;
+    if (checksumType != ContainerProtos.ChecksumType.NONE) {
+      final long chunkRelativeOffset = getChunkRelativeOffset(readBlock.getOffset(), chunkInfos);
+      offsetAlignment = chunkRelativeOffset % bytesPerChecksum;
+    } else {
+      offsetAlignment = readBlock.getOffset() % bytesPerChecksum;
+    }
     long adjustedOffset = readBlock.getOffset() - offsetAlignment;
 
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
@@ -2406,6 +2406,10 @@ public class KeyValueHandler extends Handler {
   }
 
   /**
+   * If Checksum type is not NONE then we have to align the read to checksum boundaries.
+   * Each chunk has its own checksum grid starting at byte 0 of that chunk, so the alignment
+   * must be relative to the containing chunk rather than a global multiple
+   * of bytesPerChecksum.
    * Returns the offset of {@code blockOffset} relative to the start of the
    * chunk that contains it.
    */
