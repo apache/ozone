@@ -60,6 +60,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -1203,12 +1204,13 @@ public class TestKeyValueHandler {
             .build())
         .build();
     
-    List<ContainerProtos.ChunkInfo> chunks = java.util.Arrays.asList(chunk1, chunk2, chunk3);
+    List<ContainerProtos.ChunkInfo> chunks = Arrays.asList(chunk1, chunk2, chunk3);
 
     long blockOffset1 = 0, blockOffset2 = 1024, blockOffset3 = 2048;
     // Read full block (1024 + 10 + 2048)
-    List<ByteString> checksums = KeyValueHandler.getChecksums(
-        getAdjustedOffset(blockOffset1, chunks, bytesPerChecksum), 3082, bytesPerChunk, bytesPerChecksum, chunks);
+    long adjustedOffset = getAdjustedOffset(blockOffset1, chunks, bytesPerChecksum);
+    assertEquals(0, adjustedOffset);
+    List<ByteString> checksums = KeyValueHandler.getChecksums(adjustedOffset, 3082, bytesPerChunk, bytesPerChecksum, chunks);
     assertEquals(4, checksums.size());
     assertEquals("chk1", checksums.get(0).toStringUtf8());
     assertEquals("chk2", checksums.get(1).toStringUtf8());
@@ -1217,16 +1219,18 @@ public class TestKeyValueHandler {
 
 
     // Read from offset 1024
-    checksums = KeyValueHandler.getChecksums(
-        getAdjustedOffset(blockOffset2, chunks, bytesPerChecksum), 2058, bytesPerChunk, bytesPerChecksum, chunks);
+    adjustedOffset = getAdjustedOffset(blockOffset2, chunks, bytesPerChecksum);
+    assertEquals(1024, adjustedOffset);
+    checksums = KeyValueHandler.getChecksums(adjustedOffset, 2058, bytesPerChunk, bytesPerChecksum, chunks);
     assertEquals(3, checksums.size());
     assertEquals("chk2", checksums.get(0).toStringUtf8());
     assertEquals("chk3-1", checksums.get(1).toStringUtf8());
     assertEquals("chk3-2", checksums.get(2).toStringUtf8());
 
     // Read from offset 2048
-    checksums = KeyValueHandler.getChecksums(
-        getAdjustedOffset(blockOffset3, chunks, bytesPerChecksum), 1034, bytesPerChunk, bytesPerChecksum, chunks);
+    adjustedOffset = getAdjustedOffset(blockOffset3, chunks, bytesPerChecksum);
+    assertEquals(1034, adjustedOffset);
+    checksums = KeyValueHandler.getChecksums(adjustedOffset, 1034, bytesPerChunk, bytesPerChecksum, chunks);
     assertEquals(2, checksums.size());
     assertEquals("chk3-1", checksums.get(0).toStringUtf8());
     assertEquals("chk3-2", checksums.get(1).toStringUtf8());
@@ -1268,8 +1272,9 @@ public class TestKeyValueHandler {
     List<ContainerProtos.ChunkInfo> chunks = java.util.Arrays.asList(chunk1, chunk2);
 
     // Read full block (1 + 1 = 2 bytes)
-    List<ByteString> checksums = KeyValueHandler.getChecksums(
-            getAdjustedOffset(0, chunks, bytesPerChecksum), 2, bytesPerChunk, bytesPerChecksum, chunks);
+    long adjustedOffset = getAdjustedOffset(0, chunks, bytesPerChecksum);
+    assertEquals(0, adjustedOffset);
+    List<ByteString> checksums = KeyValueHandler.getChecksums(adjustedOffset, 2, bytesPerChunk, bytesPerChecksum, chunks);
     
     // According to the bug report, this should return 2 checksums.
     assertEquals(2, checksums.size());
