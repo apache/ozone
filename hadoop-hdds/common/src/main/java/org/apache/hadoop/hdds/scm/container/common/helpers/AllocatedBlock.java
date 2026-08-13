@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
+import jakarta.annotation.Nullable;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -29,8 +30,8 @@ public final class AllocatedBlock {
   private final Pipeline pipeline;
   private final ContainerBlockID containerBlockID;
 
-  private StorageTier storageTier;
-  private boolean isFallBack;
+  private final @Nullable StorageTier storageTier;
+  private final boolean isFallBack;
 
   /**
    * Builder for AllocatedBlock.
@@ -38,7 +39,7 @@ public final class AllocatedBlock {
   public static class Builder {
     private Pipeline pipeline;
     private ContainerBlockID containerBlockID;
-    private StorageTier storageTier;
+    private @Nullable StorageTier storageTier;
     private boolean isFallBack;
 
     public Builder setPipeline(Pipeline p) {
@@ -94,6 +95,7 @@ public final class AllocatedBlock {
         .setIsFallBack(isFallBack);
   }
 
+  @Nullable
   public StorageTier getStorageTier() {
     return storageTier;
   }
