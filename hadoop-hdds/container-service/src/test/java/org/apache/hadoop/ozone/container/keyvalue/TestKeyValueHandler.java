@@ -1177,7 +1177,7 @@ public class TestKeyValueHandler {
         .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
             .setType(ContainerProtos.ChecksumType.CRC32)
             .setBytesPerChecksum(bytesPerChecksum)
-            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk1"))
+            .addChecksums(ByteString.copyFromUtf8("chk1"))
             .build())
         .build();
 
@@ -1188,7 +1188,7 @@ public class TestKeyValueHandler {
         .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
             .setType(ContainerProtos.ChecksumType.CRC32)
             .setBytesPerChecksum(bytesPerChecksum)
-            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk2"))
+            .addChecksums(ByteString.copyFromUtf8("chk2"))
             .build())
         .build();
 
@@ -1199,8 +1199,8 @@ public class TestKeyValueHandler {
         .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
             .setType(ContainerProtos.ChecksumType.CRC32)
             .setBytesPerChecksum(bytesPerChecksum)
-            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk3-1"))
-            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk3-2"))
+            .addChecksums(ByteString.copyFromUtf8("chk3-1"))
+            .addChecksums(ByteString.copyFromUtf8("chk3-2"))
             .build())
         .build();
     
@@ -1254,7 +1254,7 @@ public class TestKeyValueHandler {
         .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
             .setType(ContainerProtos.ChecksumType.CRC32)
             .setBytesPerChecksum(bytesPerChecksum)
-            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk1"))
+            .addChecksums(ByteString.copyFromUtf8("chk1"))
             .build())
         .build();
 
@@ -1265,7 +1265,7 @@ public class TestKeyValueHandler {
         .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
             .setType(ContainerProtos.ChecksumType.CRC32)
             .setBytesPerChecksum(bytesPerChecksum)
-            .addChecksums(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8("chk2"))
+            .addChecksums(ByteString.copyFromUtf8("chk2"))
             .build())
         .build();
 
