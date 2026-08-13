@@ -25,6 +25,7 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.QUOTA_EXCEEDED;
@@ -130,6 +131,17 @@ public class TestS3LifecycleConfigurationPut {
         HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
     testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withEmptyFilterAndInvalidDate,
         HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationPropagatesOmInvalidRequest()
+      throws Exception {
+    // OM also raises INVALID_REQUEST for conditions that are not rejected rule values, such as the
+    // bucket layout mismatch in OMLifecycleConfigurationSetRequest. Those keep reporting
+    // InvalidRequest instead of being remapped to InvalidArgument.
+    assertUnhandledOMExceptionPropagated(
+        new OMException("Bucket layout mismatch", OMException.ResultCodes.INVALID_REQUEST),
+        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
   }
 
   @Test
