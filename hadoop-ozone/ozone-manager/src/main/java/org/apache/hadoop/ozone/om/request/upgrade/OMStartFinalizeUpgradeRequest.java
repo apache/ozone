@@ -79,7 +79,11 @@ public class OMStartFinalizeUpgradeRequest extends OMClientRequest {
     }
 
     try {
-      ozoneManager.getScmClient().getContainerClient().finalizeUpgrade();
+      if (force) {
+        ozoneManager.getScmClient().getContainerClient().forceFinalizeUpgrade();
+      } else {
+        ozoneManager.getScmClient().getContainerClient().finalizeUpgrade();
+      }
     } catch (SCMException e) {
       if (e.getResult() == SCMException.ResultCodes.UNSUPPORTED_OPERATION) {
         throw new OMException(e.getMessage(), e, OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
