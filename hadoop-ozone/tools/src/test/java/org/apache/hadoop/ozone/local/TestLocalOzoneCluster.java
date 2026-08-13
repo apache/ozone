@@ -21,8 +21,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
@@ -303,6 +305,113 @@ class TestLocalOzoneCluster {
     assertPositivePort(properties, "om.ratis");
     assertNotEquals(properties.getProperty("scm.client"),
         properties.getProperty("om.rpc"));
+  }
+
+  @Test
+  void prepareConfigurationCreatesDatanodeConfigurations() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setDatanodes(2)
+        .build();
+
+    LocalOzoneCluster.PreparedConfiguration prepared = prepare(config);
+
+    assertEquals(2, prepared.getDatanodeConfigurations().size());
+    for (int index = 0; index < 2; index++) {
+      OzoneConfiguration dnConf = prepared.getDatanodeConfigurations().get(index);
+      Path datanodeDir = dataDir.resolve("datanode-" + index);
+      assertTrue(Files.isDirectory(datanodeDir.resolve("ozone-metadata")));
+      assertTrue(Files.isDirectory(datanodeDir.resolve("data")));
+      assertEquals(datanodeDir.resolve("ozone-metadata").toString(),
+          dnConf.get(OZONE_METADATA_DIRS));
+      assertEquals(datanodeDir.resolve("data").toString(),
+          dnConf.get(HDDS_DATANODE_DIR_KEY));
+      assertTrue(dnConf.getInt(HDDS_CONTAINER_IPC_PORT, 0) > 0);
+    }
+    assertNotEquals(
+        prepared.getDatanodeConfigurations().get(0)
+            .getInt(HDDS_CONTAINER_IPC_PORT, 0),
+        prepared.getDatanodeConfigurations().get(1)
+            .getInt(HDDS_CONTAINER_IPC_PORT, 0));
+  }
+
+  @Test
+  void prepareConfigurationRejectsTooManyDatanodes() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            tempDir.resolve("local-ozone"))
+        .setDatanodes(LocalOzoneCluster.MAX_DATANODES + 1)
+        .build();
+
+    IOException error = assertPrepareFails(config);
+
+    assertEquals("Datanode count " + (LocalOzoneCluster.MAX_DATANODES + 1)
+        + " exceeds the local maximum of " + LocalOzoneCluster.MAX_DATANODES
+        + "; each datanode reserves 8 local ports.", error.getMessage());
+  }
+
+  @Test
+  void persistedPortFileContainsDatanodePorts() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setDatanodes(1)
+        .build();
+
+    prepare(config);
+
+    Properties properties = loadPortState(dataDir);
+    assertPositivePort(properties, "dn.0.http");
+    assertPositivePort(properties, "dn.0.client");
+    assertPositivePort(properties, "dn.0.container.ipc");
+    assertPositivePort(properties, "dn.0.ratis.ipc");
+    assertPositivePort(properties, "dn.0.ratis.admin");
+    assertPositivePort(properties, "dn.0.ratis.server");
+    assertPositivePort(properties, "dn.0.ratis.datastream");
+    assertPositivePort(properties, "dn.0.replication");
+  }
+
+  @Test
+  void prepareConfigurationPersistsDatanodePortsAcrossInstances()
+      throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    LocalOzoneClusterConfig config =
+        LocalOzoneClusterConfig.builder(dataDir).build();
+
+    LocalOzoneCluster.PreparedConfiguration first = prepare(config);
+    LocalOzoneCluster.PreparedConfiguration second = prepare(config);
+
+    assertEquals(
+        first.getDatanodeConfigurations().get(0)
+            .getInt(HDDS_CONTAINER_IPC_PORT, 0),
+        second.getDatanodeConfigurations().get(0)
+            .getInt(HDDS_CONTAINER_IPC_PORT, 0));
+  }
+
+  @Test
+  void formatNeverRejectsPortStateMissingDatanodePorts() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    prepare(LocalOzoneClusterConfig.builder(dataDir).setDatanodes(1).build());
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setFormatMode(LocalOzoneClusterConfig.FormatMode.NEVER)
+        .setDatanodes(2)
+        .build();
+
+    IOException error = assertPrepareFails(config);
+
+    assertMessageContains(error, "dn.1.");
+  }
+
+  @Test
+  void getDatanodeCountReturnsZeroBeforeStart() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            tempDir.resolve("local-ozone"))
+        .setDatanodes(3)
+        .build();
+
+    try (LocalOzoneCluster cluster = newCluster(config)) {
+      cluster.prepareConfiguration();
+
+      assertEquals(0, cluster.getDatanodeCount());
+    }
   }
 
   private LocalOzoneCluster.PreparedConfiguration prepare(

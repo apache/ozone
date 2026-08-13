@@ -35,7 +35,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -59,7 +59,7 @@ public abstract class TestLeaseRecoverer implements NonHATests.TestCase {
     client = cluster().newClient();
 
     // create a volume and a FSO bucket
-    fsoOzoneBucket = TestDataUtil
+    fsoOzoneBucket = DataTestUtil
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 

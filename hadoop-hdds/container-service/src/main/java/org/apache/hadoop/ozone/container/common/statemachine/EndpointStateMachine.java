@@ -152,10 +152,14 @@ public class EndpointStateMachine
    */
   @Override
   public void close() {
-    if (endPoint != null) {
-      endPoint.close();
+    try {
+      if (endPoint != null) {
+        endPoint.close();
+      }
+    } finally {
+      // Always release the executor thread, even if closing the RPC proxy throws.
+      executorService.shutdown();
     }
-    executorService.shutdown();
   }
 
   /**

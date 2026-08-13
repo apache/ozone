@@ -858,7 +858,7 @@ public class TestKeyValueHandler {
 
     final KeyValueHandler kvHandler = new KeyValueHandler(conf,
         datanodeId, containerSet, volumeSet, null, metrics,
-        c -> icrReceived.incrementAndGet(), clock, new ContainerChecksumTreeManager(conf));
+        c -> icrReceived.incrementAndGet(), clock, new ContainerChecksumTreeManager(conf), null);
     kvHandler.setClusterID(clusterId);
 
     final ContainerCommandRequestProto createContainer =

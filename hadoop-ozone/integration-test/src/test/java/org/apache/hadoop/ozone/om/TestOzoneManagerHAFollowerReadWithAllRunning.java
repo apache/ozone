@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_DELETE;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -419,7 +420,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
 
   @Test
   public void testAllVolumeOperations() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
 
     createAndCheckVolume(volumeName);
 
@@ -435,8 +436,8 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
 
   @Test
   public void testAllBucketOperations() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
 
     OzoneVolume retVolume = createAndCheckVolume(volumeName);
 

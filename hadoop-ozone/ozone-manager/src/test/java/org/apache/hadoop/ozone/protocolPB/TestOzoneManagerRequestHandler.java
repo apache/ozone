@@ -149,6 +149,89 @@ public class TestOzoneManagerRequestHandler {
     }
   }
 
+  /**
+   * getFileStatus must forward the headOp flag from the request KeyArgs into
+   * the OmKeyArgs handed to the OM, and must drop the (unrefreshed) block
+   * locations from a head-op response so it stays small (HDDS-15678).
+   */
+  @Test
+  public void getFileStatusForwardsHeadOpAndStripsLocations() throws IOException {
+    for (boolean headOp : new boolean[] {true, false}) {
+      OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+      OzoneManager ozoneManager = requestHandler.getOzoneManager();
+
+      OzoneFileStatus status = Mockito.mock(OzoneFileStatus.class);
+      OzoneManagerProtocolProtos.OzoneFileStatusProto proto =
+          OzoneManagerProtocolProtos.OzoneFileStatusProto.newBuilder()
+              .setKeyInfo(OzoneManagerProtocolProtos.KeyInfo.newBuilder()
+                  .setVolumeName("volume").setBucketName("bucket")
+                  .setKeyName("key").setDataSize(0)
+                  .setType(HddsProtos.ReplicationType.RATIS)
+                  .setCreationTime(0).setModificationTime(0)
+                  .addKeyLocationList(
+                      OzoneManagerProtocolProtos.KeyLocationList.newBuilder()
+                          .setVersion(0).build())
+                  .build())
+              .build();
+      Mockito.when(status.getProtobuf(Mockito.anyInt())).thenReturn(proto);
+      ArgumentCaptor<OmKeyArgs> captor = ArgumentCaptor.forClass(OmKeyArgs.class);
+      Mockito.when(ozoneManager.getFileStatus(captor.capture())).thenReturn(status);
+
+      OzoneManagerProtocolProtos.OMRequest request =
+          Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+      Mockito.when(request.getTraceID()).thenReturn("traceId");
+      Mockito.when(request.getCmdType())
+          .thenReturn(OzoneManagerProtocolProtos.Type.GetFileStatus);
+      Mockito.when(request.getGetFileStatusRequest()).thenReturn(
+          OzoneManagerProtocolProtos.GetFileStatusRequest.newBuilder()
+              .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                  .setVolumeName("volume").setBucketName("bucket")
+                  .setKeyName("key").setHeadOp(headOp).build())
+              .build());
+
+      OzoneManagerProtocolProtos.OMResponse response =
+          requestHandler.handleReadRequest(request);
+
+      Assertions.assertEquals(headOp, captor.getValue().isHeadOp());
+      int locations = response.getGetFileStatusResponse().getStatus()
+          .getKeyInfo().getKeyLocationListCount();
+      // headOp -> block locations stripped; otherwise retained.
+      Assertions.assertEquals(headOp ? 0 : 1, locations);
+    }
+  }
+
+  /**
+   * A head-op status with no keyInfo (defensive) must be returned unchanged.
+   */
+  @Test
+  public void getFileStatusHeadOpWithoutKeyInfoIsNoop() throws IOException {
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+    OzoneManager ozoneManager = requestHandler.getOzoneManager();
+
+    OzoneFileStatus status = Mockito.mock(OzoneFileStatus.class);
+    Mockito.when(status.getProtobuf(Mockito.anyInt())).thenReturn(
+        OzoneManagerProtocolProtos.OzoneFileStatusProto.newBuilder()
+            .setIsDirectory(true).build());
+    Mockito.when(ozoneManager.getFileStatus(Mockito.any())).thenReturn(status);
+
+    OzoneManagerProtocolProtos.OMRequest request =
+        Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+    Mockito.when(request.getTraceID()).thenReturn("traceId");
+    Mockito.when(request.getCmdType())
+        .thenReturn(OzoneManagerProtocolProtos.Type.GetFileStatus);
+    Mockito.when(request.getGetFileStatusRequest()).thenReturn(
+        OzoneManagerProtocolProtos.GetFileStatusRequest.newBuilder()
+            .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                .setVolumeName("volume").setBucketName("bucket")
+                .setKeyName("key").setHeadOp(true).build())
+            .build());
+
+    OzoneManagerProtocolProtos.OMResponse response =
+        requestHandler.handleReadRequest(request);
+    Assertions.assertFalse(
+        response.getGetFileStatusResponse().getStatus().hasKeyInfo());
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {0, 9, 10, 11, 50})
   public void testListKeysResponseSize(int resultSize) throws IOException {
@@ -397,5 +480,70 @@ public class TestOzoneManagerRequestHandler {
         OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto.NOT_FOUND,
         reportOnlyResponse.getSnapshotDiffResponse().getJobStatus());
     Assertions.assertEquals(0L, reportOnlyResponse.getSnapshotDiffResponse().getWaitTimeInMs());
+  }
+
+  @Test
+  public void testSnapshotDiffHandlerSerializesSubStatusAndProgressIntoProto() throws IOException {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager ozoneManager = handler.getOzoneManager();
+
+    OMLayoutVersionManager lvm = Mockito.mock(OMLayoutVersionManager.class);
+    Mockito.when(lvm.isAllowed(Mockito.anyString())).thenReturn(true);
+    Mockito.when(ozoneManager.getVersionManager()).thenReturn(lvm);
+
+    SnapshotDiffResponse diffResponse =
+        new SnapshotDiffResponse(null, SnapshotDiffResponse.JobStatus.IN_PROGRESS, 60000L);
+    diffResponse.setSubStatus(SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_DIR);
+    diffResponse.setProgressPercent(50.0);
+    Mockito.when(ozoneManager.snapshotDiff(Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.anyInt()))
+        .thenReturn(diffResponse);
+
+    OzoneManagerProtocolProtos.OMRequest request =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotDiff)
+            .setClientId("client")
+            .setSnapshotDiffRequest(OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
+                .setVolumeName("vol").setBucketName("buck")
+                .setFromSnapshot("s1").setToSnapshot("s2")
+                .setToken("t").setPageSize(10))
+            .build();
+
+    OzoneManagerProtocolProtos.SnapshotDiffResponse proto =
+        handler.handleReadRequest(request).getSnapshotDiffResponse();
+    Assertions.assertTrue(proto.hasSubStatus());
+    Assertions.assertEquals(
+        OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_DIR,
+        proto.getSubStatus());
+    Assertions.assertEquals(50.0, proto.getProgressPercent(), 1e-9);
+  }
+
+  @Test
+  public void testSnapshotDiffHandlerOmitsSubStatusFromProtoWhenNull() throws IOException {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager ozoneManager = handler.getOzoneManager();
+
+    OMLayoutVersionManager lvm = Mockito.mock(OMLayoutVersionManager.class);
+    Mockito.when(lvm.isAllowed(Mockito.anyString())).thenReturn(true);
+    Mockito.when(ozoneManager.getVersionManager()).thenReturn(lvm);
+
+    Mockito.when(ozoneManager.snapshotDiff(Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.anyInt()))
+        .thenReturn(new SnapshotDiffResponse(null, SnapshotDiffResponse.JobStatus.IN_PROGRESS, 60000L));
+
+    OzoneManagerProtocolProtos.OMRequest request =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotDiff)
+            .setClientId("client")
+            .setSnapshotDiffRequest(OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
+                .setVolumeName("vol").setBucketName("buck")
+                .setFromSnapshot("s1").setToSnapshot("s2")
+                .setToken("t").setPageSize(10))
+            .build();
+
+    OzoneManagerProtocolProtos.SnapshotDiffResponse proto =
+        handler.handleReadRequest(request).getSnapshotDiffResponse();
+    Assertions.assertFalse(proto.hasSubStatus());
+    Assertions.assertFalse(proto.hasProgressPercent());
   }
 }
