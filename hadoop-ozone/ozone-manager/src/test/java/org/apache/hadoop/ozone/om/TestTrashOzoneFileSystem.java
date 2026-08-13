@@ -68,21 +68,18 @@ public class TestTrashOzoneFileSystem {
   private static final RatisReplicationConfig REPLICATION =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
 
-  private OzoneConfiguration conf;
   private OzoneManager ozoneManager;
-  private KeyManager keyManager;
-  private OMMetadataManager metadataManager;
   private UserGroupInformation testUgi;
 
   @BeforeEach
   public void setup() throws IOException {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     testUgi = UserGroupInformation.createUserForTesting(USER, new String[0]);
     UserGroupInformation.setConfiguration(conf);
 
     ozoneManager = mock(OzoneManager.class);
-    keyManager = mock(KeyManager.class);
-    metadataManager = mock(OMMetadataManager.class);
+    KeyManager keyManager = mock(KeyManager.class);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     OMMetrics metrics = mock(OMMetrics.class);
 
     when(ozoneManager.getConfiguration()).thenReturn(conf);
