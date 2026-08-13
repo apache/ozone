@@ -58,11 +58,10 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
         null,
         new Class<?>[] {ContainerInfoProto.class}
     }),
-    updateContainerState(new Class<?>[][]{
+    updateContainerState(new Class<?>[][] {
         null,
         null,
-        null,
-        new Class<?>[]{HddsProtos.ContainerID.class, LifeCycleEvent.class}
+        new Class<?>[] {HddsProtos.ContainerID.class, LifeCycleEvent.class}
     }),
     updateContainerStateWithSequenceId(new Class<?>[][] {
         null,
@@ -317,11 +316,17 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       getImpl().updateContainerReplica(arg26);
       return Message.EMPTY;
 
-    case "updateContainerStateWithSequenceId":
+    case "updateContainerState":
       final HddsProtos.ContainerID arg27 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
       final LifeCycleEvent arg28 = p.length > 1 ? (LifeCycleEvent) p[1] : null;
-      final Long arg29 = p.length > 2 ? (Long) p[2] : null;
-      getImpl().updateContainerStateWithSequenceId(arg27, arg28, arg29);
+      getImpl().updateContainerState(arg27, arg28);
+      return Message.EMPTY;
+
+    case "updateContainerStateWithSequenceId":
+      final HddsProtos.ContainerID arg29 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
+      final LifeCycleEvent arg30 = p.length > 1 ? (LifeCycleEvent) p[1] : null;
+      final Long arg31 = p.length > 2 ? (Long) p[2] : null;
+      getImpl().updateContainerStateWithSequenceId(arg29, arg30, arg31);
       return Message.EMPTY;
 
     default:
