@@ -472,7 +472,7 @@ public class TestContainerBalancer {
 
   /**
    * The freshness bound for the balancing interval is the node report interval
-   * (not the hourly du refresh period). The
+   * and not the hourly du refresh period. The
    * default 3m interval is above a typical 1m node report interval.
    */
   @Test

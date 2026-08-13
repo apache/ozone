@@ -564,7 +564,7 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
   @VisibleForTesting
   static boolean isBalancingIntervalBelowNodeReportInterval(
       long balancingIntervalMs, long nodeReportIntervalMs) {
-    return balancingIntervalMs <= nodeReportIntervalMs;
+    return balancingIntervalMs < nodeReportIntervalMs;
   }
 
   /**

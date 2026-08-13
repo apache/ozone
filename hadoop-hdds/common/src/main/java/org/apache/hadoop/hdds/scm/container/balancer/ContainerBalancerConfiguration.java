@@ -113,11 +113,9 @@ public final class ContainerBalancerConfiguration {
 
   @Config(key = "hdds.container.balancer.balancing.iteration.interval", type = ConfigType.TIME,
       defaultValue = "3m", tags = {ConfigTag.BALANCER}, description =
-      "The interval period to wait between each iteration of Container " +
-          "Balancer. Container Balancer runs iterations continuously and only " +
-          "waits this short period so that SCM receives refreshed datanode " +
-          "usage info (reported every hdds.node.report.interval) before the " +
-          "next iteration starts.")
+      "The interval to wait between Container Balancer iterations. " +
+      "Container Balancer runs iterations continuously and waits only briefly " +
+      "so SCM can receive refreshed datanode usage information before the next iteration starts..")
   private long balancingInterval = Duration.ofMinutes(3).toMillis();
 
   @Config(key = "hdds.container.balancer.include.datanodes", type = ConfigType.STRING, defaultValue =
