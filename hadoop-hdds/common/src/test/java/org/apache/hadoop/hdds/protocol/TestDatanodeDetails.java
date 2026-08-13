@@ -82,11 +82,10 @@ public class TestDatanodeDetails {
         dn2.getCurrentVersion());
 
     // test that if the current version is set, it is used
-    protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION, requiredPorts);
+    protoBuilder = dn.toProtoBuilder(DEFAULT_VERSION, requiredPorts);
+    protoBuilder.setCurrentVersion(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize());
     DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.SOFTWARE_VERSION,
-        dn3.getCurrentVersion());
+    assertEquals(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC, dn3.getCurrentVersion());
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,
