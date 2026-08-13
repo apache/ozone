@@ -45,6 +45,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -676,26 +677,34 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         CompletableFuture<Boolean> workersCompleted = CompletableFuture.completedFuture(true);
         for (int i = 0; i < parallelThreads; i++) {
           AtomicBoolean workerReady = new AtomicBoolean();
-          CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
-            try {
-              return processDeletedDirectories(currentSnapshotInfo, keyManager, dirSupplier,
-                  expectedPreviousSnapshotId, exclusiveSizeMap, rnCnt, remainNum, () -> {
-                    if (snapshotDbHandlesClosed != null) {
-                      signalWorkerReady(workerReady, snapshotDbHandlesClosed);
-                      if (awaitUninterruptibly(submitSnapshotRequests)) {
-                        Thread.currentThread().interrupt();
+          try {
+            CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
+              try {
+                return processDeletedDirectories(currentSnapshotInfo, keyManager, dirSupplier,
+                    expectedPreviousSnapshotId, exclusiveSizeMap, rnCnt, remainNum, () -> {
+                      if (snapshotDbHandlesClosed != null) {
+                        signalWorkerReady(workerReady, snapshotDbHandlesClosed);
+                        if (awaitUninterruptibly(submitSnapshotRequests)) {
+                          Thread.currentThread().interrupt();
+                        }
                       }
-                    }
-                  });
-            } catch (Throwable e) {
-              return false;
-            } finally {
-              if (snapshotDbHandlesClosed != null) {
-                signalWorkerReady(workerReady, snapshotDbHandlesClosed);
+                    });
+              } catch (Throwable e) {
+                return false;
+              } finally {
+                if (snapshotDbHandlesClosed != null) {
+                  signalWorkerReady(workerReady, snapshotDbHandlesClosed);
+                }
               }
+            }, isThreadPoolActive(deletionThreadPool) ? deletionThreadPool : ForkJoinPool.commonPool());
+            workersCompleted = workersCompleted.thenCombine(future, (a, b) -> a && b);
+          } catch (RejectedExecutionException e) {
+            if (snapshotDbHandlesClosed != null) {
+              countDown(snapshotDbHandlesClosed, parallelThreads - i);
             }
-          }, isThreadPoolActive(deletionThreadPool) ? deletionThreadPool : ForkJoinPool.commonPool());
-          workersCompleted = workersCompleted.thenCombine(future, (a, b) -> a && b);
+            workersCompleted = workersCompleted.thenApply(ignored -> false);
+            break;
+          }
         }
 
         boolean interrupted = false;
@@ -703,9 +712,12 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           interrupted = awaitUninterruptibly(snapshotDbHandlesClosed);
           // Workers have released their previous-snapshot DB handles and stopped using the iterator and current
           // snapshot. Close the task-owned resources before allowing synchronous OM requests to be submitted.
-          dirSupplier.close();
-          currentSnapshot.close();
-          submitSnapshotRequests.countDown();
+          try {
+            dirSupplier.close();
+            currentSnapshot.close();
+          } finally {
+            submitSnapshotRequests.countDown();
+          }
         }
 
         while (true) {
@@ -857,6 +869,12 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     private void signalWorkerReady(AtomicBoolean workerReady, CountDownLatch snapshotDbHandlesClosed) {
       if (workerReady.compareAndSet(false, true)) {
         snapshotDbHandlesClosed.countDown();
+      }
+    }
+
+    private void countDown(CountDownLatch latch, int count) {
+      for (int i = 0; i < count; i++) {
+        latch.countDown();
       }
     }
 

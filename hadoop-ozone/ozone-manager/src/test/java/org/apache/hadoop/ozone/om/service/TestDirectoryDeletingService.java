@@ -46,6 +46,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -62,6 +64,7 @@ import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -81,6 +84,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -488,6 +492,76 @@ public class TestDirectoryDeletingService {
       ddsMayProceed.countDown();
       executor.shutdownNow();
       service.shutdown();
+    }
+  }
+
+  @Test
+  @DisplayName("DirectoryDeletingService releases snapshot workers when submission is rejected")
+  void testRejectedSnapshotWorkerSubmission() throws Exception {
+    OzoneConfiguration conf = createConfAndInitValues(2);
+    OmTestManagers managers = new OmTestManagers(conf);
+    om = managers.getOzoneManager();
+    KeyManager keyManager = managers.getKeyManager();
+    OMMetadataManager metadataManager = managers.getMetadataManager();
+    OzoneManagerProtocol writeClient = managers.getWriteClient();
+    keyManager.getDirDeletingService().shutdown();
+
+    OMRequestTestUtils.addVolumeToOM(metadataManager,
+        OmVolumeArgs.newBuilder().setOwnerName("o").setAdminName("a").setVolume(volumeName).build());
+    OMRequestTestUtils.addBucketToOM(metadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+            .setObjectID(1).setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED).build());
+    String snapshotName = "snapshot";
+    writeClient.createSnapshot(volumeName, bucketName, snapshotName);
+    om.awaitDoubleBufferFlush();
+
+    String snapshotKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName);
+    SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable().get(snapshotKey);
+    assertNotNull(snapshotInfo);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 100, 10000);
+
+    DirectoryDeletingService service = new DirectoryDeletingService(1, TimeUnit.HOURS, 1,
+        om, conf, 2, true);
+    RejectAfterFirstExecutor rejectionExecutor = new RejectAfterFirstExecutor();
+    HddsWhiteboxTestUtils.setInternalState(service, "deletionThreadPool", rejectionExecutor);
+    ExecutorService taskExecutor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> processFuture = taskExecutor.submit(() -> {
+        try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = om.getOmSnapshotManager().getActiveSnapshot(
+            volumeName, bucketName, snapshotName)) {
+          service.new DirDeletingTask(snapshotInfo.getSnapshotId()).processDeletedDirsForStore(snapshotInfo,
+              snapshot.get().getKeyManager(), snapshot, 1, 1);
+        }
+        return null;
+      });
+      processFuture.get(10, TimeUnit.SECONDS);
+      assertThat(rejectionExecutor.getCompletedTaskCount()).isEqualTo(1);
+    } finally {
+      taskExecutor.shutdownNow();
+      service.shutdown();
+    }
+  }
+
+  private static final class RejectAfterFirstExecutor extends ThreadPoolExecutor {
+    private final AtomicInteger submittedTaskCount = new AtomicInteger();
+
+    private RejectAfterFirstExecutor() {
+      super(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingDeque<>());
+    }
+
+    @Override
+    public void execute(Runnable task) {
+      if (submittedTaskCount.getAndIncrement() == 0) {
+        super.execute(task);
+      } else {
+        throw new RejectedExecutionException("Rejected by test executor");
+      }
     }
   }
 
