@@ -514,24 +514,24 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    */
   @JsonIgnore
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
-    return toProto(ClientVersion.CURRENT.serialize());
+    return toProto(ClientVersion.CURRENT);
   }
 
-  public HddsProtos.DatanodeDetailsProto toProto(int clientVersion) {
+  public HddsProtos.DatanodeDetailsProto toProto(ClientVersion clientVersion) {
     return toProtoBuilder(clientVersion, Collections.emptySet()).build();
   }
 
-  public HddsProtos.DatanodeDetailsProto toProto(int clientVersion, Set<Port.Name> filterPorts) {
+  public HddsProtos.DatanodeDetailsProto toProto(ClientVersion clientVersion, Set<Port.Name> filterPorts) {
     return toProtoBuilder(clientVersion, filterPorts).build();
   }
 
-  public HddsProtos.DatanodeDetailsProto toProto(int clientVersion, Set<Port.Name> filterPorts,
+  public HddsProtos.DatanodeDetailsProto toProto(ClientVersion clientVersion, Set<Port.Name> filterPorts,
       ComponentVersion versionOverride) {
     return toProtoBuilder(clientVersion, filterPorts, versionOverride).build();
   }
 
   public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
-      int clientVersion, Set<Port.Name> filterPorts) {
+      ClientVersion clientVersion, Set<Port.Name> filterPorts) {
     return toProtoBuilder(clientVersion, filterPorts, null);
   }
 
@@ -546,7 +546,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    * @return A {@link HddsProtos.DatanodeDetailsProto.Builder} Object.
    */
   public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
-      int clientVersion, Set<Port.Name> filterPorts, ComponentVersion versionOverride) {
+      ClientVersion clientVersion, Set<Port.Name> filterPorts, ComponentVersion versionOverride) {
 
     final HddsProtos.DatanodeIDProto idProto = id.toProto();
     final HddsProtos.DatanodeDetailsProto.Builder builder =
@@ -1185,7 +1185,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
 
   @Override
   public HddsProtos.NetworkNode toProtobuf(
-      int clientVersion) {
+      ClientVersion clientVersion) {
     return HddsProtos.NetworkNode.newBuilder()
         .setDatanodeDetails(toProtoBuilder(clientVersion, Collections.emptySet()).build())
         .build();

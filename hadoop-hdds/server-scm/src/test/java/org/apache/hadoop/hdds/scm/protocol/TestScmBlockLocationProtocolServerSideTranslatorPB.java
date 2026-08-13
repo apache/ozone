@@ -128,7 +128,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
         .setFactor(ReplicationFactor.THREE)
         .setOwner("owner")
         .build();
-    return service.allocateScmBlock(request, ClientVersion.CURRENT.serialize());
+    return service.allocateScmBlock(request, ClientVersion.CURRENT);
   }
 
   private Pipeline buildPipeline(List<DatanodeDetails> pipelineNodes) {

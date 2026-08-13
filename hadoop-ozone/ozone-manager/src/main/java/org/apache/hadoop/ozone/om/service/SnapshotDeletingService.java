@@ -196,14 +196,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
               for (Table.KeyValue<String, List<OmKeyInfo>> deletedEntry : deletedKeyEntries) {
                 deletedKeys.add(SnapshotMoveKeyInfos.newBuilder().setKey(deletedEntry.getKey())
                     .addAllKeyInfos(deletedEntry.getValue()
-                        .stream().map(val -> val.getProtobuf(ClientVersion.CURRENT.serialize()))
+                        .stream().map(val -> val.getProtobuf(ClientVersion.CURRENT))
                         .collect(Collectors.toList())).build());
               }
 
               // Convert deletedDirEntries to SnapshotMoveKeyInfos.
               for (Table.KeyValue<String, OmKeyInfo> deletedDirEntry : deletedDirEntries) {
                 deletedDirs.add(SnapshotMoveKeyInfos.newBuilder().setKey(deletedDirEntry.getKey())
-                    .addKeyInfos(deletedDirEntry.getValue().getProtobuf(ClientVersion.CURRENT.serialize())).build());
+                    .addKeyInfos(deletedDirEntry.getValue().getProtobuf(ClientVersion.CURRENT)).build());
               }
 
               // Convert renamedEntries to KeyValue.

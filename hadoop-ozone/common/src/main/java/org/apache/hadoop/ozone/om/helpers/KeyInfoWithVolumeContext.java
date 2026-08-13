@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.io.IOException;
 import java.util.Optional;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
 
 /**
@@ -55,7 +56,7 @@ public class KeyInfoWithVolumeContext {
         .build();
   }
 
-  public GetKeyInfoResponse toProtobuf(int clientVersion) {
+  public GetKeyInfoResponse toProtobuf(ClientVersion clientVersion) {
     GetKeyInfoResponse.Builder builder = GetKeyInfoResponse.newBuilder();
     volumeArgs.ifPresent(v -> builder.setVolumeInfo(v.getProtobuf()));
     userPrincipal.ifPresent(builder::setUserPrincipal);

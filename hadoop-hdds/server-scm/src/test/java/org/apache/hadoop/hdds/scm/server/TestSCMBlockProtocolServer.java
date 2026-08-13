@@ -274,7 +274,7 @@ public class TestSCMBlockProtocolServer {
             .setClient(client)
             .build();
     ScmBlockLocationProtocolProtos.SortDatanodesResponseProto resp =
-        service.sortDatanodes(request, ClientVersion.CURRENT.serialize());
+        service.sortDatanodes(request, ClientVersion.CURRENT);
     assertEquals(NODE_COUNT, resp.getNodeList().size());
     System.out.println("client = " + client);
     resp.getNodeList().stream().forEach(
@@ -290,7 +290,7 @@ public class TestSCMBlockProtocolServer {
         .addAllNodeNetworkName(nodes)
         .setClient(client)
         .build();
-    resp = service.sortDatanodes(request, ClientVersion.CURRENT.serialize());
+    resp = service.sortDatanodes(request, ClientVersion.CURRENT);
     System.out.println("client = " + client);
     assertEquals(0, resp.getNodeList().size());
     resp.getNodeList().stream().forEach(

@@ -377,7 +377,7 @@ public class TestOMRecoverLeaseRequest extends OMKeyRequestTests {
         .setDataSize(keyArgs.getDataSize())
         .addAllMetadata(KeyValueUtil.toProtobuf(keyArgs.getMetadata()))
         .addAllKeyLocations(locationInfoList.stream()
-            .map(info -> info.getProtobuf(ClientVersion.CURRENT.serialize()))
+            .map(info -> info.getProtobuf(ClientVersion.CURRENT))
             .collect(Collectors.toList()));
     setReplicationConfig(keyArgs.getReplicationConfig(), keyArgsBuilder);
     return keyArgsBuilder.build();

@@ -68,7 +68,7 @@ public final class Pipeline {
   private static final Codec<Pipeline> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(HddsProtos.Pipeline.getDefaultInstance()),
       Pipeline::getFromProtobufSetCreationTimestamp,
-      p -> p.getProtobufMessage(ClientVersion.CURRENT.serialize()),
+      p -> p.getProtobufMessage(ClientVersion.CURRENT),
       Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
@@ -364,15 +364,16 @@ public final class Pipeline {
     return replicationConfig;
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion) {
+  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion) {
     return getProtobufMessage(clientVersion, Collections.emptySet());
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts) {
+  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion,
+      Set<DatanodeDetails.Port.Name> filterPorts) {
     return getProtobufMessage(clientVersion, filterPorts, null);
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts,
+  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion, Set<DatanodeDetails.Port.Name> filterPorts,
       ComponentVersion versionOverride) {
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     List<Integer> memberReplicaIndexes = new ArrayList<>();

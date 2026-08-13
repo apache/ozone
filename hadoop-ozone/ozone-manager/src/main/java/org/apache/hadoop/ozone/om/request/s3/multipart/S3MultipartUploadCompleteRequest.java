@@ -37,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -605,7 +606,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       partKeyInfos.put(entry.getKey(), PartKeyInfo.newBuilder()
           .setPartName(partInfo.getPartName())
           .setPartNumber(partInfo.getPartNumber())
-          .setPartKeyInfo(partKeyInfo.getProtobuf(getOmRequest().getVersion()))
+          .setPartKeyInfo(partKeyInfo.getProtobuf(
+              ClientVersion.deserialize(getOmRequest().getVersion())))
           .build());
     }
     return new OmMultipartKeyInfo.PartKeyInfoMap(partKeyInfos);

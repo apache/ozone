@@ -100,6 +100,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -1359,7 +1360,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testSuccessWhenDecommissionStatus() throws IOException {
-    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(ClientVersion.class))).thenReturn(
         nodes); // 2 nodes decommissioning
     when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
     when(mockScmClient.getMetrics(any())).thenReturn(metrics.get(1));
@@ -1385,7 +1386,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testSuccessWhenDecommissionStatusWithUUID() throws IOException {
-    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(ClientVersion.class))).thenReturn(
         getNodeDetailsForUuid("654c4b89-04ef-4015-8a3b-50d0fb0e1684")); // 1 nodes decommissioning
     when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
     Response datanodesDecommissionInfo =

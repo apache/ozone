@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -77,8 +78,8 @@ public class TestOzoneManagerRequestHandler {
         OzoneManagerProtocolProtos.KeyInfo.newBuilder().setBucketName("bucket").setKeyName("key").setVolumeName(
                 "volume").setDataSize(0).setType(HddsProtos.ReplicationType.RATIS).setCreationTime(0)
             .setModificationTime(0).build();
-    Mockito.when(keyInfo.getProtobuf(Mockito.anyBoolean(), Mockito.anyInt())).thenReturn(info);
-    Mockito.when(keyInfo.getProtobuf(Mockito.anyInt())).thenReturn(info);
+    Mockito.when(keyInfo.getProtobuf(Mockito.anyBoolean(), any(ClientVersion.class))).thenReturn(info);
+    Mockito.when(keyInfo.getProtobuf(any(ClientVersion.class))).thenReturn(info);
     return keyInfo;
   }
 
@@ -176,7 +177,7 @@ public class TestOzoneManagerRequestHandler {
                           .setVersion(0).build())
                   .build())
               .build();
-      Mockito.when(status.getProtobuf(Mockito.anyInt())).thenReturn(proto);
+      Mockito.when(status.getProtobuf(any(ClientVersion.class))).thenReturn(proto);
       ArgumentCaptor<OmKeyArgs> captor = ArgumentCaptor.forClass(OmKeyArgs.class);
       Mockito.when(ozoneManager.getFileStatus(captor.capture())).thenReturn(status);
 
@@ -212,7 +213,7 @@ public class TestOzoneManagerRequestHandler {
     OzoneManager ozoneManager = requestHandler.getOzoneManager();
 
     OzoneFileStatus status = Mockito.mock(OzoneFileStatus.class);
-    Mockito.when(status.getProtobuf(Mockito.anyInt())).thenReturn(
+    Mockito.when(status.getProtobuf(any(ClientVersion.class))).thenReturn(
         OzoneManagerProtocolProtos.OzoneFileStatusProto.newBuilder()
             .setIsDirectory(true).build());
     Mockito.when(ozoneManager.getFileStatus(Mockito.any())).thenReturn(status);
