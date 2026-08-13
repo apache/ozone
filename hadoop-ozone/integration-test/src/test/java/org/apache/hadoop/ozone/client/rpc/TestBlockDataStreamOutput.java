@@ -356,7 +356,7 @@ public class TestBlockDataStreamOutput {
       // pipeline, which here is the software version the datanodes have finalized to.
       List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
       for (DatanodeDetails details : streamDnDetails) {
-        assertEquals(HDDSVersion.ZDU, details.getCurrentVersion());
+        assertEquals(HDDSVersion.SOFTWARE_VERSION, details.getCurrentVersion());
       }
     }
   }
