@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ratis.protocol.Message;
 
 /** Code generated for {@link ContainerStateManager}.  Do not modify. */
@@ -56,6 +57,12 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
     updateContainerInfo(new Class<?>[][] {
         null,
         new Class<?>[] {ContainerInfoProto.class}
+    }),
+    updateContainerState(new Class<?>[][]{
+        null,
+        null,
+        null,
+        new Class<?>[]{HddsProtos.ContainerID.class, LifeCycleEvent.class}
     }),
     updateContainerStateWithSequenceId(new Class<?>[][] {
         null,
@@ -177,6 +184,13 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       @Override
       public void updateContainerReplica(ContainerReplica arg0) {
         invoker.getImpl().updateContainerReplica(arg0);
+      }
+
+      @Override
+      public void updateContainerState(HddsProtos.ContainerID arg0, LifeCycleEvent arg1) throws IOException,
+          InvalidStateTransitionException {
+        final Object[] args = {arg0, arg1};
+        invoker.invokeReplicateDirect(ReplicateMethod.updateContainerState, args);
       }
 
       @Override
