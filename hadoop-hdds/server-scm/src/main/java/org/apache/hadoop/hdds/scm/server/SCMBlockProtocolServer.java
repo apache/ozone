@@ -203,6 +203,7 @@ public class SCMBlockProtocolServer implements
     auditMap.put("storagePolicy", storagePolicy.toString());
     auditMap.put("allowFallbackStoragePolicy", String.valueOf(allowFallbackStoragePolicy));
     List<AllocatedBlock> blocks = new ArrayList<>(num);
+    long fallbackBlockCount = 0;
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Allocating {} blocks of size {}, with {}",
@@ -227,6 +228,9 @@ public class SCMBlockProtocolServer implements
             }
           }
           blocks.add(block);
+          if (block.isFallBack()) {
+            fallbackBlockCount++;
+          }
         }
       }
 
@@ -234,7 +238,12 @@ public class SCMBlockProtocolServer implements
       String blockIDs = blocks.stream().limit(10)
           .map(block -> block.getBlockID().toString())
           .collect(Collectors.joining(", ", "[", "]"));
+      String fallbackBlocks = blocks.stream().limit(10)
+          .map(block -> String.valueOf(block.isFallBack()))
+          .collect(Collectors.joining(", ", "[", "]"));
       auditMap.put("sampleBlocks", blockIDs);
+      auditMap.put("sampleIsFallBack", fallbackBlocks);
+      auditMap.put("fallbackBlockCount", String.valueOf(fallbackBlockCount));
 
       if (blocks.size() < num) {
         AUDIT.logWriteFailure(buildAuditMessageForFailure(
