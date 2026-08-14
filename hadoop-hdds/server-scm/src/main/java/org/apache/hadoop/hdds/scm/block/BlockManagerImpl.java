@@ -188,11 +188,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       }
     }
 
-    if (containerInfo == null && allowFallbackStoragePolicy) {
-      isFallBack = true;
-      containerInfo = writableContainerFactory.getContainer(size, replicationConfig, owner,
-          excludeList, storagePolicy.getCreationFallbackTier());
-    }
     if (containerInfo != null) {
       return newBlock(containerInfo, isFallBack);
     }
