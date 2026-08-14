@@ -158,6 +158,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
@@ -494,12 +495,16 @@ public class TestSnapshotDiffManager {
       Set<Long> oldParentIds = Sets.newHashSet();
       Set<Long> newParentIds = Sets.newHashSet();
 
+      SnapshotDiffJob dummyJob = new SnapshotDiffJob(System.currentTimeMillis(),
+          "", IN_PROGRESS, VOLUME_NAME, BUCKET_NAME, "from", "to", false, false, 0, null, 0.0, "");
+      db.get().put(snapDiffJobTable, codecRegistry.asRawData(""), codecRegistry.asRawData(dummyJob));
+
       snapshotDiffManager.addToObjectIdMap(toSnapshotTable,
           fromSnapshotTable, Sets.newHashSet(Paths.get("dummy.sst")),
           nativeLibraryLoaded, oldObjectIdKeyMap, newObjectIdKeyMap,
           objectIdsToCheck, Optional.of(oldParentIds),
           Optional.of(newParentIds),
-          new TablePrefixInfo(ImmutableMap.of(DIRECTORY_TABLE, "0", KEY_TABLE, "0", FILE_TABLE, "0")), "");
+          new TablePrefixInfo(ImmutableMap.of(DIRECTORY_TABLE, "0", KEY_TABLE, "0", FILE_TABLE, "0")), "", "");
 
       try (ClosableIterator<Map.Entry<byte[], byte[]>> oldObjectIdIter =
                oldObjectIdKeyMap.iterator()) {
@@ -1780,18 +1785,38 @@ public class TestSnapshotDiffManager {
         .build();
   }
 
-  @Test
-  public void testGetSnapshotDiffReportReportOnlyInProgressIncludesProgressDetails()
-      throws IOException {
+  @ParameterizedTest
+  @EnumSource(value = SnapshotDiffResponse.SubStatus.class,
+      names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO", "OBJECT_ID_MAP_GEN_FSO_DIR",
+          "OBJECT_ID_MAP_GEN_FSO_FILE"})
+  public void testGetSnapshotDiffReportReportOnlyInProgressIncludesProgressDetails(
+      SnapshotDiffResponse.SubStatus subStatus) throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
         IN_PROGRESS, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
-        false, false, 0L, SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_OBS, 55.5, null);
+        false, false, 0L, subStatus, 55.5, null);
     snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
 
     SnapshotDiffResponse response = snapshotDiffManager.getSnapshotDiffReport(
         ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, "", 1000);
     assertEquals(IN_PROGRESS, response.getJobStatus());
+    assertEquals(subStatus, response.getSubStatus());
+    assertThat(response.getProgressPercent()).isEqualTo(55.5);
+  }
+
+  @Test
+  public void testGetSnapshotDiffReportInProgressWithPathResolutionSubStatus()
+      throws IOException {
+    SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
+    SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
+        IN_PROGRESS, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
+        false, false, 0L, SnapshotDiffResponse.SubStatus.PATH_RESOLUTION_FSO, 0.0, null);
+    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
+
+    SnapshotDiffResponse response = snapshotDiffManager.getSnapshotDiffReport(
+        ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, "", 1000);
+    assertEquals(IN_PROGRESS, response.getJobStatus());
+    assertEquals(SnapshotDiffResponse.SubStatus.PATH_RESOLUTION_FSO, response.getSubStatus());
   }
 
   private static OmDirectoryInfo newDeletedDir(long objectId, long parentId) {

@@ -22,7 +22,13 @@ import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.OzoneTrashPolicy.CURRENT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
@@ -2882,6 +2888,125 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
+    /**
+     * An MPU whose open key entry is missing (orphan) should still be aborted when a lifecycle
+     * rule matches by age and prefix alone (no tag filter). The abort request handler already
+     * tolerates a missing open key.
+     */
+    @Test
+    void testOrphanMpuAbortedByAgeAndPrefixRule() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+      long initialMpuCount = getMultipartUploadCount(volumeName, bucketName);
+
+      // Create two MPUs: one normal (has open key), one will become an orphan.
+      OmMultipartInfo normalMpu = createTestMultipartUpload(volumeName, bucketName, "data/normal", owner);
+      OmMultipartInfo orphanMpu = createTestMultipartUpload(volumeName, bucketName, "data/orphan", owner);
+
+      // Age both MPUs past the threshold.
+      long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "data/normal",
+          normalMpu.getUploadID(), oldCreationTime);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "data/orphan",
+          orphanMpu.getUploadID(), oldCreationTime);
+
+      // Simulate orphan: delete the open key entry for "data/orphan" directly from the table.
+      // Use the same helper the service uses so the key format matches exactly.
+      String resolvedOrphanOpenKey = OMMultipartUploadUtils
+          .getMultipartOpenKey(volumeName, bucketName, "data/orphan", orphanMpu.getUploadID(),
+              metadataManager, OBJECT_STORE);
+      metadataManager.getOpenKeyTable(OBJECT_STORE).delete(resolvedOrphanOpenKey);
+
+      // Rule: abort all MPUs under "data/" after 1 day — no tag filter.
+      OmLCRule rule = new OmLCRule.Builder()
+          .setId("abort-data-prefix")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder().setPrefix("data/").build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
+              .setDaysAfterInitiation(1)
+              .build())
+          .build();
+
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, Collections.singletonList(rule));
+
+      // Both MPUs should be aborted: normal one (open key present) and orphan (open key missing).
+      GenericTestUtils.waitFor(() ->
+          getMultipartUploadCount(volumeName, bucketName) - initialMpuCount == 0,
+          WAIT_CHECK_INTERVAL, 10000);
+
+      String normalKey = metadataManager.getMultipartKey(volumeName, bucketName,
+          "data/normal", normalMpu.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(normalKey),
+          "Normal MPU should be aborted");
+
+      String orphanKey = metadataManager.getMultipartKey(volumeName, bucketName,
+          "data/orphan", orphanMpu.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(orphanKey),
+          "Orphan MPU (no open key) should be aborted when a tag-free rule matches");
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    /**
+     * An MPU whose open key is missing (orphan) must NOT be aborted when the only matching
+     * lifecycle rule requires a tag filter, because the tag metadata is unavailable.
+     */
+    @Test
+    void testOrphanMpuNotAbortedByTagOnlyRule() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+      long initialMpuCount = getMultipartUploadCount(volumeName, bucketName);
+
+      OmMultipartInfo orphanMpu = createTestMultipartUpload(volumeName, bucketName, "file.txt", owner);
+
+      // Age past the threshold.
+      long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "file.txt",
+          orphanMpu.getUploadID(), oldCreationTime);
+
+      // Simulate orphan by removing its open key.
+      String resolvedOrphanOpenKey = OMMultipartUploadUtils
+          .getMultipartOpenKey(volumeName, bucketName, "file.txt", orphanMpu.getUploadID(),
+              metadataManager, OBJECT_STORE);
+      metadataManager.getOpenKeyTable(OBJECT_STORE).delete(resolvedOrphanOpenKey);
+
+      // Rule requires tag match — cannot evaluate without open key.
+      OmLCRule tagRule = new OmLCRule.Builder()
+          .setId("abort-by-tag")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder().setTag("env", "test").build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
+              .setDaysAfterInitiation(1)
+              .build())
+          .build();
+
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, Collections.singletonList(tagRule));
+
+      // Wait long enough for the service to run at least once.
+      Thread.sleep(SERVICE_INTERVAL * 2);
+
+      // Orphan MPU must remain: the tag rule cannot evaluate without open key metadata.
+      String orphanKey = metadataManager.getMultipartKey(volumeName, bucketName,
+          "file.txt", orphanMpu.getUploadID());
+      assertNotNull(metadataManager.getMultipartInfoTable().get(orphanKey),
+          "Orphan MPU should NOT be aborted when only tag-requiring rules exist");
+
+      assertEquals(initialMpuCount + 1, getMultipartUploadCount(volumeName, bucketName),
+          "MPU count should not change");
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
   }
 
   /**
@@ -3486,6 +3611,85 @@ class TestKeyLifecycleService extends OzoneTestBase {
     assertFalse(overList.isFull());
     assertEquals(0, overList.size());
     assertEquals(0, overList.getPartCount());
+  }
+
+  /**
+   * Tests when security is enabled.
+   */
+  @Nested
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  class WithAclsEnabled {
+
+    @BeforeAll
+    void setup(@TempDir File testDir) throws Exception {
+      scmBlockTestingClient = new ScmBlockLocationTestingClient(null, null, 0);
+      createConfig(testDir);
+      conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
+      conf.setBoolean(OZONE_ACL_ENABLED, true);
+      conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+      conf.setStrings(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+      createSubject();
+      keyDeletingService.suspend();
+      directoryDeletingService.suspend();
+    }
+
+    @AfterAll
+    void cleanup() {
+      if (om != null) {
+        om.stop();
+        om.join();
+      }
+    }
+
+    @Test
+    void testLifecycleDeleteSucceedsWithAclsEnabled()
+        throws IOException, TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(OBJECT_STORE);
+
+      List<OmKeyArgs> keyList = createKeys(volumeName, bucketName, OBJECT_STORE,
+          KEY_COUNT, 1, "key", null);
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(
+          () -> getKeyCount(OBJECT_STORE) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, "key", null, date.toString(), true);
+
+      GenericTestUtils.waitFor(
+          () -> (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(0, getKeyCount(OBJECT_STORE) - initialKeyCount,
+          "Keys should be deleted by lifecycle service but were not — "
+              + "possible UNAUTHORIZED from missing userInfo in DeleteKeys request");
+    }
+
+    @Test
+    void testMoveToTrashWithAclsEnabled()
+        throws IOException, TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, KEY_COUNT, 1, "key", null);
+      assertEquals(KEY_COUNT, keyList.size());
+      final float trashInterval = 0.5f;
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>) () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
+      GenericTestUtils.waitFor(
+          () -> (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
+    }
   }
 
   private static void addSplitSchemaPart(OMMetadataManager omMetadataManager,

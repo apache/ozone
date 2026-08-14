@@ -668,6 +668,5 @@ public abstract class ConfigurationFieldsTests {
       LOG.info("Checked {} default values for collision.", valuesChecked);
     }
 
-
   }
 }

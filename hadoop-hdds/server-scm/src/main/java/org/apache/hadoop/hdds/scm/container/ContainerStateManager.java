@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
  * A ContainerStateManager is responsible for keeping track of all the
@@ -168,6 +169,11 @@ public interface ContainerStateManager extends SCMHandler {
   @Replicate
   void addContainer(ContainerInfoProto containerInfo)
       throws IOException;
+
+  @Deprecated
+  @Replicate
+  void updateContainerState(HddsProtos.ContainerID id,
+      HddsProtos.LifeCycleEvent event) throws IOException, InvalidStateTransitionException;
 
   /**
    * Updates container state with sequenceId synchronization for HA consistency.
