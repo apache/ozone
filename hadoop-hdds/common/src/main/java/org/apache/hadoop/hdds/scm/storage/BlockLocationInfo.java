@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import jakarta.annotation.Nullable;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StorageTier;
@@ -43,7 +44,7 @@ public class BlockLocationInfo {
   private int partNumber;
   // The block is under construction. Apply to hsynced file last block.
   private boolean underConstruction;
-  private StorageTier storageTier;
+  @Nullable private StorageTier storageTier;
   private boolean isFallBack;
 
   protected BlockLocationInfo(Builder builder) {
@@ -127,6 +128,7 @@ public class BlockLocationInfo {
     return this.underConstruction;
   }
 
+  @Nullable
   public StorageTier getStorageTier() {
     return storageTier;
   }
@@ -139,7 +141,7 @@ public class BlockLocationInfo {
     isFallBack = fallBack;
   }
 
-  public void setStorageTier(StorageTier storageTier) {
+  public void setStorageTier(@Nullable StorageTier storageTier) {
     this.storageTier = storageTier;
   }
 
@@ -154,7 +156,7 @@ public class BlockLocationInfo {
     private Pipeline pipeline;
     private int partNumber;
     private long createVersion;
-    private StorageTier storageTier;
+    @Nullable private StorageTier storageTier;
     private boolean isFallBack;
 
     public Builder setBlockID(BlockID blockId) {
