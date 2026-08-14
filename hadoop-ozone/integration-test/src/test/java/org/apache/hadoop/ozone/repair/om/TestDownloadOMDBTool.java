@@ -110,18 +110,22 @@ public class TestDownloadOMDBTool {
     Path outputDir = tempDir.resolve("downloaded-metadata");
 
     LogCapturer providerLog = LogCapturer.captureLogs(OmRatisSnapshotProvider.class);
-    int exitCode = new OzoneRepair().getCmd().execute(withHAConf(new String[] {
-        "om", "download",
-        "--service-id", OM_SERVICE_ID,
-        "--node-id", leaderNodeId,
-        "--output-dir", outputDir.toString()
-    }));
+    try {
+      int exitCode = new OzoneRepair().getCmd().execute(withHAConf(new String[] {
+          "om", "download",
+          "--service-id", OM_SERVICE_ID,
+          "--node-id", leaderNodeId,
+          "--output-dir", outputDir.toString()
+      }));
 
-    assertEquals(0, exitCode, err.getOutput());
-    Path omDbDir = outputDir.resolve(OM_DB_NAME);
-    assertTrue(Files.isDirectory(omDbDir), "Expected downloaded om.db directory to exist.");
-    assertTrue(Files.exists(omDbDir.resolve("CURRENT")), "Expected RocksDB CURRENT file in downloaded om.db.");
-    assertThat(providerLog.getOutput()).contains(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2);
+      assertEquals(0, exitCode, err.getOutput());
+      Path omDbDir = outputDir.resolve(OM_DB_NAME);
+      assertTrue(Files.isDirectory(omDbDir), "Expected downloaded om.db directory to exist.");
+      assertTrue(Files.exists(omDbDir.resolve("CURRENT")), "Expected RocksDB CURRENT file in downloaded om.db.");
+      assertThat(providerLog.getOutput()).contains(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2);
+    } finally {
+      providerLog.stopCapturing();
+    }
   }
 
   @Test
