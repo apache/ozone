@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,18 +16,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-HADOOP_IMAGE=${docker.hadoop.image}
-HADOOP_VERSION=${hadoop.version}${docker.hadoop.image.flavor}
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_RUNNER_IMAGE=apache/ozone-runner
-OZONE_TESTKRB5_IMAGE=${docker.ozone-testkr5b.image}
-OZONE_VOLUME=./data
-OZONE_OPTS=
-RANGER_DB_IMAGE=postgres
-RANGER_DB_IMAGE_VERSION=12
-RANGER_IMAGE=apache/ranger
-RANGER_IMAGE_VERSION=${ranger.version}
-RANGER_VERSION=${ranger.version}
-WAITFOR_TIMEOUT=3000
-FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION=true
+import json
+
+
+def main() -> None:
+    statement = {
+        "Effect": "Allow",
+        "Action": "s3:GetObject",
+        "Resource": "arn:aws:s3:::bucket123/*",
+    }
+    policy = {"Version": "2012-10-17", "Statement": [statement]}
+    base = json.dumps(policy, separators=(",", ":"))
+    # Keep the payload comfortably above the STS policy size limit.
+    policy["Pad"] = "X" * (35000 - len(base) + 64)
+    print(json.dumps(policy, separators=(",", ":")))
+
+
+if __name__ == "__main__":
+    main()
