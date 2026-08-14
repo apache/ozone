@@ -70,40 +70,27 @@ public class ContainerExportManager {
   private final ExecutorService workerPool;
   private final ContainerManager containerManager;
   private final ExportFileManager fileManager;
-  private final ExportMetrics metrics;
   private final BooleanSupplier isLeaderReady;
-  private final int defaultShardSize;
-  private final int defaultPageSize;
+  private final int shardSize;
+  private final int pageSize;
   private final int maxTerminalJobs;
-  /** SCM node id, used in the export worker thread name. */
-  private final String scmId;
 
-  public ContainerExportManager(ContainerManager containerManager, BooleanSupplier isLeaderReady,
-      OzoneConfiguration conf, String scmId) {
-    this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
-    this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");
-    this.fileManager = new ExportFileManager(
-        Objects.requireNonNull(ExportFileManager.resolveExportDirectory(conf), "exportDirectory == null"));
-    this.scmId = Objects.requireNonNull(scmId, "scmId == null");
-    this.defaultShardSize = DEFAULT_SHARD_SIZE;
-    this.defaultPageSize = DEFAULT_PAGE_SIZE;
-    this.maxTerminalJobs = DEFAULT_MAX_TERMINAL_JOBS;
-    this.metrics = ExportMetrics.create();
-    this.workerPool = newWorkerPool(this.scmId);
+  public ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
+      OzoneConfiguration conf) {
+    this(scmId, containerManager, isLeaderReady,
+        ExportFileManager.resolveExportDirectory(conf),
+        DEFAULT_SHARD_SIZE, DEFAULT_PAGE_SIZE, DEFAULT_MAX_TERMINAL_JOBS);
   }
 
-  ContainerExportManager(ContainerManager containerManager, BooleanSupplier isLeaderReady,
-      String exportDirectory, int defaultShardSize, int defaultPageSize, int maxTerminalJobs,
-      String scmId) {
+  ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
+      String exportDirectory, int shardSize, int pageSize, int maxTerminalJobs) {
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");
-    this.fileManager = new ExportFileManager(Objects.requireNonNull(exportDirectory, "exportDirectory == null"));
-    this.scmId = Objects.requireNonNull(scmId, "scmId == null");
-    this.defaultShardSize = defaultShardSize;
-    this.defaultPageSize = defaultPageSize;
+    this.fileManager = new ExportFileManager(exportDirectory);
+    this.shardSize = shardSize;
+    this.pageSize = pageSize;
     this.maxTerminalJobs = maxTerminalJobs;
-    this.metrics = null;
-    this.workerPool = newWorkerPool(this.scmId);
+    this.workerPool = newWorkerPool(scmId);
   }
 
   private static ExecutorService newWorkerPool(String scmId) {
@@ -119,59 +106,46 @@ public class ContainerExportManager {
    */
   public void start() throws IOException {
     fileManager.start();
-    reloadCompletedArchives();
+    completedArchivePaths.clear();
+    completedArchivePaths.addAll(fileManager.listCompletedArchivePaths());
+    trimCompletedArchives();
     LOG.info("ContainerExportManager started (dir={}, defaultShardSize={}, defaultPageSize={}, maxTerminalJobs={})",
-        fileManager.getExportDirectory(), defaultShardSize, defaultPageSize, maxTerminalJobs);
+        fileManager.getExportDirectory(), shardSize, pageSize, maxTerminalJobs);
   }
 
   /**
    * Submit a container ID export job on the SCM leader.
-   * Batch sizing is described by {@link ExportSizing}.
    *
    * @return job id, or {@code null} if not leader or another export is already running
    */
   public ExportJob.Id submitJob(ContainerID start, LifeCycleState lifeCycleState,
-      ContainerHealthState healthState, long maxRows, int pageSize, int shardSize) {
+      ContainerHealthState healthState, long maxRows, int requestPageSize, int requestShardSize) {
+    final ExportSizing sizing = new ExportSizing(maxRows, requestPageSize, requestShardSize,
+        this.pageSize, this.shardSize);
+    final ExportScope scope = ExportScope.of(lifeCycleState, healthState);
+
     if (!isLeaderReady.getAsBoolean()) {
       return null;
     }
-    if (lifeCycleState == null && healthState == null) {
-      throw new IllegalArgumentException("At least one of healthState or lifecycleState filter is required.");
-    }
-    validateRequest(start);
-    ExportSizing.validate(maxRows, pageSize, shardSize);
-    ExportSizing sizing = ExportSizing.resolve(maxRows, pageSize, shardSize, defaultPageSize, defaultShardSize);
 
     ExportJob.Id jobId = ExportJob.Id.newId();
     if (!runningJobId.compareAndSet(null, jobId)) {
       return null;
     }
 
-    ExportScope scope = ExportScope.of(lifeCycleState, healthState);
     Instant now = Instant.now();
-    String metadataTimestamp = ExportFileManager.formatMetadataTimestamp(now);
-    String tarPath = fileManager.resolveArchivePath(scope, now, jobId);
+    String jobStartTime = ExportFileManager.formatJobStartTime(now);
+    String tarPath = fileManager.resolveArchiveFile(scope, jobStartTime, jobId).getAbsolutePath();
 
-    ExportJob job = new ExportJob(jobId, scope, metadataTimestamp, tarPath, start, sizing);
+    ExportJob job = new ExportJob(jobId, scope, jobStartTime, tarPath, start, sizing);
 
     evictOldTerminalJobs();
     jobMap.put(jobId, job);
-
-    if (metrics != null) {
-      metrics.incrExportJobsSubmitted();
-    }
 
     workerPool.submit(() -> executeExport(job));
     LOG.info("Submitted container ID export job {} (scope={}, start={}, maxRows={}, pageSize={}, shardSize={})",
         jobId, scope, start, sizing.getMaxRows(), sizing.getPageSize(), sizing.getShardSize());
     return jobId;
-  }
-
-  private static void validateRequest(ContainerID start) {
-    if (start != null && start.getProtobuf().getId() < 0) {
-      throw new IllegalArgumentException(
-          "start container ID must be non-negative, got: " + start.getProtobuf().getId());
-    }
   }
 
   public ExportJob.Status getExportStatus(ExportJob.Id jobId) {
@@ -195,9 +169,6 @@ public class ContainerExportManager {
     } catch (IOException e) {
       LOG.warn("Failed to unlock container export directory", e);
     }
-    if (metrics != null) {
-      metrics.unRegister();
-    }
   }
 
   Map<ExportJob.Id, ExportJob> getJobMap() {
@@ -215,12 +186,6 @@ public class ContainerExportManager {
       removeCompletedArchive(evicted.getTarPath());
       jobMap.remove(evicted.getId());
     }
-    trimCompletedArchives();
-  }
-
-  private void reloadCompletedArchives() {
-    completedArchivePaths.clear();
-    completedArchivePaths.addAll(fileManager.listCompletedArchivePaths());
     trimCompletedArchives();
   }
 
@@ -338,15 +303,6 @@ public class ContainerExportManager {
       LOG.error("Export job {} failed", jobIdValue, e);
     } finally {
       runningJobId.compareAndSet(job.getId(), null);
-      if (metrics != null) {
-        ExportJob.ExecutionState state = job.getExecutionState();
-        if (state == ExportJob.ExecutionState.SUCCEEDED) {
-          metrics.incrExportJobsSucceeded();
-          metrics.recordLastSuccessfulExport(job.getTotalRows(), fileManager.getArchiveLength(archivePath));
-        } else if (state == ExportJob.ExecutionState.FAILED) {
-          metrics.incrExportJobsFailed();
-        }
-      }
       if (job.getExecutionState().isTerminal()) {
         evictOldTerminalJobs();
       }

@@ -59,17 +59,17 @@ import org.slf4j.LoggerFactory;
  *
  * <p>While a job runs, shard text files are written under {@code export_{jobId}/}. The archive is
  * created only after all shards are written. The export manager writes
- * {@code container-ids_{scope}_{timestamp}_job{jobId}.tar.gz.tmp} and atomically renames it to
+ * {@code container-ids_{scope}_{jobStartTime}_job{jobId}.tar.gz.tmp} and atomically renames it to
  * {@code .tar.gz} on close ({@link AtomicFileOutputStream}), so a partial {@code .tar.gz} is
  * never visible. {@link #start()} acquires {@code in_use.lock} to exclude concurrent writers.
  *
  * <pre>
  * {exportDirectory}/
  * ├── in_use.lock
- * ├── container-ids_{scope}_{timestamp}_job{jobId}.tar.gz
- * ├── container-ids_{scope}_{timestamp}_job{jobId}.tar.gz.tmp
+ * ├── container-ids_{scope}_{jobStartTime}_job{jobId}.tar.gz
+ * ├── container-ids_{scope}_{jobStartTime}_job{jobId}.tar.gz.tmp
  * └── export_{jobId}/
- *     ├── container-ids_{scope}_{metadataTimestamp}_part001.txt
+ *     ├── container-ids_{scope}_{jobStartTime}_part001.txt
  *     └── ...
  * </pre>
  *
@@ -93,11 +93,9 @@ final class ExportFileManager {
   static final String EXPORT_ARCHIVE_SUFFIX = ".tar.gz";
   static final String EXPORT_ARCHIVE_TMP_SUFFIX = EXPORT_ARCHIVE_SUFFIX + AtomicFileOutputStream.TMP_EXTENSION;
   static final String EXPORT_LOCK_NAME = "in_use.lock";
-  private static final int ARCHIVE_TIMESTAMP_LENGTH = 16;
-  private static final DateTimeFormatter ARCHIVE_TIMESTAMP_FORMAT =
-      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
-  private static final DateTimeFormatter METADATA_TIMESTAMP_FORMAT =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC);
+  private static final int EXPORT_JOB_START_TIME_LENGTH = 19;
+  private static final DateTimeFormatter EXPORT_JOB_START_TIME_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss").withZone(ZoneOffset.UTC);
 
   private final String exportDirectory;
   private FileLock exportDirectoryLock;
@@ -150,17 +148,13 @@ final class ExportFileManager {
     exportDirectoryLock = null;
   }
 
-  String resolveArchivePath(ExportScope scope, Instant submissionTime, ExportJob.Id jobId) {
-    return resolveArchiveFile(scope, ARCHIVE_TIMESTAMP_FORMAT.format(submissionTime), jobId).getAbsolutePath();
-  }
-
-  File resolveArchiveFile(ExportScope scope, String archiveTimestamp, ExportJob.Id jobId) {
+  File resolveArchiveFile(ExportScope scope, String jobStartTime, ExportJob.Id jobId) {
     return new File(exportDirectory, String.format("container-ids_%s_%s%s%s%s",
-        scope.getValue(), archiveTimestamp, EXPORT_ARCHIVE_JOB_INFIX, jobId.getValue(), EXPORT_ARCHIVE_SUFFIX));
+        scope.getValue(), jobStartTime, EXPORT_ARCHIVE_JOB_INFIX, jobId.getValue(), EXPORT_ARCHIVE_SUFFIX));
   }
 
-  File resolveArchiveTempFile(ExportScope scope, String archiveTimestamp, ExportJob.Id jobId) {
-    return AtomicFileOutputStream.getTemporaryFile(resolveArchiveFile(scope, archiveTimestamp, jobId));
+  File resolveArchiveTempFile(ExportScope scope, String jobStartTime, ExportJob.Id jobId) {
+    return AtomicFileOutputStream.getTemporaryFile(resolveArchiveFile(scope, jobStartTime, jobId));
   }
 
   void createJobDirectory(ExportJob.Id jobId) throws IOException {
@@ -195,14 +189,6 @@ final class ExportFileManager {
     }
   }
 
-  long getArchiveLength(String archivePath) {
-    if (archivePath == null) {
-      return 0L;
-    }
-    File archive = new File(archivePath);
-    return archive.isFile() ? archive.length() : 0L;
-  }
-
   /**
    * Returns completed archive paths ({@code tarPath} in {@code ExportJob.Status}), oldest first.
    */
@@ -214,7 +200,7 @@ final class ExportFileManager {
       return Collections.emptyList();
     }
     Arrays.sort(matches, Comparator.comparing(
-        file -> archiveTimestampFromArchiveFileName(file.getName())));
+        file -> jobStartTimeFromArchiveFileName(file.getName())));
     List<String> archivePaths = new ArrayList<>(matches.length);
     for (File archive : matches) {
       archivePaths.add(archive.getAbsolutePath());
@@ -222,18 +208,18 @@ final class ExportFileManager {
     return archivePaths;
   }
 
-  static String formatMetadataTimestamp(Instant submissionTime) {
-    return METADATA_TIMESTAMP_FORMAT.format(submissionTime);
+  static String formatJobStartTime(Instant jobStartTime) {
+    return EXPORT_JOB_START_TIME_FORMAT.format(jobStartTime);
   }
 
-  static String archiveTimestampFromArchiveFileName(String fileName) {
+  static String jobStartTimeFromArchiveFileName(String fileName) {
     int jobIndex = fileName.lastIndexOf(EXPORT_ARCHIVE_JOB_INFIX);
-    if (jobIndex < ARCHIVE_TIMESTAMP_LENGTH + 1
+    if (jobIndex < EXPORT_JOB_START_TIME_LENGTH + 1
             || !fileName.endsWith(EXPORT_ARCHIVE_SUFFIX)
             || fileName.endsWith(EXPORT_ARCHIVE_TMP_SUFFIX)) {
       return null;
     }
-    return fileName.substring(jobIndex - ARCHIVE_TIMESTAMP_LENGTH, jobIndex);
+    return fileName.substring(jobIndex - EXPORT_JOB_START_TIME_LENGTH, jobIndex);
   }
 
   static ExportJob.Id jobIdFromArchiveFileName(String fileName) {

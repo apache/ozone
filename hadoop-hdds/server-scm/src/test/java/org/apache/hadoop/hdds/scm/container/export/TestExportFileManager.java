@@ -61,8 +61,8 @@ public class TestExportFileManager {
   public void testResolveArchiveFile() {
     ExportJob.Id jobId = ExportJob.Id.newId();
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    File archive = fileManager.resolveArchiveFile(scope, "20260101T120000Z", jobId);
-    assertTrue(archive.getName().contains("health-MISSING_lifecycle-ANY_20260101T120000Z"));
+    File archive = fileManager.resolveArchiveFile(scope, "2026-01-01-12-00-00", jobId);
+    assertTrue(archive.getName().contains("health-MISSING_lifecycle-ANY_2026-01-01-12-00-00"));
     assertTrue(archive.getName().endsWith(ExportFileManager.EXPORT_ARCHIVE_JOB_INFIX + jobId.getValue()
         + ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
   }
@@ -71,40 +71,41 @@ public class TestExportFileManager {
   public void testResolveArchiveTempFile() {
     ExportJob.Id jobId = ExportJob.Id.newId();
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    File tempFile = fileManager.resolveArchiveTempFile(scope, "20260101T120000Z", jobId);
+    File tempFile = fileManager.resolveArchiveTempFile(scope, "2026-01-01-12-00-00", jobId);
     assertTrue(tempFile.getName().endsWith(ExportFileManager.EXPORT_ARCHIVE_TMP_SUFFIX));
   }
 
   @Test
   public void testJobIdFromArchiveFileName() {
     String jobId = UUID.randomUUID().toString();
-    String fileName = "container-ids_health-MISSING_lifecycle-ANY_20260101T120000Z"
+    String fileName = "container-ids_health-MISSING_lifecycle-ANY_2026-01-01-12-00-00"
         + ExportFileManager.EXPORT_ARCHIVE_JOB_INFIX + jobId + ExportFileManager.EXPORT_ARCHIVE_SUFFIX;
     assertEquals(ExportJob.Id.of(jobId), ExportFileManager.jobIdFromArchiveFileName(fileName));
-    assertNull(ExportFileManager.jobIdFromArchiveFileName("container-ids_health-MISSING_lifecycle-ANY_20260101T120000Z"
+    assertNull(ExportFileManager.
+        jobIdFromArchiveFileName("container-ids_health-MISSING_lifecycle-ANY_2026-01-01-12-00-00"
         + ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
   }
 
   @Test
-  public void testArchiveTimestampFromArchiveFileName() {
-    String fileName = "container-ids_health-MISSING_lifecycle-ANY_20260101T120000Z"
+  public void testJobStartTimeFromArchiveFileName() {
+    String fileName = "container-ids_health-MISSING_lifecycle-ANY_2026-01-01-12-00-00"
         + ExportFileManager.EXPORT_ARCHIVE_JOB_INFIX + UUID.randomUUID() + ExportFileManager.EXPORT_ARCHIVE_SUFFIX;
-    assertEquals("20260101T120000Z", ExportFileManager.archiveTimestampFromArchiveFileName(fileName));
+    assertEquals("2026-01-01-12-00-00", ExportFileManager.jobStartTimeFromArchiveFileName(fileName));
   }
 
   @Test
   public void testListCompletedArchivePaths() throws Exception {
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
     ExportJob.Id olderJobId = ExportJob.Id.newId();
-    File olderArchive = fileManager.resolveArchiveFile(scope, "20260101T120000Z", olderJobId);
+    File olderArchive = fileManager.resolveArchiveFile(scope, "2026-01-01-12-00-00", olderJobId);
     assertTrue(olderArchive.createNewFile());
     assertTrue(olderArchive.setLastModified(2_000L));
     ExportJob.Id newerJobId = ExportJob.Id.newId();
-    File newerArchive = fileManager.resolveArchiveFile(scope, "20260101T120001Z", newerJobId);
+    File newerArchive = fileManager.resolveArchiveFile(scope, "2026-01-01-12-00-01", newerJobId);
     assertTrue(newerArchive.createNewFile());
     assertTrue(newerArchive.setLastModified(1_000L));
     ExportJob.Id tempJobId = ExportJob.Id.newId();
-    File tempArchive = fileManager.resolveArchiveTempFile(scope, "20260101T120002Z", tempJobId);
+    File tempArchive = fileManager.resolveArchiveTempFile(scope, "2026-01-01-12-00-02", tempJobId);
     assertTrue(tempArchive.createNewFile());
 
     List<String> completedPaths = fileManager.listCompletedArchivePaths();
@@ -130,7 +131,7 @@ public class TestExportFileManager {
     Path jobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
     Files.createDirectories(jobDir);
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    File partialArchiveTemp = fileManager.resolveArchiveTempFile(scope, "20260101T000000Z", jobId);
+    File partialArchiveTemp = fileManager.resolveArchiveTempFile(scope, "2026-01-01-00-00-00", jobId);
     assertTrue(partialArchiveTemp.createNewFile());
 
     fileManager.start();
@@ -143,7 +144,7 @@ public class TestExportFileManager {
   public void testOrphanJobDirDoesNotDeleteCompletedTar() throws Exception {
     ExportJob.Id jobId = ExportJob.Id.newId();
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    File completedArchive = fileManager.resolveArchiveFile(scope, "20260101T000000Z", jobId);
+    File completedArchive = fileManager.resolveArchiveFile(scope, "2026-01-01-00-00-00", jobId);
     assertTrue(completedArchive.createNewFile());
     Path orphanJobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
     Files.createDirectories(orphanJobDir);

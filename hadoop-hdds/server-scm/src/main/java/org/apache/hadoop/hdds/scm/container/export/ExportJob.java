@@ -33,7 +33,7 @@ public final class ExportJob {
 
   private final Id id;
   private final ExportScope scope;
-  private final String timestamp;
+  private final String jobStartTime;
   private final ContainerID startContainerId;
   private final ExportSizing sizing;
   private String tarPath;
@@ -138,11 +138,11 @@ public final class ExportJob {
     }
   }
 
-  ExportJob(Id id, ExportScope scope, String timestamp, String tarPath, ContainerID startContainerId,
+  ExportJob(Id id, ExportScope scope, String jobStartTime, String tarPath, ContainerID startContainerId,
       ExportSizing sizing) {
     this.id = id;
     this.scope = scope;
-    this.timestamp = timestamp;
+    this.jobStartTime = jobStartTime;
     this.tarPath = tarPath;
     this.startContainerId = startContainerId != null ? startContainerId : ContainerID.valueOf(0);
     this.sizing = sizing;
@@ -152,8 +152,8 @@ public final class ExportJob {
     return id;
   }
 
-  String getTimestamp() {
-    return timestamp;
+  String getJobStartTime() {
+    return jobStartTime;
   }
 
   ContainerID getStartContainerId() {
@@ -248,14 +248,14 @@ public final class ExportJob {
 
   String shardFileName(int partIndex) {
     return String.format("container-ids_%s_%s_part%03d.txt",
-        scope.getValue(), timestamp, partIndex);
+        scope.getValue(), jobStartTime, partIndex);
   }
 
   void writeMetadataHeader(BufferedWriter writer, int partNumber, ContainerID shardStartContainerId)
       throws IOException {
     writer.write("# jobId=" + id.getValue());
     writer.newLine();
-    writer.write("# timestamp=" + timestamp);
+    writer.write("# jobStartTime=" + jobStartTime);
     writer.newLine();
     if (scope.getHealthState() != null) {
       writer.write("# healthState=" + scope.getHealthState().name());

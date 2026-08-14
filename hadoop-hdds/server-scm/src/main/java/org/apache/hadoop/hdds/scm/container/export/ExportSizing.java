@@ -36,13 +36,7 @@ final class ExportSizing {
   private final int pageSize;
   private final int shardSize;
 
-  ExportSizing(long maxRows, int pageSize, int shardSize) {
-    this.maxRows = maxRows;
-    this.pageSize = pageSize;
-    this.shardSize = shardSize;
-  }
-
-  static void validate(long maxRows, int pageSize, int shardSize) {
+  ExportSizing(long maxRows, int pageSize, int shardSize, int defaultPageSize, int defaultShardSize) {
     if (maxRows < 0) {
       throw new IllegalArgumentException("maxRows must be non-negative: " + maxRows);
     }
@@ -52,13 +46,10 @@ final class ExportSizing {
     if (shardSize < 0 || shardSize > MAX_SHARD_SIZE) {
       throw new IllegalArgumentException("shardSize must be between 0 and " + MAX_SHARD_SIZE + ": " + shardSize);
     }
-  }
 
-  static ExportSizing resolve(long maxRows, int pageSize, int shardSize, int defaultPageSize,
-      int defaultShardSize) {
-    return new ExportSizing(maxRows,
-        pageSize > 0 ? pageSize : defaultPageSize,
-        shardSize > 0 ? shardSize : defaultShardSize);
+    this.maxRows = maxRows;
+    this.pageSize = pageSize > 0 ? pageSize : defaultPageSize;
+    this.shardSize = shardSize > 0 ? shardSize : defaultShardSize;
   }
 
   long getMaxRows() {

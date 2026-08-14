@@ -440,7 +440,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     initializeSystemManagers(conf, configurator);
 
     containerExportManager = new ContainerExportManager(
-        containerManager, this::checkLeader, conf, getScmId());
+        getScmId(), containerManager, this::checkLeader, conf);
     containerExportManager.start();
 
     if (isSecretKeyEnable(securityConfig)) {
