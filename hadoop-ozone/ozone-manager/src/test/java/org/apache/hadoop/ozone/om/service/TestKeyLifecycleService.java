@@ -2840,6 +2840,125 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
+    /**
+     * An MPU whose open key entry is missing (orphan) should still be aborted when a lifecycle
+     * rule matches by age and prefix alone (no tag filter). The abort request handler already
+     * tolerates a missing open key.
+     */
+    @Test
+    void testOrphanMpuAbortedByAgeAndPrefixRule() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+      long initialMpuCount = getMultipartUploadCount(volumeName, bucketName);
+
+      // Create two MPUs: one normal (has open key), one will become an orphan.
+      OmMultipartInfo normalMpu = createTestMultipartUpload(volumeName, bucketName, "data/normal", owner);
+      OmMultipartInfo orphanMpu = createTestMultipartUpload(volumeName, bucketName, "data/orphan", owner);
+
+      // Age both MPUs past the threshold.
+      long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "data/normal",
+          normalMpu.getUploadID(), oldCreationTime);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "data/orphan",
+          orphanMpu.getUploadID(), oldCreationTime);
+
+      // Simulate orphan: delete the open key entry for "data/orphan" directly from the table.
+      // Use the same helper the service uses so the key format matches exactly.
+      String resolvedOrphanOpenKey = OMMultipartUploadUtils
+          .getMultipartOpenKey(volumeName, bucketName, "data/orphan", orphanMpu.getUploadID(),
+              metadataManager, OBJECT_STORE);
+      metadataManager.getOpenKeyTable(OBJECT_STORE).delete(resolvedOrphanOpenKey);
+
+      // Rule: abort all MPUs under "data/" after 1 day — no tag filter.
+      OmLCRule rule = new OmLCRule.Builder()
+          .setId("abort-data-prefix")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder().setPrefix("data/").build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
+              .setDaysAfterInitiation(1)
+              .build())
+          .build();
+
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, Collections.singletonList(rule));
+
+      // Both MPUs should be aborted: normal one (open key present) and orphan (open key missing).
+      GenericTestUtils.waitFor(() ->
+          getMultipartUploadCount(volumeName, bucketName) - initialMpuCount == 0,
+          WAIT_CHECK_INTERVAL, 10000);
+
+      String normalKey = metadataManager.getMultipartKey(volumeName, bucketName,
+          "data/normal", normalMpu.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(normalKey),
+          "Normal MPU should be aborted");
+
+      String orphanKey = metadataManager.getMultipartKey(volumeName, bucketName,
+          "data/orphan", orphanMpu.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(orphanKey),
+          "Orphan MPU (no open key) should be aborted when a tag-free rule matches");
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    /**
+     * An MPU whose open key is missing (orphan) must NOT be aborted when the only matching
+     * lifecycle rule requires a tag filter, because the tag metadata is unavailable.
+     */
+    @Test
+    void testOrphanMpuNotAbortedByTagOnlyRule() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+      long initialMpuCount = getMultipartUploadCount(volumeName, bucketName);
+
+      OmMultipartInfo orphanMpu = createTestMultipartUpload(volumeName, bucketName, "file.txt", owner);
+
+      // Age past the threshold.
+      long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "file.txt",
+          orphanMpu.getUploadID(), oldCreationTime);
+
+      // Simulate orphan by removing its open key.
+      String resolvedOrphanOpenKey = OMMultipartUploadUtils
+          .getMultipartOpenKey(volumeName, bucketName, "file.txt", orphanMpu.getUploadID(),
+              metadataManager, OBJECT_STORE);
+      metadataManager.getOpenKeyTable(OBJECT_STORE).delete(resolvedOrphanOpenKey);
+
+      // Rule requires tag match — cannot evaluate without open key.
+      OmLCRule tagRule = new OmLCRule.Builder()
+          .setId("abort-by-tag")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder().setTag("env", "test").build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
+              .setDaysAfterInitiation(1)
+              .build())
+          .build();
+
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, Collections.singletonList(tagRule));
+
+      // Wait long enough for the service to run at least once.
+      Thread.sleep(SERVICE_INTERVAL * 2);
+
+      // Orphan MPU must remain: the tag rule cannot evaluate without open key metadata.
+      String orphanKey = metadataManager.getMultipartKey(volumeName, bucketName,
+          "file.txt", orphanMpu.getUploadID());
+      assertNotNull(metadataManager.getMultipartInfoTable().get(orphanKey),
+          "Orphan MPU should NOT be aborted when only tag-requiring rules exist");
+
+      assertEquals(initialMpuCount + 1, getMultipartUploadCount(volumeName, bucketName),
+          "MPU count should not change");
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
   }
 
   /**
