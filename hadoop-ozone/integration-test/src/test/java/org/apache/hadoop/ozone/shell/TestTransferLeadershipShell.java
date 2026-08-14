@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftPeer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -107,14 +108,14 @@ public class TestTransferLeadershipShell {
     assertOMResetPriorities();
   }
 
-  static Stream<Named<Function<StorageContainerManager, String>>> scmTargetIds() {
+  static Stream<Named<Function<StorageContainerManager, String>>> scmTargetIdExtractors() {
     return Stream.of(
         Named.of("scmId", StorageContainerManager::getScmId),
         Named.of("nodeId", StorageContainerManager::getSCMNodeId));
   }
 
   @ParameterizedTest
-  @MethodSource("scmTargetIds")
+  @MethodSource("scmTargetIdExtractors")
   public void testScmTransfer(Function<StorageContainerManager, String> targetId) throws Exception {
     StorageContainerManager newLeader = pickScmFollower();
 
@@ -137,18 +138,20 @@ public class TestTransferLeadershipShell {
   }
 
   @Test
-  public void testScmTransferToUnknownIdFails() {
+  public void testScmTransferToUnknownIdFails() throws Exception {
     StorageContainerManager leader = getScmLeader(cluster);
 
     String[] args = {"scm", "transfer", "-n", "no-such-scm"};
-    assertNotEquals(ExitCode.OK, ozoneAdmin.execute(args));
+    try (GenericTestUtils.SystemErrCapturer capture = new GenericTestUtils.SystemErrCapturer()) {
+      assertNotEquals(ExitCode.OK, ozoneAdmin.execute(args));
+      assertThat(capture.getOutput()).contains("Target no-such-scm not found in group");
+    }
     assertEquals(leader, getScmLeader(cluster));
   }
 
   private StorageContainerManager pickScmFollower() {
     StorageContainerManager leader = getScmLeader(cluster);
-    List<StorageContainerManager> scmList = new ArrayList<>(cluster.
-        getStorageContainerManagersList());
+    List<StorageContainerManager> scmList = new ArrayList<>(cluster.getStorageContainerManagersList());
     assertThat(scmList).contains(leader);
     scmList.remove(leader);
     return scmList.get(0);

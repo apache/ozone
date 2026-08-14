@@ -1027,14 +1027,18 @@ public class SCMClientProtocolServer implements
       return peerId;
     }
     // Raft peer ids are SCM UUIDs, so a node id only matches through its configured Ratis address.
-    return scm.getSCMHANodeDetails().getAllNodeDetails().stream()
-        .filter(node -> newLeaderId.equals(node.getNodeId()))
-        .map(SCMNodeDetails::getRatisHostPortStr)
-        .flatMap(address -> group.getPeers().stream().filter(peer -> address.equals(peer.getAddress())))
-        .map(RaftPeer::getId)
-        .findFirst()
-        // Leave an unmatched id to RatisHelper, which reports the group it did not match.
-        .orElse(peerId);
+    for (SCMNodeDetails node : scm.getSCMHANodeDetails().getAllNodeDetails()) {
+      if (!newLeaderId.equals(node.getNodeId())) {
+        continue;
+      }
+      for (RaftPeer peer : group.getPeers()) {
+        if (node.getRatisHostPortStr().equals(peer.getAddress())) {
+          return peer.getId();
+        }
+      }
+    }
+    // Leave an unmatched id to RatisHelper, which reports the group it did not match.
+    return peerId;
   }
 
   @Deprecated
