@@ -62,6 +62,20 @@ public final class EndpointTestUtils {
     return subject.get(bucket, key);
   }
 
+  /** Get object attributes (?attributes). */
+  public static Response getObjectAttributes(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      String attributesHeader
+  ) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.ATTRIBUTES, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
+    when(subject.getHeaders().getHeaderString(S3Consts.OBJECT_ATTRIBUTES_HEADER))
+        .thenReturn(attributesHeader);
+    return subject.get(bucket, key);
+  }
+
   /** List parts of MPU. */
   public static Response listParts(
       ObjectEndpoint subject,
@@ -177,6 +191,47 @@ public final class EndpointTestUtils {
     return subject.delete(bucket, key);
   }
 
+  /**
+   * Get bucket tags (?tagging).
+   */
+  public static Response getBucketTagging(
+      BucketEndpoint subject,
+      String bucket
+  ) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
+    return subject.get(bucket);
+  }
+
+  /**
+   * Add tagging on bucket (?tagging).
+   */
+  public static Response putBucketTagging(
+      BucketEndpoint subject, String bucket, String content)
+      throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    setLengthHeader(subject, content);
+
+    if (content == null) {
+      return subject.put(bucket, null);
+    } else {
+      try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
+        return subject.put(bucket, body);
+      }
+    }
+  }
+
+  /**
+   * Delete bucket tags (?tagging).
+   */
+  public static Response deleteBucketTagging(
+      BucketEndpoint subject, String bucket) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.DELETE);
+    return subject.delete(bucket);
+  }
+
   /** Initiate multipart upload.
    * @return upload ID */
   public static String initiateMultipartUpload(ObjectEndpoint subject, String bucket, String key)
@@ -279,7 +334,7 @@ public final class EndpointTestUtils {
     return actual;
   }
 
-  private static void setLengthHeader(ObjectEndpoint subject, String content) {
+  private static void setLengthHeader(EndpointBase subject, String content) {
     when(subject.getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH))
         .thenReturn(String.valueOf(contentLength(content)));
   }

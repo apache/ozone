@@ -210,13 +210,13 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
       break;
     case DIRECTORY_ALREADY_EXISTS:
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Directory already exists. Volume:{}, Bucket:{}, Key{}",
+        LOG.debug("Directory already exists. Volume:{}, Bucket:{}, Key:{}",
             volumeName, bucketName, keyName, exception);
       }
       break;
     case FAILURE:
       omMetrics.incNumCreateDirectoryFails();
-      LOG.error("Directory creation failed. Volume:{}, Bucket:{}, Key{}. " +
+      LOG.error("Directory creation failed. Volume:{}, Bucket:{}, Key:{}. " +
           "Exception:{}", volumeName, bucketName, keyName, exception);
       break;
     default:

@@ -48,6 +48,8 @@ import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -257,12 +259,39 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException {
-    List<OzoneFileStatus> ozoneFileStatuses =
-        listStatus(args, recursive, startKey, numEntries, allowPartialPrefixes);
+    long maxListingPageSize = ozoneManager.getConfiguration().getInt(
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    maxListingPageSize = OzoneConfigUtil.limitValue(numEntries,
+        OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        maxListingPageSize);
 
-    return ozoneFileStatuses.stream()
-        .map(OzoneFileStatusLight::fromOzoneFileStatus)
-        .collect(Collectors.toList());
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
+    OmKeyArgs resolvedArgs = bucket.update(args);
+
+    try {
+      if (isAclEnabled) {
+        checkAcls(getResourceType(resolvedArgs), StoreType.OZONE, ACLType.READ,
+            bucket, resolvedArgs.getKeyName());
+      }
+      metrics.incNumListStatus();
+      List<OzoneFileStatus> ozoneFileStatuses = keyManager.listStatus(
+          resolvedArgs, recursive,
+          startKey, maxListingPageSize, getClientAddress(),
+          allowPartialPrefixes, false);
+      List<OzoneFileStatusLight> lightStatuses = ozoneFileStatuses.stream()
+          .map(OzoneFileStatusLight::fromOzoneFileStatus)
+          .collect(Collectors.toList());
+      audit.logReadSuccess(buildAuditMessageForSuccess(
+          OMAction.LIST_STATUS, auditMap));
+      return lightStatuses;
+    } catch (Exception ex) {
+      metrics.incNumListStatusFails();
+      audit.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_STATUS,
+          auditMap, ex));
+      throw ex;
+    }
   }
   
   @Override
@@ -469,6 +498,44 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       }
 
       perfMetrics.addGetObjectTaggingLatencyNs(Time.monotonicNowNanos() - start);
+    }
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
+    long start = Time.monotonicNowNanos();
+
+    ResolvedBucket bucket = captureLatencyNs(
+        perfMetrics.getGetBucketTaggingResolveBucketLatencyNs(),
+        () -> ozoneManager.resolveBucketLink(Pair.of(
+            args.getVolumeName(), args.getBucketName())));
+
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
+
+    try {
+      if (isAclEnabled) {
+        captureLatencyNs(perfMetrics.getGetBucketTaggingAclCheckLatencyNs(),
+            () -> checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+                ACLType.READ, bucket, null));
+      }
+      metrics.incNumGetBucketTagging();
+
+      OmBucketInfo info =
+          bucketManager.getBucketInfo(bucket.realVolume(), bucket.realBucket());
+      return info.getTags();
+    } catch (Exception ex) {
+      metrics.incNumGetBucketTaggingFails();
+      auditSuccess = false;
+      audit.logReadFailure(buildAuditMessageForFailure(
+          OMAction.GET_BUCKET_TAGGING, auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        audit.logReadSuccess(buildAuditMessageForSuccess(
+            OMAction.GET_BUCKET_TAGGING, auditMap));
+      }
+      perfMetrics.addGetBucketTaggingLatencyNs(Time.monotonicNowNanos() - start);
     }
   }
 

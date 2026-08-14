@@ -32,11 +32,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -611,12 +611,12 @@ public class TestReconContainerHealthSummaryEndToEnd {
       // so the phantom persists for the duration of the test.
       // With 10m FCR, the real DN won't send a full report that changes replica counts.
       // Result: 2 replicas for RF1 → OVER_REPLICATED.
-      Set<UUID> existingUuids = scmCm.getContainerReplicas(containerID)
+      Set<DatanodeID> existingIds = scmCm.getContainerReplicas(containerID)
           .stream()
-          .map(r -> r.getDatanodeDetails().getUuid())
+          .map(r -> r.getDatanodeDetails().getID())
           .collect(Collectors.toSet());
       DatanodeDetails phantomDN = allDatanodes.stream()
-          .filter(d -> !existingUuids.contains(d.getUuid()))
+          .filter(d -> !existingIds.contains(d.getID()))
           .findFirst()
           .orElseThrow(() -> new AssertionError(
               "No spare DN available to inject phantom replica for " + containerID));
@@ -1182,7 +1182,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
       ReconStorageContainerManagerFacade reconScm,
       ReconContainerManager reconCm,
       List<ContainerID> containerIDs) throws Exception {
-    reconScm.triggerTargetedSCMContainerSync();
+    reconScm.triggerSCMContainerSync();
     drainScmAndReconEventQueues();
     backfillMissingContainersFromScm(reconCm, containerIDs);
     LambdaTestUtils.await(REPLICA_SYNC_TIMEOUT_MS, POLL_INTERVAL_MS,

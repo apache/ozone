@@ -30,7 +30,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -40,6 +39,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
+import org.apache.hadoop.ozone.recon.metrics.NSSummaryMetrics;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconSafeModeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
@@ -87,6 +88,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   private OzoneConfiguration configuration;
   private ReconStorageConfig reconStorage;
   private CertificateClient certClient;
+  private NSSummaryMetrics nsSummaryMetrics;
   private ReconTaskStatusMetrics reconTaskStatusMetrics;
   private OzoneAdmins reconAdmins;
 
@@ -172,6 +174,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
 
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
+      this.nsSummaryMetrics = injector.getInstance(NSSummaryMetrics.class);
 
       LOG.info("Initializing support of Recon Features...");
       FeatureProvider.initFeatureSupport(configuration);
@@ -199,6 +202,10 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       if (reconTaskStatusMetrics != null) {
         reconTaskStatusMetrics.register();
         LOG.debug("ReconTaskStatusMetrics registered after schema upgrade");
+      }
+      if (nsSummaryMetrics != null) {
+        nsSummaryMetrics.register();
+        LOG.debug("NSSummaryMetrics registered after schema upgrade");
       }
 
       LOG.info("Recon server initialized successfully!");
@@ -336,6 +343,9 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       if (reconTaskStatusMetrics != null) {
         reconTaskStatusMetrics.unregister();
       }
+      if (nsSummaryMetrics != null) {
+        nsSummaryMetrics.unregister();
+      }
       isStarted = false;
       if (reconDBProvider != null) {
         try {
@@ -397,7 +407,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
           reconConfig.getKerberosPrincipal(),
           reconConfig.getKerberosKeytab());
       UserGroupInformation.setConfiguration(conf);
-      InetSocketAddress socAddr = HddsServerUtil.getReconAddressForDatanodes(conf);
+      final HostAndPort socAddr = HddsServerUtil.getReconAddressForDatanodes(conf);
       SecurityUtil.login(conf,
           OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY,
           OZONE_RECON_KERBEROS_PRINCIPAL_KEY,

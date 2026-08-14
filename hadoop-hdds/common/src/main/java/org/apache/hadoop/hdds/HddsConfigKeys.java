@@ -39,6 +39,10 @@ public final class HddsConfigKeys {
       "hdds.heartbeat.recon.initial-interval";
   public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
       "2s";
+  /** Missed heartbeats against one SCM before the DN re-resolves its hostname (HDDS-15533). */
+  public static final String HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD =
+      "hdds.heartbeat.address.refresh.missed-count-threshold";
+  public static final int HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT = 3;
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =
@@ -115,6 +119,14 @@ public final class HddsConfigKeys {
   public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL =
       "hdds.scm.safemode.log.interval";
   public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT = "1m";
+
+  /**
+   * Interval for background refresh of safeMode rules. 0 disables the background thread.
+   */
+  public static final String HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL =
+      "hdds.scm.safemode.rule.refresh.interval";
+  public static final String
+      HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT = "5s";
 
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single

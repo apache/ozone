@@ -36,6 +36,7 @@ import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import javax.net.ssl.TrustManager;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -125,18 +126,13 @@ public final class RatisHelper {
   }
 
   private static String toRaftPeerAddress(DatanodeDetails id, Port.Name port) {
-    if (datanodeUseHostName()) {
-      final String address =
-              id.getHostName() + ":" + id.getPort(port).getValue();
-      LOG.debug("Datanode is using hostname for raft peer address: {}",
-              address);
-      return address;
-    } else {
-      final String address =
-              id.getIpAddress() + ":" + id.getPort(port).getValue();
-      LOG.debug("Datanode is using IP for raft peer address: {}", address);
-      return address;
-    }
+    final boolean useHostName = datanodeUseHostName();
+    final String address = HddsUtils.getHostPortString(
+        useHostName ? id.getHostName() : id.getIpAddress(),
+        id.getPort(port).getValue());
+    LOG.debug("Datanode is using {} for raft peer address: {}",
+        useHostName ? "hostname" : "IP", address);
+    return address;
   }
 
   public static RaftPeerId toRaftPeerId(DatanodeDetails id) {

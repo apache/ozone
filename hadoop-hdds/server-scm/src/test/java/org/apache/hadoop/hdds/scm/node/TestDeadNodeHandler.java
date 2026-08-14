@@ -73,7 +73,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,6 +99,11 @@ public class TestDeadNodeHandler {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
+    // The test drives node health transitions manually. Disable the periodic
+    // health check so it does not resurrect a node forced to DEAD (the node's
+    // heartbeat stays fresh), which would race with the handlers under test.
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
+        1, TimeUnit.HOURS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 2);
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         10, StorageUnit.MB);
@@ -139,7 +143,6 @@ public class TestDeadNodeHandler {
 
   @Test
   @SuppressWarnings("checkstyle:MethodLength")
-  @Flaky("HDDS-14977")
   public void testOnMessage(@TempDir File tempDir) throws Exception {
     //GIVEN
     DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
@@ -266,6 +269,12 @@ public class TestDeadNodeHandler {
     nodeManager.addDatanodeCommand(datanode1.getID(), cmd);
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_SERVICE);
+    // Changing the operational state of a DEAD node fires a DEAD_NODE event on
+    // SCM's event queue. Let SCM's own DeadNodeHandler process it here, so its
+    // asynchronous topology removal does not race with the handlers driven
+    // below (it could otherwise remove the node right after
+    // HealthyReadOnlyNodeHandler re-adds it).
+    ((EventQueue) scm.getEventQueue()).processAll(60000L);
     setNodeHealthState(datanode1, HddsProtos.NodeState.DEAD);
     deadNodeHandler.onMessage(datanode1, publisher);
     //datanode1 has been removed from ClusterNetworkTopology, another

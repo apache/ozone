@@ -56,7 +56,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * container.
  */
 class TestOnDemandContainerScannerIntegration
-    extends TestContainerScannerIntegrationAbstract {
+    extends ContainerScannerIntegrationTests {
 
   private final GenericTestUtils.LogCapturer logCapturer =
       GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
