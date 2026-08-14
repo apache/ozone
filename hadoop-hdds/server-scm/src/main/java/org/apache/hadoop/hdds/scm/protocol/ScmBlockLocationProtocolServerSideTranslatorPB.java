@@ -229,11 +229,14 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
           storagePolicy, SCMException.ResultCodes.FAILED_TO_ALLOCATE_ENOUGH_BLOCKS);
     }
     for (AllocatedBlock block : allocatedBlocks) {
-      builder.addBlocks(AllocateBlockResponse.newBuilder()
+      AllocateBlockResponse.Builder blockBuilder = AllocateBlockResponse.newBuilder()
           .setContainerBlockID(block.getBlockID().getProtobuf())
           .setPipeline(block.getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS))
-          .setStorageTier(block.getStorageTier().toProto())
-          .setIsFallBack(block.isFallBack()));
+          .setIsFallBack(block.isFallBack());
+      if (block.getStorageTier() != null) {
+        blockBuilder.setStorageTier(block.getStorageTier().toProto());
+      }
+      builder.addBlocks(blockBuilder);
     }
 
     return builder.build();

@@ -207,14 +207,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      OzoneStoragePolicy storagePolicy = null;
-      if (storagePolicy == null) {
-        storagePolicy = OzoneStoragePolicy.getDefaultPolicy();
-      }
       // TODO Use the actually passed `allowFallbackStoragePolicy` instead of `true`
       allocatedBlocks = scmClient.getBlockClient()
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine, storagePolicy, true);
+              excludeList, clientMachine, OzoneStoragePolicy.getDefaultPolicy(), true);
     } catch (IOException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex instanceof SCMException) {
