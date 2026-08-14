@@ -24,9 +24,9 @@ import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecr
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_DEFAULT_STORAGE_TIER_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_DEFAULT_STORAGE_TIER_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
@@ -1990,7 +1990,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (!isAdminAuthorizationEnabled()) {
       return;
     }
-    
+
     if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
       if (!isRead || !scmReadOnlyAdmins.isAdmin(remoteUser)) {
         throw new AccessControlException(
@@ -2286,13 +2286,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-    
+
     scmSafeModeManager.reconfigureLogInterval(newIntervalMs, TimeUnit.MILLISECONDS);
 
     LOG.info("Reconfigured {} to {}", HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, newLogInterval);
     return newLogInterval;
   }
-  
+
   /**
    * This will remove the given SCM node from HA Ring by removing it from
    * Ratis Ring.
