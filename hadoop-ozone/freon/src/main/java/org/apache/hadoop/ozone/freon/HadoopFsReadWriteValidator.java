@@ -165,7 +165,8 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
 
     if (expected != actual) {
       throw new IllegalStateException(
-          "Checksum of read data doesn't match the written data for " + target);
+          "Checksum of read data doesn't match the written data for " + target
+              + ", expected " + expected + ", actual " + actual);
     }
   }
 
