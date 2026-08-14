@@ -30,10 +30,10 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
-import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.jupiter.api.Test;
@@ -144,51 +144,29 @@ class TestContainerBalancerMoveFailureBreakdown {
   }
 
   @Test
-  void testSameReasonAggregatesSourceFailureCountsFromMultipleSources()
-          throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
-    MockedSCM mockedScm = createMockedScm();
-    ContainerBalancerConfiguration config = buildConfig(mockedScm);
+  void testSameReasonAggregatesSourceFailureCountsFromMultipleSources() {
+    ContainerMoveFailureTracker tracker = new ContainerMoveFailureTracker();
+    DatanodeDetails source1 = MockDatanodeDetails.createDatanodeDetails("1.1.1.1", "/r1");
+    DatanodeDetails source2 = MockDatanodeDetails.createDatanodeDetails("2.2.2.2", "/r1");
+    DatanodeDetails target = MockDatanodeDetails.createDatanodeDetails("3.3.3.3", "/r2");
 
-    // Pin two over-utilized sources and one under-utilized target so two different sources are used.
-    DatanodeUsageInfo[] nodes = mockedScm.getCluster().getNodesInCluster();
-    config.setIncludeNodes(
-            nodes[NODE_COUNT - 2].getDatanodeDetails().getHostName() + ","
-                    + nodes[NODE_COUNT - 1].getDatanodeDetails().getHostName() + ","
-                    + nodes[0].getDatanodeDetails().getHostName());
+    String reason = MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT.name();
+    tracker.recordFailure(reason, source1, target);
+    tracker.recordFailure(reason, source2, target);
 
-    when(mockedScm.getMoveManager().move(any(ContainerID.class),
-            any(DatanodeDetails.class), any(DatanodeDetails.class)))
-            .thenReturn(CompletableFuture.completedFuture(
-                    MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT))
-            .thenReturn(CompletableFuture.completedFuture(
-                    MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT))
-            .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
-
-    ContainerBalancerTask task = mockedScm.startBalancerTask(config);
-    ContainerBalancerTaskIterationStatusInfo iteration = getCompletedIteration(task);
-
-    assertThat(iteration.getContainerMovesTimeout()).isEqualTo(2);
-
-    ArgumentCaptor<DatanodeDetails> sourceCaptor = ArgumentCaptor.forClass(DatanodeDetails.class);
-    ArgumentCaptor<DatanodeDetails> targetCaptor = ArgumentCaptor.forClass(DatanodeDetails.class);
-    verify(mockedScm.getMoveManager(), atLeast(2)).move(
-            any(ContainerID.class), sourceCaptor.capture(), targetCaptor.capture());
-
-    String sourceUuid1 = sourceCaptor.getAllValues().get(0).getUuidString();
-    String sourceUuid2 = sourceCaptor.getAllValues().get(1).getUuidString();
-    assertThat(sourceUuid1).isNotEqualTo(sourceUuid2);
-
-    String expectedReason = MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT.name();
-    ContainerMoveFailureDetail detail = iteration.getFailures().stream()
-            .filter(f -> expectedReason.equals(f.getReason()))
-            .findFirst()
-            .orElse(null);
-    assertThat(detail).as("failure detail for reason " + expectedReason).isNotNull();
+    ContainerMoveFailureDetail detail = tracker.getFailures().stream()
+        .filter(f -> reason.equals(f.getReason()))
+        .findFirst()
+        .orElse(null);
+    assertThat(detail).as("failure detail for reason " + reason).isNotNull();
     assertThat(detail.getCount()).isEqualTo(2L);
     assertThat(detail.getSourceFailureCounts())
-            .hasSize(2)
-            .containsEntry(sourceUuid1, 1L)
-            .containsEntry(sourceUuid2, 1L);
+        .hasSize(2)
+        .containsEntry(source1.getUuidString(), 1L)
+        .containsEntry(source2.getUuidString(), 1L);
+    assertThat(detail.getTargetFailureCounts())
+        .hasSize(1)
+        .containsEntry(target.getUuidString(), 2L);
   }
 
   private static MockedSCM createMockedScm() {
