@@ -79,12 +79,13 @@ public final class ChunkBufferPutBenchmark {
 
     final Scenario showcase = new Scenario(
         "Incremental buffer showcase",
-        "ozone.client.stream.buffer.size=4MB, "
-            + "ozone.client.stream.buffer.increment=64KB, io.file.buffer.size=4KB",
-        "4KB stream fill into IncrementalChunkBuffer (64KB steps)",
         DEFAULT_CHUNK_SIZE,
         INCREMENTAL_BUFFER_INCREMENT,
         HADOOP_FS_BUFFER_SIZE);
+
+    // Correctness self-check (verify=true) before timing; benchmark loops run
+    // with verify=false so the measurement is not polluted by read-back.
+    verifyCorrectness(showcase);
 
     System.out.println("=== Throughput showcase ===");
     runThroughputComparison(showcase);
@@ -125,9 +126,9 @@ public final class ChunkBufferPutBenchmark {
         scenario.bufferIncrement)) {
       for (int i = 0; i < 2; i++) {
         loopStreamFillDirect(buffer, source, scenario.writeSize, writesPerChunk,
-            WARMUP_SECONDS);
+            WARMUP_SECONDS, false);
         loopStreamFillWrap(buffer, source, scenario.writeSize, writesPerChunk,
-            WARMUP_SECONDS);
+            WARMUP_SECONDS, false);
       }
     }
   }
@@ -152,8 +153,8 @@ public final class ChunkBufferPutBenchmark {
 
   private static void printScenarioHeader(Scenario scenario) {
     System.out.println("--- " + scenario.name + " ---");
-    System.out.println("Config: " + scenario.config);
-    System.out.println("Pattern: " + scenario.pattern);
+    System.out.println("Config: " + scenario.config());
+    System.out.println("Pattern: " + scenario.pattern());
     System.out.printf("Chunk=%dKB increment=%dKB write=%dKB%n",
         scenario.chunkSize / 1024,
         scenario.bufferIncrement / 1024,
@@ -206,9 +207,9 @@ public final class ChunkBufferPutBenchmark {
     final int writesPerChunk = scenario.chunkSize / scenario.writeSize;
     try (ChunkBuffer buffer = ChunkBuffer.allocate(scenario.chunkSize,
         scenario.bufferIncrement)) {
-      loop.run(buffer, source, scenario.writeSize, writesPerChunk, WARMUP_SECONDS);
+      loop.run(buffer, source, scenario.writeSize, writesPerChunk, WARMUP_SECONDS, false);
       final LoopResult benchmark = loop.run(buffer, source, scenario.writeSize,
-          writesPerChunk, BENCHMARK_SECONDS);
+          writesPerChunk, BENCHMARK_SECONDS, false);
       return toResult(benchmark, scenario.writeSize);
     }
   }
@@ -219,11 +220,11 @@ public final class ChunkBufferPutBenchmark {
     final int writesPerChunk = scenario.chunkSize / scenario.writeSize;
     try (ChunkBuffer buffer = ChunkBuffer.allocate(scenario.chunkSize,
         scenario.bufferIncrement)) {
-      loop.run(buffer, source, scenario.writeSize, writesPerChunk, WARMUP_SECONDS);
+      loop.run(buffer, source, scenario.writeSize, writesPerChunk, WARMUP_SECONDS, false);
       final LoopResult[] benchmark = new LoopResult[1];
       final AllocationStats stats = JfrByteBufferAllocations.measure(
           () -> benchmark[0] = loop.run(buffer, source, scenario.writeSize,
-              writesPerChunk, ALLOCATION_BENCHMARK_SECONDS));
+              writesPerChunk, ALLOCATION_BENCHMARK_SECONDS, false));
       final long putOps = benchmark[0].totalBytes / scenario.writeSize;
       return new AllocationResult(putOps, stats.getByteBufferAllocCount(),
           stats.getByteBufferAllocBytes());
@@ -243,11 +244,11 @@ public final class ChunkBufferPutBenchmark {
   @FunctionalInterface
   private interface TimedLoop {
     LoopResult run(ChunkBuffer buffer, byte[] source, int writeSize,
-        int writesPerChunk, int seconds);
+        int writesPerChunk, int seconds, boolean verify);
   }
 
   private static LoopResult loopStreamFillDirect(ChunkBuffer buffer, byte[] source,
-      int writeSize, int writesPerChunk, int seconds) {
+      int writeSize, int writesPerChunk, int seconds, boolean verify) {
     long totalBytes = 0;
     final long start = System.nanoTime();
     final long deadline = start + seconds * 1_000_000_000L;
@@ -259,12 +260,15 @@ public final class ChunkBufferPutBenchmark {
         off += writeSize;
         totalBytes += writeSize;
       }
+      if (verify) {
+        verifyBuffer(buffer, source, off);
+      }
     }
     return new LoopResult(totalBytes, System.nanoTime() - start);
   }
 
   private static LoopResult loopStreamFillWrap(ChunkBuffer buffer, byte[] source,
-      int writeSize, int writesPerChunk, int seconds) {
+      int writeSize, int writesPerChunk, int seconds, boolean verify) {
     long totalBytes = 0;
     final long start = System.nanoTime();
     final long deadline = start + seconds * 1_000_000_000L;
@@ -276,8 +280,49 @@ public final class ChunkBufferPutBenchmark {
         off += writeSize;
         totalBytes += writeSize;
       }
+      if (verify) {
+        verifyBuffer(buffer, source, off);
+      }
     }
     return new LoopResult(totalBytes, System.nanoTime() - start);
+  }
+
+  /**
+   * Reads back the first {@code bytesWritten} bytes and asserts they equal
+   * {@code source}. Used with verify=true to guarantee both put paths are
+   * byte-for-byte correct before (and independently of) timing them.
+   */
+  private static void verifyBuffer(ChunkBuffer buffer, byte[] source, int bytesWritten) {
+    final ChunkBuffer slice = buffer.duplicate(0, bytesWritten);
+    int pos = 0;
+    for (final ByteBuffer backing : slice.asByteBufferList()) {
+      final ByteBuffer b = backing.duplicate();
+      while (b.hasRemaining()) {
+        final byte actual = b.get();
+        if (actual != source[pos]) {
+          throw new IllegalStateException("Verification failed at byte " + pos
+              + ": expected " + source[pos] + " but got " + actual);
+        }
+        pos++;
+      }
+    }
+    if (pos != bytesWritten) {
+      throw new IllegalStateException("Verification read " + pos
+          + " bytes, expected " + bytesWritten);
+    }
+  }
+
+  private static void verifyCorrectness(Scenario scenario) {
+    final byte[] source = SOURCE.get();
+    final int writesPerChunk = scenario.chunkSize / scenario.writeSize;
+    try (ChunkBuffer buffer = ChunkBuffer.allocate(scenario.chunkSize,
+        scenario.bufferIncrement)) {
+      loopStreamFillDirect(buffer, source, scenario.writeSize, writesPerChunk, 1, true);
+      loopStreamFillWrap(buffer, source, scenario.writeSize, writesPerChunk, 1, true);
+    }
+    System.out.println("Correctness self-check passed (verify=true): "
+        + "direct put(byte[]) and wrap put(ByteBuffer) produce identical bytes.");
+    System.out.println();
   }
 
   private static final class LoopResult {
@@ -305,21 +350,45 @@ public final class ChunkBufferPutBenchmark {
 
   private static final class Scenario {
     private final String name;
-    private final String config;
-    private final String pattern;
     private final int chunkSize;
     private final int bufferIncrement;
     private final int writeSize;
 
-    private Scenario(String name, String config, String pattern, int chunkSize,
-        int bufferIncrement, int writeSize) {
+    private Scenario(String name, int chunkSize, int bufferIncrement, int writeSize) {
       this.name = name;
-      this.config = config;
-      this.pattern = pattern;
       this.chunkSize = chunkSize;
       this.bufferIncrement = bufferIncrement;
       this.writeSize = writeSize;
     }
+
+    /** {@code ChunkBuffer.allocate} picks the impl from capacity vs increment. */
+    private String bufferKind() {
+      return bufferIncrement > 0 && bufferIncrement < chunkSize
+          ? "IncrementalChunkBuffer" : "ChunkBufferImplWithByteBuffer";
+    }
+
+    /** Config line derived from the numeric parameters (not hard coded). */
+    private String config() {
+      return "ozone.client.stream.buffer.size=" + human(chunkSize)
+          + ", ozone.client.stream.buffer.increment=" + human(bufferIncrement)
+          + ", io.file.buffer.size=" + human(writeSize);
+    }
+
+    /** Access pattern line derived from the numeric parameters (not hard coded). */
+    private String pattern() {
+      return human(writeSize) + " stream fill into " + bufferKind()
+          + " (" + human(bufferIncrement) + " steps)";
+    }
+  }
+
+  private static String human(int bytes) {
+    if (bytes != 0 && bytes % (1024 * 1024) == 0) {
+      return bytes / (1024 * 1024) + "MB";
+    }
+    if (bytes != 0 && bytes % 1024 == 0) {
+      return bytes / 1024 + "KB";
+    }
+    return bytes + "B";
   }
 
   private static final class Result {

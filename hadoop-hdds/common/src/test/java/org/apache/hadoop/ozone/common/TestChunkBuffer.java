@@ -170,6 +170,27 @@ public class TestChunkBuffer {
     }
   }
 
+  @ParameterizedTest(name = "put writes randomized slice [{0} via {2}]")
+  @MethodSource("putTestCases")
+  void putWritesRandomizedSlice(String ignored, IntFunction<ChunkBuffer> factory,
+      PutMethod method) throws IOException {
+    // Randomize buffer size, data size, offset and length (per review feedback:
+    // exercise both put paths the way testImplWithByteBuffer randomizes inputs).
+    for (int iter = 0; iter < 20; iter++) {
+      final int capacity = nextInt(1 << 10) + 1;
+      final int length = nextInt(capacity + 1);
+      final byte[] source = new byte[length + nextInt(64)];
+      ThreadLocalRandom.current().nextBytes(source);
+      final int offset = nextInt(source.length - length + 1);
+      try (ChunkBuffer buffer = factory.apply(capacity)) {
+        method.putSlice(buffer, source, offset, length);
+        assertEquals(length, buffer.position());
+        assertArrayEquals(Arrays.copyOfRange(source, offset, offset + length),
+            readWrittenBytes(buffer));
+      }
+    }
+  }
+
   @ParameterizedTest(name = "put zero-length payload is no-op [{0} via {1}]")
   @MethodSource("putTestCases")
   void putZeroLengthPayloadIsNoOp(String ignored, IntFunction<ChunkBuffer> factory,
