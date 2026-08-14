@@ -158,6 +158,12 @@ public interface ContainerStateManager {
   void addContainer(ContainerInfoProto containerInfo)
       throws IOException;
 
+  @Deprecated
+  @Replicate
+  void updateContainerState(HddsProtos.ContainerID id,
+                            HddsProtos.LifeCycleEvent event)
+      throws IOException;
+
   /**
    * Updates container state with sequenceId synchronization for HA consistency.
    * This method ensures that all SCM nodes have the same sequenceId when

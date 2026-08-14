@@ -352,6 +352,39 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  @Deprecated
+  @Override
+  public void updateContainerState(final HddsProtos.ContainerID containerID,
+                                   final LifeCycleEvent event)
+      throws IOException {
+    // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
+    final ContainerID id = ContainerID.getFromProtobuf(containerID);
+
+    try (AutoCloseableLock ignored = writeLock(id)) {
+      if (containers.contains(id)) {
+        final ContainerInfo oldInfo = containers.getContainerInfo(id);
+        final LifeCycleState oldState = oldInfo.getState();
+        final LifeCycleState newState = stateMachine.getNextState(
+            oldInfo.getState(), event);
+        if (newState.getNumber() > oldState.getNumber()) {
+          ExecutionUtil.create(() -> {
+            containers.updateState(id, oldState, newState);
+            transactionBuffer.addToBuffer(containerStore, id,
+                containers.getContainerInfo(id));
+          }).onException(() -> {
+            transactionBuffer.addToBuffer(containerStore, id, oldInfo);
+            containers.updateState(id, newState, oldState);
+          }).execute();
+          containerStateChangeActions.getOrDefault(event, info -> { })
+              .accept(oldInfo);
+        }
+      }
+    } catch (InvalidStateTransitionException e) {
+      LOG.warn("Failed to updateContainerState for container {}, ignoring it.",
+          id, e);
+    }
+  }
+
   @Override
   public void updateContainerStateWithSequenceId(final HddsProtos.ContainerID containerID,
                                                   final LifeCycleEvent event,
