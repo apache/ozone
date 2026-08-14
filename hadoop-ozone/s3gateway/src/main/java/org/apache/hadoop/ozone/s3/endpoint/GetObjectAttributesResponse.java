@@ -86,10 +86,8 @@ public class GetObjectAttributesResponse {
    * Represents the ObjectParts element in the GetObjectAttributes response.
    *
    * <p>For completed multipart-uploaded objects, {@code partsCount} is derived from
-   * the composite ETag suffix (e.g. {@code "hash-15"} → 15 parts). Per-part sizes
-   * are not stored for completed multipart uploads in Ozone and are therefore omitted
-   * from the part list in this response.
-   * TODO: Will support completed multipart uploads in this ticket: HDDS-16073
+   * the composite ETag suffix (e.g. {@code "hash-15"} → 15 parts). Per-part {@code PartNumber}
+   * and {@code Size} are populated from OM part-aware key metadata.
    */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "ObjectParts")
