@@ -82,7 +82,7 @@ public class ReplicasVerify extends Handler {
       description = "Print results for all passing and failing keys")
   private boolean allResults;
 
-  @CommandLine.Option(names = {"--refresh-container-locations-from-scm", "--refresh-from-scm"},
+  @CommandLine.Option(names = {"--refresh-from-scm"},
       description = "Force OM to refresh container locations from SCM before returning key info. " +
           "This can slow down verification but may avoid stale location results from OM cache.")
   private boolean refreshContainerLocationsFromScm;

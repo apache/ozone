@@ -277,25 +277,6 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     parameters.add("replicas");
     parameters.add("verify");
     parameters.add("--checksums");
-    parameters.add("--refresh-container-locations-from-scm");
-    parameters.add(ozoneAddress);
-
-    int exitCode = ozoneDebugShell.execute(parameters.toArray(new String[0]));
-
-    assertEquals(0, exitCode, err.toString());
-    assertThat(out.get())
-        .doesNotContain("Checksum mismatch")
-        .doesNotContain("Unexpected read size");
-  }
-
-  @Test
-  void testVerifyWithRefreshFromScmAlias() {
-    List<String> parameters = new ArrayList<>();
-    parameters.add(0, getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY));
-    parameters.add(0, getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY));
-    parameters.add("replicas");
-    parameters.add("verify");
-    parameters.add("--checksums");
     parameters.add("--refresh-from-scm");
     parameters.add(ozoneAddress);
 
