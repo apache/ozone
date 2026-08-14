@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.protocol;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -195,10 +196,17 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
     OzoneStoragePolicy storagePolicy;
+    boolean allowFallback;
     if (request.hasStoragePolicy()) {
       storagePolicy = OzoneStoragePolicy.fromProto(request.getStoragePolicy());
+      // If the storagePolicy was specific, then the field allowFallBack must be specified.
+      Preconditions.checkArgument(request.hasAllowFallBack());
+      allowFallback = request.getAllowFallBack();
     } else {
+      // When the request comes from an old OM that does not support StoragePolicy,
+      // StoragePolicy will not be explicitly set. The default StoragePolicy is used here.
       storagePolicy = OzoneStoragePolicy.getDefaultPolicy();
+      allowFallback = false;
     }
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
@@ -210,8 +218,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
             request.getOwner(),
             ExcludeList.getFromProtoBuf(request.getExcludeList()),
             request.getClient(),
-            storagePolicy,
-            request.getAllowFallBack());
+            storagePolicy, allowFallback);
 
     AllocateScmBlockResponseProto.Builder builder =
         AllocateScmBlockResponseProto.newBuilder();

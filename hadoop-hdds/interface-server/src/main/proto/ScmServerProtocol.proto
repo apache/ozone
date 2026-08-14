@@ -164,7 +164,7 @@ message AllocateScmBlockRequestProto {
   optional string client = 9;
 
   optional StoragePolicyProto storagePolicy = 10;
-  optional bool allowFallBack = 11 [default = true];
+  optional bool allowFallBack = 11;
 }
 
 /**

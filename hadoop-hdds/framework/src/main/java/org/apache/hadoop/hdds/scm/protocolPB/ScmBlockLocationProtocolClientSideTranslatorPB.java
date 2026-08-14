@@ -29,11 +29,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -179,6 +181,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       String owner, ExcludeList excludeList,
       String clientMachine, @Nonnull StoragePolicy storagePolicy,
       boolean allowFallbackStoragePolicy) throws IOException {
+    Objects.requireNonNull(storagePolicy, "storagePolicy cannot be null");
     Preconditions.checkArgument(size > 0, "block size must be greater than 0");
 
     final AllocateScmBlockRequestProto.Builder requestBuilder =
@@ -187,7 +190,9 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
             .setNumBlocks(num)
             .setType(replicationConfig.getReplicationType())
             .setOwner(owner)
-            .setExcludeList(excludeList.getProtoBuf());
+            .setExcludeList(excludeList.getProtoBuf())
+            .setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy))
+            .setAllowFallBack(allowFallbackStoragePolicy);
 
     if (StringUtils.isNotEmpty(clientMachine)) {
       requestBuilder.setClient(clientMachine);
