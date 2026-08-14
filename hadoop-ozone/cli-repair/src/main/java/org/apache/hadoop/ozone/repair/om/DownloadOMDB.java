@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.repair.om;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY;
 
 import java.io.IOException;
@@ -35,11 +37,12 @@ import org.apache.hadoop.ozone.repair.RepairTool;
 import picocli.CommandLine;
 
 /**
- * Tool to download and construct OM DB using follower bootstrap flow.
+ * Tool to download OM metadata using the follower bootstrap checkpoint flow.
  */
 @CommandLine.Command(
     name = "download",
-    description = "Downloads and constructs om.db from an OM node using the same checkpoint transfer flow as follower bootstrap.",
+    description = "Downloads OM metadata (om.db and db.snapshots) from an OM node using the same "
+        + "checkpoint transfer flow as follower bootstrap.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -61,7 +64,8 @@ public class DownloadOMDB extends RepairTool {
 
   @CommandLine.Option(
       names = {"--output-dir"},
-      description = "Path where the constructed om.db directory will be written.",
+      description = "Path where the downloaded OM metadata directory will be written. "
+          + "The output matches follower bootstrap layout: om.db and db.snapshots.",
       required = true
   )
   private Path outputDir;
@@ -111,13 +115,19 @@ public class DownloadOMDB extends RepairTool {
         conf, snapshotWorkDir.toFile(),
         Collections.singletonMap(omNodeDetails.getNodeId(), omNodeDetails))) {
       checkpoint = provider.downloadDBSnapshotFromLeader(omNodeDetails.getNodeId());
-      Path omDbPath = checkpoint.getCheckpointLocation().resolve(OM_DB_NAME);
+      Path checkpointRoot = checkpoint.getCheckpointLocation();
+      Path omDbPath = checkpointRoot.resolve(OM_DB_NAME);
       if (!Files.isDirectory(omDbPath)) {
         throw new IOException("Constructed OM DB directory not found in checkpoint: " + omDbPath);
       }
-      FileUtils.moveDirectory(omDbPath.toFile(), outputDir.toFile());
-      info("Successfully downloaded and constructed om.db at: %s",
-          outputDir.toAbsolutePath());
+      Path completionMarker = checkpointRoot.resolve(OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME);
+      if (Files.exists(completionMarker)) {
+        Files.delete(completionMarker);
+      }
+      FileUtils.moveDirectory(checkpointRoot.toFile(), outputDir.toFile());
+      checkpoint = null;
+      info("Successfully downloaded OM metadata at: %s (includes %s and %s if present on the leader).",
+          outputDir.toAbsolutePath(), OM_DB_NAME, OM_SNAPSHOT_DIR);
     } finally {
       if (checkpoint != null) {
         checkpoint.cleanupCheckpoint();
