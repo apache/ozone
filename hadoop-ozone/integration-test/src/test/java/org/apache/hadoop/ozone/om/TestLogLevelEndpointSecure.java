@@ -32,8 +32,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_FILTER_INITIALIZERS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_FILTER_INITIALIZERS_SECURE;
 import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.DN_LOGGER;
 import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.OM_LOGGER;
 import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.SCM_LOGGER;
@@ -214,10 +216,23 @@ public class TestLogLevelEndpointSecure {
   private static String runAsAdmin(PrivilegedExceptionAction<String> action)
       throws Exception {
     UserGroupInformation.setConfiguration(secureConf);
-    UserGroupInformation.setLoginUser(adminUgi);
-    adminUgi.setAuthenticationMethod(KERBEROS);
-    enableSpnegoOnHttpClient();
-    return adminUgi.doAs(action);
+    UserGroupInformation previousLoginUser = UserGroupInformation.getLoginUser();
+    String previousDisabledSchemes =
+        System.getProperty("jdk.http.auth.tunneling.disabledSchemes");
+    String previousDisabledProxySchemes =
+        System.getProperty("jdk.http.auth.proxying.disabledSchemes");
+    try {
+      UserGroupInformation.setLoginUser(adminUgi);
+      adminUgi.setAuthenticationMethod(KERBEROS);
+      enableSpnegoOnHttpClient();
+      return adminUgi.doAs(action);
+    } finally {
+      UserGroupInformation.setLoginUser(previousLoginUser);
+      restoreSystemProperty("jdk.http.auth.tunneling.disabledSchemes",
+          previousDisabledSchemes);
+      restoreSystemProperty("jdk.http.auth.proxying.disabledSchemes",
+          previousDisabledProxySchemes);
+    }
   }
 
   private static void startMiniKdc() throws Exception {
@@ -230,6 +245,13 @@ public class TestLogLevelEndpointSecure {
     secureConf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     secureConf.setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
     secureConf.setBoolean(OZONE_HTTP_SECURITY_ENABLED_KEY, true);
+    // Register the SPNEGO AuthenticationFilter on the HTTP consoles, exactly as
+    // a real secure cluster does (see compose/ozonesecure docker-config and
+    // SecuringOzoneHTTP.md). Without it the auth filter is never mapped onto
+    // /logLevel, so the servlet sees a null remote user and returns 403 even for
+    // an authenticated admin.
+    secureConf.set(OZONE_HTTP_FILTER_INITIALIZERS_KEY,
+        OZONE_HTTP_FILTER_INITIALIZERS_SECURE);
     secureConf.setBoolean(HADOOP_SECURITY_AUTHORIZATION, true);
     secureConf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
     secureConf.set(OZONE_OM_HTTP_AUTH_TYPE, "kerberos");
