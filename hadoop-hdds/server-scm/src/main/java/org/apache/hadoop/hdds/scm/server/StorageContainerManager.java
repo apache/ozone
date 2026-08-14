@@ -24,8 +24,8 @@ import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecr
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DEFAULT_STORAGE_TIER_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DEFAULT_STORAGE_TIER_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_DEFAULT_STORAGE_TIER_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_DEFAULT_STORAGE_TIER_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -345,7 +345,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   static StorageTier getConfiguredDefaultStorageTier(
       ConfigurationSource conf) {
     String configuredTier = conf.get(
-        OZONE_DEFAULT_STORAGE_TIER_KEY, OZONE_DEFAULT_STORAGE_TIER_DEFAULT);
+        OZONE_SCM_DEFAULT_STORAGE_TIER_KEY,
+        OZONE_SCM_DEFAULT_STORAGE_TIER_DEFAULT);
     return StorageTier.valueOf(
         configuredTier.trim().toUpperCase(Locale.ROOT));
   }

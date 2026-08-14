@@ -714,13 +714,14 @@ public final class OzoneConfigKeys {
       "ozone.client.elastic.byte.buffer.pool.max.size";
   public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT = "16GB";
 
-  public static final String OZONE_DEFAULT_STORAGE_TIER_KEY =
-      "ozone.default.storageTier";
-  public static final String OZONE_DEFAULT_STORAGE_TIER_DEFAULT =
+  public static final String OZONE_SCM_DEFAULT_STORAGE_TIER_KEY =
+      "ozone.scm.default.storage.tier";
+  public static final String OZONE_SCM_DEFAULT_STORAGE_TIER_DEFAULT =
       StorageTier.DISK.toString();
 
-  public static final String OZONE_DEFAULT_STORAGE_POLICY_KEY = "ozone.default.storagepolicy";
-  public static final String OZONE_DEFAULT_STORAGE_POLICY_DEFAULT =
+  public static final String OZONE_OM_DEFAULT_STORAGE_POLICY_KEY =
+      "ozone.om.default.storage.policy";
+  public static final String OZONE_OM_DEFAULT_STORAGE_POLICY_DEFAULT =
       OzoneStoragePolicy.WARM.name();
 
   /**

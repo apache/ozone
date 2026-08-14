@@ -34,8 +34,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLACKLIST_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLACKLIST_USERS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DEFAULT_STORAGE_POLICY_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DEFAULT_STORAGE_POLICY_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DEFAULT_STORAGE_POLICY_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DEFAULT_STORAGE_POLICY_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
@@ -734,7 +734,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .create("OmClientProtocol", "Ozone Manager RPC endpoint",
             OzoneManagerProtocolProtos.Type.class);
     String configuredStoragePolicy = conf.get(
-        OZONE_DEFAULT_STORAGE_POLICY_KEY, OZONE_DEFAULT_STORAGE_POLICY_DEFAULT);
+        OZONE_OM_DEFAULT_STORAGE_POLICY_KEY,
+        OZONE_OM_DEFAULT_STORAGE_POLICY_DEFAULT);
     OzoneStoragePolicy.setDefaultPolicy(OzoneStoragePolicy.valueOf(
         configuredStoragePolicy.trim().toUpperCase(Locale.ROOT)));
 

@@ -258,6 +258,6 @@ public class BlockLocationInfo {
   @Override
   public int hashCode() {
     return Objects.hash(blockID, length, offset, token, createVersion,
-        pipeline, storageTier, isFallBack);
+        pipeline, storageTier);
   }
 }
