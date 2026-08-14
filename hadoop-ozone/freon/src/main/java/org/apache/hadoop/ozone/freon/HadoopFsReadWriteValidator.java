@@ -27,11 +27,8 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.CRC32;
-import java.util.zip.CheckedInputStream;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.Checksum;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.output.NullOutputStream;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -197,11 +194,18 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     return checksum.getValue();
   }
 
+  /**
+   * Read the file back in --copy-buffer sized chunks and return the checksum of
+   * its content.
+   */
   private long readChecksum(Path file) throws IOException {
     Checksum checksum = new CRC32();
+    byte[] buffer = new byte[copyBufferSize];
     try (FSDataInputStream input = getFileSystem().open(file)) {
-      IOUtils.copyLarge(new CheckedInputStream(input, checksum),
-          NullOutputStream.INSTANCE, new byte[copyBufferSize]);
+      int read;
+      while ((read = input.read(buffer)) != -1) {
+        checksum.update(buffer, 0, read);
+      }
     }
     return checksum.getValue();
   }
