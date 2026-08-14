@@ -74,6 +74,11 @@ public final class OmKeyInfo extends WithParentObjectId
   // name of key client specified
   private String keyName;
   private long dataSize;
+  /**
+   * Block locations of the key, one group per key version. No write path produces more than one group today, so a
+   * key holds a single version and {@code dataSize} covers all of its blocks. Object versioning (HDDS-15728) keeps
+   * each object version in its own OmKeyInfo rather than adding groups here.
+   */
   private List<OmKeyLocationInfoGroup> keyLocationVersions;
   private final long creationTime;
   private long modificationTime;

@@ -66,9 +66,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -651,37 +648,9 @@ public class QuotaRepairTask {
     if (haveValue) {
       VALUE value = kv.getValue();
       if (value instanceof OmKeyInfo) {
-        OmKeyInfo keyInfo = (OmKeyInfo) value;
-        if (keyInfo.getKeyLocationVersions().size() > 1) {
-          usage.incrSpace(getRetainedVersionsSize(keyInfo));
-        } else {
-          usage.incrSpace(keyInfo.getReplicatedSize());
-        }
+        usage.incrSpace(((OmKeyInfo) value).getReplicatedSize());
       }
     }
-  }
-
-  /**
-   * Size of every version a key retains. {@code dataSize} covers the latest version only, while versioning keeps
-   * the blocks of all of them, so the recount has to walk the version groups.
-   *
-   * <p>Only the blocks a group created itself count: before HDDS-5472 a group also copied the earlier groups' blocks,
-   * and those keys were never migrated.
-   *
-   * <p>Each version is converted once, as {@link org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest} charges
-   * it at commit time. {@code OMKeyRequest#sumBlockLengths} is not reused because it converts every block separately,
-   * which for EC rounds a partial stripe up per block and reports more than the bucket was charged.
-   */
-  private static long getRetainedVersionsSize(OmKeyInfo keyInfo) {
-    long replicatedSize = 0;
-    for (OmKeyLocationInfoGroup group : keyInfo.getKeyLocationVersions()) {
-      long versionSize = 0;
-      for (OmKeyLocationInfo location : group.getBlocksLatestVersionOnly()) {
-        versionSize += location.getLength();
-      }
-      replicatedSize += QuotaUtil.getReplicatedSize(versionSize, keyInfo.getReplicationConfig());
-    }
-    return replicatedSize;
   }
   
   private static synchronized void updateCountToBucketInfo(
