@@ -139,6 +139,6 @@ create_containers "$CLIENT"
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-5-finalized"
 
-# Sends commands to finalize OM and SCM.
-execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-finalize" upgrade/finalize.robot
+# Sends command to finalize the cluster.
+execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-finalize" upgrade/rolling/finalize.robot
 callback with_this_version_finalized

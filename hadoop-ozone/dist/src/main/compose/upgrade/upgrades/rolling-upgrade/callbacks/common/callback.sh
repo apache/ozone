@@ -32,7 +32,7 @@ with_service_restarted() {
 }
 
 with_old_version() {
-  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/rolling/check-finalization.robot
   generate old1 "$CLIENT"
   validate old1 "$CLIENT"
 
@@ -52,7 +52,7 @@ with_this_version_pre_finalized() {
 }
 
 with_old_version_downgraded() {
-  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/rolling/check-finalization.robot
   validate old1 "$CLIENT"
   validate new1 "$CLIENT"
 
@@ -64,7 +64,7 @@ with_old_version_downgraded() {
 }
 
 with_this_version_finalized() {
-  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/rolling/check-finalization.robot
   validate old1 "$CLIENT"
   validate new1 "$CLIENT"
   validate old2 "$CLIENT"

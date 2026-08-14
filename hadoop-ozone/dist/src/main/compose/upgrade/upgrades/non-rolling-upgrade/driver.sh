@@ -82,5 +82,5 @@ OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-4-finalized"
 OZONE_KEEP_RESULTS=true start_docker_env
 
 # Sends commands to finalize OM and SCM.
-execute_robot_test "$SCM" -N "${OUTPUT_NAME}-finalize" upgrade/finalize.robot
+execute_robot_test "$SCM" -N "${OUTPUT_NAME}-finalize" upgrade/non-rolling/finalize.robot
 callback with_this_version_finalized

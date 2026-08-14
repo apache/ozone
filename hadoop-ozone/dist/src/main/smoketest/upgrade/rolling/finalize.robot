@@ -14,16 +14,16 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Finalize Upgrade of the Ozone cluster
-Resource            ../commonlib.robot
-Resource            lib.robot
+Documentation       Finalize rolling upgrade of the Ozone cluster
+Resource            ../../commonlib.robot
+Resource            ../../lib/os.robot
+Resource            ../../admincli/lib.resource
 Test Timeout        10 minutes
 Suite Setup         Get Security Enabled From Config
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Test Cases ***
-Finalize HDDS
-    Finalize SCM
-
-Finalize OMs
-    Finalize OM
+Finalize Cluster
+    ${param} =     Get OM Service Param
+    ${result} =    Execute      ozone admin upgrade finalize --wait ${param}
+    Should Contain    ${result}    Finalization complete.
