@@ -481,4 +481,69 @@ public class TestOzoneManagerRequestHandler {
         reportOnlyResponse.getSnapshotDiffResponse().getJobStatus());
     Assertions.assertEquals(0L, reportOnlyResponse.getSnapshotDiffResponse().getWaitTimeInMs());
   }
+
+  @Test
+  public void testSnapshotDiffHandlerSerializesSubStatusAndProgressIntoProto() throws IOException {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager ozoneManager = handler.getOzoneManager();
+
+    OMLayoutVersionManager lvm = Mockito.mock(OMLayoutVersionManager.class);
+    Mockito.when(lvm.isAllowed(Mockito.anyString())).thenReturn(true);
+    Mockito.when(ozoneManager.getVersionManager()).thenReturn(lvm);
+
+    SnapshotDiffResponse diffResponse =
+        new SnapshotDiffResponse(null, SnapshotDiffResponse.JobStatus.IN_PROGRESS, 60000L);
+    diffResponse.setSubStatus(SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_DIR);
+    diffResponse.setProgressPercent(50.0);
+    Mockito.when(ozoneManager.snapshotDiff(Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.anyInt()))
+        .thenReturn(diffResponse);
+
+    OzoneManagerProtocolProtos.OMRequest request =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotDiff)
+            .setClientId("client")
+            .setSnapshotDiffRequest(OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
+                .setVolumeName("vol").setBucketName("buck")
+                .setFromSnapshot("s1").setToSnapshot("s2")
+                .setToken("t").setPageSize(10))
+            .build();
+
+    OzoneManagerProtocolProtos.SnapshotDiffResponse proto =
+        handler.handleReadRequest(request).getSnapshotDiffResponse();
+    Assertions.assertTrue(proto.hasSubStatus());
+    Assertions.assertEquals(
+        OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_DIR,
+        proto.getSubStatus());
+    Assertions.assertEquals(50.0, proto.getProgressPercent(), 1e-9);
+  }
+
+  @Test
+  public void testSnapshotDiffHandlerOmitsSubStatusFromProtoWhenNull() throws IOException {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager ozoneManager = handler.getOzoneManager();
+
+    OMLayoutVersionManager lvm = Mockito.mock(OMLayoutVersionManager.class);
+    Mockito.when(lvm.isAllowed(Mockito.anyString())).thenReturn(true);
+    Mockito.when(ozoneManager.getVersionManager()).thenReturn(lvm);
+
+    Mockito.when(ozoneManager.snapshotDiff(Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.anyInt()))
+        .thenReturn(new SnapshotDiffResponse(null, SnapshotDiffResponse.JobStatus.IN_PROGRESS, 60000L));
+
+    OzoneManagerProtocolProtos.OMRequest request =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotDiff)
+            .setClientId("client")
+            .setSnapshotDiffRequest(OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
+                .setVolumeName("vol").setBucketName("buck")
+                .setFromSnapshot("s1").setToSnapshot("s2")
+                .setToken("t").setPageSize(10))
+            .build();
+
+    OzoneManagerProtocolProtos.SnapshotDiffResponse proto =
+        handler.handleReadRequest(request).getSnapshotDiffResponse();
+    Assertions.assertFalse(proto.hasSubStatus());
+    Assertions.assertFalse(proto.hasProgressPercent());
+  }
 }
