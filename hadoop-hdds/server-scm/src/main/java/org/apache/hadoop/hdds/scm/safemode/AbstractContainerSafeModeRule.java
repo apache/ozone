@@ -24,7 +24,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -92,14 +91,8 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
     // Since ContainerSafeModeRule is updated with container list notified during DN registration only,
     // So its not required to add newly created container after DN registration.
     int oldContainerCount = containers.size();
-    Set<ContainerID> containerInfoSet = containerManager.getContainers(getContainerType()).stream()
-        .filter(this::isClosed)
-        .filter(c -> c.getNumberOfKeys() > 0)
-        .filter(c -> containers.containsKey(ContainerID.valueOf(c.getContainerID())))
-        .map(c -> ContainerID.valueOf(c.getContainerID()))
-        .collect(Collectors.toSet());
-    // remove deleted containers from containers list
-    containers.keySet().removeIf(c -> !containerInfoSet.contains(c));
+    List<ContainerInfo> deletedContainers = containerManager.getContainers(LifeCycleState.DELETED);
+    deletedContainers.forEach(info -> containers.remove(ContainerID.valueOf(info.getContainerID())));
     // update new total with reducing removed containers
     totalContainers.set(totalContainers.get() - (oldContainerCount - containers.size()));
     final long cutOff = (long) Math.ceil(getTotalNumberOfContainers() * getSafeModeCutoff());

@@ -233,6 +233,11 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.dn.metrics.collection.timeout";
   public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT = "10m";
 
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT =
+      "ozone.recon.dn.metrics.collection.thread.count";
+  public static final int OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT =
+      Runtime.getRuntime().availableProcessors() * 2;
+
   /**
    * Application-level ceiling on the number of ContainerIDs fetched from SCM
    * per RPC call during container sync. The effective batch size is

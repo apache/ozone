@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSCon
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.net.InetAddresses;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +38,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
@@ -67,7 +68,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TODO.
+ * Default {@link SCMRatisServer} implementation backed by a Ratis
+ * {@link RaftServer} running the {@link SCMStateMachine}.
  */
 public class SCMRatisServerImpl implements SCMRatisServer {
   private static final Logger LOG =
@@ -222,13 +224,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
-  public void registerStateMachineHandler(final RequestType handlerType,
-                                          final Object handler) {
-    if (handler instanceof ScmInvoker) {
-      stateMachine.registerInvoker(handlerType, (ScmInvoker) handler);
-    } else {
-      stateMachine.registerHandler(handlerType, handler);
-    }
+  public void registerStateMachineHandler(final ScmInvoker<?> handler) {
+    stateMachine.registerInvoker(handler.getType(), handler);
   }
 
   @Override
@@ -294,13 +291,28 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         LOG.error("SCM Ratis PeerInetAddress {} is unresolvable",
             peer.getAddress());
       }
-      ratisRoles.add((peer.getAddress() == null ? "" :
-          peer.getAddress().concat(peer.equals(leader) ?
-                  ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
-                  ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
-                  .concat(":".concat(peer.getId().toString()))
-                  .concat(":".concat(peerInetAddress == null ? "" :
-                      peerInetAddress.getHostAddress()))));
+      if (peer.getAddress() == null) {
+        ratisRoles.add("");
+        continue;
+      }
+      String host = HddsUtils.getHostName(peer.getAddress()).orElse("");
+      OptionalInt portOpt = HddsUtils.getHostPort(peer.getAddress());
+      if (!portOpt.isPresent()) {
+        LOG.error("SCM Ratis peer address {} has no port, skipping",
+            peer.getAddress());
+        continue;
+      }
+      String normalizedAddress = HddsUtils.getHostPortString(host, portOpt.getAsInt());
+      String role = peer.equals(leader)
+          ? RaftProtos.RaftPeerRole.LEADER.toString()
+          : RaftProtos.RaftPeerRole.FOLLOWER.toString();
+      String hostIp = "";
+      if (peerInetAddress != null) {
+        hostIp = InetAddresses.toUriString(peerInetAddress);
+      }
+      String roleEntry = normalizedAddress + ":" + role + ":"
+          + peer.getId().toString() + ":" + hostIp;
+      ratisRoles.add(roleEntry);
     }
     return ratisRoles;
   }
@@ -402,8 +414,18 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final RaftGroupId groupId = buildRaftGroupId(clusterId);
     RaftPeerId selfPeerId = getSelfPeerId(scmId);
 
+    // Pass the configured host:port string through verbatim. The
+    // invariant is "do not pre-resolve" -- never construct an
+    // InetSocketAddress from the configured address and hand the
+    // resolved form to RaftPeer.setAddress, which would freeze the peer
+    // at one IP for the channel's lifetime. Ratis routes the string to
+    // gRPC's NettyChannelBuilder, whose default DnsNameResolver
+    // re-resolves hostname addresses on connection failure (peer pod
+    // restarts recover automatically in Kubernetes-style environments
+    // where DNS names are stable but IPs are not). IP-literal configs
+    // are still honored exactly as configured. See HDDS-15514
+    // (DNS-refresh-on-failure for all RPC paths).
     RaftPeer localRaftPeer = RaftPeer.newBuilder().setId(selfPeerId)
-        // TODO : Should we use IP instead of hostname??
         .setAddress(details.getRatisHostPortStr()).build();
 
     List<RaftPeer> raftPeers = new ArrayList<>();

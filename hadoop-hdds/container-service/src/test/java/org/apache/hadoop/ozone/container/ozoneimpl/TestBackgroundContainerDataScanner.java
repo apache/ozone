@@ -78,7 +78,7 @@ import org.mockito.quality.Strictness;
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class TestBackgroundContainerDataScanner extends
-    TestContainerScannersAbstract {
+    ContainerScannerTests {
 
   private BackgroundContainerDataScanner scanner;
 

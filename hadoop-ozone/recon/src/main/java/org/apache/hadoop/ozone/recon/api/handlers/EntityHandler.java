@@ -20,7 +20,12 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -33,11 +38,15 @@ import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class for handling all entity types.
  */
 public abstract class EntityHandler {
+
+  private static final Logger LOG = LoggerFactory.getLogger(EntityHandler.class);
 
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
@@ -205,32 +214,111 @@ public abstract class EntityHandler {
    * @throws IOException ioEx
    */
   protected int[] getTotalFileSizeDist(long objectId) throws IOException {
-    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
-    if (nsSummary == null) {
-      return new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
-    }
-    int[] res = nsSummary.getFileSizeBucket();
-    for (long childId: nsSummary.getChildDir()) {
-      int[] subDirFileSizeDist = getTotalFileSizeDist(childId);
+    int[] res = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
+    walkNSSummaryTree(objectId, nsSummary -> {
+      int[] fileSizeBucket = nsSummary.getFileSizeBucket();
       for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
-        res[i] += subDirFileSizeDist[i];
+        res[i] += fileSizeBucket[i];
       }
-    }
+    });
     return res;
   }
 
   protected int getTotalDirCount(long objectId) throws IOException {
-    NSSummary nsSummary =
-        getReconNamespaceSummaryManager().getNSSummary(objectId);
-    if (nsSummary == null) {
+    return walkNSSummaryTree(objectId, null);
+  }
+
+  /**
+   * Walk the NSSummary tree without retaining every object ID. Each stack frame
+   * keeps one child iterator, so live memory is proportional to tree depth
+   * instead of the number of directories. The ancestor set prevents a corrupt
+   * child reference from walking back into the active path.
+   *
+   * @param objectId root object ID
+   * @param summaryConsumer optional consumer for each available NSSummary
+   * @return number of reachable subdirectory references
+   * @throws IOException if an NSSummary cannot be read
+   */
+  private int walkNSSummaryTree(long objectId,
+      Consumer<NSSummary> summaryConsumer) throws IOException {
+    NSSummary rootSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    if (rootSummary == null) {
       return 0;
     }
-    Set<Long> subdirs = nsSummary.getChildDir();
-    int totalCnt = subdirs.size();
-    for (long subdir : subdirs) {
-      totalCnt += getTotalDirCount(subdir);
+    if (summaryConsumer != null) {
+      summaryConsumer.accept(rootSummary);
     }
-    return totalCnt;
+
+    Set<Long> ancestors = new HashSet<>();
+    Deque<NSSummaryTraversalFrame> stack = new ArrayDeque<>();
+    ancestors.add(objectId);
+    stack.push(new NSSummaryTraversalFrame(objectId,
+        rootSummary.getChildDir().iterator()));
+    int totalDirCount = 0;
+    boolean cycleLogged = false;
+    while (!stack.isEmpty()) {
+      NSSummaryTraversalFrame frame = stack.peek();
+      if (!frame.getChildIterator().hasNext()) {
+        stack.pop();
+        ancestors.remove(frame.getObjectId());
+        continue;
+      }
+
+      long childId = frame.getChildIterator().next();
+      if (ancestors.contains(childId)) {
+        if (!cycleLogged) {
+          logNSSummaryCycle(childId);
+          cycleLogged = true;
+        }
+        continue;
+      }
+
+      totalDirCount++;
+      NSSummary childSummary =
+          reconNamespaceSummaryManager.getNSSummary(childId);
+      if (childSummary == null) {
+        continue;
+      }
+      if (summaryConsumer != null) {
+        summaryConsumer.accept(childSummary);
+      }
+      ancestors.add(childId);
+      stack.push(new NSSummaryTraversalFrame(childId,
+          childSummary.getChildDir().iterator()));
+    }
+    return totalDirCount;
+  }
+
+  /**
+   * Warn that the NSSummary tree contains a self or ancestor loop. The walk
+   * skips the cyclic edge so the request still completes and operators can see
+   * that the persisted NSSummary data may be corrupted. Callers invoke this at
+   * most once per walk.
+   */
+  private void logNSSummaryCycle(long objectId) {
+    reconNamespaceSummaryManager.recordNSSummaryInvalidTreeDetection();
+    LOG.warn("Detected a cycle through object {} while walking the " +
+        "NSSummary tree under {}; skipping the cyclic reference. The " +
+        "NSSummary data may be corrupted.", objectId, getNormalizedPath());
+  }
+
+  private static final class NSSummaryTraversalFrame {
+    private final long objectId;
+    private final Iterator<Long> childIterator;
+
+    private NSSummaryTraversalFrame(long objectId,
+        Iterator<Long> childIterator) {
+      this.objectId = objectId;
+      this.childIterator = childIterator;
+    }
+
+    private long getObjectId() {
+      return objectId;
+    }
+
+    private Iterator<Long> getChildIterator() {
+      return childIterator;
+    }
   }
 
   /**

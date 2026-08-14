@@ -45,6 +45,7 @@ class TestVolumeInfoMetrics {
     when(volume.getCommittedBytes()).thenReturn(10L);
     when(volume.getContainers()).thenReturn(3L);
     when(volume.getReportedFreeSpaceToSpare(anyLong())).thenReturn(20L);
+    when(volume.getFreeSpaceToSpare(anyLong())).thenReturn(15L);
 
     VolumeUsage volumeUsage = mock(VolumeUsage.class);
     when(volume.getVolumeUsage()).thenReturn(volumeUsage);
@@ -80,6 +81,7 @@ class TestVolumeInfoMetrics {
       assertThat(findMetric(all, "FilesystemUsed")).isEqualTo(900L); // FilesystemCapacity - FilesystemAvailable
 
       assertThat(findMetric(all, "MinFreeSpace")).isEqualTo(20L);
+      assertThat(findMetric(all, "HardMinFreeSpace")).isEqualTo(15L);
       // NonOzoneUsed = FilesystemUsed - OzoneUsed = 900 - 500
       assertThat(findMetric(all, "NonOzoneUsed")).isEqualTo(400L);
     } finally {

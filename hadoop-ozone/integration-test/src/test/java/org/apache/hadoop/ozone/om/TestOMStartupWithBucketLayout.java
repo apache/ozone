@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -69,19 +69,19 @@ public class TestOMStartupWithBucketLayout {
       startCluster(conf);
 
       // 2. create bucket with FSO bucket layout and verify
-      OzoneBucket bucket1 = TestDataUtil.createVolumeAndBucket(client,
+      OzoneBucket bucket1 = DataTestUtil.createVolumeAndBucket(client,
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
       verifyBucketLayout(bucket1, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
       // 3. verify OM default behavior with empty
       restartCluster();
-      OzoneBucket bucket2 = TestDataUtil.createVolumeAndBucket(client,
+      OzoneBucket bucket2 = DataTestUtil.createVolumeAndBucket(client,
           null);
       verifyBucketLayout(bucket2, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
       // 4. create bucket with OBS bucket layout and verify
       restartCluster();
-      OzoneBucket bucket3 = TestDataUtil.createVolumeAndBucket(client,
+      OzoneBucket bucket3 = DataTestUtil.createVolumeAndBucket(client,
           BucketLayout.OBJECT_STORE);
       verifyBucketLayout(bucket3, BucketLayout.OBJECT_STORE);
 
@@ -113,19 +113,19 @@ public class TestOMStartupWithBucketLayout {
       startCluster(conf);
 
       // 2. create bucket with FSO bucket layout and verify
-      OzoneBucket bucket1 = TestDataUtil.createVolumeAndBucket(client,
+      OzoneBucket bucket1 = DataTestUtil.createVolumeAndBucket(client,
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
       verifyBucketLayout(bucket1, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
       // 3. verify OM default behavior with empty
       restartCluster();
-      OzoneBucket bucket2 = TestDataUtil.createVolumeAndBucket(client,
+      OzoneBucket bucket2 = DataTestUtil.createVolumeAndBucket(client,
           null);
       verifyBucketLayout(bucket2, BucketLayout.OBJECT_STORE);
 
       // 4. create bucket with OBS bucket layout and verify
       restartCluster();
-      OzoneBucket bucket3 = TestDataUtil.createVolumeAndBucket(client,
+      OzoneBucket bucket3 = DataTestUtil.createVolumeAndBucket(client,
           BucketLayout.OBJECT_STORE);
       verifyBucketLayout(bucket3, BucketLayout.OBJECT_STORE);
 

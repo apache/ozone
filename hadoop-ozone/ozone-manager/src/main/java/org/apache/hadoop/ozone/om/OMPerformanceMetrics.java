@@ -67,6 +67,9 @@ public class OMPerformanceMetrics {
   @Metric(about = "Sort datanodes latency in getKeyInfo")
   private MutableRate getKeyInfoSortDatanodesLatencyNs;
 
+  @Metric(about = "Sort datanodes latency in allocateBlock (streaming write)")
+  private MutableRate allocateBlockSortDatanodesLatencyNs;
+
   @Metric(about = "resolveBucketLink latency in getKeyInfo")
   private MutableRate getKeyInfoResolveBucketLatencyNs;
 
@@ -138,6 +141,15 @@ public class OMPerformanceMetrics {
 
   @Metric(about = "ACLs check in getObjectTagging")
   private MutableRate getObjectTaggingAclCheckLatencyNs;
+
+  @Metric(about = "resolveBucketLink latency in getBucketTagging")
+  private MutableRate getBucketTaggingResolveBucketLatencyNs;
+
+  @Metric(about = "ACLs check latency in getBucketTagging")
+  private MutableRate getBucketTaggingAclCheckLatencyNs;
+
+  @Metric(about = "End-to-end latency in getBucketTagging")
+  private MutableRate getBucketTaggingLatencyNs;
 
   @Metric(about = "Latency of each iteration of DirectoryDeletingService in ms")
   private MutableGaugeLong directoryDeletingServiceLatencyMs;
@@ -235,6 +247,10 @@ public class OMPerformanceMetrics {
 
   MutableRate getGetKeyInfoSortDatanodesLatencyNs() {
     return getKeyInfoSortDatanodesLatencyNs;
+  }
+
+  MutableRate getAllocateBlockSortDatanodesLatencyNs() {
+    return allocateBlockSortDatanodesLatencyNs;
   }
 
   public void setForceContainerCacheRefresh(boolean value) {
@@ -347,6 +363,18 @@ public class OMPerformanceMetrics {
 
   public void addGetObjectTaggingLatencyNs(long latencyInNs) {
     getObjectTaggingAclCheckLatencyNs.add(latencyInNs);
+  }
+
+  public MutableRate getGetBucketTaggingResolveBucketLatencyNs() {
+    return getBucketTaggingResolveBucketLatencyNs;
+  }
+
+  public MutableRate getGetBucketTaggingAclCheckLatencyNs() {
+    return getBucketTaggingAclCheckLatencyNs;
+  }
+
+  public void addGetBucketTaggingLatencyNs(long latencyInNs) {
+    getBucketTaggingLatencyNs.add(latencyInNs);
   }
 
   public void setDirectoryDeletingServiceLatencyMs(long latencyInMs) {
