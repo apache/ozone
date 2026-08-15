@@ -21,16 +21,22 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.OZONE_RATIS_SNAPSHOT_C
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.repair.RepairTool;
@@ -79,42 +85,36 @@ public class DownloadOMDB extends RepairTool {
   @Override
   public void execute() throws Exception {
     OzoneConfiguration conf = getOzoneConf();
+    String effectiveServiceId = resolveServiceId(conf);
 
-    if (nodeId == null && OmUtils.isServiceIdsDefined(conf)) {
-      error("This is an HA OM cluster; specify --node-id to select which OM to download from.");
+    boolean outputExists = Files.exists(outputDir);
+    if (outputExists && !overwrite) {
+      fatal("Output directory already exists: %s. Use --overwrite to replace it.",
+          outputDir.toAbsolutePath());
+    }
+
+    if (outputExists && !Files.isDirectory(outputDir)) {
+      fatal("Output path is not a directory: %s", outputDir.toAbsolutePath());
+    }
+
+    if (isDryRun()) {
+      info("Would download OM metadata at %s (using follower bootstrap flow).",
+          outputDir.toAbsolutePath());
       return;
     }
 
-    OMNodeDetails omNodeDetails =
-        OMNodeDetails.getOMNodeDetailsFromConf(conf, omServiceId, nodeId);
-    if (omNodeDetails == null) {
-      error("Couldn't determine OM node from the given service-id: %s and node-id: %s.",
-          omServiceId, nodeId);
-      return;
-    }
-
-    if (Files.exists(outputDir)) {
-      if (!overwrite) {
-        error("Output directory already exists: %s. Use --overwrite to replace it.",
-            outputDir.toAbsolutePath());
-        return;
-      }
+    if (outputExists) {
       FileUtils.forceDelete(outputDir.toFile());
     }
-    Path parent = outputDir.toAbsolutePath().getParent();
-    if (parent != null) {
-      Files.createDirectories(parent);
-    }
+    Files.createDirectories(outputDir);
 
     // This tool intentionally follows the inode-based follower bootstrap transfer.
     conf.setBoolean(OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY, true);
 
-    Path snapshotWorkDir = Files.createTempDirectory("ozone-omdb-bootstrap-");
+    Path snapshotWorkDir = Files.createTempDirectory(outputDir, ".omdb-bootstrap-");
     DBCheckpoint checkpoint = null;
-    try (OmRatisSnapshotProvider provider = new OmRatisSnapshotProvider(
-        conf, snapshotWorkDir.toFile(),
-        Collections.singletonMap(omNodeDetails.getNodeId(), omNodeDetails))) {
-      checkpoint = provider.downloadDBSnapshotFromLeader(omNodeDetails.getNodeId());
+    try {
+      checkpoint = downloadCheckpoint(conf, effectiveServiceId, snapshotWorkDir);
       Path checkpointRoot = checkpoint.getCheckpointLocation();
       Path omDbPath = checkpointRoot.resolve(OM_DB_NAME);
       if (!Files.isDirectory(omDbPath)) {
@@ -124,7 +124,7 @@ public class DownloadOMDB extends RepairTool {
       if (Files.exists(completionMarker)) {
         Files.delete(completionMarker);
       }
-      FileUtils.moveDirectory(checkpointRoot.toFile(), outputDir.toFile());
+      moveDirectoryContents(checkpointRoot, outputDir);
       checkpoint = null;
       info("Successfully downloaded OM metadata at: %s (includes %s and %s if present on the leader).",
           outputDir.toAbsolutePath(), OM_DB_NAME, OM_SNAPSHOT_DIR);
@@ -134,5 +134,68 @@ public class DownloadOMDB extends RepairTool {
       }
       FileUtils.deleteQuietly(snapshotWorkDir.toFile());
     }
+  }
+
+  private DBCheckpoint downloadCheckpoint(OzoneConfiguration conf,
+      String serviceId, Path snapshotWorkDir) throws Exception {
+    List<String> nodeIds = getCandidateNodeIds(conf, serviceId);
+    Exception lastFailure = null;
+    for (String candidateNodeId : nodeIds) {
+      OMNodeDetails omNodeDetails =
+          OMNodeDetails.getOMNodeDetailsFromConf(conf, serviceId, candidateNodeId);
+      if (omNodeDetails == null) {
+        if (nodeId != null) {
+          fatal("Couldn't determine OM node from the given service-id: %s and node-id: %s.",
+              serviceId, nodeId);
+        }
+        continue;
+      }
+      try (OmRatisSnapshotProvider provider = new OmRatisSnapshotProvider(
+          conf, snapshotWorkDir.toFile(),
+          Collections.singletonMap(omNodeDetails.getNodeId(), omNodeDetails))) {
+        return provider.downloadDBSnapshotFromLeader(omNodeDetails.getNodeId());
+      } catch (Exception ex) {
+        lastFailure = ex;
+        if (nodeId != null) {
+          throw ex;
+        }
+      }
+    }
+    if (lastFailure != null) {
+      throw lastFailure;
+    }
+    fatal("Couldn't determine OM node from the given service-id: %s and node-id: %s.",
+        serviceId, nodeId);
+    return null;
+  }
+
+  private List<String> getCandidateNodeIds(OzoneConfiguration conf,
+      String serviceId) {
+    if (nodeId != null) {
+      return Collections.singletonList(nodeId);
+    }
+    if (!OmUtils.isServiceIdsDefined(conf)) {
+      return Collections.singletonList(null);
+    }
+    String omNodesKey = ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, serviceId);
+    Collection<String> omNodeIds = conf.getTrimmedStringCollection(omNodesKey);
+    return new ArrayList<>(omNodeIds);
+  }
+
+  private static void moveDirectoryContents(Path sourceDir, Path targetDir)
+      throws IOException {
+    try (java.util.stream.Stream<Path> entries = Files.list(sourceDir)) {
+      for (Path entry : (Iterable<Path>) entries::iterator) {
+        Files.move(entry, targetDir.resolve(entry.getFileName()),
+            StandardCopyOption.REPLACE_EXISTING);
+      }
+    }
+  }
+
+  private String resolveServiceId(OzoneConfiguration conf) throws IOException {
+    if (omServiceId != null && !omServiceId.isEmpty()) {
+      return omServiceId;
+    }
+    return OmUtils.getOzoneManagerServiceId(conf);
   }
 }

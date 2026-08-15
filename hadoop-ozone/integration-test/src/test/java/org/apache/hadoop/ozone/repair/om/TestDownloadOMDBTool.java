@@ -28,6 +28,7 @@ import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -105,8 +106,6 @@ public class TestDownloadOMDBTool {
 
   @Test
   public void testDownloadConstructsOmDbUsingV2Transfer(@TempDir Path tempDir) throws Exception {
-    OzoneManager leader = cluster.getOMLeader();
-    String leaderNodeId = leader.getOMNodeId();
     Path outputDir = tempDir.resolve("downloaded-metadata");
 
     LogCapturer providerLog = LogCapturer.captureLogs(OmRatisSnapshotProvider.class);
@@ -114,7 +113,6 @@ public class TestDownloadOMDBTool {
       int exitCode = new OzoneRepair().getCmd().execute(withHAConf(new String[] {
           "om", "download",
           "--service-id", OM_SERVICE_ID,
-          "--node-id", leaderNodeId,
           "--output-dir", outputDir.toString()
       }));
 
@@ -204,7 +202,7 @@ public class TestDownloadOMDBTool {
         "--node-id", leaderNodeId,
         "--output-dir", outputDir.toString()
     }));
-    assertEquals(0, firstRunExitCode, err.getOutput());
+    assertNotEquals(0, firstRunExitCode);
     assertTrue(Files.exists(outputDir.resolve("OLD-MARKER")), "Marker should remain without overwrite.");
     assertThat(err.getOutput()).contains("Output directory already exists");
 
