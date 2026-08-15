@@ -19,11 +19,11 @@ package org.apache.hadoop.hdds.scm;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
-import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -105,54 +105,44 @@ public class TestXceiverClientMetrics {
       assertCounter("CreateContainerLatencyNumOps", 1L, containerMetrics);
 
       breakFlag = false;
-      latch = new CountDownLatch(1);
+      int numSenderThreads = 10;
+      latch = new CountDownLatch(numSenderThreads);
+      List<CompletableFuture<ContainerCommandResponseProto>> computeResults =
+          Collections.synchronizedList(new ArrayList<>());
+      XceiverClientMetrics clientMetrics =
+          XceiverClientManager.getXceiverClientMetrics();
 
-      int numRequest = 10;
-      List<CompletableFuture<ContainerCommandResponseProto>> computeResults
-          = new ArrayList<>();
-      // start new thread to send async requests
-      Thread sendThread = new Thread(() -> {
-        while (!breakFlag) {
+      for (int i = 0; i < numSenderThreads; i++) {
+        Thread sendThread = new Thread(() -> {
           try {
-            // use async interface for testing pending metrics
-            for (int i = 0; i < numRequest; i++) {
-              BlockID blockID = ContainerTestHelper.
-                  getTestBlockID(container.getContainerInfo().getContainerID());
-              ContainerProtos.ContainerCommandRequestProto smallFileRequest;
-
-              smallFileRequest = ContainerTestHelper.getWriteSmallFileRequest(
-                  client.getPipeline(), blockID, 1024);
-              CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-                  response =
-                  client.sendCommandAsync(smallFileRequest).getResponse();
-              computeResults.add(response);
+            while (!breakFlag) {
+              BlockID blockID = ContainerTestHelper.getTestBlockID(
+                  container.getContainerInfo().getContainerID());
+              ContainerCommandRequestProto smallFileRequest =
+                  ContainerTestHelper.getWriteSmallFileRequest(
+                      client.getPipeline(), blockID, 1024);
+              computeResults.add(
+                  client.sendCommandAsync(smallFileRequest).getResponse());
             }
-
-            Thread.sleep(1000);
           } catch (Exception ignored) {
+          } finally {
+            latch.countDown();
           }
-        }
-
-        latch.countDown();
-      });
-      sendThread.start();
+        });
+        sendThread.start();
+      }
 
       GenericTestUtils.waitFor(() -> {
         // check if pending metric count is increased
-        MetricsRecordBuilder metric =
-            getMetrics(XceiverClientMetrics.SOURCE_NAME);
-        long pendingOps = getLongCounter("PendingOps", metric);
-        long pendingPutSmallFileOps =
-            getLongCounter("numPendingPutSmallFile", metric);
-
-        if (pendingOps > 0 && pendingPutSmallFileOps > 0) {
+        if (clientMetrics.getPendingContainerOpCountMetrics(
+            ContainerProtos.Type.PutSmallFile) > 0) {
           // reset break flag
           breakFlag = true;
           return true;
         } else {
           return false;
         }
-      }, 100, 60000);
+      }, 10, 60000);
 
       // blocking until we stop sending async requests
       latch.await();
@@ -167,6 +157,9 @@ public class TestXceiverClientMetrics {
         return true;
       }, 100, 60000);
 
+      GenericTestUtils.waitFor(() ->
+          clientMetrics.getPendingContainerOpCountMetrics(
+              ContainerProtos.Type.PutSmallFile) == 0, 10, 5000);
       // the counter value of pending metrics should be decreased to 0
       containerMetrics = getMetrics(XceiverClientMetrics.SOURCE_NAME);
       assertCounter("PendingOps", 0L, containerMetrics);
