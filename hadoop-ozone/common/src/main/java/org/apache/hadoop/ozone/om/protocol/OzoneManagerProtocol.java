@@ -1337,10 +1337,11 @@ public interface OzoneManagerProtocol
 
   /**
    * Revokes an STS token.
-   * @param sessionToken            The STS sessionToken
+   * @param tempAccessKeyId         The temporary access key ID to revoke
+   * @param originalAccessKeyId     The original long-lived access key ID that created the token
    * @throws IOException            if an error occurs while revoking the STS token
    */
-  default void revokeSTSToken(String sessionToken) throws IOException  {
+  default void revokeSTSToken(String tempAccessKeyId, String originalAccessKeyId) throws IOException  {
     throw new UnsupportedOperationException("OzoneManager does not require this to be implemented");
   }
 }

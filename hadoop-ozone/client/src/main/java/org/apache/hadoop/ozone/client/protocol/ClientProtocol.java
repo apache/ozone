@@ -1649,10 +1649,11 @@ public interface ClientProtocol {
 
   /**
    * Revokes an STS token.
-   * @param sessionToken            The STS sessionToken
+   * @param tempAccessKeyId         The temporary access key ID to revoke
+   * @param originalAccessKeyId     The original long-lived access key ID that created the token
    * @throws IOException            if an error occurs while revoking the STS token
    */
-  void revokeSTSToken(String sessionToken) throws IOException;
+  void revokeSTSToken(String tempAccessKeyId, String originalAccessKeyId) throws IOException;
 
   /**
    * Gets the lifecycle configuration information.
