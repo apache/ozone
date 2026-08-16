@@ -390,8 +390,9 @@ public class BucketEndpoint extends BucketOperationHandler {
       } catch (IOException ex) {
         getMetrics().updateDeleteKeyFailureStats(startNanos);
         final OMException omEx = (OMException) HddsClientUtils.containsException(ex, OMException.class);
-        if (omEx != null && S3ErrorTable.translateResultCode(omEx) == S3ErrorTable.ACCESS_DENIED) {
-          throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, omEx);
+        if (omEx != null) {
+          auditMultiDeleteFailure(context, deleteKeys, omEx);
+          throw newError(bucketName, omEx);
         }
         LOG.error("Delete key failed: {}", ex.getMessage());
         result.addError(
@@ -400,17 +401,22 @@ public class BucketEndpoint extends BucketOperationHandler {
       }
     }
 
-    AuditMessage.Builder message = auditMessageFor(context.getAction());
-    message.getParams().put("failedDeletes", deleteKeys.toString());
-
     if (!result.getErrors().isEmpty()) {
-      AUDIT.logWriteFailure(message.withResult(AuditEventStatus.FAILURE)
-          .withException(new Exception("MultiDelete Exception")).build());
+      auditMultiDeleteFailure(context, deleteKeys, new Exception("MultiDelete Exception"));
     } else {
+      AuditMessage.Builder message = auditMessageFor(context.getAction());
+      message.getParams().put("failedDeletes", deleteKeys.toString());
       AUDIT.logWriteSuccess(message.withResult(AuditEventStatus.SUCCESS).build());
     }
 
     return result;
+  }
+
+  void auditMultiDeleteFailure(S3RequestContext context, List<String> deleteKeys, Throwable ex) {
+    final AuditMessage.Builder message = auditMessageFor(context.getAction());
+    message.getParams().put("failedDeletes", deleteKeys.toString());
+    AUDIT.logWriteFailure(message.withResult(AuditEventStatus.FAILURE)
+        .withException(ex).build());
   }
 
   private void addKey(ListObjectResponse response, OzoneKey next, boolean includeOwner) {
