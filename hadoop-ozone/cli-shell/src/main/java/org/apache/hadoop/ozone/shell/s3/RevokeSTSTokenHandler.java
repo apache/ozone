@@ -29,18 +29,23 @@ import picocli.CommandLine.Option;
 /**
  * Executes revocation of STS tokens.
  *
- * <p>This command marks the specified STS token as revoked by adding it to the OM's revoked STS token table.
- * Subsequent S3 requests using the same session token will be rejected once the revocation
- * state has propagated.</p>
+ * <p>This command marks the specified STS access key pair as revoked by adding its revoke
+ * key to the OM's revoked STS token table. Subsequent S3 requests using the same temporary
+ * credentials will be rejected once the revocation state has propagated.</p>
  */
 @Command(name = "revokeststoken",
-    description = "Revoke S3 STS token for the given session token")
+    description = "Revoke S3 STS token for the given temporary and original access key IDs")
 public class RevokeSTSTokenHandler extends S3Handler {
 
-  @Option(names = "-t",
+  @Option(names = {"-t", "--temp-access-key-id"},
       required = true,
-      description = "STS session token")
-  private String sessionToken;
+      description = "Temporary access key ID to revoke")
+  private String tempAccessKeyId;
+
+  @Option(names = {"-o", "--original-access-key-id"},
+      required = true,
+      description = "Original long-lived access key ID that created the token")
+  private String originalAccessKeyId;
 
   @Option(names = "-y",
       description = "Continue without interactive user confirmation")
@@ -56,8 +61,9 @@ public class RevokeSTSTokenHandler extends S3Handler {
       throws IOException {
 
     if (!yes) {
-      out().print("Enter 'y' to confirm STS token revocation for sessionToken '" +
-          sessionToken + "': ");
+      out().print(
+          "Enter 'y' to confirm STS token revocation for tempAccessKeyId '" + tempAccessKeyId +
+          "' and originalAccessKeyId '" + originalAccessKeyId + "': ");
       out().flush();
       final Scanner scanner = new Scanner(new InputStreamReader(System.in, StandardCharsets.UTF_8));
       final String confirmation = scanner.next().trim().toLowerCase();
@@ -67,7 +73,9 @@ public class RevokeSTSTokenHandler extends S3Handler {
       }
     }
 
-    client.getObjectStore().revokeSTSToken(sessionToken);
-    out().println("STS token revoked for sessionToken '" + sessionToken + "'.");
+    client.getObjectStore().revokeSTSToken(tempAccessKeyId, originalAccessKeyId);
+    out().println(
+        "STS token revoked for tempAccessKeyId '" + tempAccessKeyId + "' and originalAccessKeyId '" +
+        originalAccessKeyId + "'.");
   }
 }
