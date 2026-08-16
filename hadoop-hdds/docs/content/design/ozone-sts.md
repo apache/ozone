@@ -146,9 +146,13 @@ credential will have the permissions and actions comprising the intersection of 
 
 In the rare event temporary credentials need to be revoked (ex. for security reasons), a table in the OzoneManager RocksDB will be created
 to store revoked tokens, and a command-line utility will be created to add tokens to the table.  A background cleaner service
-will be created to run every 3 hours to delete revoked tokens that have been in the table for more than 12 hours.  The
-input parameter for the command-line utility will be the sessionToken - this value is returned in plain text as a result 
-of the AssumeRole call (mentioned above).  In this way, specific STS tokens can be revoked as opposed to all tokens.  Furthermore, 
+will be created to run every 3 hours to delete revoked tokens that have been in the table for more than 12 hours. The
+command-line utility accepts `originalAccessKeyId` and `tempAccessKeyId`. The OM stores revocations by building a
+single key from these two values joined by an unescaped `|` delimiter, with `tempAccessKeyId` first:
+`tempAccessKeyId|originalAccessKeyId`. Because `tempAccessKeyId` is always `ASIA` followed by characters drawn only
+from `[0-9A-Z]`, it can never contain the `|` delimiter, so no escaping is needed even though `originalAccessKeyId`
+is unconstrained. In this way, specific STS tokens can be revoked as opposed
+to all tokens.  Furthermore,
 AWS doesn't have a standard API to revoke tokens therefore we are creating our own system.
 
 Additionally, if the Kerberos identity of the user that created the STS token is revoked via the `ozone s3 revokesecret`
@@ -221,7 +225,7 @@ created in Ranger as per the Prerequisites above.
 originalAccessKeyId in the session token and perform the following checks:
   - Ensure that if the accessKeyId starts with "ASIA", that a sessionToken was included in the `x-amz-security-token` header
   - Ensure the sessionToken is not expired
-  - Ensure the sessionToken is not revoked via a `keyMayExist` check in OzoneManager RocksDB
+  - Ensure the STS credentials are not revoked by looking up the revoke key in OzoneManager RocksDB
   - Validate the HMAC-SHA256 signature in the sessionToken
   - Decrypt the secretAccessKey from the sessionToken and validate the AWS signature
   - Authorize the call with either RangerOzoneAuthorizer or OzoneNativeAuthorizer
