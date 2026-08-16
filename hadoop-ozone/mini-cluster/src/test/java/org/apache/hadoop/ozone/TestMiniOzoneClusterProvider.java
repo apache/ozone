@@ -20,14 +20,20 @@ package org.apache.hadoop.ozone;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Queue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -78,6 +84,29 @@ class TestMiniOzoneClusterProvider {
     } finally {
       provider.shutdown();
     }
+  }
+
+  @Test
+  void shutdownDoesNotBlockWhenClusterCreationConsumesInterrupt()
+      throws Exception {
+    IOException failure = new IOException("failed");
+    MiniOzoneCluster cluster = mock(MiniOzoneCluster.class);
+    CountDownLatch readinessStarted = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      readinessStarted.countDown();
+      try {
+        new CountDownLatch(1).await();
+      } catch (InterruptedException ignored) {
+        // Simulate cluster creation consuming the shutdown interrupt.
+      }
+      return null;
+    }).when(cluster).waitForClusterToBeReady();
+    MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(
+        new TestBuilder(failure, cluster), 1);
+
+    assertTrue(readinessStarted.await(5, TimeUnit.SECONDS));
+    assertTimeoutPreemptively(Duration.ofSeconds(5), provider::shutdown);
+    verify(cluster).shutdown();
   }
 
   private static final class TestBuilder extends MiniOzoneCluster.Builder {

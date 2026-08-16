@@ -117,6 +117,7 @@ public class MiniOzoneClusterProvider {
   private static final int PRE_CREATE_LIMIT = 1;
   private static final int EXPIRED_LIMIT = 4;
   private volatile boolean shutdown = false;
+  private volatile boolean shutdownRequested = false;
   private final int clusterLimit;
   private int consumedClusterCount = 0;
 
@@ -173,6 +174,7 @@ public class MiniOzoneClusterProvider {
   }
 
   public synchronized void shutdown() throws InterruptedException {
+    shutdownRequested = true;
     createThread.interrupt();
     createThread.join();
     destroyRemainingClusters();
@@ -219,7 +221,10 @@ public class MiniOzoneClusterProvider {
           cluster = builder.build();
           cluster.waitForClusterToBeReady();
           createdCount++;
-          clusterResults.put(ClusterCreationResult.success(cluster));
+          if (!addClusterResult(ClusterCreationResult.success(cluster))) {
+            cluster.shutdown();
+            break;
+          }
         } catch (InterruptedException e) {
           if (cluster != null) {
             cluster.shutdown();
@@ -231,7 +236,9 @@ public class MiniOzoneClusterProvider {
             cluster.shutdown();
           }
           try {
-            clusterResults.put(ClusterCreationResult.failure(e));
+            if (!addClusterResult(ClusterCreationResult.failure(e))) {
+              break;
+            }
           } catch (InterruptedException interrupted) {
             break;
           }
@@ -241,6 +248,16 @@ public class MiniOzoneClusterProvider {
     t.setName("Mini-Cluster-Provider-Create");
     t.start();
     return t;
+  }
+
+  private boolean addClusterResult(ClusterCreationResult result)
+      throws InterruptedException {
+    while (!shutdownRequested) {
+      if (clusterResults.offer(result, 1, SECONDS)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void destroyRemainingClusters() {
