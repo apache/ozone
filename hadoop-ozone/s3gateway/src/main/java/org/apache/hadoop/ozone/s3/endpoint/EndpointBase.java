@@ -605,6 +605,14 @@ public abstract class EndpointBase {
     Map<String, String> auditMap = getAuditParameters();
     auditMap.put("x-amz-request-id", requestIdentifier.getRequestId());
     auditMap.put("x-amz-id-2", requestIdentifier.getAmzId());
+    if (s3Auth != null) {
+      // For STS temporary credentials, record the originalAccessKeyId (the permanent principal that
+      // created the token) so the audit trail is not limited to the opaque tempAccessKeyId.
+      final String originalAccessKeyId = AuditUtils.getStsOriginalAccessKeyId(s3Auth.getSessionToken());
+      if (originalAccessKeyId != null) {
+        auditMap.put("originalAccessKeyId", originalAccessKeyId);
+      }
+    }
 
     AuditMessage.Builder builder = new AuditMessage.Builder()
         .forOperation(op)
