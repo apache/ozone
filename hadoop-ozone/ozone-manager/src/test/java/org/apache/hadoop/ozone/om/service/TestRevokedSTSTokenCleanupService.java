@@ -75,13 +75,13 @@ public class TestRevokedSTSTokenCleanupService {
 
   @Test
   public void submitsCleanupRequestForOnlyExpiredTokens() throws Exception {
-    // If there are two revoked entries, one expired and one not expired, only the expired session token should be
-    // submitted for cleanup.
+    // If there are two revoked entries, one expired and one not expired, only the expired
+    // originalAccessKeyId should be submitted for cleanup.
     final long nowMillis = testClock.millis();
     final long expiredCreationTimeMillis = nowMillis - TimeUnit.HOURS.toMillis(13); // older than 12h threshold
     final long validCreationTimeMillis = nowMillis - TimeUnit.HOURS.toMillis(1);
-    revokedStsTokenTable.put("session-token-a", expiredCreationTimeMillis);
-    revokedStsTokenTable.put("session-token-b", validCreationTimeMillis);
+    revokedStsTokenTable.put("original-access-key-a", expiredCreationTimeMillis);
+    revokedStsTokenTable.put("original-access-key-b", validCreationTimeMillis);
 
     final AtomicReference<OMRequest> capturedRequest = new AtomicReference<>();
 
@@ -100,7 +100,7 @@ public class TestRevokedSTSTokenCleanupService {
 
       final DeleteRevokedSTSTokensRequest deleteRevokedSTSTokensRequest =
           omRequest.getDeleteRevokedSTSTokensRequest();
-      assertThat(deleteRevokedSTSTokensRequest.getSessionTokenList()).containsExactly("session-token-a");
+      assertThat(deleteRevokedSTSTokensRequest.getOriginalAccessKeyIdList()).containsExactly("original-access-key-a");
     }
   }
 
@@ -109,8 +109,8 @@ public class TestRevokedSTSTokenCleanupService {
     // If only non-expired entries exist in the revoked sts token table, no cleanup request should be submitted and
     // no metrics should be updated.
     final long nowMillis = testClock.millis();
-    revokedStsTokenTable.put("session-token-c", nowMillis - TimeUnit.HOURS.toMillis(1));
-    revokedStsTokenTable.put("session-token-d", nowMillis - TimeUnit.HOURS.toMillis(2));
+    revokedStsTokenTable.put("original-access-key-c", nowMillis - TimeUnit.HOURS.toMillis(1));
+    revokedStsTokenTable.put("original-access-key-d", nowMillis - TimeUnit.HOURS.toMillis(2));
 
     final AtomicReference<OMRequest> capturedRequest = new AtomicReference<>();
 
@@ -149,8 +149,8 @@ public class TestRevokedSTSTokenCleanupService {
     // If there are expired tokens in the table but the OM request submission to clean up the entries fails with a
     // service exception, the metrics should not be updated
     final long nowMillis = testClock.millis();
-    revokedStsTokenTable.put("session-token-e", nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put("session-token-f", nowMillis - TimeUnit.HOURS.toMillis(14));
+    revokedStsTokenTable.put("original-access-key-e", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("original-access-key-f", nowMillis - TimeUnit.HOURS.toMillis(14));
 
     final AtomicInteger submitAttempts = new AtomicInteger(0);
 
@@ -172,7 +172,7 @@ public class TestRevokedSTSTokenCleanupService {
     // If there is an expired token in the table but the OM request submission to clean up the entries gets a
     // non-successful response, the metrics should not be updated
     final long nowMillis = testClock.millis();
-    revokedStsTokenTable.put("session-token-f", nowMillis - TimeUnit.HOURS.toMillis(20));
+    revokedStsTokenTable.put("original-access-key-f", nowMillis - TimeUnit.HOURS.toMillis(20));
 
     try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
       // Return a non-successful response
@@ -190,9 +190,9 @@ public class TestRevokedSTSTokenCleanupService {
   public void handlesAllExpiredTokens() throws Exception {
     // If all the tokens in the table are expired on a particular run, ensure the metrics are updated appropriately
     final long nowMillis = testClock.millis();
-    revokedStsTokenTable.put("session-token-g", nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put("session-token-h", nowMillis - TimeUnit.HOURS.toMillis(14));
-    revokedStsTokenTable.put("session-token-i", nowMillis - TimeUnit.HOURS.toMillis(15));
+    revokedStsTokenTable.put("original-access-key-g", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("original-access-key-h", nowMillis - TimeUnit.HOURS.toMillis(14));
+    revokedStsTokenTable.put("original-access-key-i", nowMillis - TimeUnit.HOURS.toMillis(15));
 
     final AtomicReference<OMRequest> capturedRequest = new AtomicReference<>();
 
@@ -211,8 +211,8 @@ public class TestRevokedSTSTokenCleanupService {
 
       final DeleteRevokedSTSTokensRequest deleteRevokedSTSTokensRequest =
           omRequest.getDeleteRevokedSTSTokensRequest();
-      assertThat(deleteRevokedSTSTokensRequest.getSessionTokenList())
-          .containsExactlyInAnyOrder("session-token-g", "session-token-h", "session-token-i");
+      assertThat(deleteRevokedSTSTokensRequest.getOriginalAccessKeyIdList())
+          .containsExactlyInAnyOrder("original-access-key-g", "original-access-key-h", "original-access-key-i");
     }
   }
 
@@ -221,9 +221,9 @@ public class TestRevokedSTSTokenCleanupService {
     // If the tokens exceed the configured batch size, multiple requests should be submitted
     final long nowMillis = testClock.millis();
 
-    // Create 10 expired tokens
+    // Create 10 expired originalAccessKeyIds
     for (int i = 0; i < 10; i++) {
-      revokedStsTokenTable.put("session-token-" + i, nowMillis - TimeUnit.HOURS.toMillis(13));
+      revokedStsTokenTable.put(String.format("AKIA%07d", i), nowMillis - TimeUnit.HOURS.toMillis(13));
     }
 
     // Set a very small ratisByteLimit (100 bytes) to force batching. A single token request will be small, but 10
@@ -245,7 +245,7 @@ public class TestRevokedSTSTokenCleanupService {
 
       // Verify all tokens were included across the requests
       final int totalTokens = capturedRequests.stream()
-          .mapToInt(r -> r.getDeleteRevokedSTSTokensRequest().getSessionTokenList().size())
+          .mapToInt(r -> r.getDeleteRevokedSTSTokensRequest().getOriginalAccessKeyIdList().size())
           .sum();
       assertThat(totalTokens).isEqualTo(10);
       assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(10);
@@ -254,7 +254,7 @@ public class TestRevokedSTSTokenCleanupService {
 
   @Test
   public void testSingleOversizedExpiredTokenAndItIsTheOnlyExpiredToken() throws Exception {
-    // One sessionToken is larger than the ratisByteLimit, and it is the only expired token
+    // One originalAccessKeyId is larger than the ratisByteLimit, and it is the only expired entry
     final long nowMillis = testClock.millis();
     // Serialized size for largeToken is 102 > 90 (the effective ratisByteLimit) .
     final String largeToken = new String(new char[100]).replace('\0', 'a');
@@ -279,10 +279,10 @@ public class TestRevokedSTSTokenCleanupService {
 
   @Test
   public void testSingleOversizedExpiredTokenAndThereAreMultipleExpiredTokens() throws Exception {
-    // One sessionToken is larger than the ratisByteLimit, and it is not the only expired token
+    // One originalAccessKeyId is larger than the ratisByteLimit, and it is not the only expired entry
     final long nowMillis = testClock.millis();
-    final String smallToken = "session-token-j";
-    final String largeToken = "session-token-k-" + new String(new char[90]).replace('\0', 'a'); // > 90 bytes
+    final String smallToken = "AKIASMALL01";
+    final String largeToken = "AKIALARGE-" + new String(new char[90]).replace('\0', 'a'); // > 90 bytes
 
     revokedStsTokenTable.put(smallToken, nowMillis - TimeUnit.HOURS.toMillis(13));
     revokedStsTokenTable.put(largeToken, nowMillis - TimeUnit.HOURS.toMillis(13));
@@ -308,9 +308,9 @@ public class TestRevokedSTSTokenCleanupService {
     // Expired and non-expired entries with ratisByteLimit of 100
     final long nowMillis = testClock.millis();
 
-    revokedStsTokenTable.put("session-token-l", nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put("session-token-m", nowMillis - TimeUnit.HOURS.toMillis(1)); // Should be skipped
-    revokedStsTokenTable.put("session-token-n", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("original-access-key-l", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("original-access-key-m", nowMillis - TimeUnit.HOURS.toMillis(1)); // Should be skipped
+    revokedStsTokenTable.put("original-access-key-n", nowMillis - TimeUnit.HOURS.toMillis(13));
 
     ozoneConfiguration.setStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
@@ -323,10 +323,11 @@ public class TestRevokedSTSTokenCleanupService {
       final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
 
       assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
-      // session-token-l and session-token-n fit in one batch.  session-token-m is ignored because it is not expired.
+      // original-access-key-l and original-access-key-n fit in one batch.
+      // original-access-key-m is ignored because it is not expired.
       assertThat(capturedRequests).hasSize(1);
-      assertThat(capturedRequests.get(0).getDeleteRevokedSTSTokensRequest().getSessionTokenList())
-          .containsExactly("session-token-l", "session-token-n");
+      assertThat(capturedRequests.get(0).getDeleteRevokedSTSTokensRequest().getOriginalAccessKeyIdList())
+          .containsExactly("original-access-key-l", "original-access-key-n");
       assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(2);
     }
   }
@@ -359,12 +360,12 @@ public class TestRevokedSTSTokenCleanupService {
   public void testCallIdCountIncreasesAcrossBatches() throws Exception {
     // Force small batch of 40 bytes (which should trigger multiple calls to OzoneManagerRatisUtils.submitRequest)
     // and ensure the callIdCount increases across each batch
-    // session-token-1 and session-token-2 are in first batch, and session-token-3 is in second batch.
+    // AKIA0000001 and AKIA0000002 are in first batch, and AKIA0000003 is in second batch.
     final long nowMillis = testClock.millis();
 
-    revokedStsTokenTable.put("session-token-1", nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put("session-token-2", nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put("session-token-3", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("AKIA0000001", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("AKIA0000002", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("AKIA0000003", nowMillis - TimeUnit.HOURS.toMillis(13));
 
     ozoneConfiguration.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 40, StorageUnit.BYTES);
 

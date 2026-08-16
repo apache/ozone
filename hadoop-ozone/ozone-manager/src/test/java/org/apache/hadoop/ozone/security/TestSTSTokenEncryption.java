@@ -76,12 +76,21 @@ public class TestSTSTokenEncryption {
     final String roleArn = "arn:aws:iam::123456789012:role/TestRole";
     final String secretAccessKey = "mySecretAccessKey123456";
     // Use millisecond precision to match serialization format
-    final Instant expiry = Instant.ofEpochMilli(Instant.now().plusSeconds(3600).toEpochMilli());
+    final Instant creationTime = Instant.ofEpochMilli(1_700_000_000_000L);
+    final Instant expiry = creationTime.plusSeconds(3600);
     final String sessionPolicy = "test-session-policy";
-    
+
     // Create token identifier with encryption
-    final STSTokenIdentifier tokenId = new STSTokenIdentifier(
-        tempAccessKeyId, originalAccessKeyId, roleArn, expiry, secretAccessKey, sessionPolicy, keyBytes);
+    final STSTokenIdentifier tokenId = new STSTokenIdentifier(STSTokenIdentifier.Params.newBuilder()
+        .setTempAccessKeyId(tempAccessKeyId)
+        .setOriginalAccessKeyId(originalAccessKeyId)
+        .setRoleArn(roleArn)
+        .setCreationTime(creationTime)
+        .setExpiry(expiry)
+        .setSecretAccessKey(secretAccessKey)
+        .setSessionPolicy(sessionPolicy)
+        .setEncryptionKey(keyBytes)
+        .build());
     tokenId.setSecretKeyId(UUID.randomUUID());
     
     // Convert to protobuf
@@ -100,6 +109,7 @@ public class TestSTSTokenEncryption {
     assertEquals(roleArn, decodedTokenId.getRoleArn());
     assertEquals(secretAccessKey, decodedTokenId.getSecretAccessKey());
     assertEquals(expiry, decodedTokenId.getExpiry());
+    assertEquals(creationTime, decodedTokenId.getCreationTime());
   }
   
   @Test

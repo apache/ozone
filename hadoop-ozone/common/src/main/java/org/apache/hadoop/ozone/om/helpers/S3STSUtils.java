@@ -40,6 +40,12 @@ public final class S3STSUtils {
   // AWS limit for session policy is 2048 characters
   public static final int MAX_SESSION_POLICY_LENGTH = 2048;
 
+  public static final String STS_TOKEN_PREFIX = "ASIA";
+  public static final String STS_ACCESS_KEY_ID_ALLOWED_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  public static final int STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH = STS_ACCESS_KEY_ID_ALLOWED_CHARS.length();
+  public static final int STS_ACCESS_KEY_ID_RANDOM_LENGTH = 20;
+  public static final int STS_ACCESS_KEY_ID_LENGTH = STS_TOKEN_PREFIX.length() + STS_ACCESS_KEY_ID_RANDOM_LENGTH;
+
   private S3STSUtils() {
   }
 

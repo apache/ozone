@@ -36,10 +36,16 @@ import java.util.Map;
 import java.util.stream.Stream;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
+import org.apache.hadoop.security.token.Token;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -49,6 +55,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Test methods of the EndpointBase.
  */
 public class TestEndpointBase {
+  private static final String ORIGINAL_ACCESS_KEY_ID_PARAM = "originalAccessKeyId";
 
   /**
    * Verify s3 metadata key "gdprEnabled" can't be set up directly
@@ -147,6 +154,38 @@ public class TestEndpointBase {
   }
 
   @Test
+  public void testAuditMessageIncludesStsOriginalAccessKeyId() throws Exception {
+    final String originalAccessKeyId = "AKIAORIGINAL123";
+    final OMTokenProto proto = OMTokenProto.newBuilder()
+        .setType(OMTokenProto.Type.S3_STS_TOKEN)
+        .setOriginalAccessKeyId(originalAccessKeyId)
+        .build();
+    final SignatureInfo signatureInfo = new SignatureInfo.Builder(SignatureInfo.Version.V4)
+        .setAwsAccessId("ASIAEXAMPLE123")
+        .setSignature("signature")
+        .setStringToSign("string-to-sign")
+        .setSessionToken(encodeSessionToken(proto))
+        .build();
+    final AuditEndpoint endpointBase = newAuditEndpoint(signatureInfo);
+
+    assertThat(endpointBase.auditMessageForTest().getParams())
+        .containsEntry(ORIGINAL_ACCESS_KEY_ID_PARAM, originalAccessKeyId);
+  }
+
+  @Test
+  public void testAuditMessageOmitsStsOriginalAccessKeyIdForNonStsRequest() {
+    final SignatureInfo signatureInfo = new SignatureInfo.Builder(SignatureInfo.Version.V4)
+        .setAwsAccessId("AKIAEXAMPLE123")
+        .setSignature("signature")
+        .setStringToSign("string-to-sign")
+        .build();
+    final AuditEndpoint endpointBase = newAuditEndpoint(signatureInfo);
+
+    assertThat(endpointBase.auditMessageForTest().getParams())
+        .doesNotContainKey(ORIGINAL_ACCESS_KEY_ID_PARAM);
+  }
+
+  @Test
   public void testListS3BucketsHandlesRuntimeExceptionWrappingOMException() throws Exception {
     final EndpointBase endpointBase = new EndpointBase() {
       @Override
@@ -207,6 +246,24 @@ public class TestEndpointBase {
     return Stream.of(
         RESERVED_USER_METADATA_KEY_PREFIX + "cache-control",
         RESERVED_USER_METADATA_KEY_PREFIX.toUpperCase(Locale.ROOT) + "cache-control");
+  }
+
+  private static String encodeSessionToken(OMTokenProto proto) throws Exception {
+    final Token<?> token = new Token<>(
+        proto.toByteArray(), new byte[0], new Text("OzoneToken"), new Text("sts"));
+    return token.encodeToUrlString();
+  }
+
+  private static AuditEndpoint newAuditEndpoint(SignatureInfo signatureInfo) {
+    return new EndpointBuilder<>(AuditEndpoint::new)
+        .setSignatureInfo(signatureInfo)
+        .build();
+  }
+
+  private static final class AuditEndpoint extends EndpointBase {
+    private AuditMessage.Builder auditMessageForTest() {
+      return auditMessageFor(S3GAction.GET_KEY);
+    }
   }
 
 }
