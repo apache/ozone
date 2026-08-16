@@ -333,6 +333,7 @@ message OMRequest {
   optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 155;
   optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 156;
   optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 157;
+  optional UpdateRevokeSTSTokenRequest      updateRevokeSTSTokenRequest    = 158;
 }
 
 message OMResponse {
@@ -2534,18 +2535,27 @@ message UpdateAssumeRoleRequest {
 }
 
 message RevokeSTSTokenRequest {
-    required string sessionToken = 1;
+  required string originalAccessKeyId = 1;
+}
+
+/**
+  This request will be used internally by OM to replicate the revocation cutoff captured by the leader
+  across the OMs in HA mode.
+*/
+message UpdateRevokeSTSTokenRequest {
+  required string originalAccessKeyId = 1;
+  required uint64 revocationTimeMillis = 2;
 }
 
 message RevokeSTSTokenResponse {
 }
 
 /**
- This will contain a list of revoked STS session tokens whose entries should be removed from
+ This will contain a list of originalAccessKeyIds whose revocation entries should be removed from
  the s3RevokedStsTokenTable.
 */
 message DeleteRevokedSTSTokensRequest {
-  repeated string sessionToken = 1;
+  repeated string originalAccessKeyId = 1;
 }
 
 message DeleteRevokedSTSTokensResponse {
