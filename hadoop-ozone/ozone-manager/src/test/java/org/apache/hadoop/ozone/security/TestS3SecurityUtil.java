@@ -188,12 +188,13 @@ public class TestS3SecurityUtil {
       }
 
       final String sessionToken = "session-token";
+      final STSTokenIdentifier stsTokenIdentifier = createSTSTokenIdentifier();
+      final String revokedStsTokenKey = STSSecurityUtil.buildRevokedStsTokenKey(
+          stsTokenIdentifier.getTempAccessKeyId(), stsTokenIdentifier.getOriginalAccessKeyId());
       if (config.isTokenRevoked && config.revokedSTSTokenTable != null) {
         final long insertionTimeMillis = CLOCK.millis();
-        config.revokedSTSTokenTable.put(sessionToken, insertionTimeMillis);
+        config.revokedSTSTokenTable.put(revokedStsTokenKey, insertionTimeMillis);
       }
-
-      final STSTokenIdentifier stsTokenIdentifier = createSTSTokenIdentifier();
 
       try (MockedStatic<STSSecurityUtil> stsSecurityUtilMock = mockStatic(STSSecurityUtil.class, CALLS_REAL_METHODS);
            MockedStatic<AWSV4AuthValidator> awsV4AuthValidatorMock = mockStatic(

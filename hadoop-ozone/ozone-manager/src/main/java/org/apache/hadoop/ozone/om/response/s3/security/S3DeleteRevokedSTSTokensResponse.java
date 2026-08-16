@@ -36,16 +36,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 @CleanupTableInfo(cleanupTables = {S3_REVOKED_STS_TOKEN_TABLE})
 public class S3DeleteRevokedSTSTokensResponse extends OMClientResponse {
 
-  private final List<String> sessionTokens;
+  private final List<String> revokedStsTokenKeys;
 
-  public S3DeleteRevokedSTSTokensResponse(List<String> sessionTokens, @Nonnull OMResponse omResponse) {
+  public S3DeleteRevokedSTSTokensResponse(List<String> revokedStsTokenKeys, @Nonnull OMResponse omResponse) {
     super(omResponse);
-    this.sessionTokens = sessionTokens;
+    this.revokedStsTokenKeys = revokedStsTokenKeys;
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager, BatchOperation batchOperation) throws IOException {
-    if (sessionTokens == null || sessionTokens.isEmpty()) {
+    if (revokedStsTokenKeys == null || revokedStsTokenKeys.isEmpty()) {
       return;
     }
     if (!getOMResponse().hasStatus() || getOMResponse().getStatus() != OK) {
@@ -57,8 +57,8 @@ public class S3DeleteRevokedSTSTokensResponse extends OMClientResponse {
       return;
     }
 
-    for (String sessionToken : sessionTokens) {
-      table.deleteWithBatch(batchOperation, sessionToken);
+    for (String revokedStsTokenKey : revokedStsTokenKeys) {
+      table.deleteWithBatch(batchOperation, revokedStsTokenKey);
     }
   }
 }

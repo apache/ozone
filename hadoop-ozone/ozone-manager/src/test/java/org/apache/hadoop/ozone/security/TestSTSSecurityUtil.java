@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.security;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -124,6 +125,16 @@ public class TestSTSSecurityUtil {
         STSSecurityUtil.constructValidateAndDecryptSTSToken("invalid-token-format", secretKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessageContaining("Invalid STS token format: Failed to decode STS token string");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenRuntimeDecodeFailure() {
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken("not-a-valid-token", secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(INVALID_TOKEN))
+        .hasMessageContaining("Invalid STS token format: Failed to decode STS token string")
+        .hasMessageContaining("NegativeArraySizeException");
   }
 
   @Test
@@ -303,7 +314,8 @@ public class TestSTSSecurityUtil {
     assertThatThrownBy(() ->
         STSSecurityUtil.constructValidateAndDecryptSTSToken("", secretKeyClient, clock))
         .isInstanceOf(OMException.class)
-        .hasMessage("Invalid STS token format: Failed to decode STS token string: java.io.EOFException");
+        .hasMessage(
+            "Invalid STS token format: Failed to decode STS token string: java.io.EOFException for encodedToken: ");
   }
 
   @Test
@@ -376,6 +388,25 @@ public class TestSTSSecurityUtil {
     assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
         .isInstanceOf(SecretManager.InvalidToken.class)
         .hasMessage("Invalid STS token - secretAccessKey is null/empty");
+  }
+
+  @Test
+  public void testBuildRevokedStsTokenKeyPutsTempAccessKeyIdFirst() {
+    final String tempAccessKeyId = "ASIAABCDEFGHIJKLMNOP";
+    final String originalAccessKeyId = "orig|inal\\access";
+    final String revokedStsTokenKey = STSSecurityUtil.buildRevokedStsTokenKey(tempAccessKeyId, originalAccessKeyId);
+
+    assertThat(revokedStsTokenKey).isEqualTo(tempAccessKeyId + "|" + originalAccessKeyId);
+  }
+
+  @Test
+  public void testBuildRevokedStsTokenKeyRejectsEmptyComponents() {
+    assertThatThrownBy(() -> STSSecurityUtil.buildRevokedStsTokenKey("", "orig"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("tempAccessKeyId is null or empty");
+    assertThatThrownBy(() -> STSSecurityUtil.buildRevokedStsTokenKey("temp", ""))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("originalAccessKeyId is null or empty");
   }
 
   @Test

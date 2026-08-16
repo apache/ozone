@@ -35,6 +35,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
 /**
  * Handles DeleteRevokedSTSTokens requests submitted by {@link RevokedSTSTokenCleanupService}.
+ * Each request contains revoked STS token keys to remove from the revocation table.
  */
 public class S3DeleteRevokedSTSTokensRequest extends OMClientRequest {
 
@@ -62,8 +63,8 @@ public class S3DeleteRevokedSTSTokensRequest extends OMClientRequest {
     final DeleteRevokedSTSTokensRequest request = getOmRequest().getDeleteRevokedSTSTokensRequest();
     final OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
-    final List<String> sessionTokens = request.getSessionTokenList();
-    return new S3DeleteRevokedSTSTokensResponse(sessionTokens, omResponse.build());
+    final List<String> revokedStsTokenKeys = request.getRevokedStsTokenKeyList();
+    return new S3DeleteRevokedSTSTokensResponse(revokedStsTokenKeys, omResponse.build());
   }
 }
 

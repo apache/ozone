@@ -143,17 +143,17 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
         iterator.seekToFirst();
         while (iterator.hasNext()) {
           final Table.KeyValue<String, Long> entry = iterator.next();
-          final String sessionToken = entry.getKey();
+          final String revokedStsTokenKey = entry.getKey();
           final Long initialCreationTimeMillis = entry.getValue();
 
           if (shouldCleanup(initialCreationTimeMillis)) {
-            // Calculate the size this token would add to the protobuf message.
+            // Calculate the size this revoked key would add to the protobuf message.
             // Make a copy of the batch to do the size check
             final List<String> batchCopyWithCandidate = new ArrayList<>(batch);
-            batchCopyWithCandidate.add(sessionToken);
+            batchCopyWithCandidate.add(revokedStsTokenKey);
             int batchWithCandidateSize = getBatchSerializedSize(batchCopyWithCandidate);
 
-            // If adding this token would exceed the limit, submit the current batch
+            // If adding this revoked key would exceed the limit, submit the current batch
             if (batchWithCandidateSize > ratisByteLimit) {
               if (!batch.isEmpty()) {
                 if (submitCleanupRequest(batch)) {
@@ -163,22 +163,22 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
                 }
                 batch.clear();
 
-                // Re-calculate the size of the candidate token alone in an empty batch
+                // Re-calculate the size of the candidate key alone in an empty batch
                 // to check if it exceeds the limit by itself.
                 final List<String> singleCandidateBatch = new ArrayList<>();
-                singleCandidateBatch.add(sessionToken);
+                singleCandidateBatch.add(revokedStsTokenKey);
                 batchWithCandidateSize = getBatchSerializedSize(singleCandidateBatch);
               }
 
-              // Check if the single token exceeds the limit (either strictly single or after flush)
+              // Check if the single key exceeds the limit (either strictly single or after flush)
               if (batchWithCandidateSize > ratisByteLimit) {
                 LOG.error(
-                    "Single revoked STS Token size ({}) would exceed the ratisByteLimit ({}). SessionToken " +
+                    "Single revoked STS token key size ({}) would exceed the ratisByteLimit ({}). " +
                     "initialCreationTimeMillis: {}", batchWithCandidateSize, ratisByteLimit, initialCreationTimeMillis);
                 continue;
               }
             }
-            batch.add(sessionToken);
+            batch.add(revokedStsTokenKey);
           }
         }
       } catch (IOException e) {
@@ -213,7 +213,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
     }
 
     /**
-     * Returns true if the given STS session token has been in the table past the cleanup threshold.
+     * Returns true if the given revoked STS token key has been in the table past the cleanup threshold.
      */
     private boolean shouldCleanup(long initialCreationTimeMillis) {
       final long now = CLOCK.millis();
@@ -230,11 +230,11 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
     }
 
     /**
-     * Builds and submits an OMRequest to delete the provided revoked STS token(s).
+     * Builds and submits an OMRequest to delete the provided revoked STS token key(s).
      */
-    private boolean submitCleanupRequest(List<String> sessionTokens) {
+    private boolean submitCleanupRequest(List<String> revokedStsTokenKeys) {
       final DeleteRevokedSTSTokensRequest request = DeleteRevokedSTSTokensRequest.newBuilder()
-          .addAllSessionToken(sessionTokens)
+          .addAllRevokedStsTokenKey(revokedStsTokenKeys)
           .build();
 
       final OMRequest omRequest = OMRequest.newBuilder()
@@ -254,9 +254,9 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
       }
     }
 
-    private int getBatchSerializedSize(List<String> sessionTokenBatch) {
+    private int getBatchSerializedSize(List<String> revokedStsTokenKeyBatch) {
       final DeleteRevokedSTSTokensRequest request = DeleteRevokedSTSTokensRequest.newBuilder()
-          .addAllSessionToken(sessionTokenBatch)
+          .addAllRevokedStsTokenKey(revokedStsTokenKeyBatch)
           .build();
 
       return request.getSerializedSize();

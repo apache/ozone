@@ -100,7 +100,7 @@ public class TestRevokedSTSTokenCleanupService {
 
       final DeleteRevokedSTSTokensRequest deleteRevokedSTSTokensRequest =
           omRequest.getDeleteRevokedSTSTokensRequest();
-      assertThat(deleteRevokedSTSTokensRequest.getSessionTokenList()).containsExactly("session-token-a");
+      assertThat(deleteRevokedSTSTokensRequest.getRevokedStsTokenKeyList()).containsExactly("session-token-a");
     }
   }
 
@@ -211,7 +211,7 @@ public class TestRevokedSTSTokenCleanupService {
 
       final DeleteRevokedSTSTokensRequest deleteRevokedSTSTokensRequest =
           omRequest.getDeleteRevokedSTSTokensRequest();
-      assertThat(deleteRevokedSTSTokensRequest.getSessionTokenList())
+      assertThat(deleteRevokedSTSTokensRequest.getRevokedStsTokenKeyList())
           .containsExactlyInAnyOrder("session-token-g", "session-token-h", "session-token-i");
     }
   }
@@ -245,7 +245,7 @@ public class TestRevokedSTSTokenCleanupService {
 
       // Verify all tokens were included across the requests
       final int totalTokens = capturedRequests.stream()
-          .mapToInt(r -> r.getDeleteRevokedSTSTokensRequest().getSessionTokenList().size())
+          .mapToInt(r -> r.getDeleteRevokedSTSTokensRequest().getRevokedStsTokenKeyList().size())
           .sum();
       assertThat(totalTokens).isEqualTo(10);
       assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(10);
@@ -325,7 +325,7 @@ public class TestRevokedSTSTokenCleanupService {
       assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
       // session-token-l and session-token-n fit in one batch.  session-token-m is ignored because it is not expired.
       assertThat(capturedRequests).hasSize(1);
-      assertThat(capturedRequests.get(0).getDeleteRevokedSTSTokensRequest().getSessionTokenList())
+      assertThat(capturedRequests.get(0).getDeleteRevokedSTSTokensRequest().getRevokedStsTokenKeyList())
           .containsExactly("session-token-l", "session-token-n");
       assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(2);
     }

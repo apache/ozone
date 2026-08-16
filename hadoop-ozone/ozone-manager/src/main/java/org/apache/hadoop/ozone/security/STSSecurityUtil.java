@@ -43,6 +43,8 @@ import org.apache.hadoop.security.token.Token;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public final class STSSecurityUtil {
+  private static final char REVOKED_STS_TOKEN_KEY_SEPARATOR = '|';
+
   private STSSecurityUtil() {
   }
 
@@ -157,8 +159,9 @@ public final class STSSecurityUtil {
     try {
       token.decodeFromUrlString(encodedToken);
       return token;
-    } catch (IOException e) {
-      throw new SecretManager.InvalidToken("Failed to decode STS token string: " + e);
+    } catch (IOException | RuntimeException e) {
+      throw new SecretManager.InvalidToken(
+          "Failed to decode STS token string: " + e + " for encodedToken: " + encodedToken);
     }
   }
 
@@ -219,6 +222,29 @@ public final class STSSecurityUtil {
         !s3Auth.hasResolvedStsSecretKeyId()) {
       throw new OMException("Resolved STS fields must be present when sessionToken is present", INVALID_TOKEN);
     }
+  }
+
+  /**
+   * Builds the canonical revoked STS token key:
+   * <pre>
+   * tempAccessKeyId + "|" + originalAccessKeyId
+   * </pre>
+   *
+   * <p>{@code tempAccessKeyId} is always {@code "ASIA"} followed by characters drawn only from
+   * {@code [0-9A-Z]} (see {@code S3AssumeRoleRequest}), so it can never contain the {@code |}
+   * delimiter. Placing it first therefore makes the mapping from
+   * {@code (tempAccessKeyId, originalAccessKeyId)} to key workable without any escaping, even
+   * though {@code originalAccessKeyId} is unconstrained and may itself contain {@code |}.
+   */
+  public static String buildRevokedStsTokenKey(String tempAccessKeyId, String originalAccessKeyId) {
+    if (StringUtils.isEmpty(tempAccessKeyId)) {
+      throw new IllegalArgumentException("tempAccessKeyId is null or empty");
+    }
+    if (StringUtils.isEmpty(originalAccessKeyId)) {
+      throw new IllegalArgumentException("originalAccessKeyId is null or empty");
+    }
+
+    return tempAccessKeyId + REVOKED_STS_TOKEN_KEY_SEPARATOR + originalAccessKeyId;
   }
 }
 
