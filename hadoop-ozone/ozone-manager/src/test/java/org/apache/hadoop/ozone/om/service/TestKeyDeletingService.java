@@ -339,6 +339,44 @@ class TestKeyDeletingService extends OzoneTestBase {
     }
 
     @Test
+    void checkPurgedBytesMatchBlocksQueuedForDeletion() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String keyName = uniqueObjectName("key");
+      final long initialDeletedCount = getDeletedKeyCount();
+
+      // Versioning keeps both committed versions on the key, so the delete entry spans two version groups.
+      createVolumeAndBucket(volumeName, bucketName, true);
+
+      keyDeletingService.suspend();
+      OmKeyArgs keyArgs = createAndCommitKey(volumeName, bucketName, keyName, 1);
+      createAndCommitKey(volumeName, bucketName, keyName, 3);
+      writeClient.deleteKey(keyArgs);
+      // The delete has to reach RocksDB before getPendingDeletionKeys() can see it.
+      om.awaitDoubleBufferFlush();
+
+      Map<String, PurgedKey> purgedKeys =
+          keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE).getPurgedKeys();
+      assertThat(purgedKeys).isNotEmpty();
+
+      for (PurgedKey purgedKey : purgedKeys.values()) {
+        assertEquals(4, purgedKey.getBlockGroup().getDeletedBlocks().size(),
+            "both committed versions must be queued for deletion");
+        long blockSum = purgedKey.getBlockGroup().getDeletedBlocks().stream()
+            .mapToLong(DeletedBlock::getReplicatedSize)
+            .sum();
+        assertEquals(blockSum, purgedKey.getPurgedBytes(),
+            "purged bytes must cover exactly the blocks queued for deletion");
+      }
+
+      // Drain the key so it does not remain pending for the next test.
+      keyDeletingService.resume();
+      GenericTestUtils.waitFor(
+          () -> getDeletedKeyCount() >= initialDeletedCount + 1,
+          1000, 10000);
+    }
+
+    @Test
     void checkDeletedTableCleanUpForSnapshot() throws Exception {
       final String volumeName = getTestName();
       final String bucketName1 = uniqueObjectName("bucket");
