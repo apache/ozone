@@ -887,9 +887,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   public static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
     for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
-        bytesUsed += QuotaUtil.getReplicatedSize(
-            locationInfo.getLength(), omKeyInfo.getReplicationConfig());
+      for (List<OmKeyLocationInfo> locationInfoList : group.getLocationLists()) {
+        for (OmKeyLocationInfo locationInfo : locationInfoList) {
+          bytesUsed += QuotaUtil.getReplicatedSize(
+              locationInfo.getLength(), omKeyInfo.getReplicationConfig());
+        }
       }
     }
 
