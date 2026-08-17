@@ -93,7 +93,7 @@ public class TestBlockDeletionService {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(9)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setApparentVersion(HBASE_SUPPORT.serialize()).build())
+            .setApparentVersion(HBASE_SUPPORT).build())
         .build();
     cluster.waitForClusterToBeReady();
     scmClient = cluster.getStorageContainerLocationClient();

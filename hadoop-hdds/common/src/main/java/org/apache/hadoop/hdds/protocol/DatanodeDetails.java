@@ -87,8 +87,8 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   private String revision;
   private volatile HddsProtos.NodeOperationalState persistedOpState;
   private volatile long persistedOpStateExpiryEpochSec;
-  private int initialVersion;
-  private int currentVersion;
+  private HDDSVersion initialVersion;
+  private HDDSVersion currentVersion;
 
   private DatanodeDetails(Builder b) {
     super(b.hostName, b.networkLocation, NetConstants.NODE_COST_DEFAULT);
@@ -463,10 +463,10 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
           datanodeDetailsProto.getPersistedOpStateExpiry());
     }
     if (datanodeDetailsProto.hasCurrentVersion()) {
-      builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
+      builder.setCurrentVersion(HDDSVersion.deserialize(datanodeDetailsProto.getCurrentVersion()));
     } else {
       // fallback to version 1 if not present
-      builder.setCurrentVersion(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.serialize());
+      builder.setCurrentVersion(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
     }
     return builder;
   }
@@ -603,7 +603,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       }
     }
 
-    builder.setCurrentVersion(versionOverride != null ? versionOverride.serialize() : currentVersion);
+    builder.setCurrentVersion(versionOverride != null ? versionOverride.serialize() : currentVersion.serialize());
 
     return builder;
   }
@@ -635,22 +635,22 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    * Note: Datanode initial version is not passed to the client due to no use case. See HDDS-9884
    * @return the version this datanode was initially created with
    */
-  public int getInitialVersion() {
+  public HDDSVersion getInitialVersion() {
     return initialVersion;
   }
 
-  public void setInitialVersion(int initialVersion) {
+  public void setInitialVersion(HDDSVersion initialVersion) {
     this.initialVersion = initialVersion;
   }
 
   /**
    * @return the version this datanode was last started with
    */
-  public int getCurrentVersion() {
+  public HDDSVersion getCurrentVersion() {
     return currentVersion;
   }
 
-  public void setCurrentVersion(int currentVersion) {
+  public void setCurrentVersion(HDDSVersion currentVersion) {
     this.currentVersion = currentVersion;
   }
 
@@ -734,8 +734,8 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     private String revision;
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
-    private int initialVersion;
-    private int currentVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
+    private HDDSVersion initialVersion = HDDSVersion.DEFAULT_VERSION;
+    private HDDSVersion currentVersion = HDDSVersion.DEFAULT_VERSION;
 
     /**
      * Default private constructor. To create Builder instance use
@@ -951,12 +951,12 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       return this;
     }
 
-    public Builder setInitialVersion(int v) {
+    public Builder setInitialVersion(HDDSVersion v) {
       this.initialVersion = v;
       return this;
     }
 
-    public Builder setCurrentVersion(int v) {
+    public Builder setCurrentVersion(HDDSVersion v) {
       this.currentVersion = v;
       return this;
     }

@@ -59,11 +59,11 @@ public class TestDatanodeDetails {
     Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
         .collect(Collectors.toSet());
     HddsProtos.DatanodeDetailsProto proto =
-        subject.toProto(ClientVersion.deserialize(subject.getCurrentVersion()), requiredPorts);
+        subject.toProto(ClientVersion.CURRENT, requiredPorts);
     assertPorts(proto, ImmutableSet.copyOf(requiredPorts));
 
     HddsProtos.DatanodeDetailsProto ioPortProto =
-        subject.toProto(ClientVersion.deserialize(subject.getCurrentVersion()), Name.IO_PORTS);
+        subject.toProto(ClientVersion.CURRENT, Name.IO_PORTS);
     assertPorts(ioPortProto, ImmutableSet.copyOf(Name.IO_PORTS));
   }
 
@@ -79,14 +79,13 @@ public class TestDatanodeDetails {
     protoBuilder.clearCurrentVersion();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
     assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE,
-        HDDSVersion.deserialize(dn2.getCurrentVersion()));
+        dn2.getCurrentVersion());
 
     // test that if the current version is set, it is used
-    protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION, requiredPorts);
+    protoBuilder = dn.toProtoBuilder(DEFAULT_VERSION, requiredPorts);
+    protoBuilder.setCurrentVersion(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize());
     DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.SOFTWARE_VERSION,
-        HDDSVersion.deserialize(dn3.getCurrentVersion()));
+    assertEquals(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC, dn3.getCurrentVersion());
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,

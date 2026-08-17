@@ -68,9 +68,6 @@ import org.junit.jupiter.api.Test;
  */
 class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
-  /** The version each source datanode reports as its own software version. */
-  private static final int SOFTWARE_VERSION = HDDSVersion.SOFTWARE_VERSION.serialize();
-
   private ScmBlockLocationProtocol impl;
   private NodeManager nodeManager;
   private ScmVersionManager versionManager;
@@ -87,7 +84,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     nodes = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
       DatanodeDetails dn = randomDatanodeDetails();
-      dn.setCurrentVersion(SOFTWARE_VERSION);
+      dn.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
       nodes.add(dn);
     }
 
@@ -174,7 +171,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
   @Test
   void finalizedClusterForwardsRealVersion() throws Exception {
-    assertAllMembersHaveVersion(SOFTWARE_VERSION, allocateAndGetMembers());
+    assertAllMembersHaveVersion(HDDSVersion.SOFTWARE_VERSION.serialize(), allocateAndGetMembers());
   }
 
   @Test
@@ -235,7 +232,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     List<DatanodeDetails> otherNodes = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
       DatanodeDetails dn = randomDatanodeDetails();
-      dn.setCurrentVersion(SOFTWARE_VERSION);
+      dn.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
       setDatanodeApparentVersion(dn, HDDSVersion.STREAM_BLOCK_SUPPORT);
       otherNodes.add(dn);
     }
@@ -247,7 +244,8 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     AllocateScmBlockResponseProto response = allocate(2);
 
     assertEquals(2, response.getBlocksCount());
-    assertAllMembersHaveVersion(SOFTWARE_VERSION, response.getBlocks(0).getPipeline().getMembersList());
+    assertAllMembersHaveVersion(HDDSVersion.SOFTWARE_VERSION.serialize(),
+        response.getBlocks(0).getPipeline().getMembersList());
     assertEquals(otherNodes.size(), response.getBlocks(1).getPipeline().getMembersCount());
     for (DatanodeDetailsProto member : response.getBlocks(1).getPipeline().getMembersList()) {
       assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT.serialize(), member.getCurrentVersion());
@@ -263,7 +261,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     // The in-memory DatanodeDetails (shared with SCM internal state) must keep
     // their real software version; only the outgoing proto is overridden.
     for (DatanodeDetails dn : nodes) {
-      assertEquals(SOFTWARE_VERSION, dn.getCurrentVersion());
+      assertEquals(HDDSVersion.SOFTWARE_VERSION, dn.getCurrentVersion());
     }
   }
 }

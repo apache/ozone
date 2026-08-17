@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -109,8 +110,8 @@ public final class DatanodeIdYaml {
         }
       }
 
-      builder.setInitialVersion(datanodeDetailsYaml.getInitialVersion())
-          .setCurrentVersion(datanodeDetailsYaml.getCurrentVersion());
+      builder.setInitialVersion(HDDSVersion.deserialize(datanodeDetailsYaml.getInitialVersion()))
+          .setCurrentVersion(HDDSVersion.deserialize(datanodeDetailsYaml.getCurrentVersion()));
 
       datanodeDetails = builder.build();
     }
@@ -248,7 +249,7 @@ public final class DatanodeIdYaml {
         persistedOpString,
         datanodeDetails.getPersistedOpStateExpiryEpochSec(),
         VersionedDatanodeFeatures.DatanodePorts.getPortsToPersist(datanodeDetails, conf),
-        datanodeDetails.getInitialVersion(),
-        datanodeDetails.getCurrentVersion());
+        datanodeDetails.getInitialVersion().serialize(),
+        datanodeDetails.getCurrentVersion().serialize());
   }
 }

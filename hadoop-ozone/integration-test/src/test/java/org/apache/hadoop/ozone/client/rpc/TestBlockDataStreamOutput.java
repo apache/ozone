@@ -135,7 +135,7 @@ public class TestBlockDataStreamOutput {
         .setNumDatanodes(5)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setCurrentVersion(DN_OLD_VERSION)
-            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION)
             .build())
         .build();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
@@ -343,7 +343,7 @@ public class TestBlockDataStreamOutput {
       for (HddsDatanodeService dn : dns) {
         DatanodeDetails details = dn.getDatanodeDetails();
         assertEquals(DN_OLD_VERSION,
-            HDDSVersion.deserialize(details.getCurrentVersion()));
+            details.getCurrentVersion());
       }
 
       String keyName = getKeyName();
@@ -356,8 +356,7 @@ public class TestBlockDataStreamOutput {
       // pipeline, which here is the software version the datanodes have finalized to.
       List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
       for (DatanodeDetails details : streamDnDetails) {
-        assertEquals(HDDSVersion.SOFTWARE_VERSION,
-            HDDSVersion.deserialize(details.getCurrentVersion()));
+        assertEquals(HDDSVersion.SOFTWARE_VERSION, details.getCurrentVersion());
       }
     }
   }
