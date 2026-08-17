@@ -1209,6 +1209,34 @@ STS session policy s3:* on * must allow ListAllMyBuckets, Create/ListBucket, and
     ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${bucket} --profile sts
     Should Not Contain           ${output}                      AccessDenied
 
+STS session policy containing only GetObject must deny DeleteObjects
+    ${bucket_suffix} =           Generate Random String         8   [LOWER]
+    ${bucket} =                  Set Variable                   sts-bucket-deleteobjects-${bucket_suffix}
+    ${key_suffix} =              Generate Random String         8   [LOWER]
+    ${key} =                     Set Variable                   sts-deny-deleteobjects-${key_suffix}.txt
+    ${local_path} =              Set Variable                   ${TEMP_DIR}/${key}
+    Create File                  ${local_path}                  deleteobjects deny test content
+
+    # Create bucket and object with full STS temp-bucket role permissions.
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${STS_TEMP_BUCKET_ROLE_ARN}
+    ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket ${bucket} --profile sts
+    Should Contain               ${output}                      Location
+    ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-object --bucket ${bucket} --key ${key} --body ${local_path} --profile sts
+    Should Contain               ${output}                      "ETag"
+
+    # Restrict token to GetObject-only via session policy. DeleteObjects must return AccessDenied.
+    ${session_policy} =          Set Variable                   {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${bucket}/*"}]}
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${STS_TEMP_BUCKET_ROLE_ARN}
+    ${output} =                  Execute And Ignore Error       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-objects --bucket ${bucket} --delete 'Objects=[{Key=${key}}],Quiet=false' --profile sts
+    Run Keyword And Continue On Failure  Should Contain         ${output}                      AccessDenied
+
+    # Cleanup using a full-permission token.
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${STS_TEMP_BUCKET_ROLE_ARN}
+    ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-object --bucket ${bucket} --key ${key} --profile sts
+    Should Not Contain           ${output}                      AccessDenied
+    ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${bucket} --profile sts
+    Should Not Contain           ${output}                      AccessDenied
+
 Revoking Permanent User Must Revoke Existing Session Token
     # Create session tokens for both buckets, verify they work, then revoke permanent user secret and verify both fail.
     Assume Role And Get Temporary Credentials                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
