@@ -28,14 +28,18 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
@@ -121,17 +125,35 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class EndpointBase {
 
-  protected static final String ETAG_CUSTOM = "etag-custom";
-  protected static final String CONTENT_TYPE_CUSTOM = "content-type-custom";
+  protected static final String ETAG_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "etag";
+  protected static final String CONTENT_TYPE_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-type";
+  protected static final String CACHE_CONTROL_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "cache-control";
+  protected static final String EXPIRES_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "expires";
+  protected static final String CONTENT_ENCODING_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-encoding";
+  protected static final String CONTENT_LANGUAGE_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-language";
+  protected static final String CONTENT_DISPOSITION_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-disposition";
 
   // System metadata key -> custom key. A user x-amz-meta-{etag,content-type}
   // collides with the system ETag / Content-Type stored under the same key, so
   // it is remapped on write and rebuilt on read; the system value is returned
   // via its own ETag / Content-Type response header.
   private static final Map<String, String> RESERVED_METADATA_KEYS =
-      ImmutableMap.of(
-          ETAG, ETAG_CUSTOM,
-          HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM);
+      ImmutableMap.<String, String>builder()
+          .put(ETAG, ETAG_CUSTOM)
+          .put(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM)
+          .put(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_CUSTOM)
+          .put(HttpHeaders.EXPIRES, EXPIRES_CUSTOM)
+          .put(HttpHeaders.CONTENT_ENCODING, CONTENT_ENCODING_CUSTOM)
+          .put(HttpHeaders.CONTENT_LANGUAGE, CONTENT_LANGUAGE_CUSTOM)
+          .put(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION_CUSTOM)
+          .build();
 
   // Custom key -> lower-cased header, to rebuild remapped user metadata on read.
   private static final Map<String, String> REBUILT_RESERVED_KEYS =
@@ -355,6 +377,13 @@ public abstract class EndpointBase {
       for (String key : customMetadataKeys) {
         String mapKey =
             key.substring(CUSTOM_METADATA_HEADER_PREFIX.length());
+        if (mapKey.regionMatches(true, 0, RESERVED_USER_METADATA_KEY_PREFIX, 0,
+            RESERVED_USER_METADATA_KEY_PREFIX.length())) {
+          OS3Exception ex = newError(INVALID_ARGUMENT, key);
+          ex.setErrorMessage("User metadata keys must not start with the reserved prefix "
+              + RESERVED_USER_METADATA_KEY_PREFIX);
+          throw ex;
+        }
         List<String> values = requestHeaders.get(key);
         String value = StringUtils.join(values, ",");
         sizeInBytes += mapKey.getBytes(UTF_8).length;
@@ -401,7 +430,7 @@ public abstract class EndpointBase {
       if (RESERVED_METADATA_KEYS.containsKey(metadataKey)) {
         continue;
       }
-      // Rebuild a remapped user value (e.g. content-type-custom -> content-type).
+      // Rebuild a remapped user value (e.g. ozone-s3-internal-content-type -> content-type).
       metadataKey = REBUILT_RESERVED_KEYS.getOrDefault(metadataKey, metadataKey);
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
@@ -649,6 +678,22 @@ public abstract class EndpointBase {
         || result == ResultCodes.INVALID_TOKEN;
   }
 
+  /**
+   * Reject object keys that cannot be represented in a valid URI. AWS S3 returns
+   * InvalidURI for keys containing malformed UTF-8 or ISO control characters.
+   */
+  protected void validateObjectKeyUri(String keyPath) throws OS3Exception {
+    if (keyPath == null || keyPath.indexOf('\uFFFD') >= 0) {
+      throw newError(INVALID_URI, keyPath);
+    }
+
+    for (int i = 0; i < keyPath.length(); i++) {
+      if (Character.isISOControl(keyPath.charAt(i))) {
+        throw newError(INVALID_URI, keyPath);
+      }
+    }
+  }
+
   protected ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket) throws OS3Exception {
     String storageType = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
     String storageConfig = getHeaders().getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
@@ -765,6 +810,23 @@ public abstract class EndpointBase {
         throw ex;
       }
     };
+  }
+
+  /**
+   * Rejects FSO directory keys when the request path omits the trailing slash.
+   *
+   * <p>Necessary for directories in buckets with FSO layout. Intended for apps which use Hadoop S3A
+   * (e.g. Trino through the Hive connector).
+   */
+  protected void validateFileKey(String keyPath, OzoneKey key) throws OMException {
+    boolean isFsoDirCreationEnabled = getOzoneConfiguration()
+        .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
+            OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT);
+    if (isFsoDirCreationEnabled &&
+        !key.isFile() &&
+        !keyPath.endsWith("/")) {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
   }
 
   protected static String extractPartsCount(String eTag) {

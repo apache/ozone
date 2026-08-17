@@ -43,6 +43,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UN
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.normalizeContentEncoding;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
@@ -148,8 +149,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   protected void init() {
     super.init();
     ObjectOperationHandler chain = ObjectOperationHandlerChain.newBuilder(this)
+        .add(new ObjectGetTorrentHandler())
         .add(new ObjectAclHandler())
         .add(new ObjectTaggingHandler())
+        .add(new ObjectAttributesHandler())
         .add(new MultipartKeyHandler())
         .add(this)
         .build();
@@ -272,6 +275,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
       putContentType(customMetadata);
+      putStandardObjectHeaders(customMetadata);
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
       long putLength;
@@ -364,6 +368,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   ) throws IOException, OS3Exception {
     ObjectRequestContext context = new ObjectRequestContext(S3GAction.GET_KEY, bucketName);
     try {
+      validateObjectKeyUri(keyPath);
       return handler.handleGetRequest(context, keyPath);
     } catch (OMException ex) {
       throw newError(bucketName, keyPath, ex);
@@ -392,7 +397,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
           getClientProtocol().getS3KeyDetails(bucketName, keyPath);
 
-      isFile(keyPath, keyDetails);
+      validateFileKey(keyPath, keyDetails);
 
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
           getHeaders(), keyPath, keyDetails, S3ConditionalRequest.PreconditionContext.READ);
@@ -479,14 +484,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       responseBuilder.header(HttpHeaders.CONTENT_TYPE, contentType);
 
       for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
-        String headerValue = getHeaders().getHeaderString(entry.getKey());
-        String queryValue = queryParams.getFirst(entry.getValue());
-        if (queryValue != null) {
-          headerValue = queryValue;
-        }
-        if (headerValue != null) {
-          responseBuilder.header(entry.getKey(), headerValue);
-        }
+        addStoredObjectHeader(responseBuilder, keyDetails, queryParams, entry.getKey(),
+            entry.getValue());
       }
 
       addLastModifiedDate(responseBuilder, keyDetails);
@@ -524,6 +523,45 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         getHeaders().getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE);
     if (contentType != null) {
       metadata.put(HttpHeaders.CONTENT_TYPE, contentType);
+    }
+  }
+
+  /**
+   * Store standard S3 object headers from the PUT request in key metadata.
+   */
+  private void putStandardObjectHeaders(Map<String, String> metadata) {
+    for (String headerName : overrideQueryParameter.keySet()) {
+      String value = getHeaders().getHeaderString(headerName);
+      if (HttpHeaders.CONTENT_ENCODING.equals(headerName)) {
+        value = normalizeContentEncoding(value);
+      }
+      if (value != null) {
+        metadata.put(headerName, value);
+      }
+    }
+  }
+
+  private void addStoredObjectHeader(ResponseBuilder responseBuilder, OzoneKey key,
+      MultivaluedMap<String, String> queryParams, String headerName,
+      String responseOverrideParam) {
+    String headerValue = queryParams.getFirst(responseOverrideParam);
+    if (headerValue == null) {
+      headerValue = key.getMetadata().get(headerName);
+    }
+    if (HttpHeaders.CONTENT_ENCODING.equals(headerName)) {
+      headerValue = normalizeContentEncoding(headerValue);
+    }
+    if (headerValue != null) {
+      responseBuilder.header(headerName, headerValue);
+    }
+  }
+
+  private void addStoredObjectHeaders(ResponseBuilder responseBuilder, OzoneKey key) {
+    MultivaluedMap<String, String> queryParams =
+        getContext().getUriInfo().getQueryParameters();
+    for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
+      addStoredObjectHeader(responseBuilder, key, queryParams, entry.getKey(),
+          entry.getValue());
     }
   }
 
@@ -610,7 +648,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getClientProtocol().headS3Object(bucketName, keyPath, partNumber) :
           getClientProtocol().headS3Object(bucketName, keyPath);
 
-      isFile(keyPath, key);
+      validateFileKey(keyPath, key);
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
           getHeaders(), keyPath, key, S3ConditionalRequest.PreconditionContext.READ);
       if (conditionalResponse != null) {
@@ -642,6 +680,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         .header(HttpHeaders.CONTENT_TYPE, contentTypeOf(key))
         .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
     addEntityTagHeader(response, key);
+    addStoredObjectHeaders(response, key);
 
     addLastModifiedDate(response, key);
     addTagCountIfAny(response, key);
@@ -649,22 +688,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     getMetrics().updateHeadKeySuccessStats(startNanos);
     auditReadSuccess(s3GAction);
     return response.build();
-  }
-
-  private void isFile(String keyPath, OzoneKey key) throws OMException {
-    /*
-      Necessary for directories in buckets with FSO layout.
-      Intended for apps which use Hadoop S3A.
-      Example of such app is Trino (through Hive connector).
-     */
-    boolean isFsoDirCreationEnabled = getOzoneConfiguration()
-        .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-            OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT);
-    if (isFsoDirCreationEnabled &&
-        !key.isFile() &&
-        !keyPath.endsWith("/")) {
-      throw new OMException(ResultCodes.KEY_NOT_FOUND);
-    }
   }
 
   /**
@@ -755,6 +778,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
       putContentType(customMetadata);
+      putStandardObjectHeaders(customMetadata);
 
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
@@ -1122,13 +1146,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);
+      // Metadata directive is read up front: a self-copy is legal when metadata
+      // is being replaced (x-amz-metadata-directive: REPLACE).
+      String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
+      boolean replacingMetadata = CopyDirective.REPLACE.name().equals(metadataCopyDirective);
+
       // Checking whether we trying to copying to it self.
-      if (sourceBucket.equals(destBucket) && sourceKey
-          .equals(destkey)) {
-        // When copying to same storage type when storage type is provided,
-        // we should not throw exception, as aws cli checks if any of the
-        // options like storage type are provided or not when source and
-        // dest are given same
+      if (sourceBucket.equals(destBucket) && sourceKey.equals(destkey)
+          && !replacingMetadata) {
+        // Self-copy without a metadata replacement. AWS still allows it
+        // when a storage class is provided (aws cli passes storage type), so
+        // only the default-storage-type case is rejected.
         if (storageTypeDefault) {
           OS3Exception ex = newError(S3ErrorTable.INVALID_REQUEST, copyHeader);
           ex.setErrorMessage("This copy request is illegal because it is " +
@@ -1176,15 +1204,15 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       // Custom metadata in copyObject with metadata directive
       Map<String, String> customMetadata;
-      String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
       if (StringUtils.isEmpty(metadataCopyDirective) || metadataCopyDirective.equals(CopyDirective.COPY.name())) {
         // The custom metadata will be copied from the source key
         customMetadata = sourceKeyDetails.getMetadata();
       } else if (metadataCopyDirective.equals(CopyDirective.REPLACE.name())) {
         // Replace the metadata with the metadata form the request headers
         customMetadata = getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
-        // REPLACE: Content-Type comes from the request, not the source.
+        // REPLACE: Content-Type and standard object headers come from the request.
         putContentType(customMetadata);
+        putStandardObjectHeaders(customMetadata);
       } else {
         OS3Exception ex = newError(INVALID_ARGUMENT, metadataCopyDirective);
         ex.setErrorMessage("An error occurred (InvalidArgument) " +

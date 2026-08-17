@@ -113,7 +113,7 @@
     <jetty.version>9.4.58.v20250814</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.15</jline.version>
+    <jline.version>3.30.16</jline.version>
     <jnr-constants.version>0.11.0</jnr-constants.version>
     <jnr-posix.version>3.2.1</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
@@ -138,7 +138,7 @@
     <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
     <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
     <maven-install-plugin.version>3.1.4</maven-install-plugin.version>
-    <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
+    <maven-jar-plugin.version>3.5.1</maven-jar-plugin.version>
     <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
     <maven-patch-plugin.version>1.3</maven-patch-plugin.version>
     <maven-remote-resources-plugin.version>3.3.0</maven-remote-resources-plugin.version>
@@ -183,7 +183,7 @@
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
     <protobuf.version>3.25.9</protobuf.version>
-    <ranger.version>2.8.0</ranger.version>
+    <ranger.version>2.9.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
     <ratis-thirdparty.grpc.version>1.77.1</ratis-thirdparty.grpc.version>
     <ratis-thirdparty.netty.version>4.1.130.Final</ratis-thirdparty.netty.version>
@@ -207,7 +207,7 @@
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
     <spring.version>5.3.39</spring.version>
-    <sqlite.version>3.53.2.0</sqlite.version>
+    <sqlite.version>3.53.2.1</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -2166,6 +2166,12 @@
                       <bannedImport>java.io.FileInputStream</bannedImport>
                       <bannedImport>java.io.FileOutputStream</bannedImport>
                     </bannedImports>
+                    <exclusions>
+                      <exclusion>org.apache.hadoop.hdds.scm.storage.LocalChunkInputStream</exclusion>
+                      <exclusion>org.apache.hadoop.hdds.scm.XceiverClientShortCircuit</exclusion>
+                      <exclusion>org.apache.hadoop.hdds.scm.storage.BlockInputStream</exclusion>
+                      <exclusion>org.apache.hadoop.hdds.TestXceiverServerDomainSocket</exclusion>
+                    </exclusions>
                   </restrictImports>
                 </rules>
               </configuration>
@@ -2631,6 +2637,91 @@
               </execution>
             </executions>
           </plugin>
+          <plugin>
+            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <artifactId>download-maven-plugin</artifactId>
+            <version>${download-maven-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>fetch-linux-x86_64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_x86_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-linux-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_aarch_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-darwin-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_osx_aarch_64.dylib</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>${maven-antrun-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>extract-linux-x86_64-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_linux_x86_64.so libhadoop.so" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>extract-darwin-aarch64-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_osx_aarch_64.dylib libhadoop.dylib" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
         </plugins>
       </build>
     </profile>
@@ -2659,7 +2750,7 @@
     <profile>
       <id>aspectj-java8-10</id>
       <activation>
-        <jdk>[1.8,10]</jdk>
+        <jdk>[1.8,11)</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java8.version}</aspectj.version>
@@ -2668,7 +2759,7 @@
     <profile>
       <id>aspectj-java11-20</id>
       <activation>
-        <jdk>[11,20]</jdk>
+        <jdk>[11,21)</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java11.version}</aspectj.version>
@@ -2677,7 +2768,7 @@
     <profile>
       <id>aspectj-java21-24</id>
       <activation>
-        <jdk>[21,24]</jdk>
+        <jdk>[21,25)</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java21.version}</aspectj.version>
@@ -2921,6 +3012,98 @@
               <groups>flaky</groups>
               <excludedGroups>slow | unhealthy</excludedGroups>
             </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>hadoop-native-lib</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <artifactId>download-maven-plugin</artifactId>
+            <version>${download-maven-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>fetch-linux-x86_64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_x86_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-linux-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_aarch_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-darwin-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_osx_aarch_64.dylib</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>${maven-antrun-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>extract-linux-x86_64-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_linux_x86_64.so libhadoop.so" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>extract-darwin-aarch64-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_osx_aarch_64.dylib libhadoop.dylib" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>

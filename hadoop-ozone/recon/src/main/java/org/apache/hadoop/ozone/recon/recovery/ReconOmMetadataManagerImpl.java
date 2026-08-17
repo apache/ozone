@@ -104,6 +104,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     LOG.info("Starting ReconOMMetadataManagerImpl");
     File reconDbDir =
         reconUtils.getReconDbDir(configuration, OZONE_RECON_OM_SNAPSHOT_DB_DIR);
+    LOG.info("reconDbDir is: {}", reconDbDir.getAbsolutePath());
     File lastKnownOMSnapshot =
         reconUtils.getLastKnownDB(reconDbDir, RECON_OM_SNAPSHOT_DB);
     if (lastKnownOMSnapshot != null) {
