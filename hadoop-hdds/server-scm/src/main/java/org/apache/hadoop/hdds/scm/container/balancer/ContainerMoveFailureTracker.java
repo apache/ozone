@@ -27,17 +27,22 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 /**
  * Tracks per-iteration container move failures by reason and per-datanode counts.
  */
-public final class ContainerMoveFailureTracker {
+final class ContainerMoveFailureTracker {
   private final Map<String, Long> failuresByReason = new HashMap<>();
   private final Map<String, Map<String, Long>> sourceFailureCountsByReason = new HashMap<>();
   private final Map<String, Map<String, Long>> targetFailureCountsByReason = new HashMap<>();
 
-  public synchronized void recordFailure(MoveManager.MoveResult result, DatanodeDetails source,
+  synchronized void recordFailure(MoveManager.MoveResult result, DatanodeDetails source,
                                          DatanodeDetails target) {
     recordFailure(result.name(), source, target);
   }
 
-  public synchronized void recordFailure(String reason, DatanodeDetails source, DatanodeDetails target) {
+  synchronized void recordFailure(ContainerBalancerTask.ContainerMoveFailureReason result,
+                                         DatanodeDetails source, DatanodeDetails target) {
+    recordFailure(result.name(), source, target);
+  }
+
+  synchronized void recordFailure(String reason, DatanodeDetails source, DatanodeDetails target) {
     failuresByReason.merge(reason, 1L, Long::sum);
     if (source != null) {
       sourceFailureCountsByReason.computeIfAbsent(reason, k -> new HashMap<>())
@@ -49,13 +54,13 @@ public final class ContainerMoveFailureTracker {
     }
   }
 
-  public synchronized void reset() {
+  synchronized void reset() {
     failuresByReason.clear();
     sourceFailureCountsByReason.clear();
     targetFailureCountsByReason.clear();
   }
 
-  public synchronized List<ContainerMoveFailureDetail> getFailures() {
+  synchronized List<ContainerMoveFailureDetail> getFailures() {
     List<ContainerMoveFailureDetail> result = new ArrayList<>();
     for (Map.Entry<String, Long> entry : failuresByReason.entrySet()) {
       String reason = entry.getKey();

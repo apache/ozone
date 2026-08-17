@@ -144,6 +144,36 @@ class TestContainerBalancerMoveFailureBreakdown {
   }
 
   @Test
+  void testNodeNotFoundRecordedInFailureBreakdown()
+      throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
+    MockedSCM mockedScm = createMockedScm();
+    when(mockedScm.getMoveManager().move(any(ContainerID.class),
+        any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        .thenThrow(new NodeNotFoundException())
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
+    ContainerBalancerTask task = mockedScm.startBalancerTask(buildConfig(mockedScm));
+    ContainerBalancerTaskIterationStatusInfo iteration = getCompletedIteration(task);
+    assertThat(iteration.getContainerMovesFailed()).isEqualTo(1);
+    assertFailureBreakdown(mockedScm, iteration,
+        ContainerBalancerTask.ContainerMoveFailureReason.PRE_MOVE_NODE_NOT_FOUND.name(), 0);
+  }
+
+  @Test
+  void testReplicaNotFoundRecordedInFailureBreakdown()
+      throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
+    MockedSCM mockedScm = createMockedScm();
+    when(mockedScm.getMoveManager().move(any(ContainerID.class),
+        any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        .thenThrow(new ContainerReplicaNotFoundException("test"))
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
+    ContainerBalancerTask task = mockedScm.startBalancerTask(buildConfig(mockedScm));
+    ContainerBalancerTaskIterationStatusInfo iteration = getCompletedIteration(task);
+    assertThat(iteration.getContainerMovesFailed()).isEqualTo(1);
+    assertFailureBreakdown(mockedScm, iteration,
+        ContainerBalancerTask.ContainerMoveFailureReason.PRE_MOVE_REPLICA_NOT_FOUND.name(), 0);
+  }
+
+  @Test
   void testSameReasonAggregatesSourceFailureCountsFromMultipleSources() {
     ContainerMoveFailureTracker tracker = new ContainerMoveFailureTracker();
     DatanodeDetails source1 = MockDatanodeDetails.createDatanodeDetails("1.1.1.1", "/r1");

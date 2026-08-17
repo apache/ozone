@@ -796,8 +796,7 @@ public class ContainerBalancerTask implements Runnable {
         LOG.warn("Container balancer is interrupted");
         Thread.currentThread().interrupt();
       } catch (TimeoutException e) {
-        long timeoutCounts = cancelMovesThatExceedTimeoutDuration(
-            ContainerMoveFailureReason.ITERATION_MOVE_TIMEOUT.name());
+        long timeoutCounts = cancelMovesThatExceedTimeoutDuration();
         LOG.warn("{} Container moves are canceled.", timeoutCounts);
         metrics.incrementNumContainerMovesTimeoutInLatestIteration(
             timeoutCounts);
@@ -840,7 +839,7 @@ public class ContainerBalancerTask implements Runnable {
    * @return number of moves that did not complete (timed out) and were
    * cancelled.
    */
-  private long cancelMovesThatExceedTimeoutDuration(String reason) {
+  private long cancelMovesThatExceedTimeoutDuration() {
     Set<Map.Entry<ContainerMoveSelection,
         CompletableFuture<MoveManager.MoveResult>>>
         entries = moveSelectionToFutureMap.entrySet();
@@ -861,7 +860,7 @@ public class ContainerBalancerTask implements Runnable {
         DatanodeDetails target = moveSelection.getTargetNode();
         LOG.warn("Container move timed out for container {} from source {}" +
                 " to target {}.", containerID, source, target);
-        moveFailureTracker.recordFailure(reason, source, target);
+        moveFailureTracker.recordFailure(ContainerMoveFailureReason.ITERATION_MOVE_TIMEOUT, source, target);
         entry.getValue().cancel(true);
         numCancelled += 1;
       }
@@ -1043,19 +1042,19 @@ public class ContainerBalancerTask implements Runnable {
       // exclude the container which caused failure of move to avoid error in next run.
       selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
-      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_CONTAINER_NOT_FOUND.name(),
+      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_CONTAINER_NOT_FOUND,
           source, moveSelection.getTargetNode());
       return false;
     } catch (NodeNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
-      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_NODE_NOT_FOUND.name(),
+      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_NODE_NOT_FOUND,
           source, moveSelection.getTargetNode());
       return false;
     } catch (ContainerReplicaNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
-      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_REPLICA_NOT_FOUND.name(),
+      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_REPLICA_NOT_FOUND,
           source, moveSelection.getTargetNode());
       // add source back to queue for replica not found only
       // the container is not excluded as it is a replica related failure
@@ -1366,8 +1365,13 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   /**
-   * Recorded when a scheduled container move fails before {@link MoveManager#move}
-   * completes, or when the balancer stops waiting for in-flight moves.
+   * Failure reasons recorded by {@link ContainerBalancerTask} that are not represented by
+   * {@link MoveManager.MoveResult}. Other move failures use {@code MoveResult} names in the
+   * failure breakdown.
+   * <p>
+   * {@code PRE_MOVE_*} values are recorded when {@link MoveManager#move} throws before returning
+   * a completed future. {@link #ITERATION_MOVE_TIMEOUT} is recorded when an in-flight move does
+   * not finish before the iteration move wait timeout expires.
    */
   enum ContainerMoveFailureReason {
     PRE_MOVE_CONTAINER_NOT_FOUND,
