@@ -41,7 +41,7 @@ services:
       start_period: 10s
     networks:
       ozone_net:
-        ipv4_address: 172.25.0.121
+        ipv4_address: 172.25.0.124
 
   polaris-setup:
     image: alpine/curl:8.19.0
