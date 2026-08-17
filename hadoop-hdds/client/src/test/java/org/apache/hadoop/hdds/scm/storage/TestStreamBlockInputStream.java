@@ -744,6 +744,118 @@ public class TestStreamBlockInputStream {
     verify(requestObserver, never()).onError(any());
   }
 
+  /**
+   * Concurrent chunk readers on the datanode serve pre-read requests in non-deterministic order, so
+   * a response covering a later offset can arrive before the one covering the current position. The
+   * later response must be cached and served once the reader reaches its offset. It used to be
+   * dropped, leaving the reader waiting for data that is never resent until the read times out.
+   */
+  @Test
+  public void testOutOfOrderResponseIsCachedAndServed() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setStreamReadResponseDataSize(4);
+    // Short timeout so a regression fails fast instead of waiting for the default timeout.
+    clientConfig.setStreamReadTimeout(Duration.ofMillis(200));
+    BlockID blockID = new BlockID(1L, 17L);
+    long length = 8;
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    AtomicInteger streamReads = new AtomicInteger();
+    doAnswer(inv -> {
+      if (streamReads.getAndIncrement() == 0) {
+        StreamingReaderSpi reader = readerRef.get();
+        // The chunk at offset 4 completes first, before the chunk covering position 0.
+        reader.onNext(buildResponseProto(new byte[]{4, 5, 6, 7}, 4));
+        reader.onNext(buildResponseProto(new byte[]{0, 1, 2, 3}, 0));
+      }
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, length, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      byte[] out = new byte[8];
+      assertEquals(8, sbis.read(out, 0, 8), "the out-of-order response must not be dropped");
+      assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7}, out);
+      assertEquals(1, streamReads.get(), "cached data must be served without re-requesting it");
+    }
+  }
+
+  /**
+   * A cached out-of-order response must not be served after the reader has seeked past it.
+   */
+  @Test
+  public void testCachedResponseIsNotServedAfterForwardSeek() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setStreamReadResponseDataSize(4);
+    clientConfig.setStreamReadTimeout(Duration.ofMillis(200));
+    BlockID blockID = new BlockID(1L, 18L);
+    long length = 12;
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    AtomicInteger streamReads = new AtomicInteger();
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = readerRef.get();
+      if (streamReads.getAndIncrement() == 0) {
+        // The chunk at offset 4 completes before the chunk covering position 0 and is cached.
+        reader.onNext(buildResponseProto(new byte[]{4, 5, 6, 7}, 4));
+        reader.onNext(buildResponseProto(new byte[]{0, 1, 2, 3}, 0));
+      } else {
+        reader.onNext(buildResponseProto(new byte[]{8, 9, 10, 11}, 8));
+      }
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, length, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      byte[] first = new byte[4];
+      assertEquals(4, sbis.read(first, 0, 4));
+      assertArrayEquals(new byte[]{0, 1, 2, 3}, first);
+
+      sbis.seek(8);
+
+      byte[] second = new byte[4];
+      assertEquals(4, sbis.read(second, 0, 4));
+      assertArrayEquals(new byte[]{8, 9, 10, 11}, second,
+          "the cached chunk the reader seeked past must not be served");
+    }
+  }
+
   private ReadBlockResponseProto buildReadBlockResponse(byte[] data) {
     return ReadBlockResponseProto.newBuilder()
         .setOffset(0)

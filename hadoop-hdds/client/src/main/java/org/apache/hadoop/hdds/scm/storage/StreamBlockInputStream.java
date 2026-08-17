@@ -24,7 +24,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -229,6 +231,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     LOG.debug("{}: seek {} -> {}", getName(streamingReader), position, pos);
     readBuffer = reuseReadBuffer(readBuffer, pos);
     position = pos;
+    if (streamingReader != null) {
+      streamingReader.clearPendingProtosBelow(pos);
+    }
     if (readBuffer == null) {
       // Only rewind the request high-watermark when the buffered (already requested/served) data cannot be reused;
       // otherwise we would re-request data that is still buffered.
@@ -486,6 +491,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     /** Response queue: poll is blocking while offer is non-blocking. */
     private final BlockingQueue<ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>();
 
+    /**
+     * Responses received ahead of the current position, keyed by their block offset.
+     * Concurrent readers on the datanode may complete out of order, so a response covering a later
+     * offset can arrive before the one covering the current position. Such a response is kept here
+     * instead of being discarded, and served once the reader reaches its offset.
+     * Only accessed from the read path, which holds the {@link StreamBlockInputStream} lock.
+     */
+    private final TreeMap<Long, ReadBlockResponseProto> pendingProtos = new TreeMap<>();
+
     private final CompletableFuture<Void> future = new CompletableFuture<>();
     private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
     private final AtomicReference<StreamingReadResponse> response = new AtomicReference<>();
@@ -539,6 +553,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     private ReadBuffer read(int length, boolean preRead) throws IOException {
       checkError();
+      // A previously cached out-of-order response may already cover the current position.
+      final ReadBuffer cached = pollPendingProtos();
+      if (cached != null) {
+        LOG.debug("{}: read(length={}, preRead={}) returns cached {}", name, length, preRead, cached);
+        return cached;
+      }
       if (future.isDone()) {
         // Don't return null while items remain in the queue. onNext() may have delivered items just before
         // onCompleted() fired.
@@ -556,6 +576,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         if (proto == null) {
           return null;
         }
+        if (getPos() < proto.getOffset()) {
+          // Out-of-order response: the chunk covering the current position is still in flight.
+          // Cache this one instead of dropping it, otherwise its data would be lost for good.
+          LOG.debug("{}: caching out-of-order response at offset {}, position {}",
+              name, proto.getOffset(), getPos());
+          pendingProtos.put(proto.getOffset(), proto);
+          continue;
+        }
         final ByteBuffer buffer = getByteBuffer(proto, getPos());
         final ReadBuffer read = buffer != null ? new ReadBuffer(proto, buffer) : null;
         if (hasRemaining(read)) {
@@ -563,6 +591,34 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
           return read;
         }
       }
+    }
+
+    /**
+     * Returns the smallest cached response that covers the current position, or null when the
+     * cache is empty or its first entry is still ahead of the reader. Entries the reader has
+     * already advanced past are dropped.
+     */
+    private ReadBuffer pollPendingProtos() {
+      while (!pendingProtos.isEmpty()) {
+        final Map.Entry<Long, ReadBlockResponseProto> first = pendingProtos.firstEntry();
+        final long pos = getPos();
+        if (pos < first.getKey()) {
+          return null;
+        }
+        pendingProtos.pollFirstEntry();
+        final ByteBuffer buffer = getByteBuffer(first.getValue(), pos);
+        final ReadBuffer read = buffer != null ? new ReadBuffer(first.getValue(), buffer) : null;
+        if (hasRemaining(read)) {
+          return read;
+        }
+      }
+      return null;
+    }
+
+    /** Drops cached responses whose data ends at or before the given block offset. */
+    private void clearPendingProtosBelow(long blockOffset) {
+      pendingProtos.headMap(blockOffset, true).values()
+          .removeIf(p -> p.getOffset() + p.getData().size() <= blockOffset);
     }
 
     private void releaseResources() {
