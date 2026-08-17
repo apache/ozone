@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
 import java.nio.file.Path;
@@ -27,9 +28,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -109,22 +111,28 @@ public class TestXceiverClientMetrics {
       latch = new CountDownLatch(numSenderThreads);
       List<CompletableFuture<ContainerCommandResponseProto>> computeResults =
           Collections.synchronizedList(new ArrayList<>());
-      XceiverClientMetrics clientMetrics =
-          XceiverClientManager.getXceiverClientMetrics();
+      AtomicReference<Exception> firstSenderError = new AtomicReference<>();
 
       for (int i = 0; i < numSenderThreads; i++) {
         Thread sendThread = new Thread(() -> {
           try {
             while (!breakFlag) {
-              BlockID blockID = ContainerTestHelper.getTestBlockID(
-                  container.getContainerInfo().getContainerID());
-              ContainerCommandRequestProto smallFileRequest =
-                  ContainerTestHelper.getWriteSmallFileRequest(
-                      client.getPipeline(), blockID, 1024);
-              computeResults.add(
-                  client.sendCommandAsync(smallFileRequest).getResponse());
+              try {
+                BlockID blockID = ContainerTestHelper.getTestBlockID(
+                    container.getContainerInfo().getContainerID());
+                ContainerCommandRequestProto smallFileRequest =
+                    ContainerTestHelper.getWriteSmallFileRequest(
+                        client.getPipeline(), blockID, 1024);
+                computeResults.add(
+                    client.sendCommandAsync(smallFileRequest).getResponse());
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                firstSenderError.compareAndSet(null, e);
+                break;
+              } catch (Exception e) {
+                firstSenderError.compareAndSet(null, e);
+              }
             }
-          } catch (Exception ignored) {
           } finally {
             latch.countDown();
           }
@@ -132,17 +140,28 @@ public class TestXceiverClientMetrics {
         sendThread.start();
       }
 
-      GenericTestUtils.waitFor(() -> {
-        // check if pending metric count is increased
-        if (clientMetrics.getPendingContainerOpCountMetrics(
-            ContainerProtos.Type.PutSmallFile) > 0) {
-          // reset break flag
-          breakFlag = true;
-          return true;
-        } else {
-          return false;
+      try {
+        GenericTestUtils.waitFor(() -> {
+          // check if pending metric count is increased
+          MetricsRecordBuilder metric = getMetrics(XceiverClientMetrics.SOURCE_NAME);
+          long pendingOps = getLongCounter("PendingOps", metric);
+          long pendingPutSmallFileOps = getLongCounter("numPendingPutSmallFile", metric);
+
+          if (pendingOps > 0 && pendingPutSmallFileOps > 0) {
+            // reset break flag
+            breakFlag = true;
+            return true;
+          } else {
+            return false;
+          }
+        }, 10, 60000);
+      } catch (TimeoutException e) {
+        Exception senderError = firstSenderError.get();
+        if (senderError != null) {
+          e.addSuppressed(senderError);
         }
-      }, 10, 60000);
+        throw e;
+      }
 
       // blocking until we stop sending async requests
       latch.await();
@@ -157,9 +176,12 @@ public class TestXceiverClientMetrics {
         return true;
       }, 100, 60000);
 
-      GenericTestUtils.waitFor(() ->
-          clientMetrics.getPendingContainerOpCountMetrics(
-              ContainerProtos.Type.PutSmallFile) == 0, 10, 5000);
+      GenericTestUtils.waitFor(() -> {
+        MetricsRecordBuilder metric = getMetrics(XceiverClientMetrics.SOURCE_NAME);
+        long pendingOps = getLongCounter("PendingOps", metric);
+        long pendingPutSmallFileOps = getLongCounter("numPendingPutSmallFile", metric);
+        return pendingOps == 0 && pendingPutSmallFileOps == 0;
+      }, 10, 5000);
       // the counter value of pending metrics should be decreased to 0
       containerMetrics = getMetrics(XceiverClientMetrics.SOURCE_NAME);
       assertCounter("PendingOps", 0L, containerMetrics);
