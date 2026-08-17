@@ -23,8 +23,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRE
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -32,9 +35,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
@@ -271,13 +274,16 @@ public class SCMSafeModeManager implements SafeModeManager {
   }
 
   /** Get the safe mode status of all rules. */
-  public Map<String, Pair<Boolean, String>> getRuleStatus() {
-    Map<String, Pair<Boolean, String>> map = new HashMap<>();
+  public List<SafeModeRuleStatusProto> getRuleStatus() {
+    final List<SafeModeRuleStatusProto> protos = new ArrayList<>(exitRules.size());
     for (SafeModeExitRule<?> exitRule : exitRules.values()) {
-      map.put(exitRule.getRuleName(),
-          Pair.of(exitRule.validate(), exitRule.getStatusText()));
+      protos.add(SafeModeRuleStatusProto.newBuilder()
+          .setRuleName(exitRule.getRuleName())
+          .setValidate(exitRule.validate())
+          .setStatusText(exitRule.getStatusText())
+          .build());
     }
-    return map;
+    return protos;
   }
 
   public boolean getPreCheckComplete() {
