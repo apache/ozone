@@ -31,7 +31,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * This class tests OS3Exception class.
+ * This class tests OS3Exception and OS3ExceptionMapper.
  */
 @ExtendWith(MockitoExtension.class)
 public class TestOS3Exceptions {
