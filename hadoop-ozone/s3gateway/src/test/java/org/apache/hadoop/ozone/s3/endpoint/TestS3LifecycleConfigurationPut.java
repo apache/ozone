@@ -56,6 +56,8 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 /**
@@ -137,6 +139,16 @@ public class TestS3LifecycleConfigurationPut {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"enabled", "disabled", "invalid"})
+  public void testPutLifecycleConfigurationWithInvalidStatus(String status)
+      throws Exception {
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.put("bucket1", withStatus(status)));
+    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+    assertEquals(MALFORMED_XML.getCode(), ex.getCode());
+  }
+
   private void testInvalidLifecycleConfiguration(Supplier<InputStream> inputStream,
       int expectedHttpCode, String expectedErrorCode) throws Exception {
     try {
@@ -170,7 +182,8 @@ public class TestS3LifecycleConfigurationPut {
 
   @Test
   public void testPutValidLifecycleConfiguration() throws Exception {
-    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", onePrefix()).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", withStatus("Enabled")).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", withStatus("Disabled")).getStatus());
     assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", emptyPrefix()).getStatus());
     assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", oneTag()).getStatus());
     assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", twoTagsInAndOperator()).getStatus());
@@ -301,6 +314,19 @@ public class TestS3LifecycleConfigurationPut {
         "<Expiration><Days>30</Days></Expiration>" +
         "</Rule>" +
         "</LifecycleConfiguration>");
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withStatus(String status) {
+    String xml =
+        "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+            "<Rule>" +
+            "<ID>remove logs after 30 days</ID>" +
+            "<Prefix>prefix/</Prefix>" +
+            "<Status>" + status + "</Status>" +
+            "<Expiration><Days>30</Days></Expiration>" +
+            "</Rule>" +
+            "</LifecycleConfiguration>";
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
 
