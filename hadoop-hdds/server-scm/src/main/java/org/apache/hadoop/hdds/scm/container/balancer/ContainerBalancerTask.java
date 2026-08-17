@@ -55,7 +55,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -1130,15 +1129,14 @@ public class ContainerBalancerTask implements Runnable {
           "ContainerBalancer.");
       return 0;
     }
-    SCMNodeStat aggregatedStats = new SCMNodeStat(
-        0, 0, 0, 0, 0, 0);
+    long totalCapacity = 0;
+    long totalRemaining = 0;
     for (DatanodeUsageInfo node : nodes) {
-      aggregatedStats.add(node.getScmNodeStat());
+      totalCapacity += node.getScmNodeStat().getCapacity().get();
+      totalRemaining += node.getScmNodeStat().getRemaining().get();
     }
-    long clusterCapacity = aggregatedStats.getCapacity().get();
-    long clusterRemaining = aggregatedStats.getRemaining().get();
-
-    return (clusterCapacity - clusterRemaining) / (double) clusterCapacity;
+    return ContainerBalancerClusterAnalyzer.calculateAvgUtilization(
+        totalCapacity, totalRemaining);
   }
 
   /**
