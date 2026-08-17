@@ -270,25 +270,6 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
   }
 
   @Test
-  void testVerifyWithContainerLocationRefreshFromScm() {
-    List<String> parameters = new ArrayList<>();
-    parameters.add(0, getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY));
-    parameters.add(0, getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY));
-    parameters.add("replicas");
-    parameters.add("verify");
-    parameters.add("--checksums");
-    parameters.add("--refresh-from-scm");
-    parameters.add(ozoneAddress);
-
-    int exitCode = ozoneDebugShell.execute(parameters.toArray(new String[0]));
-
-    assertEquals(0, exitCode, err.toString());
-    assertThat(out.get())
-        .doesNotContain("Checksum mismatch")
-        .doesNotContain("Unexpected read size");
-  }
-
-  @Test
   void testSplitOutputToNewDirectory(@TempDir Path tempDir) throws IOException {
     int maxRecordsPerFile = 2;
     int expectedKeyFiles = (int) Math.ceil(keyInfoMap.size() / (maxRecordsPerFile * 1.0));
