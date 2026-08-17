@@ -308,6 +308,10 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
       saveConfiguration(configuration, true, 0);
       this.config = configuration;
 
+      LOG.info("Container Balancer starting with balancing iteration interval {} seconds " +
+              "(hdds.container.balancer.balancing.iteration.interval).",
+          configuration.getBalancingInterval().getSeconds());
+
       //start balancing task
       startBalancingThread(0, false);
     } finally {
