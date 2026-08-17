@@ -41,7 +41,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -62,9 +61,8 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestContainerExportManager {
 
-  private static final int TEST_DEFAULT_PAGE_SIZE = 2;
-  private static final int TEST_DEFAULT_SHARD_SIZE = 3;
-  private static final int TEST_MAX_TERMINAL_JOBS = 10;
+  private static final int TEST_PAGE_SIZE = 2;
+  private static final int TEST_SHARD_SIZE = 3;
   private static final String TEST_SCM_ID = "test-scm";
 
   @TempDir
@@ -76,8 +74,7 @@ public class TestContainerExportManager {
   @BeforeEach
   public void setup() throws Exception {
     containerManager = mock(ContainerManager.class);
-    exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE,
-        TEST_MAX_TERMINAL_JOBS, () -> true);
+    exportManager = newExportManager(TEST_SHARD_SIZE, TEST_PAGE_SIZE, () -> true);
   }
 
   @AfterEach
@@ -96,34 +93,14 @@ public class TestContainerExportManager {
   @Test
   public void testRejectMissingFilters() {
     assertThrows(IllegalArgumentException.class, () ->
-        exportManager.submitJob(ContainerID.valueOf(0), null, null, 0, 0, 0));
-  }
-
-  @Test
-  public void testRejectInvalidMaxRows() {
-    assertThrows(IllegalArgumentException.class, () ->
-        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING, -1, 0, 0));
-  }
-
-  @Test
-  public void testRejectInvalidPageSize() {
-    assertThrows(IllegalArgumentException.class, () ->
-        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0,
-            ExportLimits.MAX_PAGE_SIZE + 1, 0));
-  }
-
-  @Test
-  public void testRejectInvalidShardSize() {
-    assertThrows(IllegalArgumentException.class, () ->
-        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0,
-            ExportLimits.MAX_SHARD_SIZE + 1));
+        exportManager.submitJob(ContainerID.valueOf(0), null, null));
   }
 
   @Test
   public void testRejectSubmitWhenNotLeader() throws Exception {
     exportManager.shutdown();
-    exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE, 2, () -> false);
-    assertNull(exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0, 0));
+    exportManager = newExportManager(TEST_SHARD_SIZE, TEST_PAGE_SIZE, () -> false);
+    assertNull(exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
   }
 
   @Test
@@ -144,28 +121,9 @@ public class TestContainerExportManager {
         });
 
     ExportJob.Id first = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
+        ContainerHealthState.MISSING);
     assertNotNull(first);
-    assertNull(exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.EMPTY, 0, 0, 0));
-  }
-
-  @Test
-  public void testCustomPageSizeUsedForListing() throws Exception {
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), eq(1), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(ids(1));
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(2)), eq(1), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(Collections.emptyList());
-
-    ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 1, 0);
-    assertNotNull(jobId);
-    waitForTerminal(jobId);
-
-    verify(containerManager).getContainerIDs(
-        eq(ContainerID.valueOf(0)), eq(1), isNull(), eq(ContainerHealthState.MISSING));
+    assertNull(exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
   }
 
   @Test
@@ -174,7 +132,7 @@ public class TestContainerExportManager {
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob.Id jobId = exportManager.submitJob(null, null, ContainerHealthState.MISSING, 0, 0, 0);
+    ExportJob.Id jobId = exportManager.submitJob(null, null, ContainerHealthState.MISSING);
     assertNotNull(jobId);
     waitForTerminal(jobId);
 
@@ -192,7 +150,7 @@ public class TestContainerExportManager {
         .thenReturn(Collections.emptyList());
 
     ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(5), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
+        ContainerHealthState.MISSING);
     assertNotNull(jobId);
 
     ExportJob.Status status = waitForTerminal(jobId);
@@ -212,34 +170,12 @@ public class TestContainerExportManager {
         eq(ContainerID.valueOf(2)), anyInt(), eq(LifeCycleState.OPEN), isNull()))
         .thenReturn(Collections.emptyList());
 
-    ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), LifeCycleState.OPEN,
-        null, 0, 0, 0);
+    ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), LifeCycleState.OPEN, null);
     assertNotNull(jobId);
     waitForTerminal(jobId);
 
     verify(containerManager).getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), eq(LifeCycleState.OPEN), isNull());
-  }
-
-  @Test
-  public void testMaxRowsLimitsExportedContainerIds() throws Exception {
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), eq(1), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(ids(1));
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(2)), eq(1), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(ids(2));
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(3)), eq(1), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(ids(3, 4));
-
-    ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 2, 1, 0);
-    assertNotNull(jobId);
-
-    ExportJob.Status status = waitForTerminal(jobId);
-    assertEquals(ExportJob.ExecutionState.SUCCEEDED, status.getExecutionState());
-    assertEquals(2, status.getTotalRows());
   }
 
   @Test
@@ -249,7 +185,7 @@ public class TestContainerExportManager {
         .thenReturn(Collections.emptyList());
 
     ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
+        ContainerHealthState.MISSING);
     assertNotNull(jobId);
 
     ExportJob.Status status = waitForTerminal(jobId);
@@ -261,8 +197,7 @@ public class TestContainerExportManager {
   @Test
   public void testSingleShardExportCreatesTar() throws Exception {
     exportManager.shutdown();
-    exportManager = newExportManager(100, TEST_DEFAULT_PAGE_SIZE,
-        TEST_MAX_TERMINAL_JOBS, () -> true);
+    exportManager = newExportManager(100, TEST_PAGE_SIZE, () -> true);
 
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
@@ -272,7 +207,7 @@ public class TestContainerExportManager {
         .thenReturn(Collections.emptyList());
 
     ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
+        ContainerHealthState.MISSING);
     assertNotNull(jobId);
 
     ExportJob.Status status = waitForTerminal(jobId);
@@ -297,7 +232,7 @@ public class TestContainerExportManager {
         .thenReturn(Collections.emptyList());
 
     ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
+        ContainerHealthState.MISSING);
     assertNotNull(jobId);
 
     ExportJob.Status status = waitForTerminal(jobId);
@@ -330,103 +265,6 @@ public class TestContainerExportManager {
   }
 
   @Test
-  public void testArchiveContainsExportedContainerIds() throws Exception {
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(ids(42, 43));
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(44)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(Collections.emptyList());
-
-    ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
-    ExportJob.Status status = waitForTerminal(jobId);
-    assertEquals(ExportJob.ExecutionState.SUCCEEDED, status.getExecutionState());
-
-    Path extractDir = Files.createTempDirectory("export-content");
-    try {
-      extractGzTar(new File(status.getTarPath()), extractDir);
-      List<String> dataLines;
-      try (Stream<Path> stream = Files.list(extractDir)) {
-        Path shard = stream.filter(path -> path.getFileName().toString().endsWith(".txt"))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("shard file not found"));
-        dataLines = Files.readAllLines(shard).stream()
-            .filter(line -> !line.startsWith("#") && !line.isEmpty())
-            .collect(Collectors.toList());
-      }
-      assertEquals(Arrays.asList("42", "43"), dataLines);
-    } finally {
-      FileUtils.deleteQuietly(extractDir.toFile());
-    }
-  }
-
-  @Test
-  public void testCustomShardSizeSplitsArchiveIntoMultipleParts() throws Exception {
-    exportManager.shutdown();
-    exportManager = newExportManager(2, TEST_DEFAULT_PAGE_SIZE, TEST_MAX_TERMINAL_JOBS, () -> true);
-
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(ids(1, 2, 3));
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(4)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(Collections.emptyList());
-
-    ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 2);
-    ExportJob.Status status = waitForTerminal(jobId);
-    assertEquals(ExportJob.ExecutionState.SUCCEEDED, status.getExecutionState());
-
-    Path extractDir = Files.createTempDirectory("export-shards");
-    try {
-      extractGzTar(new File(status.getTarPath()), extractDir);
-      long partCount;
-      try (Stream<Path> stream = Files.list(extractDir)) {
-        partCount = stream.map(path -> path.getFileName().toString())
-            .filter(name -> name.endsWith(".txt"))
-            .count();
-      }
-      assertEquals(2, partCount);
-    } finally {
-      FileUtils.deleteQuietly(extractDir.toFile());
-    }
-  }
-
-  @Test
-  public void testJobStartTimeFormat() throws Exception {
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(Collections.emptyList());
-
-    ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
-    assertNotNull(jobId);
-    waitForTerminal(jobId);
-
-    ExportJob job = exportManager.getJobMap().get(jobId);
-    assertTrue(job.getJobStartTime().matches("\\d{4}-\\d{2}-\\d{2}-\\d{2}-\\d{2}-\\d{2}"));
-  }
-
-  @Test
-  public void testElapsedMsStableAfterCompletion() throws Exception {
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(ids(1));
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(2)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(Collections.emptyList());
-
-    ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
-    assertNotNull(jobId);
-    ExportJob.Status first = waitForTerminal(jobId);
-    Thread.sleep(200);
-    ExportJob.Status second = exportManager.getExportStatus(jobId);
-    assertEquals(first.getElapsedMs(), second.getElapsedMs());
-  }
-
-  @Test
   public void testSubmitAfterPreviousJobCompletes() throws Exception {
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
@@ -442,11 +280,11 @@ public class TestContainerExportManager {
         .thenReturn(Collections.emptyList());
 
     ExportJob.Id first = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
+        ContainerHealthState.MISSING);
     waitForTerminal(first);
 
     ExportJob.Id second = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.EMPTY, 0, 0, 0);
+        ContainerHealthState.EMPTY);
     assertNotNull(second);
     ExportJob.Status status = waitForTerminal(second);
     assertEquals(ExportJob.ExecutionState.SUCCEEDED, status.getExecutionState());
@@ -454,52 +292,10 @@ public class TestContainerExportManager {
   }
 
   @Test
-  public void testTerminalJobEvictionWhenOverCap() throws Exception {
-    exportManager.shutdown();
-    exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE, 2, () -> true);
-
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(ids(1));
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(2)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(Collections.emptyList());
-    ExportJob.Id job1 = exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0, 0);
-    ExportJob.Status status1 = waitForTerminal(job1);
-    File tar1 = new File(status1.getTarPath());
-    assertTrue(tar1.exists());
-
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.EMPTY)))
-        .thenReturn(ids(10));
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(11)), anyInt(), isNull(), eq(ContainerHealthState.EMPTY)))
-        .thenReturn(Collections.emptyList());
-    ExportJob.Id job2 = exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY, 0, 0, 0);
-    waitForTerminal(job2);
-
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.UNDER_REPLICATED)))
-        .thenReturn(ids(20));
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(21)), anyInt(), isNull(), eq(ContainerHealthState.UNDER_REPLICATED)))
-        .thenReturn(Collections.emptyList());
-    ExportJob.Id job3 = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.UNDER_REPLICATED, 0, 0, 0);
-    waitForTerminal(job3);
-
-    assertNotNull(exportManager.getExportStatus(job2));
-    assertNotNull(exportManager.getExportStatus(job3));
-    assertNull(exportManager.getExportStatus(job1));
-    assertFalse(tar1.exists()); //evicting a terminal job deletes its TAR too
-  }
-
-  @Test
   public void testFailsWhenLeadershipLostDuringExport() throws Exception {
     AtomicBoolean leader = new AtomicBoolean(true);
     exportManager.shutdown();
-    exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE,
-        TEST_MAX_TERMINAL_JOBS, leader::get);
+    exportManager = newExportManager(TEST_SHARD_SIZE, TEST_PAGE_SIZE, leader::get);
 
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
@@ -509,7 +305,7 @@ public class TestContainerExportManager {
         });
 
     ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
+        ContainerHealthState.MISSING);
     assertNotNull(jobId);
 
     ExportJob.Status status = waitForTerminal(jobId);
@@ -524,82 +320,13 @@ public class TestContainerExportManager {
         .thenThrow(new RuntimeException("container listing failed"));
 
     ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
+        ContainerHealthState.MISSING);
     assertNotNull(jobId);
 
     ExportJob.Status status = waitForTerminal(jobId);
     assertEquals(ExportJob.ExecutionState.FAILED, status.getExecutionState());
     assertTrue(status.getErrorMessage().contains("container listing failed"));
     assertFalse(Files.exists(tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId))));
-  }
-  
-  @Test
-  public void testOrphanJobDirRemovedOnStartup() throws Exception {
-    ExportJob.Id jobId = ExportJob.Id.newId();
-    Path orphan = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
-    Files.createDirectories(orphan);
-    exportManager.shutdown();
-    exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE,
-        TEST_MAX_TERMINAL_JOBS, () -> true);
-    assertFalse(Files.exists(orphan));
-  }
-
-  @Test
-  public void testIncompleteExportArtifactsRemovedOnStartup() throws Exception {
-    ExportJob.Id jobId = ExportJob.Id.newId();
-    Path jobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
-    Files.createDirectories(jobDir);
-    ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    ExportFileManager fileManager = new ExportFileManager(tempDir.getAbsolutePath());
-    File partialArchiveTemp = fileManager.resolveArchiveTempFile(scope, "2026-01-01-00-00-00", jobId);
-    assertTrue(partialArchiveTemp.createNewFile());
-
-    exportManager.shutdown();
-    exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE,
-        TEST_MAX_TERMINAL_JOBS, () -> true);
-
-    assertFalse(Files.exists(jobDir));
-    assertFalse(partialArchiveTemp.exists());
-  }
-
-  @Test
-  public void testCompletedExportTarRetainedOnRestart() throws Exception {
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(ids(1));
-    when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(2)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
-        .thenReturn(Collections.emptyList());
-
-    ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0, 0);
-    ExportJob.Status status = waitForTerminal(jobId);
-    assertEquals(ExportJob.ExecutionState.SUCCEEDED, status.getExecutionState());
-    File tar = new File(status.getTarPath());
-    assertTrue(tar.exists());
-
-    exportManager.shutdown();
-    exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE,
-        TEST_MAX_TERMINAL_JOBS, () -> true);
-    assertTrue(tar.exists());
-    assertNull(exportManager.getExportStatus(jobId));
-  }
-
-  @Test
-  public void testOrphanJobDirDoesNotDeleteCompletedTar() throws Exception {
-    ExportJob.Id jobId = ExportJob.Id.newId();
-    ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    ExportFileManager fileManager = new ExportFileManager(tempDir.getAbsolutePath());
-    File completedTar = fileManager.resolveArchiveFile(scope, "2026-01-01-00-00-00", jobId);
-    assertTrue(completedTar.createNewFile());
-    Path orphanJobDir = tempDir.toPath().resolve(ExportFileManager.exportJobDirName(jobId));
-    Files.createDirectories(orphanJobDir);
-
-    exportManager.shutdown();
-    exportManager = newExportManager(TEST_DEFAULT_SHARD_SIZE, TEST_DEFAULT_PAGE_SIZE,
-        TEST_MAX_TERMINAL_JOBS, () -> true);
-
-    assertTrue(completedTar.exists());
-    assertFalse(Files.exists(orphanJobDir));
   }
 
   @Test
@@ -612,7 +339,7 @@ public class TestContainerExportManager {
         });
 
     ExportJob.Id jobId = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING, 0, 0, 0);
+        ContainerHealthState.MISSING);
     assertNotNull(jobId);
 
     exportManager.shutdown();
@@ -621,10 +348,10 @@ public class TestContainerExportManager {
     exportManager = null;
   }
 
-  private ContainerExportManager newExportManager(int defaultShardSize, int defaultPageSize, int maxTerminalJobs,
+  private ContainerExportManager newExportManager(int shardSize, int pageSize,
       BooleanSupplier isLeaderReady) throws Exception {
     ContainerExportManager manager = new ContainerExportManager(TEST_SCM_ID, containerManager, isLeaderReady,
-        tempDir.getAbsolutePath(), defaultShardSize, defaultPageSize, maxTerminalJobs);
+        tempDir.getAbsolutePath(), shardSize, pageSize);
     manager.start();
     return manager;
   }

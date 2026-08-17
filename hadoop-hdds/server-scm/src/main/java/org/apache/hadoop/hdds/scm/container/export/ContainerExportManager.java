@@ -17,15 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.container.export;
 
-import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.DEFAULT_PAGE_SIZE;
-import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.DEFAULT_SHARD_SIZE;
-
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.Comparator;
-import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,7 +29,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
@@ -53,19 +46,18 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Job status is kept in memory only. On SCM restart or leader failover, in-flight jobs are lost
  * and the operator must re-submit on the new leader. {@link ExportFileManager} owns on-disk layout,
- * locking, shard files, and completed archives; this class tracks {@link ExportJob} state,
- * schedules work, and applies {@code maxTerminalJobs} eviction.
+ * locking, shard files, and completed archives; this class tracks {@link ExportJob} state and
+ * schedules work.
  */
 public class ContainerExportManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerExportManager.class);
 
-  //TODO: make ozone.scm.container.export.max.terminal.jobs configurable.
-  private static final int DEFAULT_MAX_TERMINAL_JOBS = 10;
+  private static final int DEFAULT_PAGE_SIZE = 100_000;
+  private static final int DEFAULT_SHARD_SIZE = 500_000;
   private static final long SHUTDOWN_TIMEOUT_MS = 5_000;
 
   private final Map<ExportJob.Id, ExportJob> jobMap = new ConcurrentHashMap<>();
-  private final Deque<String> completedArchivePaths = new ArrayDeque<>();
   private final AtomicReference<ExportJob.Id> runningJobId = new AtomicReference<>();
   private final ExecutorService workerPool;
   private final ContainerManager containerManager;
@@ -73,23 +65,20 @@ public class ContainerExportManager {
   private final BooleanSupplier isLeaderReady;
   private final int shardSize;
   private final int pageSize;
-  private final int maxTerminalJobs;
 
   public ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
       OzoneConfiguration conf) {
     this(scmId, containerManager, isLeaderReady,
-        ExportFileManager.resolveExportDirectory(conf),
-        DEFAULT_SHARD_SIZE, DEFAULT_PAGE_SIZE, DEFAULT_MAX_TERMINAL_JOBS);
+        ExportFileManager.resolveExportDirectory(conf), DEFAULT_SHARD_SIZE, DEFAULT_PAGE_SIZE);
   }
 
   ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
-      String exportDirectory, int shardSize, int pageSize, int maxTerminalJobs) {
+      String exportDirectory, int shardSize, int pageSize) {
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");
     this.fileManager = new ExportFileManager(exportDirectory);
     this.shardSize = shardSize;
     this.pageSize = pageSize;
-    this.maxTerminalJobs = maxTerminalJobs;
     this.workerPool = newWorkerPool(scmId);
   }
 
@@ -106,11 +95,8 @@ public class ContainerExportManager {
    */
   public void start() throws IOException {
     fileManager.start();
-    completedArchivePaths.clear();
-    completedArchivePaths.addAll(fileManager.listCompletedArchivePaths());
-    trimCompletedArchives();
-    LOG.info("ContainerExportManager started (dir={}, defaultShardSize={}, defaultPageSize={}, maxTerminalJobs={})",
-        fileManager.getExportDirectory(), shardSize, pageSize, maxTerminalJobs);
+    LOG.info("ContainerExportManager started (dir={}, shardSize={}, pageSize={})",
+        fileManager.getExportDirectory(), shardSize, pageSize);
   }
 
   /**
@@ -119,9 +105,7 @@ public class ContainerExportManager {
    * @return job id, or {@code null} if not leader or another export is already running
    */
   public ExportJob.Id submitJob(ContainerID start, LifeCycleState lifeCycleState,
-      ContainerHealthState healthState, long maxRows, int requestPageSize, int requestShardSize) {
-    final ExportSizing sizing = new ExportSizing(maxRows, requestPageSize, requestShardSize,
-        this.pageSize, this.shardSize);
+      ContainerHealthState healthState) {
     final ExportScope scope = ExportScope.of(lifeCycleState, healthState);
 
     if (!isLeaderReady.getAsBoolean()) {
@@ -137,14 +121,13 @@ public class ContainerExportManager {
     String jobStartTime = ExportFileManager.formatJobStartTime(now);
     String tarPath = fileManager.resolveArchiveFile(scope, jobStartTime, jobId).getAbsolutePath();
 
-    ExportJob job = new ExportJob(jobId, scope, jobStartTime, tarPath, start, sizing);
+    ExportJob job = new ExportJob(jobId, scope, jobStartTime, tarPath, start, pageSize, shardSize);
 
-    evictOldTerminalJobs();
     jobMap.put(jobId, job);
 
     workerPool.submit(() -> executeExport(job));
-    LOG.info("Submitted container ID export job {} (scope={}, start={}, maxRows={}, pageSize={}, shardSize={})",
-        jobId, scope, start, sizing.getMaxRows(), sizing.getPageSize(), sizing.getShardSize());
+    LOG.info("Submitted container ID export job {} (scope={}, start={}, pageSize={}, shardSize={})",
+        jobId, scope, start, pageSize, shardSize);
     return jobId;
   }
 
@@ -169,39 +152,6 @@ public class ContainerExportManager {
     } catch (IOException e) {
       LOG.warn("Failed to unlock container export directory", e);
     }
-  }
-
-  Map<ExportJob.Id, ExportJob> getJobMap() {
-    return jobMap;
-  }
-
-  private void evictOldTerminalJobs() {
-    List<Map.Entry<ExportJob.Id, ExportJob>> terminalJobs = jobMap.entrySet().stream()
-        .filter(e -> e.getValue().getExecutionState().isTerminal())
-        .sorted(Comparator.comparingLong(e -> e.getValue().getEndTimeNs()))
-        .collect(Collectors.toList());
-    int excess = terminalJobs.size() - maxTerminalJobs;
-    for (int i = 0; i < excess; i++) {
-      ExportJob evicted = terminalJobs.get(i).getValue();
-      removeCompletedArchive(evicted.getTarPath());
-      jobMap.remove(evicted.getId());
-    }
-    trimCompletedArchives();
-  }
-
-  private void trimCompletedArchives() {
-    while (completedArchivePaths.size() > maxTerminalJobs) {
-      removeCompletedArchive(completedArchivePaths.removeFirst());
-    }
-  }
-
-  private void removeCompletedArchive(String tarPath) {
-    if (tarPath == null) {
-      return;
-    }
-    fileManager.deleteExportTar(tarPath);
-    completedArchivePaths.remove(tarPath);
-    jobMap.entrySet().removeIf(e -> tarPath.equals(e.getValue().getTarPath()));
   }
 
   private void executeExport(ExportJob job) {
@@ -229,17 +179,8 @@ public class ContainerExportManager {
             throw new IOException("SCM lost leadership during export job " + jobIdValue);
           }
 
-          int fetchCount = job.getPageSize();
-          if (job.getMaxRows() > 0) {
-            long remaining = job.getMaxRows() - totalRows;
-            if (remaining <= 0) {
-              break;
-            }
-            fetchCount = (int) Math.min(fetchCount, remaining);
-          }
-
           List<ContainerID> page = containerManager.getContainerIDs(
-              cursor, fetchCount, job.getLifeCycleState(), job.getHealthState());
+              cursor, job.getPageSize(), job.getLifeCycleState(), job.getHealthState());
           if (page.isEmpty()) {
             break;
           }
@@ -287,25 +228,21 @@ public class ContainerExportManager {
       } else {
         fileManager.writeArchive(job.getId(), archivePath);
         job.completeWithArchive(archivePath);
-        completedArchivePaths.addLast(archivePath);
         LOG.info("Export job {} completed ({} rows, archive={}).",
             jobIdValue, totalRows, archivePath);
       }
       fileManager.deleteJobDirectory(job.getId());
     } catch (InterruptedException e) {
-      job.fail(e.getMessage());
       fileManager.cleanupFailedJob(job.getId(), archivePath);
+      job.fail(e.getMessage());
       LOG.info("Export job {} was cancelled", jobIdValue);
       Thread.currentThread().interrupt();
     } catch (IOException | RuntimeException e) {
-      job.fail(e.getMessage() != null ? e.getMessage() : e.toString());
       fileManager.cleanupFailedJob(job.getId(), archivePath);
+      job.fail(e.getMessage() != null ? e.getMessage() : e.toString());
       LOG.error("Export job {} failed", jobIdValue, e);
     } finally {
       runningJobId.compareAndSet(job.getId(), null);
-      if (job.getExecutionState().isTerminal()) {
-        evictOldTerminalJobs();
-      }
     }
   }
 

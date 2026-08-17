@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container.export;
 
-import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.EXPORT_SUBDIR;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
@@ -77,8 +75,7 @@ import org.slf4j.LoggerFactory;
  * {@link #cleanupFailedJob(ExportJob.Id, String)} on failure or cancel, and by {@link #start()} for every
  * leftover directory and temp file after SCM restart. Completed {@code .tar.gz} files are kept.
  *
- * <p><b>Completed {@code .tar.gz}</b> remains on disk until the export manager evicts it
- * ({@code maxTerminalJobs} in {@code ContainerExportManager}) via {@link #deleteExportTar(String)}.
+ * <p><b>Completed {@code .tar.gz}</b> files remain on disk.
  *
  * <p><b>SCM restart:</b> in-memory job status is lost. {@link #start()} acquires the export
  * directory lock and clears incomplete work.
@@ -88,6 +85,7 @@ final class ExportFileManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ExportFileManager.class);
 
+  static final String EXPORT_SUBDIR = "exports";
   static final String EXPORT_JOB_DIR_PREFIX = "export_";
   static final String EXPORT_ARCHIVE_JOB_INFIX = "_job";
   static final String EXPORT_ARCHIVE_SUFFIX = ".tar.gz";
@@ -233,17 +231,6 @@ final class ExportFileManager {
     }
     String jobId = nameWithoutSuffix.substring(jobIndex + EXPORT_ARCHIVE_JOB_INFIX.length());
     return UUIDUtil.isValidUuidString(jobId) ? ExportJob.Id.of(jobId) : null;
-  }
-
-  void deleteExportTar(String tarPath) {
-    if (tarPath == null) {
-      return;
-    }
-    File archive = new File(tarPath);
-    if (archive.isFile() && FileUtils.deleteQuietly(archive)) {
-      LOG.debug("Removed container export archive: {}", archive.getName());
-    }
-    FileUtils.deleteQuietly(AtomicFileOutputStream.getTemporaryFile(archive));
   }
 
   void cleanupFailedJob(ExportJob.Id jobId, String archivePath) {

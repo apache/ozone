@@ -21,7 +21,6 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -35,12 +34,11 @@ public final class ExportJob {
   private final ExportScope scope;
   private final String jobStartTime;
   private final ContainerID startContainerId;
-  private final ExportSizing sizing;
+  private final int pageSize;
+  private final int shardSize;
   private String tarPath;
   private ExecutionState executionState = ExecutionState.RUNNING;
   private long totalRows;
-  private long startTimeNs;
-  private long endTimeNs;
   private String errorMessage;
 
   /**
@@ -106,10 +104,6 @@ public final class ExportJob {
       return ExportJob.this.getTotalRows();
     }
 
-    public long getElapsedMs() {
-      return ExportJob.this.getElapsedMs();
-    }
-
     public String getTarPath() {
       return ExportJob.this.getTarPath();
     }
@@ -139,21 +133,18 @@ public final class ExportJob {
   }
 
   ExportJob(Id id, ExportScope scope, String jobStartTime, String tarPath, ContainerID startContainerId,
-      ExportSizing sizing) {
+      int pageSize, int shardSize) {
     this.id = id;
     this.scope = scope;
     this.jobStartTime = jobStartTime;
     this.tarPath = tarPath;
     this.startContainerId = startContainerId != null ? startContainerId : ContainerID.valueOf(0);
-    this.sizing = sizing;
+    this.pageSize = pageSize;
+    this.shardSize = shardSize;
   }
 
   Id getId() {
     return id;
-  }
-
-  String getJobStartTime() {
-    return jobStartTime;
   }
 
   ContainerID getStartContainerId() {
@@ -168,16 +159,12 @@ public final class ExportJob {
     return scope.getHealthState();
   }
 
-  long getMaxRows() {
-    return sizing.getMaxRows();
-  }
-
   int getPageSize() {
-    return sizing.getPageSize();
+    return pageSize;
   }
 
   int getShardSize() {
-    return sizing.getShardSize();
+    return shardSize;
   }
 
   synchronized String getTarPath() {
@@ -188,20 +175,8 @@ public final class ExportJob {
     return executionState;
   }
 
-  synchronized long getEndTimeNs() {
-    return endTimeNs;
-  }
-
   synchronized long getTotalRows() {
     return totalRows;
-  }
-
-  synchronized long getElapsedMs() {
-    if (startTimeNs <= 0) {
-      return 0;
-    }
-    long endNs = endTimeNs > 0 ? endTimeNs : System.nanoTime();
-    return TimeUnit.NANOSECONDS.toMillis(endNs - startTimeNs);
   }
 
   synchronized String getErrorMessage() {
@@ -212,7 +187,6 @@ public final class ExportJob {
     if (executionState.isTerminal()) {
       throw new IllegalStateException("Export job " + id + " is already terminal: " + executionState);
     }
-    startTimeNs = System.nanoTime();
   }
 
   synchronized void updateTotalRows(long rows) {
@@ -239,7 +213,6 @@ public final class ExportJob {
       throw new IllegalStateException("Export job " + id + " is already terminal: " + executionState);
     }
     executionState = terminalState;
-    endTimeNs = System.nanoTime();
   }
 
   Status toStatus() {
