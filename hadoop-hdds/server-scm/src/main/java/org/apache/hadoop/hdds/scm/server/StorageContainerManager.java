@@ -2095,7 +2095,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Get the safe mode status of all rules.
    *
-   * @return map of rule statuses.
+   * @return list of rule statuses.
    */
   public List<SafeModeRuleStatusProto> getRuleStatus() {
     return scmSafeModeManager.getRuleStatus();

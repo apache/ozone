@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRE
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -277,11 +276,8 @@ public class SCMSafeModeManager implements SafeModeManager {
   public List<SafeModeRuleStatusProto> getRuleStatus() {
     final List<SafeModeRuleStatusProto> protos = new ArrayList<>(exitRules.size());
     for (SafeModeExitRule<?> exitRule : exitRules.values()) {
-      protos.add(SafeModeRuleStatusProto.newBuilder()
-          .setRuleName(exitRule.getRuleName())
-          .setValidate(exitRule.validate())
-          .setStatusText(exitRule.getStatusText())
-          .build());
+      protos.add(SafeModeRuleStatusProto.newBuilder().setRuleName(exitRule.getRuleName())
+          .setValidate(exitRule.validate()).setStatusText(exitRule.getStatusText()).build());
     }
     return protos;
   }
