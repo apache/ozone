@@ -85,6 +85,7 @@ import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
 import org.apache.ratis.proto.RaftProtos.StateMachineEntryProto;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
+import org.apache.ratis.io.MD5Hash;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroup;
@@ -96,6 +97,7 @@ import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
+import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.StateMachineStorage;
@@ -109,6 +111,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
+import org.apache.ratis.util.MD5FileUtil;
 import org.apache.ratis.util.TaskQueue;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -434,6 +437,9 @@ public class ContainerStateMachine extends BaseStateMachine {
             snapshotFile);
         throw ioe;
       }
+      final MD5Hash md5 = MD5FileUtil.computeAndSaveMd5ForFile(snapshotFile);
+      final FileInfo fileInfo = new FileInfo(snapshotFile.toPath(), md5);
+      storage.updateLatestSnapshot(new SingleFileSnapshotInfo(fileInfo, ti));
       LOG.info("{}: Finished taking a snapshot at:{} file:{} took: {} ms",
               getGroupId(), ti, snapshotFile, (Time.monotonicNow() - startTime));
       return ti.getIndex();
