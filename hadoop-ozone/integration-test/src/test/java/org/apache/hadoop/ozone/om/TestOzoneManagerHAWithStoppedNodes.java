@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.io.IOException;
 import java.net.ConnectException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -38,11 +39,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.ipc_.RPC;
@@ -69,8 +72,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.retry.RetryPolicies;
+import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.AfterEach;
@@ -79,6 +86,7 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.LoggerFactory;
 
 /**
  * Ozone Manager HA tests that stop/restart one or more OM nodes.
@@ -86,6 +94,8 @@ import org.junit.jupiter.api.TestMethodOrder;
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
+  private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(
+      TestOzoneManagerHAWithStoppedNodes.class);
 
   static {
     setExtraClusterConfig(c -> c.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "2s"));
@@ -325,10 +335,9 @@ public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
       createKey(ozoneBucket);
     }
 
-    final long snapshotIndexBeforeNewKeys = leaderOMSnaphsotIndex;
-    GenericTestUtils.waitFor(() -> followerOM1.getOmRatisServer()
-            .getLastAppliedTermIndex().getIndex() > snapshotIndexBeforeNewKeys,
-        100, 200000);
+    final long followerOM1LastAppliedIndexNew =
+        followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
+    assertThat(followerOM1LastAppliedIndexNew).isGreaterThan(leaderOMSnaphsotIndex);
   }
 
   @Test
@@ -650,12 +659,11 @@ public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
         omLeader.getOmServerProtocol().processRequest(omRequest);
     assertTrue(omResponse.getSuccess());
 
-    // Shutdown the current leader and wait for a new leader to be elected.
-    final String oldLeaderId = omLeader.getOMNodeId();
+    // Make one of the follower OM the leader, and shutdown the current leader.
+    OzoneManager newLeader = cluster.getOzoneManagersList().stream().filter(
+        om -> !om.getOMNodeId().equals(omLeader.getOMNodeId())).findFirst().get();
+    transferLeader(omLeader, newLeader);
     cluster.shutdownOzoneManager(omLeader);
-    waitForLeaderToBeReady();
-    OzoneManager newLeader = cluster.getOMLeader();
-    assertNotEquals(oldLeaderId, newLeader.getOMNodeId());
 
     // Once the rename completes, the source key should no longer exist
     // and the destination key should exist.
@@ -667,6 +675,30 @@ public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
     // Submit rename request to OM again. The request is cached so it will succeed.
     omResponse = newLeader.getOmServerProtocol().processRequest(omRequest);
     assertTrue(omResponse.getSuccess());
+  }
+
+  private void transferLeader(OzoneManager omLeader, OzoneManager newLeader) throws IOException {
+    LOG.info("Transfer leadership from {}(raft id {}) to {}(raft id {})",
+        omLeader.getOMNodeId(), omLeader.getOmRatisServer().getRaftPeerId(),
+        newLeader.getOMNodeId(), newLeader.getOmRatisServer().getRaftPeerId());
+
+    final SupportedRpcType rpc = SupportedRpcType.GRPC;
+    final RaftProperties properties = RatisHelper.newRaftProperties(rpc);
+
+    // For now not making anything configurable, RaftClient  is only used
+    // in SCM for DB updates of sub-ca certs go via Ratis.
+    RaftClient.Builder builder = RaftClient.newBuilder()
+        .setRaftGroup(omLeader.getOmRatisServer().getRaftGroup())
+        .setLeaderId(null)
+        .setProperties(properties)
+        .setRetryPolicy(
+            RetryPolicies.retryUpToMaximumCountWithFixedSleep(120,
+                TimeDuration.valueOf(500, TimeUnit.MILLISECONDS)));
+    try (RaftClient raftClient = builder.build()) {
+      RaftClientReply reply = raftClient.admin().transferLeadership(newLeader.getOmRatisServer()
+          .getRaftPeerId(), 10 * 1000);
+      assertTrue(reply.isSuccess());
+    }
   }
 
   private void validateVolumesList(Set<String> expectedVolumes,
