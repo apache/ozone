@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
@@ -48,6 +50,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
@@ -133,6 +136,7 @@ public class TestBlockDataStreamOutput {
         .setNumDatanodes(5)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setCurrentVersion(DN_OLD_VERSION)
+            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION)
             .build())
         .build();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
@@ -337,24 +341,22 @@ public class TestBlockDataStreamOutput {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       // Verify all DNs internally have versions set correctly
-      // List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
-      // for (HddsDatanodeService dn : dns) {
-      //   DatanodeDetails details = dn.getDatanodeDetails();
-      //   assertEquals(DN_OLD_VERSION,
-      //       details.getCurrentVersion());
-      // }
+      List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
+      for (HddsDatanodeService dn : dns) {
+        DatanodeDetails details = dn.getDatanodeDetails();
+        assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
+      }
 
       String keyName = getKeyName();
       OzoneDataStreamOutput key = createKey(client, keyName, 1);
       KeyDataStreamOutput keyDataStreamOutput = (KeyDataStreamOutput) key.getByteBufStreamOutput();
       BlockDataStreamOutputEntry stream = keyDataStreamOutput.getStreamEntries().get(0);
 
-      // Now check 3 DNs in a random pipeline returns the correct DN versions
-      // List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
-      // for (DatanodeDetails details : streamDnDetails) {
-      //   assertEquals(DN_OLD_VERSION,
-      //       details.getCurrentVersion());
-      // }
+     // Now check 3 DNs in a random pipeline returns the correct DN versions
+      List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
+      for (DatanodeDetails details : streamDnDetails) {
+        assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
+      }
     }
   }
 }

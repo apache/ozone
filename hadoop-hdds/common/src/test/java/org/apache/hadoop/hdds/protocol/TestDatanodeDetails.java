@@ -73,21 +73,17 @@ public class TestDatanodeDetails {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
         .collect(Collectors.toSet());
-    HddsProtos.DatanodeDetailsProto.Builder protoBuilder =
-        dn.toProtoBuilder(ClientVersion.CURRENT, requiredPorts);
+    HddsProtos.DatanodeDetailsProto.Builder protoBuilder = dn.toProtoBuilder(ClientVersion.CURRENT, requiredPorts);
     protoBuilder.clearCurrentVersion();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.DEFAULT_VERSION,
-        dn2.getCurrentVersion());
+    assertEquals(HDDSVersion.DEFAULT_VERSION, dn2.getCurrentVersion());
 
     // When the proto field is present, it round-trips correctly.
-    protoBuilder =
-        dn.toProtoBuilder(ClientVersion.CURRENT, requiredPorts);
+    protoBuilder = dn.toProtoBuilder(ClientVersion.CURRENT, requiredPorts);
     DatanodeDetails dn3 = DatanodeDetails.newBuilder(
         protoBuilder.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION.serialize()).build())
         .build();
-    assertEquals(HDDSVersion.SOFTWARE_VERSION,
-        dn3.getCurrentVersion());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION, dn3.getCurrentVersion());
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,

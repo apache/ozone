@@ -34,9 +34,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Upgrade action for TASK_STATUS_STATISTICS feature layout change, which adds
+ * Upgrade action for TASK_STATUS_STATISTICS version, which adds
  * <code>last_task_run_status</code> and <code>current_task_run_status</code> columns to
  * {@link ReconTaskSchemaDefinition} in case it is missing .
+ * <p>
+ * It also applies the UNHEALTHY_CONTAINERS check constraint which must be run with Recon's first version increase.
  */
 @ReconUpgradeActionForVersion(version = ReconVersion.TASK_STATUS_STATISTICS)
 public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
@@ -73,6 +75,8 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
   @Override
   public void execute(DataSource dataSource) throws DataAccessException, SQLException {
+    ReconUpgradeAction.updateUnhealthyContainerStatesConstraint(dataSource, LOG);
+
     try (Connection conn = dataSource.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
         return;
