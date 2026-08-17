@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -68,11 +69,27 @@ public class ChecksumVerifier implements ReplicaVerifier {
       return BlockVerificationResult.pass();
     } catch (IOException e) {
       Throwable cause = e.getCause() != null ? e.getCause() : e;
+      StorageContainerException storageContainerException = findStorageContainerException(e);
+      if (storageContainerException != null
+          && storageContainerException.getResult() == org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK) {
+        return BlockVerificationResult.failCheckAndRefreshKeyLocation(storageContainerException.getMessage());
+      }
       if (cause instanceof OzoneChecksumException) {
         return BlockVerificationResult.failCheck(cause.getMessage());
       } else {
         return BlockVerificationResult.failIncomplete(cause.getMessage());
       }
     }
+  }
+
+  private static StorageContainerException findStorageContainerException(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      if (current instanceof StorageContainerException) {
+        return (StorageContainerException) current;
+      }
+      current = current.getCause();
+    }
+    return null;
   }
 }

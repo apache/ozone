@@ -341,6 +341,32 @@ public class ReplicasVerify extends Handler {
       return;
     }
 
+    KeyVerificationResult keyVerificationResult = verifyKey(keyInfo, volumeName, bucketName, keyName);
+    if (keyVerificationResult.shouldRefreshKeyLocation()) {
+      OmKeyInfo refreshedKeyInfo = ozoneClient.getProxy().getKeyInfo(
+          volumeName, bucketName, keyName, true);
+      keyVerificationResult = verifyKey(refreshedKeyInfo, volumeName, bucketName, keyName);
+    }
+
+    keyVerificationResult.getKeyNode().put("pass", keyVerificationResult.passed());
+    if (keyVerificationResult.passed()) {
+      keysPassed.incrementAndGet();
+    } else {
+      keysFailed.incrementAndGet();
+      allKeysPassed.set(false);
+      keyVerificationResult.getFailedVerificationTypes().forEach(failedType -> failuresByType
+          .computeIfAbsent(failedType, k -> new AtomicInteger(0))
+          .incrementAndGet()
+      );
+    }
+
+    if (!keyVerificationResult.passed() || allResults) {
+      keysArray.add(keyVerificationResult.getKeyNode());
+    }
+  }
+
+  private KeyVerificationResult verifyKey(
+      OmKeyInfo keyInfo, String volumeName, String bucketName, String keyName) {
     ObjectNode keyNode = JsonUtils.createObjectNode(null);
     keyNode.put("volumeName", volumeName);
     keyNode.put("bucketName", bucketName);
@@ -348,6 +374,7 @@ public class ReplicasVerify extends Handler {
 
     ArrayNode blocksArray = keyNode.putArray("blocks");
     boolean keyPass = true;
+    boolean shouldRefreshKeyLocation = false;
     Set<String> failedVerificationTypes = new HashSet<>();
 
     for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
@@ -378,6 +405,9 @@ public class ReplicasVerify extends Handler {
           checkNode.put("type", verifier.getType());
           checkNode.put("completed", result.isCompleted());
           checkNode.put("pass", result.passed());
+          if (result.shouldRefreshKeyLocation()) {
+            shouldRefreshKeyLocation = true;
+          }
 
           ArrayNode failuresArray = checkNode.putArray("failures");
           for (String failure : result.getFailures()) {
@@ -401,20 +431,37 @@ public class ReplicasVerify extends Handler {
       }
     }
 
-    keyNode.put("pass", keyPass);
-    if (keyPass) {
-      keysPassed.incrementAndGet();
-    } else {
-      keysFailed.incrementAndGet();
-      allKeysPassed.set(false);
-      failedVerificationTypes.forEach(failedType -> failuresByType
-          .computeIfAbsent(failedType, k -> new AtomicInteger(0))
-          .incrementAndGet()
-      );
+    return new KeyVerificationResult(keyNode, keyPass, failedVerificationTypes, shouldRefreshKeyLocation);
+  }
+
+  private static final class KeyVerificationResult {
+    private final ObjectNode keyNode;
+    private final boolean pass;
+    private final Set<String> failedVerificationTypes;
+    private final boolean refreshKeyLocation;
+
+    private KeyVerificationResult(ObjectNode keyNode, boolean pass, Set<String> failedVerificationTypes,
+        boolean refreshKeyLocation) {
+      this.keyNode = keyNode;
+      this.pass = pass;
+      this.failedVerificationTypes = failedVerificationTypes;
+      this.refreshKeyLocation = refreshKeyLocation;
     }
 
-    if (!keyPass || allResults) {
-      keysArray.add(keyNode);
+    private ObjectNode getKeyNode() {
+      return keyNode;
+    }
+
+    private boolean passed() {
+      return pass;
+    }
+
+    private Set<String> getFailedVerificationTypes() {
+      return failedVerificationTypes;
+    }
+
+    private boolean shouldRefreshKeyLocation() {
+      return refreshKeyLocation;
     }
   }
 
