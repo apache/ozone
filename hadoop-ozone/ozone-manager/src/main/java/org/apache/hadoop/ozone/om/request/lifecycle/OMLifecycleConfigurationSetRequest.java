@@ -232,20 +232,18 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
           int daysAfterInitiation = action.getAbortIncompleteMultipartUpload().getDaysAfterInitiation();
           long daysAfterInitiationMillis = TimeUnit.DAYS.toMillis(daysAfterInitiation);
           if (daysAfterInitiationMillis >= expireThresholdMillis) {
-            long expireThresholdDays = TimeUnit.MILLISECONDS.toDays(expireThresholdMillis);
+            String expireThresholdConfig = ozoneManager.getConfiguration().get(
+                OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD,
+                OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT);
             throw new OMException(
                 "Invalid lifecycle configuration: rule '" + rule.getId() + "' has an " +
                 "AbortIncompleteMultipartUpload action with daysAfterInitiation=" + daysAfterInitiation +
-                " day(s), which is greater than or equal to the cluster MPU expire threshold " +
-                expireThresholdDays + " day(s) (" +
-                OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + "=" +
-                ozoneManager.getConfiguration().get(
-                    OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD,
-                    OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT) +
+                " day(s), which is not less than the cluster MPU expire threshold (" +
+                OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + "=" + expireThresholdConfig +
                 "). The MultipartUploadCleanupService will clean up the upload before the " +
                 "lifecycle rule fires, making the rule ineffective. " +
-                "Set daysAfterInitiation to a value less than " + expireThresholdDays +
-                " day(s), or increase " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + ".",
+                "Set daysAfterInitiation to a value less than " + expireThresholdConfig +
+                ", or increase " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + ".",
                 OMException.ResultCodes.INVALID_REQUEST);
           }
         }

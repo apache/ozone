@@ -1553,7 +1553,7 @@
 
       Interaction with S3 lifecycle AbortIncompleteMultipartUpload rules:
       When a bucket lifecycle rule specifies an AbortIncompleteMultipartUpload action, its
-      daysAfterInitiation value must be strictly not greater than this threshold (in days). If
+      daysAfterInitiation value must be strictly less than this threshold. If
       daysAfterInitiation is greater than or equal to this threshold, MultipartUploadCleanupService
       will abort the upload before the lifecycle rule fires, silently making the rule ineffective.
       Ozone enforces this constraint at lifecycle configuration creation time and will reject
