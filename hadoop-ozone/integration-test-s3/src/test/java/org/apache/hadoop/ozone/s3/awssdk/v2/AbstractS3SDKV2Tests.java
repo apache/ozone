@@ -2538,7 +2538,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         .prefix("")
         .status(ExpirationStatus.ENABLED)
         .abortIncompleteMultipartUpload(AbortIncompleteMultipartUpload.builder()
-            .daysAfterInitiation(30)
+            .daysAfterInitiation(29)
             .build())
         .build();
 
@@ -2583,7 +2583,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("abort-incomplete-mpu-no-filter", retrievedRule4.id());
     assertEquals("", retrievedRule4.prefix());
     assertEquals(ExpirationStatus.ENABLED, retrievedRule4.status());
-    assertEquals(30, retrievedRule4.abortIncompleteMultipartUpload().daysAfterInitiation());
+    assertEquals(29, retrievedRule4.abortIncompleteMultipartUpload().daysAfterInitiation());
   }
 
   /**
