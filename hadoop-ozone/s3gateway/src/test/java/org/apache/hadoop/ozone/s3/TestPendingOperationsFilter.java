@@ -18,15 +18,18 @@
 package org.apache.hadoop.ozone.s3;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.List;
@@ -88,6 +91,7 @@ public class TestPendingOperationsFilter {
     assertEquals(1L, metrics.getPendingOperations() - before);
 
     ContainerResponseContext response = mock(ContainerResponseContext.class);
+    when(response.hasEntity()).thenReturn(true);
     when(response.getEntityStream()).thenReturn(new ByteArrayOutputStream());
     ArgumentCaptor<OutputStream> wrapped =
         ArgumentCaptor.forClass(OutputStream.class);
@@ -105,6 +109,59 @@ public class TestPendingOperationsFilter {
 
     // A second close must not drive the gauge negative.
     wrapped.getValue().close();
+    assertEquals(before, metrics.getPendingOperations());
+  }
+
+  @Test
+  public void bodylessStreamingGetObjectDecrementsImmediately() throws Exception {
+    S3GatewayMetrics metrics = S3GatewayMetrics.create(new OzoneConfiguration());
+    filter.setResourceInfo(objectEndpointGetResourceInfo());
+    ContainerRequestContext request = mockRequestContext("GET");
+
+    long before = metrics.getPendingOperations();
+    filter.filter(request);
+
+    // A GetObject with no body (for example 304 Not Modified): the entity
+    // stream would never be closed, so the count must be released right away.
+    ContainerResponseContext response = mock(ContainerResponseContext.class);
+    when(response.hasEntity()).thenReturn(false);
+
+    filter.filter(request, response);
+
+    assertEquals(before, metrics.getPendingOperations());
+    verify(response, never()).setEntityStream(any());
+  }
+
+  @Test
+  public void decrementsEvenWhenStreamCloseThrows() throws Exception {
+    S3GatewayMetrics metrics = S3GatewayMetrics.create(new OzoneConfiguration());
+    filter.setResourceInfo(objectEndpointGetResourceInfo());
+    ContainerRequestContext request = mockRequestContext("GET");
+
+    long before = metrics.getPendingOperations();
+    filter.filter(request);
+
+    ContainerResponseContext response = mock(ContainerResponseContext.class);
+    when(response.hasEntity()).thenReturn(true);
+    OutputStream failing = new OutputStream() {
+      @Override
+      public void write(int b) {
+      }
+
+      @Override
+      public void close() throws IOException {
+        throw new IOException("close failed");
+      }
+    };
+    when(response.getEntityStream()).thenReturn(failing);
+    ArgumentCaptor<OutputStream> wrapped =
+        ArgumentCaptor.forClass(OutputStream.class);
+
+    filter.filter(request, response);
+    verify(response).setEntityStream(wrapped.capture());
+
+    // close() propagates its failure, but the count is still released.
+    assertThrows(IOException.class, () -> wrapped.getValue().close());
     assertEquals(before, metrics.getPendingOperations());
   }
 

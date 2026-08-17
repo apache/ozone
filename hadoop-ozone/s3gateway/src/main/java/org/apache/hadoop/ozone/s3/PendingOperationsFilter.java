@@ -82,7 +82,10 @@ public class PendingOperationsFilter implements ContainerRequestFilter,
     requestContext.removeProperty(COUNTED_METRICS);
     final S3GatewayMetrics metrics = (S3GatewayMetrics) counted;
 
-    if (isStreamingGetObject(requestContext)) {
+    // Defer the decrement only when there is a body to stream. A body-less
+    // response (for example 304 Not Modified) has an entity stream that the
+    // container never closes, so decrement it immediately instead.
+    if (isStreamingGetObject(requestContext) && responseContext.hasEntity()) {
       OutputStream out = responseContext.getEntityStream();
       if (out != null) {
         // Decrement only once the body has been fully streamed to the client.
@@ -90,9 +93,13 @@ public class PendingOperationsFilter implements ContainerRequestFilter,
         responseContext.setEntityStream(new WrappedOutputStream(out) {
           @Override
           public void close() throws IOException {
-            super.close();
-            if (decremented.compareAndSet(false, true)) {
-              metrics.decrPendingOperations();
+            // finally, so a failure while closing still releases the count.
+            try {
+              super.close();
+            } finally {
+              if (decremented.compareAndSet(false, true)) {
+                metrics.decrPendingOperations();
+              }
             }
           }
         });
