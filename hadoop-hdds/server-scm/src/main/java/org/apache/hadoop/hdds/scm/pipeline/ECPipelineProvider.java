@@ -148,7 +148,7 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
     // Use insecureRandomId for throwaway read pipeline IDs to avoid
     // contention on the shared SecureRandom instance.
-    // Read Pipelines do not require storage tiers, so no supported tier is set.
+    // Read Pipelines do not require storage tiers, so the calculation of storage tiers can be omitted.
     return newPipelineBuilder(replicationConfig, dns)
         .setId(PipelineID.insecureRandomId())
         .setReplicaIndexes(map)
