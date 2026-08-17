@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.utils;
 
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 /**
@@ -44,6 +45,24 @@ public final class ClientCommandsUtils {
       return getSmallFileRequest.getReadChunkVersion();
     } else {
       return ContainerProtos.ReadChunkVersion.V0;
+    }
+  }
+
+  /**
+   * Returns the write pipeline (component) version the client asked the datanode
+   * to execute the write at, as set by the client from the SCM-provided pipeline
+   * version (HDDS-15641 / HDDS-15718). When the request does not carry the field
+   * (a client predating zero downtime upgrade support), the datanode defaults to
+   * {@link HDDSVersion#STREAM_BLOCK_SUPPORT}, the last component version before ZDU,
+   * so the write keeps pre-ZDU behavior. This matches the value SCM advertises for
+   * pipelines while the cluster has not finalized ZDU.
+   */
+  public static int getWritePipelineVersion(
+      ContainerProtos.ContainerCommandRequestProto request) {
+    if (request.hasWritePipelineVersion()) {
+      return request.getWritePipelineVersion();
+    } else {
+      return HDDSVersion.STREAM_BLOCK_SUPPORT.serialize();
     }
   }
 }

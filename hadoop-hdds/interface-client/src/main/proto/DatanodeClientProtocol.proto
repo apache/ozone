@@ -199,6 +199,8 @@ message ContainerCommandRequestProto {
   optional   EchoRequestProto echo = 26;
   optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
   optional   ReadBlockRequestProto readBlock = 28;
+  // Write version of the pipeline as set by SCM in DatanodeDetails.currentVersion
+  optional   uint32 writePipelineVersion = 29;
 }
 
 message ContainerCommandResponseProto {
