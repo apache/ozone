@@ -224,7 +224,7 @@ public class TestContainerStateManagerIntegration {
   @Test
   @Flaky("HDDS-1159")
   public void testGetMatchingContainerMultipleThreads()
-      throws IOException, InterruptedException {
+      throws IOException {
     ContainerWithPipeline container1 = scm.getClientProtocolServer().
         allocateContainer(SCMTestUtils.getReplicationType(conf),
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
@@ -234,8 +234,9 @@ public class TestContainerStateManagerIntegration {
 
     // allocate blocks using multiple threads
     int numBlockAllocates = 100000;
+    CompletableFuture<?>[] futures = new CompletableFuture[numBlockAllocates];
     for (int i = 0; i < numBlockAllocates; i++) {
-      CompletableFuture.supplyAsync(() -> {
+      futures[i] = CompletableFuture.supplyAsync(() -> {
         ContainerInfo info = containerManager
             .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
                 container1.getPipeline());
@@ -244,12 +245,12 @@ public class TestContainerStateManagerIntegration {
         return null;
       }, executor);
     }
+    CompletableFuture.allOf(futures).join();
 
     // make sure pipeline has has numContainerPerOwnerInPipeline number of
     // containers.
     assertEquals(numContainerPerOwnerInPipeline, scm.getPipelineManager()
             .getNumberOfContainers(container1.getPipeline().getId()));
-    Thread.sleep(5000);
     long threshold = 2000;
     // check the way the block allocations are distributed in the different
     // containers.
