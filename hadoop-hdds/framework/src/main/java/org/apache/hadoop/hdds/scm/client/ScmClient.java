@@ -276,7 +276,7 @@ public interface ScmClient extends Closeable {
   /**
    * Get the safe mode status of all rules.
    *
-   * @return map of rule statuses.
+   * @return list of rule statuses.
    * @throws IOException
    */
   List<SafeModeRuleStatusProto> getSafeModeRuleStatuses() throws IOException;
