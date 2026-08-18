@@ -87,6 +87,7 @@ function set_outputs_run_everything_and_exit() {
                        | cut -f1 -d'.')
     compile_needed=true
     compose_tests_needed=true
+    infer_needed=true
     integration_tests_needed=true
     kubernetes_tests_needed=true
 
@@ -98,6 +99,7 @@ function set_outputs_run_everything_and_exit() {
 function set_output_skip_all_tests_and_exit() {
     BASIC_CHECKS=""
     compose_tests_needed=false
+    infer_needed=false
     integration_tests_needed=false
     kubernetes_tests_needed=false
 
@@ -456,7 +458,7 @@ function check_needs_infer() {
     filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
-        add_basic_check infer
+        infer_needed=true
     fi
 
     start_end::group_end
@@ -555,6 +557,7 @@ function set_outputs() {
     initialization::ga_output needs-build "${build_needed:-false}"
     initialization::ga_output needs-compile "${compile_needed}"
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
+    initialization::ga_output needs-infer "${infer_needed:-false}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
     initialization::ga_output needs-kubernetes-tests "${kubernetes_tests_needed}"
 }
