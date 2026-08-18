@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
  * NOTE this is temporarily needed class. When SCM containers are full-fledged,
  * this interface will likely be removed.
  */
+@InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface ScmClient extends Closeable {
   /**
