@@ -198,7 +198,6 @@ jobs:
     needs:
       - build-info
     if: needs.build-info.outputs.needs-basic-check == 'true'
-    continue-on-error: ${{ matrix.check == 'infer' }}
     uses: ./.github/workflows/check.yml
     with:
       checkout-fetch-depth: ${{ matrix.check != 'bats' && 1 || 0 }}
