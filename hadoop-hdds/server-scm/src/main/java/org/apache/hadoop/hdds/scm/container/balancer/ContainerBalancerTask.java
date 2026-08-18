@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -581,9 +582,9 @@ public class ContainerBalancerTask implements Runnable {
         metrics.incrementNumDatanodesUnbalanced(1);
 
         // amount of bytes greater than upper limit in this node
-        long overUtilizedBytes = ratioToBytes(
+        long overUtilizedBytes = ContainerBalancerClusterAnalyzer.ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-            utilization) - ratioToBytes(
+            utilization) - ContainerBalancerClusterAnalyzer.ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             upperLimit);
         totalOverUtilizedBytes += overUtilizedBytes;
@@ -592,9 +593,9 @@ public class ContainerBalancerTask implements Runnable {
         metrics.incrementNumDatanodesUnbalanced(1);
 
         // amount of bytes lesser than lower limit in this node
-        long underUtilizedBytes = ratioToBytes(
+        long underUtilizedBytes = ContainerBalancerClusterAnalyzer.ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-            lowerLimit) - ratioToBytes(
+            lowerLimit) - ContainerBalancerClusterAnalyzer.ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             utilization);
         totalUnderUtilizedBytes += underUtilizedBytes;
@@ -1105,17 +1106,6 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   /**
-   * Calculates the number of used bytes given capacity and utilization ratio.
-   *
-   * @param nodeCapacity     capacity of the node.
-   * @param utilizationRatio used space by capacity ratio of the node.
-   * @return number of bytes
-   */
-  private long ratioToBytes(Long nodeCapacity, double utilizationRatio) {
-    return (long) (nodeCapacity * utilizationRatio);
-  }
-
-  /**
    * Calculates the average utilization for the specified nodes.
    * Utilization is (capacity - remaining) divided by capacity.
    *
@@ -1129,14 +1119,14 @@ public class ContainerBalancerTask implements Runnable {
           "ContainerBalancer.");
       return 0;
     }
-    long totalCapacity = 0;
-    long totalRemaining = 0;
+    SCMNodeStat aggregatedStats = new SCMNodeStat(0, 0, 0, 0, 0, 0);
     for (DatanodeUsageInfo node : nodes) {
-      totalCapacity += node.getScmNodeStat().getCapacity().get();
-      totalRemaining += node.getScmNodeStat().getRemaining().get();
+      aggregatedStats.add(node.getScmNodeStat());
     }
+    long clusterCapacity = aggregatedStats.getCapacity().get();
+    long clusterRemaining = aggregatedStats.getRemaining().get();
     return ContainerBalancerClusterAnalyzer.calculateAvgUtilization(
-        totalCapacity, totalRemaining);
+        clusterCapacity, clusterRemaining);
   }
 
   /**

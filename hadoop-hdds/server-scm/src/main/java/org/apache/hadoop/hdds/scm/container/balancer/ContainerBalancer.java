@@ -660,14 +660,8 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
 
   static boolean shouldExcludeDatanode(DatanodeDetails datanode,
       Set<String> excludeNodes, Set<String> includeNodes) {
-    if (excludeNodes.contains(datanode.getHostName()) ||
-        excludeNodes.contains(datanode.getIpAddress())) {
-      return true;
-    } else if (!includeNodes.isEmpty()) {
-      return !includeNodes.contains(datanode.getHostName()) &&
-          !includeNodes.contains(datanode.getIpAddress());
-    }
-    return false;
+    return ContainerBalancerClusterAnalyzer.shouldExcludeDatanode(
+        datanode, excludeNodes, includeNodes);
   }
 
   public ContainerBalancerMetrics getMetrics() {

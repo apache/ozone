@@ -55,7 +55,6 @@ public final class ContainerBalancerClusterSnapshot {
       int targetCount,
       long totalOverUtilizedBytes,
       long totalUnderUtilizedBytes,
-      long bytesToMove,
       double imbalance,
       List<String> topSourceNodeHostnames,
       List<String> bottomTargetNodeHostnames) {
@@ -70,7 +69,7 @@ public final class ContainerBalancerClusterSnapshot {
     this.targetCount = targetCount;
     this.totalOverUtilizedBytes = totalOverUtilizedBytes;
     this.totalUnderUtilizedBytes = totalUnderUtilizedBytes;
-    this.bytesToMove = bytesToMove;
+    this.bytesToMove = totalOverUtilizedBytes;
     this.imbalance = imbalance;
     this.topSourceNodeHostnames = Collections.unmodifiableList(
         Objects.requireNonNull(topSourceNodeHostnames));

@@ -135,24 +135,22 @@ public final class ContainerBalancerClusterAnalyzer {
         targets.size(),
         totalOverUtilizedBytes,
         totalUnderUtilizedBytes,
-        totalOverUtilizedBytes,
         imbalance,
         topHostnames(sources),
         topHostnames(targets));
   }
 
   /**
-   * Same rules as {@code ContainerBalancer.shouldExcludeDatanode}.
+   * Function that excludes is datanode should be excluded or not.
+   * The node is in exclude set or the node is not in include set
+   * when include set is not empty.
    */
-  public static boolean shouldExcludeDatanode(
-      DatanodeDetails datanode,
-      Set<String> excludeNodes,
-      Set<String> includeNodes) {
+  public static boolean shouldExcludeDatanode(DatanodeDetails datanode,
+                                       Set<String> excludeNodes, Set<String> includeNodes) {
     if (excludeNodes.contains(datanode.getHostName()) ||
         excludeNodes.contains(datanode.getIpAddress())) {
       return true;
-    }
-    if (!includeNodes.isEmpty()) {
+    } else if (!includeNodes.isEmpty()) {
       return !includeNodes.contains(datanode.getHostName()) &&
           !includeNodes.contains(datanode.getIpAddress());
     }
@@ -184,7 +182,14 @@ public final class ContainerBalancerClusterAnalyzer {
     return eligible;
   }
 
-  private static long ratioToBytes(long nodeCapacity, double utilizationRatio) {
+  /**
+   * Calculates the number of used bytes given capacity and utilization ratio.
+   *
+   * @param nodeCapacity     capacity of the node.
+   * @param utilizationRatio used space by capacity ratio of the node.
+   * @return number of bytes
+   */
+  public static long ratioToBytes(long nodeCapacity, double utilizationRatio) {
     return (long) (nodeCapacity * utilizationRatio);
   }
 
@@ -215,7 +220,6 @@ public final class ContainerBalancerClusterAnalyzer {
         0,
         thresholdRatio,
         -thresholdRatio,
-        0,
         0,
         0,
         0,
