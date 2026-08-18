@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.slf4j.event.Level.INFO;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,6 +51,8 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -105,6 +109,29 @@ public class TestContainerBalancerSelectionCriteria {
             false, false, false));
 
     assertTrue(criteria.shouldBeExcluded(containerID, source, 0L));
+  }
+
+  @Test
+  public void shouldLogUnhealthyContainersAtInfo() {
+    when(replicationManager.getContainerReplicationHealth(eq(containerInfo), anySet())).thenReturn(
+        new ContainerHealthResult.UnderReplicatedHealthResult(containerInfo, 1,
+            false, false, false));
+
+    GenericTestUtils.setLogLevel(ContainerBalancerSelectionCriteria.class, INFO);
+    LogCapturer logCapturer = LogCapturer.captureLogs(ContainerBalancerSelectionCriteria.class);
+    try {
+      assertTrue(criteria.shouldBeExcluded(containerID, source, 0L));
+      assertThat(logCapturer.getOutput())
+          .contains("Excluding container", "as its health is UNDER_REPLICATED.");
+
+      logCapturer.clearOutput();
+      balancerConfiguration.setIncludeNonStandardContainers(true);
+      assertTrue(criteria.shouldBeExcluded(containerID, source, 0L));
+      assertThat(logCapturer.getOutput())
+          .contains("Excluding container", "as its health is UNDER_REPLICATED.");
+    } finally {
+      logCapturer.stopCapturing();
+    }
   }
 
   @Test
