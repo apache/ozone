@@ -69,6 +69,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.security.PrivilegedExceptionAction;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -2636,6 +2637,37 @@ class TestKeyLifecycleService extends OzoneTestBase {
         deleteLifecyclePolicy(volumeName, bucketName);
         log.stopCapturing();
       }
+    }
+
+    @Test
+    void testMoveToTrashMissingSourceKeyIsIdempotent() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
+      createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner);
+
+      final float trashInterval = 0.5f; // 30 seconds
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>)
+              () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      OmBucketInfo bucket = metadataManager.getBucketTable().get(bucketKey);
+      assertNotNull(bucket);
+
+      KeyLifecycleService.LimitedExpiredObjectList keysList = new KeyLifecycleService.LimitedExpiredObjectList(1);
+      keysList.add(uniqueObjectName("missing-key"), 0, 1);
+
+      KeyLifecycleService.LifecycleActionTask task = keyLifecycleService.new LifecycleActionTask(null);
+      Method moveToTrash = task.getClass().getDeclaredMethod("moveToTrash", OmBucketInfo.class,
+          KeyLifecycleService.LimitedExpiredObjectList.class, boolean.class);
+      moveToTrash.setAccessible(true);
+
+      int failedMoves = (int) moveToTrash.invoke(task, bucket, keysList, false);
+      assertEquals(0, failedMoves);
+      assertTrue(keysList.isEmpty());
     }
 
     @Test

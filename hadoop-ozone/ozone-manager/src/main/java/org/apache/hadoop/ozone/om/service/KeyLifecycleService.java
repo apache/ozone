@@ -1609,8 +1609,15 @@ public class KeyLifecycleService extends BackgroundService {
               });
           if (omResponse != null) {
             if (!omResponse.getSuccess()) {
+              OzoneManagerProtocolProtos.Status status = omResponse.getStatus();
+              if (isMissingSourceStatus(status)) {
+                LOG.info("Skip retry for missing source key: {} while moving to trash key: {}, status: {}",
+                    keyName, targetKeyName, status);
+                continue;
+              }
               // log the failure and continue the iterating
-              LOG.error("RenameKey request failed with source key: {}, dest key: {}", keyName, targetKeyName);
+              LOG.error("RenameKey request failed with source key: {}, dest key: {}, status: {}",
+                  keyName, targetKeyName, status);
               failedMoves++;
               continue;
             }
@@ -1627,12 +1634,35 @@ public class KeyLifecycleService extends BackgroundService {
             metrics.incrSizeKeyRenamed(keysList.getReplicatedSize(i));
           }
         } catch (IOException | InterruptedException e) {
+          if (e instanceof OMException) {
+            OMException.ResultCodes result = ((OMException) e).getResult();
+            if (isMissingSourceResult(result)) {
+              LOG.info("Skip retry for missing source key: {} while moving to trash key: {}, result: {}",
+                  keyName, targetKeyName, result);
+              continue;
+            }
+          }
+          if (e instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+          }
           LOG.error("Failed to send RenameKeysRequest", e);
           failedMoves++;
         }
       }
       keysList.clear();
       return failedMoves;
+    }
+
+    private boolean isMissingSourceStatus(OzoneManagerProtocolProtos.Status status) {
+      return status == OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND
+          || status == OzoneManagerProtocolProtos.Status.FILE_NOT_FOUND
+          || status == OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
+    }
+
+    private boolean isMissingSourceResult(OMException.ResultCodes result) {
+      return result == OMException.ResultCodes.KEY_NOT_FOUND
+          || result == OMException.ResultCodes.FILE_NOT_FOUND
+          || result == OMException.ResultCodes.DIRECTORY_NOT_FOUND;
     }
 
     private void checkAndCreateTrashDirIfNeeded(OmBucketInfo bucket, Path dirPath) throws IOException {
