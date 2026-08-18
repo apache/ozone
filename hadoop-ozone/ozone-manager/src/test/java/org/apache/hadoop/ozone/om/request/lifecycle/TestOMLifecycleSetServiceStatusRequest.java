@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.lifecycle;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,24 +27,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.UUID;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleScanState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SaveLifecycleScanStateRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests OMLifecycleSaveScanStateRequest.
+ * Tests OMLifecycleSetServiceStatusRequest.
  */
-public class TestOMLifecycleSaveScanStateRequest {
+public class TestOMLifecycleSetServiceStatusRequest {
 
   @Test
   public void testPreExecuteAdminCheck() throws Exception {
@@ -53,20 +47,19 @@ public class TestOMLifecycleSaveScanStateRequest {
     OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
     when(ozoneManager.getVersionManager()).thenReturn(versionManager);
-    
-    // Test when admin authorization is enabled but user is not admin
+
     when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(true);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
 
     OMRequest omRequest = OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.SaveLifecycleScanState)
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetLifecycleServiceStatus)
         .setClientId(UUID.randomUUID().toString())
-        .setSaveLifecycleScanStateRequest(SaveLifecycleScanStateRequest.newBuilder()
-            .setState(LifecycleScanState.newBuilder().setBucketKey("dummy").setScanStartTime(1L).build())
+        .setSetLifecycleServiceStatusRequest(SetLifecycleServiceStatusRequest.newBuilder()
+            .setSuspend(true)
             .build())
         .build();
 
-    OMLifecycleSaveScanStateRequest request = new OMLifecycleSaveScanStateRequest(omRequest);
+    OMLifecycleSetServiceStatusRequest request = new OMLifecycleSetServiceStatusRequest(omRequest);
     request.setUGI(UserGroupInformation.getCurrentUser());
 
     OMException exception = assertThrows(OMException.class, () -> {
@@ -75,44 +68,12 @@ public class TestOMLifecycleSaveScanStateRequest {
 
     assertEquals(OMException.ResultCodes.ACCESS_DENIED, exception.getResult());
     assertTrue(exception.getMessage().contains("Superuser privilege is required"));
-    
-    // Test when user is admin
+
     when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(true);
     assertDoesNotThrow(() -> request.preExecute(ozoneManager));
 
-    // Test when admin authorization is disabled
     when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(false);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
     assertDoesNotThrow(() -> request.preExecute(ozoneManager));
-  }
-
-  @Test
-  public void testValidateAndUpdateCache() throws Exception {
-    OzoneManager ozoneManager = mock(OzoneManager.class);
-    OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
-    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    Table<String, OmLifecycleScanState> table = mock(Table.class);
-    when(omMetadataManager.getLifecycleScanStateTable()).thenReturn(table);
-
-    LifecycleScanState stateProto = LifecycleScanState.newBuilder()
-        .setBucketKey("/vol1/bucket1")
-        .setScanStartTime(123456789L)
-        .setLastScannedKey("key1")
-        .build();
-
-    SaveLifecycleScanStateRequest saveRequest = SaveLifecycleScanStateRequest.newBuilder()
-        .setState(stateProto)
-        .build();
-
-    OMRequest omRequest = OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.SaveLifecycleScanState)
-        .setClientId(UUID.randomUUID().toString())
-        .setSaveLifecycleScanStateRequest(saveRequest)
-        .build();
-
-    OMLifecycleSaveScanStateRequest request = new OMLifecycleSaveScanStateRequest(omRequest);
-    OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 100L);
-    assertNotNull(response);
-    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
   }
 }

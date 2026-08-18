@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -50,11 +51,30 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import org.junit.jupiter.api.Test;
+import picocli.CommandLine;
 
 /**
- * Unit tests for {@link ReplicasVerify}.
+ * Unit tests for replicas verify command.
  */
 class TestReplicasVerify {
+
+  @Test
+  void testRefreshContainerLocationsFromScmOption() throws Exception {
+    ReplicasVerify command = new ReplicasVerify();
+
+    new CommandLine(command).parseArgs("--checksums", "--refresh-from-scm", "/volume1");
+
+    assertThat(isRefreshContainerLocationsFromScmEnabled(command)).isTrue();
+  }
+
+  @Test
+  void testRefreshContainerLocationsFromScmDefault() throws Exception {
+    ReplicasVerify command = new ReplicasVerify();
+
+    new CommandLine(command).parseArgs("--checksums", "/volume1");
+
+    assertThat(isRefreshContainerLocationsFromScmEnabled(command)).isFalse();
+  }
 
   @Test
   void testRetriesWithForcedContainerCacheRefreshOnBlockNotFound() throws Exception {
@@ -132,6 +152,12 @@ class TestReplicasVerify {
     assertFalse(allKeysPassed.get());
     assertEquals(1, keysArray.size());
     assertFalse(keysArray.get(0).get("pass").asBoolean());
+  }
+
+  private static boolean isRefreshContainerLocationsFromScmEnabled(ReplicasVerify command) throws Exception {
+    Field field = ReplicasVerify.class.getDeclaredField("refreshContainerLocationsFromScm");
+    field.setAccessible(true);
+    return field.getBoolean(command);
   }
 
   private static OmKeyInfo createKeyInfo(OmKeyLocationInfo keyLocationInfo) {
