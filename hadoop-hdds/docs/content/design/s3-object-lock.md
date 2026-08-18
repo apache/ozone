@@ -1,7 +1,7 @@
 ---
-title: "S3 Object Lock"
+title: S3 Object Lock
 summary: Design to support S3 object lock.
-date: 2026-08-19
+date: 2026-08-18
 jira: HDDS-15945
 status: draft
 author: Chung En Lee
@@ -30,7 +30,8 @@ With growing demands for data security and compliance, ensuring that critical da
 protected from accidental or malicious deletion and overwriting has become an essential system protection requirement.
 To establish a more rigorous data protection mechanism, we plan to introduce the Object Lock feature.
 
-Considering the current system architecture and access control strategies, this design integrates with existing Apache Ranger to manage Object Lock permissions on OBS buckets.
+Considering the current system architecture and access control strategies,
+this design integrates with existing Apache Ranger to manage Object Lock permissions on OBS buckets.
 Meanwhile, to accelerate core feature delivery, we have decided to exclude complex multi-version locking (Versioning Lock) 
 and legacy FSO buckets from this initial release. In addition, support for Native ACLs is excluded; Native ACLs typically grant permissions 
 at the granular bucket or object level, whereas Object Lock permission management favors broad, role-based authorization,
@@ -77,8 +78,8 @@ stable rollout of baseline tamper-proof protection.
   - Get Object
 
 > _**Note**:
-> Background & Root Cause: A prerequisite for enabling WORM (Write Once, Read Many) in AWS S3 is that Object Versioning must be enabled. Under S3 architecture, executing a Put on a locked object generates a new version without affecting the protected prior version; thus, S3 Object Lock primarily restricts Delete Object. 
-> Ozone Implementation Status: Because Ozone's versioning feature is still under development, to guarantee absolute immutability during the lock period, Ozone will directly block and reject all overwrite operations (such as any form of Put or overwrite) on locked objects.
+> - Background & Root Cause: A prerequisite for enabling WORM (Write Once, Read Many) in AWS S3 is that Object Versioning must be enabled. Under S3 architecture, executing a Put on a locked object generates a new version without affecting the protected prior version; thus, S3 Object Lock primarily restricts Delete Object. 
+> - Ozone Implementation Status: Because Ozone's versioning feature is still under development, to guarantee absolute immutability during the lock period, Ozone will directly block and reject all overwrite operations (such as any form of Put or overwrite) on locked objects.
 
 ## Design
 
