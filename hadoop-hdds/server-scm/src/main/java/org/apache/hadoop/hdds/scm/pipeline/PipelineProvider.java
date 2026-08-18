@@ -94,7 +94,7 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
     List<DatanodeDetails> healthyDNs = pickAllNodesNotUsed(replicationConfig);
     List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
         .filter(dn -> SCMCommonPlacementPolicy.hasEnoughSpace(
-            dn, metadataSizeRequired, dataSizeRequired, storageType))
+            dn, metadataSizeRequired, dataSizeRequired, storageType, nodeManager))
         .limit(nodesRequired)
         .collect(Collectors.toList());
 
@@ -145,5 +145,12 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
     return dns;
+  }
+
+  protected Pipeline.Builder newPipelineBuilder(ReplicationConfig replicationConfig, List<DatanodeDetails> nodes) {
+    return Pipeline.newBuilder()
+        .setNodes(nodes)
+        .setReplicationConfig(replicationConfig)
+        .setState(Pipeline.PipelineState.ALLOCATED);
   }
 }

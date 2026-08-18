@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
+import org.apache.ratis.util.function.CheckedRunnable;
 
 /**
  * OzoneOutputStream is used to write data into Ozone.
@@ -128,9 +130,9 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    KeyOutputStream keyOutputStream = getKeyOutputStream();
-    if (keyOutputStream != null) {
-      return keyOutputStream.getCommitUploadPartInfo();
+    KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
+    if (keyCommitOutput != null) {
+      return keyCommitOutput.getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
@@ -139,10 +141,21 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   public OutputStream getOutputStream() {
     return outputStream;
   }
-  
+
   public KeyOutputStream getKeyOutputStream() {
     OutputStream base = unwrap(outputStream);
     return base instanceof KeyOutputStream ? (KeyOutputStream) base : null;
+  }
+
+  public void setPreCommits(List<CheckedRunnable<IOException>> preCommits) {
+    KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
+    if (keyCommitOutput != null) {
+      keyCommitOutput.setPreCommits(preCommits);
+      return;
+    }
+    throw new IllegalStateException(
+        "Output stream is not backed by KeyCommitOutput: " +
+            outputStream.getClass());
   }
 
   @Override
@@ -153,6 +166,11 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
     }
     throw new IllegalStateException(
         "OutputStream is not KeyMetadataAware: " + base.getClass());
+  }
+
+  private KeyCommitOutput getKeyCommitOutput() {
+    OutputStream base = unwrap(outputStream);
+    return base instanceof KeyCommitOutput ? (KeyCommitOutput) base : null;
   }
 
   private static OutputStream unwrap(OutputStream out) {

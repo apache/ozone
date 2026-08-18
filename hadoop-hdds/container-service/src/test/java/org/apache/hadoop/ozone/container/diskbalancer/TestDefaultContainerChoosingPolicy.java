@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -434,6 +435,21 @@ public class TestDefaultContainerChoosingPolicy {
         Arguments.arguments(DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, 2L),
         Arguments.arguments("CLOSED", 3L)
     );
+  }
+
+  @Test
+  public void testChooseVolumesSkipsZeroCapacityVolume() throws IOException {
+    HddsVolume zeroCapacityVolume = createVolume("zero-capacity", 0, 0);
+    HddsVolume normalVolume = createVolume("normal", 0.80, VOLUME_CAPACITY);
+    volumeSet = createVolumeSetForUsages(Arrays.asList(
+        zeroCapacityVolume, normalVolume));
+    mockContainerSet(newContainerSet());
+
+    ContainerCandidate result = policy.chooseVolumesAndContainer(ozoneContainer,
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD,
+        DEFAULT_MOVABLE_STATES);
+
+    assertNull(result);
   }
 
   /**

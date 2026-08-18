@@ -59,7 +59,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
@@ -124,8 +123,7 @@ public class TestPipelineClose {
   }
 
   @Test
-  public void testPipelineCloseWithClosedContainer() throws IOException,
-      InvalidStateTransitionException, TimeoutException {
+  public void testPipelineCloseWithClosedContainer() throws IOException {
     Set<ContainerID> set = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
 

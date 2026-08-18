@@ -118,16 +118,16 @@ public class S3Tagging {
 
   /**
    * Creates a S3 tagging instance (xml representation) from a Map retrieved
-   * from OM.
+   * from OM. Tags are ordered by key for stable responses,
+   * consistent with AWS S3 {@code GetObjectTagging}.
    * @param tagMap Map representing the tags.
    * @return {@link S3Tagging}
    */
   public static S3Tagging fromMap(Map<String, String> tagMap) {
     List<Tag> tags = tagMap.entrySet()
         .stream()
-        .map(
-            tagEntry -> new Tag(tagEntry.getKey(), tagEntry.getValue())
-        )
+        .sorted(Map.Entry.comparingByKey())
+        .map(tagEntry -> new Tag(tagEntry.getKey(), tagEntry.getValue()))
         .collect(Collectors.toList());
     return new S3Tagging(new TagSet(tags));
   }

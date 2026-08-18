@@ -16,7 +16,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.ozone</groupId>
   <artifactId>ozone-main</artifactId>
-  <version>2.2.0-SNAPSHOT</version>
+  <version>2.3.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Apache Ozone Main</name>
   <description>Apache Ozone Main</description>
@@ -32,26 +32,27 @@
     <annotation-api.version>1.3.2</annotation-api.version>
     <aopalliance.version>1.0</aopalliance.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
-    <asm.version>9.9.1</asm.version>
+    <asm.version>9.10.1</asm.version>
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
     <aspectj.java11.version>1.9.20</aspectj.java11.version>
     <aspectj.java21.version>1.9.24</aspectj.java21.version>
-    <!-- Default aspectj version for java8 -->
-    <aspectj.version>1.9.7</aspectj.version>
+    <aspectj.java25.version>1.9.25.1</aspectj.java25.version>
+    <aspectj.java8.version>1.9.7</aspectj.java8.version>
     <assertj.version>3.27.7</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <bouncycastle.version>1.84</bouncycastle.version>
+    <bouncycastle.version>1.85</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
+    <byte-buddy.version>1.18.11</byte-buddy.version>
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
-    <com.nimbusds.nimbus-jose-jwt.version>10.4</com.nimbusds.nimbus-jose-jwt.version>
+    <com.nimbusds.nimbus-jose-jwt.version>10.9.1</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
     <commons-codec.version>1.22.0</commons-codec.version>
     <commons-collections.version>4.5.0</commons-collections.version>
     <commons-compress.version>1.28.0</commons-compress.version>
-    <commons-configuration2.version>2.14.0</commons-configuration2.version>
+    <commons-configuration2.version>2.15.1</commons-configuration2.version>
     <commons-csv.version>1.14.1</commons-csv.version>
     <commons-fileupload.version>1.6.0</commons-fileupload.version>
     <commons-io.version>2.22.0</commons-io.version>
@@ -62,7 +63,7 @@
     <compile-testing.version>0.23.0</compile-testing.version>
     <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
-    <cyclonedx.version>2.9.1</cyclonedx.version>
+    <cyclonedx.version>2.9.2</cyclonedx.version>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
     <derby.version>10.14.2.0</derby.version>
@@ -78,11 +79,11 @@
     <enforced.maven.version>[3.6.3,)</enforced.maven.version>
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
-    <excluded-test-groups>unhealthy</excluded-test-groups>
+    <excluded-test-groups>unhealthy | benchmark</excluded-test-groups>
     <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
     <frontend-maven-plugin.version>1.15.4</frontend-maven-plugin.version>
-    <gson.version>2.13.1</gson.version>
+    <gson.version>2.14.0</gson.version>
     <guava.version>33.6.0-jre</guava.version>
     <guice.version>6.0.0</guice.version>
     <hadoop.version>3.4.3</hadoop.version>
@@ -92,17 +93,16 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <iceberg.version>1.10.1</iceberg.version>
+    <iceberg.version>1.10.2</iceberg.version>
     <io.grpc.version>1.77.1</io.grpc.version>
-    <jackson2-bom.version>2.21.2</jackson2-bom.version>
-    <jackson2.version>2.21.2</jackson2.version>
-    <jacoco.version>0.8.14</jacoco.version>
+    <jackson2-bom.version>2.21.5</jackson2-bom.version>
+    <jacoco.version>0.8.15</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <java.security.egd>file:///dev/urandom</java.security.egd>
-    <javassist.version>3.31.0-GA</javassist.version>
+    <javassist.version>3.32.0-GA</javassist.version>
     <javax.inject.version>1</javax.inject.version>
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
@@ -113,61 +113,60 @@
     <jetty.version>9.4.58.v20250814</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.9</jline.version>
-    <jnr-constants.version>0.10.4</jnr-constants.version>
-    <jnr-posix.version>3.1.22</jnr-posix.version>
+    <jline.version>3.30.16</jline.version>
+    <jnr-constants.version>0.11.0</jnr-constants.version>
+    <jnr-posix.version>3.2.1</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.11.10</jooq.version>
     <jsch.version>0.1.55</jsch.version>
-    <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
-    <junit5.version>5.14.3</junit5.version>
-    <kerby.version>1.0.1</kerby.version>
+    <junit5.version>5.14.4</junit5.version>
+    <kerby.version>2.1.2</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
+    <langchain4j.version>0.35.0</langchain4j.version>
     <license-maven-plugin.version>2.7.1</license-maven-plugin.version>
-    <log4j2.version>2.25.4</log4j2.version>
+    <log4j2.version>2.26.1</log4j2.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
     <maven-assembly-plugin.version>3.8.0</maven-assembly-plugin.version>
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
     <maven-clean-plugin.version>3.5.0</maven-clean-plugin.version>
     <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
-    <maven-dependency-plugin.version>3.10.0</maven-dependency-plugin.version>
+    <maven-dependency-plugin.version>3.11.0</maven-dependency-plugin.version>
     <maven-deploy-plugin.version>3.1.4</maven-deploy-plugin.version>
-    <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
+    <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
     <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
     <maven-install-plugin.version>3.1.4</maven-install-plugin.version>
-    <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
+    <maven-jar-plugin.version>3.5.1</maven-jar-plugin.version>
     <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
     <maven-patch-plugin.version>1.3</maven-patch-plugin.version>
     <maven-remote-resources-plugin.version>3.3.0</maven-remote-resources-plugin.version>
     <maven-replacer-plugin.version>1.5.3</maven-replacer-plugin.version>
     <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
-    <maven-site-plugin.version>3.21.0</maven-site-plugin.version>
+    <maven-site-plugin.version>3.22.0</maven-site-plugin.version>
     <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
-    <maven-surefire-plugin.argLine>-Xmx8192m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
+    <maven-surefire-plugin.argLine>-Xmx8192m -XX:+HeapDumpOnOutOfMemoryError -XX:+IgnoreUnrecognizedVMOptions -XX:+EnableDynamicAgentLoading</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs />
     <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven.compiler.createMissingPackageInfoClass>false</maven.compiler.createMissingPackageInfoClass>
     <maven.compiler.release>8</maven.compiler.release>
-    <maven.core.version>3.9.15</maven.core.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
     <native.lib.tmp.dir />
-    <netty.version>4.1.130.Final</netty.version>
+    <netty.version>4.1.136.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
-    <nodejs.version>20.18.2</nodejs.version>
+    <nodejs.version>24.17.0</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <opentelemetry.version>1.61.0</opentelemetry.version>
+    <opentelemetry.version>1.64.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
-    <ozone.release>Katmai</ozone.release>
+    <ozone.release>Kenai Fjords</ozone.release>
     <ozone.shaded.native.prefix>org_apache_ozone_shaded</ozone.shaded.native.prefix>
     <ozone.shaded.prefix>org.apache.ozone.shaded</ozone.shaded.prefix>
-    <ozone.version>2.2.0-SNAPSHOT</ozone.version>
+    <ozone.version>2.3.0-SNAPSHOT</ozone.version>
     <!--
       4.7.6: https://github.com/remkop/picocli/issues/2309
       4.7.7: https://github.com/remkop/picocli/issues/2407
@@ -175,7 +174,7 @@
     <picocli.version>4.7.5</picocli.version>
     <pmd.version>3.28.0</pmd.version>
     <!-- Enable Reproducible Builds mode -->
-    <project.build.outputTimestamp>2025-03-12T22:12:52Z</project.build.outputTimestamp>
+    <project.build.outputTimestamp>2026-06-11T07:31:18Z</project.build.outputTimestamp>
     <!-- platform encoding override -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -183,22 +182,22 @@
     <properties.maven.plugin.version>1.3.0</properties.maven.plugin.version>
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
-    <protobuf.version>3.25.8</protobuf.version>
-    <ranger.version>2.8.0</ranger.version>
+    <protobuf.version>3.25.9</protobuf.version>
+    <ranger.version>2.9.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
-    <ratis-thirdparty.grpc.version>1.75.0</ratis-thirdparty.grpc.version>
-    <ratis-thirdparty.netty.version>4.1.127.Final</ratis-thirdparty.netty.version>
+    <ratis-thirdparty.grpc.version>1.77.1</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.netty.version>4.1.130.Final</ratis-thirdparty.netty.version>
     <ratis-thirdparty.protobuf.version>3.25.8</ratis-thirdparty.protobuf.version>
-    <ratis.thirdparty.version>1.0.10</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.0.11</ratis.thirdparty.version>
     <ratis.version>3.2.1</ratis.version>
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>3.0.0</restrict-imports.enforcer.version>
-    <rocksdb.version>7.7.3</rocksdb.version>
+    <rocksdb.version>10.10.1.1</rocksdb.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
-    <slf4j.version>2.0.17</slf4j.version>
+    <slf4j.version>2.0.18</slf4j.version>
     <snakeyaml.version>2.5</snakeyaml.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
@@ -208,7 +207,7 @@
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
     <spring.version>5.3.39</spring.version>
-    <sqlite.version>3.53.0.0</sqlite.version>
+    <sqlite.version>3.53.2.1</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -218,12 +217,12 @@
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
     <testsThreadCount>4</testsThreadCount>
     <!-- test groups excluded in CI (except in dedicated profiles for flaky) -->
-    <unstable-test-groups>flaky | slow | unhealthy</unstable-test-groups>
+    <unstable-test-groups>flaky | slow | unhealthy | benchmark</unstable-test-groups>
     <vault.driver.version>5.1.0</vault.driver.version>
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.6</zookeeper.version>
-    <zstd-jni.version>1.5.7-7</zstd-jni.version>
+    <zstd-jni.version>1.5.7-11</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
@@ -232,13 +231,6 @@
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
         <version>${jackson2-bom.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.google.inject</groupId>
-        <artifactId>guice-bom</artifactId>
-        <version>${guice.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -383,18 +375,6 @@
         <version>${vault.driver.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.fasterxml.jackson.module</groupId>
-        <artifactId>jackson-module-jaxb-annotations</artifactId>
-        <version>${jackson2.version}</version>
-        <exclusions>
-          <exclusion>
-            <!-- using jakarta.xml.bind instead -->
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
         <artifactId>woodstox-core</artifactId>
         <version>${woodstox.version}</version>
@@ -447,6 +427,21 @@
         </exclusions>
       </dependency>
       <dependency>
+        <groupId>com.google.inject</groupId>
+        <artifactId>guice</artifactId>
+        <version>${guice.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.inject.extensions</groupId>
+        <artifactId>guice-assistedinject</artifactId>
+        <version>${guice.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.inject.extensions</groupId>
+        <artifactId>guice-servlet</artifactId>
+        <version>${guice.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
         <version>${protobuf.version}</version>
@@ -460,11 +455,6 @@
         <groupId>com.google.testing.compile</groupId>
         <artifactId>compile-testing</artifactId>
         <version>${compile-testing.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.googlecode.json-simple</groupId>
-        <artifactId>json-simple</artifactId>
-        <version>${json-simple.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jcraft</groupId>
@@ -527,6 +517,21 @@
             <artifactId>commons-logging</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>dev.langchain4j</groupId>
+        <artifactId>langchain4j-anthropic</artifactId>
+        <version>${langchain4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>dev.langchain4j</groupId>
+        <artifactId>langchain4j-core</artifactId>
+        <version>${langchain4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>dev.langchain4j</groupId>
+        <artifactId>langchain4j-open-ai</artifactId>
+        <version>${langchain4j.version}</version>
       </dependency>
       <dependency>
         <groupId>info.picocli</groupId>
@@ -637,6 +642,16 @@
             <artifactId>log4j</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy</artifactId>
+        <version>${byte-buddy.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy-agent</artifactId>
+        <version>${byte-buddy.version}</version>
       </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
@@ -1249,6 +1264,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-cli-interactive</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-cli-repair</artifactId>
         <version>${ozone.version}</version>
       </dependency>
@@ -1278,11 +1298,6 @@
         <artifactId>ozone-common</artifactId>
         <version>${ozone.version}</version>
         <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>ozone-csi</artifactId>
-        <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
@@ -1534,11 +1549,6 @@
         <version>${bouncycastle.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>properties-maven-plugin</artifactId>
-        <version>${properties.maven.plugin.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.glassfish.hk2</groupId>
         <artifactId>guice-bridge</artifactId>
         <version>${hk2.version}</version>
@@ -1654,11 +1664,6 @@
             <artifactId>spring-jcl</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.vafer</groupId>
-        <artifactId>jdeb</artifactId>
-        <version>${jdeb.version}</version>
       </dependency>
       <dependency>
         <groupId>org.xerial</groupId>
@@ -1806,6 +1811,11 @@
               </configuration>
             </execution>
           </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>properties-maven-plugin</artifactId>
+          <version>${properties.maven.plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1962,6 +1972,7 @@
                     <allowedImports>
                       <!-- Allow non-RocksObject classes. -->
                       <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
+                      <allowedImport>org.rocksdb.CompactRangeOptions.BottommostLevelCompaction</allowedImport>
                       <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
                       <allowedImport>org.rocksdb.KeyMayExist</allowedImport>
                       <allowedImport>org.rocksdb.HistogramData</allowedImport>
@@ -2148,6 +2159,20 @@
                       <bannedImport>io.netty.util.internal.**</bannedImport>
                     </bannedImports>
                   </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Classes (e.g. FileInputStream, FileOutputStream) overriding the Object.finalize() method will cause gc to run a much longer time</reason>
+                    <bannedImports>
+                      <bannedImport>java.io.FileInputStream</bannedImport>
+                      <bannedImport>java.io.FileOutputStream</bannedImport>
+                    </bannedImports>
+                    <exclusions>
+                      <exclusion>org.apache.hadoop.hdds.scm.storage.LocalChunkInputStream</exclusion>
+                      <exclusion>org.apache.hadoop.hdds.scm.XceiverClientShortCircuit</exclusion>
+                      <exclusion>org.apache.hadoop.hdds.scm.storage.BlockInputStream</exclusion>
+                      <exclusion>org.apache.hadoop.hdds.TestXceiverServerDomainSocket</exclusion>
+                    </exclusions>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>
@@ -2214,13 +2239,11 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-pmd-plugin</artifactId>
           <version>${pmd.version}</version>
-          <configuration>
-            <rulesets>
-              <ruleset>dev-support/pmd/pmd-ruleset.xml</ruleset>
-            </rulesets>
-            <printFailingErrors>true</printFailingErrors>
-            <includeTests>true</includeTests>
-          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.vafer</groupId>
+          <artifactId>jdeb</artifactId>
+          <version>${jdeb.version}</version>
         </plugin>
         <plugin>
           <groupId>org.xolstice.maven.plugins</groupId>
@@ -2270,7 +2293,7 @@
             <goals>
               <goal>build-classpath</goal>
             </goals>
-            <phase>prepare-package</phase>
+            <phase>generate-resources</phase>
             <configuration>
               <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
               <prefix>$HDDS_LIB_JARS_DIR</prefix>
@@ -2353,7 +2376,7 @@
               <goal>prepare-agent</goal>
             </goals>
             <configuration>
-              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*,org.apache.ozone.*</includes>
+              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*,org.apache.ozone.*,org.apache.hadoop.io_.*,org.apache.hadoop.ipc_.*,org.apache.hadoop.security_.*</includes>
             </configuration>
           </execution>
         </executions>
@@ -2374,7 +2397,6 @@
           <systemPropertyVariables>
             <hadoop.log.dir>${project.build.directory}/log</hadoop.log.dir>
             <hadoop.tmp.dir>${project.build.directory}/tmp</hadoop.tmp.dir>
-            <java.net.preferIPv4Stack>true</java.net.preferIPv4Stack>
             <java.security.egd>${java.security.egd}</java.security.egd>
             <java.security.krb5.conf>${project.build.directory}/test-classes/krb5.conf</java.security.krb5.conf>
             <require.test.libhadoop>${require.test.libhadoop}</require.test.libhadoop>
@@ -2422,6 +2444,17 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <configuration>
+          <rulesets>
+            <ruleset>dev-support/pmd/pmd-ruleset.xml</ruleset>
+          </rulesets>
+          <printFailingErrors>true</printFailingErrors>
+          <includeTests>true</includeTests>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-site-plugin</artifactId>
         <version>${maven-site-plugin.version}</version>
       </plugin>
@@ -2448,18 +2481,6 @@
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>properties-maven-plugin</artifactId>
-        <version>${properties.maven.plugin.version}</version>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.maven</groupId>
-            <artifactId>maven-core</artifactId>
-            <version>${maven.core.version}</version>
-          </dependency>
-        </dependencies>
       </plugin>
       <plugin>
         <groupId>org.apache.rat</groupId>
@@ -2616,6 +2637,91 @@
               </execution>
             </executions>
           </plugin>
+          <plugin>
+            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <artifactId>download-maven-plugin</artifactId>
+            <version>${download-maven-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>fetch-linux-x86_64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_x86_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-linux-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_aarch_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-darwin-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_osx_aarch_64.dylib</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>${maven-antrun-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>extract-linux-x86_64-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_linux_x86_64.so libhadoop.so" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>extract-darwin-aarch64-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_osx_aarch_64.dylib libhadoop.dylib" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
         </plugins>
       </build>
     </profile>
@@ -2642,21 +2748,39 @@
     </profile>
     <!-- Profiles for specific aspectj versions -->
     <profile>
+      <id>aspectj-java8-10</id>
+      <activation>
+        <jdk>[1.8,11)</jdk>
+      </activation>
+      <properties>
+        <aspectj.version>${aspectj.java8.version}</aspectj.version>
+      </properties>
+    </profile>
+    <profile>
       <id>aspectj-java11-20</id>
       <activation>
-        <jdk>[11,20]</jdk>
+        <jdk>[11,21)</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java11.version}</aspectj.version>
       </properties>
     </profile>
     <profile>
-      <id>aspectj-java21-or-later</id>
+      <id>aspectj-java21-24</id>
       <activation>
-        <jdk>[21,]</jdk>
+        <jdk>[21,25)</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java21.version}</aspectj.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>aspectj-java25-or-later</id>
+      <activation>
+        <jdk>[25,]</jdk>
+      </activation>
+      <properties>
+        <aspectj.version>${aspectj.java25.version}</aspectj.version>
       </properties>
     </profile>
     <profile>
@@ -2679,6 +2803,9 @@
     <profile>
       <id>go-offline</id>
       <properties>
+        <cyclonedx.skip>true</cyclonedx.skip>
+        <enforcer.skip>true</enforcer.skip>
+        <jacoco.skip>true</jacoco.skip>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <mdep.analyze.skip>true</mdep.analyze.skip>
         <skip.installnodepnpm>true</skip.installnodepnpm>
@@ -2709,7 +2836,10 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <includes>
+                <include>org.apache.hadoop.io_.**</include>
+                <include>org.apache.hadoop.ipc_.**</include>
                 <include>org.apache.hadoop.ozone.client.**</include>
+                <include>org.apache.hadoop.security_.**</include>
               </includes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
@@ -2882,6 +3012,98 @@
               <groups>flaky</groups>
               <excludedGroups>slow | unhealthy</excludedGroups>
             </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>hadoop-native-lib</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <artifactId>download-maven-plugin</artifactId>
+            <version>${download-maven-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>fetch-linux-x86_64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_x86_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-linux-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_aarch_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-darwin-aarch64-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_osx_aarch_64.dylib</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>${maven-antrun-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>extract-linux-x86_64-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_linux_x86_64.so libhadoop.so" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>extract-darwin-aarch64-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_osx_aarch_64.dylib libhadoop.dylib" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>

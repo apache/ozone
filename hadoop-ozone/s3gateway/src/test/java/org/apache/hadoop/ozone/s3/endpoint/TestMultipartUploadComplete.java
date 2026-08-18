@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -41,9 +43,11 @@ import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -123,6 +127,45 @@ public class TestMultipartUploadComplete {
   }
 
   @Test
+  public void testMultipartStoresContentType() throws Exception {
+    String key = UUID.randomUUID().toString();
+
+    // Content-Type set on CreateMultipartUpload is preserved as
+    // ORIGINAL_CONTENT_TYPE and must survive to the completed object.
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+        .thenReturn("video/webm");
+
+    String uploadID = initiateMultipartUpload(key);
+    Part part1 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "Multipart Upload 1");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part1));
+
+    assertEquals("video/webm", rest.head(OzoneConsts.S3_BUCKET, key)
+        .getHeaderString(HttpHeaders.CONTENT_TYPE));
+  }
+
+  @Test
+  public void testMultipartStoresStandardObjectHeaders() throws Exception {
+    String key = UUID.randomUUID().toString();
+    when(headers.getHeaderString(HttpHeaders.CACHE_CONTROL)).thenReturn("no-cache");
+    when(headers.getHeaderString(HttpHeaders.EXPIRES)).thenReturn("Wed, 21 Oct 2015 07:29:00 GMT");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_ENCODING)).thenReturn("gzip");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LANGUAGE)).thenReturn("en-CA");
+    when(headers.getHeaderString(HttpHeaders.CONTENT_DISPOSITION)).thenReturn("inline");
+
+    String uploadID = initiateMultipartUpload(key);
+    Part part1 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "Multipart Upload 1");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part1));
+
+    Response headResponse = rest.head(OzoneConsts.S3_BUCKET, key);
+    assertEquals("no-cache", headResponse.getHeaderString(HttpHeaders.CACHE_CONTROL));
+    assertEquals("Wed, 21 Oct 2015 07:29:00 GMT",
+        headResponse.getHeaderString(HttpHeaders.EXPIRES));
+    assertEquals("gzip", headResponse.getHeaderString(HttpHeaders.CONTENT_ENCODING));
+    assertEquals("en-CA", headResponse.getHeaderString(HttpHeaders.CONTENT_LANGUAGE));
+    assertEquals("inline", headResponse.getHeaderString(HttpHeaders.CONTENT_DISPOSITION));
+  }
+
+  @Test
   public void testMultipartInvalidPartOrderError() throws Exception {
 
     // Initiate multipart upload
@@ -167,5 +210,19 @@ public class TestMultipartUploadComplete {
     OS3Exception ex = assertThrows(OS3Exception.class,
         () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, partsList));
     assertEquals(ex.getCode(), S3ErrorTable.INVALID_PART.getCode());
+  }
+
+  @Test
+  public void testMultipartEmptyPartListError() throws Exception {
+    // Initiate multipart upload
+    String key = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(key);
+
+    // A CompleteMultipartUpload request with an empty part list must fail.
+    CompleteMultipartUploadRequest request = new CompleteMultipartUploadRequest();
+    rest.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
+
+    assertErrorResponse(MALFORMED_XML,
+        () -> rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, key, request));
   }
 }

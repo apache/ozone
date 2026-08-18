@@ -28,11 +28,15 @@ import static org.apache.hadoop.ozone.container.common.statemachine.commandhandl
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -50,9 +54,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -79,6 +85,8 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -96,6 +104,7 @@ public class TestDeleteBlocksCommandHandler {
   private String schemaVersion;
   private HddsVolume volume1;
   private BlockDeletingServiceMetrics blockDeleteMetrics;
+  private static final long STALE_CONTAINER_ID = 5L;
 
   private void prepareTest(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -163,6 +172,7 @@ public class TestDeleteBlocksCommandHandler {
   public void tearDown() {
     handler.stop();
     BlockDeletingServiceMetrics.unRegister();
+    ExitUtils.clear();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -309,6 +319,108 @@ public class TestDeleteBlocksCommandHandler {
     List<DeleteBlockTransactionResult> deleteBlockTransactionResults =
         handler.executeCmdWithRetry(Collections.emptyList());
     assertEquals(1, deleteBlockTransactionResults.size());
+  }
+
+  @Test
+  public void testDeleteBlocksCommandHandlerErrorShouldInterrupt() throws Exception {
+    setup();
+    Error error = new AssertionError("Simulated Error");
+    CompletableFuture<DeleteBlockTransactionExecutionResult> failed =
+        new CompletableFuture<>();
+    failed.completeExceptionally(error);
+    CompletableFuture<DeleteBlockTransactionExecutionResult> unprocessed =
+        CompletableFuture.completedFuture(
+            new DeleteBlockTransactionExecutionResult(null, false));
+    AtomicInteger processed = new AtomicInteger();
+
+    Error thrown = assertThrows(Error.class, () -> handler.handleTasksResults(
+        Arrays.asList(failed, unprocessed), result -> processed.incrementAndGet()));
+
+    assertSame(error, thrown);
+    assertEquals(0, processed.get());
+  }
+
+  @Test
+  public void testDeleteBlocksCommandHandlerErrorOnRetryShouldInterrupt()
+      throws Exception {
+    setup();
+    DeletedBlocksTransaction transaction =
+        createDeletedBlocksTransaction(1, 1);
+    DeleteBlockTransactionResult retryResult = DeleteBlockTransactionResult
+        .newBuilder()
+        .setTxID(transaction.getTxID())
+        .setContainerID(transaction.getContainerID())
+        .setSuccess(false)
+        .build();
+    CompletableFuture<DeleteBlockTransactionExecutionResult> retry =
+        CompletableFuture.completedFuture(
+            new DeleteBlockTransactionExecutionResult(retryResult, true));
+    Error error = new AssertionError("Simulated retry Error");
+    CompletableFuture<DeleteBlockTransactionExecutionResult> failed =
+        new CompletableFuture<>();
+    failed.completeExceptionally(error);
+    AtomicInteger invocation = new AtomicInteger();
+    doAnswer(ignored -> invocation.getAndIncrement() == 0
+        ? Collections.singletonList(retry)
+        : Collections.singletonList(failed))
+        .when(handler).submitTasks(any());
+
+    Error thrown = assertThrows(Error.class,
+        () -> handler.executeCmdWithRetry(
+            Collections.singletonList(transaction)));
+
+    assertSame(error, thrown);
+    assertEquals(2, invocation.get());
+  }
+
+  @Test
+  public void testDeleteCmdWorkerTerminatesOnError() throws Exception {
+    setup();
+    ExitUtils.disableSystemExit();
+    Container<?> container = containerSet.getContainer(1);
+    String schemaVersionOrDefault = ((KeyValueContainerData)
+        container.getContainerData()).getSupportedSchemaVersionOrDefault();
+    Error error = new AssertionError("Simulated worker Error");
+    SchemaHandler schemaHandler =
+        handler.getSchemaHandlers().get(schemaVersionOrDefault);
+    CountDownLatch processingStarted = new CountDownLatch(1);
+    CountDownLatch failProcessing = new CountDownLatch(1);
+    doAnswer(ignored -> {
+      processingStarted.countDown();
+      assertTrue(failProcessing.await(5, TimeUnit.SECONDS));
+      throw error;
+    }).when(schemaHandler).handle(any(), any());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
+    DatanodeDetails datanodeDetails =
+        MockDatanodeDetails.randomDatanodeDetails();
+    when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
+    StateContext context = new StateContext(conf,
+        DatanodeStateMachine.DatanodeStates.RUNNING, stateMachine, "");
+    DeleteBlocksCommand fatalCommand = new DeleteBlocksCommand(
+        Collections.singletonList(createDeletedBlocksTransaction(1, 1)));
+    DeleteBlocksCommand queuedCommand = new DeleteBlocksCommand(emptyList());
+    context.addCommand(fatalCommand);
+    context.addCommand(queuedCommand);
+
+    handler.handle(fatalCommand, mock(OzoneContainer.class), context,
+        mock(SCMConnectionManager.class));
+    assertTrue(processingStarted.await(5, TimeUnit.SECONDS));
+    try {
+      handler.handle(queuedCommand, mock(OzoneContainer.class), context,
+          mock(SCMConnectionManager.class));
+    } finally {
+      failProcessing.countDown();
+    }
+
+    GenericTestUtils.waitFor(ExitUtils::isTerminated, 10, 5000);
+
+    assertSame(error, ExitUtils.getFirstExitException().getCause());
+    CommandStatus fatalStatus = context.getCmdStatus(fatalCommand.getId());
+    assertEquals(Status.FAILED, fatalStatus.getStatus());
+    assertFalse(fatalStatus.getProtoBufMessage().hasBlockDeletionAck());
+    assertEquals(Status.PENDING, context.getCmdStatus(queuedCommand.getId()).getStatus());
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -479,6 +591,89 @@ public class TestDeleteBlocksCommandHandler {
     // Verify pending block count and size increased since its processed.
     assertEquals(afterSecondPendingBlocks + 3, containerData.getNumPendingDeletionBlocks());
     assertEquals(afterSecondPendingBytes + 768L, containerData.getBlockPendingDeletionBytes());
+  }
+
+  /**
+   * Simulates DiskBalancer swapping the {@link ContainerSet} entry after the
+   * delete-blocks worker read the container once but before it re-checks after
+   * {@code writeLockTryLock}: the first attempt must treat {@code containerData} as stale, fail
+   * without calling the schema handler on the old replica, and succeed on the built-in retry
+   * against the live replica.
+   */
+  @Test
+  public void deleteBlocksRetriesWhenContainerDataStale() throws Exception {
+    schemaVersion = SCHEMA_V3;
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
+    ContainerSet realSet = newContainerSet();
+    volume1 = mockHddsVolume("uuid-1");
+    for (int i = 0; i <= 10; i++) {
+      KeyValueContainerData data =
+          new KeyValueContainerData(i,
+              layout,
+              ContainerTestHelper.CONTAINER_MAX_SIZE,
+              UUID.randomUUID().toString(),
+              UUID.randomUUID().toString());
+      data.setSchemaVersion(schemaVersion);
+      data.setVolume(volume1);
+      KeyValueContainer container = new KeyValueContainer(data, conf);
+      data.closeContainer();
+      realSet.addContainer(container);
+    }
+
+    KeyValueContainer oldContainer =
+        (KeyValueContainer) realSet.getContainer(STALE_CONTAINER_ID);
+    KeyValueContainerData newReplicaData =
+        new KeyValueContainerData((KeyValueContainerData) oldContainer.getContainerData());
+    newReplicaData.setVolume(volume1);
+    newReplicaData.closeContainer();
+    KeyValueContainer newContainer = new KeyValueContainer(newReplicaData, conf);
+
+    AtomicInteger getContainerSequence = new AtomicInteger(0);
+    ContainerSet containerSetSpy = spy(realSet);
+    doAnswer(invocation -> {
+      long id = invocation.getArgument(0);
+      if (id != STALE_CONTAINER_ID) {
+        return invocation.callRealMethod();
+      }
+      int seq = getContainerSequence.getAndIncrement();
+      if (seq == 0) {
+        return oldContainer;
+      }
+      if (seq == 1) {
+        return newContainer;
+      }
+      return newContainer;
+    }).when(containerSetSpy).getContainer(anyLong());
+
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSetSpy);
+    containerSet = containerSetSpy;
+
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    handler = spy(new DeleteBlocksCommandHandler(ozoneContainer, conf, dnConf, ""));
+    blockDeleteMetrics = handler.getBlockDeleteMetrics();
+    TestSchemaHandler testSchemaHandler1 = spy(new TestSchemaHandler());
+    TestSchemaHandler testSchemaHandler2 = spy(new TestSchemaHandler());
+    TestSchemaHandler testSchemaHandler3 = spy(new TestSchemaHandler());
+    handler.getSchemaHandlers().put(SCHEMA_V1, testSchemaHandler1);
+    handler.getSchemaHandlers().put(SCHEMA_V2, testSchemaHandler2);
+    handler.getSchemaHandlers().put(SCHEMA_V3, testSchemaHandler3);
+
+    DeletedBlocksTransaction transaction =
+        createDeletedBlocksTransaction(77L, STALE_CONTAINER_ID);
+    List<DeleteBlockTransactionResult> results =
+        handler.executeCmdWithRetry(Collections.singletonList(transaction));
+
+    assertEquals(1, results.size());
+    assertTrue(results.get(0).getSuccess());
+    verify(handler, times(2)).submitTasks(any());
+    verify(handler.getSchemaHandlers().get(SCHEMA_V3), times(1))
+        .handle(eq(newReplicaData), eq(transaction));
+    verify(handler.getSchemaHandlers().get(SCHEMA_V3), never())
+        .handle(eq((KeyValueContainerData) oldContainer.getContainerData()), any());
+    assertEquals(0, blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
   private DeletedBlocksTransaction createDeletedBlocksTransaction(long txID,

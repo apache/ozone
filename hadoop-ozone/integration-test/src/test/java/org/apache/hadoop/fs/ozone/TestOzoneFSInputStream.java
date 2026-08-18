@@ -33,6 +33,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -40,11 +41,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -52,9 +54,10 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -64,27 +67,28 @@ import org.junit.jupiter.params.provider.ValueSource;
 public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
   private OzoneClient client;
-  private FileSystem fs;
   private FileSystem ecFs;
   private Path filePath = null;
   private byte[] data = null;
+  private String uri = null;
 
   @BeforeAll
   void init() throws Exception {
     client = cluster().newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client);
 
     // Set the fs.defaultFS and start the filesystem
-    String uri = String.format("%s://%s.%s/",
+    uri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
-    fs =  FileSystem.get(URI.create(uri), cluster().getConf());
-    int fileLen = 30 * 1024 * 1024;
-    data = string2Bytes(RandomStringUtils.secure().nextAlphanumeric(fileLen));
-    filePath = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
-    try (FSDataOutputStream stream = fs.create(filePath)) {
-      stream.write(data);
+    try (FileSystem fs =  FileSystem.get(URI.create(uri), cluster().getConf());) {
+      int fileLen = 30 * 1024 * 1024;
+      data = string2Bytes(RandomStringUtils.secure().nextAlphanumeric(fileLen));
+      filePath = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
+      try (FSDataOutputStream stream = fs.create(filePath)) {
+        stream.write(data);
+      }
     }
 
     // create EC bucket to be used by OzoneFileSystem
@@ -97,7 +101,7 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
                 (int) OzoneConsts.MB)));
     BucketArgs omBucketArgs = builder.build();
     String ecBucket = UUID.randomUUID().toString();
-    TestDataUtil.createBucket(client, bucket.getVolumeName(), omBucketArgs,
+    DataTestUtil.createBucket(client, bucket.getVolumeName(), omBucketArgs,
         ecBucket);
     String ecUri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
@@ -106,12 +110,17 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
   @AfterAll
   void shutdown() {
-    closeQuietly(client, fs, ecFs);
+    closeQuietly(client, ecFs);
   }
 
-  @Test
-  public void testO3FSSingleByteRead() throws IOException {
-    try (FSDataInputStream inputStream = fs.open(filePath)) {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testO3FSSingleByteRead(boolean isStreamEnable) throws IOException {
+    OzoneConfiguration conf = cluster().getConf();
+    conf.setBoolean("ozone.client.stream.readblock.enable", isStreamEnable);
+
+    try (FileSystem fs = FileSystem.get(URI.create(uri), conf);
+        FSDataInputStream inputStream = fs.open(filePath)) {
       byte[] value = new byte[data.length];
       int i = 0;
       while (true) {
@@ -128,9 +137,13 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     }
   }
 
-  @Test
-  public void testByteBufferPositionedRead() throws IOException {
-    try (FSDataInputStream inputStream = fs.open(filePath)) {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testByteBufferPositionedRead(boolean isStreamEnable) throws IOException {
+    OzoneConfiguration conf = cluster().getConf();
+    conf.setBoolean("ozone.client.stream.readblock.enable", isStreamEnable);
+    try (FileSystem fs = FileSystem.get(URI.create(uri), conf);
+        FSDataInputStream inputStream = fs.open(filePath)) {
       int bufferCapacity = 20;
       ByteBuffer buffer = ByteBuffer.allocate(bufferCapacity);
       long currentPos = inputStream.getPos();
@@ -182,9 +195,12 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = { -1, 30 * 1024 * 1024, 30 * 1024 * 1024 + 1 })
-  public void testByteBufferPositionedReadWithInvalidPosition(int position) throws IOException {
-    try (FSDataInputStream inputStream = fs.open(filePath)) {
+  @MethodSource("isStreamEnableAndData")
+  public void testByteBufferPositionedReadWithInvalidPosition(boolean isStreamEnable, int position) throws IOException {
+    OzoneConfiguration conf = cluster().getConf();
+    conf.setBoolean("ozone.client.stream.readblock.enable", isStreamEnable);
+    try (FileSystem fs = FileSystem.get(URI.create(uri), conf);
+         FSDataInputStream inputStream = fs.open(filePath)) {
       long currentPos = inputStream.getPos();
       ByteBuffer buffer = ByteBuffer.allocate(20);
       assertEquals(-1, inputStream.read(position, buffer));
@@ -193,9 +209,13 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     }
   }
 
-  @Test
-  public void testByteBufferPositionedReadFully() throws IOException {
-    try (FSDataInputStream inputStream = fs.open(filePath)) {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testByteBufferPositionedReadFully(boolean isStreamEnable) throws IOException {
+    OzoneConfiguration conf = cluster().getConf();
+    conf.setBoolean("ozone.client.stream.readblock.enable", isStreamEnable);
+    try (FileSystem fs = FileSystem.get(URI.create(uri), conf);
+         FSDataInputStream inputStream = fs.open(filePath)) {
       int bufferCapacity = 20;
       long currentPos = inputStream.getPos();
       ByteBuffer buffer = ByteBuffer.allocate(bufferCapacity);
@@ -235,9 +255,13 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = { -1, 30 * 1024 * 1024, 30 * 1024 * 1024 + 1 })
-  public void testByteBufferPositionedReadFullyWithInvalidPosition(int position) throws IOException {
-    try (FSDataInputStream inputStream = fs.open(filePath)) {
+  @MethodSource("isStreamEnableAndData")
+  public void testByteBufferPositionedReadFullyWithInvalidPosition(
+      boolean isStreamEnable, int position) throws IOException {
+    OzoneConfiguration conf = cluster().getConf();
+    conf.setBoolean("ozone.client.stream.readblock.enable", isStreamEnable);
+    try (FileSystem fs = FileSystem.get(URI.create(uri), conf);
+         FSDataInputStream inputStream = fs.open(filePath)) {
       long currentPos = inputStream.getPos();
       ByteBuffer buffer = ByteBuffer.allocate(20);
       assertThrows(EOFException.class, () -> inputStream.readFully(position, buffer));
@@ -246,9 +270,13 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     }
   }
 
-  @Test
-  public void testO3FSMultiByteRead() throws IOException {
-    try (FSDataInputStream inputStream = fs.open(filePath)) {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testO3FSMultiByteRead(boolean isStreamEnable) throws IOException {
+    OzoneConfiguration conf = cluster().getConf();
+    conf.setBoolean("ozone.client.stream.readblock.enable", isStreamEnable);
+    try (FileSystem fs = FileSystem.get(URI.create(uri), conf);
+         FSDataInputStream inputStream = fs.open(filePath)) {
       byte[] value = new byte[data.length];
       byte[] tmp = new byte[1 * 1024 * 1024];
       int i = 0;
@@ -265,10 +293,13 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     }
   }
 
-  @Test
-  public void testO3FSByteBufferRead() throws IOException {
-    try (FSDataInputStream inputStream = fs.open(filePath)) {
-
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testO3FSByteBufferRead(boolean isStreamEnable) throws IOException {
+    OzoneConfiguration conf = cluster().getConf();
+    conf.setBoolean("ozone.client.stream.readblock.enable", isStreamEnable);
+    try (FileSystem fs = FileSystem.get(URI.create(uri), conf);
+         FSDataInputStream inputStream = fs.open(filePath)) {
       ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
       int byteRead = inputStream.read(buffer);
 
@@ -281,29 +312,34 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     }
   }
 
-  @Test
-  public void testSequenceFileReaderSync() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testSequenceFileReaderSync(boolean isStreamEnable) throws IOException {
     File srcfile = new File("src/test/resources/testSequenceFile");
     Path path = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
     InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));
 
     // Upload test SequenceFile file
-    FSDataOutputStream output = fs.create(path);
-    IOUtils.copyBytes(input, output, 4096, true);
-    input.close();
+    OzoneConfiguration conf = cluster().getConf();
+    conf.setBoolean("ozone.client.stream.readblock.enable", isStreamEnable);
+    try (FileSystem fs = FileSystem.get(URI.create(uri), conf);
+         FSDataOutputStream output = fs.create(path);) {
+      IOUtils.copyBytes(input, output, 4096, true);
+      input.close();
 
-    // Start SequenceFile.Reader test
-    SequenceFile.Reader in = new SequenceFile.Reader(fs, path, cluster().getConf());
-    long blockStart = -1;
-    // EOFException should not occur.
-    in.sync(0);
-    blockStart = in.getPosition();
-    // The behavior should be consistent with HDFS
-    assertEquals(srcfile.length(), blockStart);
-    in.close();
+      // Start SequenceFile.Reader test
+      SequenceFile.Reader in = new SequenceFile.Reader(fs, path, cluster().getConf());
+      long blockStart = -1;
+      // EOFException should not occur.
+      in.sync(0);
+      blockStart = in.getPosition();
+      // The behavior should be consistent with HDFS
+      assertEquals(srcfile.length(), blockStart);
+    }
   }
 
-  @Test
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
   public void testSequenceFileReaderSyncEC() throws IOException {
     File srcfile = new File("src/test/resources/testSequenceFile");
     Path path = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
@@ -323,5 +359,16 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     // The behavior should be consistent with HDFS
     assertEquals(srcfile.length(), blockStart);
     in.close();
+  }
+
+  static Stream<Arguments> isStreamEnableAndData() {
+    return Stream.of(
+        Arguments.of(false, -1),
+        Arguments.of(false, 30 * 1024 * 1024),
+        Arguments.of(false, 30 * 1024 * 1024 + 1),
+        Arguments.of(true, -1),
+        Arguments.of(true, 30 * 1024 * 1024),
+        Arguments.of(true, 30 * 1024 * 1024 + 1)
+    );
   }
 }

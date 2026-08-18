@@ -105,7 +105,7 @@ public final class RocksDatabase implements Closeable {
   }
 
   static String bytes2String(ByteBuffer bytes) {
-    return StringCodec.get().decode(bytes);
+    return StringCodec.get().decodeWithFallback(bytes);
   }
 
   static RocksDatabaseException toRocksDatabaseException(Object name, String op, RocksDBException e) {
@@ -626,8 +626,11 @@ public final class RocksDatabase implements Closeable {
   Supplier<Integer> keyMayExist(ColumnFamily family,
       ByteBuffer key, ByteBuffer out) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
+      // keyMayExist may advance the input ByteBuffer position in native code.
+      // Always pass a duplicate so callers can safely reuse the original key
+      // buffer for a follow-up point-get.
       final KeyMayExist result = db.get().keyMayExist(
-          family.getHandle(), key, out);
+          family.getHandle(), key.duplicate(), out);
       switch (result.exists) {
       case kNotExist: return null;
       case kExistsWithValue: return () -> result.valueLength;
@@ -872,12 +875,12 @@ public final class RocksDatabase implements Closeable {
         String sstFileColumnFamily = StringUtils.bytes2String(liveFileMetaData.columnFamilyName());
         int lastLevel = getLastLevel();
 
-        // RocksDB #deleteFile API allows only to delete the last level of
-        // SST Files. Any level < last level won't get deleted and
-        // only last file of level 0 can be deleted
-        // and will throw warning in the rocksdb manifest.
-        // Instead, perform the level check here
-        // itself to avoid failed delete attempts for lower level files.
+        // Restrict deletion to files at the last level (and skip entirely when
+        // the last level is 0). The old RocksDB #deleteFile API could only
+        // delete last-level SST files (and the last file of level 0);
+        // deleteSstFileRange, used below, no longer has that limitation, but
+        // this method keeps the last-level restriction to preserve its existing
+        // pruning behavior.
         if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
           continue;
         }
@@ -888,6 +891,12 @@ public final class RocksDatabase implements Closeable {
         boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
             prefixForColumnFamily, firstDbKey, lastDbKey);
         if (!isKeyWithPrefixPresent) {
+          ColumnFamilyHandle handle = getColumnFamilyHandle(sstFileColumnFamily);
+          if (handle == null) {
+            LOG.warn("Skipping sst file deletion for {}: no handle found for column family {}",
+                liveFileMetaData.fileName(), sstFileColumnFamily);
+            continue;
+          }
           LOG.info("Deleting sst file: {} with start key: {} and end key: {} "
                   + "corresponding to column family {} from db: {}. "
                   + "Prefix for the column family: {}.",
@@ -896,7 +905,15 @@ public final class RocksDatabase implements Closeable {
               StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
               db.get().getName(),
               prefixForColumnFamily);
-          db.deleteFile(liveFileMetaData);
+          // deleteSstFileRange uses deleteFilesInRanges over this file's
+          // [smallestKey, largestKey]. It may also drop other files fully
+          // contained in that range, which is safe here: any such file's key
+          // range is a subset of this non-matching file's range. Because
+          // isKeyWithPrefixPresent is a monotone prefix-range test, a subset
+          // range cannot contain the prefix when the enclosing range does not,
+          // so every collaterally deleted file is likewise non-matching. This
+          // invariant holds only while isKeyWithPrefixPresent stays monotone.
+          db.deleteSstFileRange(handle, liveFileMetaData);
         }
       }
     }

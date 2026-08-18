@@ -66,6 +66,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyLookup;
   private @Metric MutableCounterLong numKeyRenames;
   private @Metric MutableCounterLong numKeyDeletes;
+  private @Metric MutableCounterLong numKeyLifecycleDeletes;
+  private @Metric MutableCounterLong numKeyTrashDeletes;
   private @Metric MutableCounterLong numBucketLists;
   private @Metric MutableCounterLong numKeyLists;
   private @Metric MutableCounterLong numVolumeLists;
@@ -136,6 +138,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyLookupFails;
   private @Metric MutableCounterLong numKeyRenameFails;
   private @Metric MutableCounterLong numKeyDeleteFails;
+  private @Metric MutableCounterLong numKeyLifecycleDeleteFails;
+  private @Metric MutableCounterLong numKeyTrashDeleteFails;
   private @Metric MutableCounterLong numBucketListFails;
   private @Metric MutableCounterLong numKeyListFails;
   private @Metric MutableCounterLong numVolumeListFails;
@@ -236,6 +240,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numTrashRenames;
   private @Metric MutableCounterLong numTrashDeletes;
   private @Metric MutableCounterLong numTrashListStatus;
+  private @Metric MutableCounterLong numTrashListKeys;
   private @Metric MutableCounterLong numTrashGetFileStatus;
   private @Metric MutableCounterLong numTrashGetTrashRoots;
   private @Metric MutableCounterLong numTrashExists;
@@ -261,6 +266,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong ecBucketCreateFailsTotal;
   private final DBCheckpointMetrics dbCheckpointMetrics;
   private OMSnapshotDirectoryMetrics snapshotDirectoryMetrics;
+
+  // Bucket Tagging Metrics
+  private @Metric MutableCounterLong numGetBucketTagging;
+  private @Metric MutableCounterLong numPutBucketTagging;
+  private @Metric MutableCounterLong numDeleteBucketTagging;
+  private @Metric MutableCounterLong numGetBucketTaggingFails;
+  private @Metric MutableCounterLong numPutBucketTaggingFails;
+  private @Metric MutableCounterLong numDeleteBucketTaggingFails;
 
   public OMMetrics(int maxRatisEvents) {
     dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
@@ -853,9 +866,40 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numKeyDeleteFails.incr();
   }
 
+  public void incNumKeyDeleteFails(int count) {
+    numKeyDeleteFails.incr(count);
+  }
+
+  public void incNumKeyLifecycleDeleteFails(int count) {
+    numKeyLifecycleDeleteFails.incr(count);
+  }
+
+  public void incNumKeyTrashDeleteFails(int count) {
+    numKeyTrashDeleteFails.incr(count);
+  }
+
   public void incNumKeyDeletes() {
     numKeyOps.incr();
     numKeyDeletes.incr();
+  }
+
+  public void incNumKeyDeletesInternal() {
+    numKeyDeletes.incr();
+  }
+
+  public void incNumKeyDeletes(int count) {
+    numKeyOps.incr();
+    numKeyDeletes.incr(count);
+  }
+
+  public void incNumKeyLifecycleDeletes(int count) {
+    numKeyOps.incr();
+    numKeyLifecycleDeletes.incr(count);
+  }
+
+  public void incNumKeyTrashDeletes(int count) {
+    numKeyOps.incr();
+    numKeyTrashDeletes.incr(count);
   }
 
   public void incNumKeyCommits() {
@@ -1198,8 +1242,28 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   @VisibleForTesting
+  public long getNumKeyLifecycleDeletes() {
+    return numKeyLifecycleDeletes.value();
+  }
+
+  @VisibleForTesting
+  public long getNumKeyTrashDeletes() {
+    return numKeyTrashDeletes.value();
+  }
+
+  @VisibleForTesting
   public long getNumKeyDeletesFails() {
     return numKeyDeleteFails.value();
+  }
+
+  @VisibleForTesting
+  public long getNumKeyLifecycleDeleteFails() {
+    return numKeyLifecycleDeleteFails.value();
+  }
+
+  @VisibleForTesting
+  public long getNumKeyTrashDeleteFails() {
+    return numKeyTrashDeleteFails.value();
   }
 
   @VisibleForTesting
@@ -1571,6 +1635,35 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     ecBucketCreateFailsTotal.incr();
   }
 
+  @Override
+  public void incNumGetBucketTagging() {
+    numGetBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  @Override
+  public void incNumGetBucketTaggingFails() {
+    numGetBucketTaggingFails.incr();
+  }
+
+  public void incNumPutBucketTagging() {
+    numPutBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  public void incNumPutBucketTaggingFails() {
+    numPutBucketTaggingFails.incr();
+  }
+
+  public void incNumDeleteBucketTagging() {
+    numDeleteBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  public void incNumDeleteBucketTaggingFails() {
+    numDeleteBucketTaggingFails.incr();
+  }
+
   public void incNumRecoverLease() {
     numKeyOps.incr();
     numFSOps.incr();
@@ -1590,7 +1683,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     }
   }
 
-  @Metric("Ratis state machine events")
+  // Ratis state machine events are multi-line logs, which should not be
+  // published as time-series metrics to metrics systems like Prometheus.
+  // Instead, they are exposed via JMX / MXBean endpoints.
   public String getRatisEvents() {
     synchronized (ratisEvents) {
       return String.join("\n", ratisEvents);

@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
@@ -72,6 +73,7 @@ public final class ScmCodecFactory {
     codecs.put(ManagedSecretKey.class, new ScmManagedSecretKeyCodec());
 
     putEnum(LifeCycleEvent.class, LifeCycleEvent::forNumber);
+    putEnum(LifeCycleState.class, LifeCycleState::forNumber);
     putEnum(PipelineState.class, PipelineState::forNumber);
     putEnum(NodeType.class, NodeType::forNumber);
 

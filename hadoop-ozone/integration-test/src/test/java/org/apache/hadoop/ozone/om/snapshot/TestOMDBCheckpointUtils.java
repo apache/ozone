@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -87,6 +88,22 @@ public class TestOMDBCheckpointUtils {
       return baseMessage;
     }
     return String.format("%s%d, snapshots: %d", baseMessage, expectedSSTFiles, expectedSnapshots);
+  }
+
+  @Test
+  public void testEstimateCheckpointTarballSstDetails() throws IOException {
+    writeSstFilesToDirectory(dbDir, 10, 10 * 1024);
+    Set<Path> snapshotDirs = new HashSet<>();
+    OMDBCheckpointUtils.SstSizeEstimate withoutSnapshots =
+        OMDBCheckpointUtils.estimateCheckpointTarballSstDetails(dbDir, snapshotDirs);
+    assertEquals(10 * 10 * 1024L, withoutSnapshots.getTotalBytes());
+    assertEquals(10L, withoutSnapshots.getFileCount());
+
+    snapshotDirs.add(dbDir);
+    OMDBCheckpointUtils.SstSizeEstimate withSnapshots =
+        OMDBCheckpointUtils.estimateCheckpointTarballSstDetails(dbDir, snapshotDirs);
+    assertEquals(20 * 10 * 1024L, withSnapshots.getTotalBytes());
+    assertEquals(20L, withSnapshots.getFileCount());
   }
 
   @Test
