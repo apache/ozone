@@ -37,6 +37,21 @@ import org.junit.jupiter.api.Test;
  */
 public class TestSignedChunksInputStream {
 
+  // Canonical AWS SigV4 streaming example: 66560 bytes of 'a' in chunks of
+  // 65536 + 1024 + 0, secret wJalr..., us-east-1/s3, date 20130524.
+  private static final String SECRET_KEY =
+      "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+  private static final String DATE_TIME = "20130524T000000Z";
+  private static final String SCOPE = "20130524/us-east-1/s3/aws4_request";
+  private static final String SEED_SIGNATURE =
+      "4f232c4386841ef735655705268965c44a0e4690baa4adea153f7db9fa80a0a9";
+  private static final String CHUNK1_SIGNATURE =
+      "ad80c730a21e5b8d04586a2213dd63b9a0e99e0e2307b0ade35a65485a288648";
+  private static final String CHUNK2_SIGNATURE =
+      "0055627c9e194cb4542bae2aa5492e3c1575bbb81b612b7d234b86a503ef5497";
+  private static final String FINAL_CHUNK_SIGNATURE =
+      "b6c6ea8a5354eaf15b3cb7646744f4275b71ea724fed81ceb9323e279d449df9";
+
   @Test
   void testEmptyFile() throws IOException {
     try (InputStream is = wrapContent("0;chunk-signature"
@@ -235,21 +250,6 @@ public class TestSignedChunksInputStream {
     }
   }
 
-  // Canonical AWS SigV4 streaming example: 66560 bytes of 'a' in chunks of
-  // 65536 + 1024 + 0, secret wJalr..., us-east-1/s3, date 20130524.
-  private static final String SECRET_KEY =
-      "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
-  private static final String DATE_TIME = "20130524T000000Z";
-  private static final String SCOPE = "20130524/us-east-1/s3/aws4_request";
-  private static final String SEED_SIGNATURE =
-      "4f232c4386841ef735655705268965c44a0e4690baa4adea153f7db9fa80a0a9";
-  private static final String CHUNK1_SIGNATURE =
-      "ad80c730a21e5b8d04586a2213dd63b9a0e99e0e2307b0ade35a65485a288648";
-  private static final String CHUNK2_SIGNATURE =
-      "0055627c9e194cb4542bae2aa5492e3c1575bbb81b612b7d234b86a503ef5497";
-  private static final String FINAL_CHUNK_SIGNATURE =
-      "b6c6ea8a5354eaf15b3cb7646744f4275b71ea724fed81ceb9323e279d449df9";
-
   @Test
   void verifiesRealChunkSignatures() throws IOException {
     String content = signedChunkedBody('a');
@@ -266,6 +266,43 @@ public class TestSignedChunksInputStream {
     InputStream is = new SignedChunksInputStream(
         new ByteArrayInputStream(content.getBytes(UTF_8)), newValidator());
     assertThrows(OS3Exception.class, () -> IOUtils.toString(is, UTF_8));
+  }
+
+  @Test
+  void attachValidatorEnablesVerification() throws IOException {
+    // The signing key is only known after the key is opened, so the validator
+    // is attached to an already-constructed stream (HDDS-15140/15141).
+    String content = signedChunkedBody('a');
+    try (SignedChunksInputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(content.getBytes(UTF_8)))) {
+      is.attachValidator(newValidator());
+      assertEquals(repeat('a', 66560), IOUtils.toString(is, UTF_8));
+    }
+  }
+
+  @Test
+  void attachedValidatorRejectsTamperedChunkPayload() {
+    String content = signedChunkedBody('b');
+    SignedChunksInputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(content.getBytes(UTF_8)));
+    is.attachValidator(newValidator());
+    assertThrows(OS3Exception.class, () -> IOUtils.toString(is, UTF_8));
+  }
+
+  @Test
+  void attachValidatorAfterReadStartedFails() throws IOException {
+    SignedChunksInputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(signedChunkedBody('a').getBytes(UTF_8)));
+    is.read();
+    assertThrows(IllegalStateException.class, () -> is.attachValidator(newValidator()));
+  }
+
+  @Test
+  void attachValidatorTwiceFails() {
+    SignedChunksInputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(signedChunkedBody('a').getBytes(UTF_8)));
+    is.attachValidator(newValidator());
+    assertThrows(IllegalStateException.class, () -> is.attachValidator(newValidator()));
   }
 
   private static String signedChunkedBody(char payloadChar) {

@@ -116,7 +116,8 @@ public class TestUploadWithStream {
               new HashMap<>(), new HashMap<>(), body, rest.getHeaders(), true,
               new AuditLogger.PerformanceStringBuilder(),
               S3ConditionalRequest.parseWriteConditions(rest.getHeaders(),
-                  S3KEY)));
+                  S3KEY),
+              false, derivedKey -> { }));
       assertEquals("upload interrupted", ex.getMessage());
       assertThrows(IOException.class, () -> bucket.getKey(S3KEY));
     }

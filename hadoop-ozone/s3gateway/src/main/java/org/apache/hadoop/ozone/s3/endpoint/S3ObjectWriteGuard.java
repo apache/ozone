@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -117,6 +118,11 @@ class S3ObjectWriteGuard implements AutoCloseable {
 
   public Map<String, String> getMetadata() {
     return ((OzoneOutputStream) outputStream).getMetadata();
+  }
+
+  /** @return the signing key OM derived for chunk verification, or null. */
+  public ByteBuffer getDerivedKey() {
+    return ((OzoneOutputStream) outputStream).getDerivedKey();
   }
 
   @Override

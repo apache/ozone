@@ -82,10 +82,13 @@ public class SignedChunksInputStream extends InputStream {
   private final InputStream originalStream;
 
   /** Verifies each chunk signature, or {@code null} to skip verification. */
-  private final ChunksValidator validator;
+  private ChunksValidator validator;
 
   /** SHA-256 of the current chunk payload; {@code null} when not verifying. */
-  private final MessageDigest chunkDigest;
+  private MessageDigest chunkDigest;
+
+  /** Set on the first read; blocks attaching a validator once reading began. */
+  private boolean readStarted;
 
   /** Signature parsed from the current chunk header line. */
   private String chunkSignature;
@@ -112,8 +115,28 @@ public class SignedChunksInputStream extends InputStream {
     this.chunkDigest = validator == null ? null : newSha256();
   }
 
+  /**
+   * Enable chunk-signature verification. Used when the signing key (derived by
+   * OM, see HDDS-15140) only becomes available after the key is opened, i.e.
+   * after this stream is constructed. Must be called before the first read and
+   * at most once.
+   */
+  public void attachValidator(ChunksValidator chunksValidator) {
+    Objects.requireNonNull(chunksValidator, "chunksValidator == null");
+    if (readStarted) {
+      throw new IllegalStateException(
+          "Cannot attach a validator after reading has started");
+    }
+    if (validator != null) {
+      throw new IllegalStateException("A validator is already attached");
+    }
+    this.validator = chunksValidator;
+    this.chunkDigest = newSha256();
+  }
+
   @Override
   public int read() throws IOException {
+    readStarted = true;
     if (isFinalChunkEncountered) {
       return -1;
     }
@@ -147,6 +170,7 @@ public class SignedChunksInputStream extends InputStream {
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
+    readStarted = true;
     Objects.requireNonNull(b, "b == null");
     if (off < 0 || len < 0 || len > b.length - off) {
       throw new IndexOutOfBoundsException("Offset=" + off + " and len="
