@@ -306,8 +306,8 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     setupProxyProvider(2);
 
     assertNotNull(retryProxy.toString());
-    retryProxy.hashCode();
-    retryProxy.equals(retryProxy);
+    assertEquals(retryProxy.hashCode(), retryProxy.hashCode());
+    assertFalse(retryProxy.equals(new Object()));
   }
 
   @Test

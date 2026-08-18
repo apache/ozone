@@ -779,7 +779,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private OMResponse handleError(OMResponse resp) throws OMException {
     if (resp.getStatus() != OK) {
       throw new OMException(resp.getMessage(),
-          ResultCodes.values()[resp.getStatus().ordinal()]);
+          ResultCodes.valueOf(resp.getStatus().name()));
     }
     return resp;
   }

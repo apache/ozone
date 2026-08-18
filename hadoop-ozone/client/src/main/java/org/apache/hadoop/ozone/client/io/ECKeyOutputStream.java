@@ -283,7 +283,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
     }
     for (int i = firstNonFullIndex + 1; i < dataBuffers.length; i++) {
       Preconditions.checkState(dataBuffers[i].position() == 0,
-          "Illegal stripe state: cell {} is not full while cell {} has data",
+          "Illegal stripe state: cell %s is not full while cell %s has data",
           firstNonFullIndex, i);
     }
 
