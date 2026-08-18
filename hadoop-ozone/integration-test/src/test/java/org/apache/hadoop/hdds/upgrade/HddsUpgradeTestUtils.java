@@ -143,6 +143,7 @@ public final class HddsUpgradeTestUtils {
             "Requiring DB key to flush? {}",
         scm.getSCMNodeId(), scm.checkLeader(), exitedSafemode, isFinalized, dbKeyFlushed, waitForDBKeyFlush);
 
-    return exitedSafemode && isFinalized && (!waitForDBKeyFlush || dbKeyFlushed);
+    // Safemode exit status is included for logging purposes, but SCMs can still finalize while in safemode.
+    return isFinalized && (!waitForDBKeyFlush || dbKeyFlushed);
   }
 }
