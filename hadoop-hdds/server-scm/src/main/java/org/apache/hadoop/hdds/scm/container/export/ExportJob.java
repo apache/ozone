@@ -27,6 +27,10 @@ import java.util.UUID;
  */
 public final class ExportJob {
 
+  private final Id id;
+  private final ExportScope scope;
+  private final String jobStartTime;
+
   /**
    * Unique job identifier.
    */
@@ -70,10 +74,6 @@ public final class ExportJob {
       return value.hashCode();
     }
   }
-
-  private final Id id;
-  private final ExportScope scope;
-  private final String jobStartTime;
 
   ExportJob(Id id, ExportScope scope, String jobStartTime) {
     this.id = id;
