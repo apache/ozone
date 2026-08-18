@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.om.snapshot.diff;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;

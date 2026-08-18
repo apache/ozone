@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.om.snapshot.diff;
 
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.CREATE;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.DELETE;
