@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -50,6 +51,9 @@ import org.slf4j.LoggerFactory;
  * <p>This request marks an STS credential pair as revoked by inserting a key
  * ({@code tempAccessKeyId|originalAccessKeyId}) into the {@code s3RevokedStsTokenTable}. Subsequent S3 requests
  * authenticated with the same STS credentials will be rejected when the revocation state has propagated.</p>
+ *
+ * <p>{@code tempAccessKeyId} comes directly from the request, so {@code preExecute} validates it against the
+ * expected STS format.
  */
 public class S3RevokeSTSTokenRequest extends OMClientRequest {
 
@@ -113,11 +117,14 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
 
   private static void validateRevokeRequestFields(OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeReq)
       throws OMException {
-    if (StringUtils.isEmpty(revokeReq.getOriginalAccessKeyId())) {
+    final String originalAccessKeyId = revokeReq.getOriginalAccessKeyId();
+    if (StringUtils.isEmpty(originalAccessKeyId)) {
       throw new OMException("originalAccessKeyId is required for STS token revocation", INVALID_REQUEST);
     }
-    if (StringUtils.isEmpty(revokeReq.getTempAccessKeyId())) {
-      throw new OMException("tempAccessKeyId is required for STS token revocation", INVALID_REQUEST);
+    if (originalAccessKeyId.length() >= OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH) {
+      throw new OMException("originalAccessKeyId length is invalid: " + originalAccessKeyId.length(), INVALID_REQUEST);
     }
+    // Validate the tempAccessKeyId
+    S3STSUtils.validateTempAccessKeyId(revokeReq.getTempAccessKeyId());
   }
 }

@@ -315,7 +315,7 @@ public class TestSTSSecurityUtil {
         STSSecurityUtil.constructValidateAndDecryptSTSToken("", secretKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessage(
-            "Invalid STS token format: Failed to decode STS token string: java.io.EOFException for encodedToken: ");
+            "Invalid STS token format: Failed to decode STS token string: java.io.EOFException");
   }
 
   @Test

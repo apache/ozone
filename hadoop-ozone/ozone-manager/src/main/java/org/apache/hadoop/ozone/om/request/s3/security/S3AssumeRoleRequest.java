@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import static org.apache.hadoop.ozone.om.helpers.S3STSUtils.STS_ACCESS_KEY_ID_ALLOWED_CHARS;
+import static org.apache.hadoop.ozone.om.helpers.S3STSUtils.STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH;
+import static org.apache.hadoop.ozone.om.helpers.S3STSUtils.STS_ACCESS_KEY_ID_RANDOM_LENGTH;
+import static org.apache.hadoop.ozone.om.helpers.S3STSUtils.STS_TOKEN_PREFIX;
 import static org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.OzoneGrant;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -31,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
@@ -70,16 +75,12 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     SECURE_RANDOM = secureRandom;
   }
 
-  private static final int STS_ACCESS_KEY_ID_LENGTH = 20;
   private static final int STS_SECRET_ACCESS_KEY_LENGTH = 40;
   private static final int STS_ROLE_ID_LENGTH = 16;
   private static final String ASSUME_ROLE_ID_PREFIX = "AROA";
-  private static final String CHARS_FOR_ACCESS_KEY_IDS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  private static final int CHARS_FOR_ACCESS_KEY_IDS_LENGTH = CHARS_FOR_ACCESS_KEY_IDS.length();
-  private static final String CHARS_FOR_SECRET_ACCESS_KEYS = CHARS_FOR_ACCESS_KEY_IDS +
+  private static final String CHARS_FOR_SECRET_ACCESS_KEYS = STS_ACCESS_KEY_ID_ALLOWED_CHARS +
       "abcdefghijklmnopqrstuvwxyz/+";
   private static final int CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH = CHARS_FOR_SECRET_ACCESS_KEYS.length();
-  public static final String STS_TOKEN_PREFIX = "ASIA";
 
   private final Clock clock;
 
@@ -103,11 +104,13 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
     // Generate temporary AWS credentials using cryptographically strong SecureRandom
     final String tempAccessKeyId = STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
-        CHARS_FOR_ACCESS_KEY_IDS, CHARS_FOR_ACCESS_KEY_IDS_LENGTH, STS_ACCESS_KEY_ID_LENGTH);
+        STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
+        STS_ACCESS_KEY_ID_RANDOM_LENGTH);
     final String secretAccessKey = generateSecureRandomStringUsingChars(
         CHARS_FOR_SECRET_ACCESS_KEYS, CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH, STS_SECRET_ACCESS_KEY_LENGTH);
     final String roleId = ASSUME_ROLE_ID_PREFIX + generateSecureRandomStringUsingChars(
-        CHARS_FOR_ACCESS_KEY_IDS, CHARS_FOR_ACCESS_KEY_IDS_LENGTH, STS_ROLE_ID_LENGTH);
+        STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
+        STS_ROLE_ID_LENGTH);
 
     // Build UpdateAssumeRoleRequest with leader-generated credentials
     final UpdateAssumeRoleRequest.Builder updateAssumeRoleRequestBuilder =
@@ -182,7 +185,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       final long expirationEpochSeconds = clock.instant().plusSeconds(durationSeconds).getEpochSecond();
 
       // Add tempAccessKeyId to the log so it can be determined which permanent user created the tempAccessKeyId
-      auditMap.put("tempAccessKeyId", tempAccessKeyId);
+      auditMap.put(OzoneConsts.S3_STS_TEMP_ACCESS_KEY_ID, tempAccessKeyId);
 
       final AssumeRoleResponse.Builder responseBuilder = AssumeRoleResponse.newBuilder()
           .setAccessKeyId(tempAccessKeyId)

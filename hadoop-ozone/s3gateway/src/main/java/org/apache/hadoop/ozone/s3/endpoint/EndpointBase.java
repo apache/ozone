@@ -610,7 +610,7 @@ public abstract class EndpointBase {
       // created the token) so the audit trail is not limited to the opaque tempAccessKeyId.
       final String originalAccessKeyId = AuditUtils.getStsOriginalAccessKeyId(s3Auth.getSessionToken());
       if (originalAccessKeyId != null) {
-        auditMap.put("originalAccessKeyId", originalAccessKeyId);
+        auditMap.put(OzoneConsts.S3_STS_ORIGINAL_ACCESS_KEY_ID, originalAccessKeyId);
       }
     }
 

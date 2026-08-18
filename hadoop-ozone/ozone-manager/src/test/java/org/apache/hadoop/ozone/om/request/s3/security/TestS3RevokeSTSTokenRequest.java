@@ -57,6 +57,8 @@ import org.junit.jupiter.api.Test;
  * Tests for {@link S3RevokeSTSTokenRequest}.
  */
 public class TestS3RevokeSTSTokenRequest {
+  private static final String VALID_TEMP_ACCESS_KEY_ID = "ASIA0123456789ABCDEFGHIJ";
+
   private OMMultiTenantManager omMultiTenantManager;
 
   @BeforeEach
@@ -80,7 +82,6 @@ public class TestS3RevokeSTSTokenRequest {
   public void testPreExecuteFailsForNonOwnerOfOriginalAccessKey() throws Exception {
     // Verify that preExecute enforces permissions based on the request's original access key ID
     // and rejects revocation attempts from non-owners.
-    final String tempAccessKeyId = "ASIA12345678";
     final String originalAccessKeyId = "original-access-key-id";
 
     // An RPC call running another Kerberos identity should NOT be allowed to revoke the token whose original
@@ -96,7 +97,7 @@ public class TestS3RevokeSTSTokenRequest {
 
       final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
           OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-              .setTempAccessKeyId(tempAccessKeyId)
+              .setTempAccessKeyId(VALID_TEMP_ACCESS_KEY_ID)
               .setOriginalAccessKeyId(originalAccessKeyId)
               .build();
 
@@ -117,7 +118,6 @@ public class TestS3RevokeSTSTokenRequest {
   public void testPreExecuteSucceedsForOriginalAccessKeyOwner() throws Exception {
     // Verify that preExecute allows the owner of the original access key ID from the revoke request
     // to revoke the temporary credentials.
-    final String tempAccessKeyId = "ASIA4567891230";
     final String originalAccessKeyId = "original-access-key-id";
 
     // Simulate RPC call running as originalAccessKeyId
@@ -131,7 +131,7 @@ public class TestS3RevokeSTSTokenRequest {
 
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
         OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-            .setTempAccessKeyId(tempAccessKeyId)
+            .setTempAccessKeyId(VALID_TEMP_ACCESS_KEY_ID)
             .setOriginalAccessKeyId(originalAccessKeyId)
             .build();
 
@@ -152,7 +152,6 @@ public class TestS3RevokeSTSTokenRequest {
     // the tenant access ID owner is allowed to revoke the temporary credentials.
     final String tenantId = "finance";
     final String originalAccessKeyId = "alice@EXAMPLE.COM";
-    final String tempAccessKeyId = "ASIA123456789";
 
     // Caller short name "alice" should match the owner username returned from the multi-tenant manager.
     final UserGroupInformation callerUgi = UserGroupInformation.createRemoteUser(originalAccessKeyId);
@@ -173,7 +172,7 @@ public class TestS3RevokeSTSTokenRequest {
 
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
         OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-            .setTempAccessKeyId(tempAccessKeyId)
+            .setTempAccessKeyId(VALID_TEMP_ACCESS_KEY_ID)
             .setOriginalAccessKeyId(originalAccessKeyId)
             .build();
 
@@ -195,7 +194,6 @@ public class TestS3RevokeSTSTokenRequest {
     // tenant admin (who is not the owner) is allowed to revoke the temporary credentials.
     final String tenantId = "finance";
     final String originalAccessKeyId = "alice@EXAMPLE.COM";
-    final String tempAccessKeyId = "ASIA4567890123";
 
     // Caller short name "bob" does not own the access ID but will be configured as tenant admin.
     final UserGroupInformation callerUgi = UserGroupInformation.createRemoteUser("bob@EXAMPLE.COM");
@@ -216,7 +214,7 @@ public class TestS3RevokeSTSTokenRequest {
 
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
         OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-            .setTempAccessKeyId(tempAccessKeyId)
+            .setTempAccessKeyId(VALID_TEMP_ACCESS_KEY_ID)
             .setOriginalAccessKeyId(originalAccessKeyId)
             .build();
 
@@ -238,7 +236,6 @@ public class TestS3RevokeSTSTokenRequest {
     // non-owner, non-admin caller is rejected.
     final String tenantId = "finance";
     final String originalAccessKeyId = "alice@EXAMPLE.COM";
-    final String tempAccessKeyId = "ASIA123456789";
 
     // Caller short name "carol" does not own the access ID and is not
     // configured as tenant admin.
@@ -261,7 +258,7 @@ public class TestS3RevokeSTSTokenRequest {
 
       final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
           OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-              .setTempAccessKeyId(tempAccessKeyId)
+              .setTempAccessKeyId(VALID_TEMP_ACCESS_KEY_ID)
               .setOriginalAccessKeyId(originalAccessKeyId)
               .build();
 
@@ -279,8 +276,8 @@ public class TestS3RevokeSTSTokenRequest {
   }
 
   @Test
-  public void testValidateAndUpdateCacheUpdatesCacheImmediately() throws Exception {
-    final String tempAccessKeyId = "ASIA4567891230";
+  public void testValidateAndUpdateCacheUpdatesCacheImmediately() {
+    final String tempAccessKeyId = VALID_TEMP_ACCESS_KEY_ID;
     final String originalAccessKeyId = "original-access-key-id";
     final String revokedStsTokenKey = STSSecurityUtil.buildRevokedStsTokenKey(tempAccessKeyId, originalAccessKeyId);
 
@@ -319,6 +316,63 @@ public class TestS3RevokeSTSTokenRequest {
     assertEquals(
         tempAccessKeyId, s3RevokeSTSTokenRequest.getAuditBuilder().getAuditMap().get(
             OzoneConsts.S3_REVOKESTSTOKEN_TEMP_ACCESS_KEY_ID));
+  }
+
+  @Test
+  public void testPreExecuteRejectsTempAccessKeyIdContainingDelimiter() throws Exception {
+    final OMException ex = assertPreExecuteRejects("ASIA0123456789ABCDEF|IJK", "original-access-key-id");
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+  }
+
+  @Test
+  public void testPreExecuteRejectsTempAccessKeyIdWithWrongPrefix() throws Exception {
+    final OMException ex = assertPreExecuteRejects("AKIA0123456789ABCDEFGHIJ", "original-access-key-id");
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+  }
+
+  @Test
+  public void testPreExecuteRejectsTempAccessKeyIdWithWrongLength() throws Exception {
+    final OMException ex = assertPreExecuteRejects("ASIA0123", "original-access-key-id");
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+  }
+
+  @Test
+  public void testPreExecuteRejectsTempAccessKeyIdWithLowercaseCharacter() throws Exception {
+    final OMException ex = assertPreExecuteRejects("ASIA0123456789abcdefghij", "original-access-key-id");
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+  }
+
+  @Test
+  public void testPreExecuteRejectsOverlongOriginalAccessKeyId() throws Exception {
+    final StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH; i++) {
+      sb.append('a');
+    }
+    final OMException ex = assertPreExecuteRejects(VALID_TEMP_ACCESS_KEY_ID, sb.toString());
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+  }
+
+  private static OMException assertPreExecuteRejects(String tempAccessKeyId, String originalAccessKeyId)
+      throws Exception {
+    final UserGroupInformation callerUgi = UserGroupInformation.createRemoteUser("caller");
+    Server.getCurCall().set(new StubCall(callerUgi));
+
+    try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
+      final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
+          OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
+              .setTempAccessKeyId(tempAccessKeyId)
+              .setOriginalAccessKeyId(originalAccessKeyId)
+              .build();
+
+      final OMRequest omRequest = OMRequest.newBuilder()
+          .setClientId(UUID.randomUUID().toString())
+          .setCmdType(Type.RevokeSTSToken)
+          .setRevokeSTSTokenRequest(revokeRequest)
+          .build();
+
+      final OMClientRequest omClientRequest = new S3RevokeSTSTokenRequest(omRequest);
+      return assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
+    }
   }
 
   /**

@@ -40,6 +40,12 @@ public final class S3STSUtils {
   // AWS limit for session policy is 2048 characters
   public static final int MAX_SESSION_POLICY_LENGTH = 2048;
 
+  public static final String STS_TOKEN_PREFIX = "ASIA";
+  public static final String STS_ACCESS_KEY_ID_ALLOWED_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  public static final int STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH = STS_ACCESS_KEY_ID_ALLOWED_CHARS.length();
+  public static final int STS_ACCESS_KEY_ID_RANDOM_LENGTH = 20;
+  public static final int STS_ACCESS_KEY_ID_LENGTH = STS_TOKEN_PREFIX.length() + STS_ACCESS_KEY_ID_RANDOM_LENGTH;
+
   private S3STSUtils() {
   }
 
@@ -112,6 +118,37 @@ public final class S3STSUtils {
   private static boolean isRoleSessionNameChar(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
         c == '_' || c == '+' || c == '=' || c == ',' || c == '.' || c == '@' || c == '-';
+  }
+
+  /**
+   * Validates that the tempAccessKeyId has the exact format Ozone generates for STS credentials.
+   * Because the value on the revoke path comes straight from the request, enforcing this format
+   * guarantees it can never contain the {@code |} separator used to build the revoked STS token key, keeping the
+   * {@code (tempAccessKeyId, originalAccessKeyId)} to key mapping unambiguous across users.
+   *
+   * @param tempAccessKeyId the temporary access key id from the request
+   * @throws OMException if the value is null/empty or does not match the expected format
+   */
+  public static void validateTempAccessKeyId(String tempAccessKeyId) throws OMException {
+    if (Strings.isNullOrEmpty(tempAccessKeyId)) {
+      throw new OMException("tempAccessKeyId is required for STS token revocation", INVALID_REQUEST);
+    }
+
+    if (tempAccessKeyId.length() != STS_ACCESS_KEY_ID_LENGTH ||
+        !tempAccessKeyId.startsWith(STS_TOKEN_PREFIX)) {
+      throw new OMException("Invalid tempAccessKeyId: " + tempAccessKeyId, INVALID_REQUEST);
+    }
+
+    for (int i = STS_TOKEN_PREFIX.length(); i < tempAccessKeyId.length(); i++) {
+      final char c = tempAccessKeyId.charAt(i);
+      if (!isAccessKeyIdChar(c)) {
+        throw new OMException("Invalid tempAccessKeyId: " + tempAccessKeyId, INVALID_REQUEST);
+      }
+    }
+  }
+
+  private static boolean isAccessKeyIdChar(char c) {
+    return STS_ACCESS_KEY_ID_ALLOWED_CHARS.indexOf(c) >= 0;
   }
 
   /**
