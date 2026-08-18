@@ -450,7 +450,6 @@ function check_needs_infer() {
         "^.inferconfig$"
         "^hadoop-ozone/dev-support/checks/infer.sh$"
         "^hadoop-ozone/dev-support/checks/install/infer.sh$"
-        "^.github/workflows/infer.yml$"
         "pom.xml"
         "src/..../java"
     )
