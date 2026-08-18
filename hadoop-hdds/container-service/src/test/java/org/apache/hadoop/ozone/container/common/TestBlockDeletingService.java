@@ -134,6 +134,7 @@ public class TestBlockDeletingService {
   private String schemaVersion;
   private int blockLimitPerInterval;
   private MutableVolumeSet volumeSet;
+  private BlockDeletingService blockDeletingService;
   private static final int BLOCK_CHUNK_SIZE = 100;
 
   @BeforeEach
@@ -150,6 +151,10 @@ public class TestBlockDeletingService {
 
   @AfterEach
   public void cleanup() throws IOException {
+    if (blockDeletingService != null) {
+      // Wait for deletion tasks to release container DB references before cleanup.
+      blockDeletingService.shutdown();
+    }
     BlockUtils.shutdownCache(conf);
     CodecBuffer.assertNoLeaks();
   }
@@ -703,42 +708,37 @@ public class TestBlockDeletingService {
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
-    try {
-      svc.start();
-      GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+    svc.start();
+    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
 
-      // Ensure 1 container was created
-      List<ContainerData> containerData = Lists.newArrayList();
-      containerSet.listContainer(0L, 1, containerData);
-      assertEquals(1, containerData.size());
-      KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
+    // Ensure 1 container was created
+    List<ContainerData> containerData = Lists.newArrayList();
+    containerSet.listContainer(0L, 1, containerData);
+    assertEquals(1, containerData.size());
+    KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
 
-      try (DBHandle meta = BlockUtils.getDB(data, conf)) {
-        //Execute fist delete to update metrics
-        deleteAndWait(svc, 1);
+    try (DBHandle meta = BlockUtils.getDB(data, conf)) {
+      //Execute fist delete to update metrics
+      deleteAndWait(svc, 1);
 
-        assertEquals(3, blockDeletingServiceMetrics.getTotalPendingBlockCount());
-        assertEquals(3 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
+      assertEquals(3, blockDeletingServiceMetrics.getTotalPendingBlockCount());
+      assertEquals(3 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
 
-        //Execute the second delete to check whether metrics values decreased
-        deleteAndWait(svc, 2);
+      //Execute the second delete to check whether metrics values decreased
+      deleteAndWait(svc, 2);
 
-        assertEquals(2, blockDeletingServiceMetrics.getTotalPendingBlockCount());
-        assertEquals(2 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
+      assertEquals(2, blockDeletingServiceMetrics.getTotalPendingBlockCount());
+      assertEquals(2 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
 
-        //Execute the third delete to check whether metrics values decreased
-        deleteAndWait(svc, 3);
+      //Execute the third delete to check whether metrics values decreased
+      deleteAndWait(svc, 3);
 
-        assertEquals(1, blockDeletingServiceMetrics.getTotalPendingBlockCount());
-        assertEquals(1 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
+      assertEquals(1, blockDeletingServiceMetrics.getTotalPendingBlockCount());
+      assertEquals(1 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
 
-      } catch (Exception ex) {
-        ex.printStackTrace();
-        fail("Test failed with exception: " + ex.getMessage());
-      }
-    } finally {
-      // Wait for deletion tasks to release container DB references before cleanup.
-      svc.shutdown();
+    } catch (Exception ex) {
+      ex.printStackTrace();
+      fail("Test failed with exception: " + ex.getMessage());
     }
   }
 
@@ -956,7 +956,10 @@ public class TestBlockDeletingService {
       KeyValueHandler keyValueHandler) {
     OzoneContainer ozoneContainer =
         mockDependencies(containerSet, keyValueHandler);
-    return new BlockDeletingServiceTestImpl(ozoneContainer, 1000, config);
+    BlockDeletingServiceTestImpl service =
+        new BlockDeletingServiceTestImpl(ozoneContainer, 1000, config);
+    blockDeletingService = service;
+    return service;
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,
@@ -1186,30 +1189,25 @@ public class TestBlockDeletingService {
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
-    try {
-      svc.start();
-      GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+    svc.start();
+    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
 
-      // Remove all the block files from the disk, as if they were deleted previously but the system failed before
-      // doing any metadata updates or removing the transaction of to-delete block IDs from the DB.
-      File blockDataDir = new File(contData.getChunksPath());
-      try (DirectoryStream<Path> stream = Files.newDirectoryStream(blockDataDir.toPath())) {
-        for (Path entry : stream) {
-          assertTrue(entry.toFile().delete());
-        }
+    // Remove all the block files from the disk, as if they were deleted previously but the system failed before
+    // doing any metadata updates or removing the transaction of to-delete block IDs from the DB.
+    File blockDataDir = new File(contData.getChunksPath());
+    try (DirectoryStream<Path> stream = Files.newDirectoryStream(blockDataDir.toPath())) {
+      for (Path entry : stream) {
+        assertTrue(entry.toFile().delete());
       }
-
-      String[] blockFilesRemaining = blockDataDir.list();
-      assertNotNull(blockFilesRemaining);
-      assertEquals(0, blockFilesRemaining.length);
-
-      deleteAndWait(svc, 1);
-
-      assertDeletionsInChecksumFile(contData, numBlocks);
-    } finally {
-      // Wait for deletion tasks to release container DB references before cleanup.
-      svc.shutdown();
     }
+
+    String[] blockFilesRemaining = blockDataDir.list();
+    assertNotNull(blockFilesRemaining);
+    assertEquals(0, blockFilesRemaining.length);
+
+    deleteAndWait(svc, 1);
+
+    assertDeletionsInChecksumFile(contData, numBlocks);
   }
 
   /**
