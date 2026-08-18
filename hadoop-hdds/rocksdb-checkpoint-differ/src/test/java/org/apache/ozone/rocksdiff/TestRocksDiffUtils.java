@@ -106,10 +106,9 @@ public class TestRocksDiffUtils {
       RocksDiffUtils.filterRelevantSstFiles(inputSstFiles,
           tablesToLookup,
           new TablePrefixInfo(
-              new HashMap<String, String>() {{
-                put(invalidColumnFamilyName, getLexicographicallyHigherString(invalidSSTFileEndRange));
-                put(validSSTColumnFamilyName, expectedPrefix);
-              }}));
+              ImmutableMap.of(
+                  invalidColumnFamilyName, getLexicographicallyHigherString(invalidSSTFileEndRange),
+                  validSSTColumnFamilyName, expectedPrefix)));
       if (tablesToLookup.contains(validSSTColumnFamilyName)) {
         Assertions.assertEquals(Sets.newTreeSet(validSstFile, untrackedSstFile), inputSstFiles.keySet(),
             "Failed for " + tablesToLookup);
