@@ -442,9 +442,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     return inflightReconstructionCount.get();
   }
 
-  @VisibleForTesting
-  Integer getReconstructionPendingFragmentCount(long cmdId) {
-    return reconstructionCommandIdToPendingFragmentCount.get(cmdId);
+  int getReconstructionPendingFragmentCount(long cmdId) {
+    return reconstructionCommandIdToPendingFragmentCount.getOrDefault(cmdId, 0);
   }
 
   /**
