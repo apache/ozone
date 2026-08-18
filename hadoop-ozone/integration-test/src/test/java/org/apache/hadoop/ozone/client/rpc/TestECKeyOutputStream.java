@@ -403,7 +403,7 @@ public class TestECKeyOutputStream {
     final OzoneBucket bucket = getOzoneBucket();
     String keyName =
         String.format("testMultipleChunksInSingleWriteOpOffset" +
-                "%dBufferChunks%dNumChunks", offset, bufferChunks,
+                "%dBufferChunks%dNumChunks%d", offset, bufferChunks,
             numChunks);
     try (OzoneOutputStream out = bucket.createKey(keyName, 4096,
         new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,

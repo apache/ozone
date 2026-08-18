@@ -493,9 +493,9 @@ public class TestHSync {
         try (FSDataOutputStream os1 = fs.create(key2, true)) {
           os1.write(1);
           // There should be 2 key in openFileTable
-          assertThat(2 == getOpenKeyInfo(BUCKET_LAYOUT).size());
+          assertThat(getOpenKeyInfo(BUCKET_LAYOUT)).hasSize(2);
           // One key will be in fileTable as hsynced
-          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
+          assertThat(getKeyInfo(BUCKET_LAYOUT)).hasSize(1);
 
           // Resume openKeyCleanupService
           openKeyCleanupService.resume();
@@ -504,7 +504,7 @@ public class TestHSync {
           GenericTestUtils.waitFor(() ->
               getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
           // Verify only one key is still present in fileTable
-          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
+          assertThat(getKeyInfo(BUCKET_LAYOUT)).hasSize(1);
 
           // Clean up
           assertTrue(fs.delete(key1, false));
@@ -579,7 +579,7 @@ public class TestHSync {
         os.write(1);
         os.hsync();
         // There should be 1 key in openFileTable
-        assertThat(1 == getOpenKeyInfo(BUCKET_LAYOUT).size());
+        assertThat(getOpenKeyInfo(BUCKET_LAYOUT)).hasSize(1);
         // Delete directory recursively
         fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
             bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);
