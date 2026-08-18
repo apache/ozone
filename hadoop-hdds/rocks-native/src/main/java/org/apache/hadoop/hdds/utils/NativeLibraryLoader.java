@@ -26,14 +26,12 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,9 +126,9 @@ public class NativeLibraryLoader {
 
       }
       if (!loaded) {
-        Pair<Optional<File>, List<File>> files = copyResourceFromJarToTemp(libraryName, dependentFiles);
-        if (files.getKey().isPresent()) {
-          System.load(files.getKey().get().getAbsolutePath());
+        LoadedFiles files = copyResourceFromJarToTemp(libraryName, dependentFiles);
+        if (files.libraryFile.isPresent()) {
+          System.load(files.libraryFile.get().getAbsolutePath());
           loaded = true;
         }
       }
@@ -154,7 +152,7 @@ public class NativeLibraryLoader {
         .getResourceAsStream(libraryFileName);
   }
 
-  private Pair<Optional<File>, List<File>> copyResourceFromJarToTemp(final String libraryName,
+  private LoadedFiles copyResourceFromJarToTemp(final String libraryName,
                                                                      final List<String> dependentFileNames)
       throws IOException {
     final String libraryFileName = getJniLibraryFileName(libraryName);
@@ -162,7 +160,7 @@ public class NativeLibraryLoader {
     try {
       is = getResourceStream(libraryFileName);
       if (is == null) {
-        return Pair.of(Optional.empty(), null);
+        return new LoadedFiles(Optional.empty());
       }
 
       final String nativeLibDir =
@@ -174,7 +172,7 @@ public class NativeLibraryLoader {
       final Path tempPath = Files.createTempDirectory(dir.toPath(), libraryName);
       final File tempDir = tempPath.toFile();
       if (!tempDir.exists()) {
-        return Pair.of(Optional.empty(), null);
+        return new LoadedFiles(Optional.empty());
       }
 
       Path libPath = tempPath.resolve(libraryFileName);
@@ -184,7 +182,6 @@ public class NativeLibraryLoader {
         libFile.deleteOnExit();
       }
 
-      List<File> dependentFiles = new ArrayList<>();
       for (String fileName : dependentFileNames) {
         if (is != null) {
           is.close();
@@ -196,16 +193,26 @@ public class NativeLibraryLoader {
         if (file.exists()) {
           file.deleteOnExit();
         }
-        dependentFiles.add(file);
       }
       ShutdownHookManager.get().addShutdownHook(
           () -> FileUtils.deleteQuietly(tempDir),
           LIBRARY_SHUTDOWN_HOOK_PRIORITY);
-      return Pair.of(Optional.of(libFile), dependentFiles);
+      return new LoadedFiles(Optional.of(libFile));
     } finally {
       if (is != null) {
         is.close();
       }
+    }
+  }
+
+  /**
+   * The extracted library file.
+   */
+  private static final class LoadedFiles {
+    private final Optional<File> libraryFile;
+
+    private LoadedFiles(Optional<File> libraryFile) {
+      this.libraryFile = libraryFile;
     }
   }
 }

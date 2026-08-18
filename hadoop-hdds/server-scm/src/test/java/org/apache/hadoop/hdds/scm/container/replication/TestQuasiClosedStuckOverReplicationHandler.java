@@ -33,7 +33,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -46,6 +45,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.TestEntry;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,7 +58,7 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG = RatisReplicationConfig.getInstance(THREE);
   private ContainerInfo container;
   private ReplicationManager replicationManager;
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
+  private Set<TestEntry<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private QuasiClosedStuckOverReplicationHandler handler;
   private final DatanodeID origin1 = DatanodeID.randomID();
   private final DatanodeID origin2 = DatanodeID.randomID();
@@ -98,10 +98,10 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   public void testReturnsZeroIfNotOverReplicated() throws IOException {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         QUASI_CLOSED,
-        Pair.of(origin1, IN_SERVICE),
-        Pair.of(origin1, IN_SERVICE),
-        Pair.of(origin2, IN_SERVICE),
-        Pair.of(origin2, IN_SERVICE));
+        new TestEntry<>(origin1, IN_SERVICE),
+        new TestEntry<>(origin1, IN_SERVICE),
+        new TestEntry<>(origin2, IN_SERVICE),
+        new TestEntry<>(origin2, IN_SERVICE));
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     assertEquals(0, count);
@@ -111,12 +111,12 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   public void testNoCommandsScheduledIfPendingOps() throws IOException {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         QUASI_CLOSED,
-        Pair.of(origin1, IN_SERVICE),
-        Pair.of(origin1, IN_SERVICE),
-        Pair.of(origin1, IN_SERVICE),
-        Pair.of(origin2, IN_SERVICE),
-        Pair.of(origin2, IN_SERVICE),
-        Pair.of(origin2, IN_SERVICE));
+        new TestEntry<>(origin1, IN_SERVICE),
+        new TestEntry<>(origin1, IN_SERVICE),
+        new TestEntry<>(origin1, IN_SERVICE),
+        new TestEntry<>(origin2, IN_SERVICE),
+        new TestEntry<>(origin2, IN_SERVICE),
+        new TestEntry<>(origin2, IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
@@ -150,7 +150,7 @@ public class TestQuasiClosedStuckOverReplicationHandler {
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     assertEquals(1, count);
-    SCMCommand<?> command = commandsSent.iterator().next().getRight();
+    SCMCommand<?> command = commandsSent.iterator().next().getValue();
     assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteContainerCommand, command.getType());
   }
 

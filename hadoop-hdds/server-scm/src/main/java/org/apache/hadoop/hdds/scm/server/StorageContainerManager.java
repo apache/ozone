@@ -55,7 +55,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -72,6 +71,7 @@ import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
+import org.apache.hadoop.hdds.scm.SafeModeRuleStatus;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -918,7 +918,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new SCMCertStore.Builder().setMetadaStore(scmMetadataStore)
             .setRatisServer(scmHAManager.getRatisServer()).build();
 
-
     final CertificateServer scmCertificateServer;
     final CertificateServer rootCertificateServer;
 
@@ -1311,7 +1310,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setClusterId(clusterId);
         }
 
-
         if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
           HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
               getScmAddress(haDetails, conf).getHostName(), true);
@@ -1424,7 +1422,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmNodeInfoList.get(0).getBlockClientAddress());
       }
     }
-
 
     return scmAddress;
   }
@@ -2097,17 +2094,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *
    * @return map of rule statuses.
    */
-  public Map<String, Pair<Boolean, String>> getRuleStatus() {
+  public Map<String, SafeModeRuleStatus> getRuleStatus() {
     return scmSafeModeManager.getRuleStatus();
   }
 
   @Override
   public Map<String, String[]> getSafeModeRuleStatus() {
     Map<String, String[]> map = new HashMap<>();
-    for (Map.Entry<String, Pair<Boolean, String>> entry :
+    for (Map.Entry<String, SafeModeRuleStatus> entry :
         scmSafeModeManager.getRuleStatus().entrySet()) {
       String[] status =
-          {entry.getValue().getRight(), entry.getValue().getLeft().toString()};
+          {entry.getValue().getStatusText(), Boolean.toString(entry.getValue().isValidated())};
       map.put(entry.getKey(), status);
     }
     return map;

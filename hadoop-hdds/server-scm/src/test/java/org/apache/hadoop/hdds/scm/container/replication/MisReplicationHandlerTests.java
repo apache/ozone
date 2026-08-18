@@ -44,7 +44,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -62,6 +61,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.TestEntry;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
@@ -72,7 +72,7 @@ public abstract class MisReplicationHandlerTests {
   private ContainerInfo container;
   private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
+  private Set<TestEntry<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private final AtomicBoolean throwThrottledException =
       new AtomicBoolean(false);
   private ReplicationManagerMetrics metrics;
@@ -221,14 +221,14 @@ public abstract class MisReplicationHandlerTests {
           pendingOp, result, maintenanceCnt);
     } finally {
       assertEquals(expectedNumberOfCommands, commandsSent.size());
-      for (Pair<DatanodeDetails, SCMCommand<?>> pair : commandsSent) {
-        SCMCommand<?> command = pair.getValue();
+      for (TestEntry<DatanodeDetails, SCMCommand<?>> commandEntry : commandsSent) {
+        SCMCommand<?> command = commandEntry.getValue();
         assertSame(replicateContainerCommand, command.getType());
         ReplicateContainerCommand replicateContainerCommand =
             (ReplicateContainerCommand) command;
         assertEquals(replicateContainerCommand.getContainerID(),
             container.getContainerID());
-        DatanodeDetails replicateSrcDn = pair.getKey();
+        DatanodeDetails replicateSrcDn = commandEntry.getKey();
         DatanodeDetails target = replicateContainerCommand.getTargetDatanode();
         assertThat(sourceDns).contains(replicateSrcDn);
         assertThat(targetNodes).contains(target);

@@ -38,7 +38,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -140,6 +139,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.SafeModeRuleStatus;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -1057,13 +1057,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public GetSafeModeRuleStatusesResponseProto getSafeModeRuleStatues(
       GetSafeModeRuleStatusesRequestProto request) throws IOException {
-    Map<String, Pair<Boolean, String>>
+    Map<String, SafeModeRuleStatus>
         map = impl.getSafeModeRuleStatuses();
     List<SafeModeRuleStatusProto> proto = new ArrayList();
-    for (Map.Entry<String, Pair<Boolean, String>> entry : map.entrySet()) {
+    for (Map.Entry<String, SafeModeRuleStatus> entry : map.entrySet()) {
       proto.add(SafeModeRuleStatusProto.newBuilder().setRuleName(entry.getKey())
-          .setValidate(entry.getValue().getLeft())
-          .setStatusText(entry.getValue().getRight())
+          .setValidate(entry.getValue().isValidated())
+          .setStatusText(entry.getValue().getStatusText())
           .build());
     }
     return GetSafeModeRuleStatusesResponseProto.newBuilder()

@@ -88,7 +88,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -1645,7 +1644,6 @@ public class TestRocksDBCheckpointDiffer {
     );
   }
 
-
   /**
    * Test that backup SST files are pruned on loading previous compaction logs.
    */
@@ -1658,10 +1656,10 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(0L, sstFilePruningMetrics.getCompactionsProcessed());
     assertEquals(0L, sstFilePruningMetrics.getFilesRemovedTotal());
 
-    List<Pair<String, Integer>> keys = new ArrayList<Pair<String, Integer>>();
-    keys.add(Pair.of("key1", Integer.valueOf(1)));
-    keys.add(Pair.of("key2", Integer.valueOf(0)));
-    keys.add(Pair.of("key3", Integer.valueOf(1)));
+    List<SstEntry<String, Integer>> keys = new ArrayList<SstEntry<String, Integer>>();
+    keys.add(new SstEntry<>("key1", Integer.valueOf(1)));
+    keys.add(new SstEntry<>("key2", Integer.valueOf(0)));
+    keys.add(new SstEntry<>("key3", Integer.valueOf(1)));
 
     String inputFile78 = "000078";
     String inputFile73 = "000073";
@@ -1695,10 +1693,10 @@ public class TestRocksDBCheckpointDiffer {
         MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
             ManagedRawSSTFileReader.class, (mock, context) -> {
               ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
-              Iterator<Pair<CodecBuffer, Integer>> keyItr = keys.stream().map(i -> {
+              Iterator<Object> keyItr = keys.stream().map(i -> {
                 keyCodecBuffer.clear();
                 keyCodecBuffer.put(ByteBuffer.wrap(i.getKey().getBytes(UTF_8)));
-                return Pair.of(keyCodecBuffer, i.getValue());
+                return createCodecBufferType(keyCodecBuffer, i.getValue());
               }).iterator();
               doAnswer(i -> keyItr.hasNext()).when(mockedRawSSTFileItr).hasNext();
               doAnswer(i -> keyItr.next()).when(mockedRawSSTFileItr).next();
@@ -1749,18 +1747,31 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(1L, sstFilePruningMetrics.getFilesRemovedTotal());
   }
 
-  private void createSSTFileWithKeys(File file, List<Pair<String, Integer>> keys) throws RocksDatabaseException {
+  private void createSSTFileWithKeys(File file, List<SstEntry<String, Integer>> keys) throws RocksDatabaseException {
     byte[] value = "dummyValue".getBytes(UTF_8);
     try (RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(file)) {
-      Iterator<Pair<String, Integer>> itr = keys.iterator();
+      Iterator<SstEntry<String, Integer>> itr = keys.iterator();
       while (itr.hasNext()) {
-        Pair<String, Integer> entry = itr.next();
+        SstEntry<String, Integer> entry = itr.next();
         if (entry.getValue() == 0) {
           sstFileWriter.delete(entry.getKey().getBytes(UTF_8));
         } else {
           sstFileWriter.put(entry.getKey().getBytes(UTF_8), value);
         }
       }
+    }
+  }
+
+  private static Object createCodecBufferType(CodecBuffer keyCodecBuffer, int type) {
+    try {
+      Class<?> codecBufferTypeClass = Class.forName(
+          "org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer$CodecBufferType");
+      java.lang.reflect.Constructor<?> ctor = codecBufferTypeClass
+          .getDeclaredConstructor(CodecBuffer.class, int.class);
+      ctor.setAccessible(true);
+      return ctor.newInstance(keyCodecBuffer, type);
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException("Failed to create CodecBufferType for test", e);
     }
   }
 
@@ -1992,5 +2003,52 @@ public class TestRocksDBCheckpointDiffer {
                                  boolean expectedResult) {
     assertEquals(expectedResult, rocksDBCheckpointDiffer
         .shouldSkipCompaction(columnFamilyBytes, inputFiles, outputFiles));
+  }
+
+  /**
+   * A simple key/value pair used in checkpoint differ tests.
+   */
+  private static final class SstEntry<K, V> {
+    private final K key;
+    private final V value;
+
+    private SstEntry(K key, V value) {
+      this.key = key;
+      this.value = value;
+    }
+
+    private K getKey() {
+      return key;
+    }
+
+    private V getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof SstEntry)) {
+        return false;
+      }
+      SstEntry<?, ?> that = (SstEntry<?, ?>) other;
+      return java.util.Objects.equals(key, that.key)
+          && java.util.Objects.equals(value, that.value);
+    }
+
+    @Override
+    public int hashCode() {
+      return java.util.Objects.hash(key, value);
+    }
+
+    @Override
+    public String toString() {
+      return "SstEntry{"
+          + "key=" + key
+          + ", value=" + value
+          + '}';
+    }
   }
 }

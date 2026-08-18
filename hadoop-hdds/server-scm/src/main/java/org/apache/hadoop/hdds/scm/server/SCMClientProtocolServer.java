@@ -49,7 +49,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -71,6 +70,7 @@ import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslator
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.FetchMetrics;
+import org.apache.hadoop.hdds.scm.SafeModeRuleStatus;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -1064,10 +1064,10 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
+  public Map<String, SafeModeRuleStatus> getSafeModeRuleStatuses()
       throws IOException {
     try {
-      Map<String, Pair<Boolean, String>> result = scm.getRuleStatus();
+      Map<String, SafeModeRuleStatus> result = scm.getRuleStatus();
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_SAFE_MODE_RULE_STATUSES, null));
       return result;

@@ -34,13 +34,13 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.Config;
@@ -516,7 +516,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
       throws CommandTargetOverloadedException, NotLeaderException {
     long containerID = containerInfo.getContainerID();
-    List<Pair<Integer, DatanodeDetails>> sourceWithCmds =
+    List<DatanodeCommandCount> sourceWithCmds =
         getAvailableDatanodesForReplication(sources);
     if (sourceWithCmds.isEmpty()) {
       metrics.incrReplicateContainerCmdsDeferredTotal();
@@ -537,7 +537,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       ReconstructECContainersCommand command)
       throws CommandTargetOverloadedException, NotLeaderException {
     List<DatanodeDetails> targets = command.getTargetDatanodes();
-    List<Pair<Integer, DatanodeDetails>> targetWithCmds =
+    List<DatanodeCommandCount> targetWithCmds =
         getAvailableDatanodesForReplication(targets);
     if (targetWithCmds.isEmpty()) {
       metrics.incrECReconstructionCmdsDeferredTotal();
@@ -550,14 +550,14 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   }
 
   private DatanodeDetails selectAndOptionallyExcludeDatanode(
-      int additionalCmdCount, List<Pair<Integer, DatanodeDetails>> datanodes) {
+      int additionalCmdCount, List<DatanodeCommandCount> datanodes) {
     if (datanodes.isEmpty()) {
       return null;
     }
     // Put the least loaded datanode first
-    datanodes.sort(Comparator.comparingInt(Pair::getLeft));
-    DatanodeDetails datanode = datanodes.get(0).getRight();
-    int currentCount = datanodes.get(0).getLeft();
+    datanodes.sort(Comparator.comparingInt(DatanodeCommandCount::getCommandCount));
+    DatanodeDetails datanode = datanodes.get(0).getDatanodeDetails();
+    int currentCount = datanodes.get(0).getCommandCount();
     if (currentCount + additionalCmdCount >= getReplicationLimit(datanode)) {
       addExcludedNode(datanode);
     }
@@ -574,9 +574,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * @return List of datanodes with the current command count that are not over
    *         the limit.
    */
-  private List<Pair<Integer, DatanodeDetails>>
+  private List<DatanodeCommandCount>
       getAvailableDatanodesForReplication(List<DatanodeDetails> datanodes) {
-    List<Pair<Integer, DatanodeDetails>> datanodeWithCommandCount
+    List<DatanodeCommandCount> datanodeWithCommandCount
         = new ArrayList<>();
     for (DatanodeDetails dn : datanodes) {
       try {
@@ -589,13 +589,60 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
           addExcludedNode(dn);
           continue;
         }
-        datanodeWithCommandCount.add(Pair.of(totalCount, dn));
+        datanodeWithCommandCount.add(new DatanodeCommandCount(totalCount, dn));
       } catch (NodeNotFoundException e) {
         LOG.error("Node {} not found in NodeManager. Should not happen",
             dn, e);
       }
     }
     return datanodeWithCommandCount;
+  }
+
+  /**
+   * A datanode and the number of commands currently scheduled for it.
+   */
+  private static final class DatanodeCommandCount {
+    private final int commandCount;
+    private final DatanodeDetails datanodeDetails;
+
+    private DatanodeCommandCount(int commandCount, DatanodeDetails datanodeDetails) {
+      this.commandCount = commandCount;
+      this.datanodeDetails = datanodeDetails;
+    }
+
+    private int getCommandCount() {
+      return commandCount;
+    }
+
+    private DatanodeDetails getDatanodeDetails() {
+      return datanodeDetails;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof DatanodeCommandCount)) {
+        return false;
+      }
+      DatanodeCommandCount that = (DatanodeCommandCount) other;
+      return commandCount == that.commandCount
+          && Objects.equals(datanodeDetails, that.datanodeDetails);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(commandCount, datanodeDetails);
+    }
+
+    @Override
+    public String toString() {
+      return "DatanodeCommandCount{"
+          + "commandCount=" + commandCount
+          + ", datanodeDetails=" + datanodeDetails
+          + '}';
+    }
   }
 
   private int getQueuedReplicationCount(DatanodeDetails datanode)

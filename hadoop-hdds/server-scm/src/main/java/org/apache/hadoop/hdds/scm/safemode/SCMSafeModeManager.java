@@ -32,9 +32,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.SafeModeRuleStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
@@ -271,11 +271,11 @@ public class SCMSafeModeManager implements SafeModeManager {
   }
 
   /** Get the safe mode status of all rules. */
-  public Map<String, Pair<Boolean, String>> getRuleStatus() {
-    Map<String, Pair<Boolean, String>> map = new HashMap<>();
+  public Map<String, SafeModeRuleStatus> getRuleStatus() {
+    Map<String, SafeModeRuleStatus> map = new HashMap<>();
     for (SafeModeExitRule<?> exitRule : exitRules.values()) {
       map.put(exitRule.getRuleName(),
-          Pair.of(exitRule.validate(), exitRule.getStatusText()));
+          new SafeModeRuleStatus(exitRule.validate(), exitRule.getStatusText()));
     }
     return map;
   }

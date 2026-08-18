@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -38,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.SafeModeRuleStatus;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -395,7 +395,6 @@ public interface StorageContainerLocationProtocol extends Closeable {
   @Deprecated
   int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
 
-
   /**
    * Get deleted block summary.
    * @throws IOException
@@ -411,7 +410,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   boolean inSafeMode() throws IOException;
 
-  Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
+  Map<String, SafeModeRuleStatus> getSafeModeRuleStatuses()
       throws IOException;
 
   /**
