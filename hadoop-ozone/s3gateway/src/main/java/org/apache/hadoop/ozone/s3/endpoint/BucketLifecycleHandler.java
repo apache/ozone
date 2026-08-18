@@ -131,15 +131,28 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     verifyBucketOwner(context, bucketName);
     S3LifecycleConfiguration s3LifecycleConfiguration;
     OzoneBucket ozoneBucket = context.getVolume().getBucket(bucketName);
+    OmLifecycleConfiguration lcc;
     try {
       s3LifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(null,
           null, null, null, null, body);
-      OmLifecycleConfiguration lcc =
-          s3LifecycleConfiguration.toOmLifecycleConfiguration(ozoneBucket);
-      ozoneBucket.setLifecycleConfiguration(lcc);
+      lcc = s3LifecycleConfiguration.toOmLifecycleConfiguration(ozoneBucket);
     } catch (WebApplicationException ex) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName);
     } catch (OMException ex) {
+      // Rule validation rejects client-supplied values with INVALID_REQUEST, which the shared
+      // translation maps to InvalidRequest. AWS S3 uses InvalidArgument for a rejected lifecycle
+      // configuration, so only this validation step is remapped.
+      if (ex.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, bucketName, ex);
+      }
+      throw S3ErrorTable.newError(bucketName, ex);
+    }
+
+    try {
+      ozoneBucket.setLifecycleConfiguration(lcc);
+    } catch (OMException ex) {
+      // OM raises INVALID_REQUEST for server-side conditions as well, such as a bucket layout
+      // mismatch, so its result codes keep the shared translation instead of being remapped.
       throw S3ErrorTable.newError(bucketName, ex);
     }
     return Response.ok().build();
