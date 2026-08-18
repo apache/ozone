@@ -48,7 +48,7 @@ public final class SCMContainerMetrics implements MetricsSource {
 
   private final String sourceName;
 
-  private SCMContainerMetrics(String sourceName, SCMMXBean scmmxBean) {
+  SCMContainerMetrics(String sourceName, SCMMXBean scmmxBean) {
     this.sourceName = sourceName;
     this.scmmxBean = scmmxBean;
   }
