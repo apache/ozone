@@ -112,7 +112,6 @@ public final class MetricsLeakAssertion {
       "OMLockMetrics",
       "OMHAMetrics",
       "OMSnapshotDirectoryMetrics",
-      "OmSnapshotInternalMetrics",
       "OmSnapshotMetrics",
       "OmClientProtocol",
       "DeletingServiceMetrics",

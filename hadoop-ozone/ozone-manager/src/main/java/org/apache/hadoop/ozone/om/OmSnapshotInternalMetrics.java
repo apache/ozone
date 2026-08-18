@@ -28,11 +28,12 @@ import org.apache.hadoop.ozone.OzoneConsts;
  * This class contains internal Snapshot Operation metrics.
  */
 @Metrics(about = "Snapshot Internal Operation Metrics", context = OzoneConsts.OZONE)
-public class OmSnapshotInternalMetrics {
+public final class OmSnapshotInternalMetrics {
 
   public static final String METRICS_SOURCE_NAME =
       OmSnapshotInternalMetrics.class.getSimpleName();
   private MetricsRegistry registry;
+  private String sourceName;
 
   /*
    * Total internal snapshot deletion operation metrics since last restart.
@@ -73,21 +74,34 @@ public class OmSnapshotInternalMetrics {
   @Metric("Total no. of delta files processed during incremental defragmentation")
   private MutableCounterLong numSnapshotIncDefragDeltaFilesProcessed;
 
-  public OmSnapshotInternalMetrics() {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
+  private OmSnapshotInternalMetrics(String sourceName) {
+    this.sourceName = sourceName;
+    this.registry = new MetricsRegistry(sourceName);
   }
 
-  public static OmSnapshotInternalMetrics create() {
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+  /**
+   * Creates and registers the metrics instance.  In mini-cluster mode many
+   * OMs share one metrics system, so the metrics system uniquifies the
+   * constant source name on registration (OmSnapshotInternalMetrics-1, -2,
+   * ...).  Unregistering by the constant base name would then leak every
+   * source past the first.  Make the name unique per OM up front so register
+   * and unregister stay symmetric.  In production there is one instance per
+   * JVM, so keep the plain name for stable JMX and Prometheus metric names.
+   */
+  public static OmSnapshotInternalMetrics create(String omNodeId) {
+    String sourceName = DefaultMetricsSystem.inMiniClusterMode()
+        ? METRICS_SOURCE_NAME + '-' + omNodeId
+        : METRICS_SOURCE_NAME;
+    return DefaultMetricsSystem.instance().register(sourceName,
         "Metrics tracking the progress of snapshot internal operations",
-        new OmSnapshotInternalMetrics());
+        new OmSnapshotInternalMetrics(sourceName));
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+  public void unregister() {
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   public void incNumSnapshotPurges() {
