@@ -39,6 +39,7 @@ public final class SCMMetrics {
 
   private final LinkedList<String> ratisEvents = new LinkedList<>();
   private final int maxRatisEvents;
+  private final String sourceName;
 
   /**
    * Container stat metrics, the meaning of following metrics
@@ -65,8 +66,6 @@ public final class SCMMetrics {
   public DBCheckpointMetrics getDBCheckpointMetrics() {
     return dbCheckpointMetrics;
   }
-
-  private final String sourceName;
 
   private SCMMetrics(String sourceName, int maxRatisEvents) {
     this.sourceName = sourceName;
