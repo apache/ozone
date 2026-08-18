@@ -23,6 +23,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.NullOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
@@ -71,7 +72,7 @@ public class ChecksumVerifier implements ReplicaVerifier {
       Throwable cause = e.getCause() != null ? e.getCause() : e;
       StorageContainerException storageContainerException = findStorageContainerException(e);
       if (storageContainerException != null
-          && storageContainerException.getResult() == org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK) {
+          && storageContainerException.getResult() == ContainerProtos.Result.NO_SUCH_BLOCK) {
         return BlockVerificationResult.failCheckAndRefreshKeyLocation(storageContainerException.getMessage());
       }
       if (cause instanceof OzoneChecksumException) {
