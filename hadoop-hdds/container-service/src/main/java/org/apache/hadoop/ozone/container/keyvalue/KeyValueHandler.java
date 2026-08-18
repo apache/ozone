@@ -2300,7 +2300,7 @@ public class KeyValueHandler extends Handler {
     }
     try {
       final long startTime = Time.monotonicNow();
-      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
+      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver);
       KeyValueContainerData containerData = (KeyValueContainerData) kvContainer
           .getContainerData();
       HddsVolume volume = containerData.getVolume();
@@ -2324,7 +2324,7 @@ public class KeyValueHandler extends Handler {
   }
 
   private long readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
-      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean verifyChecksum)
+      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
     int responseDataSize = readBlock.getResponseDataSize();
@@ -2353,12 +2353,13 @@ public class KeyValueHandler extends Handler {
     } else {
       bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
     }
-    // We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
-    // previous checksum boundary.
-    // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
-    // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
-    // it simplifies the code to always do this.
-    final long offsetAlignment = readBlock.getOffset() % bytesPerChecksum;
+    long offsetAlignment;
+    if (checksumType != ContainerProtos.ChecksumType.NONE) {
+      final long chunkRelativeOffset = getChunkRelativeOffset(readBlock.getOffset(), chunkInfos);
+      offsetAlignment = chunkRelativeOffset % bytesPerChecksum;
+    } else {
+      offsetAlignment = readBlock.getOffset() % bytesPerChecksum;
+    }
     long adjustedOffset = readBlock.getOffset() - offsetAlignment;
 
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
@@ -2381,16 +2382,17 @@ public class KeyValueHandler extends Handler {
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
         final List<ByteString> checksums = getChecksums(adjustedOffset, readLength,
-            bytesPerChunk, bytesPerChecksum, chunkInfos);
+            bytesPerChecksum, chunkInfos);
         LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChunk {}, bytesPerChecksum {}",
             readBlock, adjustedOffset, readLength, bytesPerChunk, bytesPerChecksum);
         checksumData = new ChecksumData(checksumType, bytesPerChecksum, checksums);
-        if (verifyChecksum) {
-          Checksum.verifyChecksum(buffer.duplicate(), checksumData, 0);
+        if (validateChunkChecksumData) {
+          Checksum.verifyChecksum(
+              buffer.duplicate(), checksumData, adjustedOffset, chunkInfos);
         }
       }
       final ContainerCommandResponseProto response = getReadBlockResponse(
-          request, checksumData, buffer, adjustedOffset);
+          request, checksumData, buffer, adjustedOffset, chunkInfos);
       final int dataLength = response.getReadBlock().getData().size();
       LOG.debug("server onNext response {}: dataLength={}, numChecksums={}",
           numResponses, dataLength, response.getReadBlock().getChecksumData().getChecksumsList().size());
@@ -2404,33 +2406,63 @@ public class KeyValueHandler extends Handler {
     return totalDataLength;
   }
 
-  static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChunk, int bytesPerChecksum,
-      final List<ContainerProtos.ChunkInfo> chunks) {
-    assertSame(0, blockOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
-    final int numChecksums = 1 + (readLength - 1) / bytesPerChecksum;
-    final List<ByteString> checksums = new ArrayList<>(numChecksums);
-    for (int i = 0; i < numChecksums; i++) {
-      // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from,
-      // and its offset to pull out the correct checksum bytes for each read.
-      final int n = i * bytesPerChecksum;
-      final long offset = blockOffset + n;
-      final int c = Math.toIntExact(offset / bytesPerChunk);
-      final int chunkOffset = Math.toIntExact(offset % bytesPerChunk);
-      final int csi = chunkOffset / bytesPerChecksum;
-
-      assertTrue(c < chunks.size(),
-          () -> "chunkIndex = " + c + " >= chunk.size()" + chunks.size());
-      final ContainerProtos.ChunkInfo chunk = chunks.get(c);
-      if (c < chunks.size() - 1) {
-        assertSame(bytesPerChunk, chunk.getLen(), "bytesPerChunk");
+  /**
+   * If Checksum type is not NONE then we have to align the read to checksum boundaries.
+   * Each chunk has its own checksum grid starting at byte 0 of that chunk, so the alignment
+   * must be relative to the containing chunk rather than a global multiple
+   * of bytesPerChecksum.
+   * Returns the offset of {@code blockOffset} relative to the start of the
+   * chunk that contains it.
+   */
+  static long getChunkRelativeOffset(long blockOffset, List<ContainerProtos.ChunkInfo> chunkInfos) {
+    long currentChunkOffset = 0;
+    for (ContainerProtos.ChunkInfo chunk : chunkInfos) {
+      long chunkEnd = currentChunkOffset + chunk.getLen();
+      if (blockOffset < chunkEnd) {
+        return blockOffset - currentChunkOffset;
       }
-      final ContainerProtos.ChecksumData checksumDataProto = chunks.get(c).getChecksumData();
-      assertSame(bytesPerChecksum, checksumDataProto.getBytesPerChecksum(), "bytesPerChecksum");
-      final List<ByteString> checksumsList = checksumDataProto.getChecksumsList();
-      assertTrue(csi < checksumsList.size(),
-          () -> "checksumIndex = " + csi + " >= checksumsList.size()" + checksumsList.size());
-      checksums.add(checksumsList.get(csi));
+      currentChunkOffset = chunkEnd;
     }
+    return blockOffset;
+  }
+
+  static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChecksum,
+      final List<ContainerProtos.ChunkInfo> chunks) {
+    final List<ByteString> checksums = new ArrayList<>();
+
+    long currentChunkOffset = 0;
+    for (ContainerProtos.ChunkInfo chunk : chunks) {
+      long chunkStart = currentChunkOffset;
+      long chunkEnd = chunkStart + chunk.getLen();
+
+      long overlapStart = Math.max(blockOffset, chunkStart);
+      long overlapEnd = Math.min(blockOffset + readLength, chunkEnd);
+
+      if (overlapStart < overlapEnd) {
+        long offsetInChunk = overlapStart - chunkStart;
+        long endOffsetInChunk = overlapEnd - chunkStart;
+
+        int firstChecksumIndex = Math.toIntExact(offsetInChunk / bytesPerChecksum);
+        int lastChecksumIndex = Math.toIntExact((endOffsetInChunk - 1) / bytesPerChecksum);
+
+        ContainerProtos.ChecksumData checksumDataProto = chunk.getChecksumData();
+        assertSame(bytesPerChecksum, checksumDataProto.getBytesPerChecksum(), "bytesPerChecksum");
+        List<ByteString> checksumsList = checksumDataProto.getChecksumsList();
+
+        for (int csi = firstChecksumIndex; csi <= lastChecksumIndex; csi++) {
+          final int finalCsi = csi;
+          assertTrue(finalCsi < checksumsList.size(),
+              () -> "checksumIndex = " + finalCsi + " >= checksumsList.size()" + checksumsList.size());
+          checksums.add(checksumsList.get(finalCsi));
+        }
+      }
+
+      currentChunkOffset = chunkEnd;
+      if (currentChunkOffset >= blockOffset + readLength) {
+        break;
+      }
+    }
+
     return checksums;
   }
 

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.rpc.read;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -301,5 +302,98 @@ public class TestStreamRead {
     final String computedMD5 = generateMd5 ? StringUtils.bytes2Hex(md5.digest()) : null;
     print(name, keySizeByte, elapsedNanos, bufferSize, computedMD5);
     return computedMD5;
+  }
+
+  @Test
+  void testSmallChunksWithLargeChecksum() throws Exception {
+    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf(512);
+    System.out.println("cluster starting ...");
+    try (MiniOzoneCluster cluster = newCluster(bytesPerChecksum.getSizeInt())) {
+      cluster.waitForClusterToBeReady();
+      System.out.println("cluster ready");
+      
+      OzoneConfiguration conf = cluster.getConf();
+      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+      clientConfig.setStreamReadBlock(true);
+      clientConfig.setStreamBufferFlushDelay(false);
+      final OzoneConfiguration steamReadConf = new OzoneConfiguration(conf);
+      steamReadConf.setFromObject(clientConfig);
+
+      try (OzoneClient streamReadClient = OzoneClientFactory.getRpcClient(steamReadConf)) {
+        final BucketForTesting testBucket = BucketForTesting.newBuilder(streamReadClient).build();
+        final String keyName = "keySmallChunks";
+
+        // Write a key with multiple small chunks
+        byte[] data = new byte[]{1, 2, 3, 4, 5};
+        try (OutputStream out = testBucket.delegate()
+            .createKey(keyName, data.length, RatisReplicationConfig.getInstance(ONE), Collections.emptyMap())) {
+          for (byte b : data) {
+            out.write(b);
+            out.flush(); // Forces a chunk to be created
+          }
+        }
+
+        // Read it back using stream read
+        try (InputStream in = testBucket.delegate().readKey(keyName)) {
+          byte[] readData = new byte[data.length];
+          int bytesRead = in.read(readData);
+          assertEquals(data.length, bytesRead);
+          assertArrayEquals(data, readData);
+        }
+      }
+    }
+  }
+
+  @Test
+  void testShiftedChecksumBoundaryVerification() throws Exception {
+    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf(8192);
+    System.out.println("cluster starting ...");
+    try (MiniOzoneCluster cluster = newCluster(bytesPerChecksum.getSizeInt())) {
+      cluster.waitForClusterToBeReady();
+      System.out.println("cluster ready");
+
+      OzoneConfiguration conf = cluster.getConf();
+      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+      clientConfig.setStreamReadBlock(true);
+      clientConfig.setStreamBufferFlushDelay(false);
+      // verifyChecksum remains true by default
+      final OzoneConfiguration streamReadConf = new OzoneConfiguration(conf);
+      streamReadConf.setFromObject(clientConfig);
+
+      try (OzoneClient streamReadClient = OzoneClientFactory.getRpcClient(streamReadConf)) {
+        BucketForTesting testBucket = BucketForTesting.newBuilder(streamReadClient).build();
+        String keyName = "keyShiftedChecksum";
+
+        // Write total data and flush in three parts to create shifted checksum boundaries
+        int totalSize = 8192 + 10 + 32768;
+        byte[] fullData = new byte[totalSize];
+        ThreadLocalRandom.current().nextBytes(fullData);
+        try (OutputStream out = testBucket.delegate().createKey(keyName, totalSize,
+            RatisReplicationConfig.getInstance(ONE), Collections.emptyMap())) {
+          // Chunk 1: first 8192 bytes
+          out.write(fullData, 0, 8192);
+          out.flush();
+
+          // Chunk 2: next 10 bytes (short chunk)
+          out.write(fullData, 8192, 10);
+          out.flush();
+
+          // Chunk 3: remaining bytes (at least 32768)
+          out.write(fullData, 8192 + 10, totalSize - (8192 + 10));
+        }
+
+        // Read with seek and verify data under checksum verification
+        try (KeyInputStream in = testBucket.getKeyInputStream(keyName)) {
+          assertTrue(in.isStreamBlockInputStream());
+          in.seek(16384);
+          byte[] readBuf = new byte[8192];
+          int read = in.read(readBuf);
+          assertEquals(readBuf.length, read);
+          // Verify that the read data matches the expected slice from the original data
+          byte[] expected = java.util.Arrays.copyOfRange(fullData, 16384, 16384 + 8192);
+          assertArrayEquals(expected, readBuf);
+        }
+      }
+    }
   }
 }

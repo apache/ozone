@@ -43,8 +43,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -64,10 +66,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -99,6 +103,8 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -259,10 +265,10 @@ public class TestHddsDispatcher {
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       //Send a few WriteChunkRequests
       ContainerCommandResponseProto response;
-      ContainerCommandRequestProto writeChunkRequest0 = getWriteChunkRequest0(dd.getUuidString(), 1L, 1L, 0);
+      ContainerCommandRequestProto writeChunkRequest0 = getWriteChunkRequest0(dd.getUuidString(), 1L, 1L, 0, 32);
       hddsDispatcher.dispatch(writeChunkRequest0, null);
-      hddsDispatcher.dispatch(getWriteChunkRequest0(dd.getUuidString(), 1L, 1L, 1), null);
-      response = hddsDispatcher.dispatch(getWriteChunkRequest0(dd.getUuidString(), 1L, 1L, 2), null);
+      hddsDispatcher.dispatch(getWriteChunkRequest0(dd.getUuidString(), 1L, 1L, 1, 32), null);
+      response = hddsDispatcher.dispatch(getWriteChunkRequest0(dd.getUuidString(), 1L, 1L, 2, 32), null);
 
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
       // Send Read Chunk request for written chunk.
@@ -282,6 +288,71 @@ public class TestHddsDispatcher {
       response =
           hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest0), context);
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testReadBlockChecksum() throws IOException {
+    String testDirPath = testDir.getPath();
+    try {
+      UUID scmId = UUID.randomUUID();
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+      DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+      dnConf.setChunkDataValidationCheck(true);
+      conf.setFromObject(dnConf);
+      DatanodeDetails dd = randomDatanodeDetails();
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
+
+      ContainerCommandResponseProto response;
+      List<ContainerCommandRequestProto> writeChunkRequests = new ArrayList<>();
+      ContainerCommandRequestProto writeChunkRequest0 = getWriteChunkRequest0(dd.getUuidString(), 1L, 1L, 0, 32);
+      writeChunkRequests.add(writeChunkRequest0);
+      hddsDispatcher.dispatch(writeChunkRequest0, null);
+
+      ContainerCommandRequestProto writeChunkRequest1 = getWriteChunkRequest0(dd.getUuidString(), 1L, 1L, 1, 32);
+      writeChunkRequests.add(writeChunkRequest1);
+      hddsDispatcher.dispatch(writeChunkRequest1, null);
+
+      ContainerCommandRequestProto writeChunkRequest2 = getWriteChunkRequest0(dd.getUuidString(), 1L, 1L, 2, 32);
+      writeChunkRequests.add(writeChunkRequest2);
+      hddsDispatcher.dispatch(writeChunkRequest2, null);
+
+      DatanodeBlockID blockID = new BlockID(1, 1).getDatanodeBlockIDProtobuf();
+      ContainerCommandRequestProto putBlockRequest =
+          getPutBlockRequest(writeChunkRequests, 96, blockID, 1, dd.getUuidString());
+      response = hddsDispatcher.dispatch(putBlockRequest, null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+      StreamObserver<ContainerCommandResponseProto> streamObserver =
+          new StreamObserver<ContainerCommandResponseProto>() {
+            @Override
+            public void onNext(ContainerCommandResponseProto response) {
+              assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+            }
+
+            @Override
+            public void onError(Throwable t) {
+              Assertions.fail("ReadBlock failed: " + t.getMessage());
+            }
+
+            @Override
+            public void onCompleted() {
+            }
+          };
+
+      // Send Read Block request for written block
+      hddsDispatcher.streamDataReadOnly(
+          getReadBlockRequest(blockID, 0, 96, dd.getUuidString()),
+          streamObserver, new RandomAccessFileChannel(), null);
+
+      hddsDispatcher.streamDataReadOnly(
+          getReadBlockRequest(blockID, 16, 80, dd.getUuidString()),
+          streamObserver, new RandomAccessFileChannel(), null);
+
     } finally {
       ContainerMetrics.remove();
     }
@@ -777,9 +848,8 @@ public class TestHddsDispatcher {
   }
 
   private ContainerCommandRequestProto getWriteChunkRequest0(
-      String datanodeId, Long containerId, Long localId, int chunkNum) {
-    final int lenOfBytes = 32;
-    ByteString chunkData = ByteString.copyFrom(RandomUtils.secure().randomBytes(32));
+      String datanodeId, Long containerId, Long localId, int chunkNum, int lenOfBytes) {
+    ByteString chunkData = ByteString.copyFrom(RandomUtils.secure().randomBytes(lenOfBytes));
 
     ContainerProtos.ChunkInfo chunk = ContainerProtos.ChunkInfo
         .newBuilder()
@@ -866,6 +936,42 @@ public class TestHddsDispatcher {
         .setTraceID(writeChunkRequest.getTraceID())
         .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
         .setReadChunk(readChunkRequest)
+        .build();
+  }
+
+  private ContainerCommandRequestProto getReadBlockRequest(
+      DatanodeBlockID datanodeBlockID, long offset, long length, String datanodeUuid) {
+    ContainerProtos.ReadBlockRequestProto.Builder readBlockRequest =
+        ContainerProtos.ReadBlockRequestProto.newBuilder()
+            .setBlockID(datanodeBlockID)
+            .setOffset(offset)
+            .setLength(length);
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.ReadBlock)
+        .setContainerID(datanodeBlockID.getContainerID())
+        .setDatanodeUuid(datanodeUuid)
+        .setReadBlock(readBlockRequest)
+        .build();
+  }
+
+  private static ContainerCommandRequestProto getPutBlockRequest(
+      List<ContainerCommandRequestProto> writeChunkRequests, long length, DatanodeBlockID blockID,
+      long containerID, String dataNodeUuid) {
+    ContainerProtos.BlockData.Builder block =
+        ContainerProtos.BlockData.newBuilder()
+            .setSize(length)
+            .setBlockID(blockID);
+    for (ContainerCommandRequestProto writeChunkRequest : writeChunkRequests) {
+      block.addChunks(writeChunkRequest.getWriteChunk().getChunkData());
+    }
+
+    return ContainerCommandRequestProto.newBuilder()
+        .setContainerID(containerID)
+        .setCmdType(ContainerProtos.Type.PutBlock)
+        .setDatanodeUuid(dataNodeUuid)
+        .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(block.build())
+            .build())
         .build();
   }
 

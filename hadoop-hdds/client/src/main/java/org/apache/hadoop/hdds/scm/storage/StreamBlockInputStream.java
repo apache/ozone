@@ -578,10 +578,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
         if (verifyChecksum) {
           ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
-          Checksum.verifyChecksum(data, checksumData, 0);
+          if (readBlock.hasChunkInfoList()) {
+            Checksum.verifyChecksum(data, checksumData, readBlock.getOffset(),
+                readBlock.getChunkInfoList().getChunksList());
+          } else {
+            Checksum.verifyChecksum(data, checksumData, 0);
+          }
         }
         offerToQueue(readBlock);
-      } catch (Exception e) {
+      } catch (IOException | RuntimeException e) {
         // Record the failure first: the log and observer calls below must not mask it.
         setFailed(e);
         final ByteString data = readBlock.getData();
@@ -668,5 +673,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     public String toString() {
       return name;
     }
+
   }
 }
