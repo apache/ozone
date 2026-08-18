@@ -818,12 +818,26 @@ message BucketInfo {
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
     repeated hadoop.hdds.KeyValue tags = 23;
+    // S3-compatible object versioning status. When absent, derived from
+    // isVersionEnabled (true -> VERSIONING_ENABLED, false -> UNVERSIONED).
+    optional BucketVersioningStatusProto versioningStatus = 24;
 }
 
 enum BucketLayoutProto {
     LEGACY = 1;
     FILE_SYSTEM_OPTIMIZED = 2;
     OBJECT_STORE = 3;
+}
+
+/**
+ * S3-compatible bucket versioning state machine:
+ * UNVERSIONED -> VERSIONING_ENABLED <-> VERSIONING_SUSPENDED.
+ * Once enabled, a bucket can never return to UNVERSIONED.
+ */
+enum BucketVersioningStatusProto {
+    UNVERSIONED = 1;
+    VERSIONING_ENABLED = 2;
+    VERSIONING_SUSPENDED = 3;
 }
 
 /**
@@ -892,6 +906,9 @@ message BucketArgs {
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
     optional BucketEncryptionInfoProto bekInfo = 12;
     repeated hadoop.hdds.KeyValue tags = 13;
+    // S3-compatible object versioning status. Takes precedence over
+    // isVersionEnabled when both are set.
+    optional BucketVersioningStatusProto versioningStatus = 14;
 }
 
 message PrefixInfo {
@@ -1226,6 +1243,15 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+  // S3-compatible object versioning fields. versionId identifies an object
+  // version: assigned once from the committing transaction's index when the
+  // version is created, then frozen. A delete marker is a record with
+  // isDeleteMarker set and no data blocks. isNullVersion marks the single
+  // overwritable "null version" slot per key (writes while versioning is
+  // suspended, or objects that predate enabling versioning).
+    optional uint64 versionId = 23;
+    optional bool isDeleteMarker = 24;
+    optional bool isNullVersion = 25;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
