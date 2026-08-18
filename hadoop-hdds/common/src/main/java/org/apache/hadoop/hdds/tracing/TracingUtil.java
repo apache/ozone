@@ -518,6 +518,7 @@ public final class TracingUtil {
     return createActivatedSpan(spanName, SpanKind.INTERNAL);
   }
 
+  @SuppressWarnings("MustBeClosedChecker")
   public static TraceCloseable createActivatedSpan(String spanName, SpanKind spanKind) {
     Span span = buildSpan(spanName, spanKind);
     Scope scope = span.makeCurrent();
@@ -616,6 +617,7 @@ public final class TracingUtil {
     }
   }
 
+  @SuppressWarnings("MustBeClosedChecker")
   public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
       String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
     if (conf == null || !isTracingActive(conf)) {
