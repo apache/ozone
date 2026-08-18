@@ -81,11 +81,6 @@ public final class ContainerBalancerClusterAnalyzer {
       return emptySnapshot(thresholdRatio);
     }
 
-    long clusterCapacityBytes = 0;
-    for (DatanodeUsageInfoProto node : eligible) {
-      clusterCapacityBytes += node.getCapacity();
-    }
-
     double clusterAvgUtilization = calculateAvgUtilization(eligible);
     double upperLimit = clusterAvgUtilization + thresholdRatio;
     double lowerLimit = clusterAvgUtilization - thresholdRatio;
@@ -94,11 +89,13 @@ public final class ContainerBalancerClusterAnalyzer {
     List<NodeClassification> targets = new ArrayList<>();
     double maxUtilization = Double.NEGATIVE_INFINITY;
     double minUtilization = Double.POSITIVE_INFINITY;
+    long clusterCapacityBytes = 0;
     long totalOverUtilizedBytes = 0;
     long totalUnderUtilizedBytes = 0;
 
     for (DatanodeUsageInfoProto node : eligible) {
       long capacity = node.getCapacity();
+      clusterCapacityBytes += capacity;
       double utilization = calculateNodeUtilization(node);
 
       maxUtilization = Math.max(maxUtilization, utilization);
