@@ -95,8 +95,6 @@ public final class MetricsLeakAssertion {
       // SCM metrics.
       "SCMNodeMetrics",
       "SCMContainerManagerMetrics",
-      "SCMContainerMetrics",
-      "SCMMetrics",
       "SafeModeMetrics",
       "ContainerBalancerMetrics",
       "NodeDecommissionMetrics",

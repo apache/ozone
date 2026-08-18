@@ -33,7 +33,7 @@ import org.apache.hadoop.util.Time;
  * This class is for maintaining StorageContainerManager statistics.
  */
 @Metrics(about = "Storage Container Manager Metrics", context = "dfs")
-public class SCMMetrics {
+public final class SCMMetrics {
   public static final String SOURCE_NAME =
       SCMMetrics.class.getSimpleName();
 
@@ -66,23 +66,38 @@ public class SCMMetrics {
     return dbCheckpointMetrics;
   }
 
-  public SCMMetrics(int maxRatisEvents) {
+  private final String sourceName;
+
+  private SCMMetrics(String sourceName, int maxRatisEvents) {
+    this.sourceName = sourceName;
     dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics");
     this.maxRatisEvents = maxRatisEvents;
   }
 
-  public static SCMMetrics create() {
-    return create(null);
+  public static SCMMetrics create(String scmId) {
+    return create(scmId, null);
   }
 
-  public static SCMMetrics create(ConfigurationSource conf) {
+  /**
+   * Creates and registers the metrics instance.  In mini-cluster mode many
+   * SCMs share one metrics system, so the metrics system uniquifies the
+   * constant source name on registration (SCMMetrics-1, -2, ...).
+   * Unregistering by the constant base name would then leak every source past
+   * the first.  Make the name unique per SCM up front so register and
+   * unregister stay symmetric.  In production there is one instance per JVM,
+   * so keep the plain name for stable JMX and Prometheus metric names.
+   */
+  public static SCMMetrics create(String scmId, ConfigurationSource conf) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     int maxRatisEvents = conf == null
         ? ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
         : conf.getInt(ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
-    return ms.register(SOURCE_NAME, "Storage Container Manager Metrics",
-        new SCMMetrics(maxRatisEvents));
+    String sourceName = DefaultMetricsSystem.inMiniClusterMode()
+        ? SOURCE_NAME + '-' + scmId
+        : SOURCE_NAME;
+    return ms.register(sourceName, "Storage Container Manager Metrics",
+        new SCMMetrics(sourceName, maxRatisEvents));
   }
 
   public void setLastContainerReportSize(long size) {
@@ -191,6 +206,6 @@ public class SCMMetrics {
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 }

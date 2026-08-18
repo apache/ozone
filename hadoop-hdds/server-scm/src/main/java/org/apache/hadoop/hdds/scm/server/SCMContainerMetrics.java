@@ -40,25 +40,40 @@ import org.apache.hadoop.ozone.OzoneConsts;
  */
 @InterfaceAudience.Private
 @Metrics(about = "SCM Container Manager Metrics", context = OzoneConsts.OZONE)
-public class SCMContainerMetrics implements MetricsSource {
+public final class SCMContainerMetrics implements MetricsSource {
 
   private final SCMMXBean scmmxBean;
   private static final String SOURCE =
       SCMContainerMetrics.class.getSimpleName();
 
-  public SCMContainerMetrics(SCMMXBean scmmxBean) {
+  private final String sourceName;
+
+  private SCMContainerMetrics(String sourceName, SCMMXBean scmmxBean) {
+    this.sourceName = sourceName;
     this.scmmxBean = scmmxBean;
   }
 
-  public static SCMContainerMetrics create(SCMMXBean scmmxBean) {
+  /**
+   * Creates and registers the metrics instance.  In mini-cluster mode many
+   * SCMs share one metrics system, so the metrics system uniquifies the
+   * constant source name on registration (SCMContainerMetrics-1, -2, ...).
+   * Unregistering by the constant base name would then leak every source past
+   * the first.  Make the name unique per SCM up front so register and
+   * unregister stay symmetric.  In production there is one instance per JVM,
+   * so keep the plain name for stable JMX and Prometheus metric names.
+   */
+  public static SCMContainerMetrics create(String scmId, SCMMXBean scmmxBean) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE, "Storage " +
-        "Container Manager Metrics", new SCMContainerMetrics(scmmxBean));
+    String sourceName = DefaultMetricsSystem.inMiniClusterMode()
+        ? SOURCE + '-' + scmId
+        : SOURCE;
+    return ms.register(sourceName, "Storage " +
+        "Container Manager Metrics", new SCMContainerMetrics(sourceName, scmmxBean));
   }
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE);
+    ms.unregisterSource(sourceName);
   }
 
   @Override
