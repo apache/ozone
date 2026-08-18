@@ -78,15 +78,6 @@ public final class SCMMetrics {
     return create(scmId, null);
   }
 
-  /**
-   * Creates and registers the metrics instance.  In mini-cluster mode many
-   * SCMs share one metrics system, so the metrics system uniquifies the
-   * constant source name on registration (SCMMetrics-1, -2, ...).
-   * Unregistering by the constant base name would then leak every source past
-   * the first.  Make the name unique per SCM up front so register and
-   * unregister stay symmetric.  In production there is one instance per JVM,
-   * so keep the plain name for stable JMX and Prometheus metric names.
-   */
   public static SCMMetrics create(String scmId, ConfigurationSource conf) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     int maxRatisEvents = conf == null

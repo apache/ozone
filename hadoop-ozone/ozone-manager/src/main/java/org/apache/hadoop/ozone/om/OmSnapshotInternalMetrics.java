@@ -79,15 +79,6 @@ public final class OmSnapshotInternalMetrics {
     this.registry = new MetricsRegistry(sourceName);
   }
 
-  /**
-   * Creates and registers the metrics instance.  In mini-cluster mode many
-   * OMs share one metrics system, so the metrics system uniquifies the
-   * constant source name on registration (OmSnapshotInternalMetrics-1, -2,
-   * ...).  Unregistering by the constant base name would then leak every
-   * source past the first.  Make the name unique per OM up front so register
-   * and unregister stay symmetric.  In production there is one instance per
-   * JVM, so keep the plain name for stable JMX and Prometheus metric names.
-   */
   public static OmSnapshotInternalMetrics create(String omNodeId) {
     String sourceName = DefaultMetricsSystem.inMiniClusterMode()
         ? METRICS_SOURCE_NAME + '-' + omNodeId
