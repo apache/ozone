@@ -201,6 +201,50 @@ Three things to read out of it:
   oldest. Step 10 shows a null delete marker sliding into the noncurrent chain in
   its correct chronological position once the bucket is Enabled again.
 
+### Where a write lands
+
+The table above is one trace; the rule behind it is the same for every write that
+carries no versionId. Suspended is the branch worth reading twice: it does not
+stop versioning, it collapses every write into the key's one null slot, which is
+why the version count stops growing while the versions accumulated under Enabled
+stay untouched.
+
+```mermaid
+flowchart TB
+    W["PUT k / DELETE k<br/>(no versionId)"] --> S{"bucket state"}
+    S -->|Unversioned| U["overwrite keyTable in place<br/>old blocks → deletedTable<br/><i>unchanged from today</i>"]
+    S -->|Enabled| E["move current version → versionedKeyTable<br/>write the new record into keyTable"]
+    S -->|Suspended| N{"is the current version<br/>already the null slot?"}
+    N -->|yes| N1["overwrite the null record in place<br/>its blocks → deletedTable, a marker carries none<br/><b>version count does not grow</b>"]
+    N -->|no| N2["move current version → versionedKeyTable<br/>write the new record as current, isNullVersion<br/>drop the key's older null record, if any"]
+    E --> R["new current version:<br/>an object on PUT, a delete marker on DELETE"]
+    N1 --> R
+    N2 --> R
+```
+
+### The life of a delete marker
+
+A delete marker is not a tombstone the read path has to special-case away — it is
+an ordinary version that carries no blocks, and it occupies the current slot like
+any other. That single fact produces all of its externally visible behaviour:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    Obj: current = obj(102)
+    Marker: current = marker(103)
+    Gone: key no longer exists
+    [*] --> Obj: PUT k
+    Obj --> Marker: DELETE k (no versionId)
+    Marker --> Obj: DELETE k?versionId=103<br/>promotion restores obj(102)
+    Marker --> Gone: lifecycle ExpiredObjectDeleteMarker<br/>once it is the only version left
+    Obj --> Obj: GET k → 200
+    Marker --> Marker: GET k → 404, x-amz-delete-marker
+```
+
+Deleting the marker by versionId is exactly S3's "restore an object": nothing is
+rewritten, the newest remaining version is moved back into keyTable.
+
 ### Version promotion
 
 The invariant is that keyTable always holds a key's current version. When a
@@ -287,6 +331,23 @@ skew, or delete the key's versions before writing under the new generator.
   first, then point-look-up versionedKeyTable; if the addressed version is a delete
   marker, current or not, the gateway returns 405 with `x-amz-delete-marker: true`
   and `Allow: DELETE`.
+
+```mermaid
+flowchart TB
+    G["GET / HEAD k"] --> Q{"versionId given?"}
+    Q -->|no| C{"current version in keyTable"}
+    C -->|object| C1["200, the current version"]
+    C -->|delete marker| C2["404<br/>x-amz-delete-marker: true"]
+    Q -->|yes| L["check the current version,<br/>then point-look-up versionedKeyTable"]
+    L --> M{"the addressed version"}
+    M -->|object| M1["200, that version"]
+    M -->|delete marker| M2["405<br/>x-amz-delete-marker: true<br/>Allow: DELETE"]
+    M -->|no such version| M3["404"]
+```
+
+The 404/405 split is S3's, and it follows from the marker being addressable: an
+unaddressed read steps over the marker and reports the key absent, while a read
+that names the marker gets told the version exists but has no body to return.
 - **DELETE without versionId (Enabled)**: move current into versionedKeyTable and
   write a delete marker as the new current. (Suspended: the marker takes the null
   slot exactly as a suspended PUT does.) **DELETE ?versionId=x**: permanently
