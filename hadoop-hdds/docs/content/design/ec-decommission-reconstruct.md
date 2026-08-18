@@ -25,12 +25,12 @@ status: draft
 
 | Phase | Jira | Status | Notes |
 | --- | --- | --- | --- |
-| Phase 1 — SCM config + global reconstruction cap | [HDDS-15071](https://issues.apache.org/jira/browse/HDDS-15071) | Patch available, not merged | [PR #10122](https://github.com/apache/ozone/pull/10122) |
+| Phase 1 — SCM config + global reconstruction cap | [HDDS-15071](https://issues.apache.org/jira/browse/HDDS-15071) | Patch available, not merged | [#11054](https://github.com/apache/ozone/pull/11054) (supersedes closed #10122) |
 | Phase 2 — Dynamic load-based replication→reconstruction switch | [HDDS-15072](https://issues.apache.org/jira/browse/HDDS-15072) | Patch available, not merged | [PR #10123](https://github.com/apache/ozone/pull/10123); depends on Phase 1 |
 | Phase 3 — Datanode disk-level fairness | [HDDS-15412](https://issues.apache.org/jira/browse/HDDS-15412) | **Merged** | [PR #10693](https://github.com/apache/ozone/pull/10693); opt-in via `hdds.datanode.replication.per.volume.enabled` |
 | Phase 4 — Observability | [HDDS-15075](https://issues.apache.org/jira/browse/HDDS-15075) | Open | [HDDS-15352](https://issues.apache.org/jira/browse/HDDS-15352) Grafana dashboard merged; EC-switch metrics not yet implemented |
 | Prerequisite — Failed replication cleanup | [HDDS-15327](https://issues.apache.org/jira/browse/HDDS-15327) | Patch available, not merged | [PR #10540](https://github.com/apache/ozone/pull/10540); SCM inflight quota leak slows decommission today |
-| Superseded — Per-volume outbound counter + lookahead dispatcher | [HDDS-15073](https://issues.apache.org/jira/browse/HDDS-15073), [HDDS-15074](https://issues.apache.org/jira/browse/HDDS-15074) | Superseded by HDDS-15412 | Per-volume thread pools replace the original leapfrog-dispatch design |
+| Superseded — Per-volume outbound counter + lookahead dispatcher | [HDDS-15073](https://issues.apache.org/jira/browse/HDDS-15073), [HDDS-15074](https://issues.apache.org/jira/browse/HDDS-15074) | **Close Jira** — superseded by HDDS-15412 | Per-volume thread pools ([#10693](https://github.com/apache/ozone/pull/10693)) replace outbound counters ([#10128](https://github.com/apache/ozone/pull/10128)) and lookahead dispatch ([#10129](https://github.com/apache/ozone/pull/10129)) |
 
 **Current production behavior:** EC decommission still uses 1-1 push replication from the decommissioning datanode. The reconstruction switch (Phases 1–2) is the core speedup and is not yet in `master`.
 
