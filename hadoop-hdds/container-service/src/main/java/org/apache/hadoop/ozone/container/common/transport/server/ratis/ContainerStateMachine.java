@@ -28,7 +28,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -52,6 +55,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -60,6 +65,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Container2BCSIDMapProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -70,15 +76,18 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenExcep
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.Cache;
 import org.apache.hadoop.hdds.utils.ResourceCache;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.LogEntryProto;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
@@ -140,6 +149,8 @@ import org.slf4j.LoggerFactory;
  */
 public class ContainerStateMachine extends BaseStateMachine {
   static final Logger LOG = LoggerFactory.getLogger(ContainerStateMachine.class);
+  private static final int RATIS_READ_BLOCK_STREAM_HEADER_BYTES =
+      Integer.BYTES;
 
   private final SimpleStateMachineStorage storage = new SimpleStateMachineStorage();
   private final ContainerDispatcher dispatcher;
@@ -852,12 +863,237 @@ public class ContainerStateMachine extends BaseStateMachine {
       metrics.incNumQueryStateMachineOps();
       final ContainerCommandRequestProto requestProto =
           message2ContainerCommandRequestProto(request);
+      if (requestProto.getCmdType() == Type.ReadBlock) {
+        return CompletableFuture.completedFuture(
+            queryReadBlock(requestProto)::toByteString);
+      }
       return CompletableFuture.completedFuture(
           dispatchCommand(requestProto, null)::toByteString);
     } catch (IOException e) {
       metrics.incNumQueryStateMachineFails();
       return completeExceptionally(e);
     }
+  }
+
+  @Override
+  public long transferTo(Message request, WritableByteChannel stream)
+      throws IOException {
+    try {
+      metrics.incNumQueryStateMachineOps();
+      final ContainerCommandRequestProto requestProto =
+          message2ContainerCommandRequestProto(request);
+      if (requestProto.getCmdType() == Type.ReadBlock) {
+        return streamReadBlock(dispatcher, requestProto, stream);
+      } else {
+        return writeAndClose(stream, dispatchCommand(requestProto, null));
+      }
+    } catch (IOException e) {
+      metrics.incNumQueryStateMachineFails();
+      throw e;
+    }
+  }
+
+  static long streamReadBlock(
+      ContainerDispatcher dispatcher,
+      ContainerCommandRequestProto requestProto,
+      WritableByteChannel stream) throws IOException {
+    final AtomicReference<Throwable> error = new AtomicReference<>();
+    final AtomicBoolean responseSeen = new AtomicBoolean(false);
+    final AtomicLong bytesTransferred = new AtomicLong();
+    final DataStreamObserver<ReadBlockResponse> observer =
+        new DataStreamObserver<ReadBlockResponse>() {
+          @Override
+          public void onNext(ReadBlockResponse response) {
+            responseSeen.set(true);
+            try {
+              long wirttenLength = writeReadBlockStreamResponse(stream, response.getResponse(), response.getData());
+              bytesTransferred.addAndGet(wirttenLength);
+            } catch (IOException e) {
+              error.compareAndSet(null, e);
+              throw new CompletionException(e);
+            } catch (RuntimeException e) {
+              error.compareAndSet(null, e);
+              throw e;
+            }
+          }
+
+          @Override
+          public void onError(Throwable throwable) {
+            error.set(throwable);
+          }
+
+          @Override
+          public void onCompleted() {
+          }
+
+        };
+
+    try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
+      dispatcher.streamDataReadOnly(requestProto, observer, blockFile, null);
+    } catch (CompletionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      throw new IOException("Failed to stream ReadBlock " + requestProto,
+          e.getCause() != null ? e.getCause() : e);
+    }
+
+    if (error.get() != null) {
+      throw new IOException("Failed to stream ReadBlock " + requestProto,
+          error.get());
+    }
+    if (!responseSeen.get()) {
+      throw new IOException("ReadBlock stream returned no responses: "
+          + requestProto);
+    }
+
+    stream.close();
+    return bytesTransferred.get();
+  }
+
+  private static long writeAndClose(
+      WritableByteChannel stream, ContainerCommandResponseProto response)
+      throws IOException {
+    try {
+      return writeFully(stream, response.toByteString().asReadOnlyByteBuffer());
+    } finally {
+      stream.close();
+    }
+  }
+
+  private static long writeReadBlockStreamResponse(
+      WritableByteChannel stream, ContainerCommandResponseProto response,
+      ByteBuffer data) throws IOException {
+    return writeFully(stream, encodeReadBlockStreamResponse(response, data));
+  }
+
+  private static long writeFully(WritableByteChannel stream, ByteBuffer buffer)
+      throws IOException {
+    final int bytes = buffer.remaining();
+    while (buffer.hasRemaining()) {
+      final int position = buffer.position();
+      final int remaining = buffer.remaining();
+      final int written = stream.write(buffer);
+      if (written < 0) {
+        throw new IOException("EOF reached while writing ReadBlock stream response");
+      }
+      if (written == 0) {
+        throw new IOException("Zero bytes written to ReadBlock stream response channel");
+      }
+      final int advanced = buffer.position() - position;
+      if (advanced == 0) {
+        if (written > remaining) {
+          throw new IOException("ReadBlock stream response write exceeded remaining bytes: written="
+              + written + ", remaining=" + remaining);
+        }
+        buffer.position(position + written);
+      } else if (advanced != written) {
+        throw new IOException("Inconsistent ReadBlock stream response write: written="
+            + written + ", advanced=" + advanced);
+      }
+    }
+    return bytes;
+  }
+
+  private static ByteBuffer encodeReadBlockStreamResponse(
+      ContainerCommandResponseProto response, ByteBuffer dataBuffer) {
+    final ByteBuffer data;
+    final ContainerCommandResponseProto metadata;
+    if (response.hasReadBlock()) {
+      final ReadBlockResponseProto readBlock = response.getReadBlock();
+      data = dataBuffer != null ? dataBuffer.asReadOnlyBuffer()
+          : readBlock.getData().asReadOnlyByteBuffer();
+      metadata = response.toBuilder()
+          .setReadBlock(readBlock.toBuilder().setData(ByteString.EMPTY))
+          .build();
+    } else {
+      data = ByteBuffer.allocate(0);
+      metadata = response;
+    }
+
+    final ByteBuffer metadataBuffer =
+        metadata.toByteString().asReadOnlyByteBuffer();
+    final ByteBuffer header =
+        ByteBuffer.allocate(RATIS_READ_BLOCK_STREAM_HEADER_BYTES);
+    header.putInt(metadataBuffer.remaining());
+    header.flip();
+    final ByteBuffer frame = ByteBuffer.allocate(
+        header.remaining() + metadataBuffer.remaining() + data.remaining());
+    frame.put(header);
+    frame.put(metadataBuffer);
+    frame.put(data);
+    frame.flip();
+    return frame.asReadOnlyBuffer();
+  }
+
+  private ContainerCommandResponseProto queryReadBlock(
+      ContainerCommandRequestProto requestProto) throws IOException {
+    final List<ContainerCommandResponseProto> responses = new ArrayList<>();
+    final AtomicReference<Throwable> error = new AtomicReference<>();
+    final DataStreamObserver<ReadBlockResponse> observer =
+        new DataStreamObserver<ReadBlockResponse>() {
+          @Override
+          public void onNext(ReadBlockResponse response) {
+            responses.add(response.getData() == null ? response.getResponse()
+                : response.getResponse().toBuilder()
+                    .setReadBlock(response.getResponse().getReadBlock().toBuilder()
+                        .setData(ByteString.copyFrom(response.getData())))
+                    .build());
+          }
+
+          @Override
+          public void onError(Throwable throwable) {
+            error.set(throwable);
+          }
+
+          @Override
+          public void onCompleted() {
+          }
+        };
+
+    try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
+      dispatcher.streamDataReadOnly(requestProto, observer, blockFile, null);
+    }
+
+    if (error.get() != null) {
+      throw new IOException("Failed to query ReadBlock " + requestProto,
+          error.get());
+    }
+    if (responses.isEmpty()) {
+      throw new IOException("ReadBlock query returned no responses: "
+          + requestProto);
+    }
+    return mergeReadBlockResponses(responses);
+  }
+
+  private static ContainerCommandResponseProto mergeReadBlockResponses(
+      List<ContainerCommandResponseProto> responses) {
+    final ContainerCommandResponseProto first = responses.get(0);
+    if (responses.size() == 1
+        || first.getResult() != ContainerProtos.Result.SUCCESS
+        || !first.hasReadBlock()) {
+      return first;
+    }
+
+    ByteString data = ByteString.EMPTY;
+    final ReadBlockResponseProto firstReadBlock = first.getReadBlock();
+    final ContainerProtos.ChecksumData.Builder checksum =
+        firstReadBlock.getChecksumData().toBuilder().clearChecksums();
+    for (ContainerCommandResponseProto response : responses) {
+      if (response.getResult() != ContainerProtos.Result.SUCCESS
+          || !response.hasReadBlock()) {
+        return response;
+      }
+      final ReadBlockResponseProto readBlock = response.getReadBlock();
+      data = data.concat(readBlock.getData());
+      checksum.addAllChecksums(readBlock.getChecksumData().getChecksumsList());
+    }
+
+    return first.toBuilder()
+        .setReadBlock(firstReadBlock.toBuilder()
+            .setData(data)
+            .setChecksumData(checksum))
+        .build();
   }
 
   private ByteString readStateMachineData(

@@ -151,6 +151,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
@@ -174,9 +175,9 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2284,7 +2285,7 @@ public class KeyValueHandler extends Handler {
   public ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto request, Container kvContainer,
       RandomAccessFileChannel blockFile,
-      StreamObserver<ContainerCommandResponseProto> streamObserver) {
+      DataStreamObserver<ReadBlockResponse> streamObserver) {
 
     if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
       return ContainerUtils.logAndReturnError(LOG,
@@ -2324,7 +2325,7 @@ public class KeyValueHandler extends Handler {
   }
 
   private long readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
-      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean verifyChecksum)
+      Container kvContainer, DataStreamObserver<ReadBlockResponse> streamObserver, boolean verifyChecksum)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
     int responseDataSize = readBlock.getResponseDataSize();
@@ -2361,7 +2362,7 @@ public class KeyValueHandler extends Handler {
     final long offsetAlignment = readBlock.getOffset() % bytesPerChecksum;
     long adjustedOffset = readBlock.getOffset() - offsetAlignment;
 
-    final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
+    ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
     blockFile.position(adjustedOffset);
     long totalDataLength = 0;
     int numResponses = 0;
@@ -2389,13 +2390,16 @@ public class KeyValueHandler extends Handler {
           Checksum.verifyChecksum(buffer.duplicate(), checksumData, 0);
         }
       }
-      final ContainerCommandResponseProto response = getReadBlockResponse(
-          request, checksumData, buffer, adjustedOffset);
-      final int dataLength = response.getReadBlock().getData().size();
+      final ContainerCommandResponseProto response;
+      final int dataLength;
+      response = getReadBlockResponse(
+          request, checksumData, ByteString.EMPTY, adjustedOffset);
+      dataLength = readLength;
+      streamObserver.onNext(new ReadBlockResponse(
+          response, buffer.asReadOnlyBuffer()));
       LOG.debug("server onNext response {}: dataLength={}, numChecksums={}",
           numResponses, dataLength, response.getReadBlock().getChecksumData().getChecksumsList().size());
-      streamObserver.onNext(response);
-      buffer.clear();
+      buffer = ByteBuffer.allocate(responseDataSize);
 
       adjustedOffset += readLength;
       totalDataLength += dataLength;

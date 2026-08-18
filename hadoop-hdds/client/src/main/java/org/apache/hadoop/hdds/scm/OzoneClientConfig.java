@@ -158,6 +158,22 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean streamReadBlock = false;
 
+  @Config(key = "ozone.client.ratis.stream.readblock.enable",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Allow ReadBlock to use Ratis data stream read-only requests.",
+      tags = ConfigTag.CLIENT)
+  private boolean ratisStreamReadBlock = false;
+
+  @Config(key = "ozone.client.ratis.stream.read.window-size",
+      defaultValue = "268435456",
+      type = ConfigType.LONG,
+      tags = {ConfigTag.CLIENT},
+      description = "Target request window for sequential ReadBlock requests "
+          + "over Ratis data stream. Larger windows reduce data stream setup "
+          + "overhead for large reads.")
+  private long ratisStreamReadWindowSize = 256L << 20;
+
   @Config(key = "ozone.client.max.retries",
       defaultValue = "5",
       description = "Maximum number of retries by Ozone Client on "
@@ -416,6 +432,13 @@ public class OzoneClientConfig {
               "Resetting to default 32MB.",
           streamReadPreReadSize);
       streamReadPreReadSize = 32L << 20; // 32MB
+    }
+
+    if (ratisStreamReadWindowSize < 0) {
+      LOG.warn("Invalid ozone.client.ratis.stream.read.window-size = {}. " +
+              "Resetting to default 256MB.",
+          ratisStreamReadWindowSize);
+      ratisStreamReadWindowSize = 256L << 20; // 256MB
     }
 
     // Ensure response data size is positive.
@@ -682,12 +705,24 @@ public class OzoneClientConfig {
     this.streamReadBlock = streamReadBlock;
   }
 
+  public boolean isRatisStreamReadBlock() {
+    return ratisStreamReadBlock;
+  }
+
+  public void setRatisStreamReadBlock(boolean ratisStreamReadBlock) {
+    this.ratisStreamReadBlock = ratisStreamReadBlock;
+  }
+
   public long getStreamReadPreReadSize() {
     return streamReadPreReadSize;
   }
 
   public int getStreamReadResponseDataSize() {
     return streamReadResponseDataSize;
+  }
+
+  public long getRatisStreamReadWindowSize() {
+    return ratisStreamReadWindowSize;
   }
 
   public Duration getStreamReadTimeout() {
@@ -700,6 +735,10 @@ public class OzoneClientConfig {
 
   public void setStreamReadResponseDataSize(int streamReadResponseDataSize) {
     this.streamReadResponseDataSize = streamReadResponseDataSize;
+  }
+
+  public void setRatisStreamReadWindowSize(long ratisStreamReadWindowSize) {
+    this.ratisStreamReadWindowSize = ratisStreamReadWindowSize;
   }
 
   public void setStreamReadTimeout(Duration streamReadTimeout) {
