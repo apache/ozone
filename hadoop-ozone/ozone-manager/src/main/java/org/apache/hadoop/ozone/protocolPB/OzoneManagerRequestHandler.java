@@ -1485,6 +1485,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       builder.setSnapshotDiffReport(
           response.getSnapshotDiffReport().toProtobuf());
     }
+    if (response.getSubStatus() != null) {
+      builder.setSubStatus(response.getSubStatus().toProtoBuf());
+      if (response.getSubStatus().hasProgress()) {
+        builder.setProgressPercent(response.getProgressPercent());
+      }
+    }
 
     return builder.build();
   }

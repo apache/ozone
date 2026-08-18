@@ -34,7 +34,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -386,5 +388,66 @@ public class TestOMLifecycleConfigurationSetRequest extends
         .disallowSetLifecycleConfigurationBeforeFinalization(request, ctx);
 
     assertEquals(request, result);
+  }
+
+  @Test
+  public void testPreExecuteRejectsAbortMpuDaysEqualToExpireThreshold() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    // Default threshold is 30d; requesting daysAfterInitiation == 30 must be rejected.
+    long thresholdDays = TimeUnit.MILLISECONDS.toDays(
+        ozoneConfiguration.getTimeDuration(
+            OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD,
+            OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+            TimeUnit.MILLISECONDS));
+
+    OMRequest request = setLifecycleConfigurationRequestWithAbortMpu(
+        volumeName, bucketName, (int) thresholdDays);
+    OMLifecycleConfigurationSetRequest setRequest =
+        new OMLifecycleConfigurationSetRequest(request);
+
+    OMException ex = assertThrows(OMException.class, () -> setRequest.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+  }
+
+  @Test
+  public void testPreExecuteRejectsAbortMpuDaysGreaterThanExpireThreshold() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    // Default threshold is 30d; requesting daysAfterInitiation == 60 must be rejected.
+    OMRequest request = setLifecycleConfigurationRequestWithAbortMpu(volumeName, bucketName, 60);
+    OMLifecycleConfigurationSetRequest setRequest =
+        new OMLifecycleConfigurationSetRequest(request);
+
+    OMException ex = assertThrows(OMException.class, () -> setRequest.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+  }
+
+  @Test
+  public void testPreExecuteAcceptsAbortMpuDaysLessThanExpireThreshold() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    // Default threshold is 30d; requesting daysAfterInitiation == 7 must be accepted.
+    OMRequest request = setLifecycleConfigurationRequestWithAbortMpu(volumeName, bucketName, 7);
+    OMLifecycleConfigurationSetRequest setRequest =
+        new OMLifecycleConfigurationSetRequest(request);
+
+    // preExecute must succeed without throwing.
+    OMRequest result = setRequest.preExecute(ozoneManager);
+    assertNotNull(result);
+  }
+
+  @Test
+  public void testPreExecuteSkipsDisabledAbortMpuRule() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    // daysAfterInitiation == 60 would normally be rejected, but the rule is disabled.
+    OMRequest request = setLifecycleConfigurationRequestWithAbortMpu(volumeName, bucketName, 60, false);
+    OMLifecycleConfigurationSetRequest setRequest =
+        new OMLifecycleConfigurationSetRequest(request);
+
+    // Disabled rules must not trigger the threshold check.
+    OMRequest result = setRequest.preExecute(ozoneManager);
+    assertNotNull(result);
   }
 }

@@ -65,8 +65,10 @@ public enum S3GAction implements AuditAction {
   PUT_OBJECT_ACL,
 
   // STS endpoint
-  ASSUME_ROLE;
+  ASSUME_ROLE,
 
+  GET_OBJECT_ATTRIBUTES;
+  
   @Override
   public String getAction() {
     return this.toString();
