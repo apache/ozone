@@ -1,6 +1,6 @@
 ---
 title: S3-compatible Object Versioning
-summary: Bucket-level, S3-compatible object versioning with O(1) version writes and built-in reclamation
+summary: Bucket-level, S3-compatible object versioning with O(1) version writes, reclaimed by the existing lifecycle engine
 date: 2026-07-21
 jira: HDDS-15728
 status: accepted
@@ -22,9 +22,10 @@ author: Symious
 
 Add S3-compatible object versioning to Ozone: the full three-state bucket state
 machine (Unversioned / Enabled / Suspended), per-key version chains with delete
-markers and null versions, the S3 versioning APIs on the S3 Gateway, and built-in
-version reclamation (`maxVersions`, background expiration) — with O(1) metadata
-cost per version operation and zero regression on non-versioned paths.
+markers and null versions, the S3 versioning APIs on the S3 Gateway, and version
+reclamation expressed as lifecycle rules on the lifecycle engine Ozone already
+has — with O(1) metadata cost per version operation and zero regression on
+non-versioned paths.
 
 # Status
 
@@ -45,19 +46,24 @@ rather than object versions, and the gateway has no versioning endpoints.
 This proposal implements versioning with S3-compatible semantics, usable by
 standard S3 clients (AWS CLI / SDKs) without modification. The metadata cost of a
 version operation is decoupled from the number of versions (one extra small KV
-write per operation), and reclamation controls are built into the feature itself
-to avoid the unbounded version accumulation problems commonly seen on S3 (the S3
-troubleshooting guide documents list degradation and throttling on keys with
-millions of versions, and leaves the fix to user-configured Lifecycle rules that
-are often forgotten).
+write per operation).
+
+Reclamation is a first-class part of the feature rather than an afterthought. The
+S3 troubleshooting guide documents list degradation and throttling on keys with
+millions of versions and leaves the fix to user-configured Lifecycle rules that
+are often forgotten. Ozone already has a lifecycle engine (HDDS-8342, in master),
+so versioning does not need a reclamation mechanism of its own: it adds the three
+version-aware actions S3 defines to that engine, the lifecycle service becomes
+enabled by default, and a bucket-level `maxVersions` backstop bounds version
+growth on a versioned bucket that carries no rule at all.
 
 # Non-goals
 
 - **MFA delete** — depends on the AWS IAM/MFA device ecosystem; Ozone has no
   counterpart infrastructure. The `MfaDelete` field of `PutBucketVersioning`
   returns NotImplemented.
-- **A full S3 Lifecycle rule engine** — only the minimal reclamation capabilities
-  that versioning itself requires are included.
+- **Version-aware lifecycle transitions** (`NoncurrentVersionTransition`, and
+  `Transition` generally) — Ozone has no storage-class tiering to transition to.
 - **Version-aware cross-cluster replication.**
 - **Versioning for FSO / LEGACY bucket layouts** — the first version supports
   OBJECT_STORE buckets only; enabling versioning on other layouts returns
@@ -65,30 +71,39 @@ are often forgotten).
   chains is disproportionately complex, and S3 tooling scenarios essentially use
   the OBS layout. FSO support can be evaluated as an independent follow-up.
 - **Coexistence with Ozone snapshots on the same bucket** — the version-aware
-  reclamation the combination needs is deferred past the first version, so OM
-  rejects the combination outright rather than leaving it to convention. The
-  snapshot section below states the enforcement and what lifts it.
+  reclamation and the version-aware diff the combination needs are deferred past
+  the first version, so OM rejects the combination outright rather than leaving it
+  to convention. The snapshot section below states the enforcement and what lifts
+  it.
 
 # Technical Description (Architecture and implementation details)
 
 ## Bucket state machine
 
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Unversioned: bucket created
+    Unversioned --> Enabled: PutBucketVersioning(Enabled)
+    Enabled --> Suspended: PutBucketVersioning(Suspended)
+    Suspended --> Enabled: PutBucketVersioning(Enabled)
+    Unversioned --> Unversioned: no versions exist
+    Enabled --> Enabled: every write creates a version
+    Suspended --> Suspended: writes reuse the null slot
 ```
-Unversioned (default) ──enable──▶ Enabled ◀──enable── Suspended
-                                     │                     ▲
-                                     └──────suspend────────┘
-        (Once Enabled, a bucket can never return to Unversioned)
-```
+
+There is no edge back to Unversioned. Once a bucket has been Enabled it can only
+move between Enabled and Suspended, so no single state change can silently
+destroy the versions the bucket already holds — S3's data-protection promise. OM
+enforces this on `SetBucketProperty` and rejects a transition to `UNVERSIONED`
+with `INVALID_REQUEST`.
 
 A `BucketVersioningStatusProto` enum (`UNVERSIONED` / `VERSIONING_ENABLED` /
 `VERSIONING_SUSPENDED`) is added as an optional field on `BucketInfo` and
 `BucketArgs`. The legacy `isVersionEnabled` boolean is kept and maintained in
 two-way sync (`ENABLED → true`, otherwise `false`; records without the enum are
 interpreted via the boolean), so old and new clients/OMs coexist during rolling
-upgrades. OM enforces the state machine on `SetBucketProperty`: transitions back
-to `UNVERSIONED` are rejected with `INVALID_REQUEST`, preserving S3's
-data-protection promise that no single state change can silently destroy
-historical versions.
+upgrades.
 
 ## Metadata layout: keyTable (current) + versionedKeyTable (noncurrent)
 
@@ -107,10 +122,27 @@ A new column family, **versionedKeyTable**, splits responsibilities with keyTabl
   (fixed-width hex suffix; the separator is `0x00` rather than `/` because OBS key
   names contain `/` verbatim, which would interleave a key's versions with those of
   keys nested under it), so all versions of a key are physically adjacent and
-  ordered newest to oldest: `ListObjectVersions` and version promotion are a
-  single seek plus a sequential read. The table is registered in
-  `OmMetadataManagerImpl.getTableBucketPrefix` alongside the other key tables, so
-  bucket-prefixed iteration and SST filtering resolve its prefix.
+  ordered newest to oldest.
+
+```mermaid
+flowchart LR
+    subgraph KT["keyTable — one entry per key"]
+        K1["/vol/buck/photo.jpg<br/>versionId 104 · current"]
+    end
+    subgraph VKT["versionedKeyTable — noncurrent, newest → oldest"]
+        V1["/vol/buck/photo.jpg 0x00 MAX-103<br/>delete marker 103"]
+        V2["/vol/buck/photo.jpg 0x00 MAX-102<br/>object 102"]
+        V3["/vol/buck/photo.jpg 0x00 MAX-101<br/>object 101"]
+    end
+    K1 -. "one seek reaches the newest noncurrent version" .-> V1
+    V1 --> V2 --> V3
+```
+
+Because the suffix is `MAX - versionId`, a single `seek` on the key's prefix lands
+on the newest noncurrent version: `ListObjectVersions` and version promotion are a
+seek plus a sequential read, never a scan-and-sort. The table is registered in
+`OmMetadataManagerImpl.getTableBucketPrefix` alongside the other key tables, so
+bucket-prefixed iteration and SST filtering resolve its prefix.
 
 `OmKeyInfo` gains three optional proto fields (old records deserialize
 compatibly): `versionId` (int64, assigned once at version creation, then frozen),
@@ -127,7 +159,63 @@ cross-table consistency problem. The new column family is introduced under the O
 layout feature / finalization framework (`OMLayoutFeature.OBJECT_VERSIONING`):
 before finalization, requests carrying a versioning status are rejected.
 
-## VersionId: a pluggable generator
+## How a key's versions evolve
+
+The two mechanisms that are hardest to read out of prose — the delete marker and
+the null version — are easiest to follow as one continuous story of a single key
+`k`. `obj(n)` is a data version with versionId `n`, `marker(n)` a delete marker,
+and `null` marks the record occupying the key's null slot.
+
+| # | Operation | Bucket state | keyTable (current) | versionedKeyTable (newest → oldest) |
+|---|---|---|---|---|
+| 0 | `PUT k` | Unversioned | `obj(—)` no versionId | – |
+| 1 | `PutBucketVersioning(Enabled)` | Enabled | `obj(—)` read as the null version | – |
+| 2 | `PUT k` | Enabled | `obj(101)` | `obj(—)` |
+| 3 | `PUT k` | Enabled | `obj(102)` | `obj(101)`, `obj(—)` |
+| 4 | `DELETE k` | Enabled | `marker(103)` | `obj(102)`, `obj(101)`, `obj(—)` |
+| 5 | `DELETE k?versionId=103` | Enabled | `obj(102)` **promoted back** | `obj(101)`, `obj(—)` |
+| 6 | `PutBucketVersioning(Suspended)` | Suspended | `obj(102)` | `obj(101)`, `obj(—)` |
+| 7 | `PUT k` | Suspended | `obj(104, null)` | `obj(102)`, `obj(101)` |
+| 8 | `PUT k` | Suspended | `obj(105, null)` overwritten in place | unchanged |
+| 9 | `DELETE k` | Suspended | `marker(106, null)` overwritten in place | unchanged |
+| 10 | `PutBucketVersioning(Enabled)`, `PUT k` | Enabled | `obj(107)` | `marker(106, null)`, `obj(102)`, `obj(101)` |
+
+Three things to read out of it:
+
+- **A delete marker is an ordinary version that happens to carry no blocks**
+  (step 4). It becomes the current version, so a plain `GET` returns 404 with
+  `x-amz-delete-marker: true` while every earlier version stays intact and
+  addressable by versionId. Deleting the marker by versionId (step 5) is exactly
+  S3's "restore an object": the newest remaining version is promoted back into
+  keyTable.
+- **Suspended does not stop versioning, it stops *accumulating*** (steps 7–9).
+  Each write lands in the key's single null slot: the first suspended write pushes
+  the previous current version down into versionedKeyTable and drops the key's
+  older null record (step 7); every later suspended write overwrites the null slot
+  in place, so the version count stops growing. Versions accumulated while Enabled
+  are never touched.
+- **The null version is a slot, not a reserved id** (step 7 onwards). It carries a
+  normally generated versionId like any other version and is marked by
+  `isNullVersion`. Pinning it to a fixed low id would misorder a null created
+  between two versioned writes, which is the middle version of the key, not its
+  oldest. Step 10 shows a null delete marker sliding into the noncurrent chain in
+  its correct chronological position once the bucket is Enabled again.
+
+### Version promotion
+
+The invariant is that keyTable always holds a key's current version. When a
+permanent delete removes the current version, promotion restores the invariant in
+the same WriteBatch, under the bucket write lock:
+
+```mermaid
+flowchart TB
+    A["DELETE k?versionId = current"] --> B["remove the current entry from keyTable<br/>blocks → deletedTable"]
+    B --> C{"seek versionedKeyTable<br/>on k's prefix"}
+    C -->|"a noncurrent version exists"| D["move the newest one back into keyTable<br/>record content stays frozen — a pure positional move"]
+    C -->|"none left"| E["the key disappears entirely"]
+```
+
+## VersionId generation
 
 `versionId` generation is abstracted behind a `VersionIdGenerator` interface,
 chosen per cluster by class name (`ozone.om.versioning.version-id-generator`), so
@@ -135,41 +223,53 @@ a deployment can plug in its own. The generator is cluster-wide and may be chang
 on a running cluster; it is not recorded in bucket metadata. Every generator must
 satisfy, **for itself**: strictly increasing within a key (a later version's id is
 always greater than every earlier version's id of that key); frozen once assigned;
-`0` and `1` never handed out (`1` is the first-version sentinel).
+`0` and `1` never handed out (`0` is the unset value of the optional field, `1` is
+the first-version sentinel).
 
-That guarantee binds one generator, not a sequence of them, so the write path
-enforces it at commit: a commit whose id does not come after the key's current
-version is rejected (`INVALID_REQUEST`), and the operator deletes the key's
-versions before writing under the new generator. The check costs no read in the
-steady state — the current version holds the key's largest id, so an id above it
-cannot be taken; only a record predating versioning, which carries no id to order
-against, falls back to a versionedKeyTable lookup.
+The identifier is deliberately **not** derived from OM's Ratis transaction index.
+The versionId is persisted, externally referenced, and part of the S3 API surface;
+tying it to the replication log would export an internal counter into a public
+identity and pin the feature to one execution model, when the OM execution path is
+itself an abstraction (`ExecutionContext` already carries an index whose term may
+be absent).
 
-- **`TransactionIndexVersionIdGenerator` (default)** — the OM Ratis transaction
-  index of the committing transaction, used directly. No allocator state of any
-  kind. Externally encoded as an opaque URL-safe string. objectID's epoch bits are
-  deliberately not applied: dropping them keeps versionIds small positive longs, so
-  the versionedKeyTable ordering stays plain signed arithmetic, and uniqueness
-  rests on the monotonicity of the Ratis log index — a log that was reset or rolled
-  back is caught by the commit-time check rather than silently accepted.
+- **`UniqueIdVersionIdGenerator` (default)** — the same time-based scheme Ozone
+  already uses to mint block local IDs (`hdds.utils.UniqueId`): the id is
+  `currentTimeMillis << 16 | counter`, a 16-bit counter disambiguating ids minted
+  within the same millisecond. It needs no allocator, no persistent state and no
+  coordination; values are small positive longs, so `MAX_VALUE - versionId`
+  ordering in versionedKeyTable stays plain signed arithmetic; and the id sorts by
+  creation time, which is what the version chain wants anyway. Externally the id is
+  rendered as an opaque URL-safe string, so the timestamp is not part of the
+  contract.
 - **`PinnedFirstVersionIdGenerator` (opt-in)** — only the first version is
-  special: it takes the reserved sentinel `FIRST_VERSION_ID = 1`, below any usable
-  transaction index, so it sorts oldest and can be referenced without listing the
-  key's versions first. All later versions are the commit transaction's index; no
-  persistent allocator. First versions are detected by "no current version in
-  keyTable", reusing the lookup the write path performs anyway. Known trade-off: if
-  every version of a key is permanently deleted and the key is recreated, the new
-  first version takes the sentinel again; only deployments that accept this should
-  configure this generator.
+  special: it takes the reserved sentinel `FIRST_VERSION_ID = 1`, below any minted
+  id, so it sorts oldest and can be referenced without listing the key's versions
+  first. All later versions are minted normally. First versions are detected by "no
+  current version in keyTable", reusing the lookup the write path performs anyway.
+  Known trade-off: if every version of a key is permanently deleted and the key is
+  recreated, the new first version takes the sentinel again; only deployments that
+  accept this should configure this generator.
 
-How a versionId is rendered on the wire — the opaque encoding, and whether the
-pinned first version is presented as a fixed literal or derived from the keyName —
-is part of the `?versionId=` read path (T4), not of generation.
+**Where the id is minted.** The generator runs on the leader in `preExecute` and
+the id is stamped into the request that goes into the replication log, so every OM
+applies an identical value; nothing is minted during apply. The one apply-time
+decision is the pinned sentinel, which is a constant and is therefore deterministic
+on its own: if the pinned generator is configured and the key has no current
+version at apply time, the version takes `FIRST_VERSION_ID` instead of the minted
+candidate.
 
-The null version is not a special ID value but the `isNullVersion` attribute — it
-carries a normally generated id like any other version, since a null created
-between two versioned writes is not the oldest one;
-`versionId=null` requests resolve to "locate this key's null slot".
+**Why the ordering check stays.** A time-based id is monotonic within one OM
+process, not across a leader change with a skewed clock, and the "strictly
+increasing within a key" guarantee binds one generator rather than a sequence of
+them. So the write path enforces the property at commit: a commit whose id does not
+come after the key's current version is rejected (`INVALID_REQUEST`). The check
+costs no read in the steady state — the current version holds the key's largest id,
+so an id below it cannot be taken; only a record predating versioning, which
+carries no id to order against, falls back to a versionedKeyTable lookup. A clock
+regression or a generator change thus fails loudly on the affected keys instead of
+corrupting their version order, and the remedy is stated per case: wait out the
+skew, or delete the key's versions before writing under the new generator.
 
 ## Request handling
 
@@ -180,7 +280,7 @@ between two versioned writes is not the oldest one;
   otherwise move the current version into versionedKeyTable, write the new record
   into keyTable as current, and delete the old null record (if any) from
   versionedKeyTable, blocks to deletedTable in both cases. Versions accumulated
-  while Enabled are unaffected. 
+  while Enabled are unaffected.
 - **PUT (Unversioned)**: unchanged from today.
 - **GET/HEAD**: without versionId, read keyTable; a current delete marker returns
   404 with `x-amz-delete-marker: true`. With versionId, check the current version
@@ -191,45 +291,90 @@ between two versioned writes is not the oldest one;
   write a delete marker as the new current. (Suspended: the marker takes the null
   slot exactly as a suspended PUT does.) **DELETE ?versionId=x**: permanently
   delete that version (blocks to deletedTable); if it was current, trigger version
-  promotion.
-- **Version promotion** — the invariant is that keyTable always holds a key's
-  current version. When a permanent delete removes the current version, one
-  `seek` on the key's versionedKeyTable prefix yields the newest noncurrent
-  version (reverse ordering), which is moved back into keyTable unchanged — a
-  pure positional move; the record's content stays frozen. If no noncurrent
-  version remains, the key disappears entirely. Executed in the same WriteBatch
-  as the delete, under the bucket write lock. Deleting a delete marker this way
-  is exactly the S3 "restore an object" flow.
+  promotion as shown above.
 - **ListObjects**: scans keyTable only, skipping keys whose current version is a
   marker — list scan volume is not amplified by versions (an advantage over S3's
   single-namespace implementation). **ListObjectVersions**: merges keyTable and
   versionedKeyTable in key order (both are key-name prefixed, so the merge is
   naturally ordered), with `key-marker` / `version-id-marker` pagination.
 
-## Reclamation, quota, observability
+## Reclamation: version-aware lifecycle rules
 
-Built-in bucket-level controls: `maxVersions` (default 100, 0 = unlimited; markers
-count toward the limit), `noncurrentVersionExpiration` (opt-in), and
-expired-delete-marker cleanup (enabled by default: when only a marker remains,
-the whole key is removed) — all enforced by a new **VersionCleanupService**
-following the `KeyDeletingService` pattern. Versions beyond `maxVersions` are
-reclaimed oldest-first, asynchronously rather than inside the write transaction,
-so the cost of a version write does not grow with the number of versions the key
-already has. An earlier draft also offered a `REJECT` policy that failed the
-write instead; it is dropped. S3 has no error code for the condition and no
-client retries on it, so a default limit enforced that way would break unmodified
-S3 tooling after `maxVersions` overwrites of one key — and reclaiming is what
-S3's own lifecycle rules do. Expiration counts from the moment the version that
-superseded this one was committed, as Lifecycle's `NoncurrentDays` does, not from
-when the version itself was written. All versions count against the bucket space quota;
-version count, marker count, and noncurrent bytes are exposed via
-`ozone sh bucket info` and Recon. `maxVersions` is documented as an Ozone
-extension over S3 semantics (comparable to Lifecycle `NewerNoncurrentVersions`).
+Version reclamation is expressed as **lifecycle rules on the lifecycle engine
+already in master** (HDDS-8342: `OmLifecycleConfiguration`, `KeyLifecycleService`,
+and the three S3 lifecycle endpoints), not as a service of its own. The engine
+already provides everything version reclamation needs — per-bucket rule storage
+and validation, prefix/tag filters, a resumable background scan with saved scan
+state, batched deletes through Ratis, metrics, and `suspend`/`resume` admin
+commands. Versioning contributes the three actions that the feature documentation
+currently lists as unsupported, and each maps 1:1 onto an S3 element:
+
+| S3 lifecycle element | Effect on a versioned bucket |
+|---|---|
+| `NoncurrentVersionExpiration.NoncurrentDays` | permanently deletes a noncurrent version once it has been noncurrent that long |
+| `NoncurrentVersionExpiration.NewerNoncurrentVersions` | keeps at most N noncurrent versions of a key, reclaiming oldest-first |
+| `Expiration.ExpiredObjectDeleteMarker` | removes a delete marker, and the key with it, once it is the only version left |
+| `Expiration.Days` / `.Date` (existing action) | on a versioned bucket, inserts a delete marker instead of deleting the object, as S3 does |
+
+Concretely: `LifecycleAction` gains a `noncurrentVersionExpiration` field and
+`LifecycleExpiration` an `expiredObjectDeleteMarker` field — both optional
+additions to existing messages — and `LifecycleActionTask` gains a
+versionedKeyTable scan next to its keyTable scan, reusing the same batching, scan
+state and metrics. Expiration counts from the moment the version that superseded
+this one was committed, as `NoncurrentDays` does, not from when the version itself
+was written.
+
+Two deliberate departures from stock S3:
+
+- **The lifecycle service is enabled by default.** `ozone.lifecycle.service.enabled`
+  flips from `false` to `true`. A rule that never runs is worse than no rule, and
+  versioning is the first feature that depends on reclamation for correct operation
+  rather than for tidiness. OM rejects `PutBucketVersioning(Enabled)` while the
+  lifecycle service is disabled, so a bucket cannot enter a state where versions
+  accumulate with nothing able to reclaim them.
+- **A bucket-level `maxVersions` backstop (default 100, 0 = unlimited).** It bounds
+  version growth on a versioned bucket that carries no lifecycle configuration at
+  all, which is the failure mode the S3 troubleshooting guide describes. It is
+  enforced by the same lifecycle scan and behaves exactly like
+  `NewerNoncurrentVersions` — markers count toward the limit, reclamation is
+  oldest-first and asynchronous, so the cost of a version write never grows with
+  the number of versions the key already has. An explicit `NewerNoncurrentVersions`
+  rule on the bucket overrides it. It is documented as an Ozone extension over S3
+  semantics.
+
+An earlier draft also offered a `REJECT` policy that failed the write once
+`maxVersions` was reached; it is dropped. S3 has no error code for the condition
+and no client retries on it, so a default limit enforced that way would break
+unmodified S3 tooling after `maxVersions` overwrites of one key — and reclaiming is
+what S3's own lifecycle rules do.
+
+## Quota and observability
+
+All versions count against the bucket space quota. Version count, marker count,
+and noncurrent bytes are exposed via `ozone sh bucket info` and Recon, and the
+version-aware lifecycle actions report through the existing
+`KeyLifecycleServiceMetrics`.
 
 ## Interaction with Ozone snapshots
 
-* snapshot creation is only allowed on UNVERSIONED bucket
-* bucket versioning is only allowed to be turned on bucket which doesn't have any snapshot created.
+OM rejects the combination on the same bucket, in both directions:
+
+* a snapshot can only be created on a bucket whose versioning status is
+  UNVERSIONED;
+* versioning can only be enabled on a bucket that has no snapshot.
+
+This is enforced rather than documented as a convention. Snapshots are not
+restricted to any bucket layout in code — `TestOmSnapshotObjectStore` covers OBS
+buckets explicitly — so nothing but enforcement keeps the two apart, and the
+combination has a real gap behind it: snapshot diff is keyed by objectID, which all
+versions of a key share, so a bucket carrying both would present a diff that cannot
+describe what changed. What makes a hard rejection cheap in practice is that the
+two features barely overlap today: snapshots are overwhelmingly used on FSO buckets
+for filesystem-style workloads, while versioning in this first phase is OBS-only.
+The rejection is applied to the source of a linked bucket and evaluated at apply
+time so the two directions cannot race, and a dev-only configuration key lifts it
+for testing. It is lifted for good once version-aware snapshot reclamation and a
+version-aware diff land as follow-up work.
 
 ## S3 Gateway and native API surface
 
@@ -266,6 +411,19 @@ interaction is covered above. Buckets without versioning behave exactly as today
   destroys data — yet the bucket would present itself as never-versioned and
   `GetBucketVersioning` could not answer `Suspended`. Since the semantics are
   unavoidable, keep the standard three states and full S3 compatibility.
+- **The OM Ratis transaction index as the versionId**: free, allocator-less and
+  monotonic by construction, and it was the earlier default. Rejected because it
+  makes a public, persisted identifier a projection of the replication log: it
+  couples the S3 API surface to one execution model, and a log that was reset or
+  rolled back would silently hand out ids that had been used before. The
+  `UniqueId` scheme gives the same properties without the coupling, and the
+  commit-time ordering check covers the residual clock risk.
+- **A dedicated reclamation service (`VersionCleanupService`)**: the earlier
+  design's own background service, following the `KeyDeletingService` pattern.
+  Rejected once lifecycle landed in master — it would duplicate rule storage,
+  filters, resumable scanning, batching, metrics and admin controls that the
+  lifecycle engine already implements, and it would express reclamation in
+  Ozone-specific bucket properties where S3 users expect `NoncurrentVersionExpiration`.
 - **Reusing `objectID` as the version identity**: code verification showed the
   overwrite path (`OMKeyRequest.prepareFileInfo`) reuses the existing record via
   `toBuilder()`, so objectID is intentionally stable across overwrites — snapshot
@@ -288,8 +446,8 @@ interaction is covered above. Buckets without versioning behave exactly as today
   in the report; versionedKeyTable would also have to join
   `RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG`, paying
   compaction-log and SST retention cost for information already reachable through
-  the snapshot's own version listing. Deferred; the diff stays a current-version
-  diff with an explicit delete-marker rule.
+  the snapshot's own version listing. Deferred; it is one of the two pieces that
+  lift the snapshot exclusion.
 - **Pinning the generator into bucket metadata** (so a bucket keeps the generator
   it was created with): removes the risk of a mid-life generator change, but adds a
   proto field, a write path in both bucket create and set-property, and leaves the
@@ -303,18 +461,16 @@ Implemented as one umbrella Jira with eleven tasks (36 sub-tasks, each roughly o
 PR), in dependency order `T1 → T2 → T3 → T4 → T5 → T6 → T7 → (T8 ∥ T9) → T10 → T11`
 (reclamation and the snapshot exclusion both land before the S3 endpoints, so
 versioning is never exposed without a way to reclaim versions, nor with snapshots
-left unguarded). The snapshot interaction described above is deferred past this
-first phase: none of the other tasks carry it, and T7 enforces the exclusion in OM
-until it lands.
+left unguarded).
 
 | Task | Scope |
 |---|---|
 | T1 Metadata foundation | proto three-state enum + legacy-boolean sync, set-property state machine, `OmKeyInfo` version fields, versionedKeyTable column family, layout feature gate |
-| T2 VersionId generator framework | `VersionIdGenerator` interface with class-name configuration, transaction-index default, commit-time ordering check, pinned-first generator |
+| T2 VersionId generator framework | `VersionIdGenerator` interface with class-name configuration, `UniqueId`-based default minted in `preExecute`, commit-time ordering check, pinned-first generator |
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion, quota accounting |
 | T4 Read / permanent delete / promotion | `?versionId=` reads including null-slot addressing, reporting a delete-marker-addressed read as a condition distinct from not-found; permanent delete by versionId with quota accounting; version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys |
-| T6 Reclamation | VersionCleanupService, `maxVersions` trimming oldest-first, noncurrent expiration, expired marker cleanup |
+| T6 Version-aware lifecycle | `NoncurrentVersionExpiration` (`NoncurrentDays`, `NewerNoncurrentVersions`) and `ExpiredObjectDeleteMarker` actions, delete-marker semantics for `Expiration` on a versioned bucket, versionedKeyTable scan in `LifecycleActionTask`, `maxVersions` backstop, lifecycle service enabled by default |
 | T7 Snapshot exclusion | OM-side rejection matrix for snapshot creation and versioning state transitions, applied to the source of a linked bucket and enforced at apply time so the two directions cannot race; dev-only opt-in config key |
 | T8 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, batch delete |
 | T9 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
@@ -323,29 +479,30 @@ until it lands.
 
 Testing follows three tracks: unit/integration tests per sub-task acceptance
 criteria (state machine, two-table atomicity, promotion, null-slot semantics,
-`maxVersions` boundaries, the full snapshot-exclusion rejection matrix); S3
-compatibility via the smoketest/s3 robot suite and the versioning subset of
-ceph/s3-tests; performance benchmarks asserting no regression with versioning off
-and O(1) write latency with it on. The snapshot
-integration tests belong with the snapshot work and are deferred with it.
+`maxVersions` boundaries, the version-aware lifecycle actions, the full
+snapshot-exclusion rejection matrix); S3 compatibility via the smoketest/s3 robot
+suite and the versioning subset of ceph/s3-tests; performance benchmarks asserting
+no regression with versioning off and O(1) write latency with it on.
 
 Open questions tracked for implementation: whether an operator should be able to
 cap `maxVersions` cluster-wide, over and above the per-bucket setting and the
-cluster default; obfuscation of the external versionId encoding, and how a pinned first version
-is rendered; whether changing `ozone.om.versioning.version-id-generator` should take
-effect without an OM restart, and the operational procedure for keys already written
-under the previous generator; `PutBucketVersioning(Suspended)` on a never-versioned
-bucket (align via s3-tests); whether `ListObjectVersions` against a snapshot is
-worth adding once the feature has landed; interaction with hsync/append writes
-(appends apply to the current version and create no new one);
-multipart uploads — the version is created at `CompleteMultipartUpload` commit and
-parts stay invisible, but until that lands an MPU overwrite on a versioned bucket
-neither reclaims the previous version's blocks nor records a version for them, so
-those blocks leak; this has to be closed before multipart is declared supported.
+cluster default; whether rejecting `PutBucketVersioning(Enabled)` while the
+lifecycle service is disabled is the right coupling, or whether a warning suffices;
+obfuscation of the external versionId encoding, and how a pinned first version is
+rendered; whether changing `ozone.om.versioning.version-id-generator` should take
+effect without an OM restart, and the operational procedure for keys already
+written under the previous generator; `PutBucketVersioning(Suspended)` on a
+never-versioned bucket (align via s3-tests); whether `ListObjectVersions` against a
+snapshot is worth adding once the feature has landed; interaction with hsync/append
+writes (appends apply to the current version and create no new one); multipart
+uploads — the version is created at `CompleteMultipartUpload` commit and parts stay
+invisible, but until that lands an MPU overwrite on a versioned bucket neither
+reclaims the previous version's blocks nor records a version for them, so those
+blocks leak; this has to be closed before multipart is declared supported.
 
 # References
 
 - [AWS S3 Versioning User Guide](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html)
 - [AWS S3 troubleshooting: performance degradation with many versions](https://docs.aws.amazon.com/AmazonS3/latest/userguide/troubleshooting-by-symptom.html)
+- [S3 Object LifeCycle Management](s3-object-lifecycle-management.md) — HDDS-8342, the lifecycle engine this proposal extends
 - [ceph/s3-tests](https://github.com/ceph/s3-tests) — versioning test subset
-
