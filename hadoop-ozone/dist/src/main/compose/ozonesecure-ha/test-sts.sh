@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:misc
+#suite:sts
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
@@ -25,8 +25,6 @@ source "$COMPOSE_DIR/ranger-testlib.sh"
 
 setup_ranger_acceptance_env
 
-execute_robot_test s3g -v USER:hdfs kinit.robot
-execute_robot_test s3g freon/generate.robot
-execute_robot_test s3g freon/validate.robot
-
-execute_robot_test s3g -v RANGER_ENDPOINT_URL:"http://ranger:6080" -v USER:hdfs security/ozone-secure-tenant.robot
+execute_robot_test s3g -v RANGER_ENDPOINT_URL:"http://ranger:6080" -v USER:hdfs security/ozone-secure-sts.robot
+execute_robot_test s3g -v RANGER_ENDPOINT_URL:"http://ranger:6080" -v USER:hdfs security/ozone-secure-sts-multitenant.robot
+"${COMPOSE_DIR}/polaris-smoketest.sh"
