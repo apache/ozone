@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-import static org.apache.hadoop.ozone.container.TestHelper.createStreamKey;
-import static org.apache.hadoop.ozone.container.TestHelper.getDatanodeService;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.createStreamKey;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.getDatanodeService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 

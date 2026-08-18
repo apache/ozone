@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_MAX_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
@@ -192,13 +195,32 @@ public class TrashOzoneFileSystem extends FileSystem {
   public FileStatus[] listStatus(Path path) throws  IOException {
     ozoneManager.getMetrics().incNumTrashListStatus();
     List<FileStatus> fileStatuses = new ArrayList<>();
+    int pageSize = ozoneConfiguration.getInt(
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    pageSize = (int) OzoneConfigUtil.limitValue(pageSize,
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_MAX_LISTING_PAGE_SIZE);
     OmKeyArgs keyArgs = constructOmKeyArgs(path);
-    List<OzoneFileStatus> list = ozoneManager.
-        listStatus(keyArgs, false, null, Integer.MAX_VALUE);
-    for (OzoneFileStatus status : list) {
-      FileStatus fileStatus = convertToFileStatus(status);
-      fileStatuses.add(fileStatus);
-    }
+    String startKey = null;
+    String lastKeyPath = null;
+    int entriesAdded;
+    do {
+      List<OzoneFileStatus> list = ozoneManager.
+          listStatus(keyArgs, false, startKey, pageSize);
+      entriesAdded = 0;
+      for (OzoneFileStatus status : list) {
+        // The server includes the start key itself in the response.
+        if (status.getPath().equals(lastKeyPath)) {
+          continue;
+        }
+        fileStatuses.add(convertToFileStatus(status));
+        lastKeyPath = status.getPath();
+        startKey = status.getKeyInfo().getKeyName();
+        entriesAdded++;
+      }
+    } while (entriesAdded > 0);
     return fileStatuses.toArray(new FileStatus[0]);
   }
 

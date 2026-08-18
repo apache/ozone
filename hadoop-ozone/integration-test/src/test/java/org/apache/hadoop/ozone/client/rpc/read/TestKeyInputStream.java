@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.countReplicas;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.om.BucketForTesting;
@@ -411,7 +411,7 @@ class TestKeyInputStream extends InputStreamTests {
     long containerID = loc.getContainerID();
     assertEquals(3, countReplicas(containerID, getCluster()));
 
-    TestHelper.waitForContainerClose(getCluster(), containerID);
+    OzoneTestHelper.waitForContainerClose(getCluster(), containerID);
 
     List<DatanodeDetails> pipelineNodes = loc.getPipeline().getNodes();
 

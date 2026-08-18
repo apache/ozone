@@ -59,7 +59,7 @@ import org.mockito.MockedStatic;
 /**
  * Unit tests for {@link TrashOzoneFileSystem} on LEGACY buckets.
  */
-public class TestTrashOzoneFileSystem {
+class TestTrashOzoneFileSystemLegacyBucket {
 
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";

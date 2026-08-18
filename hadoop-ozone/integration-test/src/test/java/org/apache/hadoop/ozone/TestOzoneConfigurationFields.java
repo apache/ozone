@@ -17,9 +17,17 @@
 
 package org.apache.hadoop.ozone;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.ConfigurationFieldsTests;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
@@ -28,11 +36,19 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
  */
 public class TestOzoneConfigurationFields extends ConfigurationFieldsTests {
+
+  /**
+   * A set of property keys that are allowed to contain a newline in their
+   * value. Keep this empty unless a value genuinely requires a line break,
+   * otherwise the embedded newline corrupts the runtime string (see HDDS-8046).
+   */
+  private final Set<String> xmlPropsAllowedToContainNewline = new HashSet<>();
 
   @Override
   public void initializeMemberVariables() {
@@ -49,7 +65,6 @@ public class TestOzoneConfigurationFields extends ConfigurationFieldsTests {
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
     xmlPropsToSkipCompare.add("ozone.om.decommissioned.nodes" +
         ".EXAMPLEOMSERVICEID");
-    xmlPropsToSkipCompare.add("ozone.scm.nodes.EXAMPLESCMSERVICEID");
     xmlPropsToSkipCompare.add("ozone.scm.nodes.EXAMPLESCMSERVICEID");
     xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
@@ -69,7 +84,48 @@ public class TestOzoneConfigurationFields extends ConfigurationFieldsTests {
     // TODO: Remove this once ranger configs are finalized in HDDS-5836
     configurationPrefixToSkipCompare.add("ozone.om.ranger");
 
+    // Hadoop core-default.xml ships these values across multiple lines; they are
+    // outside Ozone's control, so opt them out of the embedded-newline check.
+    xmlPropsAllowedToContainNewline.add("fs.s3a.aws.credentials.provider");
+    xmlPropsAllowedToContainNewline.add("hadoop.security.sensitive-config-keys");
+    xmlPropsAllowedToContainNewline.add("hadoop.system.tags");
+    xmlPropsAllowedToContainNewline.add("hadoop.tags.system");
+
     addPropertiesNotInXml();
+  }
+
+  /**
+   * Verifies no default value embeds a line break, which would corrupt the
+   * runtime string (see HDDS-8046). Uses {@link OzoneConfiguration} to include both
+   * generated configuration files and the handwritten {@code ozone-default.xml}.
+   * Legitimate cases opt out via {@link #xmlPropsAllowedToContainNewline}.
+   */
+  @Test
+  public void testXmlValuesHaveNoEmbeddedNewlines() {
+    Configuration conf = new OzoneConfiguration();
+    conf.setAllowNullValueProperties(true);
+
+    Set<String> xmlValuesWithNewlines = new TreeSet<>();
+    for (Map.Entry<String, String> entry : conf) {
+      String value = entry.getValue();
+      if (value == null) {
+        continue;
+      }
+      if (xmlPropsAllowedToContainNewline.contains(entry.getKey())) {
+        continue;
+      }
+      if (value.indexOf('\n') != -1 || value.indexOf('\r') != -1) {
+        xmlValuesWithNewlines.add(entry.getKey());
+      }
+    }
+
+    assertThat(xmlValuesWithNewlines).withFailMessage(
+        "These properties have an embedded line break in their <value>, which "
+            + "corrupts the runtime string: " + xmlValuesWithNewlines
+            + " Put the value on a single line. If the newline is genuinely required, "
+            + "add the property to xmlPropsAllowedToContainNewline with a reason + Jira. "
+            + "See HDDS-8082.")
+        .isEmpty();
   }
 
   private void addPropertiesNotInXml() {
