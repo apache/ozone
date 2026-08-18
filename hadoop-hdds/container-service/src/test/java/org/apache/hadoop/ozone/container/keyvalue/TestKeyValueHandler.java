@@ -280,7 +280,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto readChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ReadChunk);
     KeyValueHandler
-        . dispatchRequest(handler, readChunkRequest, container, null);
+        .dispatchRequest(handler, readChunkRequest, container, null);
     verify(handler, times(1)).handleReadChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
