@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -226,6 +227,24 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public VALUE getSkipCache(KEY key) throws RocksDatabaseException, CodecException {
     return getFromTable(key);
+  }
+
+  @Override
+  public List<VALUE> multiGetSkipCache(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    if (keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<byte[]> keyBytesList = new ArrayList<>(keys.size());
+    for (KEY key : keys) {
+      keyBytesList.add(encodeKey(key));
+    }
+    List<byte[]> valueBytesList = rawTable.multiGetSkipCache(keyBytesList);
+    List<VALUE> values = new ArrayList<>(keys.size());
+    for (byte[] valueBytes : valueBytesList) {
+      values.add(decodeValue(valueBytes));
+    }
+    return values;
   }
 
   /**

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -120,6 +121,17 @@ class RDBTable implements Table<byte[], byte[]> {
   public byte[] get(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGets();
     return db.get(family, key);
+  }
+
+  @Override
+  public List<byte[]> multiGetSkipCache(List<byte[]> keys) throws RocksDatabaseException {
+    if (keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    for (byte[] ignored : keys) {
+      rdbMetrics.incNumDBKeyGets();
+    }
+    return db.multiGet(family, keys);
   }
 
   Integer get(ByteBuffer key, ByteBuffer outValue) throws RocksDatabaseException {

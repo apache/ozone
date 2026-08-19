@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -73,6 +74,18 @@ public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public VALUE get(KEY key) {
     return map.get(key);
+  }
+
+  @Override
+  public List<VALUE> multiGetSkipCache(List<KEY> keys) {
+    if (keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<VALUE> values = new ArrayList<>(keys.size());
+    for (KEY key : keys) {
+      values.add(map.get(key));
+    }
+    return values;
   }
 
   @Override
