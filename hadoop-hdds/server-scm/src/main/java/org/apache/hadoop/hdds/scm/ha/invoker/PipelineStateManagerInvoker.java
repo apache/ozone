@@ -132,12 +132,12 @@ public class PipelineStateManagerInvoker extends ScmInvoker<PipelineStateManager
       }
 
       @Override
-      public List<Pipeline> getPipelines(ReplicationConfig arg0, Pipeline.PipelineState arg1) {
+      public List<Pipeline> getPipelines(ReplicationConfig arg0, StorageTier arg1) {
         return invoker.getImpl().getPipelines(arg0, arg1);
       }
 
       @Override
-      public List<Pipeline> getPipelines(ReplicationConfig arg0, StorageTier arg1) {
+      public List<Pipeline> getPipelines(ReplicationConfig arg0, Pipeline.PipelineState arg1) {
         return invoker.getImpl().getPipelines(arg0, arg1);
       }
 
@@ -242,17 +242,17 @@ public class PipelineStateManagerInvoker extends ScmInvoker<PipelineStateManager
         break;
       }
       if (p.length == 2 && (p[0] == null || ReplicationConfig.class.isInstance(p[0])) && (p[1] == null ||
-          Pipeline.PipelineState.class.isInstance(p[1]))) {
+          StorageTier.class.isInstance(p[1]))) {
         final ReplicationConfig arg11 = (ReplicationConfig) p[0];
-        final Pipeline.PipelineState arg12 = (Pipeline.PipelineState) p[1];
+        final StorageTier arg12 = (StorageTier) p[1];
         returnType = List.class;
         returnValue = getImpl().getPipelines(arg11, arg12);
         break;
       }
       if (p.length == 2 && (p[0] == null || ReplicationConfig.class.isInstance(p[0])) && (p[1] == null ||
-          StorageTier.class.isInstance(p[1]))) {
+          Pipeline.PipelineState.class.isInstance(p[1]))) {
         final ReplicationConfig arg13 = (ReplicationConfig) p[0];
-        final StorageTier arg14 = (StorageTier) p[1];
+        final Pipeline.PipelineState arg14 = (Pipeline.PipelineState) p[1];
         returnType = List.class;
         returnValue = getImpl().getPipelines(arg13, arg14);
         break;
