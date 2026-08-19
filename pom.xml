@@ -2299,6 +2299,7 @@
               <prefix>$HDDS_LIB_JARS_DIR</prefix>
               <outputFilterFile>true</outputFilterFile>
               <includeScope>runtime</includeScope>
+              <excludeArtifactIds>infer-annotation</excludeArtifactIds>
               <skip>${classpath.skip}</skip>
             </configuration>
           </execution>
