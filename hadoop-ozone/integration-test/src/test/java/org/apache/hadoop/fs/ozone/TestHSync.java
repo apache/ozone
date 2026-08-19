@@ -494,8 +494,11 @@ public class TestHSync {
           os1.write(1);
           // There should be 2 key in openFileTable
           assertThat(getOpenKeyInfo(BUCKET_LAYOUT)).hasSize(2);
-          // One key will be in fileTable as hsynced
-          assertThat(getKeyInfo(BUCKET_LAYOUT)).hasSize(1);
+          // key1 will be in fileTable as hsynced, but key2 will not.
+          assertThat(getKeyInfo(BUCKET_LAYOUT))
+              .extracting(OmKeyInfo::getKeyName)
+              .contains(key1.getName())
+              .doesNotContain(key2.getName());
 
           // Resume openKeyCleanupService
           openKeyCleanupService.resume();
@@ -503,8 +506,11 @@ public class TestHSync {
           // Key without hsync is deleted
           GenericTestUtils.waitFor(() ->
               getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
-          // Verify only one key is still present in fileTable
-          assertThat(getKeyInfo(BUCKET_LAYOUT)).hasSize(1);
+          // Verify key1 remains in fileTable and key2 is absent.
+          assertThat(getKeyInfo(BUCKET_LAYOUT))
+              .extracting(OmKeyInfo::getKeyName)
+              .contains(key1.getName())
+              .doesNotContain(key2.getName());
 
           // Clean up
           assertTrue(fs.delete(key1, false));
