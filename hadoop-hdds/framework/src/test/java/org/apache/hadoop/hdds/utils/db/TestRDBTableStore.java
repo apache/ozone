@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -156,6 +157,25 @@ public class TestRDBTableStore {
     assertArrayEquals(value, readValue);
     Table<byte[], byte[]> secondTable = rdbStore.getTable("Second");
     assertTrue(secondTable.isEmpty());
+  }
+
+  @Test
+  public void multiGetSkipCache() throws Exception {
+    Table<byte[], byte[]> testTable = rdbStore.getTable("First");
+    byte[] key1 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] key2 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] missingKey = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] value1 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] value2 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    testTable.put(key1, value1);
+    testTable.put(key2, value2);
+
+    List<byte[]> values = testTable.multiGetSkipCache(Arrays.asList(key1, missingKey, key2));
+    assertEquals(3, values.size());
+    assertArrayEquals(value1, values.get(0));
+    assertNull(values.get(1));
+    assertArrayEquals(value2, values.get(2));
+    assertTrue(testTable.multiGetSkipCache(Collections.emptyList()).isEmpty());
   }
 
   @Test
