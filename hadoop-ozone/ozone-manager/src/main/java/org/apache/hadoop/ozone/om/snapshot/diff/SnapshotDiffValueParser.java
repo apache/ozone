@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.om.snapshot.diff;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.CodedInputStream;
