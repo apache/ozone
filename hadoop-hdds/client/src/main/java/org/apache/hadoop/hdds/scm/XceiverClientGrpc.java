@@ -97,6 +97,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private final ConfigurationSource config;
   private final XceiverClientMetrics metrics;
   private final Semaphore semaphore;
+  // Caps long-lived read streams; separate from the request semaphore so streams cannot starve short RPCs.
+  private final Semaphore streamSemaphore;
+  private final int maxConcurrentStreams;
   private long timeout;
   private final long streamReadTimeoutNanos;
   private final SecurityConfig secConfig;
@@ -124,8 +127,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     Objects.requireNonNull(config, "config == null");
     setTimeout(config.getTimeDuration(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT,
         OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
-    this.streamReadTimeoutNanos = config.getObject(OzoneClientConfig.class)
-        .getStreamReadTimeout().toNanos();
+    final OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
+    this.streamReadTimeoutNanos = clientConfig.getStreamReadTimeout().toNanos();
+    final int configuredMaxStreams = clientConfig.getStreamReadMaxConcurrentStreams();
+    // Non-positive inherits the request limit, matching the capacity streams had when they shared its semaphore.
+    this.maxConcurrentStreams = configuredMaxStreams > 0 ? configuredMaxStreams
+        : HddsClientUtils.getMaxOutstandingRequests(config);
+    this.streamSemaphore = new Semaphore(maxConcurrentStreams);
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -603,52 +611,73 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    */
   public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver,
       Set<DatanodeID> excludedDatanodes) throws IOException {
-    final List<DatanodeDetails> datanodeList = sortDatanodes(null, ContainerProtos.Type.ReadBlock);
-    IOException lastException = null;
-    for (DatanodeDetails dn : datanodeList) {
-      if (excludedDatanodes.contains(dn.getID())) {
-        LOG.debug("Skipping excluded datanode {} (uuid={}) for initStreamRead {}",
-            dn, dn.getUuidString(), blockID.getContainerBlockID());
-        continue;
-      }
-      try {
-        checkOpen(dn);
-        semaphore.acquire();
-        XceiverClientProtocolServiceStub stub = dnChannelInfoMap.get(dn.getID()).getStub();
-        if (stub == null) {
-          throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
+    acquireStreamPermit(blockID);
+    boolean started = false;
+    try {
+      final List<DatanodeDetails> datanodeList = sortDatanodes(null, ContainerProtos.Type.ReadBlock);
+      IOException lastException = null;
+      for (DatanodeDetails dn : datanodeList) {
+        if (excludedDatanodes.contains(dn.getID())) {
+          LOG.debug("Skipping excluded datanode {} (uuid={}) for initStreamRead {}",
+              dn, dn.getUuidString(), blockID.getContainerBlockID());
+          continue;
         }
-        LOG.debug("initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
-        StreamObserver<ContainerCommandRequestProto> requestObserver = stub
-            .withDeadlineAfter(timeout, TimeUnit.SECONDS)
-            .send(streamObserver);
-        streamObserver.setStreamingReadResponse(new StreamingReadResponse(dn,
-            (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver));
-        return;
-      } catch (IOException e) {
-        LOG.error("Failed to start streaming read to DataNode {}", dn, e);
-        semaphore.release();
-        lastException = e;
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException("Interrupted initStreamRead to " + dn + " for " + blockID, e);
+        try {
+          checkOpen(dn);
+          XceiverClientProtocolServiceStub stub = dnChannelInfoMap.get(dn.getID()).getStub();
+          if (stub == null) {
+            throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
+          }
+          LOG.debug("initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
+          // No deadline: it would bound the entire long-lived streaming call. Per-request timeliness is
+          // enforced by streamReadTimeout in streamRead() and StreamingReader.poll().
+          StreamObserver<ContainerCommandRequestProto> requestObserver = stub.send(streamObserver);
+          streamObserver.setStreamingReadResponse(new StreamingReadResponse(dn,
+              (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver));
+          started = true;
+          return;
+        } catch (IOException e) {
+          LOG.error("Failed to start streaming read to DataNode {}", dn, e);
+          lastException = e;
+        }
       }
-    }
-    if (lastException != null) {
-      throw lastException;
-    } else {
-      throw new IOException("Failed to start streaming read to any available DataNodes");
+      if (lastException != null) {
+        throw lastException;
+      } else {
+        throw new IOException("Failed to start streaming read to any available DataNodes");
+      }
+    } finally {
+      if (!started) {
+        streamSemaphore.release();
+      }
     }
   }
 
+  @VisibleForTesting
+  void acquireStreamPermit(BlockID blockID) throws IOException {
+    try {
+      if (!streamSemaphore.tryAcquire(streamReadTimeoutNanos, TimeUnit.NANOSECONDS)) {
+        throw new IOException("Failed to start streaming read for " + blockID.getContainerBlockID()
+            + ": " + maxConcurrentStreams + " block streams are already open on this pipeline client."
+            + " Close unused input streams or increase ozone.client.stream.read.max-concurrent-streams.");
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Interrupted while waiting to start streaming read for " + blockID, e);
+    }
+  }
+
+  @VisibleForTesting
+  int availableStreamPermits() {
+    return streamSemaphore.availablePermits();
+  }
+
   /**
-   * This method should be called to indicate the end of streaming read. Its primary purpose is to release the
-   * semaphore acquired when starting the streaming read, but is also used to update any metrics or debug logs as
-   * needed.
+   * Indicates the end of a streaming read: releases the stream permit acquired in initStreamRead.
    */
   @Override
   public void completeStreamRead() {
-    semaphore.release();
+    streamSemaphore.release();
   }
 
   private static List<DatanodeDetails> sortDatanodeByOperationalState(
