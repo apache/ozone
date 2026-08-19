@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -183,7 +184,16 @@ public class TestSCMContainerPlacementRackAware {
     }
     when(nodeManager.getClusterNetworkTopologyMap())
         .thenReturn(cluster);
-    when(nodeManager.hasAvailableSpace(any(DatanodeInfo.class), any())).thenReturn(true);
+    when(nodeManager.hasAvailableSpace(
+        any(DatanodeInfo.class), anyLong(), any()))
+        .thenAnswer(invocation -> {
+          DatanodeInfo di = invocation.getArgument(0);
+          long dataSizeRequired = invocation.getArgument(1);
+          StorageType requestedStorageType = invocation.getArgument(2);
+          return di.getStorageReports().stream()
+              .anyMatch(report -> hasEnoughSpace(
+                  report, dataSizeRequired, requestedStorageType));
+        });
 
     // create placement policy instances
     policy = new SCMContainerPlacementRackAware(
@@ -909,5 +919,12 @@ public class TestSCMContainerPlacementRackAware {
     assertThrows(SCMException.class,
             () -> policy.chooseDatanodes(usedNodes, null, null, 1, 0, 0, StorageType.DEFAULT),
             "No target datanode, this call should fail");
+  }
+
+  private static boolean hasEnoughSpace(
+      StorageReportProto report, long dataSizeRequired, StorageType storageType) {
+    return (storageType == null
+        || getStorageTypeProto(storageType).equals(report.getStorageType()))
+        && report.getRemaining() > dataSizeRequired;
   }
 }

@@ -190,7 +190,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /**
    * Records a container allocation on the given datanode.
    * Unlike {@link #checkSpaceAndRecordAllocation}, this does not check for
-   * available space — it is called after the placement policy has already
+   * available space; it is called after the placement policy has already
    * validated space and a replication command has been committed.
    */
   void recordAllocationForDatanode(
@@ -201,10 +201,12 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * in-flight allocations tracked by PendingContainerTracker.
    *
    * @param datanodeInfo the datanode to check
+   * @param dataSizeRequired minimum data volume space required in bytes
    * @param storageType storage type to check
    * @return true if at least one slot is free
    */
-  boolean hasAvailableSpace(DatanodeInfo datanodeInfo, StorageType storageType);
+  boolean hasAvailableSpace(
+      DatanodeInfo datanodeInfo, long dataSizeRequired, StorageType storageType);
 
   /**
    * Removes a pending container allocation from a datanode.

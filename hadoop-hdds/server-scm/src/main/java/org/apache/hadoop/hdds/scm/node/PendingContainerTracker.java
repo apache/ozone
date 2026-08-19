@@ -287,20 +287,31 @@ public class PendingContainerTracker {
   }
 
   /**
-   * Returns true if the given datanode has at least one allocatable container slot
-   * available, accounting for pending in-flight allocations.
+   * Returns true if the given datanode has enough data space and at least one
+   * allocatable container slot available, accounting for pending in-flight
+   * allocations.
    *
    * <p>Slot availability is based on {@code maxContainerSize}: a slot exists for each
    * {@code maxContainerSize}-worth of usable space on any volume. This check is intended for the placement policy.
    * This rolls expired-window entries but does not consume a slot.
    *
    * @param datanodeInfo the datanode to check
+   * @param dataSizeRequired minimum data volume space required in bytes
+   * @param storageType storage type to check
    * @return true if at least one container slot is available
    */
-  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo, StorageType storageType) {
+  public boolean hasAvailableSpace(
+      DatanodeInfo datanodeInfo, long dataSizeRequired, StorageType storageType) {
     Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
     List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
     if (storageReports.isEmpty()) {
+      return false;
+    }
+    if (!hasVolumeWithEnoughDataSpace(
+        storageReports, dataSizeRequired, storageType)) {
+      LOG.debug("Datanode {} has no volumes with enough space to allocate {} "
+              + "bytes for data.",
+          datanodeInfo.getID(), dataSizeRequired);
       return false;
     }
     TwoWindowBucket bucket = datanodeInfo.getPendingContainerAllocations();
@@ -344,6 +355,24 @@ public class PendingContainerTracker {
       StorageReportProto report, StorageType storageType) {
     return checksAllStorageTypes(storageType)
         || StorageTypeUtils.getFromProtobuf(report.getStorageType()).equals(storageType);
+  }
+
+  private static boolean hasVolumeWithEnoughDataSpace(
+      List<StorageReportProto> storageReports, long dataSizeRequired,
+      StorageType storageType) {
+    if (dataSizeRequired <= 0 || checksAllStorageTypes(storageType)) {
+      return true;
+    }
+    for (StorageReportProto report : storageReports) {
+      if (report.hasFailed() && report.getFailed()) {
+        continue;
+      }
+      if (matchesStorageType(report, storageType)
+          && VolumeUsage.getUsableSpace(report) > dataSizeRequired) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static boolean checksAllStorageTypes(StorageType storageType) {

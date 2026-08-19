@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -119,10 +120,14 @@ public class TestSCMContainerPlacementCapacity {
                 .filter(dn -> dn.getID().equals(invocation.getArgument(0)))
                 .findFirst()
                 .orElse(null));
-    when(mockNodeManager.hasAvailableSpace(any(DatanodeInfo.class), any())).thenAnswer(invocation -> {
-      DatanodeInfo di = invocation.getArgument(0);
-      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() >= 15L);
-    });
+    when(mockNodeManager.hasAvailableSpace(
+        any(DatanodeInfo.class), anyLong(), any()))
+        .thenAnswer(invocation -> {
+          DatanodeInfo di = invocation.getArgument(0);
+          long dataSizeRequired = invocation.getArgument(1);
+          return di.getStorageReports().stream()
+              .anyMatch(r -> r.getRemaining() >= dataSizeRequired);
+        });
 
     SCMContainerPlacementCapacity scmContainerPlacementRandom =
         new SCMContainerPlacementCapacity(mockNodeManager, conf, null, true,

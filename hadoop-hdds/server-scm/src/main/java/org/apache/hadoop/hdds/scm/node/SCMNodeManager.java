@@ -1075,12 +1075,15 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   @Override
   public void recordAllocationForDatanode(
       DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType) {
-    pendingContainerTracker.recordAllocation(datanodeInfo, containerID, storageType);
+    pendingContainerTracker.recordAllocation(
+        datanodeInfo, containerID, storageType);
   }
 
   @Override
-  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo, StorageType storageType) {
-    return pendingContainerTracker.hasAvailableSpace(datanodeInfo, storageType);
+  public boolean hasAvailableSpace(
+      DatanodeInfo datanodeInfo, long dataSizeRequired, StorageType storageType) {
+    return pendingContainerTracker.hasAvailableSpace(
+        datanodeInfo, dataSizeRequired, storageType);
   }
 
   @Override
@@ -1515,7 +1518,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
      * {@link PendingContainerTracker}) and sufficient Ratis metadata volume space.
      */
     private boolean hasEnoughSpaceForNode(DatanodeInfo dn) {
-      if (!tracker.hasAvailableSpace(dn, null)) {
+      if (!tracker.hasAvailableSpace(dn, 0, null)) {
         return false;
       }
       if (minRatisVolumeSizeBytes <= 0) {

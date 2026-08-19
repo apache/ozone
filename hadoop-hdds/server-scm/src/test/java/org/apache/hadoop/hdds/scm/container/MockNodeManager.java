@@ -512,8 +512,10 @@ public class MockNodeManager implements NodeManager {
 
   @Override
   public boolean hasAvailableSpace(
-      DatanodeInfo datanodeInfo, StorageType pendingStorageType) {
-    return pendingContainerTracker.hasAvailableSpace(datanodeInfo, pendingStorageType);
+      DatanodeInfo datanodeInfo, long dataSizeRequired,
+      StorageType pendingStorageType) {
+    return pendingContainerTracker.hasAvailableSpace(
+        datanodeInfo, dataSizeRequired, pendingStorageType);
   }
 
   @Override

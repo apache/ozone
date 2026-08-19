@@ -502,11 +502,13 @@ public class TestSCMCommonPlacementPolicy {
     // Space check now uses PendingContainerTracker.hasAvailableSpace:
     // slot available → isValidNode returns true.
     // storageType == null skips the tier-aware check and relies on the slot check.
-    when(nodeMngr.hasAvailableSpace(datanodeInfo, null)).thenReturn(true);
+    when(nodeMngr.hasAvailableSpace(datanodeInfo, 4000, null))
+        .thenReturn(true);
     assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000, null));
 
     // No slot available (all pending) → isValidNode returns false
-    when(nodeMngr.hasAvailableSpace(datanodeInfo, null)).thenReturn(false);
+    when(nodeMngr.hasAvailableSpace(datanodeInfo, 4000, null))
+        .thenReturn(false);
     assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000, null));
   }
 

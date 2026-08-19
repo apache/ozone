@@ -393,11 +393,11 @@ public class TestPendingContainerTracker {
     twoSlotReports.add(createStorageReport(dnInfo, 10 * containerSize, 2 * containerSize, 0));
     dnInfo.updateStorageReports(twoSlotReports);
 
-    assertTrue(tracker.hasAvailableSpace(dnInfo, null)); // 2 slots free
+    assertTrue(tracker.hasAvailableSpace(dnInfo, 0, null)); // 2 slots free
     assertTrue(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(0), null));  // slot 1 used
-    assertTrue(tracker.hasAvailableSpace(dnInfo, null));               // 1 slot free
+    assertTrue(tracker.hasAvailableSpace(dnInfo, 0, null));            // 1 slot free
     assertTrue(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(1), null));  // slot 2 used
-    assertFalse(tracker.hasAvailableSpace(dnInfo, null));              // 0 slots free
+    assertFalse(tracker.hasAvailableSpace(dnInfo, 0, null));           // 0 slots free
     assertFalse(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(2), null)); // rejected
   }
 
@@ -410,7 +410,7 @@ public class TestPendingContainerTracker {
         MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
         HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     // No storage reports set
-    assertFalse(tracker.hasAvailableSpace(emptyDn, null));
+    assertFalse(tracker.hasAvailableSpace(emptyDn, 0, null));
   }
 
   /**
@@ -424,9 +424,9 @@ public class TestPendingContainerTracker {
     StorageReportProto healthy = createStorageReport(dn1,
         10 * MAX_CONTAINER_SIZE, MAX_CONTAINER_SIZE, 0); // 1 real slot
     dn1.updateStorageReports(new ArrayList<>(Arrays.asList(failed, healthy)));
-    assertTrue(tracker.hasAvailableSpace(dn1, null));                          // healthy vol -> 1 slot
+    assertTrue(tracker.hasAvailableSpace(dn1, 0, null));                       // healthy vol -> 1 slot
     assertTrue(tracker.checkSpaceAndRecordAllocation(dn1, container1, null));  // consumes it
-    assertFalse(tracker.hasAvailableSpace(dn1, null));                         // 0 slots left
+    assertFalse(tracker.hasAvailableSpace(dn1, 0, null));                      // 0 slots left
     assertFalse(tracker.checkSpaceAndRecordAllocation(dn1, container2, null)); // rejected
   }
 
@@ -435,7 +435,7 @@ public class TestPendingContainerTracker {
     dn1.updateStorageReports(new ArrayList<>(Arrays.asList((
         createFailedStorageReport(dn1)),
         createFailedStorageReport(dn1))));
-    assertFalse(tracker.hasAvailableSpace(dn1, null));
+    assertFalse(tracker.hasAvailableSpace(dn1, 0, null));
     assertFalse(tracker.checkSpaceAndRecordAllocation(dn1, container1, null));
   }
 
@@ -450,9 +450,26 @@ public class TestPendingContainerTracker {
         0, StorageTypeProto.DISK));
     dnInfo.updateStorageReports(reports);
 
-    assertTrue(tracker.hasAvailableSpace(dnInfo, StorageType.SSD));
-    assertFalse(tracker.hasAvailableSpace(dnInfo, StorageType.DISK));
-    assertTrue(tracker.hasAvailableSpace(dnInfo, null));
+    assertTrue(tracker.hasAvailableSpace(dnInfo, 0, StorageType.SSD));
+    assertFalse(tracker.hasAvailableSpace(dnInfo, 0, StorageType.DISK));
+    assertTrue(tracker.hasAvailableSpace(dnInfo, 0, null));
+  }
+
+  @Test
+  public void testDataSizeRequiredCheckedForMatchingStorageType() {
+    long containerSize = MAX_CONTAINER_SIZE;
+    DatanodeInfo dnInfo = datanodes.get(0);
+    List<StorageReportProto> reports = new ArrayList<>();
+    reports.add(createStorageReport(dnInfo, 100 * containerSize,
+        containerSize / 2, StorageTypeProto.DISK));
+    reports.add(createStorageReport(dnInfo, 100 * containerSize,
+        2 * containerSize, StorageTypeProto.SSD));
+    dnInfo.updateStorageReports(reports);
+
+    assertFalse(tracker.hasAvailableSpace(
+        dnInfo, containerSize, StorageType.DISK));
+    assertTrue(tracker.hasAvailableSpace(
+        dnInfo, containerSize, StorageType.SSD));
   }
 
   @Test
@@ -473,8 +490,8 @@ public class TestPendingContainerTracker {
         dnInfo.getPendingContainerAllocations().getCount(StorageType.DISK));
     assertEquals(0,
         dnInfo.getPendingContainerAllocations().getCount(StorageType.SSD));
-    assertFalse(tracker.hasAvailableSpace(dnInfo, StorageType.DISK));
-    assertTrue(tracker.hasAvailableSpace(dnInfo, StorageType.SSD));
+    assertFalse(tracker.hasAvailableSpace(dnInfo, 0, StorageType.DISK));
+    assertTrue(tracker.hasAvailableSpace(dnInfo, 0, StorageType.SSD));
   }
 
   @Test
@@ -492,7 +509,7 @@ public class TestPendingContainerTracker {
         dnInfo.getPendingContainerAllocations().getCount(StorageType.DISK));
     assertEquals(1,
         dnInfo.getPendingContainerAllocations().getCount(StorageType.SSD));
-    assertFalse(tracker.hasAvailableSpace(dnInfo, StorageType.DISK));
+    assertFalse(tracker.hasAvailableSpace(dnInfo, 0, StorageType.DISK));
   }
 
   private StorageReportProto createStorageReport(DatanodeInfo dn, long capacity, long remaining, long committed) {
