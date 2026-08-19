@@ -103,7 +103,12 @@ public class TestReconScmSnapshot {
     assertTrue(logCapturer.getOutput()
         .contains("Recon Container Count: " + reconContainers.size() +
         ", SCM Container Count: " + containerManager.getContainers().size()));
-    assertEquals(containerManager.getContainers().size(),
+    // Recon syncs SCM's containers asynchronously after start; wait for the
+    // snapshot to be applied before asserting the counts match.
+    final ContainerManager scmContainerManager = containerManager;
+    GenericTestUtils.waitFor(() -> reconContainerManager.getContainers().size()
+        == scmContainerManager.getContainers().size(), 1000, 60000);
+    assertEquals(scmContainerManager.getContainers().size(),
         reconContainerManager.getContainers().size());
 
     //PipelineCount after Recon DB is updated with SCM DB

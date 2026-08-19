@@ -69,7 +69,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
@@ -84,7 +84,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests OMFileCreateRequest.
  */
-public class TestOMFileCreateRequest extends TestOMKeyRequest {
+public class TestOMFileCreateRequest extends OMKeyRequestTests {
 
   @Test
   public void testPreExecute() throws Exception {

@@ -123,7 +123,7 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
                 .map(this::formatDatanodeDisplayName)
                 .collect(toList())));
       } else {
-        System.out.println("Started DiskBalancer on all IN_SERVICE nodes.");
+        System.out.println("Started DiskBalancer on all IN_SERVICE and HEALTHY nodes.");
       }
     } else {
       // Detailed message for specific nodes

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
@@ -26,6 +27,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -37,7 +39,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -59,14 +60,13 @@ import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Unhealthy;
@@ -124,14 +124,14 @@ public class TestScmSafeMode {
 
   @Test
   void testSafeModeOperations() throws Exception {
-    TestDataUtil.createKeys(cluster, 100);
+    DataTestUtil.createKeys(cluster, 100);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000);
 
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
-    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
+    String keyName = uniqueObjectName("key");
 
     ObjectStore store = client.getObjectStore();
     store.createVolume(volumeName);
@@ -197,6 +197,29 @@ public class TestScmSafeMode {
   }
 
   @Test
+  void testClusterExitsSafeModeWithPeriodicRuleRefresh() throws Exception {
+    cluster.shutdown();
+    conf.set(HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, "1s");
+    builder = MiniOzoneCluster.newBuilder(conf).setStartDataNodes(true);
+    cluster = builder.build();
+    cluster.waitForClusterToBeReady();
+    final StorageContainerManager scm = cluster.getStorageContainerManager();
+    DataTestUtil.createKeys(cluster, 100);
+    GenericTestUtils.waitFor(() -> scm.getContainerManager().getContainers().size() >= 3,
+        100, 1000 * 30);
+
+    cluster.restartStorageContainerManager(false);
+
+    assertTrue(cluster.getStorageContainerManager().isInSafeMode(), "SCM should start in safe mode");
+    GenericTestUtils.waitFor(() -> scm.getContainerManager().getContainers().size() >= 3,
+        100, 1000 * 15);
+
+    cluster.waitTobeOutOfSafeMode();
+
+    assertFalse(scm.isInSafeMode(), "SCM should exit safe mode with periodic rule refresh enabled");
+  }
+
+  @Test
   void testSCMSafeMode() throws Exception {
     // Test1: Test safe mode  when there are no containers in system.
     cluster.stop();
@@ -210,7 +233,7 @@ public class TestScmSafeMode {
     assertFalse(cluster.getStorageContainerManager().isInSafeMode());
 
     // Test2: Test safe mode  when containers are there in system.
-    TestDataUtil.createKeys(cluster, 100 * 2);
+    DataTestUtil.createKeys(cluster, 100 * 2);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000 * 30);
@@ -228,7 +251,7 @@ public class TestScmSafeMode {
             HddsProtos.LifeCycleEvent.FINALIZE);
         mapping.updateContainerState(c.containerID(),
             LifeCycleEvent.CLOSE);
-      } catch (IOException | InvalidStateTransitionException e) {
+      } catch (IOException e) {
         LOG.info("Failed to change state of open containers.", e);
       }
     });
@@ -281,7 +304,7 @@ public class TestScmSafeMode {
     cluster.waitTobeOutOfSafeMode();
     assertFalse(scm.isInSafeMode());
 
-    TestDataUtil.createKeys(cluster, 10);
+    DataTestUtil.createKeys(cluster, 10);
     SCMClientProtocolServer clientProtocolServer = cluster
         .getStorageContainerManager().getClientProtocolServer();
     assertFalse((scm.getClientProtocolServer()).getSafeModeStatus());

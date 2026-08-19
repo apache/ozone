@@ -53,7 +53,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Tests S3 Expired Multipart Upload Abort Responses.
  */
 public class TestS3ExpiredMultipartUploadsAbortResponse
-    extends TestS3MultipartResponse {
+    extends S3MultipartResponseTests {
 
   private BucketLayout bucketLayout;
 

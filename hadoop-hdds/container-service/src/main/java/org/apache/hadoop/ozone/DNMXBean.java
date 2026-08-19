@@ -34,6 +34,13 @@ public interface DNMXBean extends ServiceRuntimeInfo {
   String getHostname();
 
   /**
+   * Gets the datanode UUID.
+   *
+   * @return the datanode UUID for the datanode.
+   */
+  String getDatanodeUuid();
+
+  /**
    * Gets the client rpc port.
    *
    * @return the client rpc port

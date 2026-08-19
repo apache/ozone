@@ -114,7 +114,12 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
       dnIndexes.put(dn, ecIndex);
       ecIndex++;
     }
-    return createPipelineInternal(replicationConfig, nodes, dnIndexes, storageTier);
+
+    return newPipelineBuilder(replicationConfig, nodes)
+        .setId(PipelineID.randomId())
+        .setReplicaIndexes(dnIndexes)
+        .setSupportedStorageTier(storageTier)
+        .build();
   }
 
   @Override
@@ -141,19 +146,13 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
     dns.sort(Comparator.comparing(nodeStatusMap::get, CREATE_FOR_READ_COMPARATOR));
 
+    // Use insecureRandomId for throwaway read pipeline IDs to avoid
+    // contention on the shared SecureRandom instance.
     // Read Pipelines do not require storage tiers, so the calculation of storage tiers can be omitted.
-    return createPipelineInternal(replicationConfig, dns, map, null);
-  }
-
-  private Pipeline createPipelineInternal(ECReplicationConfig repConfig,
-      List<DatanodeDetails> dns, Map<DatanodeDetails, Integer> indexes, StorageTier storageTier) {
-    return Pipeline.newBuilder()
-        .setId(PipelineID.randomId())
-        .setState(Pipeline.PipelineState.ALLOCATED)
-        .setReplicationConfig(repConfig)
-        .setNodes(dns)
-        .setReplicaIndexes(indexes)
-        .setSupportedStorageTier(storageTier)
+    return newPipelineBuilder(replicationConfig, dns)
+        .setId(PipelineID.insecureRandomId())
+        .setReplicaIndexes(map)
+        .setSupportedStorageTier(null)
         .build();
   }
 

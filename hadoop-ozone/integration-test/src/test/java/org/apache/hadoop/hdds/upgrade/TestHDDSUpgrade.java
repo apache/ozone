@@ -274,9 +274,9 @@ public class TestHDDSUpgrade {
     createTestContainers();
 
     // Test the Pre-Upgrade conditions on SCM as well as DataNodes.
-    TestHddsUpgradeUtils.testPreUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPreUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList());
-    TestHddsUpgradeUtils.testPreUpgradeConditionsDataNodes(
+    HddsUpgradeTestUtils.testPreUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes());
 
     Set<PipelineID> preUpgradeOpenPipelines =
@@ -291,7 +291,7 @@ public class TestHDDSUpgrade {
     assertEquals(STARTING_FINALIZATION, status.status());
 
     // Wait for the Finalization to complete on the SCM.
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(
         cluster.getStorageContainerLocationClient(), "xyz");
 
     Set<PipelineID> postUpgradeOpenPipelines =
@@ -309,19 +309,19 @@ public class TestHDDSUpgrade {
     assertEquals(0, numPreUpgradeOpenPipelines);
 
     // Verify Post-Upgrade conditions on the SCM.
-    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(),
             NUM_CONTAINERS_CREATED, NUM_DATA_NODES);
 
     // All datanodes on the SCM should have moved to HEALTHY-READONLY state.
-    TestHddsUpgradeUtils.testDataNodesStateOnSCM(
+    HddsUpgradeTestUtils.testDataNodesStateOnSCM(
         cluster.getStorageContainerManagersList(), NUM_DATA_NODES,
         HEALTHY_READONLY, HEALTHY);
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
     // In the happy path case, no containers should have been quasi closed as
     // a result of the upgrade.
-    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), NUM_CONTAINERS_CREATED, CLOSED);
 
     // Test that we can use a pipeline after upgrade.
@@ -833,9 +833,9 @@ public class TestHDDSUpgrade {
     createKey();
 
     // Test the Pre-Upgrade conditions on SCM as well as DataNodes.
-    TestHddsUpgradeUtils.testPreUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPreUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList());
-    TestHddsUpgradeUtils.testPreUpgradeConditionsDataNodes(
+    HddsUpgradeTestUtils.testPreUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes());
 
     // Trigger Finalization on the SCM
@@ -865,14 +865,14 @@ public class TestHDDSUpgrade {
 
     // Verify Post-Upgrade conditions on the SCM.
     // With failure injection
-    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), NUM_CONTAINERS_CREATED,
         NUM_DATA_NODES);
 
     // All datanodes on the SCM should have moved to HEALTHY-READONLY state.
     // Due to timing constraint also allow a "HEALTHY" state.
     loadSCMState();
-    TestHddsUpgradeUtils.testDataNodesStateOnSCM(
+    HddsUpgradeTestUtils.testDataNodesStateOnSCM(
         cluster.getStorageContainerManagersList(), NUM_DATA_NODES,
         HEALTHY_READONLY, HEALTHY);
 
@@ -880,7 +880,7 @@ public class TestHDDSUpgrade {
     LambdaTestUtils.await(600000, 500, () -> {
       try {
         loadSCMState();
-        TestHddsUpgradeUtils.testDataNodesStateOnSCM(
+        HddsUpgradeTestUtils.testDataNodesStateOnSCM(
             cluster.getStorageContainerManagersList(), NUM_DATA_NODES,
             HEALTHY, null);
         sleep(100);
@@ -892,7 +892,7 @@ public class TestHDDSUpgrade {
     });
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
-    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
+    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), NUM_CONTAINERS_CREATED);
 
     // Verify that new pipeline can be created with upgraded datanodes.

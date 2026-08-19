@@ -91,7 +91,6 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/keys")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class OMDBInsightEndpoint {
 
   private final ReconOMMetadataManager omMetadataManager;
@@ -1053,8 +1052,7 @@ public class OMDBInsightEndpoint {
       throws IOException {
     boolean skipPrevKey = false;
     String seekKey = paramInfo.getPrevKey();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, ReconBasicOmKeyInfo>> keyIter = table.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, ReconBasicOmKeyInfo>> keyIter = table.iterator()) {
 
       if (!paramInfo.isSkipPrevKeyDone() && isNotBlank(seekKey)) {
         skipPrevKey = true;

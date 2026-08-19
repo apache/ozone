@@ -43,6 +43,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -62,16 +63,16 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.TestNodeUtil;
+import org.apache.hadoop.hdds.scm.node.NodeTestUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -103,6 +104,16 @@ import org.slf4j.event.Level;
 class TestReconAndAdminContainerCLI {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestReconAndAdminContainerCLI.class);
+
+  /** Pause between SCM/Recon checks while waiting for matching reports. */
+  private static final int RM_RECON_COMPARE_POLL_INTERVAL_MS = 1000;
+  /** Max wait (Recon can trail SCM briefly). */
+  private static final int RM_RECON_COMPARE_WAIT_MS = 90_000;
+  /**
+   * Two matches in a row on purpose. A single agreeing poll can be luck while RM and Recon counts
+   * are still drifting past each other (HDDS-15223).
+   */
+  private static final int RM_RECON_COMPARE_STABLE_POLLS = 2;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static ScmClient scmClient;
@@ -166,7 +177,7 @@ class TestReconAndAdminContainerCLI {
     String volumeName = "vol1";
     String bucketName = "bucket1";
 
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(
         client, volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     String keyNameR3 = "key1";
@@ -197,7 +208,7 @@ class TestReconAndAdminContainerCLI {
     for (DatanodeDetails details : pipeline.getNodes()) {
       cluster.shutdownHddsDatanode(details);
     }
-    TestHelper.waitForReplicaCount(containerID, 0, cluster);
+    OzoneTestHelper.waitForReplicaCount(containerID, 0, cluster);
 
     GenericTestUtils.waitFor(() -> {
       try {
@@ -214,7 +225,7 @@ class TestReconAndAdminContainerCLI {
 
     for (DatanodeDetails details : pipeline.getNodes()) {
       cluster.restartHddsDatanode(details, false);
-      TestNodeUtil.waitForDnToReachOpState(scmNodeManager, details, IN_SERVICE);
+      NodeTestUtil.waitForDnToReachOpState(scmNodeManager, details, IN_SERVICE);
     }
   }
 
@@ -243,25 +254,25 @@ class TestReconAndAdminContainerCLI {
     // First node goes offline.
     if (isMaintenance) {
       scmClient.startMaintenanceNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline1)), 0, true);
+          NodeTestUtil.getDNHostAndPort(nodeToGoOffline1)), 0, true);
     } else {
       scmClient.decommissionNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline1)), false);
+          NodeTestUtil.getDNHostAndPort(nodeToGoOffline1)), false);
     }
 
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline1, initialState);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
 
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline1, finalState);
     // Every time a node goes into decommission,
     // a new replica-copy is made to another node.
     // For maintenance, there is no replica-copy in this case.
     if (!isMaintenance) {
-      TestHelper.waitForReplicaCount(containerIdR3, 4, cluster);
+      OzoneTestHelper.waitForReplicaCount(containerIdR3, 4, cluster);
     }
 
     compareRMReportToReconResponse(underReplicatedState);
@@ -270,58 +281,62 @@ class TestReconAndAdminContainerCLI {
     // Second node goes offline.
     if (isMaintenance) {
       scmClient.startMaintenanceNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)), 0, true);
+          NodeTestUtil.getDNHostAndPort(nodeToGoOffline2)), 0, true);
     } else {
       scmClient.decommissionNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)), false);
+          NodeTestUtil.getDNHostAndPort(nodeToGoOffline2)), false);
     }
 
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline2, initialState);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
 
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline2, finalState);
 
     // There will be a replica copy for both maintenance and decommission.
     // maintenance 3 -> 4, decommission 4 -> 5.
     int expectedReplicaNum = isMaintenance ? 4 : 5;
-    TestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
+    OzoneTestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
 
     scmClient.recommissionNodes(Arrays.asList(
-        TestNodeUtil.getDNHostAndPort(nodeToGoOffline1),
-        TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)));
+        NodeTestUtil.getDNHostAndPort(nodeToGoOffline1),
+        NodeTestUtil.getDNHostAndPort(nodeToGoOffline2)));
 
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline1, IN_SERVICE);
-    TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
+    NodeTestUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline2, IN_SERVICE);
 
-    TestNodeUtil.waitForDnToReachPersistedOpState(nodeToGoOffline1, IN_SERVICE);
-    TestNodeUtil.waitForDnToReachPersistedOpState(nodeToGoOffline2, IN_SERVICE);
+    NodeTestUtil.waitForDnToReachPersistedOpState(nodeToGoOffline1, IN_SERVICE);
+    NodeTestUtil.waitForDnToReachPersistedOpState(nodeToGoOffline2, IN_SERVICE);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
   }
 
   /**
-   * The purpose of this method, isn't to validate the numbers
-   * but to make sure that they are consistent between
-   * Recon and the ReplicationManager.
+   * Checks that SCM's replication manager and Recon show the same unhealthy stats
+   * (counts and RM sample IDs in Recon's list). Waits until that lines up for a short
+   * stretch of time so a one-off tick does not hide a real mismatch (HDDS-15223).
    */
   private static void compareRMReportToReconResponse(UnHealthyContainerStates containerState)
       throws Exception {
     assertNotNull(containerState);
 
-    // Both threads are running every 1 second.
-    // Wait until all values are equal.
-    GenericTestUtils.waitFor(() -> assertReportsMatch(containerState),
-        1000, 90000);
+    AtomicInteger stablePolls = new AtomicInteger(0);
+    GenericTestUtils.waitFor(() -> {
+      if (assertReportsMatch(containerState)) {
+        return stablePolls.incrementAndGet() >= RM_RECON_COMPARE_STABLE_POLLS;
+      }
+      stablePolls.set(0);
+      return false;
+    }, RM_RECON_COMPARE_POLL_INTERVAL_MS, RM_RECON_COMPARE_WAIT_MS);
   }
 
   private static boolean assertReportsMatch(UnHealthyContainerStates state) {
@@ -330,7 +345,7 @@ class TestReconAndAdminContainerCLI {
 
     try {
       rmReport = scmClient.getReplicationManagerReport();
-      reconResponse = TestReconEndpointUtil
+      reconResponse = ReconEndpointTestUtil
           .getUnhealthyContainersFromRecon(CONF, state);
 
       assertEquals(rmReport.getStat(ContainerHealthState.MISSING), reconResponse.getMissingCount());
@@ -367,7 +382,7 @@ class TestReconAndAdminContainerCLI {
     List<ContainerID> rmContainerIDs = rmReport.getSample(rmState);
     List<Long> rmIDsToLong = new ArrayList<>();
     for (ContainerID id : rmContainerIDs) {
-      rmIDsToLong.add(id.getId());
+      rmIDsToLong.add(id.getIdForTesting());
     }
     List<Long> reconContainerIDs =
         reconResponse.getContainers()
@@ -385,7 +400,7 @@ class TestReconAndAdminContainerCLI {
         RatisReplicationConfig.getInstance(replicationFactor));
 
     // Sync Recon with OM, to force it to get the new key entries.
-    TestReconEndpointUtil.triggerReconDbSyncWithOm(CONF);
+    ReconEndpointTestUtil.triggerReconDbSyncWithOm(CONF);
 
     List<Long> containerIDs = getContainerIdsForKey(omKeyInfo);
     // The list has only 1 containerID.
@@ -417,7 +432,7 @@ class TestReconAndAdminContainerCLI {
       ReplicationConfig replicationConfig)
       throws IOException {
     byte[] textBytes = "Testing".getBytes(UTF_8);
-    TestDataUtil.createKey(ozoneBucket, keyName, replicationConfig, textBytes);
+    DataTestUtil.createKey(ozoneBucket, keyName, replicationConfig, textBytes);
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
                             .setVolumeName(ozoneBucket.getVolumeName())

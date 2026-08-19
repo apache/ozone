@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.client.StorageTierUtil;
@@ -75,28 +76,17 @@ public class SimplePipelineProvider
     }
 
     Collections.shuffle(dns);
-    List<StorageTier> storageTiers = NodeUtils.getDatanodesStorageTypes(dns, getNodeManager());
-    if (!storageTiers.contains(storageTier)) {
-      throw new SCMException(String.format("Cannot create pipeline for StorageTier %s replicationConfig: %s",
-          storageTier, replicationConfig), SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
-    }
-    return Pipeline.newBuilder()
+    return newPipelineBuilder(replicationConfig,
+        dns.subList(0, replicationConfig.getReplicationFactor().getNumber()))
         .setId(PipelineID.randomId())
-        .setState(PipelineState.OPEN)
-        .setReplicationConfig(replicationConfig)
-        .setNodes(dns.subList(0,
-            replicationConfig.getReplicationFactor().getNumber()))
         .setSupportedStorageTier(storageTier)
         .build();
   }
 
   private Pipeline createPipelineInternal(StandaloneReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes, StorageTier storageTier) {
-    return Pipeline.newBuilder()
+    return newPipelineBuilder(replicationConfig, nodes)
         .setId(PipelineID.randomId())
-        .setState(PipelineState.OPEN)
-        .setReplicationConfig(replicationConfig)
-        .setNodes(nodes)
         .setSupportedStorageTier(storageTier)
         .build();
   }
@@ -117,11 +107,13 @@ public class SimplePipelineProvider
   @Override
   public Pipeline createForRead(StandaloneReplicationConfig replicationConfig,
       Set<ContainerReplica> replicas) {
+    // Use insecureRandomId for throwaway read pipeline IDs to avoid
+    // contention on the shared SecureRandom instance.
     // Read Pipelines do not require storage tiers, so the calculation of storage tiers can be omitted.
-    return createPipelineInternal(replicationConfig, replicas
-        .stream()
-        .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList()), null);
+    return newPipelineBuilder(replicationConfig, ContainerReplica.toDatanodeDetailsList(replicas))
+        .setId(PipelineID.insecureRandomId())
+        .setSupportedStorageTier(null)
+        .build();
   }
 
   @Override
@@ -129,4 +121,9 @@ public class SimplePipelineProvider
 
   }
 
+  @Override
+  protected Pipeline.Builder newPipelineBuilder(ReplicationConfig replicationConfig, List<DatanodeDetails> nodes) {
+    return super.newPipelineBuilder(replicationConfig, nodes)
+        .setState(PipelineState.OPEN);
+  }
 }

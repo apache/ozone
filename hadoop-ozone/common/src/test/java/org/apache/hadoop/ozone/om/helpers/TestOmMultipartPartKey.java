@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -127,20 +128,27 @@ public class TestOmMultipartPartKey {
 
   @Test
   public void testDecodeRejectsInvalidKeyWithoutSeparator() {
-    assertThrows(IllegalArgumentException.class,
+    assertThrows(CodecException.class,
         () -> codec.fromPersistedFormat("invalid".getBytes(UTF_8)));
   }
 
   @Test
+  public void testDecodeRejectsMalformedUtf8UploadId() {
+    byte[] malformed = new byte[] {(byte) 0xC3, (byte) '/', 0, 0, 0, 1};
+    assertThrows(CodecException.class,
+        () -> codec.fromPersistedFormat(malformed));
+  }
+
+  @Test
   public void testDecodeRejectsEmptyKey() {
-    assertThrows(IllegalArgumentException.class,
+    assertThrows(CodecException.class,
         () -> codec.fromPersistedFormat(new byte[0]));
   }
 
   @Test
   public void testCodecBufferDecodeRejectsInvalidKeyWithoutSeparator() {
     try (CodecBuffer buffer = CodecBuffer.wrap("invalid".getBytes(UTF_8))) {
-      assertThrows(IllegalArgumentException.class,
+      assertThrows(CodecException.class,
           () -> codec.fromCodecBuffer(buffer));
     }
   }
@@ -148,7 +156,7 @@ public class TestOmMultipartPartKey {
   @Test
   public void testCodecBufferDecodeRejectsEmptyKey() {
     try (CodecBuffer buffer = CodecBuffer.wrap(new byte[0])) {
-      assertThrows(IllegalArgumentException.class,
+      assertThrows(CodecException.class,
           () -> codec.fromCodecBuffer(buffer));
     }
   }
@@ -156,7 +164,7 @@ public class TestOmMultipartPartKey {
   @Test
   public void testDecodeRejectsMalformedKeyWithMiddleSeparatorOnly() {
     byte[] malformed = "up/xx".getBytes(UTF_8);
-    assertThrows(IllegalArgumentException.class,
+    assertThrows(CodecException.class,
         () -> codec.fromPersistedFormat(malformed));
   }
 
@@ -200,5 +208,16 @@ public class TestOmMultipartPartKey {
     OmMultipartPartKey decoded = codec.fromPersistedFormat(raw);
     assertEquals("upload/with/slashes", decoded.getUploadId());
     assertEquals(5, decoded.getPartNumber().intValue());
+  }
+
+  @Test
+  public void testEncodeRejectsMalformedUploadId() {
+    OmMultipartPartKey key = OmMultipartPartKey.of("bad-\uD800", 1);
+
+    assertThrows(CodecException.class,
+        () -> codec.toPersistedFormat(key));
+
+    assertThrows(CodecException.class,
+        () -> codec.toHeapCodecBuffer(key));
   }
 }
