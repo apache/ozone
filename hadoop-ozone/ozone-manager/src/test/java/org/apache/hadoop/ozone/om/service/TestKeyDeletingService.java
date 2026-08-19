@@ -345,29 +345,30 @@ class TestKeyDeletingService extends OzoneTestBase {
       final String keyName = uniqueObjectName("key");
       final long initialDeletedCount = getDeletedKeyCount();
 
-      // Versioning keeps both committed versions on the key, so the delete entry spans two version groups.
+      // Create Volume and Bucket with versioning enabled
       createVolumeAndBucket(volumeName, bucketName, true);
 
       keyDeletingService.suspend();
-      OmKeyArgs keyArgs = createAndCommitKey(volumeName, bucketName, keyName, 1);
-      createAndCommitKey(volumeName, bucketName, keyName, 3);
-      writeClient.deleteKey(keyArgs);
+
+      // Create 2 versions of the same key, so the delete entry spans two version groups
+      OmKeyArgs firstVersion = createAndCommitKey(volumeName, bucketName, keyName, 1);
+      OmKeyArgs secondVersion = createAndCommitKey(volumeName, bucketName, keyName, 3);
+      writeClient.deleteKey(firstVersion);
       // The delete has to reach RocksDB before getPendingDeletionKeys() can see it.
       om.awaitDoubleBufferFlush();
 
+      // Both versions are queued for deletion, so the purged bytes must account for both.
+      long expectedPurgedBytes =
+          QuotaUtil.getReplicatedSize(firstVersion.getDataSize(), firstVersion.getReplicationConfig())
+              + QuotaUtil.getReplicatedSize(secondVersion.getDataSize(), secondVersion.getReplicationConfig());
+
       Map<String, PurgedKey> purgedKeys =
           keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE).getPurgedKeys();
-      assertThat(purgedKeys).isNotEmpty();
-
-      for (PurgedKey purgedKey : purgedKeys.values()) {
-        assertEquals(4, purgedKey.getBlockGroup().getDeletedBlocks().size(),
-            "both committed versions must be queued for deletion");
-        long blockSum = purgedKey.getBlockGroup().getDeletedBlocks().stream()
-            .mapToLong(DeletedBlock::getReplicatedSize)
-            .sum();
-        assertEquals(blockSum, purgedKey.getPurgedBytes(),
-            "purged bytes must cover exactly the blocks queued for deletion");
-      }
+      assertThat(purgedKeys).hasSize(1);
+      PurgedKey purgedKey = purgedKeys.values().iterator().next();
+      assertEquals(4, purgedKey.getBlockGroup().getDeletedBlocks().size(),
+          "the 1st version has 1 block and the 2nd version has 3");
+      assertEquals(expectedPurgedBytes, purgedKey.getPurgedBytes());
 
       // Drain the key so it does not remain pending for the next test.
       keyDeletingService.resume();
