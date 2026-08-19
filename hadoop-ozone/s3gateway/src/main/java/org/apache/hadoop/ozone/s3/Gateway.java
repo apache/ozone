@@ -46,6 +46,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 import picocli.CommandLine.Command;
 
 /**
@@ -69,9 +70,16 @@ public class Gateway extends GenericCli implements Callable<Void> {
   private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
 
   public static void main(String[] args) throws Exception {
+    redirectJulToSlf4j();
     OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
             new OzoneConfiguration());
     new Gateway().run(args);
+  }
+
+  @VisibleForTesting
+  static void redirectJulToSlf4j() {
+    SLF4JBridgeHandler.removeHandlersForRootLogger();
+    SLF4JBridgeHandler.install();
   }
 
   @Override

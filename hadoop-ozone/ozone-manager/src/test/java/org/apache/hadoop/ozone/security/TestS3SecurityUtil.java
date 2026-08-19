@@ -41,6 +41,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.AWSV4AuthValidator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;

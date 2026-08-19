@@ -1518,6 +1518,111 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     return omKeyInfo;
   }
 
+  @Test
+  public void testCreateKeyWithS3DerivedKey() throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(true, true));
+    when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+    byte[] expectedDerivedKey = new byte[] {9, 8, 7, 6};
+    when(ozoneManager.getS3DerivedKey(anyString(), anyString())).thenReturn(expectedDerivedKey);
+
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
+        .setType(replicationConfig.getReplicationType())
+        .setLatestVersionLocation(true)
+        .setDataSize(100L);
+
+    OzoneManagerProtocolProtos.S3Authentication s3Authentication =
+        OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+            .setAccessId("testAccessId")
+            .setSignature("testSignature")
+            .setStringToSign("testStringToSign")
+            .build();
+
+    CreateKeyRequest createKeyRequest = CreateKeyRequest.newBuilder()
+        .setKeyArgs(keyArgs)
+        .setDerivedKeyPiggyBacking(true)
+        .build();
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateKeyRequest(createKeyRequest)
+        .setS3Authentication(s3Authentication)
+        .build();
+
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OMRequest modifiedOmRequest = omKeyCreateRequest.preExecute(ozoneManager);
+    omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OK, response.getOMResponse().getStatus());
+    OzoneManagerProtocolProtos.CreateKeyResponse createKeyResponse =
+        response.getOMResponse().getCreateKeyResponse();
+    assertNotNull(createKeyResponse);
+    assertTrue(createKeyResponse.hasDerivedKey());
+    assertEquals(com.google.protobuf.ByteString.copyFrom(expectedDerivedKey), createKeyResponse.getDerivedKey());
+  }
+
+  @Test
+  public void testCreateKeyWithoutS3DerivedKey() throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(true, true));
+    when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
+        .setType(replicationConfig.getReplicationType())
+        .setLatestVersionLocation(true)
+        .setDataSize(100L);
+
+    OzoneManagerProtocolProtos.S3Authentication s3Authentication =
+        OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+            .setAccessId("testAccessId")
+            .setSignature("testSignature")
+            .setStringToSign("testStringToSign")
+            .build();
+
+    CreateKeyRequest createKeyRequest = CreateKeyRequest.newBuilder()
+        .setKeyArgs(keyArgs)
+        .setDerivedKeyPiggyBacking(false)
+        .build();
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateKeyRequest(createKeyRequest)
+        .setS3Authentication(s3Authentication)
+        .build();
+
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OMRequest modifiedOmRequest = omKeyCreateRequest.preExecute(ozoneManager);
+    omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OK, response.getOMResponse().getStatus());
+    OzoneManagerProtocolProtos.CreateKeyResponse createKeyResponse =
+        response.getOMResponse().getCreateKeyResponse();
+    assertNotNull(createKeyResponse);
+    assertFalse(createKeyResponse.hasDerivedKey());
+  }
+
   protected long checkIntermediatePaths(Path keyPath) throws Exception {
     // Check intermediate paths are created
     keyPath = keyPath.getParent();

@@ -368,6 +368,48 @@ public class TestOMMetadataReader {
   }
 
   @Test
+  public void testListStatusLightUsesListPrefixForAclWhenKeyNameIsAncestorOfListPrefix() throws Exception {
+    setupStsS3Request();
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final KeyManager keyManager = createListStatusKeyManagerReturningEmpty();
+
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, keyManager);
+    final OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName("user")
+        .setListPrefix("user/foo")
+        .build();
+
+    omMetadataReader.listStatusLight(args, false, "", MAX_KEYS, false);
+
+    final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
+    assertContainsVolumeReadCheck(checks);
+    assertContainsKeyReadCheckWithName(checks, "user/foo");
+  }
+
+  @Test
+  public void testListStatusLightThrowsWhenStsKeyNameNotUnderListPrefix() throws Exception {
+    setupStsS3Request();
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final KeyManager keyManager = createListStatusKeyManagerReturningEmpty();
+
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, keyManager);
+    final OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName(KEY_PREFIX)
+        .setListPrefix("other/")
+        .build();
+
+    final OMException ex = assertThrows(
+        OMException.class, () -> omMetadataReader.listStatusLight(args, false, "", MAX_KEYS, false));
+    assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
+  }
+
+  @Test
   public void testGetFileStatusUsesReadAclForStsS3Request() throws Exception {
     setupStsS3Request();
 

@@ -39,6 +39,7 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
   private final ByteBufferStreamOutput byteBufferStreamOutput;
   private boolean enableHsync;
   private final Syncable syncable;
+  private ByteBuffer derivedKey;
 
   /**
    * Constructs an instance with a {@link Syncable} {@link OutputStream}.
@@ -203,4 +204,11 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
     return ((KeyMetadataAware)this.byteBufferStreamOutput).getMetadata();
   }
 
+  public ByteBuffer getDerivedKey() {
+    return derivedKey;
+  }
+
+  public void setDerivedKey(ByteBuffer derivedKey) {
+    this.derivedKey = derivedKey;
+  }
 }

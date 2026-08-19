@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.om.AWSV4AuthValidator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -126,7 +127,7 @@ public final class S3SecurityUtil {
   /**
    * Construct and return {@link OzoneTokenIdentifier} from {@link OMRequest}.
    */
-  private static OzoneTokenIdentifier constructS3Token(OMRequest omRequest) {
+  public static OzoneTokenIdentifier constructS3Token(OMRequest omRequest) {
     S3Authentication auth = omRequest.getS3Authentication();
     OzoneTokenIdentifier s3Token = new OzoneTokenIdentifier();
     s3Token.setTokenType(S3AUTHINFO);

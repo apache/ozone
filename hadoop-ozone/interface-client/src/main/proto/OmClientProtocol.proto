@@ -1376,6 +1376,7 @@ message CreateKeyRequest {
     // Set in OM HA during preExecute step. This way all OM's use same ID in
     // OM HA.
     optional uint64 clientID = 2;
+    optional bool derivedKeyPiggyBacking = 3;
 }
 
 message CreateKeyResponse {
@@ -1384,6 +1385,7 @@ message CreateKeyResponse {
     // (similar to a cookie).
     optional uint64 ID = 3;
     optional uint64 openVersion = 4;
+    optional bytes derivedKey = 5;
 }
 
 message LookupKeyRequest {

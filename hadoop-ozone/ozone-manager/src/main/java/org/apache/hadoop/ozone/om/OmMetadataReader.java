@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -127,14 +128,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
-    OmKeyArgs resolvedArgs = bucket.update(args);
+    OmKeyArgs resolvedArgs = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getLookupAclCheckLatencyNs(),
             () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
                 ACLType.READ, bucket,
-                args.getKeyName())
+                resolvedArgs.getKeyName())
         );
       }
       metrics.incNumKeyLookups();
@@ -180,14 +181,15 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         () -> ozoneManager.resolveBucketLink(resolvedVolumeArgs));
 
     boolean auditSuccess = true;
-    OmKeyArgs resolvedArgs = bucket.update(resolvedVolumeArgs);
+    OmKeyArgs resolvedArgs =
+        normalizeKeyArgs(bucket.update(resolvedVolumeArgs), bucket);
 
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
             checkAcls(ResourceType.KEY,
                 StoreType.OZONE, ACLType.READ,
-                bucket, args.getKeyName())
+                bucket, resolvedArgs.getKeyName())
         );
       }
 
@@ -238,32 +240,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        if (isStsS3Request()) {
-          // When listPrefix is set (original S3 ListObjects prefix), authorize READ on that prefix for the whole
-          // listing, including FSO traversal where keyName is an internal directory (e.g. userA) under prefix user.
-          final String listPrefix = args.getListPrefix();
-          final String keyName = args.getKeyName();
-          final String aclKey;
-          if (StringUtils.isNotBlank(listPrefix)) {
-            if (StringUtils.isBlank(keyName)) {
-              aclKey = listPrefix;
-            } else if (isStsListPathUnderRequestPrefix(keyName, listPrefix)) {
-              aclKey = listPrefix;
-            } else {
-              throw new OMException(
-                  "STS listStatus: key path: " + keyName + " does not match authorized list prefix: " + listPrefix,
-                  ResultCodes.PERMISSION_DENIED);
-            }
-          } else if (keyName != null && !keyName.isEmpty()) {
-            aclKey = keyName;
-          } else {
-            aclKey = "*";
-          }
-          checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket.realVolume(), bucket.realBucket(), aclKey);
-        } else {
-          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-              bucket, args.getKeyName());
-        }
+        checkListStatusAcls(args, bucket);
       }
       metrics.incNumListStatus();
       return keyManager.listStatus(args, recursive, startKey,
@@ -299,8 +276,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(getResourceType(resolvedArgs), StoreType.OZONE, ACLType.READ,
-            bucket, resolvedArgs.getKeyName());
+        checkListStatusAcls(resolvedArgs, bucket);
       }
       metrics.incNumListStatus();
       List<OzoneFileStatus> ozoneFileStatuses = keyManager.listStatus(
@@ -357,7 +333,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
-    args = bucket.update(args);
+    args = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
       if (isAclEnabled) {
@@ -512,14 +488,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
-    OmKeyArgs resolvedArgs = bucket.update(args);
+    OmKeyArgs resolvedArgs = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getGetObjectTaggingAclCheckLatencyNs(),
             () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
                 ACLType.READ, bucket,
-                args.getKeyName())
+                resolvedArgs.getKeyName())
         );
       }
       metrics.incNumGetObjectTagging();
@@ -576,6 +552,32 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       }
       perfMetrics.addGetBucketTaggingLatencyNs(Time.monotonicNowNanos() - start);
     }
+  }
+
+  /**
+   * Normalize the key name on the read args up front, so the ACL check and the
+   * key read resolve the SAME key. The read path
+   * ({@link KeyManagerImpl#readKeyInfo}) normalizes '.'/'..' path segments before
+   * the DB lookup for layouts that use filesystem semantics (FSO, and LEGACY when
+   * {@code ozone.om.enable.filesystem.paths} is set). If the ACL check instead ran
+   * on the raw name, a request such as {@code a/../k1} would be evaluated against a
+   * different (literal) path than the normalized key {@code k1} that the read
+   * actually serves. Normalizing here keeps the check and the read in agreement for
+   * every authorizer (native and Ranger). Layouts that do not normalize (OBJECT_STORE)
+   * are returned unchanged.
+   */
+  private OmKeyArgs normalizeKeyArgs(OmKeyArgs args, ResolvedBucket bucket)
+      throws OMException {
+    String keyName = args.getKeyName();
+    if (keyName == null || keyName.isEmpty() || bucket.bucketLayout() == null) {
+      return args;
+    }
+    String normalized = OMClientRequest.validateAndNormalizeKey(
+        ozoneManager.getEnableFileSystemPaths(), keyName, bucket.bucketLayout());
+    if (normalized.equals(keyName)) {
+      return args;
+    }
+    return args.toBuilder().setKeyName(normalized).build();
   }
 
   /**
@@ -813,6 +815,36 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
   private boolean isStsS3Request() {
     return getS3Auth() != null && OzoneManager.getStsTokenIdentifier() != null;
+  }
+
+  private void checkListStatusAcls(OmKeyArgs args, ResolvedBucket bucket) throws IOException {
+    if (isStsS3Request()) {
+      checkAcls(
+          ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket.realVolume(), bucket.realBucket(),
+          getStsListStatusAclKey(args));
+      return;
+    }
+
+    checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
+  }
+
+  private static String getStsListStatusAclKey(OmKeyArgs args) throws OMException {
+    // When listPrefix is set (original S3 ListObjects prefix), authorize READ on that prefix for the whole listing,
+    // including FSO traversal where keyName is an internal directory (e.g. userA) under prefix user.
+    final String listPrefix = args.getListPrefix();
+    final String keyName = args.getKeyName();
+    if (StringUtils.isNotBlank(listPrefix)) {
+      if (StringUtils.isBlank(keyName) || isStsListPathUnderRequestPrefix(keyName, listPrefix)) {
+        return listPrefix;
+      }
+      throw new OMException(
+          "STS listStatus: key path: " + keyName + " does not match authorized list prefix: " + listPrefix,
+          ResultCodes.PERMISSION_DENIED);
+    }
+    if (StringUtils.isNotEmpty(keyName)) {
+      return keyName;
+    }
+    return "*";
   }
 
   /**
