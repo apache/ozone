@@ -993,15 +993,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
-      getBucketIterator() {
-    return bucketTable.cacheIterator();
-  }
-
-  @Override
   public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
       getVolumeIterator() {
     return volumeTable.cacheIterator();
+  }
+
+  @Override
+  public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
+      getBucketIterator() {
+    return bucketTable.cacheIterator();
   }
 
   @Override

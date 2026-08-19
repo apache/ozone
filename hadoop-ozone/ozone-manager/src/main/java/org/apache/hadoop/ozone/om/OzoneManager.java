@@ -508,8 +508,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
-  private final BucketUtilizationMetrics bucketUtilizationMetrics;
   private final VolumeUtilizationMetrics volumeUtilizationMetrics;
+  private final BucketUtilizationMetrics bucketUtilizationMetrics;
 
   private boolean fsSnapshotEnabled;
 
