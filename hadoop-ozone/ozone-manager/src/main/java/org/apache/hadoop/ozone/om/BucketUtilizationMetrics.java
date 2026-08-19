@@ -37,8 +37,10 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
  * Available metrics:
  * <ul>
  *   <li>Bytes used in bucket.
- *   <li>Bucket quota in bytes.
- *   <li>Bucket quota in namespace.
+ *   <li>Bucket quota bytes held in snapshots.
+ *   <li>Bucket quota in bytes. If bucket quota is not set then this metric shows -1 as value.
+ *   <li>Bucket quota in namespace. If bucket quota is not set then this metric shows -1 as value.
+ *   <li>Bucket used namespace (number of keys/directories in bucket).
  *   <li>Bucket available space. Calculated from difference between used bytes in bucket and bucket quota.
  *   If bucket quota is not set then this metric shows -1 as value.
  * </ul>

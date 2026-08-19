@@ -55,8 +55,8 @@ public class TestBucketUtilizationMetrics {
   private static final long QUOTA_IN_BYTES_2 = QUOTA_RESET;
   private static final long QUOTA_IN_NAMESPACE_1 = 1;
   private static final long QUOTA_IN_NAMESPACE_2 = 2;
-  private static final long USED_NAMESPACE_1 = 5;
-  private static final long USED_NAMESPACE_2 = 3;
+  private static final long USED_NAMESPACE_1 = 3;
+  private static final long USED_NAMESPACE_2 = 4;
 
   @Test
   void testBucketUtilizationMetrics() {

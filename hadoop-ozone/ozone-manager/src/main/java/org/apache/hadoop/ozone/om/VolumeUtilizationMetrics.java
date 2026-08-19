@@ -33,11 +33,14 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 
 /**
  * A class for collecting and reporting volume utilization metrics.
+ * <p>
  * Available metrics:
- *   Volume quota in bytes.
- *   Volume quota in namespace (maximum number of buckets).
- *   Volume used namespace (current number of buckets).
- *
+ * <ul>
+ *   <li>Volume quota in bytes. If volume quota is not set then this metric shows -1 as value.
+ *   <li>Volume quota in namespace (maximum number of buckets). If volume quota is not set then this
+ *   metric shows -1 as value.
+ *   <li>Volume used namespace (current number of buckets).
+ * </ul>
  */
 @InterfaceAudience.Private
 @Metrics(about = "Ozone Volume Utilization Metrics", context = OzoneConsts.OZONE)

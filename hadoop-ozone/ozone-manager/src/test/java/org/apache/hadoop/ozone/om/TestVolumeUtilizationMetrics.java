@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.VolumeUtilizationMetrics.VolumeMetricsInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.junit.jupiter.api.Test;
@@ -45,12 +44,12 @@ public class TestVolumeUtilizationMetrics {
 
   private static final String VOLUME_NAME_1 = "volume1";
   private static final String VOLUME_NAME_2 = "volume2";
-  private static final long QUOTA_IN_BYTES_1 = OzoneConsts.TB;
+  private static final long QUOTA_IN_BYTES_1 = 1;
   private static final long QUOTA_IN_BYTES_2 = -1;
-  private static final long QUOTA_IN_NAMESPACE_1 = 10;
+  private static final long QUOTA_IN_NAMESPACE_1 = 2;
   private static final long QUOTA_IN_NAMESPACE_2 = -1;
-  private static final long USED_NAMESPACE_1 = 4;
-  private static final long USED_NAMESPACE_2 = 0;
+  private static final long USED_NAMESPACE_1 = 3;
+  private static final long USED_NAMESPACE_2 = 4;
 
   @Test
   void testVolumeUtilizationMetrics() {
