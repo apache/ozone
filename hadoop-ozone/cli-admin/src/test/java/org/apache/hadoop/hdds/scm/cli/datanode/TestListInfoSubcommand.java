@@ -40,13 +40,20 @@ import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import picocli.CommandLine;
 
 /**
@@ -457,6 +464,54 @@ public class TestListInfoSubcommand {
         assertTrue(ratio1 >= ratio2, "Expected descending order, got: " + ratio1 + " < " + ratio2);
       }
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = StorageTier.class, names = {"EMPTY"}, mode = EnumSource.Mode.EXCLUDE)
+  public void testRelatedPipelineShowsStorageTier(StorageTier tier) throws Exception {
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    HddsProtos.Node node = nodes.get(0);
+
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.queryNode(any(), any(), any(), any())).thenReturn(nodes);
+    when(scmClient.listPipelines()).thenReturn(
+        Collections.singletonList(pipelineContaining(node, tier)));
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs();
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("/[" + tier.getTierName() + "]");
+  }
+
+  @Test
+  public void testRelatedPipelineOmitsTierWhenNull() throws Exception {
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    HddsProtos.Node node = nodes.get(0);
+
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.queryNode(any(), any(), any(), any())).thenReturn(nodes);
+    when(scmClient.listPipelines()).thenReturn(
+        Collections.singletonList(pipelineContaining(node, null)));
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs();
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("/[]").doesNotContain("null");
+  }
+
+  private Pipeline pipelineContaining(HddsProtos.Node node, StorageTier tier) {
+    DatanodeDetails dn = DatanodeDetails.getFromProtoBuf(node.getNodeID());
+    return Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(Pipeline.PipelineState.OPEN)
+        .setNodes(Collections.singletonList(dn))
+        .setSupportedStorageTier(tier)
+        .build();
   }
 
   private List<HddsProtos.Node> getNodeDetails() {
