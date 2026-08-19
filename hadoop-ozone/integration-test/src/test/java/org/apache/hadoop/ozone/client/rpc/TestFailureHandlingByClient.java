@@ -22,6 +22,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NO
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -253,12 +254,7 @@ public class TestFailureHandlingByClient {
     List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations()
         .getLocationList();
     long containerId1 = locationList.get(0).getContainerID();
-    List<DatanodeDetails> block1DNs = locationList.get(0).getPipeline()
-        .getNodes();
     long containerId2 = locationList.get(1).getContainerID();
-    List<DatanodeDetails> block2DNs = locationList.get(1).getPipeline()
-        .getNodes();
-
 
     int block2ExpectedChunkCount;
     if (locationList.get(0).getLength() == 2L * chunkSize) {
@@ -276,9 +272,7 @@ public class TestFailureHandlingByClient {
     // the pipeline would be closed before the last 0.5 chunk was committed
     // to the block.
     KeyValueContainerData containerData1 =
-        ((KeyValueContainer) cluster.getHddsDatanode(block1DNs.get(2))
-            .getDatanodeStateMachine().getContainer().getContainerSet()
-            .getContainer(containerId1)).getContainerData();
+        ((KeyValueContainer) getContainerByID(cluster, containerId1)).getContainerData();
     try (DBHandle containerDb1 = BlockUtils.getDB(containerData1, conf)) {
       BlockData blockData1 = containerDb1.getStore().getBlockDataTable().get(
           containerData1.getBlockKey(locationList.get(0).getBlockID()
@@ -292,9 +286,7 @@ public class TestFailureHandlingByClient {
 
     // Verify that the second block has the remaining 0.5*chunkSize of data
     KeyValueContainerData containerData2 =
-        ((KeyValueContainer) cluster.getHddsDatanode(block2DNs.get(0))
-            .getDatanodeStateMachine().getContainer().getContainerSet()
-            .getContainer(containerId2)).getContainerData();
+        ((KeyValueContainer) getContainerByID(cluster, containerId2)).getContainerData();
     try (DBHandle containerDb2 = BlockUtils.getDB(containerData2, conf)) {
       BlockData blockData2 = containerDb2.getStore().getBlockDataTable().get(
           containerData2.getBlockKey(locationList.get(1).getBlockID()
