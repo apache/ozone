@@ -618,7 +618,9 @@ public class QuotaRepairTask {
           kvList = new ArrayList<>(BATCH_SIZE);
         }
       }
-      putBatch(q, kvList, tasks);
+      if (!kvList.isEmpty()) {
+        putBatch(q, kvList, tasks);
+      }
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       failure = ex;
