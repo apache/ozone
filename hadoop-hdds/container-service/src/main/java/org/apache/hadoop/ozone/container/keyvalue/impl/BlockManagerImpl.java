@@ -215,10 +215,17 @@ public class BlockManagerImpl implements BlockManager {
         return data.getSize();
       }
 
-      // Check if the block is present in the pendingPutBlockCache for the
-      // container to determine whether the blockCount is already incremented
-      // for this block in the DB or not.
       long localID = data.getLocalID();
+
+      // PutBlock is not idempotent; ignore duplicate eof writes (HDDS-12007).
+      if (container.isBlockFinalizedByEof(localID)) {
+        LOG.warn("Ignoring write on block {} which has already been finalized "
+            + "by a PutBlock with the end-of-block flag set. PutBlock is not "
+            + "idempotent",
+            data.getBlockID());
+        return data.getSize();
+      }
+
       // For the PutBlock that is endOfBlock and meanwhile bscId = 0, it means
       // this PutBlock comes from data stream close without going through the
       // Raft, thus there is no log index. In this case, we should not let
@@ -233,6 +240,10 @@ public class BlockManagerImpl implements BlockManager {
           data.setBlockCommitSequenceId(bcsId);
         }
       }
+
+      // Check if the block is present in the pendingPutBlockCache for the
+      // container to determine whether the blockCount is already incremented
+      // for this block in the DB or not.
       boolean isBlockInCache = container.isBlockInPendingPutBlockCache(localID);
       boolean incrBlockCount = false;
 
@@ -302,6 +313,13 @@ public class BlockManagerImpl implements BlockManager {
         // Remove the block from the PendingPutBlockCache as there would not
         // be any more writes to this block
         container.removeFromPendingPutBlockCache(localID);
+      }
+
+      // Track the block as finalized so that any subsequent write on it can be
+      // detected and ignored, since PutBlock is not idempotent. Only OPEN and
+      // CLOSING containers maintain eofBlockCache.
+      if (endOfBlock && (containerData.isOpen() || containerData.isClosing())) {
+        container.addToEofBlockCache(localID);
       }
 
       if (LOG.isDebugEnabled()) {

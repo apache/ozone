@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
@@ -467,5 +469,65 @@ public class TestBlockManagerImpl {
       assertEquals(chunkLimit, chunkInfos.get(i).getLen());
       assertEquals(chunkLimit * i, chunkInfos.get(i).getOffset());
     }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPutBlockAfterEndOfBlockIgnored(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    initTest(versionInfo);
+    // Finalize the block with an end-of-block PutBlock.
+    blockManager.putBlock(keyValueContainer, blockData, true);
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
+    long finalizedSize = blockManager.getBlock(keyValueContainer,
+        blockData.getBlockID()).getSize();
+
+    // A subsequent PutBlock on the same block is ignored (no exception),
+    // since PutBlock is not idempotent and the block is already finalized.
+    // Uses different content to verify that the finalized block is not overwritten.
+    BlockData duplicate = new BlockData(blockData.getBlockID());
+    List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
+    chunkList.add(new ChunkInfo("data", 0, 4096).getProtoBufMessage());
+    duplicate.setChunks(chunkList);
+    LogCapturer logCapturer = LogCapturer.captureLogs(BlockManagerImpl.class);
+    blockManager.putBlock(keyValueContainer, duplicate, true);
+
+    // A warning is logged when the write is ignored.
+    assertThat(logCapturer.getOutput()).contains("has already been finalized");
+
+    // Block count is unchanged and the finalized block data is untouched.
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
+    assertEquals(finalizedSize, blockManager.getBlock(keyValueContainer,
+        blockData.getBlockID()).getSize());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testWriteAfterEndOfBlockIgnoredIncremental(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    initTest(versionInfo);
+    Assumptions.assumeFalse(
+        isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));
+    long containerID = 1;
+    long blockNo = 2;
+    // incremental write, block not yet finalized
+    BlockData first = createBlockData(containerID, blockNo, 1, 0, 1024, 1);
+    blockManager.putBlock(keyValueContainer, first, false);
+    // end-of-block PutBlock finalizes the block
+    BlockData eof = createBlockData(containerID, blockNo, 1, 0, 2048, 2);
+    blockManager.putBlock(keyValueContainer, eof, true);
+    BlockData finalized = blockManager.getBlock(keyValueContainer,
+        new BlockID(containerID, blockNo));
+    long finalizedSize = finalized.getSize();
+    long finalizedBcsId = finalized.getBlockCommitSequenceId();
+
+    // A further write on the same block (with a higher bcsId) is ignored,
+    // leaving the finalized block untouched.
+    BlockData afterEof = createBlockData(containerID, blockNo, 1, 0, 3072, 3);
+    blockManager.putBlock(keyValueContainer, afterEof, true);
+
+    BlockData afterIgnore = blockManager.getBlock(keyValueContainer,
+        new BlockID(containerID, blockNo));
+    assertEquals(finalizedSize, afterIgnore.getSize());
+    assertEquals(finalizedBcsId, afterIgnore.getBlockCommitSequenceId());
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
   }
 }
