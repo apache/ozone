@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS;
@@ -275,6 +276,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       keyLifecycleService.setOzoneTrash(null);
       keyLifecycleService.setMoveToTrashEnabled(true);
       KeyLifecycleService.setInjectors(null);
+      keyLifecycleService.setListMaxSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
+          OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
     }
 
     @AfterAll
@@ -567,6 +570,55 @@ class TestKeyLifecycleService extends OzoneTestBase {
         keyLifecycleService.resume();
         deleteLifecyclePolicy(volumeName, bucketName);
       }
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters1")
+    void testAbortedScanDoesNotMarkScanComplete(BucketLayout bucketLayout, boolean createPrefix)
+        throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
+      int testKeyCount = 3;
+
+      keyLifecycleService.setListMaxSize(1);
+      //keyLifecycleService.suspend();
+      KeyLifecycleService.setInjectors(Arrays.asList(new FaultInjectorImpl()));
+
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, bucketLayout, testKeyCount, 1, keyPrefix, null);
+      assertEquals(testKeyCount, keyList.size());
+
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      if (createPrefix) {
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
+      } else {
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
+      }
+
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      //keyLifecycleService.resume();
+
+      GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().contains(bucketKey),
+          WAIT_CHECK_INTERVAL, 10000);
+      keyLifecycleService.suspend();
+      KeyLifecycleService.getInjector(0).resume();
+
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+          LoggerFactory.getLogger(KeyLifecycleService.class));
+      GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+          WAIT_CHECK_INTERVAL, 10000);
+
+      OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+      assertNotNull(scanState);
+      assertNull(scanState.getScanEndTime(),
+          "Aborted scan must not persist scanEndTime so a new leader can resume");
+      assertTrue(logCapturer.getOutput().contains("KeyLifecycleService is suspended or disabled"));
+      keyLifecycleService.resume();
+      deleteLifecyclePolicy(volumeName, bucketName);
     }
 
     @ParameterizedTest

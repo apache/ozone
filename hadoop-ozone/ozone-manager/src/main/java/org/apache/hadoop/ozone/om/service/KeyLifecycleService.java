@@ -311,6 +311,7 @@ public class KeyLifecycleService extends BackgroundService {
 
     private long lastStateSaveTime = Time.monotonicNow();
     private long lastStateSaveKeyCount = 0;
+    private boolean scanAborted;
 
     private boolean shouldSaveState() {
       if ((Time.monotonicNow() - lastStateSaveTime) > stateSaveIntervalMs ||
@@ -436,9 +437,12 @@ public class KeyLifecycleService extends BackgroundService {
               evaluateBucket(bucket, keyTable, expirationRules, expiredKeyList, scanStateBuilder);
             }
 
+            boolean scanFinished = !scanAborted;
             if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
               LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
-              sendSaveScanStateRequest(scanStateBuilder, true);
+              if (scanFinished || test) {
+                sendSaveScanStateRequest(scanStateBuilder, scanFinished);
+              }
             } else {
               LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
                   expiredKeyList.size(), expiredDirList.size(), bucketKey);
@@ -447,11 +451,11 @@ public class KeyLifecycleService extends BackgroundService {
               // OBS bucket doesn't support trash.
               if (bucket.getBucketLayout() == OBJECT_STORE) {
                 sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
-                    bucket.getOwner(), expiredKeyList, false, scanStateBuilder, true);
+                    bucket.getOwner(), expiredKeyList, false, scanStateBuilder, scanFinished);
               } else {
                 // handle keys first, then directories
-                handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, true);
-                handleAndClearFullList(bucket, expiredDirList, true, scanStateBuilder, true);
+                handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, scanFinished);
+                handleAndClearFullList(bucket, expiredDirList, true, scanStateBuilder, scanFinished);
               }
             }
           }
@@ -677,10 +681,8 @@ public class KeyLifecycleService extends BackgroundService {
       HashSet<Long> deletedDirSet = new HashSet<>();
       while (!stack.isEmpty()) {
         if (!shouldRun()) {
-          LOG.info("LifecycleActionTask for bucket {} stopping. " +
-              "Service enabled: {}, suspended: {}, leader ready: {}",
-              bucketName, isServiceEnabled.get(), suspended.get(), 
-              getOzoneManager() != null ? getOzoneManager().isLeaderReady() : "N/A");
+          scanAborted = true;
+          LOG.info("KeyLifecycleService is suspended or disabled. Stopping task for bucket {}.", bucketName);
           return;
         }
 
@@ -1028,8 +1030,8 @@ public class KeyLifecycleService extends BackgroundService {
 
         while (keyTblItr.hasNext()) {
           if (!shouldRun()) {
-            LOG.info("KeyLifecycleService is suspended or disabled. " +
-                "Stopping LifecycleActionTask for bucket {}.", bucketName);
+            scanAborted = true;
+            LOG.info("KeyLifecycleService is suspended or disabled. Stopping task for bucket {}.", bucketName);
             return;
           }
           if (shouldSaveState()) {
@@ -1093,8 +1095,8 @@ public class KeyLifecycleService extends BackgroundService {
                omMetadataManager.getMultipartInfoTable().iterator(bucketPrefix)) {
         while (mpuIterator.hasNext()) {
           if (!shouldRun()) {
-            LOG.info("KeyLifecycleService is suspended or disabled. " +
-                "Stopping multipart upload processing for bucket {}.", bucketName);
+            scanAborted = true;
+            LOG.info("KeyLifecycleService is suspended or disabled. Stopping task for bucket {}.", bucketName);
             return;
           }
           Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();
