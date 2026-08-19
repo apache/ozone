@@ -33,10 +33,10 @@ git checkout -- hadoop-ozone/ozonefs-hadoop2/pom.xml hadoop-ozone/ozonefs-shaded
 
 mkdir -p "$REPORT_DIR"
 infer run --keep-going \
-  --skip-analysis-in-path "src/test/" \
-  --skip-analysis-in-path "target/generated-test-sources/" \
-  --skip-analysis-in-path "target/generated-sources/" \
-  --skip-analysis-in-path "test-utils/" \
+  --skip-analysis-in-path '.*/src/test/.*' \
+  --skip-analysis-in-path '.*/target/generated-test-sources/.*' \
+  --skip-analysis-in-path '.*/target/generated-sources/.*' \
+  --skip-analysis-in-path '.*/test-utils/.*' \
   -- mvn ${MAVEN_OPTIONS} install "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
 infer_rc=$?
 
