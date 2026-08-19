@@ -88,7 +88,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   private volatile HddsProtos.NodeOperationalState persistedOpState;
   private volatile long persistedOpStateExpiryEpochSec;
   private HDDSVersion initialVersion;
-  private HDDSVersion currentVersion;
+  private volatile HDDSVersion currentVersion;
 
   private DatanodeDetails(Builder b) {
     super(b.hostName, b.networkLocation, NetConstants.NODE_COST_DEFAULT);
