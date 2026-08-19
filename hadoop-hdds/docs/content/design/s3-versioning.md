@@ -294,16 +294,16 @@ does show the migration path if a persisted sequence is ever wanted:
 `upgradeToSequenceId` seeds one from a future timestamp in this same encoding.
 
 - **`UniqueIdVersionIdGenerator` (default)** — the same time-based scheme Ozone
-  already uses to mint block local IDs (`hdds.utils.UniqueId`): the id is
-  `currentTimeMillis << 16 | counter`, a 16-bit counter disambiguating ids minted
+  already uses to generate block local IDs (`hdds.utils.UniqueId`): the id is
+  `currentTimeMillis << 16 | counter`, a 16-bit counter disambiguating ids proposed
   within the same millisecond. It needs no allocator, no persistent state and no
   coordination; values are small positive longs, so `MAX_VALUE - versionId`
   ordering in versionedKeyTable stays plain signed arithmetic; and the id sorts by
   creation time, which is what the version chain wants anyway.
 - **`PinnedFirstVersionIdGenerator` (opt-in)** — only the first version is
-  special: it takes the reserved sentinel `FIRST_VERSION_ID = 1`, below any minted
+  special: it takes the reserved sentinel `FIRST_VERSION_ID = 1`, below any proposed
   id, so it sorts oldest and can be referenced without listing the key's versions
-  first. All later versions are minted normally. First versions are detected by "no
+  first. All later versions take a normally proposed id. First versions are detected by "no
   current version in keyTable", reusing the lookup the write path performs anyway.
   Known trade-off: if every version of a key is permanently deleted and the key is
   recreated, the new first version takes the sentinel again; only deployments that
@@ -311,42 +311,42 @@ does show the migration path if a persisted sequence is ever wanted:
 
 **How the id appears on the wire.** `x-amz-version-id`, `?versionId=` and
 `ListObjectVersions` carry the id as its decimal digits, the way a GCS
-`generation` is rendered: `117121056706265088` for a minted version, `1` for a
+`generation` is rendered: `117121056706265088` for a proposed id, `1` for a
 pinned first version. Decimal digits cannot collide with `null`, the identifier
 S3 reserves for a key's null version, so both share the parameter without
-escaping. Clients should still treat the value as opaque. The digits of a minted
+escaping. Clients should still treat the value as opaque. The digits of a proposed
 id do decode to the millisecond of the write, but that is a property of this
 generator rather than of the API, and ids are ordered only within one key —
 comparing them across keys means nothing.
 
-**Where the id is minted.** The generator runs on the leader in `preExecute` and
+**Where the id is proposed.** The generator runs on the leader in `preExecute` and
 the id is stamped into the request that goes into the replication log, so every OM
-applies an identical value; nothing is minted during apply. The one apply-time
+applies an identical value; nothing is proposed during apply. The one apply-time
 decision is the pinned sentinel, which is a constant and is therefore deterministic
 on its own: if the pinned generator is configured and the key has no current
-version at apply time, the version takes `FIRST_VERSION_ID` instead of the minted
-candidate.
+version at apply time, the version takes `FIRST_VERSION_ID` instead of the proposed
+id.
 
-**Why a minted id is only a floor.** A time-based id is monotonic within one OM
+**Why a proposed id is only a floor.** A time-based id is monotonic within one OM
 process, not across a leader change onto a node whose clock lags, and the "strictly
 increasing within a key" guarantee binds one generator rather than a sequence of
-them. So a minted id is a proposal, and the id a version is applied with is the
+them. So the generator only proposes, and the id a version is applied with is the
 later of that proposal and the id after the key's current version:
 
 ```
-versionId = max(mintedVersionId, currentVersionId + 1)
+versionId = max(proposedVersionId, currentVersionId + 1)
 ```
 
 The write path already holds the current version, so this costs no read, and it
 reads no other key and no global state: it is a pure function of the replicated
 request and the state every OM already shares, so all of them settle on the same id
 without coordinating. A current version predating versioning carries no id, and a
-key in that state has no other versions to order against, so it takes the minted
+key in that state has no other versions to order against, so it takes the proposed
 value unchanged — no versionedKeyTable lookup in any case.
 
 Ordering therefore never rests on the clock being trustworthy, and neither does it
-rest on one generator having minted every id of a key. Under a clock regression, or
-after a change of generator, the ids of an affected key climb by one until minted
+rest on one generator having proposed every id of a key. Under a clock regression, or
+after a change of generator, the ids of an affected key climb by one until proposed
 values overtake them again: the versions stay correctly ordered, and only the id's
 reading as a time degrades — the right one of the two to give up. An earlier draft
 instead rejected such a commit with `INVALID_REQUEST`; that is dropped, because it
@@ -516,7 +516,7 @@ interaction is covered above. Buckets without versioning behave exactly as today
   couples the S3 API surface to one execution model, and a log that was reset or
   rolled back would silently hand out ids that had been used before. The
   `UniqueId` scheme gives the same properties without the coupling, and taking the
-  minted id as a floor at commit covers the residual clock risk.
+  proposed id as a floor at commit covers the residual clock risk.
 - **A dedicated reclamation service (`VersionCleanupService`)**: the earlier
   design's own background service, following the `KeyDeletingService` pattern.
   Rejected once lifecycle landed in master — it would duplicate rule storage,
@@ -551,9 +551,9 @@ interaction is covered above. Buckets without versioning behave exactly as today
   it was created with): removes the risk of a mid-life generator change, but adds a
   proto field, a write path in both bucket create and set-property, and leaves the
   generator un-changeable even when an operator legitimately wants to switch.
-  Replaced by taking the minted id as a floor at commit, which absorbs a generator
+  Replaced by taking the proposed id as a floor at commit, which absorbs a generator
   change into the key's own ordering — the affected key's ids climb by one until
-  minted values overtake them — and costs no persistent state.
+  proposed values overtake them — and costs no persistent state.
 
 # Plan
 
@@ -566,7 +566,7 @@ left unguarded).
 | Task | Scope |
 |---|---|
 | T1 Metadata foundation | proto three-state enum + legacy-boolean sync, set-property state machine, `OmKeyInfo` version fields, versionedKeyTable column family, layout feature gate |
-| T2 VersionId generator framework | `VersionIdGenerator` interface with class-name configuration, `UniqueId`-based default minted in `preExecute`, commit-time ordering floor, pinned-first generator |
+| T2 VersionId generator framework | `VersionIdGenerator` interface with class-name configuration, `UniqueId`-based default proposed in `preExecute`, commit-time ordering floor, pinned-first generator |
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion, quota accounting |
 | T4 Read / permanent delete / promotion | `?versionId=` reads including null-slot addressing, reporting a delete-marker-addressed read as a condition distinct from not-found; permanent delete by versionId with quota accounting; version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys |
