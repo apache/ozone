@@ -150,7 +150,6 @@ public class RunningDatanodeState implements DatanodeState {
           .setConfig(conf)
           .setEndpointStateMachine(endpoint)
           .setContext(context)
-          .setDatanodeDetails(context.getParent().getDatanodeDetails())
           .setOzoneContainer(context.getParent().getContainer())
           .build();
     case HEARTBEAT:
