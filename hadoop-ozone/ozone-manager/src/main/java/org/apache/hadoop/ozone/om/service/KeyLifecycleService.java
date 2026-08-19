@@ -466,6 +466,11 @@ public class KeyLifecycleService extends BackgroundService {
         }
 
         onSuccess(bucketKey);
+      } else {
+        // The task was registered in inFlight when scheduled, but the service got suspended/disabled
+        // or lost leadership before the task ran. Clear the registration, otherwise this bucket is
+        // skipped as "already running" in every following getTasks() cycle.
+        inFlight.remove(bucketKey);
       }
 
       // By design, no one cares about the results of this call back.

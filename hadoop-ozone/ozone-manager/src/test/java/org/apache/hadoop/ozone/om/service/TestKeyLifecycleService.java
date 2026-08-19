@@ -92,6 +92,8 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.BackgroundTask;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -527,6 +529,44 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // confirm it hasn't deleted all keys
       assertEquals(testKeyCount - expectedDeleted, getKeyCount(bucketLayout) - initialKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @Test
+    void testInFlightClearedWhenTaskSkipsRun() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      keyLifecycleService.suspend();
+      createVolumeAndBucket(volumeName, bucketName, BucketLayout.OBJECT_STORE,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, BucketLayout.OBJECT_STORE, "key", null, date.toString(), true);
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+
+      try {
+        // Schedule the task manually. The service's own scheduler may win the registration and run
+        // the task to completion; in that case getTasks() returns nothing, so retry until this
+        // thread holds the scheduled task.
+        keyLifecycleService.resume();
+        BackgroundTaskQueue queue = keyLifecycleService.getTasks();
+        for (int i = 0; queue.isEmpty() && i < 200; i++) {
+          Thread.sleep(WAIT_CHECK_INTERVAL);
+          queue = keyLifecycleService.getTasks();
+        }
+        assertFalse(queue.isEmpty());
+
+        // Suspend before the scheduled task executes, then run it: call() skips the scan because
+        // shouldRun() is false, but must still clear the in-flight registration, otherwise the
+        // bucket is never scheduled again.
+        keyLifecycleService.suspend();
+        for (BackgroundTask task = queue.poll(); task != null; task = queue.poll()) {
+          task.call();
+        }
+        assertFalse(keyLifecycleService.status().getRunningBucketsList().contains(bucketKey));
+      } finally {
+        keyLifecycleService.resume();
+        deleteLifecyclePolicy(volumeName, bucketName);
+      }
     }
 
     @ParameterizedTest
