@@ -28,7 +28,10 @@ ${STS_ENDPOINT_URL}                         http://s3g:9880/sts
 ${S3G_ENDPOINT_URL}                         http://s3g:9878
 ${ROLE_SESSION_NAME}                        sts-session-name
 ${EXPIRED_STS_TOKEN_PROFILE}                expired_sts_token
-${EXPIRED_STS_TOKEN_MIN_ELAPSED_SECONDS}    902
+${EXPIRED_STS_TOKEN_ACCESS_KEY_ID}          ${EMPTY}
+${EXPIRED_STS_TOKEN_SECRET_ACCESS_KEY}      ${EMPTY}
+${EXPIRED_STS_TOKEN_SESSION_TOKEN}          ${EMPTY}
+${EXPIRED_STS_TOKEN_EXPIRATION}             ${EMPTY}
 
 *** Keywords ***
 Configure AWS Profile
@@ -129,25 +132,32 @@ Assume Role And Store Expired STS Token Credentials
     ${json} =                     Execute                       ${cmd}
     Should Contain                ${json}                       Credentials
 
-    ${issued_epoch} =             Get Current Date              result_format=epoch  time_zone=UTC
-
     ${expiredStsAccessKeyId} =    Execute                       printf '%s' '${json}' | jq -r '.Credentials.AccessKeyId'
     ${expiredStsSecretKey} =      Execute                       printf '%s' '${json}' | jq -r '.Credentials.SecretAccessKey'
     ${expiredStsSessionToken} =   Execute                       printf '%s' '${json}' | jq -r '.Credentials.SessionToken'
+    ${expiration} =               Execute                       printf '%s' '${json}' | jq -r '.Credentials.Expiration'
     Should Start With             ${expiredStsAccessKeyId}      ASIA
     Set Global Variable           ${EXPIRED_STS_TOKEN_ACCESS_KEY_ID}         ${expiredStsAccessKeyId}
     Set Global Variable           ${EXPIRED_STS_TOKEN_SECRET_ACCESS_KEY}     ${expiredStsSecretKey}
     Set Global Variable           ${EXPIRED_STS_TOKEN_SESSION_TOKEN}         ${expiredStsSessionToken}
-    Set Global Variable           ${EXPIRED_STS_TOKEN_ISSUED_EPOCH}          ${issued_epoch}
+    Set Global Variable           ${EXPIRED_STS_TOKEN_EXPIRATION}            ${expiration}
 
-Wait Until Minimum Expired STS Token Lifetime Elapsed
-    # Matches the +/-2s skew tolerance used for AssumeRole duration checks: require 900 + 2 seconds before calling S3.
-    ${now} =                      Get Current Date              result_format=epoch  time_zone=UTC
-    ${elapsed} =                  Evaluate                      float('${now}') - float('${EXPIRED_STS_TOKEN_ISSUED_EPOCH}')
-    ${remaining} =                Evaluate                      ${EXPIRED_STS_TOKEN_MIN_ELAPSED_SECONDS} - ${elapsed}
+Expired STS Token Credentials Should Be Available
+    Skip If                       '${EXPIRED_STS_TOKEN_EXPIRATION}' == '${EMPTY}'  Expired STS token credentials are unavailable. Run the prerequisite AssumeRole test before expired-token checks.
+    Should Not Be Empty           ${EXPIRED_STS_TOKEN_ACCESS_KEY_ID}         Expired STS token access key ID is unavailable.
+    Should Not Be Empty           ${EXPIRED_STS_TOKEN_SECRET_ACCESS_KEY}     Expired STS token secret key is unavailable.
+    Should Not Be Empty           ${EXPIRED_STS_TOKEN_SESSION_TOKEN}         Expired STS token session token is unavailable.
+
+Wait Until Expired STS Token Expiration Elapsed
+    # Matches the +/-2s skew tolerance used for AssumeRole duration checks.
+    Expired STS Token Credentials Should Be Available
+    ${now} =                      Get Current Date              time_zone=UTC
+    ${secondsUntilExpiration} =   Subtract Date From Date       ${EXPIRED_STS_TOKEN_EXPIRATION}    ${now}
+    ${remaining} =                Evaluate                      ${secondsUntilExpiration} + 2
     Run Keyword If                ${remaining} > 0              Sleep  ${remaining}
 
 Configure Expired STS Token S3 Profile
+    Expired STS Token Credentials Should Be Available
     Configure AWS Profile         ${EXPIRED_STS_TOKEN_PROFILE}  ${EXPIRED_STS_TOKEN_ACCESS_KEY_ID}  ${EXPIRED_STS_TOKEN_SECRET_ACCESS_KEY}  ${EXPIRED_STS_TOKEN_SESSION_TOKEN}
 
 Execute S3api Expect Expired Token

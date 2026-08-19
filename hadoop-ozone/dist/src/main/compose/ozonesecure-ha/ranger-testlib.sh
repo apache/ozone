@@ -28,7 +28,7 @@ setup_ranger_acceptance_env() {
       (
         set -a
         # shellcheck source=/dev/null
-        source "${COMPOSE_DIR}/.env"
+        source "${COMPOSE_DIR}/.env" || true
         echo "${FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION:-}"
       ) 2>/dev/null
     )"
