@@ -139,6 +139,21 @@ public final class OmLCRule {
     return null;
   }
 
+  /**
+   * Get the NoncurrentVersionExpiration action if present.
+   *
+   * @return the NoncurrentVersionExpiration action if present, null otherwise
+   */
+  @Nullable
+  public OmLCNoncurrentVersionExpiration getNoncurrentVersionExpiration() {
+    for (OmLCAction action : actions) {
+      if (action instanceof OmLCNoncurrentVersionExpiration) {
+        return (OmLCNoncurrentVersionExpiration) action;
+      }
+    }
+    return null;
+  }
+
   @Nullable
   public OmLCFilter getFilter() {
     return filter;
@@ -187,12 +202,22 @@ public final class OmLCRule {
 
     // Check that there is at most one Expiration action
     int expirationActionCount = 0;
+    int noncurrentExpirationActionCount = 0;
     for (OmLCAction action : actions) {
       if (action.getActionType() == OmLCAction.ActionType.EXPIRATION) {
         expirationActionCount++;
       }
+      if (action.getActionType()
+          == OmLCAction.ActionType.NONCURRENT_VERSION_EXPIRATION) {
+        noncurrentExpirationActionCount++;
+      }
       if (expirationActionCount > 1) {
         throw new OMException("A rule can have at most one Expiration action.",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+      if (noncurrentExpirationActionCount > 1) {
+        throw new OMException(
+            "A rule can have at most one NoncurrentVersionExpiration action.",
             OMException.ResultCodes.INVALID_REQUEST);
       }
       action.valid(creationTime);
@@ -326,6 +351,10 @@ public final class OmLCRule {
       if (lifecycleAction.hasAbortIncompleteMultipartUpload()) {
         builder.addAction(OmLCAbortIncompleteMultipartUpload.getFromProtobuf(
             lifecycleAction.getAbortIncompleteMultipartUpload()));
+      }
+      if (lifecycleAction.hasNoncurrentVersionExpiration()) {
+        builder.addAction(OmLCNoncurrentVersionExpiration.getFromProtobuf(
+            lifecycleAction.getNoncurrentVersionExpiration()));
       }
     }
     if (lifecycleRule.hasFilter()) {
