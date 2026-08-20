@@ -680,7 +680,8 @@ public class KeyLifecycleService extends BackgroundService {
       while (!stack.isEmpty()) {
         if (!shouldRun()) {
           scanAborted = true;
-          LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.", bucketName);
+          LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
+              bucketName);
           return;
         }
 
@@ -1029,7 +1030,8 @@ public class KeyLifecycleService extends BackgroundService {
         while (keyTblItr.hasNext()) {
           if (!shouldRun()) {
             scanAborted = true;
-            LOG.info("KeyLifecycleService is suspended or disabled. Stopping task for bucket {}.", bucketName);
+            LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
+                bucketName);
             return;
           }
           if (shouldSaveState()) {
@@ -1094,7 +1096,8 @@ public class KeyLifecycleService extends BackgroundService {
         while (mpuIterator.hasNext()) {
           if (!shouldRun()) {
             scanAborted = true;
-            LOG.info("KeyLifecycleService is suspended or disabled. Stopping task for bucket {}.", bucketName);
+            LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
+                bucketName);
             return;
           }
           Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();

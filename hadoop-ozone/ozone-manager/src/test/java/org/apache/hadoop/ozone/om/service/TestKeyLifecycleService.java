@@ -613,7 +613,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertNotNull(scanState);
       assertNull(scanState.getScanEndTime(),
           "Aborted scan must not persist scanEndTime so a new leader can resume");
-      assertTrue(logCapturer.getOutput().contains("KeyLifecycleService is suspended or disabled"));
+      assertTrue(logCapturer.getOutput().contains("KeyLifecycleService is suspended, disabled, or leader not ready"));
       keyLifecycleService.resume();
       deleteLifecyclePolicy(volumeName, bucketName);
     }
@@ -1776,7 +1776,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
       Thread.sleep(SERVICE_INTERVAL);
-      assertEquals(dirDepth, getDirCount() - initialDirCount);
+
+      GenericTestUtils.waitFor(() -> dirDepth == getDirCount() - initialDirCount,
+          WAIT_CHECK_INTERVAL, 5000);
       assertEquals(0, getDeletedDirectoryCount() - initialDeletedDirCount);
 
       GenericTestUtils.LogCapturer log =
@@ -3484,9 +3486,14 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
   }
 
-  private long getDirCount() throws IOException {
+  private long getDirCount() {
     final Table<String, OmDirectoryInfo> table = metadataManager.getDirectoryTable();
-    return metadataManager.countRowsInTable(table);
+    try {
+      return metadataManager.countRowsInTable(table);
+    } catch (IOException e) {
+      fail("Failed to count directories " + e.getMessage());
+      return -1;
+    }
   }
 
   private long getKeyCount(BucketLayout layout) {
