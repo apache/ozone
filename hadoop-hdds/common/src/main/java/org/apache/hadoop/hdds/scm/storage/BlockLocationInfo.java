@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import jakarta.annotation.Nullable;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -42,6 +44,8 @@ public class BlockLocationInfo {
   private int partNumber;
   // The block is under construction. Apply to hsynced file last block.
   private boolean underConstruction;
+  @Nullable private StorageTier storageTier;
+  private boolean isFallBack;
 
   protected BlockLocationInfo(Builder builder) {
     this.blockID = builder.blockID;
@@ -51,6 +55,9 @@ public class BlockLocationInfo {
     this.token = builder.token;
     this.partNumber = builder.partNumber;
     this.createVersion = builder.createVersion;
+    this.storageTier = builder.storageTier;
+    this.isFallBack = builder.isFallBack;
+
   }
 
   public void setCreateVersion(long version) {
@@ -121,6 +128,23 @@ public class BlockLocationInfo {
     return this.underConstruction;
   }
 
+  @Nullable
+  public StorageTier getStorageTier() {
+    return storageTier;
+  }
+
+  public boolean getIsFallBack() {
+    return isFallBack;
+  }
+
+  public void setIsFallBack(boolean fallBack) {
+    isFallBack = fallBack;
+  }
+
+  public void setStorageTier(@Nullable StorageTier storageTier) {
+    this.storageTier = storageTier;
+  }
+
   /**
    * Builder of BlockLocationInfo.
    */
@@ -132,6 +156,8 @@ public class BlockLocationInfo {
     private Pipeline pipeline;
     private int partNumber;
     private long createVersion;
+    @Nullable private StorageTier storageTier;
+    private boolean isFallBack;
 
     public Builder setBlockID(BlockID blockId) {
       this.blockID = blockId;
@@ -168,6 +194,16 @@ public class BlockLocationInfo {
       return this;
     }
 
+    public Builder setStorageTier(StorageTier storageTier) {
+      this.storageTier = storageTier;
+      return this;
+    }
+
+    public Builder setIsFallBack(boolean fallBack) {
+      isFallBack = fallBack;
+      return this;
+    }
+
     public BlockLocationInfo build() {
       return new BlockLocationInfo(this);
     }
@@ -181,7 +217,9 @@ public class BlockLocationInfo {
         ", token=" + token +
         ", pipeline=" + pipeline +
         ", createVersion=" + createVersion +
-        ", partNumber=" + partNumber
+        ", partNumber=" + partNumber +
+        ", storageTier=" + storageTier +
+        ", isFallBack=" + isFallBack
         + '}';
   }
 
@@ -213,12 +251,13 @@ public class BlockLocationInfo {
         createVersion == that.createVersion &&
         Objects.equals(blockID, that.blockID) &&
         Objects.equals(token, that.token) &&
-        Objects.equals(pipeline, that.pipeline);
+        Objects.equals(pipeline, that.pipeline) &&
+        Objects.equals(storageTier, that.storageTier);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(blockID, length, offset, token, createVersion,
-        pipeline);
+        pipeline, storageTier);
   }
 }

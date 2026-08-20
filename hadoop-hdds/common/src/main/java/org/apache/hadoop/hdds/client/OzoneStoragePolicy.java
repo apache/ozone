@@ -32,6 +32,8 @@ public enum OzoneStoragePolicy implements StoragePolicy {
   private final StorageTier creationTier;
   private final StorageTier creationFallbackTier;
 
+  private static OzoneStoragePolicy defaultPolicy = WARM;
+
   OzoneStoragePolicy(String name, StorageTier creationTier,
       StorageTier creationFallbackTier) {
     this.name = name;
@@ -73,6 +75,23 @@ public enum OzoneStoragePolicy implements StoragePolicy {
   }
 
   /**
+   * Converts the provided StoragePolicy to its protobuf representation.
+   *
+   * @param storagePolicy the StoragePolicy to convert.
+   * @return the corresponding StoragePolicyProto.
+   */
+  public static StoragePolicyProto toProto(StoragePolicy storagePolicy) {
+    if (storagePolicy == null) {
+      throw new IllegalArgumentException("Error: StoragePolicy cannot be null.");
+    }
+    if (!(storagePolicy instanceof OzoneStoragePolicy)) {
+      throw new IllegalArgumentException(
+          "Error: Unsupported StoragePolicy type: " + storagePolicy.getName());
+    }
+    return ((OzoneStoragePolicy) storagePolicy).toProto();
+  }
+
+  /**
    * Converts a protobuf StoragePolicyProto to the corresponding OzoneStoragePolicy.
    * @param proto the StoragePolicyProto to convert.
    * @return the corresponding OzoneStoragePolicy.
@@ -91,6 +110,14 @@ public enum OzoneStoragePolicy implements StoragePolicy {
     default:
       throw new IllegalArgumentException("Error: StoragePolicyProto not found, proto=" + proto);
     }
+  }
+
+  public static OzoneStoragePolicy getDefaultPolicy() {
+    return defaultPolicy;
+  }
+
+  public static void setDefaultPolicy(OzoneStoragePolicy storagePolicy) {
+    defaultPolicy = storagePolicy;
   }
 
   @Override

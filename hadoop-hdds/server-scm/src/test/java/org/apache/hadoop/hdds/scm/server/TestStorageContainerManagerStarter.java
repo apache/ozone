@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DEFAULT_STORAGE_TIER_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_DEFAULT_STORAGE_TIER_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -143,7 +143,7 @@ public class TestStorageContainerManagerStarter {
   @Test
   public void testConfiguredDefaultStorageTierIgnoresCaseAndWhitespace() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_DEFAULT_STORAGE_TIER_KEY, " aRcHiVe ");
+    conf.set(OZONE_SCM_DEFAULT_STORAGE_TIER_KEY, " aRcHiVe ");
 
     assertEquals(StorageTier.ARCHIVE,
         StorageContainerManager.getConfiguredDefaultStorageTier(conf));

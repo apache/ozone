@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.hdds.scm.protocol;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -193,6 +195,19 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   public AllocateScmBlockResponseProto allocateScmBlock(
       AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
+    OzoneStoragePolicy storagePolicy;
+    boolean allowFallback;
+    if (request.hasStoragePolicy()) {
+      storagePolicy = OzoneStoragePolicy.fromProto(request.getStoragePolicy());
+      // If the storagePolicy was specific, then the field allowFallBack must be specified.
+      Preconditions.checkArgument(request.hasAllowFallBack());
+      allowFallback = request.getAllowFallBack();
+    } else {
+      // When the request comes from an old OM that does not support StoragePolicy,
+      // StoragePolicy will not be explicitly set. The default StoragePolicy is used here.
+      storagePolicy = OzoneStoragePolicy.getDefaultPolicy();
+      allowFallback = false;
+    }
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
             request.getNumBlocks(),
@@ -202,20 +217,26 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
                 request.getEcReplicationConfig()),
             request.getOwner(),
             ExcludeList.getFromProtoBuf(request.getExcludeList()),
-            request.getClient());
+            request.getClient(),
+            storagePolicy, allowFallback);
 
     AllocateScmBlockResponseProto.Builder builder =
         AllocateScmBlockResponseProto.newBuilder();
 
     if (allocatedBlocks.size() < request.getNumBlocks()) {
       throw new SCMException("Allocated " + allocatedBlocks.size() +
-          " blocks. Requested " + request.getNumBlocks() + " blocks",
-          SCMException.ResultCodes.FAILED_TO_ALLOCATE_ENOUGH_BLOCKS);
+          " blocks. Requested " + request.getNumBlocks() + " blocks. StoragePolicy " +
+          storagePolicy, SCMException.ResultCodes.FAILED_TO_ALLOCATE_ENOUGH_BLOCKS);
     }
     for (AllocatedBlock block : allocatedBlocks) {
-      builder.addBlocks(AllocateBlockResponse.newBuilder()
+      AllocateBlockResponse.Builder blockBuilder = AllocateBlockResponse.newBuilder()
           .setContainerBlockID(block.getBlockID().getProtobuf())
-          .setPipeline(block.getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS)));
+          .setPipeline(block.getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS))
+          .setIsFallBack(block.isFallBack());
+      if (block.getStorageTier() != null) {
+        blockBuilder.setStorageTier(block.getStorageTier().toProto());
+      }
+      builder.addBlocks(blockBuilder);
     }
 
     return builder.build();

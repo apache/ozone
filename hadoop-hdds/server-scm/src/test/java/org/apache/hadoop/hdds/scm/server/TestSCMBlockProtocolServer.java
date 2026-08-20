@@ -40,8 +40,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -99,7 +101,8 @@ public class TestSCMBlockProtocolServer {
     @Override
     public AllocatedBlock allocateBlock(long size,
         ReplicationConfig replicationConfig, String owner,
-        ExcludeList excludeList) throws IOException, TimeoutException {
+        ExcludeList excludeList, StoragePolicy storagePolicy,
+        boolean allowFallbackStoragePolicy) throws IOException, TimeoutException {
       List<DatanodeDetails> nodes = new ArrayList<>(datanodes);
       Collections.shuffle(nodes);
       Pipeline pipeline;
@@ -121,6 +124,7 @@ public class TestSCMBlockProtocolServer {
       long containerID = ThreadLocalRandom.current().nextLong();
       AllocatedBlock.Builder abb = new AllocatedBlock.Builder()
           .setContainerBlockID(new ContainerBlockID(containerID, localID))
+          .setStorageTier(storagePolicy.getCreationTier())
           .setPipeline(pipeline);
       return abb.build();
     }
@@ -305,10 +309,10 @@ public class TestSCMBlockProtocolServer {
         .getInstance(ReplicationFactor.THREE);
     final long blockSize = 128 * MB;
     final int numOfBlocks = 5;
-
+    OzoneStoragePolicy storagePolicy = OzoneStoragePolicy.getDefaultPolicy();
     List<AllocatedBlock> allocatedBlocks = server.allocateBlock(
         blockSize, numOfBlocks, replicationConfig, "o",
-        new ExcludeList(), clientAddress);
+        new ExcludeList(), clientAddress, storagePolicy, false);
     assertEquals(numOfBlocks, allocatedBlocks.size());
     for (AllocatedBlock allocatedBlock: allocatedBlocks) {
       List<DatanodeDetails> nodesInOrder =
@@ -318,6 +322,7 @@ public class TestSCMBlockProtocolServer {
             "Source node should be sorted very first");
       }
       String clientLocation = clientDatanode.getNetworkLocation();
+      assertEquals(storagePolicy.getCreationTier(), allocatedBlock.getStorageTier());
 
       boolean stillSameRackAsClient = nodesInOrder.get(0).getNetworkLocation()
           .equals(clientLocation);

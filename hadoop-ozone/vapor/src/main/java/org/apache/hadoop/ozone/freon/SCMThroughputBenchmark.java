@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -490,7 +491,8 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
 
     private void doAllocateBlock(long size, ReplicationConfig config) {
       try {
-        scmBlockClient.allocateBlock(size, 1, config, "STB", excludeList);
+        scmBlockClient.allocateBlock(size, 1, config, "STB", excludeList,
+            OzoneStoragePolicy.getDefaultPolicy(), true);
         succBlockCounter.incrementAndGet();
       } catch (IOException e) {
         LOG.error("Failed to allocate block", e);

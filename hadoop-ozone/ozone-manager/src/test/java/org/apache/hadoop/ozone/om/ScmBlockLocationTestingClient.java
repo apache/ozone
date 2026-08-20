@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProt
 import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.success;
 import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.unknownFailure;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -119,7 +121,8 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   @Override
   public List<AllocatedBlock> allocateBlock(long size, int num,
       ReplicationConfig config,
-      String owner, ExcludeList excludeList, String clientMachine)
+      String owner, ExcludeList excludeList, String clientMachine,
+      @Nonnull StoragePolicy storagePolicy, boolean allowFallbackStoragePolicy)
       throws IOException {
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     Pipeline pipeline = createPipeline(datanodeDetails);
