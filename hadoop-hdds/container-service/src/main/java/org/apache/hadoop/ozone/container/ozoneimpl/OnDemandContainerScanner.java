@@ -57,7 +57,7 @@ public final class OnDemandContainerScanner {
     scanExecutor = Executors.newSingleThreadExecutor();
     containerRescheduleCheckSet = ConcurrentHashMap.newKeySet();
     this.scannerHelper = ContainerScanHelper.withScanGap(LOG, controller, metrics, conf);
-    this.scannerHelperWithoutGap = ContainerScanHelper.withoutScanGap(LOG, controller, metrics);
+    this.scannerHelperWithoutGap = ContainerScanHelper.withoutScanGap(LOG, controller, metrics, conf);
   }
 
   /**
