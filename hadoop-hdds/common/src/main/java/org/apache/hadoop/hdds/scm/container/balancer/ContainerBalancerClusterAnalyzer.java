@@ -120,27 +120,29 @@ public final class ContainerBalancerClusterAnalyzer {
 
     double imbalance = maxUtilization - minUtilization;
 
-    return new ContainerBalancerClusterSnapshot(
-        eligible.size(),
-        clusterAvgUtilization,
-        clusterCapacityBytes,
-        maxUtilization,
-        minUtilization,
-        upperLimit,
-        lowerLimit,
-        sources.size(),
-        targets.size(),
-        totalOverUtilizedBytes,
-        totalUnderUtilizedBytes,
-        imbalance,
-        topHostnames(sources),
-        topHostnames(targets));
+    return ContainerBalancerClusterSnapshot.newBuilder()
+        .setTotalEligibleDatanodes(eligible.size())
+        .setClusterAvgUtilization(clusterAvgUtilization)
+        .setClusterCapacityBytes(clusterCapacityBytes)
+        .setMaxUtilization(maxUtilization)
+        .setMinUtilization(minUtilization)
+        .setUpperLimit(upperLimit)
+        .setLowerLimit(lowerLimit)
+        .setSourceCount(sources.size())
+        .setTargetCount(targets.size())
+        .setTotalOverUtilizedBytes(totalOverUtilizedBytes)
+        .setTotalUnderUtilizedBytes(totalUnderUtilizedBytes)
+        .setImbalance(imbalance)
+        .setTopSourceNodeHostnames(topHostnames(sources))
+        .setBottomTargetNodeHostnames(topHostnames(targets))
+        .build();
   }
 
   /**
-   * Function that excludes is datanode should be excluded or not.
-   * The node is in exclude set or the node is not in include set
-   * when include set is not empty.
+   * Function that returns whether a datanode should be excluded from cluster analysis.
+   * A datanode is excluded if it appears in excludeNodes set, or if
+   * includeNodes is non-empty and the datanode is not listed there
+   * by hostname or IP address.
    */
   public static boolean shouldExcludeDatanode(DatanodeDetails datanode,
                                        Set<String> excludeNodes, Set<String> includeNodes) {
@@ -209,21 +211,22 @@ public final class ContainerBalancerClusterAnalyzer {
   }
 
   private static ContainerBalancerClusterSnapshot emptySnapshot(double thresholdRatio) {
-    return new ContainerBalancerClusterSnapshot(
-        0,
-        0,
-        0,
-        0,
-        0,
-        thresholdRatio,
-        -thresholdRatio,
-        0,
-        0,
-        0,
-        0,
-        0,
-        Collections.emptyList(),
-        Collections.emptyList());
+    return ContainerBalancerClusterSnapshot.newBuilder()
+        .setTotalEligibleDatanodes(0)
+        .setClusterAvgUtilization(0)
+        .setClusterCapacityBytes(0)
+        .setMaxUtilization(0)
+        .setMinUtilization(0)
+        .setUpperLimit(thresholdRatio)
+        .setLowerLimit(-thresholdRatio)
+        .setSourceCount(0)
+        .setTargetCount(0)
+        .setTotalOverUtilizedBytes(0)
+        .setTotalUnderUtilizedBytes(0)
+        .setImbalance(0)
+        .setTopSourceNodeHostnames(Collections.emptyList())
+        .setBottomTargetNodeHostnames(Collections.emptyList())
+        .build();
   }
 
   private static final class NodeClassification {
