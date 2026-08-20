@@ -103,6 +103,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReclaimObjectVersionsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SaveLifecycleScanStateRequest;
@@ -306,6 +308,8 @@ public class KeyLifecycleService extends BackgroundService {
     private long numMultipartUploadIterated = 0;
     private long numMultipartUploadAborted = 0;
     private String lastScannedKey;
+    // Where the versionedKeyTable scan left off, always at a key boundary.
+    private String lastScannedVersionKey;
     private String lastScannedDir;
     private String lastScannedDirKey;
 
@@ -396,6 +400,10 @@ public class KeyLifecycleService extends BackgroundService {
               .filter(r -> r.getAbortIncompleteMultipartUpload() != null)
               .collect(Collectors.toList());
 
+          List<OmLCRule> noncurrentRules = ruleList.stream()
+              .filter(r -> r.getNoncurrentVersionExpiration() != null)
+              .collect(Collectors.toList());
+
           if (!expirationRules.isEmpty()) {
             LimitedExpiredObjectList expiredKeyList = new LimitedExpiredObjectList(listMaxSize);
             LimitedExpiredObjectList expiredDirList = new LimitedExpiredObjectList(listMaxSize);
@@ -455,6 +463,8 @@ public class KeyLifecycleService extends BackgroundService {
               }
             }
           }
+
+          scanNoncurrentVersionsIfAny(bucket, noncurrentRules, scanStateBuilder);
 
           if (!mpuRules.isEmpty()) {
             processMultipartUploads(bucket, mpuRules);
@@ -1002,6 +1012,126 @@ public class KeyLifecycleService extends BackgroundService {
       if (!saved) {
         sendSaveScanStateRequest(scanStateBuilder, false);
       }
+      lastStateSaveTime = Time.monotonicNow();
+      lastStateSaveKeyCount = numKeyIterated;
+    }
+
+    /**
+     * Noncurrent versions live in a table of their own, so they need a scan of
+     * their own. Only a bucket that has been versioned can have any, and
+     * versioning is an OBJECT_STORE feature.
+     */
+    private void scanNoncurrentVersionsIfAny(OmBucketInfo bucket,
+        List<OmLCRule> noncurrentRules,
+        OmLifecycleScanState.Builder scanStateBuilder) {
+      if (!noncurrentRules.isEmpty()
+          && bucket.getBucketLayout() == OBJECT_STORE
+          && bucket.hasEverBeenVersioned()) {
+        evaluateNoncurrentVersions(bucket, noncurrentRules, scanStateBuilder);
+      }
+    }
+
+    /**
+     * Reclaims the noncurrent versions of a versioned bucket's keys, one batch
+     * per pass. Which versions go is {@link NoncurrentVersionSelector}'s
+     * decision; this only feeds it, submits what it picked, and records where
+     * it stopped.
+     */
+    private void evaluateNoncurrentVersions(OmBucketInfo bucket,
+        List<OmLCRule> ruleList, OmLifecycleScanState.Builder scanStateBuilder) {
+      final NoncurrentVersionSelector selector =
+          new NoncurrentVersionSelector(omMetadataManager);
+      String resumeFrom = scanStateBuilder == null ? null
+          : scanStateBuilder.getLastScannedVersionKey();
+
+      try {
+        while (true) {
+          if (!shouldRun()) {
+            LOG.info("KeyLifecycleService is suspended or disabled. Stopping "
+                + "the noncurrent version scan for bucket {}.",
+                bucket.getBucketName());
+            return;
+          }
+
+          NoncurrentVersionSelector.Selection selection =
+              selector.select(bucket, ruleList, resumeFrom, listMaxSize);
+          numKeyIterated += selection.getVersionsScanned();
+          lastScannedVersionKey = selection.getResumeFrom();
+          submitExpiredVersions(bucket, selection.getExpiredVersionKeys());
+
+          // Saving state costs a Ratis write, so it is throttled the same way
+          // the keyTable scan throttles it. Resuming from an older boundary
+          // only re-selects versions the reclaim request then skips as gone.
+          if (selection.isFinished() || shouldSaveState()) {
+            saveVersionScanState(scanStateBuilder, selection.isFinished());
+          }
+
+          if (selection.isFinished()) {
+            return;
+          }
+          resumeFrom = selection.getResumeFrom();
+        }
+      } catch (IOException e) {
+        LOG.warn("Failed to iterate the noncurrent versions of bucket {}/{}",
+            bucket.getVolumeName(), bucket.getBucketName(), e);
+      }
+    }
+
+    /**
+     * Submits the versions one pass selected, if any.
+     */
+    private void submitExpiredVersions(OmBucketInfo bucket,
+        List<String> expiredVersions) {
+      if (!expiredVersions.isEmpty()) {
+        ObjectVersionsBucket versionsBucket = ObjectVersionsBucket.newBuilder()
+            .setVolumeName(bucket.getVolumeName())
+            .setBucketName(bucket.getBucketName())
+            .addAllVersionKeys(expiredVersions)
+            .build();
+
+        OMRequest omRequestRaw = OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.ReclaimObjectVersions)
+            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setClientId(clientId.toString())
+            .setReclaimObjectVersionsRequest(
+                ReclaimObjectVersionsRequest.newBuilder()
+                    .addVersionsPerBucket(versionsBucket))
+            .build();
+
+        try {
+          final OMClientRequest omClientRequest =
+              OzoneManagerRatisUtils.createClientRequest(omRequestRaw, getOzoneManager());
+          UserGroupInformation ugi =
+              UserGroupInformation.createRemoteUser(bucket.getOwner());
+          ugi.doAs((PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>) () -> {
+            OMRequest omRequest = omClientRequest.preExecute(getOzoneManager());
+            return OzoneManagerRatisUtils.submitRequest(
+                getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
+          });
+          getOzoneManager().getDeletionMetrics()
+              .incrNumObjectVersionsSentForReclaim(expiredVersions.size());
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          LOG.warn("Interrupted while reclaiming {} noncurrent versions of bucket {}/{}",
+              expiredVersions.size(), bucket.getVolumeName(), bucket.getBucketName(), e);
+        } catch (Exception e) {
+          LOG.warn("Failed to reclaim {} noncurrent versions of bucket {}/{}",
+              expiredVersions.size(), bucket.getVolumeName(), bucket.getBucketName(), e);
+        }
+        expiredVersions.clear();
+      }
+    }
+
+    /**
+     * Records the key boundary the scan reached, so an interrupted scan
+     * resumes there rather than from the beginning of the bucket.
+     */
+    private void saveVersionScanState(
+        OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
+      if (scanStateBuilder != null) {
+        scanStateBuilder.setLastScannedVersionKey(lastScannedVersionKey);
+      }
+      sendSaveScanStateRequest(scanStateBuilder, scanFinished);
       lastStateSaveTime = Time.monotonicNow();
       lastStateSaveKeyCount = numKeyIterated;
     }
