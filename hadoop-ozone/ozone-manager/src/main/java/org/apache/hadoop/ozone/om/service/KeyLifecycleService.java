@@ -682,7 +682,7 @@ public class KeyLifecycleService extends BackgroundService {
       while (!stack.isEmpty()) {
         if (!shouldRun()) {
           scanAborted = true;
-          LOG.info("KeyLifecycleService is suspended or disabled. Stopping task for bucket {}.", bucketName);
+          LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.", bucketName);
           return;
         }
 
