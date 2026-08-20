@@ -2627,10 +2627,24 @@ message LifecycleFilter {
 message LifecycleExpiration {
   optional uint32 days = 1;
   optional string date = 2;
+  // On a bucket with S3-compatible versioning, removes a delete marker once it
+  // is the key's only remaining version, taking the key with it. Exclusive with
+  // days and date: the action removes a marker rather than expiring an object.
+  optional bool expiredObjectDeleteMarker = 3;
 }
 
 message AbortIncompleteMultipartUpload {
   optional uint32 daysAfterInitiation = 1;
+}
+
+// Reclaims the noncurrent versions of a key on a bucket with S3-compatible
+// versioning. At least one of the two must be set; when both are, a version is
+// reclaimed once either says so.
+message NoncurrentVersionExpiration {
+  // days a version is retained after it stopped being current
+  optional uint32 noncurrentDays = 1;
+  // how many noncurrent versions of a key are kept, newest first
+  optional uint32 newerNoncurrentVersions = 2;
 }
 
 message LifecycleRule {
@@ -2644,6 +2658,7 @@ message LifecycleRule {
 message LifecycleAction {
   optional LifecycleExpiration expiration = 1;
   optional AbortIncompleteMultipartUpload abortIncompleteMultipartUpload = 2;
+  optional NoncurrentVersionExpiration noncurrentVersionExpiration = 3;
 }
 
 message LifecycleConfiguration {
