@@ -583,7 +583,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
       int testKeyCount = 3;
 
       keyLifecycleService.setListMaxSize(1);
-      //keyLifecycleService.suspend();
       KeyLifecycleService.setInjectors(Arrays.asList(new FaultInjectorImpl()));
 
       List<OmKeyArgs> keyList =
@@ -600,15 +599,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
       }
 
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-      //keyLifecycleService.resume();
-
       GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().contains(bucketKey),
           WAIT_CHECK_INTERVAL, 10000);
-      keyLifecycleService.suspend();
-      KeyLifecycleService.getInjector(0).resume();
 
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
           LoggerFactory.getLogger(KeyLifecycleService.class));
+      keyLifecycleService.suspend();
+      KeyLifecycleService.getInjector(0).resume();
       GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
           WAIT_CHECK_INTERVAL, 10000);
 

@@ -440,9 +440,7 @@ public class KeyLifecycleService extends BackgroundService {
             boolean scanFinished = !scanAborted;
             if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
               LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
-              if (scanFinished || test) {
-                sendSaveScanStateRequest(scanStateBuilder, scanFinished);
-              }
+              sendSaveScanStateRequest(scanStateBuilder, scanFinished);
             } else {
               LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
                   expiredKeyList.size(), expiredDirList.size(), bucketKey);
