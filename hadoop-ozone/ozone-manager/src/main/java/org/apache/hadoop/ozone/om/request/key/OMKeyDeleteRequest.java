@@ -24,13 +24,8 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -47,8 +42,6 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -282,15 +275,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  /**
-   * Supersedes the key's current version with a delete marker: a record with
-   * no data blocks that makes plain reads of the key return KEY_NOT_FOUND
-   * while every existing version stays readable by versionId. The superseded
-   * current version becomes a noncurrent version; a record written before
-   * versioning was enabled carries no versionId and becomes the key's null
-   * version. When the key does not exist the marker is still inserted, as S3
-   * does.
-   */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OMClientResponse insertDeleteMarker(OzoneManager ozoneManager,
       OMMetadataManager omMetadataManager, OmBucketInfo omBucketInfo,
@@ -298,74 +282,15 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       OzoneManagerProtocolProtos.KeyArgs keyArgs, long trxnLogIndex,
       OMResponse.Builder omResponse) throws IOException {
 
-    String volumeName = omBucketInfo.getVolumeName();
-    String bucketName = omBucketInfo.getBucketName();
-    String keyName = keyArgs.getKeyName();
-
-    long markerVersionId = ozoneManager.getVersionIdAllocator().allocate(
-        keyArgs.getProposedVersionId(), currentVersion);
-
-    // Everything that can fail runs before the first cache entry is added: a
-    // request that throws here is answered with an OMKeyDeleteResponse, whose
-    // cleanup does not cover the versionedKeyTable, so a cache entry left
-    // behind would never be removed and would outlive the failed request.
-    // The marker is a record of its own; it holds no blocks, so it consumes
-    // namespace but no space.
-    checkBucketQuotaInNamespace(omBucketInfo, 1L);
-
-    OmKeyInfo.Builder markerBuilder;
-    if (currentVersion != null) {
-      markerBuilder = currentVersion.toBuilder()
-          .setMetadata(new HashMap<>())
-          .setTags(new HashMap<>())
-          .setFileChecksum(null);
-    } else {
-      markerBuilder = new OmKeyInfo.Builder()
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName(keyName)
-          .setReplicationConfig(RatisReplicationConfig.getInstance(
-              ReplicationFactor.ONE))
-          .setObjectID(ozoneManager.getObjectIdFromTxId(trxnLogIndex))
-          .setOwnerName(omBucketInfo.getOwner())
-          .setFile(true);
-    }
-    OmKeyInfo deleteMarker = markerBuilder
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setDataSize(0L)
-        .setCreationTime(keyArgs.getModificationTime())
-        .setModificationTime(keyArgs.getModificationTime())
-        .setUpdateID(trxnLogIndex)
-        .setVersionId(markerVersionId)
-        .setDeleteMarker(true)
-        .setNullVersion(false)
-        .build();
-
-    String movedVersionedKeyName = null;
-    OmKeyInfo movedVersionedKeyInfo = null;
-    if (currentVersion != null) {
-      movedVersionedKeyInfo = currentVersion.getVersionId() != null
-          ? currentVersion
-          : currentVersion.toBuilder()
-              .setVersionId(VersionIdGenerator.UNSET_VERSION_ID)
-              .setNullVersion(true)
-              .build();
-      movedVersionedKeyName = omMetadataManager.getVersionedOzoneKey(
-          volumeName, bucketName, keyName,
-          movedVersionedKeyInfo.getVersionId());
-      omMetadataManager.getVersionedKeyTable().addCacheEntry(
-          movedVersionedKeyName, movedVersionedKeyInfo, trxnLogIndex);
-    }
-
-    omBucketInfo.incrUsedNamespace(1L);
-
-    omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
-        objectKey, deleteMarker, trxnLogIndex);
+    DeleteMarkerInsertion inserted = insertDeleteMarker(ozoneManager,
+        omMetadataManager, omBucketInfo, currentVersion, objectKey,
+        keyArgs.getKeyName(), keyArgs.getProposedVersionId(),
+        keyArgs.getModificationTime(), trxnLogIndex);
 
     return new OMKeyDeleteMarkerResponse(
         omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-        deleteMarker, objectKey, movedVersionedKeyName, movedVersionedKeyInfo,
+        inserted.getDeleteMarker(), inserted.getObjectKey(),
+        inserted.getDemotedVersionKey(), inserted.getDemotedVersion(),
         omBucketInfo.copyObject());
   }
 
