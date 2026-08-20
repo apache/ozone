@@ -18,11 +18,10 @@
 package org.apache.hadoop.ozone.om.request.upgrade;
 
 import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.FinalizeUpgrade;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CompleteFinalizeUpgrade;
 
 import java.io.IOException;
 import java.util.HashMap;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -30,30 +29,27 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.upgrade.OMFinalizeUpgradeResponse;
+import org.apache.hadoop.ozone.om.response.upgrade.OMCompleteFinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CompleteFinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles finalizeUpgrade request.
+ * Completes OM finalization once SCM has finalized. Submitted internally over Ratis by
+ * {@code OMUpgradeFinalizeService}; no client ever sends this request.
  */
-public class OMFinalizeUpgradeRequest extends OMClientRequest {
+public class OMCompleteFinalizeUpgradeRequest extends OMClientRequest {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMFinalizeUpgradeRequest.class);
+      LoggerFactory.getLogger(OMCompleteFinalizeUpgradeRequest.class);
 
-  public OMFinalizeUpgradeRequest(OMRequest omRequest) {
+  public OMCompleteFinalizeUpgradeRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
@@ -64,32 +60,13 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    responseBuilder.setCmdType(FinalizeUpgrade);
+    responseBuilder.setCmdType(CompleteFinalizeUpgrade);
     OMClientResponse response = null;
     Exception exception = null;
 
     try {
-      if (ozoneManager.isAdminAuthorizationEnabled()) {
-        UserGroupInformation ugi = createUGIForApi();
-        if (!ozoneManager.isAdmin(ugi)) {
-          throw new OMException("Access denied for user " + ugi + ". "
-              + "Superuser privilege is required to finalize upgrade.",
-              OMException.ResultCodes.ACCESS_DENIED);
-        }
-      }
-
-      FinalizeUpgradeRequest request =
-          getOmRequest().getFinalizeUpgradeRequest();
-      String upgradeClientID = request.getUpgradeClientId();
-      StatusAndMessages omStatus =
-          ozoneManager.finalizeUpgrade(upgradeClientID);
-
-      UpgradeFinalizationStatus.Status protoStatus =
-          UpgradeFinalizationStatus.Status.valueOf(omStatus.status().name());
-      UpgradeFinalizationStatus responseStatus =
-          UpgradeFinalizationStatus.newBuilder()
-              .setStatus(protoStatus)
-              .build();
+      // The upgrade client id is unused; finalization is driven by the background service.
+      ozoneManager.finalizeUpgrade("");
 
       OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
       int apparentVersion = ozoneManager.getVersionManager().getApparentVersion().serialize();
@@ -101,17 +78,13 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
           new CacheKey<>(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY), CacheValue.get(context.getIndex()));
       ozoneManager.getMetrics().setFinalizationInProgress(false);
 
-      FinalizeUpgradeResponse omResponse =
-          FinalizeUpgradeResponse.newBuilder()
-              .setStatus(responseStatus)
-              .build();
-      responseBuilder.setFinalizeUpgradeResponse(omResponse);
-      response = new OMFinalizeUpgradeResponse(responseBuilder.build(),
+      responseBuilder.setCompleteFinalizeUpgradeResponse(CompleteFinalizeUpgradeResponse.newBuilder().build());
+      response = new OMCompleteFinalizeUpgradeResponse(responseBuilder.build(),
           ozoneManager.getVersionManager().getApparentVersion().serialize());
       LOG.trace("Returning response: {}", response);
     } catch (IOException e) {
       exception = e;
-      response = new OMFinalizeUpgradeResponse(
+      response = new OMCompleteFinalizeUpgradeResponse(
           createErrorOMResponse(responseBuilder, e), -1);
     }
 

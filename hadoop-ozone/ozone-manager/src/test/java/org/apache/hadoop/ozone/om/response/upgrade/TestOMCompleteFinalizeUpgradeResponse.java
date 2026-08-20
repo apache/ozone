@@ -34,9 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Tests for the OMFinalizeUpgradeResponse class.
+ * Tests for the OMCompleteFinalizeUpgradeResponse class.
  */
-public class TestOMFinalizeUpgradeResponse {
+public class TestOMCompleteFinalizeUpgradeResponse {
 
   @TempDir
   private Path folder;
@@ -60,7 +60,8 @@ public class TestOMFinalizeUpgradeResponse {
     String value = omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY);
     assertEquals("ignored", value);
 
-    OMFinalizeUpgradeResponse finalizeUpgradeResponse = new OMFinalizeUpgradeResponse(createRequest(), 1);
+    OMCompleteFinalizeUpgradeResponse finalizeUpgradeResponse =
+        new OMCompleteFinalizeUpgradeResponse(createRequest(), 1);
     finalizeUpgradeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
@@ -72,7 +73,7 @@ public class TestOMFinalizeUpgradeResponse {
 
   private OzoneManagerProtocolProtos.OMResponse createRequest() {
     return OzoneManagerProtocolProtos.OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
+        .setCmdType(OzoneManagerProtocolProtos.Type.CompleteFinalizeUpgrade)
         .setStatus(OzoneManagerProtocolProtos.Status.OK)
         .build();
   }

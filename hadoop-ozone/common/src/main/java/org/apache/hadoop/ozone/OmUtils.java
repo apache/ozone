@@ -302,6 +302,7 @@ public final class OmUtils {
       // as deprecated
     case FinalizeUpgrade:
     case StartFinalizeUpgrade:
+    case CompleteFinalizeUpgrade:
     case DeleteOpenKeys:
     case SetS3Secret:
     case RevokeS3Secret:
@@ -421,6 +422,7 @@ public final class OmUtils {
       // as deprecated
     case FinalizeUpgrade:
     case StartFinalizeUpgrade:
+    case CompleteFinalizeUpgrade:
     case Prepare:
     case CancelPrepare:
     case DeleteOpenKeys:
