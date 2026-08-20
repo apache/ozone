@@ -17,21 +17,20 @@
 
 package org.apache.hadoop.ozone.om.ratis.utils;
 
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestCount;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestTime;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.hadoop.metrics2.AbstractMetric;
-import org.apache.hadoop.metrics2.MetricsRecord;
-import org.apache.hadoop.metrics2.MetricsTag;
-import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -66,41 +65,54 @@ public class TestOzoneManagerRatisUtils {
   public void testSubmitRequestRecordsMetricForRequestType() throws Exception {
     OMRequest request = newRequest(Type.PurgeKeys);
     OMResponse expected = newResponse(Type.PurgeKeys);
-    when(ratisServer.submitRequest(eq(request), any(ClientId.class), anyLong()))
-        .thenReturn(expected);
+    mockSubmitRequestWithDelay(expected);
 
     OMResponse actual = OzoneManagerRatisUtils.submitRequest(
         ozoneManager, request, ClientId.randomId(), 1L);
 
     assertSame(expected, actual);
-    assertEquals(1, counterFor(Type.PurgeKeys));
+    assertEquals(1, getRequestCount(metrics, Type.PurgeKeys));
+    assertThat(getRequestTime(metrics, Type.PurgeKeys)).isGreaterThan(0L);
     // Only the submitted type should be counted.
-    assertEquals(0, counterFor(Type.RenameKey));
+    assertEquals(0, getRequestCount(metrics, Type.RenameKey));
+    assertEquals(0, getRequestTime(metrics, Type.RenameKey));
   }
 
   @Test
   public void testSubmitRequestIncrementsMetricPerCall() throws Exception {
     OMRequest request = newRequest(Type.PurgeKeys);
-    when(ratisServer.submitRequest(any(OMRequest.class), any(ClientId.class), anyLong()))
-        .thenReturn(newResponse(Type.PurgeKeys));
+    mockSubmitRequestWithDelay(newResponse(Type.PurgeKeys));
 
     OzoneManagerRatisUtils.submitRequest(ozoneManager, request, ClientId.randomId(), 1L);
     OzoneManagerRatisUtils.submitRequest(ozoneManager, request, ClientId.randomId(), 2L);
 
-    assertEquals(2, counterFor(Type.PurgeKeys));
+    assertEquals(2, getRequestCount(metrics, Type.PurgeKeys));
+    assertThat(getRequestTime(metrics, Type.PurgeKeys)).isGreaterThan(0L);
   }
 
   @Test
   public void testSubmitRequestRecordsMetricOnFailure() throws Exception {
     OMRequest request = newRequest(Type.PurgeKeys);
-    when(ratisServer.submitRequest(any(OMRequest.class), any(ClientId.class), anyLong()))
-        .thenThrow(new ServiceException("submit failed"));
+    // Sleep briefly before failing so the measured latency is reliably greater than zero.
+    doAnswer(invocation -> {
+      Thread.sleep(2);
+      throw new ServiceException("submit failed");
+    }).when(ratisServer).submitRequest(any(OMRequest.class), any(ClientId.class), anyLong());
 
     assertThrows(ServiceException.class, () -> OzoneManagerRatisUtils.submitRequest(
         ozoneManager, request, ClientId.randomId(), 1L));
 
     // The measurement wraps the submission, so the metric is recorded even when it fails.
-    assertEquals(1, counterFor(Type.PurgeKeys));
+    assertEquals(1, getRequestCount(metrics, Type.PurgeKeys));
+    assertThat(getRequestTime(metrics, Type.PurgeKeys)).isGreaterThan(0L);
+  }
+
+  private void mockSubmitRequestWithDelay(OMResponse expectedResponse) throws ServiceException {
+    // Sleep briefly inside the submission so the measured latency is reliably greater than zero.
+    doAnswer(invocation -> {
+      Thread.sleep(2);
+      return expectedResponse;
+    }).when(ratisServer).submitRequest(any(OMRequest.class), any(ClientId.class), anyLong());
   }
 
   private static OMRequest newRequest(Type type) {
@@ -116,32 +128,5 @@ public class TestOzoneManagerRatisUtils {
         .setStatus(Status.OK)
         .setSuccess(true)
         .build();
-  }
-
-  /**
-   * Reads back the {@code counter} value recorded for the given request type
-   * from the live {@link ProtocolMessageMetrics} source.
-   */
-  private long counterFor(Type type) {
-    MetricsCollectorImpl collector = new MetricsCollectorImpl();
-    metrics.getMetrics(collector, true);
-    for (MetricsRecord record : collector.getRecords()) {
-      boolean matchesType = false;
-      for (MetricsTag tag : record.tags()) {
-        if ("type".equals(tag.name()) && type.toString().equals(tag.value())) {
-          matchesType = true;
-          break;
-        }
-      }
-      if (!matchesType) {
-        continue;
-      }
-      for (AbstractMetric metric : record.metrics()) {
-        if ("counter".equals(metric.name())) {
-          return metric.value().longValue();
-        }
-      }
-    }
-    return 0;
   }
 }
