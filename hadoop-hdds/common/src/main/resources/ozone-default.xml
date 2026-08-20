@@ -5293,7 +5293,10 @@
     <description>
       Implementation of org.apache.hadoop.ozone.om.helpers.VersionIdGenerator used to propose the
       versionId of an object version. The default numbers a version with the time it was written,
-      through the same scheme Ozone uses for block local IDs.
+      through the same scheme Ozone uses for block local IDs;
+      org.apache.hadoop.ozone.om.helpers.PinnedFirstVersionIdGenerator additionally pins the first
+      version of every key to a reserved sentinel, so that it can be referenced without listing the
+      key's versions first.
       The setting is cluster-wide and read when an OM starts, so a change takes effect on every
       bucket once the OMs have been restarted; it is not recorded in bucket metadata. Keys written
       under a previous generator keep the ids they were given: a proposal is taken as a floor when
