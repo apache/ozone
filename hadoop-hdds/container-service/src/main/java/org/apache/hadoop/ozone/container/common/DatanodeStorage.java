@@ -36,6 +36,9 @@ import org.apache.hadoop.ozone.common.Storage;
  * StorageDirectories used by the DataNode.
  */
 public class DatanodeStorage extends Storage {
+
+  public static final String TESTING_INIT_APPARENT_VERSION_KEY = "testing.hdds.datanode.init.apparent.version";
+
   /**
    * Construct DataNodeStorageConfig.
    * @throws IOException if any directories are inaccessible.
@@ -43,7 +46,8 @@ public class DatanodeStorage extends Storage {
   public DatanodeStorage(ConfigurationSource conf, String dataNodeId)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
-        DATANODE_LAYOUT_VERSION_DIR, dataNodeId, getDefaultApparentVersion(conf));
+        DATANODE_LAYOUT_VERSION_DIR, dataNodeId,
+        getInitApparentVersion(conf, TESTING_INIT_APPARENT_VERSION_KEY, () -> getDefaultApparentVersion(conf)));
   }
 
   public DatanodeStorage(OzoneConfiguration conf, String dataNodeId, int apparentVersion)
@@ -55,7 +59,8 @@ public class DatanodeStorage extends Storage {
   public DatanodeStorage(ConfigurationSource conf)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
-        DATANODE_LAYOUT_VERSION_DIR, getDefaultApparentVersion(conf));
+        DATANODE_LAYOUT_VERSION_DIR,
+        getInitApparentVersion(conf, TESTING_INIT_APPARENT_VERSION_KEY, () -> getDefaultApparentVersion(conf)));
   }
 
   @Override

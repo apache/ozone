@@ -27,7 +27,7 @@ import java.nio.file.Path;
 import java.util.Properties;
 import java.util.function.IntSupplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -280,7 +280,7 @@ public abstract class Storage {
     storageInfo.writeTo(getVersionFile());
   }
 
-  protected static int getInitApparentVersion(OzoneConfiguration conf, String configKey,
+  protected static int getInitApparentVersion(ConfigurationSource conf, String configKey,
       IntSupplier defaultLvSupplier) {
     int lV = conf.getInt(configKey, OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT);
     if (lV == OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT) {

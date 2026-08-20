@@ -224,6 +224,25 @@ class TestDatanodeVersionManager extends AbstractComponentVersionManagerTest {
     }
   }
 
+  @Test
+  public void testInitApparentVersionConfigKeyOverridesDefault(@TempDir Path storageRoot) throws IOException {
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageRoot.toString());
+    conf.setInt(DatanodeStorage.TESTING_INIT_APPARENT_VERSION_KEY, INITIAL_VERSION.serialize());
+
+    DatanodeStorage storage = new DatanodeStorage(conf, UUID.randomUUID().toString());
+    assertEquals(INITIAL_VERSION.serialize(), storage.getApparentVersion());
+    assertDatanodeApparentVersionOnDisk(conf, INITIAL_VERSION.serialize());
+  }
+
+  @Test
+  public void testInitApparentVersionDefaultsToSoftwareVersionWhenUnset(@TempDir Path storageRoot) throws IOException {
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageRoot.toString());
+
+    DatanodeStorage storage = new DatanodeStorage(conf, UUID.randomUUID().toString());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), storage.getApparentVersion());
+    assertDatanodeApparentVersionOnDisk(conf, HDDSVersion.SOFTWARE_VERSION.serialize());
+  }
+
   private static void assertDatanodeApparentVersionOnDisk(OzoneConfiguration conf, int expected)
       throws IOException {
     DatanodeStorage reloaded = new DatanodeStorage(conf, UUID.randomUUID().toString());
