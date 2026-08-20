@@ -215,7 +215,7 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getOpenKeyTableCodec();
     final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getKeyTableCodec();
 
-    OmKeyInfo originKey = getKeyInfo(1);
+    OmKeyInfo originKey = getKeyInfo(1, StorageTier.getDefaultTier(), true);
     assertNull(originKey.getExpectedDataGeneration());
 
     byte[] openKeyData = openKeyCodec.toPersistedFormat(originKey);

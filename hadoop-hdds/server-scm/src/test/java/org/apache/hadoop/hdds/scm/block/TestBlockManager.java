@@ -76,6 +76,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -225,7 +226,7 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockWithStoragePolicy() throws Exception {
-    List<DatanodeDetails> dns = nodeManager.getAllNodes();
+    List<DatanodeInfo> dns = nodeManager.getAllNodes();
     AllocatedBlock block = null;
 
     for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
@@ -657,8 +658,8 @@ public class TestBlockManager {
     return pipelineManager.openContainerLimit(pipeline.getNodes());
   }
 
-  private void staleDatanodeForStorageType(StorageType storageType, List<DatanodeDetails> dns) {
-    for (DatanodeDetails dn : dns) {
+  private void staleDatanodeForStorageType(StorageType storageType, List<DatanodeInfo> dns) {
+    for (DatanodeInfo dn : dns) {
       if (nodeManager.getDatanodeInfo(dn).getStorageReports().get(0).getStorageType() ==
           StorageTypeUtils.getStorageTypeProto(storageType)) {
         nodeManager.setNodeState(dn, STALE);
