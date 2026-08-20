@@ -261,19 +261,24 @@ public final class OmLCRule {
    * @return true is this key fits this rule and will trigger the action, otherwise false
    */
   public boolean match(OmKeyInfo omKeyInfo) {
-    boolean matched = false;
-    // verify modification time first
-    if (getExpiration().isExpired(omKeyInfo.getModificationTime())) {
-      // verify prefix and filter
-      if (prefix != null) {
-        if (omKeyInfo.getKeyName().startsWith(prefix)) {
-          matched = true;
-        }
-      } else {
-        return filter.match(omKeyInfo);
-      }
+    // verify modification time first, then prefix and filter
+    return getExpiration().isExpired(omKeyInfo.getModificationTime())
+        && matchesScope(omKeyInfo);
+  }
+
+  /**
+   * Whether the key is in this rule's scope, by prefix or by filter, without
+   * regard to any action's own condition. An action that decides expiry for
+   * itself - NoncurrentVersionExpiration, which reasons about a version's
+   * position and how long it has been noncurrent - needs the scope alone.
+   *
+   * @param omKeyInfo the key to evaluate against this rule's scope
+   */
+  public boolean matchesScope(OmKeyInfo omKeyInfo) {
+    if (prefix != null) {
+      return omKeyInfo.getKeyName().startsWith(prefix);
     }
-    return matched;
+    return filter.match(omKeyInfo);
   }
 
   /**

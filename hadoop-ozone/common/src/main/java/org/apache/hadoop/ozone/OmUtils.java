@@ -333,6 +333,7 @@ public final class OmUtils {
     case DeleteLifecycleConfiguration:
     case SetLifecycleServiceStatus:
     case SaveLifecycleScanState:
+    case ReclaimObjectVersions:
       return false;
     case UnknownCommand:
       return false;
@@ -474,6 +475,9 @@ public final class OmUtils {
     case DeleteLifecycleConfiguration:
     case SetLifecycleServiceStatus:
     case SaveLifecycleScanState:
+    // Submitted by the leader's own lifecycle scan, like the scan state it
+    // travels with.
+    case ReclaimObjectVersions:
     case UnknownCommand:
       return false;
     case EchoRPC:
