@@ -1357,16 +1357,8 @@ public class KeyLifecycleService extends BackgroundService {
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList,
         boolean dir, OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
       if (moveToTrashEnabled.get() && bucket.getBucketLayout() != OBJECT_STORE && getEffectiveOzoneTrash() != null) {
-        int failedMoves = moveToTrash(bucket, keysList, dir);
-        if (failedMoves == 0) {
-          sendSaveScanStateRequest(scanStateBuilder, scanFinished);
-        } else {
-          String message = "Failed to move " + failedMoves + " expired " +
-              (dir ? "directory" : "key") + " entries to trash in bucket " +
-              bucket.getVolumeName() + "/" + bucket.getBucketName();
-          LOG.warn(message);
-          throw new IllegalStateException(message);
-        }
+        moveToTrash(bucket, keysList, dir);
+        sendSaveScanStateRequest(scanStateBuilder, scanFinished);
       } else {
         sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
             bucket.getOwner(), keysList, dir, scanStateBuilder, scanFinished);
@@ -1544,11 +1536,10 @@ public class KeyLifecycleService extends BackgroundService {
       }
     }
 
-    private int moveToTrash(OmBucketInfo bucket, LimitedExpiredObjectList keysList, boolean isDir) {
+    private void moveToTrash(OmBucketInfo bucket, LimitedExpiredObjectList keysList, boolean isDir) {
       if (keysList.isEmpty()) {
-        return 0;
+        return;
       }
-      int failedMoves = 0;
       String volumeName = bucket.getVolumeName();
       String bucketName = bucket.getBucketName();
       String trashRoot = TRASH_PREFIX + OM_KEY_PREFIX + bucket.getOwner();
@@ -1556,8 +1547,9 @@ public class KeyLifecycleService extends BackgroundService {
       try {
         checkAndCreateTrashDirIfNeeded(bucket, trashCurrent);
       } catch (IOException e) {
-        LOG.error("Failed to prepare trash root {} for bucket {}/{}", trashCurrent, volumeName, bucketName, e);
-        return keysList.size();
+        String message = "Failed to prepare trash root " + trashCurrent + " for bucket " + volumeName + "/" + bucketName;
+        LOG.error(message, e);
+        throw new IllegalStateException(message, e);
       }
 
       for (int i = 0; i < keysList.size(); i++) {
@@ -1569,7 +1561,6 @@ public class KeyLifecycleService extends BackgroundService {
         } catch (IOException e) {
           LOG.error("Failed to check and create Trash dir {} for bucket {}/{}", baseKeyTrashPath,
               volumeName, bucketName, e);
-          failedMoves++;
           continue;
         }
         String targetKeyName = trashCurrent + OM_KEY_PREFIX + keyName;
@@ -1610,15 +1601,9 @@ public class KeyLifecycleService extends BackgroundService {
           if (omResponse != null) {
             if (!omResponse.getSuccess()) {
               OzoneManagerProtocolProtos.Status status = omResponse.getStatus();
-              if (isMissingSourceStatus(status)) {
-                LOG.info("Skip retry for missing source key: {} while moving to trash key: {}, status: {}",
-                    keyName, targetKeyName, status);
-                continue;
-              }
               // log the failure and continue the iterating
               LOG.error("RenameKey request failed with source key: {}, dest key: {}, status: {}",
                   keyName, targetKeyName, status);
-              failedMoves++;
               continue;
             }
           }
@@ -1634,35 +1619,13 @@ public class KeyLifecycleService extends BackgroundService {
             metrics.incrSizeKeyRenamed(keysList.getReplicatedSize(i));
           }
         } catch (IOException | InterruptedException e) {
-          if (e instanceof OMException) {
-            OMException.ResultCodes result = ((OMException) e).getResult();
-            if (isMissingSourceResult(result)) {
-              LOG.info("Skip retry for missing source key: {} while moving to trash key: {}, result: {}",
-                  keyName, targetKeyName, result);
-              continue;
-            }
-          }
           if (e instanceof InterruptedException) {
             Thread.currentThread().interrupt();
           }
           LOG.error("Failed to send RenameKeysRequest", e);
-          failedMoves++;
         }
       }
       keysList.clear();
-      return failedMoves;
-    }
-
-    private boolean isMissingSourceStatus(OzoneManagerProtocolProtos.Status status) {
-      return status == OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND
-          || status == OzoneManagerProtocolProtos.Status.FILE_NOT_FOUND
-          || status == OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
-    }
-
-    private boolean isMissingSourceResult(OMException.ResultCodes result) {
-      return result == OMException.ResultCodes.KEY_NOT_FOUND
-          || result == OMException.ResultCodes.FILE_NOT_FOUND
-          || result == OMException.ResultCodes.DIRECTORY_NOT_FOUND;
     }
 
     private void checkAndCreateTrashDirIfNeeded(OmBucketInfo bucket, Path dirPath) throws IOException {
