@@ -166,6 +166,8 @@ enum Type {
   GetLifecycleServiceStatus    = 150;
   SetLifecycleServiceStatus    = 151;
   SaveLifecycleScanState       = 152;
+  // Submitted by the lifecycle scan to reclaim noncurrent object versions.
+  ReclaimObjectVersions        = 153;
 }
 
 enum SafeMode {
@@ -326,6 +328,7 @@ message OMRequest {
   optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 151;
   optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 152;
   optional SaveLifecycleScanStateRequest saveLifecycleScanStateRequest = 153;
+  optional ReclaimObjectVersionsRequest reclaimObjectVersionsRequest = 154;
 }
 
 message OMResponse {
@@ -471,6 +474,7 @@ message OMResponse {
   optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 150;
   optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 151;
   optional SaveLifecycleScanStateResponse saveLifecycleScanStateResponse = 152;
+  optional ReclaimObjectVersionsResponse reclaimObjectVersionsResponse = 153;
 }
 
 enum Status {
@@ -2719,6 +2723,23 @@ message SetLifecycleServiceStatusRequest {
 message SetLifecycleServiceStatusResponse {
 }
 
+/**
+ * Noncurrent object versions of one bucket that the lifecycle scan selected for
+ * reclamation, addressed by their versionedKeyTable dbKeys.
+ */
+message ObjectVersionsBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated string versionKeys = 3;
+}
+
+message ReclaimObjectVersionsRequest {
+  repeated ObjectVersionsBucket versionsPerBucket = 1;
+}
+
+message ReclaimObjectVersionsResponse {
+}
+
 message LifecycleScanState {
   optional string bucketKey = 1;  // volume/bucket
   optional uint64 bucketObjID = 2;
@@ -2729,6 +2750,9 @@ message LifecycleScanState {
   optional string lastScannedDir = 7;
   optional string lastScannedDirKey = 8;
   optional string lastScannedMpuKey = 9;
+  // Where the versionedKeyTable scan left off. Its own field because that scan
+  // walks a different table than lastScannedKey's.
+  optional string lastScannedVersionKey = 10;
 }
 
 message SaveLifecycleScanStateRequest {
