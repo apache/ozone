@@ -47,10 +47,21 @@ public class OzoneLifecycleConfiguration {
   public static class OzoneLCExpiration {
     private final Integer days;
     private final String date;
+    private final boolean expiredObjectDeleteMarker;
 
     public OzoneLCExpiration(Integer days, String date) {
+      this(days, date, false);
+    }
+
+    public OzoneLCExpiration(Integer days, String date,
+        boolean expiredObjectDeleteMarker) {
       this.days = days;
       this.date = date;
+      this.expiredObjectDeleteMarker = expiredObjectDeleteMarker;
+    }
+
+    public boolean isExpiredObjectDeleteMarker() {
+      return expiredObjectDeleteMarker;
     }
 
     public String getDate() {
@@ -59,6 +70,28 @@ public class OzoneLifecycleConfiguration {
 
     public Integer getDays() {
       return days;
+    }
+  }
+
+  /**
+   * A class that encapsulates OzoneLCNoncurrentVersionExpiration.
+   */
+  public static class OzoneLCNoncurrentVersionExpiration {
+    private final Integer noncurrentDays;
+    private final Integer newerNoncurrentVersions;
+
+    public OzoneLCNoncurrentVersionExpiration(Integer noncurrentDays,
+        Integer newerNoncurrentVersions) {
+      this.noncurrentDays = noncurrentDays;
+      this.newerNoncurrentVersions = newerNoncurrentVersions;
+    }
+
+    public Integer getNoncurrentDays() {
+      return noncurrentDays;
+    }
+
+    public Integer getNewerNoncurrentVersions() {
+      return newerNoncurrentVersions;
     }
   }
 
@@ -136,17 +169,32 @@ public class OzoneLifecycleConfiguration {
     private final String status;
     private final OzoneLCExpiration expiration;
     private final OzoneLCAbortIncompleteMultipartUpload abortIncompleteMultipartUpload;
+    private final OzoneLCNoncurrentVersionExpiration noncurrentVersionExpiration;
     private final OzoneLCFilter filter;
 
     public OzoneLCRule(String id, String prefix, String status,
         OzoneLCExpiration expiration, OzoneLCAbortIncompleteMultipartUpload abortIncompleteMultipartUpload,
+        OzoneLCFilter filter) {
+      this(id, prefix, status, expiration, abortIncompleteMultipartUpload, null,
+          filter);
+    }
+
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public OzoneLCRule(String id, String prefix, String status,
+        OzoneLCExpiration expiration, OzoneLCAbortIncompleteMultipartUpload abortIncompleteMultipartUpload,
+        OzoneLCNoncurrentVersionExpiration noncurrentVersionExpiration,
         OzoneLCFilter filter) {
       this.id = id;
       this.prefix = prefix;
       this.status = status;
       this.expiration = expiration;
       this.abortIncompleteMultipartUpload = abortIncompleteMultipartUpload;
+      this.noncurrentVersionExpiration = noncurrentVersionExpiration;
       this.filter = filter;
+    }
+
+    public OzoneLCNoncurrentVersionExpiration getNoncurrentVersionExpiration() {
+      return noncurrentVersionExpiration;
     }
 
     public String getId() {
@@ -200,7 +248,15 @@ public class OzoneLifecycleConfiguration {
       OzoneLifecycleConfiguration.OzoneLCExpiration e = null;
       if (r.getExpiration() != null) {
         e = new OzoneLifecycleConfiguration.OzoneLCExpiration(
-            r.getExpiration().getDays(), r.getExpiration().getDate());
+            r.getExpiration().getDays(), r.getExpiration().getDate(),
+            r.getExpiration().isExpiredObjectDeleteMarker());
+      }
+
+      OzoneLifecycleConfiguration.OzoneLCNoncurrentVersionExpiration n = null;
+      if (r.getNoncurrentVersionExpiration() != null) {
+        n = new OzoneLifecycleConfiguration.OzoneLCNoncurrentVersionExpiration(
+            r.getNoncurrentVersionExpiration().getNoncurrentDays(),
+            r.getNoncurrentVersionExpiration().getNewerNoncurrentVersions());
       }
 
       OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload a = null;
@@ -221,7 +277,7 @@ public class OzoneLifecycleConfiguration {
       }
 
       rules.add(new OzoneLifecycleConfiguration.OzoneLCRule(r.getId(),
-          r.getPrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, a, f));
+          r.getPrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, a, n, f));
     }
 
     return new OzoneLifecycleConfiguration(lifecycleConfiguration.getVolume(),

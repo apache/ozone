@@ -888,9 +888,17 @@ public final class OzoneBucketStub extends OzoneBucket {
       OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload a = null;
       OzoneLifecycleConfiguration.OzoneLCFilter f = null;
 
+      OzoneLifecycleConfiguration.OzoneLCNoncurrentVersionExpiration n = null;
+
       if (r.getExpiration() != null) {
         e = new OzoneLifecycleConfiguration.OzoneLCExpiration(
-            r.getExpiration().getDays(), r.getExpiration().getDate());
+            r.getExpiration().getDays(), r.getExpiration().getDate(),
+            r.getExpiration().isExpiredObjectDeleteMarker());
+      }
+      if (r.getNoncurrentVersionExpiration() != null) {
+        n = new OzoneLifecycleConfiguration.OzoneLCNoncurrentVersionExpiration(
+            r.getNoncurrentVersionExpiration().getNoncurrentDays(),
+            r.getNoncurrentVersionExpiration().getNewerNoncurrentVersions());
       }
       if (r.getAbortIncompleteMultipartUpload() != null) {
         a = new OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload(
@@ -907,7 +915,7 @@ public final class OzoneBucketStub extends OzoneBucket {
       }
 
       rules.add(new OzoneLifecycleConfiguration.OzoneLCRule(r.getId(),
-          r.getEffectivePrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, a, f));
+          r.getEffectivePrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, a, n, f));
     }
 
     return new OzoneLifecycleConfiguration(
