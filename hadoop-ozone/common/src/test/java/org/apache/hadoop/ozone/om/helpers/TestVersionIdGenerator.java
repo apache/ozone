@@ -37,7 +37,8 @@ public class TestVersionIdGenerator {
 
   /** Every generator, so the contract below is checked against all of them. */
   static Stream<VersionIdGenerator> generators() {
-    return Stream.of(new UniqueIdVersionIdGenerator());
+    return Stream.of(new UniqueIdVersionIdGenerator(),
+        new PinnedFirstVersionIdGenerator());
   }
 
   /**
@@ -91,6 +92,44 @@ public class TestVersionIdGenerator {
     assertEquals(5000L, generator.versionIdFor(5000L, true));
   }
 
+  /** Only a key's first version is special; later ones are numbered normally. */
+  @Test
+  void onlyTheFirstVersionIsPinned() {
+    final VersionIdGenerator generator = new PinnedFirstVersionIdGenerator();
+
+    assertEquals(PinnedFirstVersionIdGenerator.FIRST_VERSION_ID,
+        generator.versionIdFor(5000L, false));
+    assertEquals(5000L, generator.versionIdFor(5000L, true));
+  }
+
+  /**
+   * versionedKeyTable orders versions by Long.MAX_VALUE - versionId, so the
+   * sentinel has to stay below every proposed id to sort at the old end of the
+   * key.
+   */
+  @Test
+  void theSentinelSortsBeforeEveryProposedId() {
+    final long sentinel = PinnedFirstVersionIdGenerator.FIRST_VERSION_ID;
+    final long proposed =
+        new PinnedFirstVersionIdGenerator().generateVersionId();
+
+    assertTrue(sentinel < proposed,
+        "sentinel " + sentinel + " does not sort before " + proposed);
+    assertTrue(Long.MAX_VALUE - sentinel > Long.MAX_VALUE - proposed,
+        "the sentinel does not sort at the old end of the key");
+  }
+
+  /**
+   * The null version is marked by isNullVersion and carries a proposed id like
+   * any other version, so nothing of it is reserved; the sentinel only has to
+   * stay clear of the unset value a pre-versioning record carries.
+   */
+  @Test
+  void theSentinelDoesNotCollideWithTheNullSlot() {
+    assertTrue(PinnedFirstVersionIdGenerator.FIRST_VERSION_ID
+        > VersionIdGenerator.UNSET_VERSION_ID);
+  }
+
   @Test
   void timeBasedIdsAreTheClusterDefault() {
     assertInstanceOf(UniqueIdVersionIdGenerator.class,
@@ -102,6 +141,13 @@ public class TestVersionIdGenerator {
     assertInstanceOf(FixedVersionIdGenerator.class,
         VersionIdGenerator.fromConfiguration(
             configuredWith(FixedVersionIdGenerator.class.getName())));
+  }
+
+  @Test
+  void thePinnedGeneratorIsSelectedByClassName() {
+    assertInstanceOf(PinnedFirstVersionIdGenerator.class,
+        VersionIdGenerator.fromConfiguration(configuredWith(
+            PinnedFirstVersionIdGenerator.class.getName())));
   }
 
   @Test

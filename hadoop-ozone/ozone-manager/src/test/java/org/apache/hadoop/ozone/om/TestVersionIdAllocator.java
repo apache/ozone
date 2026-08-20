@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.helpers.PinnedFirstVersionIdGenerator.FIRST_VERSION_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.PinnedFirstVersionIdGenerator;
 import org.apache.hadoop.ozone.om.helpers.UniqueIdVersionIdGenerator;
 import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.junit.jupiter.api.Test;
@@ -156,6 +158,32 @@ public class TestVersionIdAllocator {
           "the allocator should hold nothing but its generator, but holds "
               + field.getType().getName() + " " + field.getName());
     }
+  }
+
+  /**
+   * Whether the key has a current version is settled under the write's lock, so
+   * a generator that numbers the first one specially decides it here.
+   */
+  @Test
+  void thePinnedGeneratorGivesTheFirstVersionTheSentinel() {
+    VersionIdAllocator allocator =
+        new VersionIdAllocator(new PinnedFirstVersionIdGenerator());
+
+    assertEquals(FIRST_VERSION_ID, allocator.allocate(5000L, null));
+  }
+
+  @Test
+  void thePinnedGeneratorLeavesLaterVersionsAlone() {
+    VersionIdAllocator allocator =
+        new VersionIdAllocator(new PinnedFirstVersionIdGenerator());
+
+    assertEquals(5000L,
+        allocator.allocate(5000L, versionWithId(FIRST_VERSION_ID)));
+  }
+
+  @Test
+  void theDefaultGeneratorDoesNotPinTheFirstVersion() {
+    assertEquals(5000L, allocator().allocate(5000L, null));
   }
 
   @Test
