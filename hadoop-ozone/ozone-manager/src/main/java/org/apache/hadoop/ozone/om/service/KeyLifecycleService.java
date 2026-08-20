@@ -1547,7 +1547,8 @@ public class KeyLifecycleService extends BackgroundService {
       try {
         checkAndCreateTrashDirIfNeeded(bucket, trashCurrent);
       } catch (IOException e) {
-        String message = "Failed to prepare trash root " + trashCurrent + " for bucket " + volumeName + "/" + bucketName;
+        String message =
+            "Failed to prepare trash root " + trashCurrent + " for bucket " + volumeName + "/" + bucketName;
         LOG.error(message, e);
         throw new IllegalStateException(message, e);
       }
