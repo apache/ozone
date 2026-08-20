@@ -87,6 +87,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -2588,6 +2589,72 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(initialRenamedKeyCount, metrics.getNumKeyRenamed().value());
       assertEquals(0, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @Test
+    void testMoveToTrashAbortTaskWhenTrashRootPrepareFails() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String keyPrefix = "key";
+      String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
+      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+      long initialSuccessTaskCount = metrics.getNumSuccessTask().value();
+
+      createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, 1, 1, keyPrefix, null);
+      Thread.sleep(SERVICE_INTERVAL);
+      GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == 1,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      keyLifecycleService.setMoveToTrashEnabled(true);
+      final float trashInterval = 0.5f;
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>)
+              () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+
+      OmLifecycleConfiguration policy = new OmLifecycleConfiguration.Builder()
+          .setVolume(volumeName)
+          .setBucket(bucketName)
+          .setBucketLayout(FILE_SYSTEM_OPTIMIZED)
+          .setBucketObjectID(bucketObjectID)
+          .setRules(Collections.singletonList(new OmLCRule.Builder()
+              .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
+              .setEnabled(true)
+              .setPrefix("")
+              .setAction(new OmLCExpiration.Builder()
+                  .setDate(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS).toString())
+                  .build())
+              .build()))
+          .build();
+
+      String expectedTrashRoot = new Path(TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner, CURRENT).toString();
+      OzoneManager omSpy = spy(om);
+      doThrow(new IOException("Injected trash root prepare failure"))
+          .when(omSpy).getFileStatus(argThat(key ->
+              key != null
+                  && volumeName.equals(key.getVolumeName())
+                  && bucketName.equals(key.getBucketName())
+                  && expectedTrashRoot.equals(key.getKeyName())));
+
+      Field ozoneManagerField = KeyLifecycleService.class.getDeclaredField("ozoneManager");
+      ozoneManagerField.setAccessible(true);
+      ozoneManagerField.set(keyLifecycleService, omSpy);
+
+      GenericTestUtils.LogCapturer log =
+          GenericTestUtils.LogCapturer.captureLogs(LoggerFactory.getLogger(KeyLifecycleService.class));
+      try {
+        KeyLifecycleService.LifecycleActionTask task = keyLifecycleService.new LifecycleActionTask(policy);
+        task.call();
+
+        assertTrue(log.getOutput().contains("Failed to prepare trash root"));
+        assertTrue(log.getOutput().contains("Failed to evaluate lifecycle configuration for bucket"));
+        assertEquals(initialSuccessTaskCount, metrics.getNumSuccessTask().value());
+        assertEquals(1, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+      } finally {
+        ozoneManagerField.set(keyLifecycleService, om);
+        log.stopCapturing();
+      }
     }
 
     @Test
