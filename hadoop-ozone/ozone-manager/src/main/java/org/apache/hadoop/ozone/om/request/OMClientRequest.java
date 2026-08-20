@@ -177,8 +177,11 @@ public abstract class OMClientRequest implements RequestAuditor {
       userInfo.setUserName(user.getUserName());
     }
 
-    // for gRPC s3g omRequests that contain user name
-    if (user == null && omRequest.hasUserInfo()) {
+    // for gRPC s3g omRequests that contain user name. Only adopt the
+    // client-supplied user name when no identity was established above:
+    // it is unauthenticated data and must never override the identity
+    // derived from S3 authentication or from the RPC user.
+    if (user == null && !userInfo.hasUserName() && omRequest.hasUserInfo()) {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 
