@@ -1243,7 +1243,6 @@ STS session policy containing only GetObject must deny DeleteObjects
 Expired STS temporary credentials must return ExpiredToken on S3 APIs
     # Increase timeout to account for 15 minute STS token expiration plus the time to execute the api calls
     [Timeout]                     25 minutes
-    Skip                          Temporarily disabled.
     ${dummy_mpu_upload_id} =      Set Variable                  dummyExpiredStsMpuUploadId01
 
     Wait Until Expired STS Token Expiration Elapsed
