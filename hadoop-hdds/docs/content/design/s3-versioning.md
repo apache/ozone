@@ -263,12 +263,14 @@ flowchart TB
 
 `versionId` generation is abstracted behind a `VersionIdGenerator` interface,
 chosen per cluster by class name (`ozone.om.versioning.version-id-generator`), so
-a deployment can plug in its own. The generator is cluster-wide and may be changed
-on a running cluster; it is not recorded in bucket metadata. Every generator must
-satisfy, **for itself**: strictly increasing within a key (a later version's id is
-always greater than every earlier version's id of that key); frozen once assigned;
-`0` and `1` never handed out (`0` is the unset value of the optional field, `1` is
-the first-version sentinel).
+a deployment can plug in its own. The generator is cluster-wide and read when an OM
+starts, so a change takes effect on every bucket once the OMs have been restarted;
+it is not recorded in bucket metadata. Every generator must satisfy, **for itself**:
+strictly increasing within a key (a later version's id is always greater than every
+earlier version's id of that key); frozen once assigned; and `0` never handed out,
+being the unset value of the optional field. `1` is reserved as well, but by the
+pinned generator below rather than by the interface: it is that generator's own
+sentinel, which it assigns and never proposes.
 
 The identifier is deliberately **not** derived from OM's Ratis transaction index.
 The versionId is persisted, externally referenced, and part of the S3 API surface;
@@ -301,9 +303,9 @@ does show the migration path if a persisted sequence is ever wanted:
   ordering in versionedKeyTable stays plain signed arithmetic; and the id sorts by
   creation time, which is what the version chain wants anyway.
 - **`PinnedFirstVersionIdGenerator` (opt-in)** — only the first version is
-  special: it takes the reserved sentinel `FIRST_VERSION_ID = 1`, below any proposed
-  id, so it sorts oldest and can be referenced without listing the key's versions
-  first. All later versions take a normally proposed id. First versions are detected by "no
+  special: it takes its own sentinel, `PinnedFirstVersionIdGenerator.FIRST_VERSION_ID
+  = 1`, below any proposed id, so it sorts oldest and can be referenced without
+  listing the key's versions first. All later versions take a normally proposed id. First versions are detected by "no
   current version in keyTable", reusing the lookup the write path performs anyway.
   Known trade-off: if every version of a key is permanently deleted and the key is
   recreated, the new first version takes the sentinel again; only deployments that
