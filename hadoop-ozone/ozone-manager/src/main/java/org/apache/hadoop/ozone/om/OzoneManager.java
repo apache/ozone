@@ -5912,6 +5912,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omExecutionFlow;
   }
 
+  public ProtocolMessageMetrics<OzoneManagerProtocolProtos.Type> getOmClientProtocolMetrics() {
+    return omClientProtocolMetrics;
+  }
+
   /**
    * OM Startup mode.
    */
