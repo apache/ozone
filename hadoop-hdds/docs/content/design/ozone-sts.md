@@ -42,7 +42,7 @@ solutions that want to aggregate data across multiple cloud providers.
 # 3. How Ozone STS Works
 
 The initial implementation of Ozone STS supports only the [AssumeRole](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html)
-API from the AWS specification.  A new STS endpoint `/sts` on port `9880` (port `9881` for https) will be created to service STS requests in the S3 Gateway.
+API from the AWS specification.  A new STS endpoint on port `9880` (port `9881` for https) will be created to service STS requests in the S3 Gateway at the root path (`/`).
 We use a separate port for STS to align with AWS so we don't have conflicts at a later time.  This means we have:
 - Admin port for Ozone specific S3 admin operations
 - STS port for STS APIs, analogous to AWS' separate STS endpoint
