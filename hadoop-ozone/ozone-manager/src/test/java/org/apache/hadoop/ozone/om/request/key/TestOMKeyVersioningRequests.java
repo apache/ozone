@@ -38,9 +38,12 @@ import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyDeleteMarkerResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteMarkerResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
@@ -96,6 +99,18 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
   /** Puts a current version into keyTable, as an earlier write would have. */
   private String seedCurrentVersion(Long versionId) throws Exception {
     return seedCurrentVersion(versionId, false);
+  }
+
+  /** Puts a current version of another key, to batch alongside the first. */
+  private void seedCurrentVersion(String otherKey, Long versionId)
+      throws Exception {
+    OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, otherKey, replicationConfig)
+        .setVersionId(versionId)
+        .build();
+    omMetadataManager.getKeyTable(getBucketLayout()).put(
+        omMetadataManager.getOzoneKey(volumeName, bucketName, otherKey),
+        keyInfo);
   }
 
   private String seedCurrentVersion(Long versionId, boolean deleteMarker)
@@ -380,6 +395,83 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
 
     assertTrue(processed.getDeleteKeyRequest().getKeyArgs()
         .getProposedVersionId() > VersionIdGenerator.UNSET_VERSION_ID);
+  }
+
+  /**
+   * A batch delete is the same operation over more keys, so it has to leave
+   * the bucket in the same shape a single delete would: a marker per key, the
+   * version each one superseded kept. Hard-deleting instead would destroy the
+   * current version and strand the versions under it.
+   */
+  @Test
+  public void testBatchDeleteInsertsAMarkerPerKey() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(100L);
+    String otherKey = keyName + "-other";
+    seedCurrentVersion(otherKey, 150L);
+
+    OMClientResponse response = new OMKeysDeleteRequest(
+        batchDeleteRequest(PROPOSED, keyName, otherKey), getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 200L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+
+    // both keys are now markers, and neither superseded version was reclaimed
+    assertTrue(currentVersion().isDeleteMarker());
+    assertEquals(PROPOSED, currentVersion().getVersionId());
+    assertNotNull(noncurrentVersion(100L));
+
+    OmKeyInfo otherCurrent = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneKey(volumeName, bucketName, otherKey));
+    assertTrue(otherCurrent.isDeleteMarker());
+    // one proposal covers the batch: ids only have to increase within a key
+    assertEquals(PROPOSED, otherCurrent.getVersionId());
+    assertNotNull(omMetadataManager.getVersionedKeyTable().get(
+        omMetadataManager.getVersionedOzoneKey(volumeName, bucketName,
+            otherKey, 150L)));
+
+    assertInstanceOf(OMKeysDeleteMarkerResponse.class, response);
+  }
+
+  /** The proposal is a floor for each key independently. */
+  @Test
+  public void testBatchDeleteRaisesTheProposalPerKey() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(PROPOSED + 10);
+
+    new OMKeysDeleteRequest(batchDeleteRequest(PROPOSED, keyName),
+        getBucketLayout()).validateAndUpdateCache(ozoneManager, 200L);
+
+    assertEquals(PROPOSED + 11, currentVersion().getVersionId());
+  }
+
+  /** A bucket without versioning keeps the old hard-delete behaviour. */
+  @Test
+  public void testBatchDeleteOnAnUnversionedBucketStillDeletes()
+      throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    seedCurrentVersion(null);
+
+    OMClientResponse response = new OMKeysDeleteRequest(
+        batchDeleteRequest(PROPOSED, keyName), getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 200L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertNull(currentVersion());
+  }
+
+  private OMRequest batchDeleteRequest(long proposedVersionId, String... keys) {
+    return OMRequest.newBuilder()
+        .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
+            .setDeleteKeys(DeleteKeyArgs.newBuilder()
+                .setVolumeName(volumeName)
+                .setBucketName(bucketName)
+                .addAllKeys(java.util.Arrays.asList(keys))
+                .setProposedVersionId(proposedVersionId)))
+        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
+        .setClientId(UUID.randomUUID().toString()).build();
   }
 
   /** S3 inserts a delete marker even for a key that does not exist. */
