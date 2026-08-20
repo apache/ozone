@@ -113,6 +113,10 @@ public class TestContainerUtils {
   public void testDatanodeIDPersistent(@TempDir File tempDir) throws Exception {
     // Generate IDs for testing
     DatanodeDetails id1 = randomDatanodeDetails();
+    // `randomDatanodeDetails()` populates the current version to SOFTWARE_VERSION by default.
+    // Datanodes do not populate this value when persisting the proto, only when sending it over the wire,
+    // so override the setter to the default value to match what Datanodes actually persist internally.
+    id1.setCurrentVersion(HDDSVersion.DEFAULT_VERSION);
     try (MockedStatic<InetAddress> mockedStaticInetAddress = mockStatic(InetAddress.class)) {
       InetAddress mockedInetAddress = mock(InetAddress.class);
       mockedStaticInetAddress.when(() -> InetAddress.getByName(id1.getHostName()))
