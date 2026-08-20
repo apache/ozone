@@ -571,7 +571,7 @@ left unguarded).
 | T2 VersionId generator framework | `VersionIdGenerator` interface with class-name configuration, `UniqueId`-based default proposed in `preExecute`, commit-time ordering floor, pinned-first generator |
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion, quota accounting |
 | T4 Read / permanent delete / promotion | `?versionId=` reads including null-slot addressing, reporting a delete-marker-addressed read as a condition distinct from not-found; permanent delete by versionId with quota accounting; version promotion |
-| T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys |
+| T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys, multipart completion on the same version-retention path as a PUT |
 | T6 Version-aware lifecycle | `NoncurrentVersionExpiration` (`NoncurrentDays`, `NewerNoncurrentVersions`) and `ExpiredObjectDeleteMarker` actions, delete-marker semantics for `Expiration` on a versioned bucket, versionedKeyTable scan in `LifecycleActionTask`, `maxVersions` backstop, lifecycle service enabled by default |
 | T7 Snapshot exclusion | OM-side rejection matrix for snapshot creation and versioning state transitions, applied to the source of a linked bucket and enforced at apply time so the two directions cannot race; dev-only opt-in config key |
 | T8 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, batch delete |
@@ -596,11 +596,14 @@ effect without an OM restart, and the operational procedure for keys already
 written under the previous generator; `PutBucketVersioning(Suspended)` on a
 never-versioned bucket (align via s3-tests); whether `ListObjectVersions` against a
 snapshot is worth adding once the feature has landed; interaction with hsync/append
-writes (appends apply to the current version and create no new one); multipart
-uploads — the version is created at `CompleteMultipartUpload` commit and parts stay
-invisible, but until that lands an MPU overwrite on a versioned bucket neither
-reclaims the previous version's blocks nor records a version for them, so those
-blocks leak; this has to be closed before multipart is declared supported.
+writes (appends apply to the current version and create no new one).
+
+A multipart upload creates its version at `CompleteMultipartUpload` and its parts
+stay invisible until then, so the version it supersedes has to be demoted on that
+path exactly as a PUT demotes one — T5 does this. Until it lands, the legacy
+`isVersionEnabled` flag already stops an MPU overwrite from reclaiming the previous
+version's blocks while no version record is written for them, so those blocks leak;
+multipart cannot be declared supported before T5.
 
 # References
 
