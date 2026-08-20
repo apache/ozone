@@ -30,7 +30,8 @@ public enum OMSystemAction implements AuditAction {
   KEY_DELETION,
   SNAPSHOT_MOVE_TABLE_KEYS,
   SNAPSHOT_PURGE,
-  SNAPSHOT_SET_PROPERTY;
+  SNAPSHOT_SET_PROPERTY,
+  OBJECT_VERSION_CLEANUP;
 
   @Override
   public String getAction() {
