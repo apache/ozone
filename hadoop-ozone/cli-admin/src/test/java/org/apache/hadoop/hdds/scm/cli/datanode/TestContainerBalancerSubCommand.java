@@ -712,4 +712,78 @@ class TestContainerBalancerSubCommand {
         .contains(ITERATION_2_COMPLETED_OUTPUT)
         .doesNotContain(ITERATION_3_COMPLETED_OUTPUT);
   }
+
+  @Test
+  void testContainerBalancerStatusVerboseShowsFailureBreakdown() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
+            .setIterationNumber(1)
+            .setIterationResult("ITERATION_COMPLETED")
+            .setIterationDuration(120L)
+            .setContainerMovesScheduled(5)
+            .setContainerMovesCompleted(3)
+            .setContainerMovesFailed(1)
+            .setContainerMovesTimeout(2)
+            .addContainerMoveFailures(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
+                    .setReason("REPLICATION_FAIL_TIME_OUT")
+                    .setCount(2)
+                    .addSourceFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("source-uuid-1").setCount(1).build())
+                    .addSourceFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("source-uuid-2").setCount(1).build())
+                    .addTargetFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("target-uuid-1").setCount(1).build())
+                    .addTargetFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("target-uuid-2").setCount(1).build())
+                    .build())
+            .addContainerMoveFailures(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
+                    .setReason("PRE_MOVE_CONTAINER_NOT_FOUND")
+                    .setCount(1)
+                    .addSourceFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("source-uuid-3").setCount(1).build())
+                    .addTargetFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("target-uuid-3").setCount(1).build())
+                    .build())
+            .build();
+
+    long stoppedAt = OffsetDateTime.now().toEpochSecond();
+    ContainerBalancerStatusInfoProto statusInfo = ContainerBalancerStatusInfoProto.newBuilder()
+        .setStartedAt(stoppedAt - 600)
+        .setStoppedAt(stoppedAt)
+        .setStopReason("USER_REQUESTED")
+        .setStopMessage("Stopped by user request.")
+        .setConfiguration(config.toProtobufBuilder().setShouldRun(false))
+        .addIterationsStatusInfo(iteration)
+        .build();
+
+    when(scmClient.getContainerBalancerStatusInfo())
+        .thenReturn(ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setIsRunning(false)
+            .setContainerBalancerStatusInfo(statusInfo)
+            .build());
+
+    verbose.set(true);
+    statusCmd.execute(scmClient);
+
+    assertThat(out.get())
+        .contains("Failed container moves")
+        .contains("REPLICATION_FAIL_TIME_OUT")
+        .contains("PRE_MOVE_CONTAINER_NOT_FOUND")
+        .contains("source-uuid-1")
+        .contains("target-uuid-1")
+        .contains("source-uuid-3")
+        .contains("target-uuid-3")
+        .doesNotContain("Failure breakdown")
+        .doesNotContain("Failed move details");
+  }
 }

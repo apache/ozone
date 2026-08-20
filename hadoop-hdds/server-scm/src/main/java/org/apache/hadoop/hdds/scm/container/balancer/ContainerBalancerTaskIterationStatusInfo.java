@@ -107,6 +107,14 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
+   * Get per-reason failure summaries with per-datanode counts for this iteration.
+   * @return list of failure details, one entry per failure reason
+   */
+  public List<ContainerMoveFailureDetail> getFailures() {
+    return containerMoveInfo.getFailures();
+  }
+
+  /**
    * Get a map of the node IDs and the corresponding data sizes moved to each node.
    * @return nodeId to size entering from node map
    */
@@ -151,7 +159,33 @@ public class ContainerBalancerTaskIterationStatusInfo {
         .addAllSizeLeavingNodes(
             mapToProtoNodeTransferInfo(getSizeLeavingNodes())
         )
+        .addAllContainerMoveFailures(mapToProtoFailures(getFailures()))
         .build();
+  }
+
+  private List<StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto> mapToProtoFailures(
+      List<ContainerMoveFailureDetail> failures) {
+    return failures.stream()
+        .map(failure -> {
+          StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.Builder builder =
+              StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
+                  .setReason(failure.getReason())
+                  .setCount(failure.getCount());
+          failure.getSourceFailureCounts().forEach((uuid, count) ->
+              builder.addSourceFailureCounts(
+                  StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                      .setDatanodeUuid(uuid)
+                      .setCount(count)
+                      .build()));
+          failure.getTargetFailureCounts().forEach((uuid, count) ->
+              builder.addTargetFailureCounts(
+                  StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                      .setDatanodeUuid(uuid)
+                      .setCount(count)
+                      .build()));
+          return builder.build();
+        })
+        .collect(Collectors.toList());
   }
 
   /**
