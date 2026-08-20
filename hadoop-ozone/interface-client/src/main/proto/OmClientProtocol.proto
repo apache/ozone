@@ -163,6 +163,7 @@ enum Type {
   DeleteBucketTagging = 146;
   StartFinalizeUpgrade = 147;
   QueryUpgradeStatus = 148;
+  CompleteFinalizeUpgrade = 149;
 }
 
 enum SafeMode {
@@ -323,6 +324,7 @@ message OMRequest {
   optional DeleteBucketTaggingRequest       deleteBucketTaggingRequest       = 147;
   optional StartFinalizeUpgradeRequest      startFinalizeUpgradeRequest     = 148;
   optional QueryUpgradeStatusRequest        queryUpgradeStatusRequest       = 149;
+  optional CompleteFinalizeUpgradeRequest   completeFinalizeUpgradeRequest  = 150;
 }
 
 message OMResponse {
@@ -466,6 +468,7 @@ message OMResponse {
   optional DeleteBucketTaggingResponse       deleteBucketTaggingResponse    = 146;
   optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 147;
   optional QueryUpgradeStatusResponse        queryUpgradeStatusResponse    = 148;
+  optional CompleteFinalizeUpgradeResponse   completeFinalizeUpgradeResponse = 149;
 }
 
 enum Status {
@@ -1662,6 +1665,14 @@ message StartFinalizeUpgradeRequest {
 }
 
 message StartFinalizeUpgradeResponse {
+}
+
+// Internal request submitted by OMUpgradeFinalizeService to complete OM finalization
+// once SCM reports FINALIZED.
+message CompleteFinalizeUpgradeRequest {
+}
+
+message CompleteFinalizeUpgradeResponse {
 }
 
 message QueryUpgradeStatusRequest {

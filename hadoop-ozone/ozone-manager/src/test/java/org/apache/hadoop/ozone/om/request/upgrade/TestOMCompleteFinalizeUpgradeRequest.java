@@ -47,9 +47,9 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for the OMFinalizeUpgradeRequest class.
+ * Tests for the OMCompleteFinalizeUpgradeRequest class.
  */
-public class TestOMFinalizeUpgradeRequest extends OMKeyRequestTests {
+public class TestOMCompleteFinalizeUpgradeRequest extends OMKeyRequestTests {
 
   @Test
   public void testFinalizationInProgressKeyRemoved() throws IOException {
@@ -93,10 +93,10 @@ public class TestOMFinalizeUpgradeRequest extends OMKeyRequestTests {
         new UpgradeException(UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED));
 
     OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
+        .setCmdType(OzoneManagerProtocolProtos.Type.CompleteFinalizeUpgrade)
         .setClientId(ClientId.randomId().toString())
         .build();
-    OMFinalizeUpgradeRequest request = new OMFinalizeUpgradeRequest(omRequest);
+    OMCompleteFinalizeUpgradeRequest request = new OMCompleteFinalizeUpgradeRequest(omRequest);
     ExecutionContext context = ExecutionContext.of(1, TermIndex.INITIAL_VALUE);
     request.preExecute(ozoneManager);
 
@@ -108,11 +108,11 @@ public class TestOMFinalizeUpgradeRequest extends OMKeyRequestTests {
 
   private void submitRequest() throws IOException {
     OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
+        .setCmdType(OzoneManagerProtocolProtos.Type.CompleteFinalizeUpgrade)
         .setClientId(ClientId.randomId().toString())
         .build();
 
-    OMFinalizeUpgradeRequest request = new OMFinalizeUpgradeRequest(omRequest);
+    OMCompleteFinalizeUpgradeRequest request = new OMCompleteFinalizeUpgradeRequest(omRequest);
     ExecutionContext context = ExecutionContext.of(1, TermIndex.INITIAL_VALUE);
 
     OzoneManagerProtocolProtos.OMRequest modifiedOmRequest = request.preExecute(ozoneManager);

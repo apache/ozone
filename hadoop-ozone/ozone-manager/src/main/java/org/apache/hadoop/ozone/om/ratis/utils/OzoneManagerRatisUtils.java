@@ -86,8 +86,9 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotMoveTableKeysReques
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotRenameRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotSetPropertyRequest;
-import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMCompleteFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequestLegacy;
 import org.apache.hadoop.ozone.om.request.util.OMEchoRPCWriteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMQuotaRepairRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
@@ -185,9 +186,11 @@ public final class OzoneManagerRatisUtils {
     case GetS3Secret:
       return new S3GetSecretRequest(omRequest);
     case FinalizeUpgrade:
-      return new OMFinalizeUpgradeRequest(omRequest);
+      return new OMStartFinalizeUpgradeRequestLegacy(omRequest);
     case StartFinalizeUpgrade:
       return new OMStartFinalizeUpgradeRequest(omRequest);
+    case CompleteFinalizeUpgrade:
+      return new OMCompleteFinalizeUpgradeRequest(omRequest);
     case SetS3Secret:
       return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:

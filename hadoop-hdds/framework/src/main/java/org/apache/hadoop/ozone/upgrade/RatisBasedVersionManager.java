@@ -53,7 +53,7 @@ public abstract class RatisBasedVersionManager extends ComponentVersionManager {
           apparentVersionInNewDB);
       finalizeUpgrade();
       // Update the apparent version in the DB to match the VERSION file.
-      // When finalization is not done with a snapshot, this DB value is updated by OMFinalizeUpgradeRequest.
+      // When finalization is not done with a snapshot, this DB value is updated by OMCompleteFinalizeUpgradeRequest.
       finalizationStore.put(APPARENT_VERSION_KEY, String.valueOf(getApparentVersion().serialize()));
     }
   }
