@@ -421,7 +421,7 @@ currently lists as unsupported, and each maps 1:1 onto an S3 element:
 | `NoncurrentVersionExpiration.NoncurrentDays` | permanently deletes a noncurrent version once it has been noncurrent that long |
 | `NoncurrentVersionExpiration.NewerNoncurrentVersions` | keeps at most N noncurrent versions of a key, reclaiming oldest-first |
 | `Expiration.ExpiredObjectDeleteMarker` | removes a delete marker, and the key with it, once it is the only version left |
-| `Expiration.Days` / `.Date` (existing action) | on a versioned bucket, inserts a delete marker instead of deleting the object, as S3 does |
+| `Expiration.Days` / `.Date` (existing action) | on a versioned bucket, inserts a delete marker instead of deleting the object, as S3 does — through the same insertion the write requests use, so an expiry and a DELETE leave the same records behind |
 
 Concretely: `LifecycleAction` gains a `noncurrentVersionExpiration` field and
 `LifecycleExpiration` an `expiredObjectDeleteMarker` field — both optional
@@ -567,7 +567,7 @@ interaction is covered above. Buckets without versioning behave exactly as today
 
 # Plan
 
-Implemented as one umbrella Jira with eleven tasks (36 sub-tasks, each roughly one
+Implemented as one umbrella Jira with eleven tasks (39 sub-tasks, each roughly one
 PR), in dependency order `T1 → T2 → T3 → T4 → T5 → T6 → T7 → (T8 ∥ T9) → T10 → T11`
 (reclamation and the snapshot exclusion both land before the S3 endpoints, so
 versioning is never exposed without a way to reclaim versions, nor with snapshots
@@ -580,7 +580,7 @@ left unguarded).
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion on both the single-key and the batch request, quota accounting |
 | T4 Read / permanent delete / promotion | `?versionId=` reads including null-slot addressing, reporting a delete-marker-addressed read as a condition distinct from not-found; permanent delete by versionId with quota accounting; version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys, multipart completion on the same version-retention path as a PUT |
-| T6 Version-aware lifecycle | `NoncurrentVersionExpiration` (`NoncurrentDays`, `NewerNoncurrentVersions`) and `ExpiredObjectDeleteMarker` actions, delete-marker semantics for `Expiration` on a versioned bucket, versionedKeyTable scan in `LifecycleActionTask`, `maxVersions` backstop, lifecycle service enabled by default |
+| T6 Version-aware lifecycle | `NoncurrentVersionExpiration` (`NoncurrentDays`, `NewerNoncurrentVersions`) and `ExpiredObjectDeleteMarker` on the lifecycle proto and its validation, a versionedKeyTable scan in `LifecycleActionTask`, `Expiration` on a versioned bucket routed to the marker insertion the write paths already share, marker removal once nothing is left under it, `maxVersions` backstop with the lifecycle service enabled by default |
 | T7 Snapshot exclusion | OM-side rejection matrix for snapshot creation and versioning state transitions, applied to the source of a linked bucket and enforced at apply time so the two directions cannot race; dev-only opt-in config key |
 | T8 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, per-entry `versionId` and `DeleteMarker` reporting in batch `DeleteObjects` |
 | T9 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
