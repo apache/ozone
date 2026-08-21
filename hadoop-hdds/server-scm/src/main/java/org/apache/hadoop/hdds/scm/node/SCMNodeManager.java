@@ -1098,7 +1098,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
       DatanodeInfo dnInfo = getNode(op.getTarget().getID());
       if (dnInfo != null) {
-        recordAllocationForDatanode(dnInfo, containerID, StorageType.DEFAULT);
+        recordAllocationForDatanode(dnInfo, containerID, op.getStorageType());
       }
     }
   }

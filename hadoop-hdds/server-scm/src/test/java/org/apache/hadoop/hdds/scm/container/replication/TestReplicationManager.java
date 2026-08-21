@@ -65,9 +65,11 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -84,6 +86,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -1200,9 +1203,14 @@ public class TestReplicationManager {
       throws NotLeaderException {
     // create a closed EC container
     ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
-    ContainerInfo containerInfo =
-        ReplicationTestUtil.createContainerInfo(ecRepConfig, 1,
-            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ContainerInfo containerInfo = TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(ecRepConfig)
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setNumberOfKeys(10)
+        .setUsedBytes(20)
+        .setStorageTier(StorageTier.SSD)
+        .build();
 
     // command will be pushed from source to target
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
@@ -1225,6 +1233,7 @@ public class TestReplicationManager {
         ops.get(0).getOpType());
     assertEquals(target, ops.get(0).getTarget());
     assertEquals(1, ops.get(0).getReplicaIndex());
+    assertEquals(StorageType.SSD, ops.get(0).getStorageType());
     assertEquals(1, replicationManager.getMetrics()
         .getEcReplicationCmdsSentTotal());
     assertEquals(0, replicationManager.getMetrics()

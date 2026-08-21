@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -167,8 +168,17 @@ public class ContainerReplicaPendingOps {
   public void scheduleAddReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis, long containerSize,
       long scheduledEpochMillis) {
-    addReplica(ADD, containerID, target, replicaIndex, command, deadlineEpochMillis, containerSize,
-        scheduledEpochMillis);
+    scheduleAddReplica(containerID, target, replicaIndex, command,
+        deadlineEpochMillis, containerSize, null, scheduledEpochMillis);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  void scheduleAddReplica(ContainerID containerID,
+      DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
+      long deadlineEpochMillis, long containerSize, StorageType storageType,
+      long scheduledEpochMillis) {
+    addReplica(ADD, containerID, target, replicaIndex, command,
+        deadlineEpochMillis, containerSize, storageType, scheduledEpochMillis);
   }
 
   /**
@@ -183,7 +193,8 @@ public class ContainerReplicaPendingOps {
    */
   public void scheduleDeleteReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis) {
-    addReplica(DELETE, containerID, target, replicaIndex, command, deadlineEpochMillis, 0L, clock.millis());
+    addReplica(DELETE, containerID, target, replicaIndex, command,
+        deadlineEpochMillis, 0L, null, clock.millis());
   }
 
   /**
@@ -328,9 +339,11 @@ public class ContainerReplicaPendingOps {
   @SuppressWarnings("checkstyle:ParameterNumber")
   private void addReplica(ContainerReplicaOp.PendingOpType opType,
       ContainerID containerID, DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
-      long deadlineEpochMillis, long containerSize, long scheduledEpochMillis) {
+      long deadlineEpochMillis, long containerSize, StorageType storageType,
+      long scheduledEpochMillis) {
     ContainerReplicaOp op = new ContainerReplicaOp(opType,
-        target, replicaIndex, command, deadlineEpochMillis, containerSize);
+        target, replicaIndex, command, deadlineEpochMillis, containerSize,
+        storageType);
     Lock lock = writeLock(containerID);
     lock(lock);
     boolean found;
