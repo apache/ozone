@@ -298,6 +298,7 @@ public class KeyLifecycleService extends BackgroundService {
     private final OmLifecycleConfiguration policy;
     private long taskStartTime;
     private long numKeyIterated = 0;
+    private long numDeleteMarkersInserted = 0;
     private long numDirIterated = 0;
     private long numDirDeleted = 0;
     private long numKeyDeleted = 0;
@@ -454,8 +455,8 @@ public class KeyLifecycleService extends BackgroundService {
               // If trash is enabled, move files to trash, instead of send delete requests.
               // OBS bucket doesn't support trash.
               if (bucket.getBucketLayout() == OBJECT_STORE) {
-                sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
-                    bucket.getOwner(), expiredKeyList, false, scanStateBuilder, true);
+                sendDeleteKeysRequestAndClearList(bucket, expiredKeyList, false,
+                    scanStateBuilder, true);
               } else {
                 // handle keys first, then directories
                 handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, true);
@@ -996,8 +997,8 @@ public class KeyLifecycleService extends BackgroundService {
       boolean saved = false;
       if (expiredKeyList != null && !expiredKeyList.isEmpty()) {
         if (bucket.getBucketLayout() == OBJECT_STORE) {
-          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
-              bucket.getOwner(), expiredKeyList, false, scanStateBuilder, false);
+          sendDeleteKeysRequestAndClearList(bucket, expiredKeyList, false,
+              scanStateBuilder, false);
         } else {
           handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, false);
         }
@@ -1178,6 +1179,15 @@ public class KeyLifecycleService extends BackgroundService {
         LimitedExpiredObjectList expiredKeyList, OmLifecycleScanState.Builder scanStateBuilder) {
       if (bucketInfo.getBucketLayout() == BucketLayout.LEGACY &&
           key.getKeyName().startsWith(TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX)) {
+        return;
+      }
+      // Expiring a key whose current version is already a delete marker would
+      // put a marker on top of a marker, and the new one would age into the
+      // rule again, so the chain would grow for as long as the rule exists.
+      // The object is already gone from an unversioned read; removing the
+      // marker that hides it is ExpiredObjectDeleteMarker's decision, not
+      // Expiration's.
+      if (key.isDeleteMarker()) {
         return;
       }
       for (OmLCRule rule : ruleList) {
@@ -1462,10 +1472,12 @@ public class KeyLifecycleService extends BackgroundService {
       metrics.incNumMultipartUploadIterated(numMultipartUploadIterated);
       long timeSpent = Time.monotonicNow() - taskStartTime;
       LOG.info("Spent {} ms on bucket {} to iterate {} keys and {} dirs and {} multipart uploads, " +
-              "deleted {} keys with {} bytes, and {} dirs, renamed {} keys with {} bytes, and {} dirs to trash, " +
+              "deleted {} keys with {} bytes, and {} dirs, inserted {} delete markers, " +
+              "renamed {} keys with {} bytes, and {} dirs to trash, " +
               "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
           numDirIterated, numMultipartUploadIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted,
-          numKeyRenamed, sizeKeyRenamed, numDirRenamed, numMultipartUploadAborted);
+          numDeleteMarkersInserted, numKeyRenamed, sizeKeyRenamed, numDirRenamed,
+          numMultipartUploadAborted);
     }
 
     private void onSuccess(String bucketName) {
@@ -1478,10 +1490,12 @@ public class KeyLifecycleService extends BackgroundService {
       metrics.incNumMultipartUploadIterated(numMultipartUploadIterated);
       metrics.incNumMultipartUploadAborted(numMultipartUploadAborted);
       LOG.info("Spent {} ms on bucket {} to iterate {} keys and {} dirs and {} multipart uploads, " +
-              "deleted {} keys with {} bytes, and {} dirs, renamed {} keys with {} bytes, and {} dirs to trash, " +
+              "deleted {} keys with {} bytes, and {} dirs, inserted {} delete markers, " +
+              "renamed {} keys with {} bytes, and {} dirs to trash, " +
               "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
           numDirIterated, numMultipartUploadIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted,
-          numKeyRenamed, sizeKeyRenamed, numDirRenamed, numMultipartUploadAborted);
+          numDeleteMarkersInserted, numKeyRenamed, sizeKeyRenamed, numDirRenamed,
+          numMultipartUploadAborted);
     }
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList,
@@ -1490,8 +1504,8 @@ public class KeyLifecycleService extends BackgroundService {
         moveToTrash(bucket, keysList, dir);
         sendSaveScanStateRequest(scanStateBuilder, scanFinished);
       } else {
-        sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
-            bucket.getOwner(), keysList, dir, scanStateBuilder, scanFinished);
+        sendDeleteKeysRequestAndClearList(bucket, keysList, dir, scanStateBuilder,
+            scanFinished);
       }
     }
 
@@ -1531,9 +1545,19 @@ public class KeyLifecycleService extends BackgroundService {
       }
     }
 
-    private void sendDeleteKeysRequestAndClearList(String volume, String bucket, String bucketOwner,
+    /**
+     * On a bucket that has ever been versioned this request inserts a delete
+     * marker per key instead of deleting: the object stops being visible, but
+     * its current version is demoted rather than removed, so nothing is
+     * reclaimed and no space is freed.
+     */
+    private void sendDeleteKeysRequestAndClearList(OmBucketInfo bucketInfo,
         LimitedExpiredObjectList keysList, boolean dir,
         OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
+      final String volume = bucketInfo.getVolumeName();
+      final String bucket = bucketInfo.getBucketName();
+      final String bucketOwner = bucketInfo.getOwner();
+      final boolean insertsMarkers = bucketInfo.hasEverBeenVersioned();
       try {
         if (getInjector(1) != null) {
           try {
@@ -1647,6 +1671,9 @@ public class KeyLifecycleService extends BackgroundService {
             if (dir) {
               numDirDeleted += deletedCount;
               metrics.incrNumDirDeleted(deletedCount);
+            } else if (insertsMarkers) {
+              numDeleteMarkersInserted += deletedCount;
+              metrics.incrNumDeleteMarkersInserted(deletedCount);
             } else {
               numKeyDeleted += deletedCount;
               sizeKeyDeleted += deletedSize;
