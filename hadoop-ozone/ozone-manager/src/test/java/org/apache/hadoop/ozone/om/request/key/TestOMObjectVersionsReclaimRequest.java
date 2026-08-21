@@ -43,9 +43,10 @@ import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests the reclamation of the noncurrent object versions the lifecycle scan
- * selects: they leave the versionedKeyTable and their blocks are queued in
- * the deletedTable, with the bucket quota released.
+ * Tests the reclamation the lifecycle scan submits: noncurrent versions leave
+ * the versionedKeyTable with their blocks queued in the deletedTable, expired
+ * delete markers leave the keyTable, and the bucket quota is released for
+ * both.
  */
 public class TestOMObjectVersionsReclaimRequest extends OMKeyRequestTests {
 
@@ -155,6 +156,104 @@ public class TestOMObjectVersionsReclaimRequest extends OMKeyRequestTests {
     // the version of the bucket that does exist is left alone
     assertNull(omMetadataManager.getVersionedKeyTable().getCacheValue(
         new CacheKey<>(versionKey(100L))));
+  }
+
+  /**
+   * A marker with nothing under it hides nothing and cannot be addressed by
+   * versionId, so nothing else would ever remove it. It leaves the keyTable
+   * and the key disappears with it, releasing the namespace slot it held.
+   */
+  @Test
+  public void testReclaimsAMarkerWithNothingUnderIt() throws Exception {
+    setupVersionedBucket(0L, 1L);
+    seedCurrentMarker(300L);
+
+    OMObjectVersionsReclaimResponse response = reclaimMarkers(500L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    CacheValue<OmKeyInfo> cached = omMetadataManager
+        .getKeyTable(getBucketLayout()).getCacheValue(new CacheKey<>(ozoneKey()));
+    assertNotNull(cached, "the marker was not reclaimed");
+    assertNull(cached.getCacheValue(), "the marker was not tombstoned");
+
+    // it holds no blocks, so nothing is queued and only namespace is released
+    assertTrue(response.getKeysToDelete().isEmpty());
+    OmBucketInfo bucketInfo = OMKeyRequest.getBucketInfo(omMetadataManager,
+        volumeName, bucketName);
+    assertEquals(0L, bucketInfo.getUsedNamespace());
+  }
+
+  /**
+   * While a noncurrent version survives, removing the marker would promote it
+   * and bring back an object the user deleted. The scan checked this too, but
+   * a version can be written between the scan and this request, so the check
+   * is what happens under the bucket lock that decides.
+   */
+  @Test
+  public void testKeepsAMarkerThatStillHidesAVersion() throws Exception {
+    setupVersionedBucket(BLOCK_LENGTH, 2L);
+    seedCurrentMarker(300L);
+    seedNoncurrentVersion(100L);
+
+    OMObjectVersionsReclaimResponse response = reclaimMarkers(500L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .getCacheValue(new CacheKey<>(ozoneKey())));
+    OmBucketInfo bucketInfo = OMKeyRequest.getBucketInfo(omMetadataManager,
+        volumeName, bucketName);
+    assertEquals(2L, bucketInfo.getUsedNamespace());
+  }
+
+  /**
+   * A write since the scan supersedes the marker: the key's current version is
+   * a real object again, and there is nothing expired to remove.
+   */
+  @Test
+  public void testSkipsAMarkerSupersededByAWrite() throws Exception {
+    setupVersionedBucket(BLOCK_LENGTH, 1L);
+    OmKeyInfo rewritten = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(400L)
+        .build();
+    OMRequestTestUtils.addKeyLocationInfo(rewritten, 0L, BLOCK_LENGTH);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(ozoneKey(), rewritten);
+
+    OMObjectVersionsReclaimResponse response = reclaimMarkers(500L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .getCacheValue(new CacheKey<>(ozoneKey())));
+  }
+
+  private String ozoneKey() {
+    return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+  }
+
+  /** A key whose current version is a delete marker. */
+  private void seedCurrentMarker(long versionId) throws Exception {
+    OmKeyInfo marker = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(versionId)
+        .setDeleteMarker(true)
+        .build();
+    omMetadataManager.getKeyTable(getBucketLayout()).put(ozoneKey(), marker);
+  }
+
+  private OMObjectVersionsReclaimResponse reclaimMarkers(long trxnLogIndex)
+      throws Exception {
+    OMRequest request = reclaimRequest(ObjectVersionsBucket.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .addMarkerKeys(ozoneKey())
+        .build());
+    return (OMObjectVersionsReclaimResponse)
+        new OMObjectVersionsReclaimRequest(request)
+            .validateAndUpdateCache(ozoneManager, trxnLogIndex);
   }
 
   private void setupVersionedBucket(long usedBytes, long usedNamespace)
