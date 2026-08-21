@@ -102,6 +102,14 @@ public abstract class ComponentVersionManager implements Closeable {
   }
 
   /**
+   * Returns the version that the server should advertise to the client for new client/oldserver compatibility.
+   * If ZDU is finalized, we can use the same apparent version for both client and disk compatibility.
+   * If the server is not yet finalized for ZDU, we must continue to use the separate component version system for
+   * clients and layout feature versioning system for internal apparent version.
+   */
+  public abstract ComponentVersion getVersionForClient();
+
+  /**
    * @return An Iterable of all versions after the current apparent version which still need to be finalized. If this
    *    component is already finalized, the Iterable will be empty.
    */

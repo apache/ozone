@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -112,6 +113,10 @@ public class TestContainerUtils {
   public void testDatanodeIDPersistent(@TempDir File tempDir) throws Exception {
     // Generate IDs for testing
     DatanodeDetails id1 = randomDatanodeDetails();
+    // `randomDatanodeDetails()` populates the current version to SOFTWARE_VERSION by default.
+    // Datanodes do not populate this value when persisting the proto, only when sending it over the wire,
+    // so override the setter to the default value to match what Datanodes actually persist internally.
+    id1.setCurrentVersion(HDDSVersion.DEFAULT_VERSION);
     try (MockedStatic<InetAddress> mockedStaticInetAddress = mockStatic(InetAddress.class)) {
       InetAddress mockedInetAddress = mock(InetAddress.class);
       mockedStaticInetAddress.when(() -> InetAddress.getByName(id1.getHostName()))
@@ -204,7 +209,20 @@ public class TestContainerUtils {
     DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file, conf);
 
     assertDetailsEquals(details, read);
-    assertEquals(details.getCurrentVersion(), read.getCurrentVersion());
+    // currentVersion is updated by SCM for clients to consume. When unset for cases like persisting to the datanode,
+    // it should return DEFAULT_VERSION. This is an in-memory placeholder which is not written to the file.
+    assertEquals(HDDSVersion.DEFAULT_VERSION, read.getCurrentVersion());
+  }
+
+  @Test
+  public void writtenYamlOmitsCurrentVersion(@TempDir File tempDir) throws IOException {
+    DatanodeDetails details = randomDatanodeDetails();
+    details.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
+    File file = new File(tempDir, "no-current-version.id");
+    ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
+
+    String yaml = new String(Files.readAllBytes(file.toPath()), UTF_8);
+    assertThat(yaml).doesNotContain("currentVersion");
   }
 
   private void assertWriteReadWithChangedIpAddress(@TempDir File tempDir,

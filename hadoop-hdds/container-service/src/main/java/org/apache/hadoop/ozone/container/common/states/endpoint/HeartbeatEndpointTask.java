@@ -72,7 +72,7 @@ public class HeartbeatEndpointTask
     implements Callable<EndpointStateMachine.EndPointStates> {
   private static final Logger LOG = LoggerFactory.getLogger(HeartbeatEndpointTask.class);
   private final EndpointStateMachine rpcEndpoint;
-  private DatanodeDetailsProto datanodeDetailsProto;
+  private final DatanodeDetails datanodeDetails;
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
@@ -93,26 +93,8 @@ public class HeartbeatEndpointTask
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
+    this.datanodeDetails = context.getParent().getDatanodeDetails();
     this.versionManager = context.getParent().getVersionManager();
-  }
-
-  /**
-   * Get the container Node ID proto.
-   *
-   * @return ContainerNodeIDProto
-   */
-  public DatanodeDetailsProto getDatanodeDetailsProto() {
-    return datanodeDetailsProto;
-  }
-
-  /**
-   * Set container node ID proto.
-   *
-   * @param datanodeDetailsProto - the node id.
-   */
-  public void setDatanodeDetailsProto(DatanodeDetailsProto
-      datanodeDetailsProto) {
-    this.datanodeDetailsProto = datanodeDetailsProto;
   }
 
   /**
@@ -126,11 +108,12 @@ public class HeartbeatEndpointTask
     rpcEndpoint.lock();
     SCMHeartbeatRequestProto.Builder requestBuilder = null;
     try {
-      Preconditions.checkState(this.datanodeDetailsProto != null);
-
       DatanodeVersionProto versionInfo = toVersionProto(
           versionManager.getApparentVersion(),
           versionManager.getSoftwareVersion());
+
+      datanodeDetails.setCurrentVersion(versionManager.getVersionForClient());
+      DatanodeDetailsProto datanodeDetailsProto = datanodeDetails.getProtoBufMessage();
 
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(datanodeDetailsProto)
@@ -265,9 +248,9 @@ public class HeartbeatEndpointTask
    * @param response - SCMHeartbeat response.
    */
   private void processResponse(SCMHeartbeatResponseProto response,
-      final DatanodeDetailsProto datanodeDetails) {
+      final DatanodeDetailsProto datanodeDetailsProto) {
     Preconditions.checkState(response.getDatanodeUUID()
-            .equalsIgnoreCase(datanodeDetails.getUuid()),
+            .equalsIgnoreCase(datanodeDetailsProto.getUuid()),
         "Unexpected datanode ID in the response.");
     if (response.hasTerm()) {
       context.updateTermOfLeaderSCM(response.getTerm());
@@ -433,7 +416,6 @@ public class HeartbeatEndpointTask
   public static class Builder {
     private EndpointStateMachine endPointStateMachine;
     private ConfigurationSource conf;
-    private DatanodeDetails datanodeDetails;
     private StateContext context;
 
     /**
@@ -465,17 +447,6 @@ public class HeartbeatEndpointTask
     }
 
     /**
-     * Sets the NodeID.
-     *
-     * @param dnDetails - NodeID proto
-     * @return Builder
-     */
-    public Builder setDatanodeDetails(DatanodeDetails dnDetails) {
-      this.datanodeDetails = dnDetails;
-      return this;
-    }
-
-    /**
      * Sets the context.
      * @param stateContext - State context.
      * @return this.
@@ -498,16 +469,8 @@ public class HeartbeatEndpointTask
             " construct HeartbeatEndpointTask task");
       }
 
-      if (datanodeDetails == null) {
-        LOG.error("No datanode specified.");
-        throw new IllegalArgumentException("A valid Node ID is needed to " +
-            "construct HeartbeatEndpointTask task");
-      }
-
-      HeartbeatEndpointTask task = new HeartbeatEndpointTask(this
+      return new HeartbeatEndpointTask(this
           .endPointStateMachine, this.conf, this.context);
-      task.setDatanodeDetailsProto(datanodeDetails.getProtoBufMessage());
-      return task;
     }
   }
 }

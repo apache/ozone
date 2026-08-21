@@ -135,6 +135,15 @@ public class ReconVersionManager extends ComponentVersionManager {
     }
   }
 
+  /**
+   * Recon never used separate layout features and component versions, so its apparent version can always be used for
+   * both network and disk compatibility.
+   */
+  @Override
+  public ReconVersion getVersionForClient() {
+    return (ReconVersion) getApparentVersion();
+  }
+
   @Override
   protected void runUpgradeAction(ComponentVersion version) throws UpgradeException {
     ReconUpgradeAction action = upgradeActions.get(version);

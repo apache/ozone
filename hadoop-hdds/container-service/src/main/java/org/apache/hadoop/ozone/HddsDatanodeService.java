@@ -122,6 +122,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       HddsDatanodeService.class);
 
   public static final String TESTING_DATANODE_VERSION_INITIAL = "testing.hdds.datanode.version.initial";
+  // TODO(HDDS-16044): TESTING_DATANODE_VERSION_CURRENT is unused until SCM-side version setting lands.
   public static final String TESTING_DATANODE_VERSION_CURRENT = "testing.hdds.datanode.version.current";
 
   private OzoneConfiguration conf;
@@ -478,8 +479,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       details = DatanodeDetails.newBuilder().setID(DatanodeID.randomID()).build();
       details.setInitialVersion(getInitialVersion());
     }
-    // Current version is always overridden to the latest
-    details.setCurrentVersion(getCurrentVersion());
     return details;
   }
 
@@ -839,13 +838,5 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private HDDSVersion getInitialVersion() {
     return HDDSVersion.deserialize(
         conf.getInt(TESTING_DATANODE_VERSION_INITIAL, HDDSVersion.SOFTWARE_VERSION.serialize()));
-  }
-
-  /**
-   * Returns the current version of the datanode.
-   */
-  private HDDSVersion getCurrentVersion() {
-    return HDDSVersion.deserialize(
-        conf.getInt(TESTING_DATANODE_VERSION_CURRENT, HDDSVersion.SOFTWARE_VERSION.serialize()));
   }
 }

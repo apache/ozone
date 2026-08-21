@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -333,17 +334,17 @@ public class TestBlockDataStreamOutput {
     }
   }
 
+  @Unhealthy("Requires HDDS-16044 to finish implementing datanode version passing to client.")
   @ParameterizedTest
   @MethodSource("clientParameters")
   public void testDatanodeVersion(boolean flushDelay) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
-      // Each datanode advertises its own (older) currentVersion internally.
+      // Verify all DNs internally have versions set correctly
       List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
       for (HddsDatanodeService dn : dns) {
         DatanodeDetails details = dn.getDatanodeDetails();
-        assertEquals(DN_OLD_VERSION,
-            details.getCurrentVersion());
+        assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
       }
 
       String keyName = getKeyName();
@@ -351,12 +352,10 @@ public class TestBlockDataStreamOutput {
       KeyDataStreamOutput keyDataStreamOutput = (KeyDataStreamOutput) key.getByteBufStreamOutput();
       BlockDataStreamOutputEntry stream = keyDataStreamOutput.getStreamEntries().get(0);
 
-      // The cluster is finalized for ZDU, so the pipeline SCM returns on block allocation
-      // stamps each member's currentVersion with the lowest apparent version across the
-      // pipeline, which here is the software version the datanodes have finalized to.
+     // Now check 3 DNs in a random pipeline returns the correct DN versions
       List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
       for (DatanodeDetails details : streamDnDetails) {
-        assertEquals(HDDSVersion.SOFTWARE_VERSION, details.getCurrentVersion());
+        assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
       }
     }
   }

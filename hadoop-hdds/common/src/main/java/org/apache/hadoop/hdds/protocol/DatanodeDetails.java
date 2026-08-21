@@ -88,7 +88,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   private volatile HddsProtos.NodeOperationalState persistedOpState;
   private volatile long persistedOpStateExpiryEpochSec;
   private HDDSVersion initialVersion;
-  private HDDSVersion currentVersion;
+  private volatile HDDSVersion currentVersion;
 
   private DatanodeDetails(Builder b) {
     super(b.hostName, b.networkLocation, NetConstants.NODE_COST_DEFAULT);
@@ -464,9 +464,6 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     }
     if (datanodeDetailsProto.hasCurrentVersion()) {
       builder.setCurrentVersion(HDDSVersion.deserialize(datanodeDetailsProto.getCurrentVersion()));
-    } else {
-      // fallback to version 1 if not present
-      builder.setCurrentVersion(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
     }
     return builder;
   }

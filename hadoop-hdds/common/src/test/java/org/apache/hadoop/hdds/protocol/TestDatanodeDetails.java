@@ -69,23 +69,21 @@ public class TestDatanodeDetails {
 
   @Test
   public void testNewBuilderCurrentVersion() {
-    // test that if the current version is not set (Ozone 1.4.0 and earlier),
-    // it falls back to SEPARATE_RATIS_PORTS_AVAILABLE
+    // When the current version proto field is absent, the builder default (DEFAULT_VERSION) applies.
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
         .collect(Collectors.toSet());
-    HddsProtos.DatanodeDetailsProto.Builder protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION, requiredPorts);
+    HddsProtos.DatanodeDetailsProto.Builder protoBuilder = dn.toProtoBuilder(ClientVersion.CURRENT, requiredPorts);
     protoBuilder.clearCurrentVersion();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE,
-        dn2.getCurrentVersion());
+    assertEquals(HDDSVersion.DEFAULT_VERSION, dn2.getCurrentVersion());
 
-    // test that if the current version is set, it is used
-    protoBuilder = dn.toProtoBuilder(DEFAULT_VERSION, requiredPorts);
-    protoBuilder.setCurrentVersion(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize());
-    DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC, dn3.getCurrentVersion());
+    // When the proto field is present, it round-trips correctly.
+    protoBuilder = dn.toProtoBuilder(ClientVersion.CURRENT, requiredPorts);
+    DatanodeDetails dn3 = DatanodeDetails.newBuilder(
+        protoBuilder.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION.serialize()).build())
+        .build();
+    assertEquals(HDDSVersion.SOFTWARE_VERSION, dn3.getCurrentVersion());
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,

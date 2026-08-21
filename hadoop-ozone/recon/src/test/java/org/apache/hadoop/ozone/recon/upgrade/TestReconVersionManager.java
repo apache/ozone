@@ -214,6 +214,18 @@ class TestReconVersionManager extends AbstractComponentVersionManagerTest {
     }
   }
 
+  @Test
+  public void testGetVersionForClientReturnsApparentVersion() throws Exception {
+    // Recon has no separate ZDU/layout-feature split, so the client version is always the apparent version.
+    try (ComponentVersionManager versionManager = createManager(ReconVersion.SOFTWARE_VERSION.serialize())) {
+      assertEquals(ReconVersion.SOFTWARE_VERSION, versionManager.getVersionForClient());
+    }
+
+    try (ComponentVersionManager versionManager = createManager(ReconVersion.INITIAL_VERSION.serialize())) {
+      assertEquals(ReconVersion.INITIAL_VERSION, versionManager.getVersionForClient());
+    }
+  }
+
   @Override
   @Test
   public void testPersistFailureRollsBack() throws Exception {
