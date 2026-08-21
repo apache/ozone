@@ -143,7 +143,7 @@ public class TestRDBStoreByteArrayIterator {
 
   @Test
   public void testConstructorDoesNotSeek() {
-    newIterator();
+    newIterator().close();
 
     verify(rocksDBIteratorMock, never()).seekToFirst();
   }
