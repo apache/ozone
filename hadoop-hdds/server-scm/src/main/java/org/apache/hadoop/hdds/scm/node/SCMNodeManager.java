@@ -49,6 +49,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -1065,22 +1066,29 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   }
 
   @Override
-  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
-    return pendingContainerTracker.checkSpaceAndRecordAllocation(datanodeInfo, containerID);
+  public boolean checkSpaceAndRecordAllocation(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType) {
+    return pendingContainerTracker.checkSpaceAndRecordAllocation(
+        datanodeInfo, containerID, storageType);
   }
 
   @Override
-  public void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
-    pendingContainerTracker.recordAllocation(datanodeInfo, containerID);
-  }
-  
-  @Override
-  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
-    return pendingContainerTracker.hasAvailableSpace(datanodeInfo);
+  public void recordAllocationForDatanode(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType) {
+    pendingContainerTracker.recordAllocation(
+        datanodeInfo, containerID, storageType);
   }
 
   @Override
-  public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  public boolean hasAvailableSpace(
+      DatanodeInfo datanodeInfo, long dataSizeRequired, StorageType storageType) {
+    return pendingContainerTracker.hasAvailableSpace(
+        datanodeInfo, dataSizeRequired, storageType);
+  }
+
+  @Override
+  public void removePendingAllocationForDatanode(
+      DatanodeInfo datanodeInfo, ContainerID containerID) {
     pendingContainerTracker.removePendingAllocation(
         datanodeInfo.getPendingContainerAllocations(), containerID);
   }
@@ -1090,7 +1098,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
       DatanodeInfo dnInfo = getNode(op.getTarget().getID());
       if (dnInfo != null) {
-        recordAllocationForDatanode(dnInfo, containerID);
+        recordAllocationForDatanode(dnInfo, containerID, op.getStorageType());
       }
     }
   }
@@ -1510,7 +1518,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
      * {@link PendingContainerTracker}) and sufficient Ratis metadata volume space.
      */
     private boolean hasEnoughSpaceForNode(DatanodeInfo dn) {
-      if (!tracker.hasAvailableSpace(dn)) {
+      if (!tracker.hasAvailableSpace(dn, 0, null)) {
         return false;
       }
       if (minRatisVolumeSizeBytes <= 0) {
@@ -1785,6 +1793,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       final ContainerID containerId)
       throws NodeNotFoundException {
     nodeStateManager.addContainer(datanodeDetails.getID(), containerId);
+    removePendingAllocation(datanodeDetails, containerId);
   }
 
   @Override
@@ -1792,6 +1801,14 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
                            final ContainerID containerId)
       throws NodeNotFoundException {
     nodeStateManager.removeContainer(datanodeDetails.getID(), containerId);
+    removePendingAllocation(datanodeDetails, containerId);
+  }
+
+  private void removePendingAllocation(DatanodeDetails datanodeDetails,
+      ContainerID containerId) throws NodeNotFoundException {
+    DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+    pendingContainerTracker.removePendingAllocation(
+        datanodeInfo.getPendingContainerAllocations(), containerId);
   }
 
   /**

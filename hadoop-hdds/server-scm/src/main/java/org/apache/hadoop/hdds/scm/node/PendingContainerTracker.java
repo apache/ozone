@@ -18,10 +18,12 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -79,11 +81,11 @@ public class PendingContainerTracker {
 
   /**
    * Two-window bucket for a single DataNode.
-   * Contains current and previous window sets, plus last roll timestamp.
+   * Contains current and previous window maps, plus last roll timestamp.
    */
   public static class TwoWindowBucket {
-    private Set<ContainerID> currentWindow = new HashSet<>();
-    private Set<ContainerID> previousWindow = new HashSet<>();
+    private Map<ContainerID, StorageType> currentWindow = new HashMap<>();
+    private Map<ContainerID, StorageType> previousWindow = new HashMap<>();
     private long lastRollTime = Time.monotonicNow();
     private final long rollIntervalMs;
     private final DatanodeID datanodeID;
@@ -112,7 +114,7 @@ public class PendingContainerTracker {
         }
       } else if (elapsed >= rollIntervalMs) {
         previousWindow.clear();
-        final Set<ContainerID> tmp = previousWindow;
+        final Map<ContainerID, StorageType> tmp = previousWindow;
         previousWindow = currentWindow;
         currentWindow = tmp;
         lastRollTime = now;
@@ -122,15 +124,30 @@ public class PendingContainerTracker {
     }
 
     synchronized boolean contains(ContainerID containerID) {
-      return currentWindow.contains(containerID) || previousWindow.contains(containerID);
+      return currentWindow.containsKey(containerID) || previousWindow.containsKey(containerID);
+    }
+
+    /**
+     * Add container with its storage type to current window.
+     */
+    synchronized boolean add(ContainerID containerID, StorageType storageType) {
+      boolean added = !currentWindow.containsKey(containerID);
+      if (added) {
+        currentWindow.put(containerID, storageType);
+      }
+      LOG.debug("Recorded pending container {} on DataNode {} with storageType {}. Added={}, Total pending={}",
+          containerID, datanodeID, storageType, added, getCount());
+      return added;
     }
 
     /**
      * Remove container from both windows.
      */
     synchronized boolean remove(ContainerID containerID) {
-      boolean removedFromCurrent = currentWindow.remove(containerID);
-      boolean removedFromPrevious = previousWindow.remove(containerID);
+      boolean removedFromCurrent = currentWindow.containsKey(containerID);
+      currentWindow.remove(containerID);
+      boolean removedFromPrevious = previousWindow.containsKey(containerID);
+      previousWindow.remove(containerID);
       boolean removed = removedFromCurrent || removedFromPrevious;
       LOG.debug("Removed pending container {} from DataNode {}. Removed={}, Remaining={}",
           containerID, datanodeID, removed, getCount());
@@ -145,12 +162,33 @@ public class PendingContainerTracker {
     }
 
     /**
+     * Count pending containers of the given storage type.
+     * Unknown storage type entries are counted for typed checks because they
+     * may occupy the requested storage type.
+     */
+    synchronized int getCount(StorageType storageType) {
+      if (checksAllStorageTypes(storageType)) {
+        return getCount();
+      }
+      return countByStorageType(currentWindow, storageType)
+          + countByStorageType(previousWindow, storageType);
+    }
+
+    private static int countByStorageType(
+        Map<ContainerID, StorageType> window, StorageType storageType) {
+      return (int) window.values().stream()
+          .filter(recordedStorageType ->
+              recordedStorageType == null || storageType.equals(recordedStorageType))
+          .count();
+    }
+
+    /**
      * Records a container allocation in the current window,
      * without checking available space. Use this when the space check has
      * already been performed by the placement policy.
      */
-    synchronized void add(ContainerID containerID) {
-      currentWindow.add(containerID);
+    synchronized boolean record(ContainerID containerID, StorageType storageType) {
+      return add(containerID, storageType);
     }
 
     /**
@@ -161,24 +199,26 @@ public class PendingContainerTracker {
      * @param storageReports storage reports for the datanode
      * @param maxContainerSize maximum size of a single container in bytes
      * @param containerID the container being allocated
+     * @param storageType the storage type selected for the allocation
      * @return true if space was available and the container was recorded, false otherwise
      */
-
     synchronized boolean checkSpaceAndAdd(
-        List<StorageReportProto> storageReports, long maxContainerSize, ContainerID containerID) {
-      final int pendingAllocationCount = getCount();
+        List<StorageReportProto> storageReports, long maxContainerSize,
+        ContainerID containerID, StorageType storageType) {
+      final int pendingAllocationCount = getCount(storageType);
       long allocatableCount = 0;
       for (StorageReportProto report : storageReports) {
         if (report.hasFailed() && report.getFailed()) {
+          continue;
+        }
+        if (!matchesStorageType(report, storageType)) {
           continue;
         }
         final long allocatableCountOnThisDisk =
             Math.max(0L, VolumeUsage.getUsableSpace(report)) / maxContainerSize;
         allocatableCount += allocatableCountOnThisDisk;
         if (allocatableCount > pendingAllocationCount) {
-          final boolean added = currentWindow.add(containerID);
-          LOG.debug("Recorded pending container {} on DataNode {}. Added={}, Total pending={}",
-              containerID, datanodeID, added, getCount());
+          final boolean added = add(containerID, storageType);
           return added;
         }
       }
@@ -202,7 +242,8 @@ public class PendingContainerTracker {
    * @param containerID the container being allocated
    * @return true if space was available and the allocation was recorded, false otherwise
    */
-  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  public boolean checkSpaceAndRecordAllocation(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType) {
     Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
     Objects.requireNonNull(containerID, "containerID == null");
 
@@ -213,7 +254,7 @@ public class PendingContainerTracker {
     }
 
     boolean added = datanodeInfo.getPendingContainerAllocations()
-        .checkSpaceAndAdd(storageReports, maxContainerSize, containerID);
+        .checkSpaceAndAdd(storageReports, maxContainerSize, containerID, storageType);
     if (metrics != null) {
       if (added) {
         metrics.incNumPendingContainersAdded();
@@ -232,39 +273,56 @@ public class PendingContainerTracker {
    *
    * @param datanodeInfo the datanode receiving the container
    * @param containerID  the container being allocated
+   * @param storageType the storage type selected for the allocation
    */
-  public void recordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  public void recordAllocation(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType) {
     Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
     Objects.requireNonNull(containerID, "containerID == null");
-    datanodeInfo.getPendingContainerAllocations().add(containerID);
-    if (metrics != null) {
+    final boolean added =
+        datanodeInfo.getPendingContainerAllocations().record(containerID, storageType);
+    if (added && metrics != null) {
       metrics.incNumPendingContainersAdded();
     }
   }
 
   /**
-   * Returns true if the given datanode has at least one allocatable container slot
-   * available, accounting for pending in-flight allocations.
+   * Returns true if the given datanode has enough data space and at least one
+   * allocatable container slot available, accounting for pending in-flight
+   * allocations.
    *
    * <p>Slot availability is based on {@code maxContainerSize}: a slot exists for each
    * {@code maxContainerSize}-worth of usable space on any volume. This check is intended for the placement policy.
    * This rolls expired-window entries but does not consume a slot.
    *
    * @param datanodeInfo the datanode to check
+   * @param dataSizeRequired minimum data volume space required in bytes
+   * @param storageType storage type to check
    * @return true if at least one container slot is available
    */
-  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
+  public boolean hasAvailableSpace(
+      DatanodeInfo datanodeInfo, long dataSizeRequired, StorageType storageType) {
     Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
     List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
     if (storageReports.isEmpty()) {
       return false;
     }
+    if (!hasVolumeWithEnoughDataSpace(
+        storageReports, dataSizeRequired, storageType)) {
+      LOG.debug("Datanode {} has no volumes with enough space to allocate {} "
+              + "bytes for data.",
+          datanodeInfo.getID(), dataSizeRequired);
+      return false;
+    }
     TwoWindowBucket bucket = datanodeInfo.getPendingContainerAllocations();
     bucket.rollIfNeeded();
-    final int pendingCount = bucket.getCount();
+    final int pendingCount = bucket.getCount(storageType);
     long allocatableCount = 0;
     for (StorageReportProto report : storageReports) {
       if (report.hasFailed() && report.getFailed()) {
+        continue;
+      }
+      if (!matchesStorageType(report, storageType)) {
         continue;
       }
       allocatableCount += Math.max(0L, VolumeUsage.getUsableSpace(report)) / maxContainerSize;
@@ -291,6 +349,34 @@ public class PendingContainerTracker {
     if (removed && metrics != null) {
       metrics.incNumPendingContainersRemoved();
     }
+  }
+
+  private static boolean matchesStorageType(
+      StorageReportProto report, StorageType storageType) {
+    return checksAllStorageTypes(storageType)
+        || StorageTypeUtils.getFromProtobuf(report.getStorageType()).equals(storageType);
+  }
+
+  private static boolean hasVolumeWithEnoughDataSpace(
+      List<StorageReportProto> storageReports, long dataSizeRequired,
+      StorageType storageType) {
+    if (dataSizeRequired <= 0 || checksAllStorageTypes(storageType)) {
+      return true;
+    }
+    for (StorageReportProto report : storageReports) {
+      if (report.hasFailed() && report.getFailed()) {
+        continue;
+      }
+      if (matchesStorageType(report, storageType)
+          && VolumeUsage.getUsableSpace(report) > dataSizeRequired) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean checksAllStorageTypes(StorageType storageType) {
+    return storageType == null;
   }
 
   @VisibleForTesting

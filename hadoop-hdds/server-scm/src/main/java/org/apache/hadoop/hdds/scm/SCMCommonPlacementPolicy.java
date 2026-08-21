@@ -35,11 +35,9 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -49,7 +47,6 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -304,7 +301,7 @@ public abstract class SCMCommonPlacementPolicy implements
    *
    * <p>Data-space is checked via {@link NodeManager#hasAvailableSpace}, which
    * delegates to {@link org.apache.hadoop.hdds.scm.node.PendingContainerTracker}
-   * and accounts for both current disk usage and in-flight allocations.
+   * and accounts for current disk usage, storage type and in-flight allocations.
    * The check always uses {@code maxContainerSize} as the unit of allocation,
    * regardless of the actual container's used bytes.
    *
@@ -323,34 +320,12 @@ public abstract class SCMCommonPlacementPolicy implements
 
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
 
-    // Data-space check: use PendingContainerTracker slot availability.
-    // This accounts for both current disk usage and in-flight allocations.
+    // Data-space check: use PendingContainerTracker availability.
+    // This accounts for current disk usage, storage type and in-flight allocations.
     // Always slot-based (maxContainerSize unit).
-    if (!nodeManager.hasAvailableSpace(datanodeInfo)) {
+    if (!nodeManager.hasAvailableSpace(
+        datanodeInfo, dataSizeRequired, storageType)) {
       LOG.debug("Datanode {} has no available container slots.", datanodeDetails);
-      return false;
-    }
-
-    // Tier-aware data check (StorageType feature): when a specific storageType is
-    // requested, ensure the node has a volume of that tier with enough usable space.
-    // When storageType is null (any tier), rely on the slot check above (master behavior).
-    boolean enoughForData = false;
-    if (dataSizeRequired > 0 && storageType != null) {
-      for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        boolean matchesTier = StorageTypeUtils.getFromProtobuf(
-            reportProto.getStorageType()).equals(storageType);
-        if (matchesTier && VolumeUsage.getUsableSpace(reportProto) > dataSizeRequired) {
-          enoughForData = true;
-          break;
-        }
-      }
-    } else {
-      enoughForData = true;
-    }
-
-    if (!enoughForData) {
-      LOG.debug("Datanode {} has no volumes with enough space to allocate {} " +
-              "bytes for data.", datanodeDetails, dataSizeRequired);
       return false;
     }
 
