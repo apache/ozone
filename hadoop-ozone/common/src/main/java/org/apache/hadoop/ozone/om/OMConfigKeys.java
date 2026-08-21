@@ -190,7 +190,9 @@ public final class OMConfigKeys {
       = 5;
   public static final String OZONE_KEY_LIFECYCLE_SERVICE_ENABLED =
       "ozone.lifecycle.service.enabled";
-  public static final boolean OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT = false;
+  // On by default: S3 object versioning relies on the lifecycle scan to
+  // reclaim versions, and a rule that never runs is worse than no rule.
+  public static final boolean OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT = true;
   public static final String OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE =
       "ozone.lifecycle.service.delete.batch-size";
   public static final int OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT = 1000;
