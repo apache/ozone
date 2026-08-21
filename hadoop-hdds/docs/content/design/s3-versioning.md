@@ -390,7 +390,13 @@ unaddressed read steps over the marker and reports the key absent, while a read
 that names the marker gets told the version exists but has no body to return.
 - **DELETE without versionId (Enabled)**: move current into versionedKeyTable and
   write a delete marker as the new current. (Suspended: the marker takes the null
-  slot exactly as a suspended PUT does.) **DELETE ?versionId=x**: permanently
+  slot exactly as a suspended PUT does.) A batch delete is the same operation over
+  more keys and takes the same path — it goes through a request of its own, which
+  inserts one marker per key from the same implementation, so the two cannot
+  diverge. Hard-deleting there instead would destroy the current version and leave
+  the versions under it in the versionedKeyTable with nothing above them: absent to
+  a plain read, holding quota, and unreachable by promotion, which only runs when a
+  version is deleted by id. **DELETE ?versionId=x**: permanently
   delete that version (blocks to deletedTable); if it was current, trigger version
   promotion as shown above.
 - **ListObjects**: scans keyTable only, skipping keys whose current version is a
@@ -482,7 +488,9 @@ version-aware diff land as follow-up work.
 New endpoints: `PutBucketVersioning`, `GetBucketVersioning`,
 `ListObjectVersions`. Extended: GET/HEAD/DELETE with `?versionId=` (including the
 literal `null`), `x-amz-version-id` / `x-amz-delete-marker` response headers,
-per-entry version semantics in batch `DeleteObjects`, `CopyObject` versioning
+per-entry version semantics in batch `DeleteObjects` (whose OM-side marker
+insertion lands with the write paths, leaving the gateway to carry the per-entry
+`versionId` and report `DeleteMarker`), `CopyObject` versioning
 behavior, and version-id headers on `PutObject` / `CompleteMultipartUpload`. The
 native interfaces (`ozone sh`, `OzoneBucket` API) are extended in parallel so
 versions are manageable outside the S3 path.
@@ -569,12 +577,12 @@ left unguarded).
 |---|---|
 | T1 Metadata foundation | proto three-state enum + legacy-boolean sync, set-property state machine, `OmKeyInfo` version fields, versionedKeyTable column family, layout feature gate |
 | T2 VersionId generator framework | `VersionIdGenerator` interface with class-name configuration, `UniqueId`-based default proposed in `preExecute`, commit-time ordering floor, pinned-first generator |
-| T3 ENABLED write paths | PUT two-table update, DELETE marker insertion, quota accounting |
+| T3 ENABLED write paths | PUT two-table update, DELETE marker insertion on both the single-key and the batch request, quota accounting |
 | T4 Read / permanent delete / promotion | `?versionId=` reads including null-slot addressing, reporting a delete-marker-addressed read as a condition distinct from not-found; permanent delete by versionId with quota accounting; version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys, multipart completion on the same version-retention path as a PUT |
 | T6 Version-aware lifecycle | `NoncurrentVersionExpiration` (`NoncurrentDays`, `NewerNoncurrentVersions`) and `ExpiredObjectDeleteMarker` actions, delete-marker semantics for `Expiration` on a versioned bucket, versionedKeyTable scan in `LifecycleActionTask`, `maxVersions` backstop, lifecycle service enabled by default |
 | T7 Snapshot exclusion | OM-side rejection matrix for snapshot creation and versioning state transitions, applied to the source of a linked bucket and enforced at apply time so the two directions cannot race; dev-only opt-in config key |
-| T8 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, batch delete |
+| T8 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, per-entry `versionId` and `DeleteMarker` reporting in batch `DeleteObjects` |
 | T9 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
 | T10 Quota and observability | quota edges + QuotaRepair, Recon / metrics |
 | T11 Wrap-up | upgrade validation, robot tests, benchmarks, docs |
