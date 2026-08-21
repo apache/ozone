@@ -14,8 +14,8 @@
 # limitations under the License.
 
 # Configuration for the component-labeler job in label-pr.yml.
-# Labels listed here are automation-owned: they are added and removed
-# based on the files changed in the pull request (sync-labels).
+# Labels listed here are added based on the files changed in the pull request.
+# They are never removed, so labels applied manually are left alone.
 
 scm:
   - changed-files:
@@ -58,11 +58,6 @@ ofs:
   - changed-files:
       - any-glob-to-any-file:
           - 'hadoop-ozone/ozonefs*/**'
-
-EC:
-  - changed-files:
-      - any-glob-to-any-file:
-          - 'hadoop-hdds/erasurecode/**'
 
 command-line:
   - changed-files:

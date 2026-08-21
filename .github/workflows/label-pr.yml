@@ -24,6 +24,11 @@ on:
   # allow running the workflow manually from GitHub UI
   workflow_dispatch:
 
+# component-labeler scans every open PR, so a slow run must not overlap the next one
+concurrency:
+  group: label-pull-requests
+  cancel-in-progress: false
+
 jobs:
   labeler:
     permissions:
@@ -80,4 +85,6 @@ jobs:
         uses: actions/labeler@b8dd2d9be0f68b860e7dae5dae7d772984eacd6d # v6.2.0
         with:
           pr-number: ${{ steps.prs.outputs.numbers }}
-          sync-labels: true
+          # add only: path rules cannot express why a label was applied manually,
+          # so removing labels here would override human judgement
+          sync-labels: false
