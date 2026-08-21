@@ -582,9 +582,9 @@ public class ContainerBalancerTask implements Runnable {
         metrics.incrementNumDatanodesUnbalanced(1);
 
         // amount of bytes greater than upper limit in this node
-        long overUtilizedBytes = ratioToBytes(
+        long overUtilizedBytes = ContainerBalancerClusterAnalyzer.ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-            utilization) - ratioToBytes(
+            utilization) - ContainerBalancerClusterAnalyzer.ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             upperLimit);
         totalOverUtilizedBytes += overUtilizedBytes;
@@ -593,9 +593,9 @@ public class ContainerBalancerTask implements Runnable {
         metrics.incrementNumDatanodesUnbalanced(1);
 
         // amount of bytes lesser than lower limit in this node
-        long underUtilizedBytes = ratioToBytes(
+        long underUtilizedBytes = ContainerBalancerClusterAnalyzer.ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-            lowerLimit) - ratioToBytes(
+            lowerLimit) - ContainerBalancerClusterAnalyzer.ratioToBytes(
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             utilization);
         totalUnderUtilizedBytes += underUtilizedBytes;
@@ -1106,17 +1106,6 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   /**
-   * Calculates the number of used bytes given capacity and utilization ratio.
-   *
-   * @param nodeCapacity     capacity of the node.
-   * @param utilizationRatio used space by capacity ratio of the node.
-   * @return number of bytes
-   */
-  private long ratioToBytes(Long nodeCapacity, double utilizationRatio) {
-    return (long) (nodeCapacity * utilizationRatio);
-  }
-
-  /**
    * Calculates the average utilization for the specified nodes.
    * Utilization is (capacity - remaining) divided by capacity.
    *
@@ -1137,8 +1126,8 @@ public class ContainerBalancerTask implements Runnable {
     }
     long clusterCapacity = aggregatedStats.getCapacity().get();
     long clusterRemaining = aggregatedStats.getRemaining().get();
-
-    return (clusterCapacity - clusterRemaining) / (double) clusterCapacity;
+    return ContainerBalancerClusterAnalyzer.calculateAvgUtilization(
+        clusterCapacity, clusterRemaining);
   }
 
   /**
