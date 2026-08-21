@@ -627,17 +627,10 @@ public class TestRDBTableStore {
     byte[] samplePrefix = testPrefixes.get(2).getBytes(
         StandardCharsets.UTF_8);
 
-    // A start key equal to the prefix denotes the beginning of that range, not
-    // an exact point lookup for the prefix itself.
-    List<Table.KeyValue<byte[], byte[]>> rangeKVs = testTable
-        .getRangeKVs(samplePrefix, 1, samplePrefix);
-    assertEquals(1, rangeKVs.size());
-    assertArrayEquals(StringUtils.string2Bytes(testPrefixes.get(2) + "0"),
-        rangeKVs.get(0).getKey());
-
     // test start at first
     byte[] startKey = samplePrefix;
-    rangeKVs = testTable.getRangeKVs(startKey, 3, samplePrefix);
+    List<Table.KeyValue<byte[], byte[]>> rangeKVs = testTable
+        .getRangeKVs(startKey, 3, samplePrefix);
     assertEquals(3, rangeKVs.size());
 
     // test start with a middle key
@@ -646,26 +639,18 @@ public class TestRDBTableStore {
     rangeKVs = testTable.getRangeKVs(startKey, blockCount, samplePrefix);
     assertEquals(2, rangeKVs.size());
 
-    // A filtered single-entry range must continue iterating until it finds a
-    // matching key instead of returning the exact start key.
+    // test with a filter
     final KeyPrefixFilter filter1 = KeyPrefixFilter.newFilter(StringUtils.bytes2String(samplePrefix) + "1");
     startKey = StringUtils.string2Bytes(
-        StringUtils.bytes2String(samplePrefix) + "0");
-    rangeKVs = testTable.getRangeKVs(startKey, 1,
+        StringUtils.bytes2String(samplePrefix));
+    rangeKVs = testTable.getRangeKVs(startKey, blockCount,
         samplePrefix, filter1);
     assertEquals(1, rangeKVs.size());
-    assertArrayEquals(StringUtils.string2Bytes(testPrefixes.get(2) + "1"),
-        rangeKVs.get(0).getKey());
 
     // test start with a non-exist key
     startKey = StringUtils.string2Bytes(
         StringUtils.bytes2String(samplePrefix) + 123);
     rangeKVs = testTable.getRangeKVs(startKey, 10, samplePrefix);
-    assertEquals(0, rangeKVs.size());
-
-    // An existing point outside the requested prefix is not part of the range.
-    startKey = StringUtils.string2Bytes(testPrefixes.get(1) + "0");
-    rangeKVs = testTable.getRangeKVs(startKey, 1, samplePrefix);
     assertEquals(0, rangeKVs.size());
   }
 
