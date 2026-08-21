@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -591,6 +594,56 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     assertSame(request, OMBucketSetPropertyRequest
         .disallowSetBucketPropertyWithVersioningStatus(
             request, finalizedContext));
+  }
+
+  /**
+   * Versions are reclaimed by the lifecycle scan and by nothing else, so a
+   * bucket must not be able to enter a state where they accumulate with
+   * nothing able to reclaim them. Checked in preExecute, since whether the
+   * service runs is a property of the receiving OM rather than of replicated
+   * state.
+   */
+  @Test
+  public void testEnablingVersioningNeedsTheLifecycleService()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequest request = createSetVersioningStatusRequest(volumeName,
+        bucketName, BucketVersioningStatus.ENABLED);
+
+    withLifecycleService(false);
+    OMException ex = assertThrows(OMException.class,
+        () -> new OMBucketSetPropertyRequest(request).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION,
+        ex.getResult());
+    assertThat(ex.getMessage()).contains("lifecycle service is disabled");
+
+    withLifecycleService(true);
+    assertNotNull(new OMBucketSetPropertyRequest(request)
+        .preExecute(ozoneManager));
+  }
+
+  /**
+   * Suspending is not blocked: it stops new versions from being created, so
+   * it can only reduce what has to be reclaimed.
+   */
+  @Test
+  public void testSuspendingVersioningNeedsNoLifecycleService()
+      throws Exception {
+    withLifecycleService(false);
+
+    assertNotNull(new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(UUID.randomUUID().toString(),
+            UUID.randomUUID().toString(), BucketVersioningStatus.SUSPENDED))
+        .preExecute(ozoneManager));
+  }
+
+  private void withLifecycleService(boolean enabled) {
+    KeyLifecycleService lifecycleService = mock(KeyLifecycleService.class);
+    when(lifecycleService.isEnabled()).thenReturn(enabled);
+    KeyManager keyManager = mock(KeyManager.class);
+    when(keyManager.getKeyLifecycleService()).thenReturn(lifecycleService);
+    when(ozoneManager.getKeyManager()).thenReturn(keyManager);
   }
 
   private OMRequest createSetVersioningStatusRequest(String volumeName,
