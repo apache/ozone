@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketVersioningStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -108,6 +109,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
           + bucketInfo.getBucketName() + " is created with layout "
           + bucketLayout + ".",
           OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+
+    if (bucketInfo.getVersioningStatus()
+        == BucketVersioningStatusProto.VERSIONING_ENABLED) {
+      OMBucketSetPropertyRequest.rejectIfLifecycleServiceIsDisabled(
+          ozoneManager);
     }
 
     // ACL check during preExecute

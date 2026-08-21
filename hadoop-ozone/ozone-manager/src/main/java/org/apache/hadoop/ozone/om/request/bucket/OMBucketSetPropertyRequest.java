@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.common.BekInfoUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -51,9 +52,11 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketSetPropertyResponse;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketVersioningStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
@@ -89,6 +92,11 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     BucketArgs bucketArgs =
         getOmRequest().getSetBucketPropertyRequest().getBucketArgs();
+
+    if (bucketArgs.getVersioningStatus()
+        == BucketVersioningStatusProto.VERSIONING_ENABLED) {
+      rejectIfLifecycleServiceIsDisabled(ozoneManager);
+    }
 
     if (bucketArgs.hasBekInfo()) {
       KeyProviderCryptoExtension kmsProvider = ozoneManager.getKmsProvider();
@@ -415,6 +423,28 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.SetBucketProperty
   )
+  /**
+   * Versions are reclaimed by the lifecycle scan and by nothing else, so a
+   * bucket must not be able to enter a state where they accumulate with
+   * nothing able to reclaim them. Checked here rather than in
+   * validateAndUpdateCache because whether the service runs is a property of
+   * this OM's configuration, not of the replicated state: only the OM that
+   * received the request may decide it, and its decision is what travels.
+   */
+  static void rejectIfLifecycleServiceIsDisabled(OzoneManager ozoneManager)
+      throws OMException {
+    KeyLifecycleService lifecycleService =
+        ozoneManager.getKeyManager() == null ? null
+            : ozoneManager.getKeyManager().getKeyLifecycleService();
+    if (lifecycleService != null && !lifecycleService.isEnabled()) {
+      throw new OMException("S3 object versioning cannot be enabled while the "
+          + "lifecycle service is disabled: versions would accumulate with "
+          + "nothing able to reclaim them. Set "
+          + OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED + " to true.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+  }
+
   public static OMRequest disallowSetBucketPropertyWithVersioningStatus(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
