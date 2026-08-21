@@ -34,6 +34,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -536,38 +537,49 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private List<OzoneManagerProtocolProtos.OMResponse> submitPurgePathsWithBatching(List<PurgePathRequest> requests,
       String snapTableKey, UUID expectedPreviousSnapshotId, Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap) {
 
-    List<OzoneManagerProtocolProtos.OMResponse> responses = new ArrayList<>();
-    List<PurgePathRequest> purgePathRequestBatch = new ArrayList<>();
-    long batchBytes = 0;
-
+    // Group purge paths by their owning bucket so that every submitted purge transaction contains paths from a single
+    // bucket only. This keeps the apply side acquiring exactly one bucket write lock per transaction; combined with
+    // apply-side chunking within that lock, a large background directory purge cannot starve readers on other buckets.
+    Map<VolumeBucketId, List<PurgePathRequest>> requestsByBucket = new LinkedHashMap<>();
     for (PurgePathRequest req : requests) {
-      int reqSize = req.getSerializedSize();
+      requestsByBucket.computeIfAbsent(new VolumeBucketId(req.getVolumeId(), req.getBucketId()),
+          k -> new ArrayList<>()).add(req);
+    }
 
-      // If adding this request would exceed the limit, flush the current batch first
-      if (batchBytes + reqSize > ratisByteLimit && !purgePathRequestBatch.isEmpty()) {
+    List<OzoneManagerProtocolProtos.OMResponse> responses = new ArrayList<>();
+    for (List<PurgePathRequest> bucketRequests : requestsByBucket.values()) {
+      List<PurgePathRequest> purgePathRequestBatch = new ArrayList<>();
+      long batchBytes = 0;
+
+      for (PurgePathRequest req : bucketRequests) {
+        int reqSize = req.getSerializedSize();
+
+        // If adding this request would exceed the limit, flush the current batch first
+        if (batchBytes + reqSize > ratisByteLimit && !purgePathRequestBatch.isEmpty()) {
+          OzoneManagerProtocolProtos.OMResponse resp =
+              submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
+          if (!resp.getSuccess()) {
+            return Collections.emptyList();
+          }
+          responses.add(resp);
+          purgePathRequestBatch.clear();
+          batchBytes = 0;
+        }
+
+        // Add current request to batch
+        purgePathRequestBatch.add(req);
+        batchBytes += reqSize;
+      }
+
+      // Flush remaining batch for this bucket if any
+      if (!purgePathRequestBatch.isEmpty()) {
         OzoneManagerProtocolProtos.OMResponse resp =
             submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
         if (!resp.getSuccess()) {
           return Collections.emptyList();
         }
         responses.add(resp);
-        purgePathRequestBatch.clear();
-        batchBytes = 0;
       }
-
-      // Add current request to batch
-      purgePathRequestBatch.add(req);
-      batchBytes += reqSize;
-    }
-
-    // Flush remaining batch if any
-    if (!purgePathRequestBatch.isEmpty()) {
-      OzoneManagerProtocolProtos.OMResponse resp =
-          submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
-      if (!resp.getSuccess()) {
-        return Collections.emptyList();
-      }
-      responses.add(resp);
     }
 
     return responses;

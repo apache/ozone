@@ -331,4 +331,63 @@ public class TestDirectoryDeletingService {
     org.apache.commons.io.FileUtils.deleteDirectory(testDir);
   }
 
+  @Test
+  @DisplayName("DirectoryDeletingService submits one bucket per PurgeDirectories transaction")
+  void testPurgeDirectoriesGroupedByBucketPerTransaction() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    File testDir = Files.createTempDirectory("TestDDS-BucketGroup").toFile();
+    ServerUtils.setOzoneMetaDirPath(conf, testDir.toString());
+    conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setQuietMode(false);
+
+    OmTestManagers managers = new OmTestManagers(conf);
+    om = managers.getOzoneManager();
+    KeyManager km = managers.getKeyManager();
+
+    DirectoryDeletingService real = (DirectoryDeletingService) km.getDirDeletingService();
+    DirectoryDeletingService dds = Mockito.spy(real);
+
+    List<OzoneManagerProtocolProtos.OMRequest> captured = new ArrayList<>();
+    Mockito.doAnswer(inv -> {
+      captured.add(inv.getArgument(0));
+      return OzoneManagerProtocolProtos.OMResponse.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories).setStatus(OzoneManagerProtocolProtos.Status.OK)
+          .build();
+    }).when(dds).submitRequest(Mockito.any(OzoneManagerProtocolProtos.OMRequest.class));
+
+    final long volumeId = 1L, bucketIdA = 2L, bucketIdB = 3L;
+    // Interleave paths from two different buckets to prove grouping is order-independent.
+    List<OzoneManagerProtocolProtos.PurgePathRequest> purgeList = new ArrayList<>();
+    Map<org.apache.hadoop.ozone.om.OMMetadataManager.VolumeBucketId, OzoneManagerProtocolProtos.BucketNameInfo>
+        bucketNameInfoMap = new HashMap<>();
+    for (long bucketId : new long[] {bucketIdA, bucketIdB}) {
+      bucketNameInfoMap.put(new org.apache.hadoop.ozone.om.OMMetadataManager.VolumeBucketId(volumeId, bucketId),
+          OzoneManagerProtocolProtos.BucketNameInfo.newBuilder().setVolumeId(volumeId).setBucketId(bucketId)
+              .setVolumeName("v").setBucketName("b" + bucketId).build());
+    }
+    for (int i = 0; i < 6; i++) {
+      purgeList.add(OzoneManagerProtocolProtos.PurgePathRequest.newBuilder()
+          .setVolumeId(volumeId).setBucketId(bucketIdA).setDeletedDir("a-dir-" + i).build());
+      purgeList.add(OzoneManagerProtocolProtos.PurgePathRequest.newBuilder()
+          .setVolumeId(volumeId).setBucketId(bucketIdB).setDeletedDir("b-dir-" + i).build());
+    }
+
+    dds.optimizeDirDeletesAndSubmitRequest(0L, 0L, 0L, new ArrayList<>(), purgeList, null, Time.monotonicNow(), km,
+        kv -> true, kv -> true, bucketNameInfoMap, null, 1L, new AtomicInteger(Integer.MAX_VALUE));
+
+    assertThat(captured).as("Expect one transaction per bucket when the byte limit is not hit").hasSize(2);
+    Set<Long> bucketsSeen = new HashSet<>();
+    for (OzoneManagerProtocolProtos.OMRequest omReq : captured) {
+      OzoneManagerProtocolProtos.PurgeDirectoriesRequest purge = omReq.getPurgeDirectoriesRequest();
+      Set<Long> bucketsInTxn = purge.getDeletedPathList().stream()
+          .map(OzoneManagerProtocolProtos.PurgePathRequest::getBucketId).collect(java.util.stream.Collectors.toSet());
+      assertThat(bucketsInTxn).as("Each transaction must contain paths from a single bucket").hasSize(1);
+      bucketsSeen.addAll(bucketsInTxn);
+    }
+    assertThat(bucketsSeen).as("Both buckets should be purged across transactions").containsExactlyInAnyOrder(
+        bucketIdA, bucketIdB);
+
+    org.apache.commons.io.FileUtils.deleteDirectory(testDir);
+  }
+
 }
