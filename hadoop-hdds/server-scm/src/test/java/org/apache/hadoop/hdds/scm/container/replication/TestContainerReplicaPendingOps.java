@@ -533,6 +533,117 @@ public class TestContainerReplicaPendingOps {
     assertNull(scheduled.get(dn2.getID()));
   }
 
+  @Test
+  public void testFailedAddCommandRemovesPendingOp() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
+    cmd.setRecipient(dn1.getID());
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, cmd,
+        clock.millis() + 60000, 1000L, clock.millis());
+    assertEquals(1, pendingOps.getPendingOpCount(ADD));
+
+    pendingOps.onReplicationCommandFailed(cmd.getId(), dn1);
+
+    assertEquals(0, pendingOps.getPendingOpCount(ADD));
+    assertTrue(pendingOps.getPendingOps(containerID).isEmpty());
+  }
+
+  @Test
+  public void testFailedAddCommandIsCountedSeparatelyFromTimeout() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
+    cmd.setRecipient(dn1.getID());
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, cmd,
+        clock.millis() + 60000, 1000L, clock.millis());
+
+    pendingOps.onReplicationCommandFailed(cmd.getId(), dn1);
+
+    assertEquals(1, metrics.getReplicaCreateFailedTotal());
+    assertEquals(0, metrics.getReplicaCreateTimeoutTotal());
+  }
+
+  @Test
+  public void testFailedEcAddCommandIncrementsEcFailedCount() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
+    cmd.setRecipient(dn1.getID());
+    pendingOps.scheduleAddReplica(containerID, dn1, 1, cmd,
+        clock.millis() + 60000, 1000L, clock.millis());
+
+    pendingOps.onReplicationCommandFailed(cmd.getId(), dn1);
+
+    assertEquals(1, metrics.getEcReplicaCreateFailedTotal());
+    assertEquals(0, metrics.getReplicaCreateFailedTotal());
+    assertEquals(0, metrics.getEcReplicaCreateTimeoutTotal());
+  }
+
+  @Test
+  public void testFailedCommandWithUnknownIdIsNoOp() {
+    pendingOps.onReplicationCommandFailed(999999L, dn1);
+    assertEquals(0, pendingOps.getPendingOpCount(ADD));
+  }
+
+  @Test
+  public void testFailedCommandFromAnotherDatanodeIsIgnored() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
+    cmd.setRecipient(dn1.getID());
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, cmd,
+        clock.millis() + 60000, 1000L, clock.millis());
+
+    pendingOps.onReplicationCommandFailed(cmd.getId(), dn2);
+
+    assertEquals(1, pendingOps.getPendingOpCount(ADD));
+    assertEquals(0, metrics.getReplicaCreateFailedTotal());
+  }
+
+  @Test
+  public void testFailedCommandDoesNotRemoveDeleteOp() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
+    cmd.setRecipient(dn1.getID());
+    pendingOps.scheduleDeleteReplica(containerID, dn1, 0, cmd, clock.millis() + 60000);
+
+    pendingOps.onReplicationCommandFailed(cmd.getId(), dn1);
+
+    assertEquals(1, pendingOps.getPendingOpCount(DELETE));
+  }
+
+  @Test
+  public void testCompletedOpKeepsCommandIndexForSiblingOps() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
+    cmd.setRecipient(dn1.getID());
+    pendingOps.scheduleAddReplica(containerID, dn1, 1, cmd,
+        clock.millis() + 60000, 1000L, clock.millis());
+    pendingOps.scheduleAddReplica(containerID, dn2, 2, cmd,
+        clock.millis() + 60000, 1000L, clock.millis());
+
+    pendingOps.completeAddReplica(containerID, dn1, 1);
+    pendingOps.onReplicationCommandFailed(cmd.getId(), dn1);
+
+    assertEquals(0, pendingOps.getPendingOpCount(ADD));
+    assertTrue(pendingOps.getPendingOps(containerID).isEmpty());
+  }
+
+  @Test
+  public void testExpiredOpKeepsCommandIndexForSiblingOps() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    SCMCommand<?> cmd = ReplicateContainerCommand.toTarget(1L, dn1);
+    cmd.setRecipient(dn1.getID());
+    pendingOps.scheduleAddReplica(containerID, dn1, 1, cmd,
+        clock.millis(), 1000L, clock.millis());
+    pendingOps.scheduleAddReplica(containerID, dn2, 2, cmd,
+        clock.millis() + 60000, 1000L, clock.millis());
+
+    clock.fastForward(1);
+    pendingOps.removeExpiredEntries();
+    pendingOps.onReplicationCommandFailed(cmd.getId(), dn1);
+
+    assertEquals(0, pendingOps.getPendingOpCount(ADD));
+    assertTrue(pendingOps.getPendingOps(containerID).isEmpty());
+  }
+
   /**
    * Tests that only the size of containers with expired ops is reduced from the map tracking size of pending ops.
    * For example, if target Datanode DN1 has two pending ADD ops 10GB + 15GB, and the first op expires, then only

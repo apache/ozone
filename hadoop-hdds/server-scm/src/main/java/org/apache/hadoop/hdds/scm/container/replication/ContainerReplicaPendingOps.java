@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class to track pending replication operations across the cluster. For
@@ -46,12 +48,19 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  */
 public class ContainerReplicaPendingOps {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerReplicaPendingOps.class);
+
   private static final int RATIS_COUNTER_INDEX = 0;
   private static final int EC_COUNTER_INDEX = 1;
 
   private final Clock clock;
   private final ConcurrentHashMap<ContainerID, List<ContainerReplicaOp>>
       pendingOps = new ConcurrentHashMap<>();
+  // Maps an in-flight command id back to the container it belongs to, so a
+  // failed-command report from a datanode can locate and clear the pending op
+  // without scanning every container.
+  private final ConcurrentHashMap<Long, ContainerID> commandIdToContainer =
+      new ConcurrentHashMap<>();
   private final Striped<ReadWriteLock> stripedLock = Striped.readWriteLock(64);
   private final ReentrantReadWriteLock globalLock =
       new ReentrantReadWriteLock();
@@ -125,6 +134,7 @@ public class ContainerReplicaPendingOps {
     globalLock.writeLock().lock();
     try {
       pendingOps.clear();
+      commandIdToContainer.clear();
       resetCounters();
       containerSizeScheduled.clear();
     } finally {
@@ -274,6 +284,9 @@ public class ContainerReplicaPendingOps {
                 releaseScheduledContainerSize(op);
               }
               decrementCounter(op.getOpType(), op.getReplicaIndex());
+              if (op.getCommand() != null) {
+                removeCommandIndexIfUnused(op.getCommand().getId(), ops);
+              }
             }
             expiredOps.add(op);
             updateTimeoutMetrics(op);
@@ -289,6 +302,72 @@ public class ContainerReplicaPendingOps {
       // notify if there are expired ops
       if (!expiredOps.isEmpty()) {
         notifySubscribers(expiredOps, containerID, true);
+      }
+    }
+  }
+
+  /**
+   * Removes the pending ops of a replication or reconstruction command the datanode reported as
+   * failed, so the inflight quota is freed immediately instead of at the event timeout. Subscribers
+   * are notified with timedOut=true so ReplicationManager re-evaluates the container.
+   *
+   * @param cmdId the id of the failed command, as reported by the datanode
+   * @param reporter the datanode that reported the failure
+   */
+  public void onReplicationCommandFailed(long cmdId, DatanodeDetails reporter) {
+    ContainerID containerID = commandIdToContainer.get(cmdId);
+    if (containerID == null) {
+      // Already completed, already expired, or not a tracked replication op.
+      return;
+    }
+    List<ContainerReplicaOp> failedOps = new ArrayList<>();
+    Lock lock = writeLock(containerID);
+    lock(lock);
+    try {
+      List<ContainerReplicaOp> ops = pendingOps.get(containerID);
+      if (ops == null) {
+        commandIdToContainer.remove(cmdId);
+        return;
+      }
+      Iterator<ContainerReplicaOp> iterator = ops.listIterator();
+      while (iterator.hasNext()) {
+        ContainerReplicaOp op = iterator.next();
+        // Only ADD ops are cleared here. Expired DELETE ops are deliberately kept for resend by
+        // removeExpiredEntries, and a failure report must not bypass that.
+        if (op.getOpType() != ADD || op.getCommand() == null || op.getCommand().getId() != cmdId) {
+          continue;
+        }
+        if (!reporter.getID().equals(op.getCommand().getRecipient())) {
+          LOG.warn("Datanode {} reported command {} for container {} as failed, but the command was sent to {}.",
+              reporter, cmdId, containerID, op.getCommand().getRecipient());
+          continue;
+        }
+        iterator.remove();
+        releaseScheduledContainerSize(op);
+        decrementCounter(op.getOpType(), op.getReplicaIndex());
+        updateFailureMetrics(op);
+        failedOps.add(op);
+      }
+      removeCommandIndexIfUnused(cmdId, ops);
+      if (ops.isEmpty()) {
+        pendingOps.remove(containerID);
+      }
+    } finally {
+      unlock(lock);
+    }
+    if (!failedOps.isEmpty()) {
+      // Failures reuse timedOut=true so ReplicationManager re-evaluates like an expired op.
+      notifySubscribers(failedOps, containerID, true);
+    }
+  }
+
+  // Reported failures used to be counted as timeouts; they are counted separately now.
+  private void updateFailureMetrics(ContainerReplicaOp op) {
+    if (op.getOpType() == ADD && isMetricsNotNull()) {
+      if (isEC(op.getReplicaIndex())) {
+        replicationMetrics.incrEcReplicaCreateFailedTotal();
+      } else {
+        replicationMetrics.incrReplicaCreateFailedTotal();
       }
     }
   }
@@ -341,6 +420,9 @@ public class ContainerReplicaPendingOps {
       List<ContainerReplicaOp> ops = pendingOps.computeIfAbsent(
           containerID, s -> new ArrayList<>());
       ops.add(op);
+      if (command != null) {
+        commandIdToContainer.put(command.getId(), containerID);
+      }
       DatanodeID id = target.getID();
       if (opType == ADD) {
         containerSizeScheduled.compute(id, (k, v) -> {
@@ -380,6 +462,9 @@ public class ContainerReplicaPendingOps {
             found = true;
             completedOps.add(op);
             iterator.remove();
+            if (op.getCommand() != null) {
+              removeCommandIndexIfUnused(op.getCommand().getId(), ops);
+            }
             if (opType == ADD) {
               containerSizeScheduled.computeIfPresent(target.getID(), (k, v) -> {
                 long newSize = v.getSize() - op.getContainerSize();
@@ -404,6 +489,16 @@ public class ContainerReplicaPendingOps {
       notifySubscribers(completedOps, containerID, false);
     }
     return found;
+  }
+
+  private void removeCommandIndexIfUnused(long commandId,
+      List<ContainerReplicaOp> ops) {
+    for (ContainerReplicaOp op : ops) {
+      if (op.getCommand() != null && op.getCommand().getId() == commandId) {
+        return;
+      }
+    }
+    commandIdToContainer.remove(commandId);
   }
 
   /**

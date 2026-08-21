@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.protocol.commands;
 
 import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.HddsIdFactory;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
 
@@ -38,6 +39,9 @@ public abstract class SCMCommand<T extends Message> implements
   private String encodedToken = "";
 
   private long deadlineMsSinceEpoch = 0;
+
+  // The datanode SCM sent the command to. Not sent over the wire, so it is null on the datanode.
+  private DatanodeID recipient;
 
   SCMCommand() {
     this.id = HddsIdFactory.getLongId();
@@ -81,6 +85,14 @@ public abstract class SCMCommand<T extends Message> implements
    */
   public void setTerm(long term) {
     this.term = term;
+  }
+
+  public DatanodeID getRecipient() {
+    return recipient;
+  }
+
+  public void setRecipient(DatanodeID recipient) {
+    this.recipient = recipient;
   }
 
   public String getEncodedToken() {
