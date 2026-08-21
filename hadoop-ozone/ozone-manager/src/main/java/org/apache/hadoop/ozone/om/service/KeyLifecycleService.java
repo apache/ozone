@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCFilter;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
@@ -299,6 +300,8 @@ public class KeyLifecycleService extends BackgroundService {
     private long taskStartTime;
     private long numKeyIterated = 0;
     private long numDeleteMarkersInserted = 0;
+    /** keyTable dbKeys of markers an ExpiredObjectDeleteMarker rule removes. */
+    private final List<String> expiredMarkerKeys = new ArrayList<>();
     private long numDirIterated = 0;
     private long numDirDeleted = 0;
     private long numKeyDeleted = 0;
@@ -444,6 +447,8 @@ public class KeyLifecycleService extends BackgroundService {
               // use bucket name as key iterator prefix
               evaluateBucket(bucket, keyTable, expirationRules, expiredKeyList, scanStateBuilder);
             }
+
+            submitExpiredMarkers(bucket);
 
             if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
               LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
@@ -1083,11 +1088,29 @@ public class KeyLifecycleService extends BackgroundService {
      */
     private void submitExpiredVersions(OmBucketInfo bucket,
         List<String> expiredVersions) {
-      if (!expiredVersions.isEmpty()) {
+      submitForReclaim(bucket, expiredVersions, Collections.emptyList());
+    }
+
+    /**
+     * Submits the expired delete markers the scan selected, if any. They go
+     * through the same request as an expired version rather than through
+     * DeleteKeys, which on a versioned bucket would answer a delete by
+     * inserting another marker. Only a versioned bucket has markers, and
+     * versioning is an OBJECT_STORE feature, so the FSO walk never fills this.
+     */
+    private void submitExpiredMarkers(OmBucketInfo bucket) {
+      submitForReclaim(bucket, Collections.emptyList(), expiredMarkerKeys);
+    }
+
+    private void submitForReclaim(OmBucketInfo bucket,
+        List<String> expiredVersions, List<String> expiredMarkers) {
+      final int submitted = expiredVersions.size() + expiredMarkers.size();
+      if (submitted > 0) {
         ObjectVersionsBucket versionsBucket = ObjectVersionsBucket.newBuilder()
             .setVolumeName(bucket.getVolumeName())
             .setBucketName(bucket.getBucketName())
             .addAllVersionKeys(expiredVersions)
+            .addAllMarkerKeys(expiredMarkers)
             .build();
 
         OMRequest omRequestRaw = OMRequest.newBuilder()
@@ -1110,16 +1133,17 @@ public class KeyLifecycleService extends BackgroundService {
                 getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
           });
           getOzoneManager().getDeletionMetrics()
-              .incrNumObjectVersionsSentForReclaim(expiredVersions.size());
+              .incrNumObjectVersionsSentForReclaim(submitted);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
-          LOG.warn("Interrupted while reclaiming {} noncurrent versions of bucket {}/{}",
-              expiredVersions.size(), bucket.getVolumeName(), bucket.getBucketName(), e);
+          LOG.warn("Interrupted while reclaiming {} records of bucket {}/{}",
+              submitted, bucket.getVolumeName(), bucket.getBucketName(), e);
         } catch (Exception e) {
-          LOG.warn("Failed to reclaim {} noncurrent versions of bucket {}/{}",
-              expiredVersions.size(), bucket.getVolumeName(), bucket.getBucketName(), e);
+          LOG.warn("Failed to reclaim {} records of bucket {}/{}",
+              submitted, bucket.getVolumeName(), bucket.getBucketName(), e);
         }
         expiredVersions.clear();
+        expiredMarkers.clear();
       }
     }
 
@@ -1175,6 +1199,55 @@ public class KeyLifecycleService extends BackgroundService {
       }
     }
 
+    /**
+     * Selects a delete marker for removal if an ExpiredObjectDeleteMarker rule
+     * covers it and nothing is left under it. "Expired" is not about the
+     * marker's own age: a marker is expired exactly when it is the key's only
+     * remaining version, because then it hides nothing and no versionId can
+     * address it, so nothing else would ever remove it. While a noncurrent
+     * version survives, removing the marker would promote that version and
+     * resurrect an object the user deleted.
+     */
+    private void collectIfExpiredMarker(OmBucketInfo bucketInfo,
+        OmKeyInfo marker, List<OmLCRule> ruleList) {
+      for (OmLCRule rule : ruleList) {
+        OmLCExpiration expiration = rule.getExpiration();
+        if (expiration == null || !expiration.isExpiredObjectDeleteMarker()
+            || !rule.matchesScope(marker)) {
+          continue;
+        }
+        try {
+          if (hasNoncurrentVersion(bucketInfo, marker)) {
+            return;
+          }
+        } catch (IOException e) {
+          LOG.warn("Failed to check the versions left under the delete marker "
+              + "of {}/{}/{}", bucketInfo.getVolumeName(),
+              bucketInfo.getBucketName(), marker.getKeyName(), e);
+          return;
+        }
+        expiredMarkerKeys.add(omMetadataManager.getOzoneKey(
+            bucketInfo.getVolumeName(), bucketInfo.getBucketName(),
+            marker.getKeyName()));
+        if (expiredMarkerKeys.size() >= listMaxSize) {
+          submitExpiredMarkers(bucketInfo);
+        }
+        return;
+      }
+    }
+
+    /** Whether the key has any version left in the versionedKeyTable. */
+    private boolean hasNoncurrentVersion(OmBucketInfo bucketInfo,
+        OmKeyInfo marker) throws IOException {
+      try (Table.KeyValueIterator<String, OmKeyInfo> versions =
+               omMetadataManager.getVersionedKeyTable().iterator(
+                   omMetadataManager.getVersionedOzoneKeyPrefix(
+                       bucketInfo.getVolumeName(), bucketInfo.getBucketName(),
+                       marker.getKeyName()))) {
+        return versions.hasNext();
+      }
+    }
+
     private void processKey(OmBucketInfo bucketInfo, OmKeyInfo key, List<OmLCRule> ruleList,
         LimitedExpiredObjectList expiredKeyList, OmLifecycleScanState.Builder scanStateBuilder) {
       if (bucketInfo.getBucketLayout() == BucketLayout.LEGACY &&
@@ -1185,9 +1258,9 @@ public class KeyLifecycleService extends BackgroundService {
       // put a marker on top of a marker, and the new one would age into the
       // rule again, so the chain would grow for as long as the rule exists.
       // The object is already gone from an unversioned read; removing the
-      // marker that hides it is ExpiredObjectDeleteMarker's decision, not
-      // Expiration's.
+      // marker that hides it is ExpiredObjectDeleteMarker's decision.
       if (key.isDeleteMarker()) {
+        collectIfExpiredMarker(bucketInfo, key, ruleList);
         return;
       }
       for (OmLCRule rule : ruleList) {
