@@ -328,11 +328,9 @@ public class ReconContainerManager extends ContainerManagerImpl {
     // If replica doesn't exist in in-memory map, add to DB and add to map
     if (replicaLastSeenMap == null) {
       // putIfAbsent to avoid TOCTOU
-      replicaHistoryMap.putIfAbsent(cid,
-          new ConcurrentHashMap<DatanodeID, ContainerReplicaHistory>() {{
-            put(id, new ContainerReplicaHistory(id, currTime, currTime,
-                bcsId, state, checksums));
-          }});
+      Map<DatanodeID, ContainerReplicaHistory> newReplicaHistoryMap = new ConcurrentHashMap<>();
+      newReplicaHistoryMap.put(id, new ContainerReplicaHistory(id, currTime, currTime, bcsId, state, checksums));
+      replicaHistoryMap.putIfAbsent(cid, newReplicaHistoryMap);
       flushToDB = true;
     } else {
       // ContainerID exists, update timestamp in memory

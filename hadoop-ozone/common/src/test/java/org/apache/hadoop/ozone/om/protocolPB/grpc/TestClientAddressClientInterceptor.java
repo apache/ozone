@@ -39,6 +39,7 @@ import org.mockito.MockedStatic;
 public class TestClientAddressClientInterceptor {
 
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testClientAddressEntriesInRequestHeaders() {
     try (MockedStatic<Context> grpcContextStaticMock =
              mockStatic(Context.class)) {

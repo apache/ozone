@@ -17,7 +17,6 @@
 
 package org.apache.ozone.rocksdiff;
 
-import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -106,10 +105,7 @@ public class TestRocksDiffUtils {
       RocksDiffUtils.filterRelevantSstFiles(inputSstFiles,
           tablesToLookup,
           new TablePrefixInfo(
-              new HashMap<String, String>() {{
-                put(invalidColumnFamilyName, getLexicographicallyHigherString(invalidSSTFileEndRange));
-                put(validSSTColumnFamilyName, expectedPrefix);
-              }}));
+              ImmutableMap.of(validSSTColumnFamilyName, expectedPrefix)));
       if (tablesToLookup.contains(validSSTColumnFamilyName)) {
         Assertions.assertEquals(Sets.newTreeSet(validSstFile, untrackedSstFile), inputSstFiles.keySet(),
             "Failed for " + tablesToLookup);

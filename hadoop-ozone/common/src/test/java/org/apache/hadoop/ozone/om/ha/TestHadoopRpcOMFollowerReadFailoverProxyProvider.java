@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -306,8 +307,8 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     setupProxyProvider(2);
 
     assertNotNull(retryProxy.toString());
-    retryProxy.hashCode();
-    retryProxy.equals(retryProxy);
+    assertEquals(retryProxy.hashCode(), retryProxy.hashCode());
+    assertNotEquals((Object) retryProxy, new Object());
   }
 
   @Test

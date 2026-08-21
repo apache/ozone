@@ -489,7 +489,7 @@ public class TestAddRemoveOzoneManager {
     // Verify decomm node is removed from the HA ring
     GenericTestUtils.waitFor(() -> {
       for (OzoneManager om : activeOMs) {
-        if (om.getPeerNodes().contains(decommNodeId)) {
+        if (om.getPeerNodes().stream().anyMatch(node -> node.getNodeId().equals(decommNodeId))) {
           return false;
         }
       }

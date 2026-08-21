@@ -251,34 +251,22 @@ public class TestRocksDBCheckpointDiffer {
   );
 
   private static TablePrefixInfo columnFamilyToPrefixMap1 =
-      new TablePrefixInfo(new HashMap<String, String>() {
-        {
-          put("keyTable", "/volume/bucket1/");
-          // Simply using bucketName instead of ID for the test.
-          put("directoryTable", "/volume/bucket1/");
-          put("fileTable", "/volume/bucket1/");
-        }
-      });
+      new TablePrefixInfo(ImmutableMap.of(
+          "keyTable", "/volume/bucket1/",
+          "directoryTable", "/volume/bucket1/",
+          "fileTable", "/volume/bucket1/"));
 
   private static TablePrefixInfo columnFamilyToPrefixMap2 =
-      new TablePrefixInfo(new HashMap<String, String>() {
-        {
-          put("keyTable", "/volume/bucket2/");
-          // Simply using bucketName instead of ID for the test.
-          put("directoryTable", "/volume/bucket2/");
-          put("fileTable", "/volume/bucket2/");
-        }
-      });
+      new TablePrefixInfo(ImmutableMap.of(
+          "keyTable", "/volume/bucket2/",
+          "directoryTable", "/volume/bucket2/",
+          "fileTable", "/volume/bucket2/"));
 
   private static TablePrefixInfo columnFamilyToPrefixMap3 =
-      new TablePrefixInfo(new HashMap<String, String>() {
-        {
-          put("keyTable", "/volume/bucket3/");
-          // Simply using bucketName instead of ID for the test.
-          put("directoryTable", "/volume/bucket3/");
-          put("fileTable", "/volume/bucket3/");
-        }
-      });
+      new TablePrefixInfo(ImmutableMap.of(
+          "keyTable", "/volume/bucket3/",
+          "directoryTable", "/volume/bucket3/",
+          "fileTable", "/volume/bucket3/"));
 
   private static final int NUM_ROW = 250000;
   private static final int SNAPSHOT_EVERY_SO_MANY_KEYS = 49999;
@@ -820,19 +808,19 @@ public class TestRocksDBCheckpointDiffer {
         Arguments.of("Test 13: Compaction log to test filtering logic based on range and column family",
             null,
             getPrunedCompactionEntries(false,
-                new HashMap<String, SstFileInfo>() {{
-                  put("1", new SstFileInfo("1", "a", "c", "col1"));
-                  put("3", new SstFileInfo("3", "a", "d", "col2"));
-                  put("13", new SstFileInfo("13", "a", "c", "col13"));
-                  put("14", new SstFileInfo("14", "a", "c", "col1"));
-                  put("2", new SstFileInfo("2", "a", "c", "col1"));
-                  put("4", new SstFileInfo("4", "a", "b", "col1"));
-                  put("5", new SstFileInfo("5", "b", "b", "col1"));
-                  put("10", new SstFileInfo("10", "a", "b", "col1"));
-                  put("8", new SstFileInfo("8", "a", "b", "col1"));
-                  put("6", new SstFileInfo("6", "a", "z", "col13"));
-                  put("7", new SstFileInfo("7", "a", "z", "col13"));
-                }}),
+                ImmutableMap.<String, SstFileInfo>builder()
+                    .put("1", new SstFileInfo("1", "a", "c", "col1"))
+                    .put("3", new SstFileInfo("3", "a", "d", "col2"))
+                    .put("13", new SstFileInfo("13", "a", "c", "col13"))
+                    .put("14", new SstFileInfo("14", "a", "c", "col1"))
+                    .put("2", new SstFileInfo("2", "a", "c", "col1"))
+                    .put("4", new SstFileInfo("4", "a", "b", "col1"))
+                    .put("5", new SstFileInfo("5", "b", "b", "col1"))
+                    .put("10", new SstFileInfo("10", "a", "b", "col1"))
+                    .put("8", new SstFileInfo("8", "a", "b", "col1"))
+                    .put("6", new SstFileInfo("6", "a", "z", "col13"))
+                    .put("7", new SstFileInfo("7", "a", "z", "col13"))
+                    .build()),
             snapshotInfo6,
             snapshotInfo5,
             ImmutableSet.of("10", "11", "8", "9", "12", "15"),

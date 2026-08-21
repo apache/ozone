@@ -138,6 +138,7 @@ public class TestOMClientRequestWithUserInfo {
   }
 
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testUserInfoInCaseOfGrpcTransport() throws IOException {
     try (MockedStatic<Context> mockedGrpcRequestContextKey =
              mockStatic(Context.class)) {

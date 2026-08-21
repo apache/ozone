@@ -151,7 +151,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       throws SCMException {
     if (resp.getStatus() != OK) {
       throw new SCMException(resp.getMessage(),
-          SCMException.ResultCodes.values()[resp.getStatus().ordinal()]);
+          SCMException.ResultCodes.valueOf(resp.getStatus().name()));
     }
     return resp;
   }
