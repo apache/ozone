@@ -340,9 +340,8 @@ public class TestReconTasks {
    * <p>Classification logic: When a CLOSING container has zero replicas,
    * {@code ClosingContainerHandler} samples it as {@code MISSING}. Then
    * {@code handleMissingContainer()} calls {@code isEmptyMissing()} which checks
-   * {@link ContainerInfo#getNumberOfKeys()}. The container is created empty (no block is written), so the
-   * datanode reports a replica key count of 0 and Recon's {@link ContainerInfo} key count stays 0, so the
-   * container is classified as {@code EMPTY_MISSING} rather than {@code MISSING}.</p>
+   * {@link ContainerInfo#getNumberOfKeys()}. Since no block is written, container reports keep the key
+   * count at 0, so Recon classifies the container as {@code EMPTY_MISSING} rather than {@code MISSING}.</p>
    *
    * <p>Note: this test relies on the CLOSING-state path (not the CLOSED-state path),
    * so no explicit container close is needed before node shutdown. The dead-node
