@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.HashSet;
 import java.util.ServiceLoader;
@@ -36,8 +36,6 @@ public class TestDtFetcherProviders {
       serviceNames.add(fetcher.getServiceName().toString());
     }
 
-    assertTrue(serviceNames.contains("o3fs"));
-    assertTrue(serviceNames.contains("ofs"));
-    assertTrue(serviceNames.contains("o3"));
+    assertThat(serviceNames).contains("o3", "ofs", "o3fs");
   }
 }
