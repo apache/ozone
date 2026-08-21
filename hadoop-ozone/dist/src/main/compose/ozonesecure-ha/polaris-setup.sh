@@ -23,7 +23,7 @@ realm="${POLARIS_REALM:-POLARIS}"
 catalog_name="${POLARIS_CATALOG_NAME:-quickstart_catalog}"
 storage_location="${POLARIS_STORAGE_LOCATION:-s3://iceberg-obs/polaris-smoke}"
 s3_endpoint="${POLARIS_S3_ENDPOINT:-http://s3g:9878}"
-sts_endpoint="${POLARIS_STS_ENDPOINT:-http://s3g:9880/sts}"
+sts_endpoint="${POLARIS_STS_ENDPOINT:-http://s3g:9880}"
 role_arn="${POLARIS_ROLE_ARN:-arn:aws:iam::123456789012:role/iceberg-data-all-access-obs}"
 
 if [ -z "${POLARIS_AWS_ACCESS_KEY_ID:-}" ] || [ -z "${POLARIS_AWS_SECRET_ACCESS_KEY:-}" ]; then

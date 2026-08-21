@@ -24,7 +24,7 @@ Resource            ../s3/commonawslib.robot
 
 *** Variables ***
 ${RANGER_ENDPOINT_URL}                      ${EMPTY}
-${STS_ENDPOINT_URL}                         http://s3g:9880/sts
+${STS_ENDPOINT_URL}                         http://s3g:9880
 ${S3G_ENDPOINT_URL}                         http://s3g:9878
 ${ROLE_SESSION_NAME}                        sts-session-name
 

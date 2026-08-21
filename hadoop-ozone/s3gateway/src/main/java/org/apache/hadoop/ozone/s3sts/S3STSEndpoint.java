@@ -71,7 +71,7 @@ import org.slf4j.LoggerFactory;
  * AWS STS (Security Token Service) compatible endpoint for Ozone S3 Gateway.
  * <p>
  * This endpoint provides temporary security credentials compatible with
- * AWS STS API, exposed on the port 9880 or 9881.
+ * AWS STS API, exposed on port 9880 or 9881 at the root path ({@code /}).
  * <p>
  * Currently supports only AssumeRole operation. Other STS operations will
  * return appropriate error responses.

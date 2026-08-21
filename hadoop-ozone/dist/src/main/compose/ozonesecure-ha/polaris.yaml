@@ -56,7 +56,7 @@ services:
       POLARIS_CATALOG_NAME: ${POLARIS_CATALOG_NAME:-quickstart_catalog}
       POLARIS_STORAGE_LOCATION: ${POLARIS_STORAGE_LOCATION:-s3://iceberg-obs/polaris-smoke}
       POLARIS_S3_ENDPOINT: http://s3g:9878
-      POLARIS_STS_ENDPOINT: http://s3g:9880/sts
+      POLARIS_STS_ENDPOINT: http://s3g:9880
       POLARIS_ROLE_ARN: arn:aws:iam::123456789012:role/iceberg-data-all-access-obs
       POLARIS_AWS_ACCESS_KEY_ID: ${POLARIS_AWS_ACCESS_KEY_ID}
       POLARIS_AWS_SECRET_ACCESS_KEY: ${POLARIS_AWS_SECRET_ACCESS_KEY}

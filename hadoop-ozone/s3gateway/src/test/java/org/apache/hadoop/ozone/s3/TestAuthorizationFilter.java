@@ -137,7 +137,7 @@ public class TestAuthorizationFilter {
             "Content-SHA",
             DATETIME,
             "application/x-www-form-urlencoded; charset=utf-8",
-            "/sts",
+            "/",
             PAYLOAD_TOO_LARGE.getErrorMessage()
         )
     );
