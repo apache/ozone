@@ -15,7 +15,7 @@
    limitations under the License.
 -->
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="PrimordialSCM-ha" type="Application" factoryName="Application">
+  <configuration default="false" name="PrimordialSCM-ha" type="Application" factoryName="Application" folderName="ozone-ha">
     <option name="MAIN_CLASS_NAME" value="org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter" />
     <module name="hdds-server-scm" />
     <option name="PROGRAM_PARAMETERS" value="-conf=hadoop-ozone/dev-support/intellij/ozone-site-ha.xml --set ozone.scm.node.id=scm1 --set ozone.metadata.dirs=/tmp/scm1 --set ozone.scm.http-address=127.0.0.1:19876" />

@@ -15,7 +15,7 @@
    limitations under the License.
 -->
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="OzoneManager-ha" type="Application" factoryName="Application">
+  <configuration default="false" name="OzoneManager-ha" type="Application" factoryName="Application" folderName="ozone-ha">
     <option name="MAIN_CLASS_NAME" value="org.apache.hadoop.ozone.om.OzoneManagerStarter" />
     <module name="ozone-manager" />
     <option name="PROGRAM_PARAMETERS" value="-conf=hadoop-ozone/dev-support/intellij/ozone-site-ha.xml" />
