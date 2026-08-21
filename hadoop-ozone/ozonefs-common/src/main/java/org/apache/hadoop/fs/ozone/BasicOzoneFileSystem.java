@@ -129,6 +129,9 @@ public class BasicOzoneFileSystem extends FileSystem {
       "o3fs://bucket.volume.om-host.example.com:5678/key  OR " +
       "o3fs://bucket.volume.omServiceId/key";
 
+  private static final String IPV6_EXCEPTION_TEXT =
+      "Raw IPv6 literals are not supported in O3FS authorities; use an OM service ID or DNS name instead";
+
   private static final int PATH_DEPTH_TO_BUCKET = 0;
 
   @Override
@@ -151,6 +154,10 @@ public class BasicOzoneFileSystem extends FileSystem {
       // authority is null when fs.defaultFS is not a qualified o3fs URI and
       // o3fs:/// is passed to the client. matcher will NPE if authority is null
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
+    }
+
+    if (authority.indexOf(':') != authority.lastIndexOf(':')) {
+      throw new IllegalArgumentException(IPV6_EXCEPTION_TEXT);
     }
 
     Matcher matcher = URL_SCHEMA_PATTERN.matcher(authority);

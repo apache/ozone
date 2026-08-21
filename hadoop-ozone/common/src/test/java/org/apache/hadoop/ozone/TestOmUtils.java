@@ -38,6 +38,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.TreeSet;
@@ -214,6 +215,40 @@ public class TestOmUtils {
     InetSocketAddress addr = OmUtils.getOmAddress(conf);
     assertEquals("1.2.3.4", addr.getHostString());
     assertEquals(100, addr.getPort());
+  }
+
+  @Test
+  void getOmSocketAddressIpv6HostPort() throws UnknownHostException {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::10]:100");
+
+    assertEquals("[2001:db8::10]:100", OmUtils.getOmRpcAddress(conf));
+    InetSocketAddress addr = OmUtils.getOmAddress(conf);
+    assertEquals(InetAddress.getByName("2001:db8::10"), addr.getAddress());
+    assertEquals(100, addr.getPort());
+  }
+
+  @Test
+  void getOmSocketAddressIpv6Host() throws UnknownHostException {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::10]");
+
+    int defaultPort = OMConfigKeys.OZONE_OM_PORT_DEFAULT;
+    assertEquals("[2001:db8::10]:" + defaultPort,
+        OmUtils.getOmRpcAddress(conf));
+    InetSocketAddress addr = OmUtils.getOmAddress(conf);
+    assertEquals(InetAddress.getByName("2001:db8::10"), addr.getAddress());
+    assertEquals(defaultPort, addr.getPort());
+  }
+
+  @Test
+  void getOmRpcAddressIpv6ForConfigKey() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    String addressKey = OZONE_OM_ADDRESS_KEY + ".service.node";
+    conf.set(addressKey, "[2001:db8::10]:100");
+
+    assertEquals("[2001:db8::10]:100",
+        OmUtils.getOmRpcAddress(conf, addressKey));
   }
 
   @Test

@@ -151,8 +151,8 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         OZONE_OM_ADDRESS_KEY);
 
-    return host.orElse(OZONE_OM_BIND_HOST_DEFAULT) + ":" +
-        getOmRpcPort(conf);
+    return getHostPortString(host.orElse(OZONE_OM_BIND_HOST_DEFAULT),
+        getOmRpcPort(conf));
   }
 
   /**
@@ -167,8 +167,9 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf, confKey);
 
     if (host.isPresent()) {
-      return host.get() + ":" + getPortNumberFromConfigKeys(conf, confKey)
-              .orElse(OZONE_OM_PORT_DEFAULT);
+      return getHostPortString(host.get(),
+          getPortNumberFromConfigKeys(conf, confKey)
+              .orElse(OZONE_OM_PORT_DEFAULT));
     } else {
       // The specified confKey is not set
       return null;
