@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -294,27 +295,42 @@ class RDBTable implements Table<byte[], byte[]> {
             "Invalid count given " + count + ", count must be greater than 0");
     }
     final List<KeyValue<byte[], byte[]>> result = new ArrayList<>();
-    try (KeyValueIterator<byte[], byte[]> it = iterator(prefix)) {
-      if (startKey == null) {
-        it.seekToFirst();
-      } else {
-        if ((prefix == null || startKey.length > prefix.length)
-            && get(startKey) == null) {
-          // Key not found, return empty list
-          return result;
+    try {
+      // For this subset, the range contract requires startKey itself to exist.
+      // A point lookup preserves that contract and avoids positioning an
+      // iterator across tombstones before reading one exact entry.
+      if (startKey != null && count == 1 && filter == null
+          && (prefix == null || startKey.length > prefix.length)
+          && startsWith(startKey, prefix)) {
+        final byte[] value = get(startKey);
+        if (value != null) {
+          result.add(Table.newKeyValue(Arrays.copyOf(startKey, startKey.length), value));
         }
-        it.seek(startKey);
+        return result;
       }
 
-      while (it.hasNext() && result.size() < count) {
-        final KeyValue<byte[], byte[]> currentEntry = it.next();
-        if (filter == null || filter.filterKey(currentEntry.getKey())) {
-          result.add(currentEntry);
-        } else if (!result.isEmpty() && sequential) {
-          // if the caller asks for a sequential range of results,
-          // and we met a dis-match, abort iteration from here.
-          // if result is empty, we continue to look for the first match.
-          break;
+      try (KeyValueIterator<byte[], byte[]> it = iterator(prefix)) {
+        if (startKey == null) {
+          it.seekToFirst();
+        } else {
+          if ((prefix == null || startKey.length > prefix.length)
+              && get(startKey) == null) {
+            // Key not found, return empty list
+            return result;
+          }
+          it.seek(startKey);
+        }
+
+        while (it.hasNext() && result.size() < count) {
+          final KeyValue<byte[], byte[]> currentEntry = it.next();
+          if (filter == null || filter.filterKey(currentEntry.getKey())) {
+            result.add(currentEntry);
+          } else if (!result.isEmpty() && sequential) {
+            // if the caller asks for a sequential range of results,
+            // and we met a dis-match, abort iteration from here.
+            // if result is empty, we continue to look for the first match.
+            break;
+          }
         }
       }
     } finally {
@@ -333,5 +349,20 @@ class RDBTable implements Table<byte[], byte[]> {
       }
     }
     return result;
+  }
+
+  private static boolean startsWith(byte[] key, byte[] prefix) {
+    if (prefix == null || prefix.length == 0) {
+      return true;
+    }
+    if (key.length < prefix.length) {
+      return false;
+    }
+    for (int i = 0; i < prefix.length; i++) {
+      if (key[i] != prefix[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 }

@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.utils.db;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -28,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.junit.jupiter.api.Test;
@@ -105,5 +108,44 @@ public class TestRDBTable {
     outValue.duplicate().get(readBack);
     assertArrayEquals(valueBytes, readBack);
   }
-}
 
+  @Test
+  public void testSingleExactRangeUsesPointGet() throws Exception {
+    RocksDatabase db = mock(RocksDatabase.class);
+    ColumnFamily columnFamily = mock(ColumnFamily.class);
+    RDBMetrics metrics = mock(RDBMetrics.class);
+    RDBTable table = new RDBTable(db, columnFamily, metrics);
+
+    byte[] prefix = "key-".getBytes(UTF_8);
+    byte[] startKey = "key-1".getBytes(UTF_8);
+    byte[] value = "value-1".getBytes(UTF_8);
+    when(db.get(columnFamily, startKey)).thenReturn(value);
+
+    List<Table.KeyValue<byte[], byte[]>> result =
+        table.getRangeKVs(startKey, 1, prefix, null, false);
+
+    assertEquals(1, result.size());
+    assertArrayEquals(startKey, result.get(0).getKey());
+    assertNotSame(startKey, result.get(0).getKey());
+    assertSame(value, result.get(0).getValue());
+    verify(db, never()).newIterator(columnFamily, false);
+  }
+
+  @Test
+  public void testSingleMissingExactRangeUsesPointGet() throws Exception {
+    RocksDatabase db = mock(RocksDatabase.class);
+    ColumnFamily columnFamily = mock(ColumnFamily.class);
+    RDBMetrics metrics = mock(RDBMetrics.class);
+    RDBTable table = new RDBTable(db, columnFamily, metrics);
+
+    byte[] prefix = "key-".getBytes(UTF_8);
+    byte[] startKey = "key-missing".getBytes(UTF_8);
+
+    List<Table.KeyValue<byte[], byte[]>> result =
+        table.getRangeKVs(startKey, 1, prefix, null, false);
+
+    assertEquals(0, result.size());
+    verify(db).get(columnFamily, startKey);
+    verify(db, never()).newIterator(columnFamily, false);
+  }
+}
