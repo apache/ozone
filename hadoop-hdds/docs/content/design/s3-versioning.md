@@ -53,9 +53,8 @@ S3 troubleshooting guide documents list degradation and throttling on keys with
 millions of versions and leaves the fix to user-configured Lifecycle rules that
 are often forgotten. Ozone already has a lifecycle engine (HDDS-8342, in master),
 so versioning does not need a reclamation mechanism of its own: it adds the three
-version-aware actions S3 defines to that engine, the lifecycle service becomes
-enabled by default, and a bucket-level `maxVersions` backstop bounds version
-growth on a versioned bucket that carries no rule at all.
+version-aware actions S3 defines to that engine, and the lifecycle service
+becomes enabled by default, so that a rule a user writes is a rule that runs.
 
 # Non-goals
 
@@ -431,29 +430,24 @@ state and metrics. Expiration counts from the moment the version that superseded
 this one was committed, as `NoncurrentDays` does, not from when the version itself
 was written.
 
-Two deliberate departures from stock S3:
+One deliberate departure from stock S3: **the lifecycle service is enabled by
+default.** `ozone.lifecycle.service.enabled` flips from `false` to `true`. A rule
+that never runs is worse than no rule, and versioning is the first feature that
+depends on reclamation for correct operation rather than for tidiness. OM rejects
+`PutBucketVersioning(Enabled)` while the lifecycle service is disabled: that does
+not promise a bucket's versions are bounded — one whose owner writes no rule
+accumulates them, as on S3 — but it rules out a rule existing that nothing will
+ever act on.
 
-- **The lifecycle service is enabled by default.** `ozone.lifecycle.service.enabled`
-  flips from `false` to `true`. A rule that never runs is worse than no rule, and
-  versioning is the first feature that depends on reclamation for correct operation
-  rather than for tidiness. OM rejects `PutBucketVersioning(Enabled)` while the
-  lifecycle service is disabled, so a bucket cannot enter a state where versions
-  accumulate with nothing able to reclaim them.
-- **A bucket-level `maxVersions` backstop (default 100, 0 = unlimited).** It bounds
-  version growth on a versioned bucket that carries no lifecycle configuration at
-  all, which is the failure mode the S3 troubleshooting guide describes. It is
-  enforced by the same lifecycle scan and behaves exactly like
-  `NewerNoncurrentVersions` — markers count toward the limit, reclamation is
-  oldest-first and asynchronous, so the cost of a version write never grows with
-  the number of versions the key already has. An explicit `NewerNoncurrentVersions`
-  rule on the bucket overrides it. It is documented as an Ozone extension over S3
-  semantics.
-
-An earlier draft also offered a `REJECT` policy that failed the write once
-`maxVersions` was reached; it is dropped. S3 has no error code for the condition
-and no client retries on it, so a default limit enforced that way would break
-unmodified S3 tooling after `maxVersions` overwrites of one key — and reclaiming is
-what S3's own lifecycle rules do.
+Earlier drafts bounded version growth with a bucket-level `maxVersions` property
+as well, first refusing the write once the limit was reached and later trimming
+oldest-first from the same scan. Both are dropped. A per-bucket cap duplicates
+`NewerNoncurrentVersions` in an Ozone-private property, which cuts against
+expressing reclamation as lifecycle rules at all; and applying it to the buckets
+it existed for — those carrying no lifecycle configuration — meant scheduling scan
+work for buckets the engine otherwise never visits, a second kind of task that
+differs from every other one in what it may assume. A bucket with no rule now
+accumulates versions, which is what S3 does.
 
 ## Quota and observability
 
@@ -580,7 +574,7 @@ left unguarded).
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion on both the single-key and the batch request, quota accounting |
 | T4 Read / permanent delete / promotion | `?versionId=` reads including null-slot addressing, reporting a delete-marker-addressed read as a condition distinct from not-found; permanent delete by versionId with quota accounting; version promotion |
 | T5 SUSPENDED semantics | null-slot overwrite, null markers, zero-migration legacy keys, multipart completion on the same version-retention path as a PUT |
-| T6 Version-aware lifecycle | `NoncurrentVersionExpiration` (`NoncurrentDays`, `NewerNoncurrentVersions`) and `ExpiredObjectDeleteMarker` on the lifecycle proto and its validation, a versionedKeyTable scan in `LifecycleActionTask`, `Expiration` on a versioned bucket routed to the marker insertion the write paths already share, marker removal once nothing is left under it, `maxVersions` backstop with the lifecycle service enabled by default |
+| T6 Version-aware lifecycle | `NoncurrentVersionExpiration` (`NoncurrentDays`, `NewerNoncurrentVersions`) and `ExpiredObjectDeleteMarker` on the lifecycle proto and its validation, a versionedKeyTable scan in `LifecycleActionTask`, `Expiration` on a versioned bucket routed to the marker insertion the write paths already share, marker removal once nothing is left under it, and the lifecycle service enabled by default with versioning refused while it is off |
 | T7 Snapshot exclusion | OM-side rejection matrix for snapshot creation and versioning state transitions, applied to the source of a linked bucket and enforced at apply time so the two directions cannot race; dev-only opt-in config key |
 | T8 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, per-entry `versionId` and `DeleteMarker` reporting in batch `DeleteObjects` |
 | T9 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
@@ -589,14 +583,13 @@ left unguarded).
 
 Testing follows three tracks: unit/integration tests per sub-task acceptance
 criteria (state machine, two-table atomicity, promotion, null-slot semantics,
-`maxVersions` boundaries, the version-aware lifecycle actions, the full
+the version-aware lifecycle actions, the full
 snapshot-exclusion rejection matrix); S3 compatibility via the smoketest/s3 robot
 suite and the versioning subset of ceph/s3-tests; performance benchmarks asserting
 no regression with versioning off and O(1) write latency with it on.
 
-Open questions tracked for implementation: whether an operator should be able to
-cap `maxVersions` cluster-wide, over and above the per-bucket setting and the
-cluster default; whether rejecting `PutBucketVersioning(Enabled)` while the
+Open questions tracked for implementation: whether rejecting
+`PutBucketVersioning(Enabled)` while the
 lifecycle service is disabled is the right coupling, or whether a warning suffices;
 obfuscation of the external versionId encoding, and how a pinned first version is
 rendered; whether changing `ozone.om.versioning.version-id-generator` should take
