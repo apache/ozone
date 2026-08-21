@@ -114,6 +114,15 @@ public class CodecBuffer implements UncheckedAutoCloseable {
     Factory.set(LeakDetector::newCodecBuffer, "LeakDetector::newCodecBuffer");
   }
 
+  /**
+   * Restore the default (non-leak-detecting) buffer factory, reverting a previous
+   * {@link #enableLeakDetection()}. Intended for performance-sensitive measurements that need to avoid the
+   * per-allocation finalizer registration the leak detector adds.
+   */
+  public static void disableLeakDetection() {
+    Factory.set(CodecBuffer::new, "CodecBuffer::new");
+  }
+
   /** The size of a buffer. */
   public static class Capacity {
     private final Object name;
