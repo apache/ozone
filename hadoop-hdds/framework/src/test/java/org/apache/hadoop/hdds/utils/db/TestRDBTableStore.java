@@ -179,6 +179,35 @@ public class TestRDBTableStore {
   }
 
   @Test
+  public void multiGetSkipCacheWithTypedTable() throws Exception {
+    byte[] smallKey = "small-key".getBytes(StandardCharsets.UTF_8);
+    byte[] largeKey1 = "large-key-1".getBytes(StandardCharsets.UTF_8);
+    byte[] largeKey2 = "large-key-2".getBytes(StandardCharsets.UTF_8);
+    byte[] emptyKey = "empty-key".getBytes(StandardCharsets.UTF_8);
+    byte[] missingKey = "missing-key".getBytes(StandardCharsets.UTF_8);
+    byte[] smallValue = "small".getBytes(StandardCharsets.UTF_8);
+    byte[] largeValue1 = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 100];
+    byte[] largeValue2 = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 200];
+    Arrays.fill(largeValue1, (byte) 'a');
+    Arrays.fill(largeValue2, (byte) 'b');
+    Table<byte[], byte[]> writeTable = rdbStore.getTable("Second");
+    writeTable.put(smallKey, smallValue);
+    writeTable.put(largeKey1, largeValue1);
+    writeTable.put(largeKey2, largeValue2);
+    writeTable.put(emptyKey, new byte[0]);
+
+    Table<String, String> readTable = rdbStore.getTable("Second", StringCodec.get(), StringCodec.get());
+    List<String> values = readTable.multiGetSkipCache(
+        Arrays.asList("small-key", "large-key-1", "missing-key", "large-key-2", "empty-key"));
+    assertEquals(5, values.size());
+    assertEquals(new String(smallValue, StandardCharsets.UTF_8), values.get(0));
+    assertEquals(new String(largeValue1, StandardCharsets.UTF_8), values.get(1));
+    assertNull(values.get(2));
+    assertEquals(new String(largeValue2, StandardCharsets.UTF_8), values.get(3));
+    assertEquals("", values.get(4));
+  }
+
+  @Test
   public void delete() throws Exception {
     List<byte[]> deletedKeys = new ArrayList<>();
     List<byte[]> validKeys = new ArrayList<>();

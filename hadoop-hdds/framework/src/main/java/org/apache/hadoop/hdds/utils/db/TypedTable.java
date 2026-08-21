@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
+import org.rocksdb.ByteBufferGetStatus;
 
 /**
  * Strongly typed table implementation.
@@ -235,16 +236,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     if (keys.isEmpty()) {
       return Collections.emptyList();
     }
-    List<byte[]> keyBytesList = new ArrayList<>(keys.size());
-    for (KEY key : keys) {
-      keyBytesList.add(encodeKey(key));
-    }
-    List<byte[]> valueBytesList = rawTable.multiGetSkipCache(keyBytesList);
-    List<VALUE> values = new ArrayList<>(keys.size());
-    for (byte[] valueBytes : valueBytesList) {
-      values.add(decodeValue(valueBytes));
-    }
-    return values;
+    return multiGetFromTable(keys);
   }
 
   /**
@@ -322,6 +314,114 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       final byte[] keyBytes = encodeKey(key);
       byte[] valueBytes = rawTable.get(keyBytes);
       return decodeValue(valueBytes);
+    }
+  }
+
+  List<VALUE> multiGetFromTable(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    if (supportCodecBuffer) {
+      final int n = keys.size();
+      final List<CodecBuffer> keyBuffers = new ArrayList<>(n);
+      final List<CodecBuffer> valueBuffers = new ArrayList<>(n);
+      final List<ByteBuffer> keyByteBuffers = new ArrayList<>(n);
+      final List<ByteBuffer> valueByteBuffers = new ArrayList<>(n);
+      final int initial = bufferCapacity.get();
+      for (int i = 0; i < n; i++) {
+        final CodecBuffer keyBuffer = keyCodec.toDirectCodecBuffer(keys.get(i));
+        keyBuffers.add(keyBuffer);
+        keyByteBuffers.add(keyBuffer.asReadOnlyByteBuffer());
+        final CodecBuffer valueBuffer = CodecBuffer.allocateDirect(initial);
+        valueBuffers.add(valueBuffer);
+        valueBuffer.clear();
+        final ByteBuffer out = valueBuffer.asWritableByteBuffer();
+        out.position(0).limit(initial);
+        valueByteBuffers.add(out);
+      }
+      try {
+        final List<ByteBufferGetStatus> statuses =
+            rawTable.multiGetSkipCache(keyByteBuffers, valueByteBuffers);
+        final List<VALUE> values = new ArrayList<>(Collections.nCopies(n, null));
+        final List<Integer> retryIndices = new ArrayList<>();
+        final List<Integer> retrySizes = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+          final ByteBufferGetStatus status = statuses.get(i);
+          final CodecBuffer valueBuffer = valueBuffers.get(i);
+          try {
+            if (status.value == null) {
+              continue;
+            }
+            if (status.requiredSize < 0 || status.status.getCode() != org.rocksdb.Status.Code.Ok) {
+              throw new IllegalStateException("status = " + status.status.getCode()
+                  + "; required = " + status.requiredSize + " < 0");
+            }
+            if (status.requiredSize > initial) {
+              // Buffer size too small. Track the keys for retry with increased capacity.
+              retryIndices.add(i);
+              retrySizes.add(status.requiredSize);
+            } else {
+              // Buffer size is adequate.
+              valueBuffer.clear();
+              valueBuffer.put(status.value.asReadOnlyBuffer());
+              values.set(i, valueCodec.fromCodecBuffer(valueBuffer));
+            }
+          } finally {
+            valueBuffer.close();
+          }
+        }
+        // Retry multiGet for keys with larger values with increased capacity.
+        if (!retryIndices.isEmpty()) {
+          final List<ByteBuffer> retryKeyByteBuffers = new ArrayList<>(retryIndices.size());
+          final List<CodecBuffer> retryValueBuffers = new ArrayList<>(retryIndices.size());
+          final List<ByteBuffer> retryValueByteBuffers = new ArrayList<>(retryIndices.size());
+          for (int j = 0; j < retryIndices.size(); j++) {
+            final int required = retrySizes.get(j);
+            retryKeyByteBuffers.add(keyByteBuffers.get(retryIndices.get(j)));
+            final CodecBuffer valueBuffer = CodecBuffer.allocateDirect(required);
+            retryValueBuffers.add(valueBuffer);
+            valueBuffer.clear();
+            final ByteBuffer out = valueBuffer.asWritableByteBuffer();
+            out.position(0).limit(required);
+            retryValueByteBuffers.add(out);
+          }
+          final List<ByteBufferGetStatus> retryStatuses =
+              rawTable.multiGetSkipCache(retryKeyByteBuffers, retryValueByteBuffers);
+          for (int j = 0; j < retryIndices.size(); j++) {
+            final int i = retryIndices.get(j);
+            final int required = retrySizes.get(j);
+            final ByteBufferGetStatus status = retryStatuses.get(j);
+            final CodecBuffer valueBuffer = retryValueBuffers.get(j);
+            try {
+              if (status.value == null) {
+                continue;
+              }
+              if (status.status.getCode() != org.rocksdb.Status.Code.Ok
+                  || required != status.requiredSize) {
+                throw new IllegalStateException("status = " + status.status.getCode()
+                    + "; expectedSize = " + required + ", actualSize = " + status.requiredSize);
+              }
+              valueBuffer.clear();
+              valueBuffer.put(status.value.asReadOnlyBuffer());
+              values.set(i, valueCodec.fromCodecBuffer(valueBuffer));
+            } finally {
+              valueBuffer.close();
+            }
+          }
+        }
+        return values;
+      } finally {
+        IOUtils.closeQuietly(keyBuffers);
+      }
+    } else {
+      List<byte[]> keyBytesList = new ArrayList<>(keys.size());
+      for (KEY key : keys) {
+        keyBytesList.add(encodeKey(key));
+      }
+      List<byte[]> valueBytesList = rawTable.multiGetSkipCache(keyBytesList);
+      List<VALUE> values = new ArrayList<>(keys.size());
+      for (byte[] valueBytes : valueBytesList) {
+        values.add(decodeValue(valueBytes));
+      }
+      return values;
     }
   }
 
