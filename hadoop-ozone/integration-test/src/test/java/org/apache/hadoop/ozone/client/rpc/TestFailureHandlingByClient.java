@@ -537,7 +537,8 @@ public class TestFailureHandlingByClient {
       assertThat(keyOutputStream.getExcludeList().getPipelineIds())
           .contains(pipeline.getId());
       assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
-      assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+      // Datanodes are not asserted: watchForCommit can time out against the two shut down
+      // followers, which then get recorded as failed servers and added to the exclude list.
       // The close will just write to the buffer
     }
 
