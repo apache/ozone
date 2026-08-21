@@ -44,7 +44,10 @@ import static org.apache.hadoop.ozone.om.OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestCount;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestTime;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -333,6 +336,42 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
       assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    /**
+     * The KeyLifecycleService submits an internal {@code DeleteKeys} request to remove expired keys,
+     * which should be counted in the OmClientProtocol per-type metrics just like a client request.
+     */
+    @Test
+    void testExpiredKeyDeletionIncrementsDeleteKeysMetric() throws IOException,
+        TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String keyPrefix = "key";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(BucketLayout.OBJECT_STORE);
+      final long beforeCount = getRequestCount(om.getOmClientProtocolMetrics(),
+          OzoneManagerProtocolProtos.Type.DeleteKeys);
+      final long beforeTime = getRequestTime(om.getOmClientProtocolMetrics(),
+          OzoneManagerProtocolProtos.Type.DeleteKeys);
+      // create keys
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, BucketLayout.OBJECT_STORE, KEY_COUNT, 1, keyPrefix, null);
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(BucketLayout.OBJECT_STORE) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+      // create Lifecycle configuration so the keys expire and get deleted
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, BucketLayout.OBJECT_STORE, keyPrefix, null, date.toString(), true);
+
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
+      GenericTestUtils.waitFor(() -> getRequestCount(om.getOmClientProtocolMetrics(),
+          OzoneManagerProtocolProtos.Type.DeleteKeys) > beforeCount, WAIT_CHECK_INTERVAL, 10000);
+      assertThat(getRequestTime(om.getOmClientProtocolMetrics(),
+          OzoneManagerProtocolProtos.Type.DeleteKeys)).isGreaterThan(beforeTime);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
