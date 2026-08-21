@@ -15,6 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+_ranger_testlib_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+: "${COMPOSE_DIR:=$_ranger_testlib_dir}"
+export COMPOSE_DIR
+
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
@@ -100,7 +104,7 @@ setup_ranger_acceptance_env() {
     -e 's@^XAAUDIT.LOG4J.DESTINATION.LOG4J=true@XAAUDIT.LOG4J.DESTINATION.LOG4J=false@;' \
     "${RANGER_OZONE_PLUGIN_DIR}/install.properties"
 
-  echo 'machine ranger login admin password rangerR0cks!' > ../../.netrc
+  echo 'machine ranger login admin password rangerR0cks!' > "${COMPOSE_DIR}/../../.netrc"
 
   start_docker_env
   wait_for_port ranger 6080 120
