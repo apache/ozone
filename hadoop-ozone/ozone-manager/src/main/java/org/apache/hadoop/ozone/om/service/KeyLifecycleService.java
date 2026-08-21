@@ -237,6 +237,15 @@ public class KeyLifecycleService extends BackgroundService {
     return queue;
   }
 
+  /**
+   * Whether the service is switched on at all, which is a matter of
+   * configuration and fixed for the life of the OM. Distinct from being
+   * suspended, which an admin can undo without a restart.
+   */
+  public boolean isEnabled() {
+    return isServiceEnabled.get();
+  }
+
   private boolean shouldRun() {
     if (getOzoneManager() == null) {
       // OzoneManager can be null for testing

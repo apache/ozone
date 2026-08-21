@@ -5216,9 +5216,11 @@
 
   <property>
     <name>ozone.lifecycle.service.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE</tag>
-    <description>It specifies whether to enable lifecycle management service.</description>
+    <description>It specifies whether to enable lifecycle management service.
+      S3 object versioning depends on it to reclaim versions, so OM refuses to
+      enable versioning on a bucket while this is off.</description>
   </property>
   <property>
     <name>ozone.lifecycle.service.move.to.trash.enabled</name>

@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketVersioningStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -110,6 +111,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
       throw new OMException("Bucket versioning cannot be set while the bucket"
           + " is being created; create the bucket first and then set its"
           + " versioning status.", ResultCodes.INVALID_REQUEST);
+    }
+
+    if (bucketInfo.getVersioningStatus()
+        == BucketVersioningStatusProto.VERSIONING_ENABLED) {
+      OMBucketSetPropertyRequest.rejectIfLifecycleServiceIsDisabled(
+          ozoneManager);
     }
 
     // ACL check during preExecute
