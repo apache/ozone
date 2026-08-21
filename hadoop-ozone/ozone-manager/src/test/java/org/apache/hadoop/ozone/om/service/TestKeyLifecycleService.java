@@ -99,6 +99,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.FaultInjectorImpl;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -110,6 +111,7 @@ import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
 import org.apache.hadoop.ozone.om.TrashOzoneFileSystem;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -2959,6 +2961,93 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
+    /**
+     * Expiring an object on a versioned bucket hides it behind a delete
+     * marker rather than deleting it, as S3 does. The version that was
+     * current when the rule matched is demoted, not reclaimed: nothing
+     * reaches the deletedTable and no space is freed, so the run reports a
+     * marker inserted rather than a key deleted.
+     */
+    @Test
+    void testExpirationInsertsADeleteMarkerOnAVersionedBucket()
+        throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialMarkers = metrics.getNumDeleteMarkersInserted().value();
+      long initialKeyDeleted = metrics.getNumKeyDeleted().value();
+
+      createVersionedVolumeAndBucket(volumeName, bucketName);
+      OmKeyArgs key = createAndCommitKey(volumeName, bucketName,
+          uniqueObjectName("key"), 1, null);
+
+      ZonedDateTime date =
+          ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, "key", null,
+          date.toString(), true);
+
+      GenericTestUtils.waitFor(
+          () -> isDeleteMarker(volumeName, bucketName, key.getKeyName()),
+          WAIT_CHECK_INTERVAL, 10000);
+
+      // the version the marker superseded is kept, addressable by versionId
+      assertEquals(1, countNoncurrentVersions(volumeName, bucketName,
+          key.getKeyName()));
+      // and it was not reclaimed: no blocks were queued, no space released
+      assertEquals(initialDeletedKeyCount, getDeletedKeyCount());
+      assertEquals(initialKeyDeleted, metrics.getNumKeyDeleted().value());
+      assertEquals(initialMarkers + 1,
+          metrics.getNumDeleteMarkersInserted().value());
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    /**
+     * The marker itself must not expire again. A marker is the key's current
+     * version and carries the time it was written, so it ages into the same
+     * rule; putting another marker on top of it would demote the old one and
+     * grow the version chain for as long as the rule exists. Removing an
+     * expired marker is ExpiredObjectDeleteMarker's decision instead.
+     */
+    @Test
+    void testExpirationLeavesAnExistingDeleteMarkerAlone() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialMarkers = metrics.getNumDeleteMarkersInserted().value();
+
+      createVersionedVolumeAndBucket(volumeName, bucketName);
+      // sorts first, so the scan decides about it before the live key
+      String markerKey = "key-a-already-a-marker";
+      OmKeyInfo marker = seedDeleteMarker(volumeName, bucketName, markerKey);
+      OmKeyArgs liveKey = createAndCommitKey(volumeName, bucketName,
+          "key-b-live", 1, null);
+
+      ZonedDateTime date =
+          ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, "key", null,
+          date.toString(), true);
+
+      GenericTestUtils.waitFor(
+          () -> isDeleteMarker(volumeName, bucketName, liveKey.getKeyName()),
+          WAIT_CHECK_INTERVAL, 10000);
+
+      // the pre-existing marker matched the rule too, and was left as it was
+      OmKeyInfo stillThere = metadataManager.getKeyTable(OBJECT_STORE)
+          .get(metadataManager.getOzoneKey(volumeName, bucketName, markerKey));
+      assertTrue(stillThere.isDeleteMarker());
+      assertEquals(marker.getVersionId(), stillThere.getVersionId());
+      assertEquals(marker.getModificationTime(),
+          stillThere.getModificationTime());
+      // nothing was demoted under it, so no marker was stacked on it
+      assertEquals(0,
+          countNoncurrentVersions(volumeName, bucketName, markerKey));
+      // only the live key produced a marker
+      assertEquals(initialMarkers + 1,
+          metrics.getNumDeleteMarkersInserted().value());
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
   }
 
   /**
@@ -3264,6 +3353,66 @@ class TestKeyLifecycleService extends OzoneTestBase {
     metadataManager.getLifecycleConfigurationTable().delete(key);
     metadataManager.getLifecycleConfigurationTable().addCacheEntry(
         new CacheKey<>(key), CacheValue.get(1L));
+  }
+
+  /** An OBJECT_STORE bucket with S3 versioning enabled. */
+  private void createVersionedVolumeAndBucket(String volumeName,
+      String bucketName) throws IOException {
+    createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE,
+        UserGroupInformation.getCurrentUser().getShortUserName());
+    String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo versioned = metadataManager.getBucketTable().get(bucketKey)
+        .toBuilder()
+        .setVersioningStatus(BucketVersioningStatus.ENABLED)
+        .setIsVersionEnabled(true)
+        .build();
+    metadataManager.getBucketTable().put(bucketKey, versioned);
+    metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
+        CacheValue.get(1L, versioned));
+  }
+
+  /** A key whose current version is already a delete marker. */
+  private OmKeyInfo seedDeleteMarker(String volumeName, String bucketName,
+      String keyName) throws IOException {
+    OmKeyInfo marker = OMRequestTestUtils.createOmKeyInfo(volumeName,
+            bucketName, keyName, RatisReplicationConfig.getInstance(THREE))
+        .setVersionId(1000L)
+        .setDeleteMarker(true)
+        .build();
+    metadataManager.getKeyTable(OBJECT_STORE).put(
+        metadataManager.getOzoneKey(volumeName, bucketName, keyName), marker);
+    return marker;
+  }
+
+  /** Whether the key's current version is a delete marker. */
+  private boolean isDeleteMarker(String volumeName, String bucketName,
+      String keyName) {
+    try {
+      OmKeyInfo current = metadataManager.getKeyTable(OBJECT_STORE)
+          .get(metadataManager.getOzoneKey(volumeName, bucketName, keyName));
+      return current != null && current.isDeleteMarker();
+    } catch (IOException e) {
+      fail("Failed to read the current version: " + e.getMessage());
+      return false;
+    }
+  }
+
+  /** How many versions of the key the versionedKeyTable holds. */
+  private long countNoncurrentVersions(String volumeName, String bucketName,
+      String keyName) {
+    String prefix = metadataManager.getOzoneKey(volumeName, bucketName,
+        keyName) + OzoneConsts.OM_VERSIONED_KEY_SEPARATOR;
+    long count = 0;
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iter = metadataManager.getVersionedKeyTable().iterator(prefix)) {
+      while (iter.hasNext()) {
+        iter.next();
+        count++;
+      }
+    } catch (IOException e) {
+      fail("Failed to count versions: " + e.getMessage());
+    }
+    return count;
   }
 
   private void createVolumeAndBucket(String volumeName,
