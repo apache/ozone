@@ -3048,6 +3048,55 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
+
+    /**
+     * ExpiredObjectDeleteMarker removes a delete marker, and the key with it,
+     * once nothing is left under it - and only then. A marker that still
+     * hides a noncurrent version has to stay: removing it would promote that
+     * version and bring back an object the user deleted.
+     */
+    @Test
+    void testExpiredObjectDeleteMarkerRemovesOnlyALoneMarker()
+        throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      long initialSent = om.getDeletionMetrics()
+          .getNumObjectVersionsSentForReclaim().value();
+
+      createVersionedVolumeAndBucket(volumeName, bucketName);
+      String loneMarker = "key-a-lone-marker";
+      String hidingMarker = "key-b-hides-a-version";
+      seedDeleteMarker(volumeName, bucketName, loneMarker);
+      seedDeleteMarker(volumeName, bucketName, hidingMarker);
+      seedNoncurrentVersion(volumeName, bucketName, hidingMarker, 900L);
+
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE,
+          Collections.singletonList(new OmLCRule.Builder()
+              .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
+              .setEnabled(true)
+              .setPrefix("key")
+              .setAction(new OmLCExpiration.Builder()
+                  .setExpiredObjectDeleteMarker(true)
+                  .build())
+              .build()));
+
+      GenericTestUtils.waitFor(
+          () -> !keyExists(volumeName, bucketName, loneMarker),
+          WAIT_CHECK_INTERVAL, 10000);
+
+      // the marker that still hides a version is left exactly as it was
+      assertTrue(isDeleteMarker(volumeName, bucketName, hidingMarker));
+      assertEquals(1, countNoncurrentVersions(volumeName, bucketName,
+          hidingMarker));
+      // and the scan never submitted it: the request refusing it would keep
+      // the marker too, so this is what shows the scan itself ruled it out
+      assertEquals(initialSent + 1, om.getDeletionMetrics()
+          .getNumObjectVersionsSentForReclaim().value());
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
   }
 
   /**
@@ -3382,6 +3431,31 @@ class TestKeyLifecycleService extends OzoneTestBase {
     metadataManager.getKeyTable(OBJECT_STORE).put(
         metadataManager.getOzoneKey(volumeName, bucketName, keyName), marker);
     return marker;
+  }
+
+  /** Whether the keyTable still holds the key at all. */
+  private boolean keyExists(String volumeName, String bucketName,
+      String keyName) {
+    try {
+      return metadataManager.getKeyTable(OBJECT_STORE)
+          .get(metadataManager.getOzoneKey(volumeName, bucketName, keyName))
+          != null;
+    } catch (IOException e) {
+      fail("Failed to read the key: " + e.getMessage());
+      return false;
+    }
+  }
+
+  /** A version of the key in the versionedKeyTable. */
+  private void seedNoncurrentVersion(String volumeName, String bucketName,
+      String keyName, long versionId) throws IOException {
+    OmKeyInfo version = OMRequestTestUtils.createOmKeyInfo(volumeName,
+            bucketName, keyName, RatisReplicationConfig.getInstance(THREE))
+        .setVersionId(versionId)
+        .build();
+    metadataManager.getVersionedKeyTable().put(
+        metadataManager.getVersionedOzoneKey(volumeName, bucketName, keyName,
+            versionId), version);
   }
 
   /** Whether the key's current version is a delete marker. */

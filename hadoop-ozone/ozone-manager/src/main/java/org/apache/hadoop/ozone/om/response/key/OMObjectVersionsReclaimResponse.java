@@ -37,26 +37,30 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Response for the reclamation of noncurrent object versions that exceed their
- * bucket's maxVersions. The versions leave the versionedKeyTable and their
- * blocks go to the deletedTable, which is the single path through which
- * version blocks are reclaimed: KeyDeletingService decides from there whether
- * a snapshot still needs them.
+ * Response for the reclamation the lifecycle scan selects. Expired noncurrent
+ * versions leave the versionedKeyTable and their blocks go to the deletedTable,
+ * which is the single path through which version blocks are reclaimed:
+ * KeyDeletingService decides from there whether a snapshot still needs them.
+ * Expired delete markers leave the keyTable, and since a marker holds no
+ * blocks, nothing goes to the deletedTable for one.
  */
 @CleanupTableInfo(cleanupTables = {KEY_TABLE, VERSIONED_KEY_TABLE,
     DELETED_TABLE, BUCKET_TABLE})
 public class OMObjectVersionsReclaimResponse extends OmKeyResponse {
 
   private final List<String> reclaimedVersionKeys;
+  private final List<String> reclaimedMarkerKeys;
   private final Map<String, RepeatedOmKeyInfo> keysToDelete;
   private final List<OmBucketInfo> updatedBuckets;
 
   public OMObjectVersionsReclaimResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<String> reclaimedVersionKeys,
+      @Nonnull List<String> reclaimedMarkerKeys,
       @Nonnull Map<String, RepeatedOmKeyInfo> keysToDelete,
       @Nonnull List<OmBucketInfo> updatedBuckets) {
     super(omResponse, BucketLayout.OBJECT_STORE);
     this.reclaimedVersionKeys = reclaimedVersionKeys;
+    this.reclaimedMarkerKeys = reclaimedMarkerKeys;
     this.keysToDelete = keysToDelete;
     this.updatedBuckets = updatedBuckets;
   }
@@ -68,6 +72,7 @@ public class OMObjectVersionsReclaimResponse extends OmKeyResponse {
   public OMObjectVersionsReclaimResponse(@Nonnull OMResponse omResponse) {
     super(omResponse, BucketLayout.OBJECT_STORE);
     this.reclaimedVersionKeys = Collections.emptyList();
+    this.reclaimedMarkerKeys = Collections.emptyList();
     this.keysToDelete = Collections.emptyMap();
     this.updatedBuckets = Collections.emptyList();
     checkStatusNotOK();
@@ -84,6 +89,13 @@ public class OMObjectVersionsReclaimResponse extends OmKeyResponse {
     for (String versionKey : reclaimedVersionKeys) {
       omMetadataManager.getVersionedKeyTable()
           .deleteWithBatch(batchOperation, versionKey);
+    }
+
+    // An expired marker leaves the keyTable and the key disappears with it.
+    // It holds no blocks, so nothing goes to the deletedTable for it.
+    for (String markerKey : reclaimedMarkerKeys) {
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .deleteWithBatch(batchOperation, markerKey);
     }
 
     for (Map.Entry<String, RepeatedOmKeyInfo> entry : keysToDelete.entrySet()) {

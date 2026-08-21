@@ -363,6 +363,14 @@ public final class DeletingServiceMetrics {
     this.numObjectVersionsSentForReclaim.incr(versions);
   }
 
+  public MutableGaugeLong getNumObjectVersionsSentForReclaim() {
+    return numObjectVersionsSentForReclaim;
+  }
+
+  public MutableGaugeLong getNumObjectVersionsReclaimed() {
+    return numObjectVersionsReclaimed;
+  }
+
   public void incrNumObjectVersionsReclaimed(long versions) {
     this.numObjectVersionsReclaimed.incr(versions);
   }

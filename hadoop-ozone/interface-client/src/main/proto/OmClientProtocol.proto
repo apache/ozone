@@ -2731,6 +2731,10 @@ message ObjectVersionsBucket {
   required string volumeName = 1;
   required string bucketName = 2;
   repeated string versionKeys = 3;
+  // keyTable dbKeys of keys whose only remaining version is a delete marker.
+  // These leave the keyTable rather than the versionedKeyTable, so the key
+  // disappears entirely.
+  repeated string markerKeys = 4;
 }
 
 message ReclaimObjectVersionsRequest {
