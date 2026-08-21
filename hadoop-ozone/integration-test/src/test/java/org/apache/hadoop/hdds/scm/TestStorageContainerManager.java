@@ -481,7 +481,7 @@ public class TestStorageContainerManager {
     // on datanodes.
     Set<Long> containerNames = new HashSet<>();
     for (Map.Entry<String, OmKeyInfo> entry : keyLocations.entrySet()) {
-      entry.getValue().getLatestVersionLocations().getLocationList()
+      entry.getValue().getLatestVersionLocations().createLocationList()
           .forEach(loc -> containerNames.add(loc.getContainerID()));
     }
 
@@ -499,7 +499,7 @@ public class TestStorageContainerManager {
     Map<Long, List<DeletedBlock>> containerBlocks = Maps.newHashMap();
     for (OmKeyInfo info : keyLocations.values()) {
       List<OmKeyLocationInfo> list =
-          info.getLatestVersionLocations().getLocationList();
+          info.getLatestVersionLocations().createLocationList();
       list.forEach(location -> {
         if (containerBlocks.containsKey(location.getContainerID())) {
           containerBlocks.get(location.getContainerID()).add(new DeletedBlock(location.getBlockID(),
