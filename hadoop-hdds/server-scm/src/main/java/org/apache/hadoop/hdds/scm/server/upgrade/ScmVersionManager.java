@@ -19,9 +19,11 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
@@ -54,6 +56,18 @@ public class ScmVersionManager extends RatisBasedVersionManager {
     this.storage = storage;
     this.upgradeActionArg = upgradeActionArg;
     upgradeActions = upgradeActionProvider.load();
+  }
+
+  public static HDDSVersion computeCommonVersion(List<DatanodeDetails> datanodes) {
+    if (datanodes.isEmpty()) {
+      throw new IllegalArgumentException("No nodes provided");
+    }
+
+    HDDSVersion minVersion = datanodes.get(0).getCurrentVersion();
+    for (int i = 1; i < datanodes.size(); i++) {
+      minVersion = ComponentVersion.min(datanodes.get(i).getCurrentVersion(), minVersion);
+    }
+    return minVersion;
   }
 
   @Override

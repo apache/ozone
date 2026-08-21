@@ -557,6 +557,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
         "DatanodeDetails.");
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
+      nodeStateManager.updateCurrentVersion(datanodeDetails);
       metrics.incNumHBProcessed();
       updateDatanodeOpState(datanodeDetails);
     } catch (NodeNotFoundException e) {

@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -341,8 +340,7 @@ public class TestBlockDataStreamOutput {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       // Verify all DNs internally have versions set correctly
-      List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
-      for (HddsDatanodeService dn : dns) {
+      for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
         DatanodeDetails details = dn.getDatanodeDetails();
         assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
       }
@@ -352,9 +350,8 @@ public class TestBlockDataStreamOutput {
       KeyDataStreamOutput keyDataStreamOutput = (KeyDataStreamOutput) key.getByteBufStreamOutput();
       BlockDataStreamOutputEntry stream = keyDataStreamOutput.getStreamEntries().get(0);
 
-     // Now check 3 DNs in a random pipeline returns the correct DN versions
-      List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
-      for (DatanodeDetails details : streamDnDetails) {
+      // Now check 3 DNs in a random pipeline returns the correct DN versions
+      for (DatanodeDetails details : stream.getPipeline().getNodes()) {
         assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
       }
     }

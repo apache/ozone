@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -83,6 +84,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
@@ -527,17 +529,11 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     DatanodeDetails source = selectAndOptionallyExcludeDatanode(
         1, sourceWithCmds);
 
-    try {
-      ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(
-          containerID, target,
-          nodeManager.getLowestApparentVersion(source, target));
-      cmd.setReplicaIndex(replicaIndex);
-      sendDatanodeCommand(cmd, containerInfo, source);
-    } catch (NodeNotFoundException e) {
-      throw new IllegalArgumentException("Datanode not found in NodeManager while sending replication "
-          + "command for container " + containerID + " from source " + source + " to target " + target
-          + ". Should not happen", e);
-    }
+    ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(
+        containerID, target,
+        ScmVersionManager.computeCommonVersion(Arrays.asList(source, target)));
+    cmd.setReplicaIndex(replicaIndex);
+    sendDatanodeCommand(cmd, containerInfo, source);
   }
 
   public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
@@ -634,18 +630,12 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       final ContainerInfo container, int replicaIndex, DatanodeDetails source,
       DatanodeDetails target, long scmDeadlineEpochMs)
       throws NotLeaderException {
-    try {
-      final ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
-          container.getContainerID(), target,
-          nodeManager.getLowestApparentVersion(source, target));
-      command.setReplicaIndex(replicaIndex);
-      command.setPriority(ReplicationCommandPriority.LOW);
-      sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
-    } catch (NodeNotFoundException e) {
-      throw new IllegalArgumentException("Datanode not found in NodeManager while sending replication "
-          + "command for container " + container.getContainerID() + " from source " + source
-          + " to target " + target + ". Should not happen", e);
-    }
+    final ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
+        container.getContainerID(), target,
+        ScmVersionManager.computeCommonVersion(Arrays.asList(source, target)));
+    command.setReplicaIndex(replicaIndex);
+    command.setPriority(ReplicationCommandPriority.LOW);
+    sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
   }
 
   /**

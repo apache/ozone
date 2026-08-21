@@ -738,6 +738,23 @@ public class TestSCMNodeManager {
   }
 
   @Test
+  public void testProcessHeartbeatUpdatesCurrentVersion()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      DatanodeDetails datanodeDetails =
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
+
+      // A later heartbeat reports a new currentVersion; SCM should refresh the
+      // value stored in the datanode's DatanodeInfo.
+      datanodeDetails.setCurrentVersion(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC);
+      nodeManager.processHeartbeat(datanodeDetails);
+
+      assertEquals(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC,
+          nodeManager.getNode(datanodeDetails.getID()).getCurrentVersion());
+    }
+  }
+
+  @Test
   public void testDatanodeFinalizationCountsWithNoHealthyDatanodes()
       throws IOException, AuthenticationException {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
