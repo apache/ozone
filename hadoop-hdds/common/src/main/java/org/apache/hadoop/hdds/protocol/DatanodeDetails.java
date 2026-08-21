@@ -33,6 +33,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -521,16 +522,28 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     return toProtoBuilder(clientVersion, filterPorts).build();
   }
 
+  public HddsProtos.DatanodeDetailsProto toProto(ClientVersion clientVersion, Set<Port.Name> filterPorts,
+      ComponentVersion versionOverride) {
+    return toProtoBuilder(clientVersion, filterPorts, versionOverride).build();
+  }
+
+  public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
+      ClientVersion clientVersion, Set<Port.Name> filterPorts) {
+    return toProtoBuilder(clientVersion, filterPorts, null);
+  }
+
   /**
    * Converts the current DatanodeDetails instance into a proto {@link HddsProtos.DatanodeDetailsProto.Builder} object.
    *
-   * @param clientVersion - The client version.
-   * @param filterPorts   - A set of {@link Port.Name} specifying ports to include.
-   *                        If empty, all available ports will be included.
+   * @param clientVersion          - The client version.
+   * @param filterPorts            - A set of {@link Port.Name} specifying ports to include.
+   *                                 If empty, all available ports will be included.
+   * @param versionOverride        - When non-null, its serialized value is set as the proto's currentVersion instead
+   *                                 of this node's own version. Used to advertise a pipeline-wide write version.
    * @return A {@link HddsProtos.DatanodeDetailsProto.Builder} Object.
    */
   public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
-      ClientVersion clientVersion, Set<Port.Name> filterPorts) {
+      ClientVersion clientVersion, Set<Port.Name> filterPorts, ComponentVersion versionOverride) {
 
     final HddsProtos.DatanodeIDProto idProto = id.toProto();
     final HddsProtos.DatanodeDetailsProto.Builder builder =
@@ -587,7 +600,8 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       }
     }
 
-    builder.setCurrentVersion(currentVersion.serialize());
+    builder.setCurrentVersion(versionOverride != null ? versionOverride.serialize() : currentVersion.serialize());
+
     return builder;
   }
 
@@ -627,7 +641,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   }
 
   /**
-   * @return the version this datanode was last started with
+   * @return the version this datanode should report to clients
    */
   public HDDSVersion getCurrentVersion() {
     return currentVersion;

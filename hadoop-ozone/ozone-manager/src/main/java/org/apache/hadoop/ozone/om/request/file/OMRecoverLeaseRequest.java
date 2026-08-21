@@ -258,10 +258,9 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     }
 
     RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
-    rb.setKeyInfo(keyInfo.getNetworkProtobuf(
-        ClientVersion.deserialize(getOmRequest().getVersion()), true));
-    rb.setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(
-        ClientVersion.deserialize(getOmRequest().getVersion()), true));
+    ClientVersion clientVersion = ClientVersion.deserialize(getOmRequest().getVersion());
+    rb.setKeyInfo(keyInfo.getNetworkProtobuf(clientVersion, true));
+    rb.setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(clientVersion, true));
     return rb.build();
   }
 

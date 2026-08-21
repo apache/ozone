@@ -38,6 +38,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
@@ -1198,8 +1199,17 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public void finalizeUpgrade() throws IOException {
+    finalizeUpgrade(false);
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    finalizeUpgrade(true);
+  }
+
+  private void finalizeUpgrade(boolean force) throws IOException {
     FinalizeUpgradeRequestProto req = FinalizeUpgradeRequestProto.newBuilder()
-        .build();
+        .setForce(force).build();
     submitRequest(Type.FinalizeUpgrade, builder -> builder.setFinalizeUpgradeRequest(req));
   }
 
@@ -1238,6 +1248,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         submitRequest(Type.QueryUpgradeStatus, builder -> builder.setQueryUpgradeStatusRequest(req))
             .getQueryUpgradeStatusResponse();
     return response.getStatus();
+  }
+
+  @Override
+  public HDDSVersion getPeerUpgradeStatus() throws IOException {
+    StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusRequestProto req =
+        StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusRequestProto
+            .newBuilder()
+            .build();
+
+    StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusResponseProto response =
+        submitRequest(Type.GetPeerUpgradeStatus, builder -> builder.setGetPeerUpgradeStatusRequest(req))
+            .getGetPeerUpgradeStatusResponse();
+    return HDDSVersion.deserialize(response.getScmSoftwareVersion());
   }
 
   @Override

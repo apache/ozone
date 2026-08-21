@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -134,6 +135,7 @@ public class TestBlockDataStreamOutput {
         .setNumDatanodes(5)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setCurrentVersion(DN_OLD_VERSION)
+            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION)
             .build())
         .build();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
@@ -331,6 +333,7 @@ public class TestBlockDataStreamOutput {
     }
   }
 
+  @Unhealthy("Requires HDDS-16044 to finish implementing datanode version passing to client.")
   @ParameterizedTest
   @MethodSource("clientParameters")
   public void testDatanodeVersion(boolean flushDelay) throws Exception {

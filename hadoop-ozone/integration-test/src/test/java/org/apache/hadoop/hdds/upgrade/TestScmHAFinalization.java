@@ -75,7 +75,7 @@ public class TestScmHAFinalization {
         .setSCMConfigurator(configurator)
         .setNumDatanodes(NUM_DATANODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
+            .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION)
             .build());
     this.cluster = clusterBuilder.build();
 
@@ -104,7 +104,7 @@ public class TestScmHAFinalization {
         .setNumOfOzoneManagers(1)
         .setNumDatanodes(NUM_DATANODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION)
             .build());
 
     // Prevent terminateDatanode() from calling System.exit(1) and killing the test JVM.
@@ -167,7 +167,8 @@ public class TestScmHAFinalization {
     }
 
     // Wait for finalization from the client perspective.
-    scmClient.finalizeUpgrade();
+    // Force finalize skips the peer version checks that require all peers to be active.
+    scmClient.forceFinalizeUpgrade();
     HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
     // Wait for two running SCMs to finish finalization.
     waitForScmsToFinalize(activeScms);

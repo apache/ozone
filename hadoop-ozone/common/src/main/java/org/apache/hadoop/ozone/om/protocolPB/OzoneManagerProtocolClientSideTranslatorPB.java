@@ -854,7 +854,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize())
         .addAllMetadata(KeyValueUtil.toProtobuf(args.getMetadata()))
         .addAllKeyLocations(locationInfoList.stream()
-            // TODO use OM version?
             .map(info -> info.getProtobuf(ClientVersion.CURRENT))
             .collect(Collectors.toList()));
 
@@ -1773,7 +1772,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(omKeyArgs.getDataSize())
         .addAllMetadata(KeyValueUtil.toProtobuf(omKeyArgs.getMetadata()))
         .addAllKeyLocations(locationInfoList.stream()
-            // TODO use OM version?
             .map(info -> info.getProtobuf(ClientVersion.CURRENT))
             .collect(Collectors.toList()));
     multipartCommitUploadPartRequest.setClientID(clientId);

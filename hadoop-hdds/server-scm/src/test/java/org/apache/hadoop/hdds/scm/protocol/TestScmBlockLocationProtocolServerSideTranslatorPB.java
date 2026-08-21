@@ -26,6 +26,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
@@ -80,6 +82,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
   private Map<DatanodeID, DatanodeInfo> registry;
   private List<DatanodeDetails> nodes;
+  private NodeManager nodeManager;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -87,7 +90,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     StorageContainerManager scm = mock(StorageContainerManager.class);
 
     registry = new HashMap<>();
-    NodeManager nodeManager = mock(NodeManager.class);
+    nodeManager = mock(NodeManager.class);
     when(nodeManager.getNode(any(DatanodeID.class))).thenAnswer(inv -> registry.get(inv.getArgument(0)));
     when(scm.getScmNodeManager()).thenReturn(nodeManager);
 
@@ -209,6 +212,12 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     for (int i = 0; i < response.getBlocksCount(); i++) {
       assertAllMembersHaveVersion(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize(), response.getBlocks(i));
     }
+
+    // The write version is memoized per pipeline: each node is looked up once
+    // for the whole batch, not once per block.
+    for (DatanodeDetails dn : nodes) {
+      verify(nodeManager, times(1)).getNode(dn.getID());
+    }
   }
 
   @Test
@@ -237,17 +246,28 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     // Pipeline members carry the DEFAULT_VERSION baked in at pipeline creation,
     // but the live registry reports a higher version for every node. The
     // forwarded version must come from the registry, not the stale copy.
+    DatanodeDetails oldNode = nodes.get(0);
+    setLiveVersion(oldNode, HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC);
+
     for (DatanodeDetails member : nodes) {
-      assertEquals(HDDSVersion.DEFAULT_VERSION, member.getCurrentVersion());
+      if (member.equals(oldNode)) {
+        assertEquals(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC, member.getCurrentVersion());
+      } else {
+        assertEquals(HDDSVersion.SOFTWARE_VERSION, member.getCurrentVersion());
+      }
     }
 
-    assertAllMembersHaveVersion(HDDSVersion.SOFTWARE_VERSION.serialize(), allocate(1).getBlocks(0));
+    assertAllMembersHaveVersion(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize(),
+        allocate(1).getBlocks(0));
 
     // Serialization overrides only the outgoing proto; the source pipeline copies and the
     // registered node info keep their own versions.
     for (DatanodeDetails member : nodes) {
-      assertEquals(HDDSVersion.DEFAULT_VERSION, member.getCurrentVersion());
-      assertEquals(HDDSVersion.SOFTWARE_VERSION, registry.get(member.getID()).getCurrentVersion());
+      if (member.equals(oldNode)) {
+        assertEquals(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC, member.getCurrentVersion());
+      } else {
+        assertEquals(HDDSVersion.SOFTWARE_VERSION, member.getCurrentVersion());
+      }
     }
   }
 
