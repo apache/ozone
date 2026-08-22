@@ -21,8 +21,11 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.getObjectAttributes;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
@@ -31,15 +34,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.List;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import javax.xml.bind.JAXB;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -172,5 +182,106 @@ public class TestObjectAttributesGet {
     Response response = getObjectAttributes(rest, BUCKET_NAME, keyPath, "ObjectSize");
 
     assertEquals(HTTP_OK, response.getStatus());
+  }
+
+  @Test
+  public void testGetObjectAttributesMultipartObjectPartsListsAllParts() throws IOException, OS3Exception {
+    final String key = "mpu-key";
+    completeMultipartUploadWithParts(key, "part-one", "part-two", "part-three");
+
+    Response response = getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts");
+
+    assertEquals(HTTP_OK, response.getStatus());
+    GetObjectAttributesResponse attributes = (GetObjectAttributesResponse) response.getEntity();
+    GetObjectAttributesResponse.ObjectParts objectParts = attributes.getObjectParts();
+    assertNotNull(objectParts);
+    assertEquals(3, objectParts.getPartsCount().intValue());
+    assertFalse(objectParts.isTruncated());
+    assertEquals(S3Consts.GET_OBJECT_ATTRIBUTES_MAX_PARTS_LIMIT, objectParts.getMaxParts().intValue());
+    assertNull(objectParts.getPartNumberMarker());
+    assertNull(objectParts.getNextPartNumberMarker());
+    assertEquals(3, objectParts.getParts().size());
+    assertEquals(1, objectParts.getParts().get(0).getPartNumber());
+    assertEquals("part-one".length(), objectParts.getParts().get(0).getSize());
+    assertEquals(2, objectParts.getParts().get(1).getPartNumber());
+    assertEquals("part-two".length(), objectParts.getParts().get(1).getSize());
+    assertEquals(3, objectParts.getParts().get(2).getPartNumber());
+    assertEquals("part-three".length(), objectParts.getParts().get(2).getSize());
+  }
+
+  @Test
+  public void testGetObjectAttributesMultipartObjectPartsPagination() throws IOException, OS3Exception {
+    final String key = "mpu-paginated";
+    completeMultipartUploadWithParts(key, "part-one", "part-two", "part-three");
+
+    Response response = getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts", 2, 0);
+
+    assertEquals(HTTP_OK, response.getStatus());
+    GetObjectAttributesResponse.ObjectParts objectParts =
+        ((GetObjectAttributesResponse) response.getEntity()).getObjectParts();
+    assertEquals(3, objectParts.getPartsCount().intValue());
+    assertTrue(objectParts.isTruncated());
+    assertEquals(2, objectParts.getMaxParts().intValue());
+    assertEquals(0, objectParts.getPartNumberMarker().intValue());
+    assertEquals(2, objectParts.getNextPartNumberMarker().intValue());
+    assertEquals(2, objectParts.getParts().size());
+    assertEquals(1, objectParts.getParts().get(0).getPartNumber());
+    assertEquals(2, objectParts.getParts().get(1).getPartNumber());
+  }
+
+  @Test
+  public void testGetObjectAttributesMultipartObjectPartsPaginationSecondPage()
+      throws IOException, OS3Exception {
+    final String key = "mpu-paginated-page2";
+    completeMultipartUploadWithParts(key, "part-one", "part-two", "part-three");
+
+    Response response = getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts", 2, 2);
+
+    assertEquals(HTTP_OK, response.getStatus());
+    GetObjectAttributesResponse.ObjectParts objectParts =
+        ((GetObjectAttributesResponse) response.getEntity()).getObjectParts();
+    assertEquals(3, objectParts.getPartsCount().intValue());
+    assertFalse(objectParts.isTruncated());
+    assertEquals(2, objectParts.getMaxParts().intValue());
+    assertEquals(2, objectParts.getPartNumberMarker().intValue());
+    assertNull(objectParts.getNextPartNumberMarker());
+    assertEquals(1, objectParts.getParts().size());
+    assertEquals(3, objectParts.getParts().get(0).getPartNumber());
+    assertEquals("part-three".length(), objectParts.getParts().get(0).getSize());
+  }
+
+  @Test
+  public void testGetObjectAttributesInvalidMaxParts() throws IOException, OS3Exception {
+    final String key = "mpu-invalid-max-parts";
+    completeMultipartUploadWithParts(key, "part-one", "part-two");
+
+    assertErrorResponse(INVALID_ARGUMENT,
+        () -> getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts",
+            S3Consts.GET_OBJECT_ATTRIBUTES_MAX_PARTS_LIMIT + 1, null));
+  }
+
+  @Test
+  public void testObjectPartsXmlOmitsUnsetPaginationFields() {
+    GetObjectAttributesResponse.ObjectParts parts = new GetObjectAttributesResponse.ObjectParts();
+    parts.setPartsCount(3);
+    parts.setTruncated(false);
+    parts.addPart(new GetObjectAttributesResponse.Part(1, 100));
+
+    StringWriter writer = new StringWriter();
+    JAXB.marshal(parts, writer);
+    String xml = writer.toString();
+    assertFalse(xml.contains("MaxParts"));
+    assertFalse(xml.contains("PartNumberMarker"));
+    assertFalse(xml.contains("NextPartNumberMarker"));
+  }
+
+  private void completeMultipartUploadWithParts(String key, String... partContents)
+      throws IOException, OS3Exception {
+    String uploadID = initiateMultipartUpload(rest, BUCKET_NAME, key);
+    List<Part> partsList = new ArrayList<>();
+    for (int i = 0; i < partContents.length; i++) {
+      partsList.add(uploadPart(rest, BUCKET_NAME, key, i + 1, uploadID, partContents[i]));
+    }
+    completeMultipartUpload(rest, BUCKET_NAME, key, uploadID, partsList);
   }
 }
