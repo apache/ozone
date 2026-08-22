@@ -121,37 +121,6 @@ public final class S3STSUtils {
   }
 
   /**
-   * Validates that the tempAccessKeyId has the exact format Ozone generates for STS credentials.
-   * Because the value on the revoke path comes straight from the request, enforcing this format
-   * guarantees it can never contain the {@code |} separator used to build the revoked STS token key, keeping the
-   * {@code (tempAccessKeyId, originalAccessKeyId)} to key mapping unambiguous across users.
-   *
-   * @param tempAccessKeyId the temporary access key id from the request
-   * @throws OMException if the value is null/empty or does not match the expected format
-   */
-  public static void validateTempAccessKeyId(String tempAccessKeyId) throws OMException {
-    if (Strings.isNullOrEmpty(tempAccessKeyId)) {
-      throw new OMException("tempAccessKeyId is required for STS token revocation", INVALID_REQUEST);
-    }
-
-    if (tempAccessKeyId.length() != STS_ACCESS_KEY_ID_LENGTH ||
-        !tempAccessKeyId.startsWith(STS_TOKEN_PREFIX)) {
-      throw new OMException("Invalid tempAccessKeyId: " + tempAccessKeyId, INVALID_REQUEST);
-    }
-
-    for (int i = STS_TOKEN_PREFIX.length(); i < tempAccessKeyId.length(); i++) {
-      final char c = tempAccessKeyId.charAt(i);
-      if (!isAccessKeyIdChar(c)) {
-        throw new OMException("Invalid tempAccessKeyId: " + tempAccessKeyId, INVALID_REQUEST);
-      }
-    }
-  }
-
-  private static boolean isAccessKeyIdChar(char c) {
-    return STS_ACCESS_KEY_ID_ALLOWED_CHARS.indexOf(c) >= 0;
-  }
-
-  /**
    * Validates the session policy length.
    * @param awsIamSessionPolicy session policy
    * @throws OMException if policy length is invalid

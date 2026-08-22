@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
 import java.io.IOException;
@@ -32,7 +33,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
-import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -40,7 +40,8 @@ import org.apache.hadoop.ozone.om.response.s3.security.S3RevokeSTSTokenResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.STSSecurityUtil;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeSTSTokenRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateRevokeSTSTokenRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,12 +49,14 @@ import org.slf4j.LoggerFactory;
 /**
  * Handles S3RevokeSTSTokenRequest request.
  *
- * <p>This request marks an STS credential pair as revoked by inserting a key
- * ({@code tempAccessKeyId|originalAccessKeyId}) into the {@code s3RevokedStsTokenTable}. Subsequent S3 requests
- * authenticated with the same STS credentials will be rejected when the revocation state has propagated.</p>
+ * <p>The client submits {@link RevokeSTSTokenRequest} with {@code originalAccessKeyId} only. On the
+ * leader, {@code preExecute} captures the revocation cutoff and builds an {@link UpdateRevokeSTSTokenRequest}
+ * that is replicated through Ratis so every OM applies the same cutoff.</p>
  *
- * <p>{@code tempAccessKeyId} comes directly from the request, so {@code preExecute} validates it against the
- * expected STS format.
+ * <p>This request records a revocation cutoff for the given {@code originalAccessKeyId} in the
+ * {@code s3RevokedStsTokenTable}. Subsequent S3 requests authenticated with STS tokens whose
+ * {@code creationTime} is strictly before the cutoff will be rejected when the revocation state
+ * has propagated.</p>
  */
 public class S3RevokeSTSTokenRequest extends OMClientRequest {
 
@@ -67,8 +70,7 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final OMRequest omRequest = super.preExecute(ozoneManager);
-    final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeReq =
-        omRequest.getRevokeSTSTokenRequest();
+    final RevokeSTSTokenRequest revokeReq = omRequest.getRevokeSTSTokenRequest();
     validateRevokeRequestFields(revokeReq);
 
     // Use the original (long-lived) access key ID from the request and enforce
@@ -81,42 +83,62 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     final UserGroupInformation ugi = S3SecretRequestHelper.getOrCreateUgi(originalAccessKeyId);
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(ozoneManager, ugi, originalAccessKeyId);
 
-    return omRequest;
+    if (!ozoneManager.getS3SecretManager().hasS3Secret(originalAccessKeyId)) {
+      throw new OMException("originalAccessKeyId does not exist: " + originalAccessKeyId, INVALID_REQUEST);
+    }
+
+    final long revocationTimeMillis = CLOCK.millis();
+    final UpdateRevokeSTSTokenRequest updateRevokeSTSTokenRequest = UpdateRevokeSTSTokenRequest.newBuilder()
+        .setOriginalAccessKeyId(originalAccessKeyId)
+        .setRevocationTimeMillis(revocationTimeMillis)
+        .build();
+
+    return omRequest.toBuilder()
+        .setUpdateRevokeSTSTokenRequest(updateRevokeSTSTokenRequest)
+        .build();
   }
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
+    IOException exception = null;
+    OMClientResponse omClientResponse;
+    String originalAccessKeyId = null;
 
-    final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeReq = getOmRequest().getRevokeSTSTokenRequest();
-    final String originalAccessKeyId = revokeReq.getOriginalAccessKeyId();
-    final String tempAccessKeyId = revokeReq.getTempAccessKeyId();
-    final String revokedStsTokenKey = STSSecurityUtil.buildRevokedStsTokenKey(tempAccessKeyId, originalAccessKeyId);
+    try {
+      validateReplicatedRevokeRequestFields(getOmRequest());
+      final UpdateRevokeSTSTokenRequest updateRevokeSTSTokenRequest = getOmRequest().getUpdateRevokeSTSTokenRequest();
+      originalAccessKeyId = updateRevokeSTSTokenRequest.getOriginalAccessKeyId();
+      final long revocationTimeMillis = updateRevokeSTSTokenRequest.getRevocationTimeMillis();
 
-    // All actual DB mutations are done in the response's addToDBBatch().
-    final OMClientResponse omClientResponse = new S3RevokeSTSTokenResponse(revokedStsTokenKey, omResponse.build());
+      // All actual DB mutations are done in the response's addToDBBatch().
+      omClientResponse = new S3RevokeSTSTokenResponse(originalAccessKeyId, revocationTimeMillis, omResponse.build());
+
+      // Update the cache immediately so subsequent validation checks see the revocation
+      ozoneManager.getMetadataManager().getS3RevokedStsTokenTable().addCacheEntry(
+          new CacheKey<>(originalAccessKeyId), CacheValue.get(context.getIndex(), revocationTimeMillis));
+
+      LOG.info(
+          "Marked STS tokens as revoked for originalAccessKeyId={} with cutoff time {}.",
+          originalAccessKeyId, revocationTimeMillis);
+    } catch (IOException ex) {
+      exception = ex;
+      omClientResponse = new S3RevokeSTSTokenResponse(null, 0L, createErrorOMResponse(omResponse, ex));
+    }
 
     // Audit log
     final Map<String, String> auditMap = new HashMap<>();
     final OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_USER, userInfo.getUserName());
-    auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_ORIGINAL_ACCESS_KEY_ID, originalAccessKeyId);
-    auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_TEMP_ACCESS_KEY_ID, tempAccessKeyId);
-    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.REVOKE_STS_TOKEN, auditMap, null, userInfo));
-
-    // Update the cache immediately so subsequent validation checks see the revocation
-    ozoneManager.getMetadataManager().getS3RevokedStsTokenTable().addCacheEntry(
-        new CacheKey<>(revokedStsTokenKey), CacheValue.get(context.getIndex(), CLOCK.millis()));
-
-    LOG.info(
-        "Marked STS token as revoked for originalAccessKeyId={}, tempAccessKeyId={}.", originalAccessKeyId,
-        tempAccessKeyId);
+    if (originalAccessKeyId != null) {
+      auditMap.put(OzoneConsts.S3_STS_ORIGINAL_ACCESS_KEY_ID, originalAccessKeyId);
+    }
+    markForAudit(
+        ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.REVOKE_STS_TOKEN, auditMap, exception, userInfo));
     return omClientResponse;
   }
 
-  private static void validateRevokeRequestFields(OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeReq)
-      throws OMException {
+  private static void validateRevokeRequestFields(RevokeSTSTokenRequest revokeReq) throws OMException {
     final String originalAccessKeyId = revokeReq.getOriginalAccessKeyId();
     if (StringUtils.isEmpty(originalAccessKeyId)) {
       throw new OMException("originalAccessKeyId is required for STS token revocation", INVALID_REQUEST);
@@ -124,7 +146,18 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     if (originalAccessKeyId.length() >= OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH) {
       throw new OMException("originalAccessKeyId length is invalid: " + originalAccessKeyId.length(), INVALID_REQUEST);
     }
-    // Validate the tempAccessKeyId
-    S3STSUtils.validateTempAccessKeyId(revokeReq.getTempAccessKeyId());
+  }
+
+  private static void validateReplicatedRevokeRequestFields(OMRequest omRequest) throws OMException {
+    if (!omRequest.hasUpdateRevokeSTSTokenRequest()) {
+      throw new OMException("updateRevokeSTSTokenRequest is required for STS token revocation", INTERNAL_ERROR);
+    }
+    final String originalAccessKeyId = omRequest.getRevokeSTSTokenRequest().getOriginalAccessKeyId();
+    final UpdateRevokeSTSTokenRequest updateRevokeSTSTokenRequest = omRequest.getUpdateRevokeSTSTokenRequest();
+    if (!originalAccessKeyId.equals(updateRevokeSTSTokenRequest.getOriginalAccessKeyId())) {
+      throw new OMException(
+          "originalAccessKeyId mismatch between revokeSTSTokenRequest and updateRevokeSTSTokenRequest",
+          INTERNAL_ERROR);
+    }
   }
 }
