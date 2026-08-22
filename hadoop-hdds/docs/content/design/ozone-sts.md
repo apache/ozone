@@ -139,21 +139,24 @@ was included with the AssumeRole request, the String return value will also incl
 would further limit the scope of the permissions, resources and actions granted by the role in Ranger, such that the temporary 
 credential will have the permissions and actions comprising the intersection of the role permissions and actions and the sessionPolicy permissions and actions.
 - HMAC-SHA256 signature - used to ensure the sessionToken was created by Ozone and was not altered since it was created.
+- creation time of the token (via `OMTokenProto#issueDate`, exposed as `STSTokenIdentifier#getCreationTime()`)
 - expiration time of the token (via `ShortLivedTokenIdentifier#getExpiry()`)
 - UUID of the OzoneManager secret key used to sign the sessionToken and encrypt the secretAccessKey (via `ShortLivedTokenIdentifier#getSecretKeyId()`)
 
 ## 3.5 STS Token Revocation
 
 In the rare event temporary credentials need to be revoked (ex. for security reasons), a table in the OzoneManager RocksDB will be created
-to store revoked tokens, and a command-line utility will be created to add tokens to the table.  A background cleaner service
-will be created to run every 3 hours to delete revoked tokens that have been in the table for more than 12 hours. The
-command-line utility accepts `originalAccessKeyId` and `tempAccessKeyId`. The OM stores revocations by building a
-single key from these two values joined by an unescaped `|` delimiter, with `tempAccessKeyId` first:
-`tempAccessKeyId|originalAccessKeyId`. Because `tempAccessKeyId` is always `ASIA` followed by characters drawn only
-from `[0-9A-Z]`, it can never contain the `|` delimiter, so no escaping is needed even though `originalAccessKeyId`
-is unconstrained. In this way, specific STS tokens can be revoked as opposed
-to all tokens.  Furthermore,
-AWS doesn't have a standard API to revoke tokens therefore we are creating our own system.
+to store revocation cutoffs per originalAccessKeyId, and a command-line utility will be created to add entries to the table. 
+A background cleaner service will be created to run every 3 hours to delete revocation entries whose cutoff is more than 12 hours old.
+
+The command-line utility accepts only `originalAccessKeyId`. The OM stores revocations by keying the table on
+`originalAccessKeyId` and storing the revocation cutoff time in milliseconds as the value. When the command is issued,
+all STS tokens created by that `originalAccessKeyId` whose signed `creationTime` is strictly before the cutoff are
+revoked. Tokens created at or after the cutoff remain valid.
+
+Before writing a revocation entry, the OM verifies that `originalAccessKeyId` corresponds to a real Kerberos identity by
+checking that an S3 secret exists for it. This prevents bogus entries from filling the table. Non-admins may only
+revoke their own `originalAccessKeyId`; S3 and tenant admins may revoke other principals.
 
 Additionally, if the Kerberos identity of the user that created the STS token is revoked via the `ozone s3 revokesecret`
 command, then all the existing and unexpired STS tokens that user created will be revoked.
@@ -225,7 +228,8 @@ created in Ranger as per the Prerequisites above.
 originalAccessKeyId in the session token and perform the following checks:
   - Ensure that if the accessKeyId starts with "ASIA", that a sessionToken was included in the `x-amz-security-token` header
   - Ensure the sessionToken is not expired
-  - Ensure the STS credentials are not revoked by looking up the revoke key in OzoneManager RocksDB
+  - Ensure the STS credentials are not revoked by looking up the revocation cutoff for the token's originalAccessKeyId
+    and comparing it against the token's signed creationTime
   - Validate the HMAC-SHA256 signature in the sessionToken
   - Decrypt the secretAccessKey from the sessionToken and validate the AWS signature
   - Authorize the call with either RangerOzoneAuthorizer or OzoneNativeAuthorizer
