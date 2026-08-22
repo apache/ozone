@@ -38,7 +38,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.VersionIdAllocator;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -172,6 +174,10 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
     OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
     when(ozoneManager.getVersionManager()).thenReturn(versionManager);
+    // preExecute proposes a versionId for the delete markers a versioned
+    // bucket would need, before it knows which bucket the request is for.
+    when(ozoneManager.getVersionIdAllocator())
+        .thenReturn(new VersionIdAllocator(new OzoneConfiguration()));
 
     when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(true);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);

@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketVersioningStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -100,6 +101,21 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // OBS (Object Store) buckets must follow strict S3 bucket naming rules.
     // FSO and LEGACY buckets are not strictly bound to S3 naming semantics.
     OmUtils.validateBucketName(bucketInfo.getBucketName(), strict);
+
+    if (bucketInfo.hasVersioningStatus()
+        && bucketLayout != BucketLayout.OBJECT_STORE) {
+      throw new OMException("S3 object versioning is only supported on "
+          + BucketLayout.OBJECT_STORE + " buckets, but bucket "
+          + bucketInfo.getBucketName() + " is created with layout "
+          + bucketLayout + ".",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+
+    if (bucketInfo.getVersioningStatus()
+        == BucketVersioningStatusProto.VERSIONING_ENABLED) {
+      OMBucketSetPropertyRequest.rejectIfLifecycleServiceIsDisabled(
+          ozoneManager);
+    }
 
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {

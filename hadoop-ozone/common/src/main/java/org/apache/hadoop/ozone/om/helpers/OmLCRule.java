@@ -139,6 +139,21 @@ public final class OmLCRule {
     return null;
   }
 
+  /**
+   * Get the NoncurrentVersionExpiration action if present.
+   *
+   * @return the NoncurrentVersionExpiration action if present, null otherwise
+   */
+  @Nullable
+  public OmLCNoncurrentVersionExpiration getNoncurrentVersionExpiration() {
+    for (OmLCAction action : actions) {
+      if (action instanceof OmLCNoncurrentVersionExpiration) {
+        return (OmLCNoncurrentVersionExpiration) action;
+      }
+    }
+    return null;
+  }
+
   @Nullable
   public OmLCFilter getFilter() {
     return filter;
@@ -187,12 +202,22 @@ public final class OmLCRule {
 
     // Check that there is at most one Expiration action
     int expirationActionCount = 0;
+    int noncurrentExpirationActionCount = 0;
     for (OmLCAction action : actions) {
       if (action.getActionType() == OmLCAction.ActionType.EXPIRATION) {
         expirationActionCount++;
       }
+      if (action.getActionType()
+          == OmLCAction.ActionType.NONCURRENT_VERSION_EXPIRATION) {
+        noncurrentExpirationActionCount++;
+      }
       if (expirationActionCount > 1) {
         throw new OMException("A rule can have at most one Expiration action.",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+      if (noncurrentExpirationActionCount > 1) {
+        throw new OMException(
+            "A rule can have at most one NoncurrentVersionExpiration action.",
             OMException.ResultCodes.INVALID_REQUEST);
       }
       action.valid(creationTime);
@@ -236,19 +261,24 @@ public final class OmLCRule {
    * @return true is this key fits this rule and will trigger the action, otherwise false
    */
   public boolean match(OmKeyInfo omKeyInfo) {
-    boolean matched = false;
-    // verify modification time first
-    if (getExpiration().isExpired(omKeyInfo.getModificationTime())) {
-      // verify prefix and filter
-      if (prefix != null) {
-        if (omKeyInfo.getKeyName().startsWith(prefix)) {
-          matched = true;
-        }
-      } else {
-        return filter.match(omKeyInfo);
-      }
+    // verify modification time first, then prefix and filter
+    return getExpiration().isExpired(omKeyInfo.getModificationTime())
+        && matchesScope(omKeyInfo);
+  }
+
+  /**
+   * Whether the key is in this rule's scope, by prefix or by filter, without
+   * regard to any action's own condition. An action that decides expiry for
+   * itself - NoncurrentVersionExpiration, which reasons about a version's
+   * position and how long it has been noncurrent - needs the scope alone.
+   *
+   * @param omKeyInfo the key to evaluate against this rule's scope
+   */
+  public boolean matchesScope(OmKeyInfo omKeyInfo) {
+    if (prefix != null) {
+      return omKeyInfo.getKeyName().startsWith(prefix);
     }
-    return matched;
+    return filter.match(omKeyInfo);
   }
 
   /**
@@ -326,6 +356,10 @@ public final class OmLCRule {
       if (lifecycleAction.hasAbortIncompleteMultipartUpload()) {
         builder.addAction(OmLCAbortIncompleteMultipartUpload.getFromProtobuf(
             lifecycleAction.getAbortIncompleteMultipartUpload()));
+      }
+      if (lifecycleAction.hasNoncurrentVersionExpiration()) {
+        builder.addAction(OmLCNoncurrentVersionExpiration.getFromProtobuf(
+            lifecycleAction.getNoncurrentVersionExpiration()));
       }
     }
     if (lifecycleRule.hasFilter()) {
