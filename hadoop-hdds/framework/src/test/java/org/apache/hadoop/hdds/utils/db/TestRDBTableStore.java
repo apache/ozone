@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -156,6 +157,54 @@ public class TestRDBTableStore {
     assertArrayEquals(value, readValue);
     Table<byte[], byte[]> secondTable = rdbStore.getTable("Second");
     assertTrue(secondTable.isEmpty());
+  }
+
+  @Test
+  public void multiGetSkipCache() throws Exception {
+    Table<byte[], byte[]> testTable = rdbStore.getTable("First");
+    byte[] key1 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] key2 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] missingKey = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] value1 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] value2 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    testTable.put(key1, value1);
+    testTable.put(key2, value2);
+
+    List<byte[]> values = testTable.multiGetSkipCache(Arrays.asList(key1, missingKey, key2));
+    assertEquals(3, values.size());
+    assertArrayEquals(value1, values.get(0));
+    assertNull(values.get(1));
+    assertArrayEquals(value2, values.get(2));
+    assertTrue(testTable.multiGetSkipCache(Collections.emptyList()).isEmpty());
+  }
+
+  @Test
+  public void multiGetSkipCacheWithTypedTable() throws Exception {
+    byte[] smallKey = "small-key".getBytes(StandardCharsets.UTF_8);
+    byte[] largeKey1 = "large-key-1".getBytes(StandardCharsets.UTF_8);
+    byte[] largeKey2 = "large-key-2".getBytes(StandardCharsets.UTF_8);
+    byte[] emptyKey = "empty-key".getBytes(StandardCharsets.UTF_8);
+    byte[] missingKey = "missing-key".getBytes(StandardCharsets.UTF_8);
+    byte[] smallValue = "small".getBytes(StandardCharsets.UTF_8);
+    byte[] largeValue1 = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 100];
+    byte[] largeValue2 = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 200];
+    Arrays.fill(largeValue1, (byte) 'a');
+    Arrays.fill(largeValue2, (byte) 'b');
+    Table<byte[], byte[]> writeTable = rdbStore.getTable("Second");
+    writeTable.put(smallKey, smallValue);
+    writeTable.put(largeKey1, largeValue1);
+    writeTable.put(largeKey2, largeValue2);
+    writeTable.put(emptyKey, new byte[0]);
+
+    Table<String, String> readTable = rdbStore.getTable("Second", StringCodec.get(), StringCodec.get());
+    List<String> values = readTable.multiGetSkipCache(
+        Arrays.asList("small-key", "large-key-1", "missing-key", "large-key-2", "empty-key"));
+    assertEquals(5, values.size());
+    assertEquals(new String(smallValue, StandardCharsets.UTF_8), values.get(0));
+    assertEquals(new String(largeValue1, StandardCharsets.UTF_8), values.get(1));
+    assertNull(values.get(2));
+    assertEquals(new String(largeValue2, StandardCharsets.UTF_8), values.get(3));
+    assertEquals("", values.get(4));
   }
 
   @Test

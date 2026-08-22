@@ -20,12 +20,14 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.util.Time;
+import org.rocksdb.ByteBufferGetStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,8 +124,30 @@ class RDBTable implements Table<byte[], byte[]> {
     return db.get(family, key);
   }
 
+  @Override
+  public List<byte[]> multiGetSkipCache(List<byte[]> keys) throws RocksDatabaseException {
+    if (keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    for (byte[] ignored : keys) {
+      rdbMetrics.incNumDBKeyGets();
+    }
+    return db.multiGet(family, keys);
+  }
+
   Integer get(ByteBuffer key, ByteBuffer outValue) throws RocksDatabaseException {
     return db.get(family, key, outValue);
+  }
+
+  List<ByteBufferGetStatus> multiGetSkipCache(List<ByteBuffer> keys, List<ByteBuffer> values)
+      throws RocksDatabaseException {
+    if (keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    for (ByteBuffer ignored : keys) {
+      rdbMetrics.incNumDBKeyGets();
+    }
+    return db.multiGet(family, keys, values);
   }
 
   /**

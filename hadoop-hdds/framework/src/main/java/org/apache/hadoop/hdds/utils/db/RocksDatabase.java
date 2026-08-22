@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.rocksdb.ByteBufferGetStatus;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
@@ -681,6 +682,21 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
+  List<byte[]> multiGet(ColumnFamily family, List<byte[]> keys)
+      throws RocksDatabaseException {
+    if (keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      return db.get().multiGetAsList(DEFAULT_READ_OPTION,
+          Collections.nCopies(keys.size(), family.getHandle()), keys);
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      final String message = "multiGet " + keys.size() + " keys from " + family;
+      throw toRocksDatabaseException(this, message, e);
+    }
+  }
+
   /**
    * Get the value mapped to the given key.
    *
@@ -706,6 +722,32 @@ public final class RocksDatabase implements Closeable {
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "get " + bytes2String(key) + " from " + family;
+      throw toRocksDatabaseException(this, message, e);
+    }
+  }
+
+  List<ByteBufferGetStatus> multiGet(ColumnFamily family, List<ByteBuffer> keys, List<ByteBuffer> values)
+      throws RocksDatabaseException {
+    if (keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      final List<ByteBufferGetStatus> statuses = db.get().multiGetByteBuffers(DEFAULT_READ_OPTION,
+          Collections.nCopies(keys.size(), family.getHandle()), keys, values);
+      if (LOG.isTraceEnabled()) {
+        for (ByteBufferGetStatus status: statuses) {
+          if (status.value != null) {
+            LOG.trace("multiGet: requiredSize={}, remaining={}",
+                status.requiredSize, status.value.asReadOnlyBuffer().remaining());
+          } else {
+            LOG.trace("multiGet: status={}", status.status);
+          }
+        }
+      }
+      return statuses;
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      final String message = "multiGet " + keys.size() + " keys from " + family;
       throw toRocksDatabaseException(this, message, e);
     }
   }

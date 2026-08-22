@@ -1991,6 +1991,7 @@
                       <allowedImport>org.rocksdb.Env</allowedImport>
                       <allowedImport>org.rocksdb.Statistics</allowedImport>
                       <allowedImport>org.rocksdb.AbstractSlice</allowedImport>
+                      <allowedImport>org.rocksdb.ByteBufferGetStatus</allowedImport>
                       <!-- Allow RocksDB constants and static methods to be used. -->
                       <allowedImport>org.rocksdb.RocksDB.*</allowedImport>
                     </allowedImports>
