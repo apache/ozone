@@ -38,6 +38,7 @@ import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachHealthState;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachPersistedOpState;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -77,6 +78,7 @@ import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
@@ -148,7 +150,10 @@ public class TestDecommissionAndMaintenance {
     conf.setFromObject(replicationConf);
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(DATANODE_COUNT);
+        .setNumDatanodes(DATANODE_COUNT)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setLayoutVersion(maxLayoutVersion())
+            .build());
 
     clusterProvider = new MiniOzoneClusterProvider(builder, 9);
   }

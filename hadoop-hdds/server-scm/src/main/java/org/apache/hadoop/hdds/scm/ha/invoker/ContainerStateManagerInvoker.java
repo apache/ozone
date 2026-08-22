@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ratis.protocol.Message;
 
 /** Code generated for {@link ContainerStateManager}.  Do not modify. */
@@ -56,6 +57,11 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
     updateContainerInfo(new Class<?>[][] {
         null,
         new Class<?>[] {ContainerInfoProto.class}
+    }),
+    updateContainerState(new Class<?>[][] {
+        null,
+        null,
+        new Class<?>[] {HddsProtos.ContainerID.class, LifeCycleEvent.class}
     }),
     updateContainerStateWithSequenceId(new Class<?>[][] {
         null,
@@ -177,6 +183,13 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       @Override
       public void updateContainerReplica(ContainerReplica arg0) {
         invoker.getImpl().updateContainerReplica(arg0);
+      }
+
+      @Override
+      public void updateContainerState(HddsProtos.ContainerID arg0, LifeCycleEvent arg1) throws IOException,
+          InvalidStateTransitionException {
+        final Object[] args = {arg0, arg1};
+        invoker.invokeReplicateDirect(ReplicateMethod.updateContainerState, args);
       }
 
       @Override
@@ -303,11 +316,17 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       getImpl().updateContainerReplica(arg26);
       return Message.EMPTY;
 
-    case "updateContainerStateWithSequenceId":
+    case "updateContainerState":
       final HddsProtos.ContainerID arg27 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
       final LifeCycleEvent arg28 = p.length > 1 ? (LifeCycleEvent) p[1] : null;
-      final Long arg29 = p.length > 2 ? (Long) p[2] : null;
-      getImpl().updateContainerStateWithSequenceId(arg27, arg28, arg29);
+      getImpl().updateContainerState(arg27, arg28);
+      return Message.EMPTY;
+
+    case "updateContainerStateWithSequenceId":
+      final HddsProtos.ContainerID arg29 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
+      final LifeCycleEvent arg30 = p.length > 1 ? (LifeCycleEvent) p[1] : null;
+      final Long arg31 = p.length > 2 ? (Long) p[2] : null;
+      getImpl().updateContainerStateWithSequenceId(arg29, arg30, arg31);
       return Message.EMPTY;
 
     default:
