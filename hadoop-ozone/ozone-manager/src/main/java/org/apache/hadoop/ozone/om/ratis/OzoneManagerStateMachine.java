@@ -666,7 +666,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return CompletableFuture.supplyAsync(
         () -> {
           try {
-            return ozoneManager.installSnapshotFromLeader(leaderNodeId);
+            TermIndex termIndex = ozoneManager.installSnapshotFromLeader(leaderNodeId);
+            if (termIndex == null) {
+              throw new CompletionException(
+                  new IOException("Failed to install snapshot from OM leader " + leaderNodeId));
+            }
+            return termIndex;
           } catch (IOException e) {
             throw new CompletionException(e);
           }
