@@ -383,6 +383,48 @@ class TestObjectPut {
   }
 
   @Test
+  void testCopyObjectToSelfWithMetadataReplace() throws Exception {
+    // Put the source object with some custom metadata.
+    Map<String, String> sourceMetadata = ImmutableMap.of(
+        "custom-key-1", "custom-value-1",
+        "custom-key-2", "custom-value-2");
+    MultivaluedMap<String, String> metadataHeaders = new MultivaluedHashMap<>();
+    sourceMetadata.forEach((k, v) -> metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + k, v));
+    when(headers.getRequestHeaders()).thenReturn(metadataHeaders);
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("COPY");
+    assertSucceeds(() -> putObject(CONTENT));
+    assertThat(bucket.getKey(KEY_NAME).getMetadata()).containsAllEntriesOf(sourceMetadata);
+
+    // Copy the object onto itself with x-amz-metadata-directive: REPLACE and a
+    // new metadata set. AWS allows this as an in-place metadata update.
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("REPLACE");
+    metadataHeaders.clear();
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-3", "custom-value-3");
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertThat(keyDetails.getMetadata())
+        .containsEntry("custom-key-3", "custom-value-3")
+        .doesNotContainKeys("custom-key-1", "custom-key-2");
+  }
+
+  @Test
+  void testCopyObjectToSelfWithoutMetadataReplaceRejected() throws Exception {
+    // Seed the source object.
+    assertSucceeds(() -> putObject(CONTENT));
+
+    // Self-copy without x-amz-metadata-directive: REPLACE (and no storage-class
+    // change) is not a real update, so it stays InvalidRequest.
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+
+    assertErrorResponse(INVALID_REQUEST, () -> putObject(CONTENT));
+  }
+
+  @Test
   void testContentTypeStoredAndCopied() throws Exception {
     // PUT with an explicit Content-Type (preserved by HeaderPreprocessor).
     when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
