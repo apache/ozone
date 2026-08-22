@@ -352,12 +352,14 @@ public final class OmKeyInfo extends WithParentObjectId
     // the pipeline field by default and bcsId would be updated in Ratis mode.
     Map<ContainerBlockID, OmKeyLocationInfo> allocatedBlockLocations =
         new HashMap<>();
-    for (OmKeyLocationInfo existingLocationInfo : keyLocationInfoGroup.
-        createLocationList()) {
-      ContainerBlockID existingBlockID = existingLocationInfo.getBlockID().
-          getContainerBlockID();
-      // The case of overwriting value should never happen
-      allocatedBlockLocations.put(existingBlockID, existingLocationInfo);
+    for (List<OmKeyLocationInfo> existingLocationInfos :
+        keyLocationInfoGroup.getLocationLists()) {
+      for (OmKeyLocationInfo existingLocationInfo : existingLocationInfos) {
+        ContainerBlockID existingBlockID = existingLocationInfo.getBlockID().
+            getContainerBlockID();
+        // The case of overwriting value should never happen
+        allocatedBlockLocations.put(existingBlockID, existingLocationInfo);
+      }
     }
 
     List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
