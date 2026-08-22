@@ -60,16 +60,30 @@ public interface LocalOzoneRuntime extends AutoCloseable {
   /**
    * Returns the S3 Gateway HTTP port for this local runtime.
    *
-   * @return S3 Gateway port
+   * @return S3 Gateway port, or -1 when the S3 Gateway is disabled
    */
   int getS3gPort();
 
   /**
    * Returns the full S3 Gateway endpoint shown to users.
    *
-   * @return S3 Gateway endpoint, including scheme, host, and port
+   * @return S3 Gateway endpoint, including scheme, host, and port; empty when the S3 Gateway is disabled
    */
   String getS3Endpoint();
+
+  /**
+   * Returns the Recon HTTP port for this local runtime.
+   *
+   * @return Recon port
+   */
+  int getReconPort();
+
+  /**
+   * Returns the full Recon endpoint shown to users.
+   *
+   * @return Recon endpoint, including scheme, host, and port
+   */
+  String getReconEndpoint();
 
   /**
    * Stops the local runtime and releases resources created during startup.

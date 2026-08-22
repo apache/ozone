@@ -17,12 +17,16 @@
 
 package org.apache.hadoop.ozone.util;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED_DEFAULT;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
@@ -108,6 +112,28 @@ public final class MetricUtil {
       return registry.newQuantiles(quantileName, description,
           sampleName, valueName, interval);
     }).collect(Collectors.toList());
+  }
+
+  /**
+   * Qualifies a metrics-source name with a per-instance component so several
+   * instances can register in one JVM (see
+   * {@code HddsConfigKeys.HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED}).
+   * Returns {@code base} unchanged when {@code component} is null or empty,
+   * so standalone services keep their original registration names.
+   */
+  public static String qualifySourceName(String base, String component) {
+    return component == null || component.isEmpty() ? base
+        : base + "." + component.replaceAll("[^A-Za-z0-9]+", "");
+  }
+
+  /**
+   * Returns {@code component} when metrics-source disambiguation is enabled
+   * in {@code conf}, otherwise null; intended as the argument for
+   * {@link #qualifySourceName(String, String)}-based factory methods.
+   */
+  public static String metricsSourceComponent(ConfigurationSource conf, String component) {
+    return conf.getBoolean(HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED,
+        HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED_DEFAULT) ? component : null;
   }
 
   public static void stop(MutableQuantiles... quantiles) {

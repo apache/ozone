@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
 /**
@@ -34,26 +35,44 @@ public final class HttpServer2Metrics implements MetricsSource {
 
   public static final String SOURCE_NAME = HttpServer2Metrics.class.getSimpleName();
 
-  public static final String NAME = HttpServer2Metrics.class.getSimpleName();
-
   private final QueuedThreadPool threadPool;
   private final String name;
+  private final String sourceName;
 
-  private HttpServer2Metrics(QueuedThreadPool threadPool, String name) {
+  private HttpServer2Metrics(QueuedThreadPool threadPool, String name, String sourceName) {
     this.threadPool = threadPool;
     this.name = name;
+    this.sourceName = sourceName;
   }
 
   public static HttpServer2Metrics create(
       QueuedThreadPool threadPool, String name) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(NAME, "HttpServer2 Metrics",
-        new HttpServer2Metrics(threadPool, name));
+    return ms.register(SOURCE_NAME, "HttpServer2 Metrics",
+        new HttpServer2Metrics(threadPool, name, SOURCE_NAME));
+  }
+
+  public static HttpServer2Metrics create(
+      QueuedThreadPool threadPool, String name, String component) {
+    if (component == null) {
+      return create(threadPool, name);
+    }
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    // Several servers of one service can share a component (e.g. the
+    // datanodes of ozone local all name their HTTP server the same), so
+    // probe for a free name; start order makes the result deterministic.
+    String base = MetricUtil.qualifySourceName(SOURCE_NAME, component);
+    String sourceName = base;
+    for (int i = 1; ms.getSource(sourceName) != null; i++) {
+      sourceName = base + i;
+    }
+    return ms.register(sourceName, "HttpServer2 Metrics",
+        new HttpServer2Metrics(threadPool, name, sourceName));
   }
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME)
+    MetricsRecordBuilder recordBuilder = collector.addRecord(sourceName)
         .setContext("HttpServer2")
         .tag(HttpServer2MetricsInfo.SERVER_NAME, name);
 
@@ -69,7 +88,7 @@ public final class HttpServer2Metrics implements MetricsSource {
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(NAME);
+    ms.unregisterSource(sourceName);
   }
 
   enum HttpServer2MetricsInfo implements MetricsInfo {
