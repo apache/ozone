@@ -724,10 +724,13 @@ public class KeyManagerImpl implements KeyManager {
     if (grpcBlockTokenEnabled) {
       String remoteUser = getRemoteUser().getShortUserName();
       for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-        key.getLocationList().forEach(k -> {
-          k.setToken(secretManager.generateToken(remoteUser, k.getBlockID(),
-              EnumSet.of(READ), k.getLength()));
-        });
+        for (List<OmKeyLocationInfo> locationInfoList :
+            key.getLocationLists()) {
+          locationInfoList.forEach(k -> {
+            k.setToken(secretManager.generateToken(remoteUser, k.getBlockID(),
+                EnumSet.of(READ), k.getLength()));
+          });
+        }
       }
     }
   }
@@ -2263,34 +2266,37 @@ public class KeyManagerImpl implements KeyManager {
           LOG.warn("No location for key {}", keyInfo);
           continue;
         }
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          Pipeline pipeline = k.getPipeline();
-          List<DatanodeDetails> nodes = pipeline.getNodes();
-          if (nodes.isEmpty()) {
-            LOG.warn("No datanodes in pipeline {}", pipeline.getId());
-            continue;
-          }
-
-          final Set<String> uuidSet = nodes.stream().map(DatanodeDetails::getUuidString)
-              .collect(Collectors.toSet());
-
-          List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
-          if (sortedNodes == null) {
-            sortedNodes = sortDatanodes(nodes, clientMachine);
-            // Cache only a freshly sorted order, not an input list returned
-            // unchanged when no sort happens: that order is per-pipeline and must
-            // not be reused for another pipeline with the same node set. The read
-            // sort always returns a new list, so this never skips caching here; it
-            // keeps the pattern identical to the write path.
-            if (sortedNodes != null && sortedNodes != nodes) {
-              sortedPipelines.put(uuidSet, sortedNodes);
+        for (List<OmKeyLocationInfo> locationInfoList :
+            key.getLocationLists()) {
+          for (OmKeyLocationInfo k : locationInfoList) {
+            Pipeline pipeline = k.getPipeline();
+            List<DatanodeDetails> nodes = pipeline.getNodes();
+            if (nodes.isEmpty()) {
+              LOG.warn("No datanodes in pipeline {}", pipeline.getId());
+              continue;
             }
-          } else if (LOG.isDebugEnabled()) {
-            LOG.debug("Found sorted datanodes for pipeline {} and client {} "
-                + "in cache", pipeline.getId(), clientMachine);
-          }
-          if (!Objects.equals(pipeline.getNodesInOrder(), sortedNodes)) {
-            k.setPipeline(pipeline.copyWithNodesInOrder(sortedNodes));
+
+            final Set<String> uuidSet = nodes.stream().map(DatanodeDetails::getUuidString)
+                .collect(Collectors.toSet());
+
+            List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
+            if (sortedNodes == null) {
+              sortedNodes = sortDatanodes(nodes, clientMachine);
+              // Cache only a freshly sorted order, not an input list returned
+              // unchanged when no sort happens: that order is per-pipeline and must
+              // not be reused for another pipeline with the same node set. The read
+              // sort always returns a new list, so this never skips caching here; it
+              // keeps the pattern identical to the write path.
+              if (sortedNodes != null && sortedNodes != nodes) {
+                sortedPipelines.put(uuidSet, sortedNodes);
+              }
+            } else if (LOG.isDebugEnabled()) {
+              LOG.debug("Found sorted datanodes for pipeline {} and client {} "
+                  + "in cache", pipeline.getId(), clientMachine);
+            }
+            if (!Objects.equals(pipeline.getNodesInOrder(), sortedNodes)) {
+              k.setPipeline(pipeline.copyWithNodesInOrder(sortedNodes));
+            }
           }
         }
       }
@@ -2569,7 +2575,8 @@ public class KeyManagerImpl implements KeyManager {
   @Nonnull
   private Stream<Long> extractContainerIDs(OmKeyInfo keyInfo) {
     return keyInfo.getKeyLocationVersions().stream()
-        .flatMap(v -> v.getLocationList().stream())
+        .flatMap(v -> v.getLocationLists().stream())
+        .flatMap(List::stream)
         .map(BlockLocationInfo::getContainerID);
   }
 }
