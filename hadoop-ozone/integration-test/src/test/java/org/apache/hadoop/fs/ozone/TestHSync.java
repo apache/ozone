@@ -1289,6 +1289,45 @@ public class TestHSync {
   }
 
   @Test
+  public void testUsedNamespaceWithRepeatedHsync() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final Path file = new Path(dir, "file-hsync-used-namespace");
+
+    OzoneVolume volume = client.getObjectStore().getVolume(bucket.getVolumeName());
+    final long usedNamespace = volume.getBucket(bucket.getName()).getUsedNamespace();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      try (FSDataOutputStream out = fs.create(file, true)) {
+        // Each new block makes the client send an hsync commit to OM. Only the
+        // first commit adds the key name, the rest re-commit the same key.
+        byte[] blockData = RandomStringUtils.secure().nextAlphabetic(BLOCK_SIZE)
+            .getBytes(UTF_8);
+        for (int i = 0; i < 4; i++) {
+          out.write(blockData);
+          out.hsync();
+        }
+      }
+      // One key name was added, no matter how many commits it took.
+      assertEquals(usedNamespace + 1,
+          volume.getBucket(bucket.getName()).getUsedNamespace());
+
+      assertTrue(fs.delete(file, false));
+      // OzoneBucket reports usedNamespace as live plus pending-delete namespace
+      // (RpcClient sets it from getTotalBucketNamespace), so the refund becomes
+      // visible to the client once the deleting services purge the key.
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
+          volume.getBucket(bucket.getName()).getUsedNamespace() == usedNamespace,
+          100, 30000);
+    }
+  }
+
+  @Test
   public void testNormalKeyOverwriteHSyncKey() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",

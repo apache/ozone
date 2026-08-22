@@ -511,6 +511,25 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     assertEquals(1000, thirdCommitUsedBytes - usedBytes);
   }
 
+  @Test
+  public void testCommitWithHsyncUsedNamespace() throws Exception {
+    BucketLayout bucketLayout = getBucketLayout();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, bucketLayout);
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
+
+    // Three commits of the same key by the same client: two hsync re-commits
+    // and the final close. Only one key name is ever added.
+    doKeyCommit(true, allocatedKeyLocationList.subList(0, 3));
+    doKeyCommit(true, allocatedKeyLocationList.subList(0, 6));
+    doKeyCommit(false, allocatedKeyLocationList);
+
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(1, bucketInfo.getUsedNamespace());
+  }
+
   private Map<String, RepeatedOmKeyInfo> doKeyCommit(boolean isHSync,
       List<KeyLocation> keyLocations) throws Exception {
     // allocated block list
