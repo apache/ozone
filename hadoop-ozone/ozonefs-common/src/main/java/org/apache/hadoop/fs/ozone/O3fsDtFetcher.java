@@ -70,8 +70,13 @@ public class O3fsDtFetcher implements DtFetcher {
     if (!url.startsWith(getServiceName().toString())) {
       url = getServiceName().toString() + "://" + url;
     }
-    LOG.debug("addDelegationTokens from {} renewer {}.", url, renewer);
-    FileSystem fs = FileSystem.get(URI.create(url), conf);
+    return addDelegationTokens(conf, creds, renewer, URI.create(url));
+  }
+
+  protected Token<?> addDelegationTokens(Configuration conf, Credentials creds,
+      String renewer, URI uri) throws IOException {
+    LOG.debug("addDelegationTokens from {} renewer {}.", uri, renewer);
+    FileSystem fs = FileSystem.get(uri, conf);
     Token<?> token = fs.getDelegationToken(renewer);
     if (token == null) {
       LOG.error(FETCH_FAILED);
