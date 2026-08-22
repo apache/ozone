@@ -899,7 +899,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public void revokeSTSToken(String tempAccessKeyId, String originalAccessKeyId) throws IOException {
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException {
   }
 
   @Override

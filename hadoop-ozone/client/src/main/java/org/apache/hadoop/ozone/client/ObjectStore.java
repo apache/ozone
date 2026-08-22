@@ -813,13 +813,12 @@ public class ObjectStore {
   }
 
   /**
-   * Revokes an STS token.
-   * @param tempAccessKeyId         The temporary access key ID to revoke
-   * @param originalAccessKeyId     The original long-lived access key ID that created the token
+   * Revokes STS tokens for the given original access key ID.
+   * @param originalAccessKeyId     The original long-lived access key ID whose STS tokens to revoke
    * @throws IOException            if an error occurs while revoking the STS token
    */
-  public void revokeSTSToken(String tempAccessKeyId, String originalAccessKeyId) throws IOException  {
-    proxy.revokeSTSToken(tempAccessKeyId, originalAccessKeyId);
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException  {
+    proxy.revokeSTSToken(originalAccessKeyId);
   }
 
   /**
