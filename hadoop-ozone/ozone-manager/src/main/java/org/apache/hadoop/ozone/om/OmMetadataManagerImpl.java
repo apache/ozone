@@ -1959,7 +1959,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     for (OmKeyInfo info : omKeyInfo.cloneOmKeyInfoList()) {
       for (OmKeyLocationInfoGroup keyLocations :
           info.getKeyLocationVersions()) {
-        List<DeletedBlock> item = keyLocations.getLocationList().stream()
+        List<DeletedBlock> item = keyLocations.getLocationLists().stream()
+            .flatMap(List::stream)
             .map(b -> new DeletedBlock(
                 new BlockID(b.getContainerID(), b.getLocalID()),
                 b.getLength(),
