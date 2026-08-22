@@ -618,8 +618,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
         }
         LOG.debug("initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
-        stub.withDeadlineAfter(timeout, TimeUnit.SECONDS)
-            .send(new ReadyAwareResponseObserver(dn, streamObserver));
+        // No deadline: it would bound the entire long-lived streaming call. Per-request timeliness is
+        // enforced by streamReadTimeout in streamRead() and StreamingReader.poll().
+        stub.send(new ReadyAwareResponseObserver(dn, streamObserver));
         return;
       } catch (IOException e) {
         LOG.error("Failed to start streaming read to DataNode {}", dn, e);
