@@ -444,7 +444,8 @@ public class ReplicasVerify extends Handler {
       }
     }
 
-    return new KeyVerificationResult(keyNode, keyPass, failedVerificationTypes, shouldRefreshKeyLocation, refreshChecks);
+    return new KeyVerificationResult(
+        keyNode, keyPass, failedVerificationTypes, shouldRefreshKeyLocation, refreshChecks);
   }
 
   private static final class KeyVerificationResult {
