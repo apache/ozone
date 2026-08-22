@@ -29,22 +29,17 @@ import picocli.CommandLine.Option;
 /**
  * Executes revocation of STS tokens.
  *
- * <p>This command marks the specified STS access key pair as revoked by adding its revoke
- * key to the OM's revoked STS token table. Subsequent S3 requests using the same temporary
- * credentials will be rejected once the revocation state has propagated.</p>
+ * <p>This command records a revocation cutoff for the given original access key ID in the OM's
+ * revoked STS token table. Subsequent S3 requests using STS tokens created before that cutoff
+ * will be rejected once the revocation state has propagated.</p>
  */
 @Command(name = "revokeststoken",
-    description = "Revoke S3 STS token for the given temporary and original access key IDs")
+    description = "Revoke S3 STS tokens for the given original access key ID")
 public class RevokeSTSTokenHandler extends S3Handler {
-
-  @Option(names = {"-t", "--temp-access-key-id"},
-      required = true,
-      description = "Temporary access key ID to revoke")
-  private String tempAccessKeyId;
 
   @Option(names = {"-o", "--original-access-key-id"},
       required = true,
-      description = "Original long-lived access key ID that created the token")
+      description = "Original long-lived access key ID whose STS tokens should be revoked")
   private String originalAccessKeyId;
 
   @Option(names = "-y",
@@ -62,8 +57,7 @@ public class RevokeSTSTokenHandler extends S3Handler {
 
     if (!yes) {
       out().print(
-          "Enter 'y' to confirm STS token revocation for tempAccessKeyId '" + tempAccessKeyId +
-          "' and originalAccessKeyId '" + originalAccessKeyId + "': ");
+          "Enter 'y' to confirm STS token revocation for originalAccessKeyId '" + originalAccessKeyId + "': ");
       out().flush();
       final Scanner scanner = new Scanner(new InputStreamReader(System.in, StandardCharsets.UTF_8));
       final String confirmation = scanner.next().trim().toLowerCase();
@@ -73,9 +67,7 @@ public class RevokeSTSTokenHandler extends S3Handler {
       }
     }
 
-    client.getObjectStore().revokeSTSToken(tempAccessKeyId, originalAccessKeyId);
-    out().println(
-        "STS token revoked for tempAccessKeyId '" + tempAccessKeyId + "' and originalAccessKeyId '" +
-        originalAccessKeyId + "'.");
+    client.getObjectStore().revokeSTSToken(originalAccessKeyId);
+    out().println("STS tokens revoked for originalAccessKeyId '" + originalAccessKeyId + "'.");
   }
 }
