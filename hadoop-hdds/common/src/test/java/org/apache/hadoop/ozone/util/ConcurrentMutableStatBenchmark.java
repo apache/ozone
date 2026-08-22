@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.util;
 
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -112,7 +113,7 @@ public class ConcurrentMutableStatBenchmark {
             }
             barrier.await();
           }
-        } catch (Exception e) {
+        } catch (InterruptedException | BrokenBarrierException e) {
           Thread.currentThread().interrupt();
         }
       });
@@ -141,7 +142,7 @@ public class ConcurrentMutableStatBenchmark {
             }
             barrier.await();
           }
-        } catch (Exception e) {
+        } catch (InterruptedException | BrokenBarrierException e) {
           Thread.currentThread().interrupt();
         }
       });
@@ -206,7 +207,9 @@ public class ConcurrentMutableStatBenchmark {
       });
     }
     start.countDown();
-    done.await(60, TimeUnit.SECONDS);
+    if (!done.await(60, TimeUnit.SECONDS)) {
+      throw new AssertionError("steady-state threads did not finish within 60 s");
+    }
     pool.shutdownNow();
     pool.awaitTermination(5, TimeUnit.SECONDS);
     return (double) totalOps.sum() / STEADY_MEASURE_MS;
@@ -247,7 +250,9 @@ public class ConcurrentMutableStatBenchmark {
       });
     }
     start.countDown();
-    done.await(60, TimeUnit.SECONDS);
+    if (!done.await(60, TimeUnit.SECONDS)) {
+      throw new AssertionError("steady-state threads did not finish within 60 s");
+    }
     pool.shutdownNow();
     pool.awaitTermination(5, TimeUnit.SECONDS);
     return (double) totalOps.sum() / STEADY_MEASURE_MS;

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -100,7 +101,7 @@ public class TestConcurrentMutableStat {
       });
     }
     start.countDown();
-    done.await(30, TimeUnit.SECONDS);
+    assertTrue(done.await(30, TimeUnit.SECONDS));
     pool.shutdown();
 
     assertEquals((long) threads * addsPerThread, stat.lastStat().numSamples());
@@ -120,7 +121,7 @@ public class TestConcurrentMutableStat {
         done.countDown();
       });
     }
-    done.await(10, TimeUnit.SECONDS);
+    assertTrue(done.await(10, TimeUnit.SECONDS));
     pool.shutdown();
 
     SampleStat last = stat.lastStat();
@@ -142,7 +143,7 @@ public class TestConcurrentMutableStat {
         done.countDown();
       });
     }
-    done.await(10, TimeUnit.SECONDS);
+    assertTrue(done.await(10, TimeUnit.SECONDS));
     pool.shutdown();
 
     assertEquals(10.0, stat.lastStat().min(), 0.001);
