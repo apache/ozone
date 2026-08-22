@@ -82,6 +82,11 @@ public class ReplicasVerify extends Handler {
       description = "Print results for all passing and failing keys")
   private boolean allResults;
 
+  @CommandLine.Option(names = {"--refresh-from-scm"},
+      description = "Force OM to refresh container locations from SCM before returning key info. " +
+          "This can slow down verification but may avoid stale location results from OM cache.")
+  private boolean refreshContainerLocationsFromScm;
+
   @CommandLine.ArgGroup(exclusive = false, multiplicity = "1")
   private Verification verification;
 
@@ -334,7 +339,7 @@ public class ReplicasVerify extends Handler {
       ArrayNode keysArray, AtomicBoolean allKeysPassed) throws IOException {
     keysProcessed.incrementAndGet();
     OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
-        volumeName, bucketName, keyName, false);
+        volumeName, bucketName, keyName, refreshContainerLocationsFromScm);
 
     // Check if key should be processed based on replication config
     if (!shouldProcessKeyByReplicationType(keyInfo)) {

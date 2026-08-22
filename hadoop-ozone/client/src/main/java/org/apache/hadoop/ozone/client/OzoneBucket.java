@@ -499,6 +499,16 @@ public class OzoneBucket extends WithMetadata {
         .createKey(volumeName, name, key, size, replicationConfig, keyMetadata, tags);
   }
 
+  public OzoneOutputStream createKey(String key, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata,
+      Map<String, String> tags,
+      boolean derivedKeyPiggyBacking)
+      throws IOException {
+    return proxy
+        .createKey(volumeName, name, key, size, replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
+  }
+
   /**
    * This API allows to atomically update an existing key. The key read before invoking this API
    * should remain unchanged for this key to be written. This is controlled by the generation
@@ -539,6 +549,13 @@ public class OzoneBucket extends WithMetadata {
         replicationConfig, metadata, tags);
   }
 
+  public OzoneOutputStream createKeyIfNotExists(String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return proxy.createKeyIfNotExists(volumeName, name, keyName, size,
+        replicationConfig, metadata, tags, derivedKeyPiggyBacking);
+  }
+
   /**
    * Rewrites a key only if its ETag matches (S3 If-Match semantics).
    *
@@ -557,6 +574,15 @@ public class OzoneBucket extends WithMetadata {
       throws IOException {
     return proxy.rewriteKeyIfMatch(volumeName, name, keyName, size,
         expectedETag, replicationConfig, metadata, tags);
+  }
+
+  public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking)
+      throws IOException {
+    return proxy.rewriteKeyIfMatch(volumeName, name, keyName, size,
+        expectedETag, replicationConfig, metadata, tags, derivedKeyPiggyBacking);
   }
 
   /**
@@ -614,6 +640,17 @@ public class OzoneBucket extends WithMetadata {
         replicationConfig, keyMetadata, tags);
   }
 
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking)
+      throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKey(volumeName, name, key, size,
+        replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
+  }
+
   /**
    * Creates a key with datastream only if it does not exist already
    * (S3 If-None-Match: * semantics).
@@ -634,6 +671,16 @@ public class OzoneBucket extends WithMetadata {
     }
     return proxy.createStreamKeyIfNotExists(volumeName, name, key, size,
         replicationConfig, keyMetadata, tags);
+  }
+
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKeyIfNotExists(volumeName, name, key, size,
+        replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
   }
 
   /**
@@ -658,6 +705,18 @@ public class OzoneBucket extends WithMetadata {
     }
     return proxy.rewriteStreamKeyIfMatch(volumeName, name, key, size,
         expectedETag, replicationConfig, keyMetadata, tags);
+  }
+
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking)
+      throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.rewriteStreamKeyIfMatch(volumeName, name, key, size,
+        expectedETag, replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
   }
 
   /**
@@ -921,6 +980,14 @@ public class OzoneBucket extends WithMetadata {
         uploadID);
   }
 
+  public OzoneOutputStream createMultipartKey(String key, long size,
+                                              int partNumber, String uploadID,
+                                              boolean derivedKeyPiggyBacking)
+      throws IOException {
+    return proxy.createMultipartKey(volumeName, name, key, size, partNumber,
+        uploadID, derivedKeyPiggyBacking);
+  }
+
   /**
    * Create a part key for a multipart upload key.
    * @param key
@@ -934,6 +1001,12 @@ public class OzoneBucket extends WithMetadata {
       long size, int partNumber, String uploadID) throws IOException {
     return proxy.createMultipartStreamKey(volumeName, name,
             key, size, partNumber, uploadID);
+  }
+
+  public OzoneDataStreamOutput createMultipartStreamKey(String key,
+      long size, int partNumber, String uploadID, boolean derivedKeyPiggyBacking) throws IOException {
+    return proxy.createMultipartStreamKey(volumeName, name,
+            key, size, partNumber, uploadID, derivedKeyPiggyBacking);
   }
 
   /**
