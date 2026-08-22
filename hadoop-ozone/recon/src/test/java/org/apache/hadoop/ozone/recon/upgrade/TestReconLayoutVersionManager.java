@@ -32,6 +32,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
@@ -94,6 +96,11 @@ public class TestReconLayoutVersionManager {
     doNothing().when(mockConnection).setAutoCommit(false);
     doNothing().when(mockConnection).commit();
     doNothing().when(mockConnection).rollback();
+    DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+    ResultSet tables = mock(ResultSet.class);
+    when(mockConnection.getMetaData()).thenReturn(metadata);
+    when(metadata.getTables(any(), any(), any(), any())).thenReturn(tables);
+    when(tables.next()).thenReturn(false);
   }
 
   @AfterEach
@@ -292,6 +299,25 @@ public class TestReconLayoutVersionManager {
 
     // Verify that no schema version updates were attempted
     verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt(), eq(mockConnection));
+  }
+
+  @Test
+  public void testTaskStatusRepairDoesNotChangeMlv() throws Exception {
+    ReconUpgradeAction repairAction = mock(ReconUpgradeAction.class);
+    when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
+    mockedEnum.when(ReconLayoutFeature::values)
+        .thenReturn(new ReconLayoutFeature[]{});
+
+    ReconLayoutVersionManager manager = new ReconLayoutVersionManager(
+        schemaVersionTableManager, mock(ReconContext.class), mockDataSource,
+        repairAction);
+
+    manager.finalizeLayoutFeatures();
+
+    verify(repairAction).execute(mockDataSource);
+    verify(schemaVersionTableManager, never())
+        .updateSchemaVersion(anyInt(), eq(mockConnection));
+    assertEquals(2, manager.getCurrentMLV());
   }
 
   /**
