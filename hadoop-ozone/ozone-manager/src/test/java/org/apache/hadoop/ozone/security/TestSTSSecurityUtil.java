@@ -99,6 +99,7 @@ public class TestSTSSecurityUtil {
     assertThat(result.getRoleArn()).isEqualTo(ROLE_ARN);
     assertThat(result.getSecretAccessKey()).isEqualTo(SECRET_ACCESS_KEY);
     assertThat(result.getSessionPolicy()).isEqualTo(SESSION_POLICY);
+    assertThat(result.getCreationTime()).isEqualTo(clock.instant());
     assertThat(result.isExpired(clock.instant())).isFalse();
     final long expirationEpochMillis = result.getExpiry().toEpochMilli();
     assertThat(expirationEpochMillis).isEqualTo(clock.millis() + (DURATION_SECONDS * 1000));
@@ -342,8 +343,7 @@ public class TestSTSSecurityUtil {
 
   @Test
   public void testEnsureEssentialFieldsArePresentInTokenMissingExpiry() {
-    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, null, SECRET_ACCESS_KEY, SESSION_POLICY, ENCRYPTION_KEY);
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(paramsBuilder().setExpiry(null).build());
 
     assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
         .isInstanceOf(SecretManager.InvalidToken.class)
@@ -352,8 +352,7 @@ public class TestSTSSecurityUtil {
 
   @Test
   public void testEnsureEssentialFieldsArePresentInTokenMissingTempAccessKeyId() {
-    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
-        null, ORIGINAL_ACCESS_KEY, ROLE_ARN, clock.instant(), SECRET_ACCESS_KEY, SESSION_POLICY, ENCRYPTION_KEY);
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(paramsBuilder().setTempAccessKeyId(null).build());
 
     assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
         .isInstanceOf(SecretManager.InvalidToken.class)
@@ -362,8 +361,7 @@ public class TestSTSSecurityUtil {
 
   @Test
   public void testEnsureEssentialFieldsArePresentInTokenMissingRoleArn() {
-    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, null, clock.instant(), SECRET_ACCESS_KEY, SESSION_POLICY, ENCRYPTION_KEY);
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(paramsBuilder().setRoleArn(null).build());
 
     assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
         .isInstanceOf(SecretManager.InvalidToken.class)
@@ -373,7 +371,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testEnsureEssentialFieldsArePresentInTokenMissingOriginalAccessKeyId() {
     final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
-        TEMP_ACCESS_KEY, null, ROLE_ARN, clock.instant(), SECRET_ACCESS_KEY, SESSION_POLICY, ENCRYPTION_KEY);
+        paramsBuilder().setOriginalAccessKeyId(null).build());
 
     assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
         .isInstanceOf(SecretManager.InvalidToken.class)
@@ -382,8 +380,7 @@ public class TestSTSSecurityUtil {
 
   @Test
   public void testEnsureEssentialFieldsArePresentInTokenMissingSecretAccessKey() {
-    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, clock.instant(), null, SESSION_POLICY, ENCRYPTION_KEY);
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(paramsBuilder().setSecretAccessKey(null).build());
 
     assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
         .isInstanceOf(SecretManager.InvalidToken.class)
@@ -391,22 +388,12 @@ public class TestSTSSecurityUtil {
   }
 
   @Test
-  public void testBuildRevokedStsTokenKeyPutsTempAccessKeyIdFirst() {
-    final String tempAccessKeyId = "ASIAABCDEFGHIJKLMNOP";
-    final String originalAccessKeyId = "orig|inal\\access";
-    final String revokedStsTokenKey = STSSecurityUtil.buildRevokedStsTokenKey(tempAccessKeyId, originalAccessKeyId);
+  public void testEnsureEssentialFieldsArePresentInTokenMissingCreationTime() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(paramsBuilder().setCreationTime(null).build());
 
-    assertThat(revokedStsTokenKey).isEqualTo(tempAccessKeyId + "|" + originalAccessKeyId);
-  }
-
-  @Test
-  public void testBuildRevokedStsTokenKeyRejectsEmptyComponents() {
-    assertThatThrownBy(() -> STSSecurityUtil.buildRevokedStsTokenKey("", "orig"))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("tempAccessKeyId is null or empty");
-    assertThatThrownBy(() -> STSSecurityUtil.buildRevokedStsTokenKey("temp", ""))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("originalAccessKeyId is null or empty");
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - creationTime is null");
   }
 
   @Test
@@ -479,5 +466,17 @@ public class TestSTSSecurityUtil {
 
     // Should not throw
     STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+  }
+
+  private STSTokenIdentifier.Params.Builder paramsBuilder() {
+    return STSTokenIdentifier.Params.newBuilder()
+        .setTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setRoleArn(ROLE_ARN)
+        .setCreationTime(clock.instant())
+        .setExpiry(clock.instant().plusSeconds(DURATION_SECONDS))
+        .setSecretAccessKey(SECRET_ACCESS_KEY)
+        .setSessionPolicy(SESSION_POLICY)
+        .setEncryptionKey(ENCRYPTION_KEY);
   }
 }

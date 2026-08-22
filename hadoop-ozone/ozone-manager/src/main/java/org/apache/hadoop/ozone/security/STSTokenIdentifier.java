@@ -46,6 +46,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   private String originalAccessKeyId;
   private String secretAccessKey;
   private String sessionPolicy;
+  private Instant creationTime;
 
   // Encryption key derived from ManagedSecretKey for this token
   private transient byte[] encryptionKey;
@@ -63,23 +64,131 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   /**
    * Create a new STS token identifier with encryption support.
    *
-   * @param tempAccessKeyId     the temporary access key ID (owner)
-   * @param originalAccessKeyId the original long-lived access key ID that created this token
-   * @param roleArn             the ARN of the assumed role
-   * @param expiry              the token expiration time
-   * @param secretAccessKey     the secret access key associated with the temporary access key ID
-   * @param sessionPolicy       an optional opaque identifier that further limits the scope of
-   *                            the permissions granted by the role
-   * @param encryptionKey       the key bytes for encrypting sensitive fields
+   * @param params the STS token creation parameters
    */
-  public STSTokenIdentifier(String tempAccessKeyId, String originalAccessKeyId, String roleArn, Instant expiry,
-      String secretAccessKey, String sessionPolicy, byte[] encryptionKey) {
-    super(tempAccessKeyId, expiry);
-    this.originalAccessKeyId = originalAccessKeyId;
-    this.roleArn = roleArn;
-    this.secretAccessKey = secretAccessKey;
-    this.sessionPolicy = sessionPolicy;
-    this.encryptionKey = encryptionKey != null ? encryptionKey.clone() : null;
+  public STSTokenIdentifier(Params params) {
+    super(params.getTempAccessKeyId(), params.getExpiry());
+    this.originalAccessKeyId = params.getOriginalAccessKeyId();
+    this.roleArn = params.getRoleArn();
+    this.creationTime = params.getCreationTime();
+    this.secretAccessKey = params.getSecretAccessKey();
+    this.sessionPolicy = params.getSessionPolicy();
+    this.encryptionKey = params.encryptionKey != null ? params.encryptionKey.clone() : null;
+  }
+
+  /**
+   * Parameters for constructing an {@link STSTokenIdentifier}.
+   */
+  public static final class Params {
+    private final String tempAccessKeyId;
+    private final String originalAccessKeyId;
+    private final String roleArn;
+    private final Instant creationTime;
+    private final Instant expiry;
+    private final String secretAccessKey;
+    private final String sessionPolicy;
+    private final byte[] encryptionKey;
+
+    private Params(Builder builder) {
+      this.tempAccessKeyId = builder.tempAccessKeyId;
+      this.originalAccessKeyId = builder.originalAccessKeyId;
+      this.roleArn = builder.roleArn;
+      this.creationTime = builder.creationTime;
+      this.expiry = builder.expiry;
+      this.secretAccessKey = builder.secretAccessKey;
+      this.sessionPolicy = builder.sessionPolicy;
+      this.encryptionKey = builder.encryptionKey;
+    }
+
+    public static Builder newBuilder() {
+      return new Builder();
+    }
+
+    public String getTempAccessKeyId() {
+      return tempAccessKeyId;
+    }
+
+    public String getOriginalAccessKeyId() {
+      return originalAccessKeyId;
+    }
+
+    public String getRoleArn() {
+      return roleArn;
+    }
+
+    public Instant getCreationTime() {
+      return creationTime;
+    }
+
+    public Instant getExpiry() {
+      return expiry;
+    }
+
+    public String getSecretAccessKey() {
+      return secretAccessKey;
+    }
+
+    public String getSessionPolicy() {
+      return sessionPolicy;
+    }
+
+    /**
+     * Builder for {@link Params}.
+     */
+    public static final class Builder {
+      private String tempAccessKeyId;
+      private String originalAccessKeyId;
+      private String roleArn;
+      private Instant creationTime;
+      private Instant expiry;
+      private String secretAccessKey;
+      private String sessionPolicy;
+      private byte[] encryptionKey;
+
+      public Builder setTempAccessKeyId(String value) {
+        this.tempAccessKeyId = value;
+        return this;
+      }
+
+      public Builder setOriginalAccessKeyId(String value) {
+        this.originalAccessKeyId = value;
+        return this;
+      }
+
+      public Builder setRoleArn(String value) {
+        this.roleArn = value;
+        return this;
+      }
+
+      public Builder setCreationTime(Instant value) {
+        this.creationTime = value;
+        return this;
+      }
+
+      public Builder setExpiry(Instant value) {
+        this.expiry = value;
+        return this;
+      }
+
+      public Builder setSecretAccessKey(String value) {
+        this.secretAccessKey = value;
+        return this;
+      }
+
+      public Builder setSessionPolicy(String value) {
+        this.sessionPolicy = value;
+        return this;
+      }
+
+      public Builder setEncryptionKey(byte[] value) {
+        this.encryptionKey = value;
+        return this;
+      }
+
+      public Params build() {
+        return new Params(this);
+      }
+    }
   }
 
   @Override
@@ -123,6 +232,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
 
     builder
         .setType(OMTokenProto.Type.S3_STS_TOKEN)
+        .setIssueDate(creationTime.toEpochMilli())
         .setMaxDate(getExpiry().toEpochMilli())
         .setOwner(getOwnerId() != null ? getOwnerId() : "")
         .setAccessKeyId(getOwnerId() != null ? getOwnerId() : "")
@@ -146,6 +256,9 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     setOwnerId(token.getOwner());
     setExpiry(Instant.ofEpochMilli(token.getMaxDate()));
 
+    if (token.hasIssueDate()) {
+      this.creationTime = Instant.ofEpochMilli(token.getIssueDate());
+    }
     if (token.hasOriginalAccessKeyId()) {
       this.originalAccessKeyId = token.getOriginalAccessKeyId();
     }
@@ -244,6 +357,10 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     return sessionPolicy;
   }
 
+  public Instant getCreationTime() {
+    return creationTime;
+  }
+
   public void setEncryptionKey(byte[] encryptionKey) {
     this.encryptionKey = encryptionKey.clone();
   }
@@ -265,13 +382,13 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     final STSTokenIdentifier that = (STSTokenIdentifier) o;
     return Objects.equals(roleArn, that.roleArn) && Objects.equals(secretAccessKey, that.secretAccessKey) &&
         Objects.equals(originalAccessKeyId, that.originalAccessKeyId) &&
-        Objects.equals(sessionPolicy, that.sessionPolicy);
+        Objects.equals(sessionPolicy, that.sessionPolicy) && Objects.equals(creationTime, that.creationTime);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-        super.hashCode(), roleArn, secretAccessKey, originalAccessKeyId, sessionPolicy);
+        super.hashCode(), roleArn, secretAccessKey, originalAccessKeyId, sessionPolicy, creationTime);
   }
 
   @Override
@@ -279,7 +396,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     // Intentionally left off secretAccessKey
     return "STSTokenIdentifier{" + "tempAccessKeyId='" + getOwnerId() + "'" +
         ", originalAccessKeyId='" + originalAccessKeyId + "', roleArn='" + roleArn + "'" +
-        ", expiry='" + getExpiry() + "', secretKeyId='" + getSecretKeyId() + "'" +
-        ", sessionPolicy='" + sessionPolicy + "'}";
+        ", creationTime='" + creationTime + "', expiry='" + getExpiry() + "', secretKeyId='" + getSecretKeyId() +
+        "', sessionPolicy='" + sessionPolicy + "'}";
   }
 }
