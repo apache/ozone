@@ -255,6 +255,17 @@ Configure STS Profile With Bogus Credential Part
         Configure STS Profile     ${STS_ACCESS_KEY_ID}  ${STS_SECRET_KEY}  bogusSessionToken
     END
 
+Verify STS Token Revocation And Post Revocation Assume Role
+    [Arguments]                   ${bucket}  ${role_arn}  ${revoker_user}  ${revoker_keytab}
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
+    Get Object Should Succeed     ${bucket}  ${ICEBERG_BUCKET_TESTFILE}
+    Kinit test user               ${revoker_user}               ${revoker_keytab}
+    ${output} =                   Execute                       ozone s3 revokeststoken -o ${PERMANENT_ACCESS_KEY_ID} -y ${OM_HA_PARAM}
+    Should Contain                ${output}                     STS tokens revoked for originalAccessKeyId
+    Get Object Should Fail        ${bucket}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
+    Get Object Should Succeed     ${bucket}  ${ICEBERG_BUCKET_TESTFILE}
+
 *** Test Cases ***
 Create User in Ranger
     ${user_json} =                Set Variable                  { "loginId": "${ICEBERG_SVC_CATALOG_USER}", "name": "${ICEBERG_SVC_CATALOG_USER}", "password": "Password123", "firstName": "Iceberg REST", "lastName": "Catalog", "emailAddress": "${ICEBERG_SVC_CATALOG_USER}@example.com", "userRoleList": ["ROLE_USER"], "userPermList": [ { "moduleId": 1, "isAllowed": 1 }, { "moduleId": 3, "isAllowed": 1 }, { "moduleId": 7, "isAllowed": 1 } ] }
@@ -557,34 +568,30 @@ Verify Token Revocation via CLI
     ...    ${ICEBERG_BUCKET_OBS}    ${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
     ...    ${ICEBERG_BUCKET_FSO}    ${ICEBERG_ALL_ACCESS_ROLE_FSO_ARN}
         # Owner of the original access key can revoke the STS token.
-        Assume Role And Configure STS Profile                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
-        Kinit test user           ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
-        ${output} =               Execute                       ozone s3 revokeststoken -t ${STS_ACCESS_KEY_ID} -o ${PERMANENT_ACCESS_KEY_ID} -y ${OM_HA_PARAM}
-        Should Contain            ${output}                     STS token revoked for tempAccessKeyId
-        # Trying to use the token for even get-object should now fail.
-        Get Object Should Fail    ${bucket}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
-
+        Verify STS Token Revocation And Post Revocation Assume Role  ${bucket}  ${role_arn}  ${ICEBERG_SVC_CATALOG_USER}  ${ICEBERG_SVC_CATALOG_USER}.keytab
         # S3 admin can also revoke an STS token owned by another user.
-        Assume Role And Configure STS Profile                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
-        Kinit test user           ${TEST_USER_ADMIN}            ${TEST_USER_ADMIN}.keytab
-        ${output} =               Execute                       ozone s3 revokeststoken -t ${STS_ACCESS_KEY_ID} -o ${PERMANENT_ACCESS_KEY_ID} -y ${OM_HA_PARAM}
-        Should Contain            ${output}                     STS token revoked for tempAccessKeyId
-        Get Object Should Fail    ${bucket}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+        Verify STS Token Revocation And Post Revocation Assume Role  ${bucket}  ${role_arn}  ${TEST_USER_ADMIN}  ${TEST_USER_ADMIN}.keytab
     END
 
 Non-Admin Cannot Revoke STS Token
     FOR    ${role_arn}    IN    ${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}    ${ICEBERG_ALL_ACCESS_ROLE_FSO_ARN}
         # Create a token first.
         Assume Role And Get Temporary Credentials               perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
-        ${temp_key_to_revoke} =   Set Variable                  ${STS_ACCESS_KEY_ID}
 
         # Kinit as non-admin user.
         Kinit test user           ${TEST_USER_NON_ADMIN}        ${TEST_USER_NON_ADMIN}.keytab
 
         # Try to revoke - should give USER_MISMATCH error.
-        ${output} =               Execute And Ignore Error      ozone s3 revokeststoken -o ${PERMANENT_ACCESS_KEY_ID} -t ${temp_key_to_revoke} -y ${OM_HA_PARAM}
+        ${output} =               Execute And Ignore Error      ozone s3 revokeststoken -o ${PERMANENT_ACCESS_KEY_ID} -y ${OM_HA_PARAM}
         Should Contain            ${output}                     USER_MISMATCH
     END
+
+Revoke STS Token Should Fail For Unknown Original Access Key Id
+    # Revoking a bogus originalAccessKeyId must fail before writing to the revocation table.
+    Kinit test user               ${TEST_USER_ADMIN}            ${TEST_USER_ADMIN}.keytab
+    ${output} =                   Execute And Ignore Error      ozone s3 revokeststoken -o bogus-original-access-key-id -y ${OM_HA_PARAM}
+    Should Contain                ${output}                     INVALID_REQUEST
+    Should Contain                ${output}                     does not exist
 
 List Objects V1 and V2 IAM Session Policy Matrix for OBS and FSO
     Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
