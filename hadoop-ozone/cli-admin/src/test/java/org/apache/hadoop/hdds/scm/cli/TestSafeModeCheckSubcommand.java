@@ -107,8 +107,7 @@ public class TestSafeModeCheckSubcommand {
   }
 
   /**
-   * An empty entry is what the producer emits for a peer with no address, so
-   * it reaches leader detection like any other role string.
+   * Verify that leader detection skips invalid role strings and checks later entries.
    */
   @ParameterizedTest
   @ValueSource(strings = {"", "Exception Occurred, No leader found"})

@@ -110,8 +110,7 @@ public class TestStorageContainerManagerRatisRoles {
   }
 
   /**
-   * An empty entry is what the producer emits for a peer with no address, so
-   * it reaches this view like any other role string.
+   * Verify that the JMX view reports invalid role strings as an error row.
    */
   @ParameterizedTest
   @ValueSource(strings = {"", "scm1.example.com:9894"})
