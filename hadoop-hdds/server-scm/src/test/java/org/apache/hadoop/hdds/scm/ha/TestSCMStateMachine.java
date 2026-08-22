@@ -36,7 +36,7 @@ public class TestSCMStateMachine {
   @Test
   public void testRatisEventsRecording() throws Exception {
     StorageContainerManager scm = mock(StorageContainerManager.class);
-    SCMMetrics metrics = SCMMetrics.create();
+    SCMMetrics metrics = SCMMetrics.create("scm1");
     when(scm.getMetrics()).thenReturn(metrics);
 
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
