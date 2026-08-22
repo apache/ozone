@@ -110,6 +110,11 @@ public enum S3ErrorTable {
       "AccessDenied", "User doesn't have the right to access this " +
       "resource.", HTTP_FORBIDDEN),
 
+  SIGNATURE_DOES_NOT_MATCH(
+      "SignatureDoesNotMatch", "The request signature we calculated does not " +
+      "match the signature you provided. Check your key and signing method.",
+      HTTP_FORBIDDEN),
+
   PRECOND_FAILED(
       "PreconditionFailed", "At least one of the pre-conditions you " +
       "specified did not hold", HTTP_PRECON_FAILED),

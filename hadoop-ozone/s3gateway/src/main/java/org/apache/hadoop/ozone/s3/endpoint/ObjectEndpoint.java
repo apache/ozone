@@ -271,6 +271,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           length, amzDecodedLength, keyPath);
       multiDigestInputStream = chunkInputStreamInfo.getMultiDigestInputStream();
       length = chunkInputStreamInfo.getEffectiveLength();
+      final boolean wantDerivedKey = wantsChunkSignatureVerification(chunkInputStreamInfo);
 
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
@@ -285,7 +286,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, getChunkSize(),
                 customMetadata, tags, multiDigestInputStream, getHeaders(),
-                signatureInfo.isSignPayload(), perf, writeConditions);
+                signatureInfo.isSignPayload(), perf, writeConditions,
+                wantDerivedKey,
+                derivedKey -> attachChunkValidator(chunkInputStreamInfo, derivedKey));
         md5Hash = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
@@ -295,11 +298,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         try (S3ObjectWriteGuard output =
             new S3ObjectWriteGuard(openKeyForPut(
                 volume.getName(), bucketName, keyPath, expectedLength,
-                replicationConfig, customMetadata, tags, writeConditions),
+                replicationConfig, customMetadata, tags, writeConditions, wantDerivedKey),
                 expectedLength, keyPath)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
+          attachChunkValidator(chunkInputStreamInfo, output.getDerivedKey());
           putLength = output.copyFrom(multiDigestInputStream, getIOBufferSize(expectedLength));
           md5Hash = DatatypeConverter.printHexBinary(
                   multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
@@ -916,6 +920,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           body, length, amzDecodedLength, key);
       multiDigestInputStream = chunkInputStreamInfo.getMultiDigestInputStream();
       length = chunkInputStreamInfo.getEffectiveLength();
+      final boolean wantDerivedKey = wantsChunkSignatureVerification(chunkInputStreamInfo);
 
       copyHeader = getHeaders().getHeaderString(COPY_SOURCE_HEADER);
       ReplicationConfig replicationConfig = getReplicationConfig(ozoneBucket);
@@ -931,7 +936,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         perf.appendStreamMode();
         return ObjectEndpointStreaming
             .createMultipartKey(ozoneBucket, key, length, partNumber,
-                uploadID, getChunkSize(), multiDigestInputStream, perf, getHeaders());
+                uploadID, getChunkSize(), multiDigestInputStream, perf, getHeaders(),
+                wantDerivedKey,
+                derivedKey -> attachChunkValidator(chunkInputStreamInfo, derivedKey));
       }
       // OmMultipartCommitUploadPartInfo can only be gotten after the
       // OzoneOutputStream is closed, so we need to save the OzoneOutputStream
@@ -1019,11 +1026,15 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       } else {
         long putLength;
         final long expectedLength = length;
-        OzoneOutputStream ozoneOutputStream = getClientProtocol()
-            .createMultipartKey(volume.getName(), bucketName, key, expectedLength, partNumber, uploadID);
+        OzoneOutputStream ozoneOutputStream = wantDerivedKey
+            ? getClientProtocol().createMultipartKey(volume.getName(), bucketName, key,
+                expectedLength, partNumber, uploadID, true)
+            : getClientProtocol().createMultipartKey(volume.getName(), bucketName, key,
+                expectedLength, partNumber, uploadID);
         try (S3ObjectWriteGuard writeGuard = new S3ObjectWriteGuard(ozoneOutputStream, expectedLength, key)) {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
+          attachChunkValidator(chunkInputStreamInfo, writeGuard.getDerivedKey());
           putLength = writeGuard.copyFrom(multiDigestInputStream, getIOBufferSize(expectedLength));
           byte[] digest = multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest();
           String md5Hash = DatatypeConverter.printHexBinary(digest).toLowerCase();
@@ -1284,6 +1295,34 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       return getClientProtocol().createKey(
           volumeName, bucketName, keyPath, length, replicationConfig,
           customMetadata, tags);
+    }
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  private OzoneOutputStream openKeyForPut(String volumeName, String bucketName, String keyPath, long length,
+      ReplicationConfig replicationConfig, Map<String, String> customMetadata,
+      Map<String, String> tags,
+      S3ConditionalRequest.WriteConditions writeConditions, boolean derivedKeyPiggyBacking)
+      throws IOException {
+    // Only signed multi-chunk uploads ask OM to piggyback the derived key; every
+    // other PUT uses the same client call as before.
+    if (!derivedKeyPiggyBacking) {
+      return openKeyForPut(volumeName, bucketName, keyPath, length, replicationConfig,
+          customMetadata, tags, writeConditions);
+    }
+    if (writeConditions.hasIfNoneMatch()) {
+      return getClientProtocol().createKeyIfNotExists(
+          volumeName, bucketName, keyPath, length, replicationConfig,
+          customMetadata, tags, true);
+    } else if (writeConditions.hasIfMatch()) {
+      return getClientProtocol().rewriteKeyIfMatch(
+          volumeName, bucketName, keyPath, length,
+          writeConditions.getExpectedETag(),
+          replicationConfig, customMetadata, tags, true);
+    } else {
+      return getClientProtocol().createKey(
+          volumeName, bucketName, keyPath, length, replicationConfig,
+          customMetadata, tags, true);
     }
   }
 

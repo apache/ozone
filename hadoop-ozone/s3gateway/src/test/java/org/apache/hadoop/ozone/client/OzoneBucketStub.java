@@ -293,6 +293,36 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return createStreamKey(key, size, rConfig, keyMetadata, tags);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return createStreamKeyIfNotExists(key, size, rConfig, keyMetadata, tags);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return rewriteStreamKeyIfMatch(key, size, expectedETag, rConfig, keyMetadata, tags);
+  }
+
+  @Override
+  public OzoneDataStreamOutput createMultipartStreamKey(String key, long size,
+      int partNumber, String uploadID, boolean derivedKeyPiggyBacking) throws IOException {
+    return createMultipartStreamKey(key, size, partNumber, uploadID);
+  }
+
+  @Override
   public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
       ReplicationConfig rConfig, Map<String, String> keyMetadata,
       Map<String, String> tags) throws IOException {

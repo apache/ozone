@@ -21,9 +21,13 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
+import org.apache.kerby.util.Hex;
 
 /**
  * Input stream implementation to read body of a signed chunked upload. This should also work
@@ -53,8 +57,9 @@ import java.util.regex.Pattern;
  * </p>
  *
  * <p>
- * Note that there are no actual chunk signature verification taking place. The InputStream only
- * returns the actual chunk payload from chunked signatures format.
+ * If a {@link ChunksValidator} is supplied, the signature of each chunk is verified (in real time, without
+ * buffering the whole chunk) as the payload is read. Without a validator the stream only strips the chunk
+ * signatures format and returns the payload.
  * </p>
  *
  * Reference:
@@ -72,9 +77,21 @@ import java.util.regex.Pattern;
 public class SignedChunksInputStream extends InputStream {
 
   private final Pattern signatureLinePattern =
-      Pattern.compile("([0-9A-Fa-f]+);chunk-signature=.*");
+      Pattern.compile("([0-9A-Fa-f]+);chunk-signature=(.*)");
 
   private final InputStream originalStream;
+
+  /** Verifies each chunk signature, or {@code null} to skip verification. */
+  private ChunksValidator validator;
+
+  /** SHA-256 of the current chunk payload; {@code null} when not verifying. */
+  private MessageDigest chunkDigest;
+
+  /** Set on the first read; blocks attaching a validator once reading began. */
+  private boolean readStarted;
+
+  /** Signature parsed from the current chunk header line. */
+  private String chunkSignature;
 
   /**
    * Size of the chunk payload. If zero, the signature line should be parsed to
@@ -89,28 +106,61 @@ public class SignedChunksInputStream extends InputStream {
   private boolean isFinalChunkEncountered = false;
 
   public SignedChunksInputStream(InputStream inputStream) {
-    originalStream = inputStream;
+    this(inputStream, null);
+  }
+
+  public SignedChunksInputStream(InputStream inputStream, ChunksValidator validator) {
+    this.originalStream = inputStream;
+    this.validator = validator;
+    this.chunkDigest = validator == null ? null : newSha256();
+  }
+
+  /**
+   * Enable chunk-signature verification. Used when the signing key (derived by
+   * OM, see HDDS-15140) only becomes available after the key is opened, i.e.
+   * after this stream is constructed. Must be called before the first read and
+   * at most once.
+   */
+  public void attachValidator(ChunksValidator chunksValidator) {
+    Objects.requireNonNull(chunksValidator, "chunksValidator == null");
+    if (readStarted) {
+      throw new IllegalStateException(
+          "Cannot attach a validator after reading has started");
+    }
+    if (validator != null) {
+      throw new IllegalStateException("A validator is already attached");
+    }
+    this.validator = chunksValidator;
+    this.chunkDigest = newSha256();
   }
 
   @Override
   public int read() throws IOException {
+    readStarted = true;
     if (isFinalChunkEncountered) {
       return -1;
     }
     if (remainingData > 0) {
       int curr = originalStream.read();
       remainingData--;
+      if (curr != -1) {
+        updateDigest((byte) curr);
+      }
       if (remainingData == 0) {
         //read the "\r\n" at the end of the data section
         originalStream.read();
         originalStream.read();
+        validateChunk();
       }
       return curr;
     } else {
       remainingData = readContentLengthFromHeader();
-      if (remainingData <= 0) {
-        // there is always a final zero byte chunk so we can stop reading
-        // if we encounter this chunk
+      if (remainingData == 0) {
+        // final zero-byte chunk: verify it (empty payload) and stop reading
+        validateChunk();
+        isFinalChunkEncountered = true;
+        return -1;
+      } else if (remainingData < 0) {
         isFinalChunkEncountered = true;
         return -1;
       }
@@ -120,6 +170,7 @@ public class SignedChunksInputStream extends InputStream {
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
+    readStarted = true;
     Objects.requireNonNull(b, "b == null");
     if (off < 0 || len < 0 || len > b.length - off) {
       throw new IndexOutOfBoundsException("Offset=" + off + " and len="
@@ -142,6 +193,7 @@ public class SignedChunksInputStream extends InputStream {
         if (realReadLen == -1) {
           break;
         }
+        updateDigest(b, currentOff, realReadLen);
         currentOff += realReadLen;
         currentLen -= realReadLen;
         totalReadBytes += realReadLen;
@@ -150,12 +202,13 @@ public class SignedChunksInputStream extends InputStream {
           //read the "\r\n" at the end of the data section
           originalStream.read();
           originalStream.read();
+          validateChunk();
         }
       } else {
         remainingData = readContentLengthFromHeader();
         if (remainingData == 0) {
-          // there is always a final zero byte chunk so we can stop reading
-          // if we encounter this chunk
+          // final zero-byte chunk: verify it (empty payload) and stop reading
+          validateChunk();
           isFinalChunkEncountered = true;
         }
         if (isFinalChunkEncountered || remainingData == -1) {
@@ -191,12 +244,43 @@ public class SignedChunksInputStream extends InputStream {
       return -1;
     }
 
-    //parse the data length.
+    //parse the data length and the chunk signature.
     Matcher matcher = signatureLinePattern.matcher(signatureLine);
     if (matcher.matches()) {
+      chunkSignature = matcher.group(2);
       return Integer.parseInt(matcher.group(1), 16);
     } else {
       throw new IOException("Invalid signature line: " + signatureLine);
+    }
+  }
+
+  private void updateDigest(byte b) {
+    if (chunkDigest != null) {
+      chunkDigest.update(b);
+    }
+  }
+
+  private void updateDigest(byte[] b, int off, int len) {
+    if (chunkDigest != null) {
+      chunkDigest.update(b, off, len);
+    }
+  }
+
+  /**
+   * Verify the signature of the chunk just read. {@link MessageDigest#digest()}
+   * also resets the digest for the next chunk. No-op without a validator.
+   */
+  private void validateChunk() {
+    if (validator != null) {
+      validator.validateChunk(chunkSignature, Hex.encode(chunkDigest.digest()).toLowerCase());
+    }
+  }
+
+  private static MessageDigest newSha256() {
+    try {
+      return MessageDigest.getInstance("SHA-256");
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 not available", e);
     }
   }
 }
