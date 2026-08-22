@@ -191,6 +191,31 @@ class TestReplicasVerify {
         .contains("Failed to refresh key location from OM: OM refresh failed");
   }
 
+  @Test
+  void testInitialGetKeyInfoFailureMarksKeyIncompleteAndDoesNotAbortRun() throws Exception {
+    ReplicasVerify replicasVerify = new ReplicasVerify();
+    OzoneClient ozoneClient = mock(OzoneClient.class);
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    when(ozoneClient.getProxy()).thenReturn(proxy);
+    when(proxy.getKeyInfo("vol1", "bucket1", "key1", false))
+        .thenThrow(new IOException("Key not found"));
+
+    ObjectNode root = JsonUtils.createObjectNode(null);
+    ArrayNode keysArray = root.putArray("keys");
+    AtomicBoolean allKeysPassed = new AtomicBoolean(true);
+
+    replicasVerify.processKey(ozoneClient, "vol1", "bucket1", "key1", keysArray, allKeysPassed);
+
+    verify(proxy).getKeyInfo("vol1", "bucket1", "key1", false);
+    verify(proxy, never()).getKeyInfo("vol1", "bucket1", "key1", true);
+    assertFalse(allKeysPassed.get());
+    assertEquals(1, keysArray.size());
+    assertFalse(keysArray.get(0).get("completed").asBoolean());
+    assertFalse(keysArray.get(0).get("pass").asBoolean());
+    assertThat(keysArray.get(0).get("failures").toString())
+        .contains("Failed to fetch key info from OM: Key not found");
+  }
+
   private static boolean isRefreshContainerLocationsFromScmEnabled(ReplicasVerify command) throws Exception {
     Field field = ReplicasVerify.class.getDeclaredField("refreshContainerLocationsFromScm");
     field.setAccessible(true);

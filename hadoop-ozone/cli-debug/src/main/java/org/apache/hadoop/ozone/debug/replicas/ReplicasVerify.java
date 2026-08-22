@@ -338,8 +338,16 @@ public class ReplicasVerify extends Handler {
   void processKey(OzoneClient ozoneClient, String volumeName, String bucketName, String keyName,
       ArrayNode keysArray, AtomicBoolean allKeysPassed) throws IOException {
     keysProcessed.incrementAndGet();
-    OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
-        volumeName, bucketName, keyName, refreshContainerLocationsFromScm);
+    OmKeyInfo keyInfo;
+    try {
+      keyInfo = ozoneClient.getProxy().getKeyInfo(
+          volumeName, bucketName, keyName, refreshContainerLocationsFromScm);
+    } catch (IOException e) {
+      LOG.warn("Unable to fetch key info from OM for key {}/{}/{}; marking verification incomplete.",
+          volumeName, bucketName, keyName, e);
+      markKeyFetchFailure(volumeName, bucketName, keyName, e.getMessage(), keysArray, allKeysPassed);
+      return;
+    }
 
     // Check if key should be processed based on replication config
     if (!shouldProcessKeyByReplicationType(keyInfo)) {
@@ -374,6 +382,21 @@ public class ReplicasVerify extends Handler {
     if (!keyVerificationResult.passed() || allResults) {
       keysArray.add(keyVerificationResult.getKeyNode());
     }
+  }
+
+  private void markKeyFetchFailure(String volumeName, String bucketName, String keyName, String message,
+      ArrayNode keysArray, AtomicBoolean allKeysPassed) {
+    ObjectNode keyNode = JsonUtils.createObjectNode(null);
+    keyNode.put("volumeName", volumeName);
+    keyNode.put("bucketName", bucketName);
+    keyNode.put("name", keyName);
+    keyNode.putArray("blocks");
+    keyNode.put("completed", false);
+    keyNode.put("pass", false);
+    keyNode.putArray("failures").addObject().put("message", "Failed to fetch key info from OM: " + message);
+    keysFailed.incrementAndGet();
+    allKeysPassed.set(false);
+    keysArray.add(keyNode);
   }
 
   private KeyVerificationResult verifyKey(
