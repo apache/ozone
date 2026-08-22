@@ -60,6 +60,8 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -450,6 +452,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         return;
       }
     }
+    if (config.isDatastreamPutBlockOnCloseEnabled() && !close) {
+      executePutBlockCommand(blockData, byteBufferList, flushPos);
+      return;
+    }
     try {
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, tokenString);
@@ -495,6 +501,67 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
+    }
+  }
+
+  private void executePutBlockCommand(BlockData blockData,
+      List<StreamBuffer> byteBufferList, long flushPos) throws IOException {
+    checkOpen();
+    final ContainerCommandRequestProto putBlockRequest =
+        ContainerProtocolCalls.getPutBlockRequest(
+            xceiverClient.getPipeline(), blockData, false, tokenString);
+    final ByteBuffer putBlock = ContainerCommandRequestMessage.toMessage(
+        putBlockRequest, null).getContent().asReadOnlyByteBuffer();
+    RatisHelper.debug(putBlock, "putBlockCommand", LOG);
+    final CompletableFuture<DataStreamReply> commandFuture = out.commandAsync(putBlock);
+    final CompletableFuture<ContainerCommandResponseProto> flushFuture =
+        commandFuture.thenApplyAsync(reply -> {
+          if (reply == null || !reply.isSuccess()) {
+            throw new CompletionException(reply == null ? new IOException("null reply")
+                : new IOException("PutBlock command failed"));
+          }
+          xceiverClient.updateCommitInfosMap(reply.getCommitInfos());
+          try {
+            ContainerCommandResponseProto response = parseCommandResponse(reply);
+            validateResponse(response);
+            if (getIoException() == null && byteBufferList != null) {
+              BlockID responseBlockID = BlockID.getFromProtobuf(
+                  response.getPutBlock().getCommittedBlockLength().getBlockID());
+              Preconditions.checkState(blockID.get().getContainerBlockID()
+                  .equals(responseBlockID.getContainerBlockID()));
+              blockID.set(responseBlockID);
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("PutBlock command succeeded for blockID {} flushLength {}",
+                    blockID, flushPos);
+              }
+              commitWatcher.releaseBuffers(byteBufferList);
+            }
+            return response;
+          } catch (IOException sce) {
+            throw new CompletionException(sce);
+          }
+        }, responseExecutor).exceptionally(e -> {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("PutBlock command failed for blockID {} with exception {}",
+                blockID, e.getLocalizedMessage());
+          }
+          CompletionException ce = new CompletionException(e);
+          setIoException(ce);
+          throw ce;
+        });
+    putBlockFutures.add(flushFuture);
+  }
+
+  static ContainerCommandResponseProto parseCommandResponse(DataStreamReply reply)
+      throws IOException {
+    final ByteBuffer buffer = reply.nioBuffer();
+    if (buffer == null || !buffer.hasRemaining()) {
+      throw new IOException("Empty PutBlock command response");
+    }
+    try {
+      return ContainerCommandResponseProto.parseFrom(ByteString.copyFrom(buffer));
+    } catch (InvalidProtocolBufferException e) {
+      throw new IOException("Failed to parse PutBlock command response", e);
     }
   }
 

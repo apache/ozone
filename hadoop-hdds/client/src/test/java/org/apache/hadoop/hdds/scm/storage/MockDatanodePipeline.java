@@ -78,6 +78,8 @@ public class MockDatanodePipeline {
   private final List<byte[]> receivedChunks = Collections.synchronizedList(new ArrayList<>());
   private final List<ContainerCommandRequestProto> receivedPutBlocks = Collections.synchronizedList(new ArrayList<>());
   private final AtomicInteger watchForCommitCount = new AtomicInteger(0);
+  private final AtomicInteger commandAsyncPutBlockCount = new AtomicInteger(0);
+  private final AtomicInteger raftPutBlockCount = new AtomicInteger(0);
   private volatile Type streamInitType;
 
   // Commit tracking
@@ -139,6 +141,7 @@ public class MockDatanodePipeline {
       if (request.getCmdType() == Type.PutBlock) {
         receivedPutBlocks.add(request);
         int count = putBlockCount.incrementAndGet();
+        raftPutBlockCount.incrementAndGet();
         CompletableFuture<ContainerCommandResponseProto> f = new CompletableFuture<>();
         if (count > putBlockFailAfter && putBlockFailure != null) {
           f.completeExceptionally(putBlockFailure.get());
@@ -202,6 +205,21 @@ public class MockDatanodePipeline {
       return CompletableFuture.completedFuture(dataStreamReply(data.length));
     }).when(mockDataStreamOutput).writeAsync(any(ByteBuffer.class), any(Iterable.class));
 
+    doAnswer(invocation -> {
+      ByteBuffer buffer = invocation.getArgument(0);
+      ContainerCommandRequestProto request = decodePutBlockRequest(buffer);
+      receivedPutBlocks.add(request);
+      int count = putBlockCount.incrementAndGet();
+      commandAsyncPutBlockCount.incrementAndGet();
+      if (count > putBlockFailAfter && putBlockFailure != null) {
+        CompletableFuture<DataStreamReply> failed = new CompletableFuture<>();
+        failed.completeExceptionally(putBlockFailure.get());
+        return failed;
+      }
+      return CompletableFuture.completedFuture(
+          commandDataStreamReply(buildPutBlockResponse(blockID)));
+    }).when(mockDataStreamOutput).commandAsync(any(ByteBuffer.class));
+
     // Mock XceiverClientFactory
     this.clientFactory = mock(XceiverClientFactory.class);
     doReturn(xceiverClient).when(clientFactory).acquireClient(any(Pipeline.class), anyBoolean());
@@ -236,6 +254,14 @@ public class MockDatanodePipeline {
 
   public int getWatchForCommitCount() {
     return watchForCommitCount.get();
+  }
+
+  public int getCommandAsyncPutBlockCount() {
+    return commandAsyncPutBlockCount.get();
+  }
+
+  public int getRaftPutBlockCount() {
+    return raftPutBlockCount.get();
   }
 
   public Type getStreamInitType() {
@@ -302,12 +328,31 @@ public class MockDatanodePipeline {
         .build();
   }
 
+  private static ContainerCommandRequestProto decodePutBlockRequest(ByteBuffer buffer)
+      throws IOException {
+    ByteBuffer dup = buffer.duplicate();
+    byte[] bytes = new byte[dup.remaining()];
+    dup.get(bytes);
+    return ContainerCommandRequestMessage.toProto(ByteString.copyFrom(bytes), null);
+  }
+
   private static DataStreamReply dataStreamReply(long bytesWritten) {
     DataStreamReply reply = mock(DataStreamReply.class);
     when(reply.isSuccess()).thenReturn(true);
     when(reply.getBytesWritten()).thenReturn(bytesWritten);
     when(reply.getDataLength()).thenReturn(bytesWritten);
     when(reply.getCommitInfos()).thenReturn(Collections.emptyList());
+    return reply;
+  }
+
+  private static DataStreamReply commandDataStreamReply(
+      ContainerCommandResponseProto response) {
+    DataStreamReply reply = mock(DataStreamReply.class);
+    when(reply.isSuccess()).thenReturn(true);
+    when(reply.getBytesWritten()).thenReturn(0L);
+    when(reply.getDataLength()).thenReturn((long) response.getSerializedSize());
+    when(reply.getCommitInfos()).thenReturn(Collections.emptyList());
+    when(reply.nioBuffer()).thenReturn(response.toByteString().asReadOnlyByteBuffer());
     return reply;
   }
 }

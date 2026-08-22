@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.client.rpc;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.createStreamKey;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.getDatanodeService;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.validateData;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import java.nio.ByteBuffer;
@@ -30,7 +32,10 @@ import java.util.stream.Stream;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -46,12 +51,16 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests the containerStateMachine stream handling.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class TestContainerStateMachineStream implements NonHATests.TestCase {
+  private static final int STREAM_CHUNK_SIZE = 100;
+  private static final int STREAM_FLUSH_SIZE = 400;
+
   private OzoneClient client;
   private String volumeName;
   private String bucketName;
@@ -81,15 +90,25 @@ public abstract class TestContainerStateMachineStream implements NonHATests.Test
             Arguments.of(offset, putBlockOnCloseEnabled)));
   }
 
+  private OzoneConfiguration clientConf(boolean putBlockOnCloseEnabled) {
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
+    clientConfig.setDataStreamMinPacketSize(STREAM_CHUNK_SIZE);
+    clientConfig.setDataStreamBufferFlushSize(STREAM_FLUSH_SIZE);
+    clientConfig.setStreamBufferSize(STREAM_CHUNK_SIZE);
+    clientConfig.setStreamBufferFlushSize(STREAM_FLUSH_SIZE);
+    clientConfig.setStreamWindowSize(5 * STREAM_CHUNK_SIZE);
+    conf.setFromObject(clientConfig);
+    return conf;
+  }
+
   @ParameterizedTest
   @MethodSource("streamingParameters")
   void testContainerStateMachineForStreaming(int offset, boolean putBlockOnCloseEnabled)
       throws Exception {
     final int size = chunkSize + offset;
-    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
-    conf.setFromObject(clientConfig);
+    OzoneConfiguration conf = clientConf(putBlockOnCloseEnabled);
 
     final List<OmKeyLocationInfo> locationInfoList;
     try (OzoneClient streamingClient = OzoneClientFactory.getRpcClient(conf);
@@ -117,6 +136,29 @@ public abstract class TestContainerStateMachineStream implements NonHATests.Test
     assertThat(bytesUsed)
         // container may have previous data
         .isGreaterThanOrEqualTo(size);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testMidStreamFlushPutBlockCommitPath(boolean putBlockOnCloseEnabled) throws Exception {
+    final int dataLength = 500;
+    OzoneConfiguration conf = clientConf(putBlockOnCloseEnabled);
+    XceiverClientMetrics metrics = XceiverClientManager.getXceiverClientMetrics();
+    long putBlockCount = metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock);
+    String keyName = "mid-flush-" + putBlockOnCloseEnabled + "-" + UUID.randomUUID();
+    byte[] data = ContainerTestHelper.generateData(dataLength, true);
+
+    try (OzoneClient streamingClient = OzoneClientFactory.getRpcClient(conf);
+         OzoneDataStreamOutput key = createStreamKey(keyName, ReplicationType.RATIS, dataLength,
+             streamingClient.getObjectStore(), volumeName, bucketName)) {
+      key.write(ByteBuffer.wrap(data));
+    }
+
+    validateData(keyName, data, client.getObjectStore(), volumeName, bucketName);
+
+    int expectedRaftPutBlocks = putBlockOnCloseEnabled ? 0 : 2;
+    assertEquals(putBlockCount + expectedRaftPutBlocks,
+        metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
   }
 
 }

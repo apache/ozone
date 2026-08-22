@@ -117,6 +117,27 @@ class TestBlockDataStreamOutput {
     assertArrayEquals(data, pipeline.getAllReceivedData());
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void writeFlushBoundaryPutBlockPath(boolean putBlockOnCloseEnabled) throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
+    byte[] data = randomBytes(400);
+    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
+      stream.write(ByteBuffer.wrap(data), 0, data.length);
+      assertEquals(4, pipeline.getReceivedChunks().size());
+      assertEquals(1, pipeline.getReceivedPutBlocks().size());
+      if (putBlockOnCloseEnabled) {
+        assertEquals(1, pipeline.getCommandAsyncPutBlockCount());
+        assertEquals(0, pipeline.getRaftPutBlockCount());
+      } else {
+        assertEquals(0, pipeline.getCommandAsyncPutBlockCount());
+        assertEquals(1, pipeline.getRaftPutBlockCount());
+      }
+    }
+  }
+
   @Test
   void writeFlushBoundaryTriggersPutBlock() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();

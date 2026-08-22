@@ -321,7 +321,8 @@ public class OzoneClientConfig {
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       description = "When enabled, use StreamInitWithPutBlock so datanodes commit PutBlock " +
-          "when the Ratis data stream closes instead of via a separate WriteAsync PutBlock.",
+          "when the Ratis data stream closes instead of via a separate WriteAsync PutBlock. " +
+          "Mid-stream flush PutBlocks are sent through DataStream commandAsync.",
       tags = ConfigTag.CLIENT)
   private boolean datastreamPutBlockOnCloseEnabled = false;
 
