@@ -830,6 +830,27 @@ public class TestOzoneManagerStateMachine {
   // --- notifySnapshotInstalled tests ---
 
   @Test
+  public void testNotifyInstallSnapshotFromLeaderSuccess() throws Exception {
+    TermIndex termIndex = TermIndex.valueOf(1, 10);
+    when(om.installSnapshotFromLeader("leader-om")).thenReturn(termIndex);
+
+    CompletableFuture<TermIndex> future = sm.notifyInstallSnapshotFromLeader(
+        roleInfoWithLeader("leader-om"), TermIndex.valueOf(1, 11));
+
+    assertEquals(termIndex, future.get());
+  }
+
+  @Test
+  public void testNotifyInstallSnapshotFromLeaderFailure() {
+    CompletableFuture<TermIndex> future = sm.notifyInstallSnapshotFromLeader(
+        roleInfoWithLeader("leader-om"), TermIndex.valueOf(1, 11));
+
+    ExecutionException exception = assertThrows(ExecutionException.class, future::get);
+
+    assertInstanceOf(IOException.class, exception.getCause());
+  }
+
+  @Test
   public void testNotifySnapshotInstalledSuccess() {
     RaftPeer localPeer = RaftPeer.newBuilder()
         .setId("om1").setAddress("localhost:9862").build();
@@ -1041,6 +1062,15 @@ public class TestOzoneManagerStateMachine {
         .setMessage(Message.valueOf(
             OMRatisHelper.convertRequestToByteString(omRequest)))
         .setType(RaftClientRequest.writeRequestType())
+        .build();
+  }
+
+  private RaftProtos.RoleInfoProto roleInfoWithLeader(String leaderId) {
+    return RaftProtos.RoleInfoProto.newBuilder()
+        .setFollowerInfo(RaftProtos.FollowerInfoProto.newBuilder()
+            .setLeaderInfo(RaftProtos.ServerRpcProto.newBuilder()
+                .setId(RaftProtos.RaftPeerProto.newBuilder()
+                    .setId(ByteString.copyFromUtf8(leaderId)))))
         .build();
   }
 
