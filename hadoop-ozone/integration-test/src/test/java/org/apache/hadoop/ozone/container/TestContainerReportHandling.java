@@ -21,7 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.waitForContainerClose;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -53,7 +53,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.container.TestHelper.ReplicationInput;
+import org.apache.hadoop.ozone.container.OzoneTestHelper.ReplicationInput;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -164,7 +164,7 @@ public class TestContainerReportHandling {
         // flips to CLOSED as soon as the first replica is reported CLOSED, so a lagging replica may still be CLOSING in
         // SCM. Deleting then races with that lagging CLOSING report, which would resurrect the container out of
         // DELETING/DELETED and the replicas would never be deleted.
-        TestHelper.waitForReplicaState(containerManager, containerID, replicationInput.getNumDatanodes(),
+        OzoneTestHelper.waitForReplicaState(containerManager, containerID, replicationInput.getNumDatanodes(),
             ContainerReplicaProto.State.CLOSED);
 
         // move the container to DELETING
@@ -190,7 +190,7 @@ public class TestContainerReportHandling {
   private void waitForContainerClosedInSCM(ContainerID containerID)
       throws TimeoutException, InterruptedException {
     for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
-      TestHelper.waitForContainerStateInSCM(scm, containerID, LifeCycleState.CLOSED);
+      OzoneTestHelper.waitForContainerStateInSCM(scm, containerID, LifeCycleState.CLOSED);
     }
   }
 

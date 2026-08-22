@@ -58,7 +58,7 @@ import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.junit.jupiter.api.AfterEach;
@@ -210,12 +210,12 @@ public class TestFailureHandlingByClientFlushDelay {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
                                       long size) throws Exception {
-    return TestHelper
+    return OzoneTestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    TestHelper
+    OzoneTestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

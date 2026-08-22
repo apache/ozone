@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSCon
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.net.InetAddresses;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -289,13 +291,28 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         LOG.error("SCM Ratis PeerInetAddress {} is unresolvable",
             peer.getAddress());
       }
-      ratisRoles.add((peer.getAddress() == null ? "" :
-          peer.getAddress().concat(peer.equals(leader) ?
-                  ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
-                  ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
-                  .concat(":".concat(peer.getId().toString()))
-                  .concat(":".concat(peerInetAddress == null ? "" :
-                      peerInetAddress.getHostAddress()))));
+      if (peer.getAddress() == null) {
+        ratisRoles.add("");
+        continue;
+      }
+      String host = HddsUtils.getHostName(peer.getAddress()).orElse("");
+      OptionalInt portOpt = HddsUtils.getHostPort(peer.getAddress());
+      if (!portOpt.isPresent()) {
+        LOG.error("SCM Ratis peer address {} has no port, skipping",
+            peer.getAddress());
+        continue;
+      }
+      String normalizedAddress = HddsUtils.getHostPortString(host, portOpt.getAsInt());
+      String role = peer.equals(leader)
+          ? RaftProtos.RaftPeerRole.LEADER.toString()
+          : RaftProtos.RaftPeerRole.FOLLOWER.toString();
+      String hostIp = "";
+      if (peerInetAddress != null) {
+        hostIp = InetAddresses.toUriString(peerInetAddress);
+      }
+      String roleEntry = normalizedAddress + ":" + role + ":"
+          + peer.getId().toString() + ":" + hostIp;
+      ratisRoles.add(roleEntry);
     }
     return ratisRoles;
   }
