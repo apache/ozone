@@ -134,6 +134,7 @@ public class TestBlockDeletingService {
   private String schemaVersion;
   private int blockLimitPerInterval;
   private MutableVolumeSet volumeSet;
+  private BlockDeletingService blockDeletingService;
   private static final int BLOCK_CHUNK_SIZE = 100;
 
   @BeforeEach
@@ -150,6 +151,10 @@ public class TestBlockDeletingService {
 
   @AfterEach
   public void cleanup() throws IOException {
+    if (blockDeletingService != null) {
+      // Wait for deletion tasks to release container DB references before cleanup.
+      blockDeletingService.shutdown();
+    }
     BlockUtils.shutdownCache(conf);
     CodecBuffer.assertNoLeaks();
   }
@@ -951,7 +956,10 @@ public class TestBlockDeletingService {
       KeyValueHandler keyValueHandler) {
     OzoneContainer ozoneContainer =
         mockDependencies(containerSet, keyValueHandler);
-    return new BlockDeletingServiceTestImpl(ozoneContainer, 1000, config);
+    BlockDeletingServiceTestImpl service =
+        new BlockDeletingServiceTestImpl(ozoneContainer, 1000, config);
+    blockDeletingService = service;
+    return service;
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,
