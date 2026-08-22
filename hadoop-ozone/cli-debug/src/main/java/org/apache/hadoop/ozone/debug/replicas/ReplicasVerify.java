@@ -338,14 +338,69 @@ public class ReplicasVerify extends Handler {
   void processKey(OzoneClient ozoneClient, String volumeName, String bucketName, String keyName,
       ArrayNode keysArray, AtomicBoolean allKeysPassed) throws IOException {
     keysProcessed.incrementAndGet();
-    OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
-        volumeName, bucketName, keyName, refreshContainerLocationsFromScm);
+    OmKeyInfo keyInfo;
+    try {
+      keyInfo = ozoneClient.getProxy().getKeyInfo(
+          volumeName, bucketName, keyName, refreshContainerLocationsFromScm);
+    } catch (IOException e) {
+      LOG.warn("Unable to fetch key info from OM for key {}/{}/{}; marking verification incomplete.",
+          volumeName, bucketName, keyName, e);
+      markKeyFetchFailure(volumeName, bucketName, keyName, e.getMessage(), keysArray, allKeysPassed);
+      return;
+    }
 
     // Check if key should be processed based on replication config
     if (!shouldProcessKeyByReplicationType(keyInfo)) {
       return;
     }
 
+    KeyVerificationResult keyVerificationResult = verifyKey(keyInfo, volumeName, bucketName, keyName);
+    if (keyVerificationResult.shouldRefreshKeyLocation()) {
+      try {
+        OmKeyInfo refreshedKeyInfo = ozoneClient.getProxy().getKeyInfo(
+            volumeName, bucketName, keyName, true);
+        keyVerificationResult = verifyKey(refreshedKeyInfo, volumeName, bucketName, keyName);
+      } catch (IOException e) {
+        LOG.warn("Unable to refresh key location from OM for key {}/{}/{}; marking verification incomplete.",
+            volumeName, bucketName, keyName, e);
+        keyVerificationResult.markRefreshFailure(e.getMessage());
+      }
+    }
+
+    keyVerificationResult.getKeyNode().put("pass", keyVerificationResult.passed());
+    if (keyVerificationResult.passed()) {
+      keysPassed.incrementAndGet();
+    } else {
+      keysFailed.incrementAndGet();
+      allKeysPassed.set(false);
+      keyVerificationResult.getFailedVerificationTypes().forEach(failedType -> failuresByType
+          .computeIfAbsent(failedType, k -> new AtomicInteger(0))
+          .incrementAndGet()
+      );
+    }
+
+    if (!keyVerificationResult.passed() || allResults) {
+      keysArray.add(keyVerificationResult.getKeyNode());
+    }
+  }
+
+  private void markKeyFetchFailure(String volumeName, String bucketName, String keyName, String message,
+      ArrayNode keysArray, AtomicBoolean allKeysPassed) {
+    ObjectNode keyNode = JsonUtils.createObjectNode(null);
+    keyNode.put("volumeName", volumeName);
+    keyNode.put("bucketName", bucketName);
+    keyNode.put("name", keyName);
+    keyNode.putArray("blocks");
+    keyNode.put("completed", false);
+    keyNode.put("pass", false);
+    keyNode.putArray("failures").addObject().put("message", "Failed to fetch key info from OM: " + message);
+    keysFailed.incrementAndGet();
+    allKeysPassed.set(false);
+    keysArray.add(keyNode);
+  }
+
+  private KeyVerificationResult verifyKey(
+      OmKeyInfo keyInfo, String volumeName, String bucketName, String keyName) {
     ObjectNode keyNode = JsonUtils.createObjectNode(null);
     keyNode.put("volumeName", volumeName);
     keyNode.put("bucketName", bucketName);
@@ -353,7 +408,9 @@ public class ReplicasVerify extends Handler {
 
     ArrayNode blocksArray = keyNode.putArray("blocks");
     boolean keyPass = true;
+    boolean shouldRefreshKeyLocation = false;
     Set<String> failedVerificationTypes = new HashSet<>();
+    List<ObjectNode> refreshChecks = new ArrayList<>();
 
     for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
       long containerID = keyLocation.getContainerID();
@@ -383,6 +440,10 @@ public class ReplicasVerify extends Handler {
           checkNode.put("type", verifier.getType());
           checkNode.put("completed", result.isCompleted());
           checkNode.put("pass", result.passed());
+          if (result.shouldRefreshKeyLocation()) {
+            shouldRefreshKeyLocation = true;
+            refreshChecks.add(checkNode);
+          }
 
           ArrayNode failuresArray = checkNode.putArray("failures");
           for (String failure : result.getFailures()) {
@@ -406,20 +467,48 @@ public class ReplicasVerify extends Handler {
       }
     }
 
-    keyNode.put("pass", keyPass);
-    if (keyPass) {
-      keysPassed.incrementAndGet();
-    } else {
-      keysFailed.incrementAndGet();
-      allKeysPassed.set(false);
-      failedVerificationTypes.forEach(failedType -> failuresByType
-          .computeIfAbsent(failedType, k -> new AtomicInteger(0))
-          .incrementAndGet()
-      );
+    return new KeyVerificationResult(
+        keyNode, keyPass, failedVerificationTypes, shouldRefreshKeyLocation, refreshChecks);
+  }
+
+  private static final class KeyVerificationResult {
+    private final ObjectNode keyNode;
+    private final boolean pass;
+    private final Set<String> failedVerificationTypes;
+    private final boolean refreshKeyLocation;
+    private final List<ObjectNode> refreshChecks;
+
+    private KeyVerificationResult(ObjectNode keyNode, boolean pass, Set<String> failedVerificationTypes,
+        boolean refreshKeyLocation, List<ObjectNode> refreshChecks) {
+      this.keyNode = keyNode;
+      this.pass = pass;
+      this.failedVerificationTypes = failedVerificationTypes;
+      this.refreshKeyLocation = refreshKeyLocation;
+      this.refreshChecks = refreshChecks;
     }
 
-    if (!keyPass || allResults) {
-      keysArray.add(keyNode);
+    private ObjectNode getKeyNode() {
+      return keyNode;
+    }
+
+    private boolean passed() {
+      return pass;
+    }
+
+    private Set<String> getFailedVerificationTypes() {
+      return failedVerificationTypes;
+    }
+
+    private boolean shouldRefreshKeyLocation() {
+      return refreshKeyLocation;
+    }
+
+    private void markRefreshFailure(String message) {
+      String refreshFailure = "Failed to refresh key location from OM: " + message;
+      for (ObjectNode checkNode : refreshChecks) {
+        checkNode.put("completed", false);
+        checkNode.withArray("failures").addObject().put("message", refreshFailure);
+      }
     }
   }
 
