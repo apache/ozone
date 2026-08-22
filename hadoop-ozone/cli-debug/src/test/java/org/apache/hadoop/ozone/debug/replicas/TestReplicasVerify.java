@@ -154,6 +154,43 @@ class TestReplicasVerify {
     assertFalse(keysArray.get(0).get("pass").asBoolean());
   }
 
+  @Test
+  void testRefreshFailureMarksKeyIncompleteAndDoesNotAbortRun() throws Exception {
+    ReplicasVerify replicasVerify = new ReplicasVerify();
+    ReplicaVerifier blockExistenceVerifier = mock(ReplicaVerifier.class);
+
+    when(blockExistenceVerifier.getType()).thenReturn("blockExistence");
+    when(blockExistenceVerifier.verifyBlock(any(), any()))
+        .thenReturn(BlockVerificationResult.failCheckAndRefreshKeyLocation("Block not found"));
+    setField(replicasVerify, "replicaVerifiers", Collections.singletonList(blockExistenceVerifier));
+    setField(replicasVerify, "replication", emptyReplicationFilter());
+
+    OzoneClient ozoneClient = mock(OzoneClient.class);
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    when(ozoneClient.getProxy()).thenReturn(proxy);
+    when(proxy.getKeyInfo("vol1", "bucket1", "key1", false))
+        .thenReturn(createKeyInfo(createKeyLocationInfo(1L, 11L)));
+    when(proxy.getKeyInfo("vol1", "bucket1", "key1", true))
+        .thenThrow(new IOException("OM refresh failed"));
+
+    ObjectNode root = JsonUtils.createObjectNode(null);
+    ArrayNode keysArray = root.putArray("keys");
+    AtomicBoolean allKeysPassed = new AtomicBoolean(true);
+
+    replicasVerify.processKey(ozoneClient, "vol1", "bucket1", "key1", keysArray, allKeysPassed);
+
+    verify(proxy).getKeyInfo("vol1", "bucket1", "key1", false);
+    verify(proxy).getKeyInfo("vol1", "bucket1", "key1", true);
+    assertFalse(allKeysPassed.get());
+    assertEquals(1, keysArray.size());
+    assertFalse(keysArray.get(0).get("pass").asBoolean());
+    assertFalse(keysArray.get(0).get("blocks").get(0)
+        .get("replicas").get(0).get("checks").get(0).get("completed").asBoolean());
+    assertThat(keysArray.get(0).get("blocks").get(0)
+        .get("replicas").get(0).get("checks").get(0).get("failures").toString())
+        .contains("Failed to refresh key location from OM: OM refresh failed");
+  }
+
   private static boolean isRefreshContainerLocationsFromScmEnabled(ReplicasVerify command) throws Exception {
     Field field = ReplicasVerify.class.getDeclaredField("refreshContainerLocationsFromScm");
     field.setAccessible(true);

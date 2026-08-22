@@ -348,9 +348,15 @@ public class ReplicasVerify extends Handler {
 
     KeyVerificationResult keyVerificationResult = verifyKey(keyInfo, volumeName, bucketName, keyName);
     if (keyVerificationResult.shouldRefreshKeyLocation()) {
-      OmKeyInfo refreshedKeyInfo = ozoneClient.getProxy().getKeyInfo(
-          volumeName, bucketName, keyName, true);
-      keyVerificationResult = verifyKey(refreshedKeyInfo, volumeName, bucketName, keyName);
+      try {
+        OmKeyInfo refreshedKeyInfo = ozoneClient.getProxy().getKeyInfo(
+            volumeName, bucketName, keyName, true);
+        keyVerificationResult = verifyKey(refreshedKeyInfo, volumeName, bucketName, keyName);
+      } catch (IOException e) {
+        LOG.warn("Unable to refresh key location from OM for key {}/{}/{}; marking verification incomplete.",
+            volumeName, bucketName, keyName, e);
+        keyVerificationResult.markRefreshFailure(e.getMessage());
+      }
     }
 
     keyVerificationResult.getKeyNode().put("pass", keyVerificationResult.passed());
@@ -381,6 +387,7 @@ public class ReplicasVerify extends Handler {
     boolean keyPass = true;
     boolean shouldRefreshKeyLocation = false;
     Set<String> failedVerificationTypes = new HashSet<>();
+    List<ObjectNode> refreshChecks = new ArrayList<>();
 
     for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
       long containerID = keyLocation.getContainerID();
@@ -412,6 +419,7 @@ public class ReplicasVerify extends Handler {
           checkNode.put("pass", result.passed());
           if (result.shouldRefreshKeyLocation()) {
             shouldRefreshKeyLocation = true;
+            refreshChecks.add(checkNode);
           }
 
           ArrayNode failuresArray = checkNode.putArray("failures");
@@ -436,7 +444,7 @@ public class ReplicasVerify extends Handler {
       }
     }
 
-    return new KeyVerificationResult(keyNode, keyPass, failedVerificationTypes, shouldRefreshKeyLocation);
+    return new KeyVerificationResult(keyNode, keyPass, failedVerificationTypes, shouldRefreshKeyLocation, refreshChecks);
   }
 
   private static final class KeyVerificationResult {
@@ -444,13 +452,15 @@ public class ReplicasVerify extends Handler {
     private final boolean pass;
     private final Set<String> failedVerificationTypes;
     private final boolean refreshKeyLocation;
+    private final List<ObjectNode> refreshChecks;
 
     private KeyVerificationResult(ObjectNode keyNode, boolean pass, Set<String> failedVerificationTypes,
-        boolean refreshKeyLocation) {
+        boolean refreshKeyLocation, List<ObjectNode> refreshChecks) {
       this.keyNode = keyNode;
       this.pass = pass;
       this.failedVerificationTypes = failedVerificationTypes;
       this.refreshKeyLocation = refreshKeyLocation;
+      this.refreshChecks = refreshChecks;
     }
 
     private ObjectNode getKeyNode() {
@@ -467,6 +477,14 @@ public class ReplicasVerify extends Handler {
 
     private boolean shouldRefreshKeyLocation() {
       return refreshKeyLocation;
+    }
+
+    private void markRefreshFailure(String message) {
+      String refreshFailure = "Failed to refresh key location from OM: " + message;
+      for (ObjectNode checkNode : refreshChecks) {
+        checkNode.put("completed", false);
+        checkNode.withArray("failures").addObject().put("message", refreshFailure);
+      }
     }
   }
 
