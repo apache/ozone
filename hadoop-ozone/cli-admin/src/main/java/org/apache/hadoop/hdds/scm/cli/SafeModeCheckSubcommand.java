@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
@@ -84,7 +85,7 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     SCMNodeInfo targetNode;
     if (serviceId != null) {
       // HA mode: find leader
-      targetNode = findLeaderNode(scmClient);
+      targetNode = findLeaderNode(scmClient, nodes);
       if (targetNode == null) {
         throw new IOException("Could not determine leader node");
       }
@@ -99,9 +100,12 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
   /**
    * Find the leader node from SCM roles.
    * @param scmClient the SCM client
+   * @param nodes the SCM nodes configured for the service
    * @return the leader SCMNodeInfo
    */
-  private SCMNodeInfo findLeaderNode(ScmClient scmClient) throws IOException {
+  @VisibleForTesting
+  static SCMNodeInfo findLeaderNode(ScmClient scmClient, List<SCMNodeInfo> nodes)
+      throws IOException {
     try {
       List<String> roles = scmClient.getScmRoles();
       for (String role : roles) {
@@ -188,7 +192,7 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
    * Inputs may be bare hosts or host:port strings. Handles IPv6 equivalence
    * (e.g. 2001:db8::1 vs 2001:db8:0:0:0:0:0:1) by resolving to InetAddress.
    */
-  private boolean matchesAddress(String address1, String address2) {
+  private static boolean matchesAddress(String address1, String address2) {
     if (address1.equalsIgnoreCase(address2)) {
       return true;
     }

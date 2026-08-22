@@ -118,11 +118,86 @@ public class TestGetScmRatisRolesSubcommand {
     try (GenericTestUtils.SystemOutCapturer capture =
         new GenericTestUtils.SystemOutCapturer()) {
       cmd.execute(client);
-      assertThat(capture.getOutput()).contains("2001:db8::1");
-      assertThat(capture.getOutput()).contains("9894");
-      assertThat(capture.getOutput()).contains("LEADER");
-      assertThat(capture.getOutput()).contains("e428ca07-b2a3-4756-bf9b-a4abb033c7d1");
-      assertThat(capture.getOutput()).contains("FOLLOWER");
+      // Column widths depend on the rendered content, but the column order and
+      // the value in each one must not shift.
+      assertThat(capture.getOutput()).containsPattern(
+          "\\|\\s+2001:db8::1\\s+\\|\\s+9894\\s+\\|\\s+LEADER\\s+\\|"
+              + "\\s+e428ca07-b2a3-4756-bf9b-a4abb033c7d1\\s+\\|\\s+2001:db8:0:0:0:0:0:1\\s+\\|");
+      assertThat(capture.getOutput()).containsPattern(
+          "\\|\\s+2001:db8::2\\s+\\|\\s+9894\\s+\\|\\s+FOLLOWER\\s+\\|"
+              + "\\s+61b1c8e5-da40-4567-8a17-96a0234ba14e\\s+\\|\\s+2001:db8:0:0:0:0:0:2\\s+\\|");
+    }
+  }
+
+  @Test
+  public void testGetScmRatisRolesJson() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+
+    List<String> result = new ArrayList<>();
+    result.add("scm1.example.com:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:10.0.0.1");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      assertThat(JsonUtils.readTree(capture.getOutput())).isEqualTo(
+          JsonUtils.readTree("{\"scm1.example.com\":{"
+              + "\"address\":\"scm1.example.com:9894\","
+              + "\"raftPeerRole\":\"LEADER\","
+              + "\"ID\":\"e428ca07-b2a3-4756-bf9b-a4abb033c7d1\","
+              + "\"InetAddress\":\"10.0.0.1\"}}"));
+    }
+  }
+
+  @Test
+  public void testGetScmHARatisRolesIPv6Json() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+
+    List<String> result = new ArrayList<>();
+    result.add("[2001:db8::1]:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:[2001:db8:0:0:0:0:0:1]");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      // The address is a connectable target so it keeps its brackets; the
+      // resolved literal in InetAddress is a bare address and stays unbracketed.
+      assertThat(JsonUtils.readTree(capture.getOutput())).isEqualTo(
+          JsonUtils.readTree("{\"2001:db8::1\":{"
+              + "\"address\":\"[2001:db8::1]:9894\","
+              + "\"raftPeerRole\":\"LEADER\","
+              + "\"ID\":\"e428ca07-b2a3-4756-bf9b-a4abb033c7d1\","
+              + "\"InetAddress\":\"2001:db8:0:0:0:0:0:1\"}}"));
+    }
+  }
+
+  @Test
+  public void testGetScmRatisRolesDefaultOutputIsVerbatim() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs();
+
+    List<String> result = new ArrayList<>();
+    result.add("scm1.example.com:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:10.0.0.1");
+    result.add("[2001:db8::1]:9894:FOLLOWER:61b1c8e5-da40-4567-8a17-96a0234ba14e:[2001:db8:0:0:0:0:0:1]");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      for (String role : result) {
+        assertThat(capture.getOutput()).contains(role);
+      }
     }
   }
 
