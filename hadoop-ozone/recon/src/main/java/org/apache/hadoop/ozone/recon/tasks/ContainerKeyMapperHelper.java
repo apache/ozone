@@ -319,7 +319,7 @@ public abstract class ContainerKeyMapperHelper {
     long containerCountToIncrement = 0;
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : omKeyInfo.getKeyLocationVersions()) {
       long keyVersion = omKeyLocationInfoGroup.getVersion();
-      for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoGroup.getLocationList()) {
+      for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoGroup.createLocationList()) {
         long containerId = omKeyLocationInfo.getContainerID();
         ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(containerId, key, keyVersion);
         if (reconContainerMetadataManager.getCountForContainerKeyPrefix(containerKeyPrefix) == 0 &&
@@ -490,7 +490,7 @@ public abstract class ContainerKeyMapperHelper {
 
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : omKeyInfo.getKeyLocationVersions()) {
       long keyVersion = omKeyLocationInfoGroup.getVersion();
-      for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoGroup.getLocationList()) {
+      for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoGroup.createLocationList()) {
         long containerId = omKeyLocationInfo.getContainerID();
         ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(containerId, key, keyVersion);
 
