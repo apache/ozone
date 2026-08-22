@@ -282,6 +282,11 @@ public class TestWatchForCommit {
   }
 
   private void shutdownRatisLeaderAndOneFollower(Pipeline pipeline) throws Exception {
+    // Leader detection and shutdown happen in two steps. This assumes the leader
+    // stays stable in between, which holds here because the pipeline is freshly
+    // formed and idle (no writes in flight), so no Ratis re-election is expected
+    // during the scan. If one did occur, a stale leader could be shut down while
+    // the real leader survives.
     DatanodeDetails leader = null;
     DatanodeDetails follower = null;
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
