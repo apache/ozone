@@ -55,7 +55,11 @@ public class ContainerBalancerSelectionCriteria {
   private Map<ContainerID, DatanodeDetails> containerToSourceMap;
   private Set<ContainerID> excludeContainers;
   private Set<ContainerID> includeContainers;
-  private Set<ContainerID> excludeContainersDueToFailure;
+
+  // excludeContainersDueToFailure: Containers excluded for current iteration only.
+  // excludeContainersNotFound: Container exclusions persist across iterations.
+  private final Set<ContainerID> excludeContainersDueToFailure;
+  private final Set<ContainerID> excludeContainersNotFound;
   private FindSourceStrategy findSourceStrategy;
   private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
 
@@ -66,12 +70,25 @@ public class ContainerBalancerSelectionCriteria {
       ContainerManager containerManager,
       FindSourceStrategy findSourceStrategy,
       Map<ContainerID, DatanodeDetails> containerToSourceMap) {
+    this(balancerConfiguration, nodeManager, replicationManager, containerManager,
+        findSourceStrategy, containerToSourceMap, new HashSet<>());
+  }
+
+  public ContainerBalancerSelectionCriteria(
+      ContainerBalancerConfiguration balancerConfiguration,
+      NodeManager nodeManager,
+      ReplicationManager replicationManager,
+      ContainerManager containerManager,
+      FindSourceStrategy findSourceStrategy,
+      Map<ContainerID, DatanodeDetails> containerToSourceMap,
+      Set<ContainerID> excludeContainersNotFound) {
     this.balancerConfiguration = balancerConfiguration;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
     this.containerToSourceMap = containerToSourceMap;
-    excludeContainersDueToFailure = new HashSet<>();
+    this.excludeContainersDueToFailure = new HashSet<>();
+    this.excludeContainersNotFound = excludeContainersNotFound;
     excludeContainers = balancerConfiguration.getExcludeContainers();
     includeContainers = balancerConfiguration.getIncludeContainers();
     this.findSourceStrategy = findSourceStrategy;
@@ -175,11 +192,13 @@ public class ContainerBalancerSelectionCriteria {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not find Container {} to check if it should be a " +
           "candidate container. Excluding it.", containerID);
+      excludeContainersNotFound.add(containerID);
       return true;
     }
 
     if (excludeContainers.contains(containerID) ||
         excludeContainersDueToFailure.contains(containerID) ||
+        excludeContainersNotFound.contains(containerID) ||
         containerToSourceMap.containsKey(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
         || breaksMaxSizeToMoveLimit(container.containerID(),
@@ -193,6 +212,7 @@ public class ContainerBalancerSelectionCriteria {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
           "this container.", container.getContainerID(), e);
+      excludeContainersNotFound.add(containerID);
       return true;
     }
 
@@ -369,6 +389,14 @@ public class ContainerBalancerSelectionCriteria {
     return excludeContainersDueToFailure;
   }
 
+  public void addToExcludeNotFoundContainers(ContainerID container) {
+    this.excludeContainersNotFound.add(container);
+  }
+
+  Set<ContainerID> getExcludeNotFoundContainers() {
+    return excludeContainersNotFound;
+  }
+
   private NavigableSet<ContainerID> getCandidateContainers(DatanodeDetails node) {
     NavigableSet<ContainerID> newSet =
         new TreeSet<>(orderContainersByUsedBytes().reversed());
@@ -380,9 +408,9 @@ public class ContainerBalancerSelectionCriteria {
       if (excludeContainers != null) {
         idSet.removeAll(excludeContainers);
       }
-      if (excludeContainersDueToFailure != null) {
-        idSet.removeAll(excludeContainersDueToFailure);
-      }
+      idSet.removeAll(excludeContainersDueToFailure);
+      idSet.removeAll(excludeContainersNotFound);
+
       idSet.removeAll(containerToSourceMap.keySet());
       newSet.addAll(idSet);
       return newSet;
