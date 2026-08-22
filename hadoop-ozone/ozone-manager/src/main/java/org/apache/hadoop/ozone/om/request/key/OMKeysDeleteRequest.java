@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteMarkerResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
@@ -110,7 +111,16 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
     }
 
-    return getOmRequest();
+    // A delete on a versioned bucket creates a marker per key, and a marker is
+    // a version, so it needs an id proposed here on the OM that received the
+    // request. One covers the batch: versionIds only have to increase within a
+    // key, and each key's own current version raises it if needed.
+    return getOmRequest().toBuilder()
+        .setDeleteKeysRequest(deleteKeysRequest.toBuilder()
+            .setDeleteKeys(deleteKeysRequest.getDeleteKeys().toBuilder()
+                .setProposedVersionId(
+                    ozoneManager.getVersionIdAllocator().propose())))
+        .build();
   }
 
   @Override @SuppressWarnings("methodlength")
@@ -239,15 +249,26 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
-      // Mark all keys which can be deleted, in cache as deleted.
-      Pair<Long, Integer> quotaReleasedEmptyKeys =
-          markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
-              dirList, omMetadataManager, openKeyInfoMap);
-      omBucketInfo.decrUsedBytes(quotaReleasedEmptyKeys.getKey(), true);
-      // For empty keyInfos the quota should be released and not added to namespace.
-      omBucketInfo.decrUsedNamespace(omKeyInfoList.size() + dirList.size() -
-              quotaReleasedEmptyKeys.getValue(), true);
-      omBucketInfo.decrUsedNamespace(quotaReleasedEmptyKeys.getValue(), false);
+      // On a bucket that has ever been versioned a delete removes no data:
+      // each key gets a delete marker as its current version, exactly as a
+      // single-key delete does. While versioning is suspended the marker is
+      // the key's null version, which destroys only what held that slot.
+      List<DeleteMarkerInsertion> markerInsertions = null;
+      if (omBucketInfo.hasEverBeenVersioned()) {
+        markerInsertions = insertDeleteMarkers(ozoneManager, omMetadataManager,
+            omBucketInfo, omKeyInfoList,
+            deleteKeyArgs.getProposedVersionId(), trxnLogIndex);
+      } else {
+        // Mark all keys which can be deleted, in cache as deleted.
+        Pair<Long, Integer> quotaReleasedEmptyKeys =
+            markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
+                dirList, omMetadataManager, openKeyInfoMap);
+        omBucketInfo.decrUsedBytes(quotaReleasedEmptyKeys.getKey(), true);
+        // For empty keyInfos the quota should be released and not added to namespace.
+        omBucketInfo.decrUsedNamespace(omKeyInfoList.size() + dirList.size() -
+                quotaReleasedEmptyKeys.getValue(), true);
+        omBucketInfo.decrUsedNamespace(quotaReleasedEmptyKeys.getValue(), false);
+      }
 
       OmLifecycleScanState state = null;
       if (sourceType == RequestSource.LIFECYCLE && deleteKeyRequest.hasScanState()) {
@@ -259,9 +280,17 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
-      omClientResponse =
-          getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
-              unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap, state);
+      if (markerInsertions != null) {
+        omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
+            .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
+            .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus);
+        omClientResponse = new OMKeysDeleteMarkerResponse(omResponse.build(),
+            markerInsertions, omBucketInfo.copyObject(), state);
+      } else {
+        omClientResponse =
+            getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
+                unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap, state);
+      }
 
       result = Result.SUCCESS;
       long endNanosDeleteKeySuccessLatencyNs = Time.monotonicNowNanos();
@@ -382,6 +411,30 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         .build(), omKeyInfoList,
         omBucketInfo.copyObject(), openKeyInfoMap, scanState);
     return omClientResponse;
+  }
+
+  /**
+   * Inserts a delete marker for every key that survived validation, reusing
+   * the implementation a single-key delete uses so the two cannot drift.
+   *
+   * @return what each insertion changed, for the response to write out
+   */
+  private List<DeleteMarkerInsertion> insertDeleteMarkers(
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
+      OmBucketInfo omBucketInfo, List<OmKeyInfo> omKeyInfoList,
+      long proposedVersionId, long trxnLogIndex) throws IOException {
+
+    List<DeleteMarkerInsertion> insertions = new ArrayList<>();
+    for (OmKeyInfo currentVersion : omKeyInfoList) {
+      String objectKey = omMetadataManager.getOzoneKey(
+          currentVersion.getVolumeName(), currentVersion.getBucketName(),
+          currentVersion.getKeyName());
+      insertions.add(insertDeleteMarker(ozoneManager, omMetadataManager,
+          omBucketInfo, currentVersion, objectKey,
+          currentVersion.getKeyName(), proposedVersionId,
+          Time.now(), trxnLogIndex));
+    }
+    return insertions;
   }
 
   protected Pair<Long, Integer> markKeysAsDeletedInCache(OzoneManager ozoneManager,

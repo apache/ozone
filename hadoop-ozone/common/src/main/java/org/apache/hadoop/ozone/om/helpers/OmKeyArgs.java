@@ -62,6 +62,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // been modified.
   private Long expectedDataGeneration = null;
   private final String expectedETag;
+  // Addresses one specific version of the key instead of its current version.
+  // versionId names a version by id; nullVersion selects the key's null version
+  // slot, which has no fixed id of its own. At most one of the two is set.
+  private final Long versionId;
+  private final boolean nullVersion;
 
   private OmKeyArgs(Builder b) {
     super(b);
@@ -84,6 +89,26 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
     this.expectedETag = b.expectedETag;
+    this.versionId = b.versionId;
+    this.nullVersion = b.nullVersion;
+  }
+
+  /**
+   * @return the addressed versionId, or null when no specific version is
+   *     addressed by id
+   */
+  public Long getVersionId() {
+    return versionId;
+  }
+
+  /** @return whether the key's null version slot is addressed */
+  public boolean isNullVersion() {
+    return nullVersion;
+  }
+
+  /** @return whether a version other than the current one is addressed */
+  public boolean addressesVersion() {
+    return versionId != null || nullVersion;
   }
 
   public boolean getIsMultipartKey() {
@@ -240,6 +265,8 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private final AclListBuilder acls;
     private boolean recursive;
     private boolean headOp;
+    private Long versionId;
+    private boolean nullVersion;
     private boolean forceUpdateContainerCacheFromSCM;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
@@ -290,6 +317,8 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
+      this.versionId = obj.versionId;
+      this.nullVersion = obj.nullVersion;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
     }
@@ -407,6 +436,24 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setRecursive(boolean isRecursive) {
       this.recursive = isRecursive;
+      return this;
+    }
+
+    /** Addresses the version with this id; clears any null-version selection. */
+    public Builder setVersionId(Long id) {
+      this.versionId = id;
+      if (id != null) {
+        this.nullVersion = false;
+      }
+      return this;
+    }
+
+    /** Addresses the key's null version slot; clears any addressed versionId. */
+    public Builder setNullVersion(boolean isNullVersion) {
+      this.nullVersion = isNullVersion;
+      if (isNullVersion) {
+        this.versionId = null;
+      }
       return this;
     }
 
