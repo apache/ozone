@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCFilter;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
@@ -103,6 +104,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReclaimObjectVersionsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SaveLifecycleScanStateRequest;
@@ -234,6 +237,15 @@ public class KeyLifecycleService extends BackgroundService {
     return queue;
   }
 
+  /**
+   * Whether the service is switched on at all, which is a matter of
+   * configuration and fixed for the life of the OM. Distinct from being
+   * suspended, which an admin can undo without a restart.
+   */
+  public boolean isEnabled() {
+    return isServiceEnabled.get();
+  }
+
   private boolean shouldRun() {
     if (getOzoneManager() == null) {
       // OzoneManager can be null for testing
@@ -296,6 +308,9 @@ public class KeyLifecycleService extends BackgroundService {
     private final OmLifecycleConfiguration policy;
     private long taskStartTime;
     private long numKeyIterated = 0;
+    private long numDeleteMarkersInserted = 0;
+    /** keyTable dbKeys of markers an ExpiredObjectDeleteMarker rule removes. */
+    private final List<String> expiredMarkerKeys = new ArrayList<>();
     private long numDirIterated = 0;
     private long numDirDeleted = 0;
     private long numKeyDeleted = 0;
@@ -306,6 +321,8 @@ public class KeyLifecycleService extends BackgroundService {
     private long numMultipartUploadIterated = 0;
     private long numMultipartUploadAborted = 0;
     private String lastScannedKey;
+    // Where the versionedKeyTable scan left off, always at a key boundary.
+    private String lastScannedVersionKey;
     private String lastScannedDir;
     private String lastScannedDirKey;
 
@@ -396,6 +413,10 @@ public class KeyLifecycleService extends BackgroundService {
               .filter(r -> r.getAbortIncompleteMultipartUpload() != null)
               .collect(Collectors.toList());
 
+          List<OmLCRule> noncurrentRules = ruleList.stream()
+              .filter(r -> r.getNoncurrentVersionExpiration() != null)
+              .collect(Collectors.toList());
+
           if (!expirationRules.isEmpty()) {
             LimitedExpiredObjectList expiredKeyList = new LimitedExpiredObjectList(listMaxSize);
             LimitedExpiredObjectList expiredDirList = new LimitedExpiredObjectList(listMaxSize);
@@ -436,6 +457,8 @@ public class KeyLifecycleService extends BackgroundService {
               evaluateBucket(bucket, keyTable, expirationRules, expiredKeyList, scanStateBuilder);
             }
 
+            submitExpiredMarkers(bucket);
+
             if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
               LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
               sendSaveScanStateRequest(scanStateBuilder, true);
@@ -446,8 +469,8 @@ public class KeyLifecycleService extends BackgroundService {
               // If trash is enabled, move files to trash, instead of send delete requests.
               // OBS bucket doesn't support trash.
               if (bucket.getBucketLayout() == OBJECT_STORE) {
-                sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
-                    bucket.getOwner(), expiredKeyList, false, scanStateBuilder, true);
+                sendDeleteKeysRequestAndClearList(bucket, expiredKeyList, false,
+                    scanStateBuilder, true);
               } else {
                 // handle keys first, then directories
                 handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, true);
@@ -455,6 +478,8 @@ public class KeyLifecycleService extends BackgroundService {
               }
             }
           }
+
+          scanNoncurrentVersionsIfAny(bucket, noncurrentRules, scanStateBuilder);
 
           if (!mpuRules.isEmpty()) {
             processMultipartUploads(bucket, mpuRules);
@@ -986,8 +1011,8 @@ public class KeyLifecycleService extends BackgroundService {
       boolean saved = false;
       if (expiredKeyList != null && !expiredKeyList.isEmpty()) {
         if (bucket.getBucketLayout() == OBJECT_STORE) {
-          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
-              bucket.getOwner(), expiredKeyList, false, scanStateBuilder, false);
+          sendDeleteKeysRequestAndClearList(bucket, expiredKeyList, false,
+              scanStateBuilder, false);
         } else {
           handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, false);
         }
@@ -1002,6 +1027,145 @@ public class KeyLifecycleService extends BackgroundService {
       if (!saved) {
         sendSaveScanStateRequest(scanStateBuilder, false);
       }
+      lastStateSaveTime = Time.monotonicNow();
+      lastStateSaveKeyCount = numKeyIterated;
+    }
+
+    /**
+     * Noncurrent versions live in a table of their own, so they need a scan of
+     * their own. Only a bucket that has been versioned can have any, and
+     * versioning is an OBJECT_STORE feature.
+     */
+    private void scanNoncurrentVersionsIfAny(OmBucketInfo bucket,
+        List<OmLCRule> noncurrentRules,
+        OmLifecycleScanState.Builder scanStateBuilder) {
+      if (!noncurrentRules.isEmpty()
+          && bucket.getBucketLayout() == OBJECT_STORE
+          && bucket.hasEverBeenVersioned()) {
+        evaluateNoncurrentVersions(bucket, noncurrentRules, scanStateBuilder);
+      }
+    }
+
+    /**
+     * Reclaims the noncurrent versions of a versioned bucket's keys, one batch
+     * per pass. Which versions go is {@link NoncurrentVersionSelector}'s
+     * decision; this only feeds it, submits what it picked, and records where
+     * it stopped.
+     */
+    private void evaluateNoncurrentVersions(OmBucketInfo bucket,
+        List<OmLCRule> ruleList, OmLifecycleScanState.Builder scanStateBuilder) {
+      final NoncurrentVersionSelector selector =
+          new NoncurrentVersionSelector(omMetadataManager);
+      String resumeFrom = scanStateBuilder == null ? null
+          : scanStateBuilder.getLastScannedVersionKey();
+
+      try {
+        while (true) {
+          if (!shouldRun()) {
+            LOG.info("KeyLifecycleService is suspended or disabled. Stopping "
+                + "the noncurrent version scan for bucket {}.",
+                bucket.getBucketName());
+            return;
+          }
+
+          NoncurrentVersionSelector.Selection selection =
+              selector.select(bucket, ruleList, resumeFrom, listMaxSize);
+          numKeyIterated += selection.getVersionsScanned();
+          lastScannedVersionKey = selection.getResumeFrom();
+          submitExpiredVersions(bucket, selection.getExpiredVersionKeys());
+
+          // Saving state costs a Ratis write, so it is throttled the same way
+          // the keyTable scan throttles it. Resuming from an older boundary
+          // only re-selects versions the reclaim request then skips as gone.
+          if (selection.isFinished() || shouldSaveState()) {
+            saveVersionScanState(scanStateBuilder, selection.isFinished());
+          }
+
+          if (selection.isFinished()) {
+            return;
+          }
+          resumeFrom = selection.getResumeFrom();
+        }
+      } catch (IOException e) {
+        LOG.warn("Failed to iterate the noncurrent versions of bucket {}/{}",
+            bucket.getVolumeName(), bucket.getBucketName(), e);
+      }
+    }
+
+    /**
+     * Submits the versions one pass selected, if any.
+     */
+    private void submitExpiredVersions(OmBucketInfo bucket,
+        List<String> expiredVersions) {
+      submitForReclaim(bucket, expiredVersions, Collections.emptyList());
+    }
+
+    /**
+     * Submits the expired delete markers the scan selected, if any. They go
+     * through the same request as an expired version rather than through
+     * DeleteKeys, which on a versioned bucket would answer a delete by
+     * inserting another marker. Only a versioned bucket has markers, and
+     * versioning is an OBJECT_STORE feature, so the FSO walk never fills this.
+     */
+    private void submitExpiredMarkers(OmBucketInfo bucket) {
+      submitForReclaim(bucket, Collections.emptyList(), expiredMarkerKeys);
+    }
+
+    private void submitForReclaim(OmBucketInfo bucket,
+        List<String> expiredVersions, List<String> expiredMarkers) {
+      final int submitted = expiredVersions.size() + expiredMarkers.size();
+      if (submitted > 0) {
+        ObjectVersionsBucket versionsBucket = ObjectVersionsBucket.newBuilder()
+            .setVolumeName(bucket.getVolumeName())
+            .setBucketName(bucket.getBucketName())
+            .addAllVersionKeys(expiredVersions)
+            .addAllMarkerKeys(expiredMarkers)
+            .build();
+
+        OMRequest omRequestRaw = OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.ReclaimObjectVersions)
+            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setClientId(clientId.toString())
+            .setReclaimObjectVersionsRequest(
+                ReclaimObjectVersionsRequest.newBuilder()
+                    .addVersionsPerBucket(versionsBucket))
+            .build();
+
+        try {
+          final OMClientRequest omClientRequest =
+              OzoneManagerRatisUtils.createClientRequest(omRequestRaw, getOzoneManager());
+          UserGroupInformation ugi =
+              UserGroupInformation.createRemoteUser(bucket.getOwner());
+          ugi.doAs((PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>) () -> {
+            OMRequest omRequest = omClientRequest.preExecute(getOzoneManager());
+            return OzoneManagerRatisUtils.submitRequest(
+                getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
+          });
+          getOzoneManager().getDeletionMetrics()
+              .incrNumObjectVersionsSentForReclaim(submitted);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          LOG.warn("Interrupted while reclaiming {} records of bucket {}/{}",
+              submitted, bucket.getVolumeName(), bucket.getBucketName(), e);
+        } catch (Exception e) {
+          LOG.warn("Failed to reclaim {} records of bucket {}/{}",
+              submitted, bucket.getVolumeName(), bucket.getBucketName(), e);
+        }
+        expiredVersions.clear();
+        expiredMarkers.clear();
+      }
+    }
+
+    /**
+     * Records the key boundary the scan reached, so an interrupted scan
+     * resumes there rather than from the beginning of the bucket.
+     */
+    private void saveVersionScanState(
+        OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
+      if (scanStateBuilder != null) {
+        scanStateBuilder.setLastScannedVersionKey(lastScannedVersionKey);
+      }
+      sendSaveScanStateRequest(scanStateBuilder, scanFinished);
       lastStateSaveTime = Time.monotonicNow();
       lastStateSaveKeyCount = numKeyIterated;
     }
@@ -1044,10 +1208,68 @@ public class KeyLifecycleService extends BackgroundService {
       }
     }
 
+    /**
+     * Selects a delete marker for removal if an ExpiredObjectDeleteMarker rule
+     * covers it and nothing is left under it. "Expired" is not about the
+     * marker's own age: a marker is expired exactly when it is the key's only
+     * remaining version, because then it hides nothing and no versionId can
+     * address it, so nothing else would ever remove it. While a noncurrent
+     * version survives, removing the marker would promote that version and
+     * resurrect an object the user deleted.
+     */
+    private void collectIfExpiredMarker(OmBucketInfo bucketInfo,
+        OmKeyInfo marker, List<OmLCRule> ruleList) {
+      for (OmLCRule rule : ruleList) {
+        OmLCExpiration expiration = rule.getExpiration();
+        if (expiration == null || !expiration.isExpiredObjectDeleteMarker()
+            || !rule.matchesScope(marker)) {
+          continue;
+        }
+        try {
+          if (hasNoncurrentVersion(bucketInfo, marker)) {
+            return;
+          }
+        } catch (IOException e) {
+          LOG.warn("Failed to check the versions left under the delete marker "
+              + "of {}/{}/{}", bucketInfo.getVolumeName(),
+              bucketInfo.getBucketName(), marker.getKeyName(), e);
+          return;
+        }
+        expiredMarkerKeys.add(omMetadataManager.getOzoneKey(
+            bucketInfo.getVolumeName(), bucketInfo.getBucketName(),
+            marker.getKeyName()));
+        if (expiredMarkerKeys.size() >= listMaxSize) {
+          submitExpiredMarkers(bucketInfo);
+        }
+        return;
+      }
+    }
+
+    /** Whether the key has any version left in the versionedKeyTable. */
+    private boolean hasNoncurrentVersion(OmBucketInfo bucketInfo,
+        OmKeyInfo marker) throws IOException {
+      try (Table.KeyValueIterator<String, OmKeyInfo> versions =
+               omMetadataManager.getVersionedKeyTable().iterator(
+                   omMetadataManager.getVersionedOzoneKeyPrefix(
+                       bucketInfo.getVolumeName(), bucketInfo.getBucketName(),
+                       marker.getKeyName()))) {
+        return versions.hasNext();
+      }
+    }
+
     private void processKey(OmBucketInfo bucketInfo, OmKeyInfo key, List<OmLCRule> ruleList,
         LimitedExpiredObjectList expiredKeyList, OmLifecycleScanState.Builder scanStateBuilder) {
       if (bucketInfo.getBucketLayout() == BucketLayout.LEGACY &&
           key.getKeyName().startsWith(TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX)) {
+        return;
+      }
+      // Expiring a key whose current version is already a delete marker would
+      // put a marker on top of a marker, and the new one would age into the
+      // rule again, so the chain would grow for as long as the rule exists.
+      // The object is already gone from an unversioned read; removing the
+      // marker that hides it is ExpiredObjectDeleteMarker's decision.
+      if (key.isDeleteMarker()) {
+        collectIfExpiredMarker(bucketInfo, key, ruleList);
         return;
       }
       for (OmLCRule rule : ruleList) {
@@ -1332,10 +1554,12 @@ public class KeyLifecycleService extends BackgroundService {
       metrics.incNumMultipartUploadIterated(numMultipartUploadIterated);
       long timeSpent = Time.monotonicNow() - taskStartTime;
       LOG.info("Spent {} ms on bucket {} to iterate {} keys and {} dirs and {} multipart uploads, " +
-              "deleted {} keys with {} bytes, and {} dirs, renamed {} keys with {} bytes, and {} dirs to trash, " +
+              "deleted {} keys with {} bytes, and {} dirs, inserted {} delete markers, " +
+              "renamed {} keys with {} bytes, and {} dirs to trash, " +
               "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
           numDirIterated, numMultipartUploadIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted,
-          numKeyRenamed, sizeKeyRenamed, numDirRenamed, numMultipartUploadAborted);
+          numDeleteMarkersInserted, numKeyRenamed, sizeKeyRenamed, numDirRenamed,
+          numMultipartUploadAborted);
     }
 
     private void onSuccess(String bucketName) {
@@ -1348,10 +1572,12 @@ public class KeyLifecycleService extends BackgroundService {
       metrics.incNumMultipartUploadIterated(numMultipartUploadIterated);
       metrics.incNumMultipartUploadAborted(numMultipartUploadAborted);
       LOG.info("Spent {} ms on bucket {} to iterate {} keys and {} dirs and {} multipart uploads, " +
-              "deleted {} keys with {} bytes, and {} dirs, renamed {} keys with {} bytes, and {} dirs to trash, " +
+              "deleted {} keys with {} bytes, and {} dirs, inserted {} delete markers, " +
+              "renamed {} keys with {} bytes, and {} dirs to trash, " +
               "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
           numDirIterated, numMultipartUploadIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted,
-          numKeyRenamed, sizeKeyRenamed, numDirRenamed, numMultipartUploadAborted);
+          numDeleteMarkersInserted, numKeyRenamed, sizeKeyRenamed, numDirRenamed,
+          numMultipartUploadAborted);
     }
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList,
@@ -1360,8 +1586,8 @@ public class KeyLifecycleService extends BackgroundService {
         moveToTrash(bucket, keysList, dir);
         sendSaveScanStateRequest(scanStateBuilder, scanFinished);
       } else {
-        sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
-            bucket.getOwner(), keysList, dir, scanStateBuilder, scanFinished);
+        sendDeleteKeysRequestAndClearList(bucket, keysList, dir, scanStateBuilder,
+            scanFinished);
       }
     }
 
@@ -1401,9 +1627,19 @@ public class KeyLifecycleService extends BackgroundService {
       }
     }
 
-    private void sendDeleteKeysRequestAndClearList(String volume, String bucket, String bucketOwner,
+    /**
+     * On a bucket that has ever been versioned this request inserts a delete
+     * marker per key instead of deleting: the object stops being visible, but
+     * its current version is demoted rather than removed, so nothing is
+     * reclaimed and no space is freed.
+     */
+    private void sendDeleteKeysRequestAndClearList(OmBucketInfo bucketInfo,
         LimitedExpiredObjectList keysList, boolean dir,
         OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
+      final String volume = bucketInfo.getVolumeName();
+      final String bucket = bucketInfo.getBucketName();
+      final String bucketOwner = bucketInfo.getOwner();
+      final boolean insertsMarkers = bucketInfo.hasEverBeenVersioned();
       try {
         if (getInjector(1) != null) {
           try {
@@ -1517,6 +1753,9 @@ public class KeyLifecycleService extends BackgroundService {
             if (dir) {
               numDirDeleted += deletedCount;
               metrics.incrNumDirDeleted(deletedCount);
+            } else if (insertsMarkers) {
+              numDeleteMarkersInserted += deletedCount;
+              metrics.incrNumDeleteMarkersInserted(deletedCount);
             } else {
               numKeyDeleted += deletedCount;
               sizeKeyDeleted += deletedSize;

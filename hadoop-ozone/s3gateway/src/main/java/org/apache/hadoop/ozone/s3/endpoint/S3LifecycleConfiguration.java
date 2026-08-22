@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmLCAbortIncompleteMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCFilter;
+import org.apache.hadoop.ozone.om.helpers.OmLCNoncurrentVersionExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleRuleAndOperator;
@@ -80,6 +81,9 @@ public class S3LifecycleConfiguration {
     @XmlElement(name = "AbortIncompleteMultipartUpload")
     private AbortIncompleteMultipartUpload abortIncompleteMultipartUpload;
 
+    @XmlElement(name = "NoncurrentVersionExpiration")
+    private NoncurrentVersionExpiration noncurrentVersionExpiration;
+
     @XmlElement(name = "Filter")
     private Filter filter;
 
@@ -119,6 +123,15 @@ public class S3LifecycleConfiguration {
       return abortIncompleteMultipartUpload;
     }
 
+    public NoncurrentVersionExpiration getNoncurrentVersionExpiration() {
+      return noncurrentVersionExpiration;
+    }
+
+    public void setNoncurrentVersionExpiration(
+        NoncurrentVersionExpiration noncurrentVersionExpiration) {
+      this.noncurrentVersionExpiration = noncurrentVersionExpiration;
+    }
+
     public void setAbortIncompleteMultipartUpload(AbortIncompleteMultipartUpload abortIncompleteMultipartUpload) {
       this.abortIncompleteMultipartUpload = abortIncompleteMultipartUpload;
     }
@@ -144,6 +157,17 @@ public class S3LifecycleConfiguration {
     @XmlElement(name = "Date")
     private String date;
 
+    @XmlElement(name = "ExpiredObjectDeleteMarker")
+    private Boolean expiredObjectDeleteMarker;
+
+    public Boolean getExpiredObjectDeleteMarker() {
+      return expiredObjectDeleteMarker;
+    }
+
+    public void setExpiredObjectDeleteMarker(Boolean removeMarker) {
+      this.expiredObjectDeleteMarker = removeMarker;
+    }
+
     public Integer getDays() {
       return days;
     }
@@ -158,6 +182,36 @@ public class S3LifecycleConfiguration {
 
     public void setDate(String date) {
       this.date = date;
+    }
+  }
+
+  /**
+   * NoncurrentVersionExpiration entity for lifecycle rule: reclaims the
+   * noncurrent versions of a key on a bucket with versioning enabled.
+   */
+  @XmlAccessorType(XmlAccessType.FIELD)
+  @XmlRootElement(name = "NoncurrentVersionExpiration")
+  public static class NoncurrentVersionExpiration {
+    @XmlElement(name = "NoncurrentDays")
+    private Integer noncurrentDays;
+
+    @XmlElement(name = "NewerNoncurrentVersions")
+    private Integer newerNoncurrentVersions;
+
+    public Integer getNoncurrentDays() {
+      return noncurrentDays;
+    }
+
+    public void setNoncurrentDays(Integer noncurrentDays) {
+      this.noncurrentDays = noncurrentDays;
+    }
+
+    public Integer getNewerNoncurrentVersions() {
+      return newerNoncurrentVersions;
+    }
+
+    public void setNewerNoncurrentVersions(Integer newerNoncurrentVersions) {
+      this.newerNoncurrentVersions = newerNoncurrentVersions;
     }
   }
 
@@ -336,6 +390,10 @@ public class S3LifecycleConfiguration {
     if (rule.getAbortIncompleteMultipartUpload() != null) {
       builder.addAction(convertToOmAbortIncompleteMultipartUpload(rule.getAbortIncompleteMultipartUpload()));
     }
+    if (rule.getNoncurrentVersionExpiration() != null) {
+      builder.addAction(convertToOmNoncurrentVersionExpiration(
+          rule.getNoncurrentVersionExpiration()));
+    }
     if (rule.getFilter() != null) {
       builder.setFilter(convertToOmFilter(rule.getFilter()));
     }
@@ -357,6 +415,30 @@ public class S3LifecycleConfiguration {
     }
     if (expiration.getDate() != null) {
       builder.setDate(expiration.getDate());
+    }
+    if (expiration.getExpiredObjectDeleteMarker() != null) {
+      builder.setExpiredObjectDeleteMarker(
+          expiration.getExpiredObjectDeleteMarker());
+    }
+
+    return builder.build();
+  }
+
+  /**
+   * Converts S3 NoncurrentVersionExpiration to internal representation.
+   */
+  private OmLCNoncurrentVersionExpiration convertToOmNoncurrentVersionExpiration(
+      NoncurrentVersionExpiration noncurrentVersionExpiration) {
+    OmLCNoncurrentVersionExpiration.Builder builder =
+        new OmLCNoncurrentVersionExpiration.Builder();
+
+    if (noncurrentVersionExpiration.getNoncurrentDays() != null) {
+      builder.setNoncurrentDays(
+          noncurrentVersionExpiration.getNoncurrentDays());
+    }
+    if (noncurrentVersionExpiration.getNewerNoncurrentVersions() != null) {
+      builder.setNewerNoncurrentVersions(
+          noncurrentVersionExpiration.getNewerNoncurrentVersions());
     }
 
     return builder.build();
@@ -465,11 +547,37 @@ public class S3LifecycleConfiguration {
       rule.setAbortIncompleteMultipartUpload(
           convertFromOzoneAbortIncompleteMultipartUpload(ozoneRule.getAbortIncompleteMultipartUpload()));
     }
+    if (ozoneRule.getNoncurrentVersionExpiration() != null) {
+      rule.setNoncurrentVersionExpiration(
+          convertFromOzoneNoncurrentVersionExpiration(
+              ozoneRule.getNoncurrentVersionExpiration()));
+    }
     if (ozoneRule.getFilter() != null) {
       rule.setFilter(convertFromOzoneFilter(ozoneRule.getFilter()));
     }
 
     return rule;
+  }
+
+  /**
+   * Converts an Ozone internal NoncurrentVersionExpiration to S3.
+   */
+  private static NoncurrentVersionExpiration
+      convertFromOzoneNoncurrentVersionExpiration(
+          OzoneLifecycleConfiguration.OzoneLCNoncurrentVersionExpiration ozone) {
+
+    NoncurrentVersionExpiration expiration = new NoncurrentVersionExpiration();
+
+    if (ozone.getNoncurrentDays() != null && ozone.getNoncurrentDays() > 0) {
+      expiration.setNoncurrentDays(ozone.getNoncurrentDays());
+    }
+    if (ozone.getNewerNoncurrentVersions() != null
+        && ozone.getNewerNoncurrentVersions() > 0) {
+      expiration.setNewerNoncurrentVersions(
+          ozone.getNewerNoncurrentVersions());
+    }
+
+    return expiration;
   }
 
   /**
@@ -489,6 +597,9 @@ public class S3LifecycleConfiguration {
     }
     if (ozoneExpiration.getDays() != null && ozoneExpiration.getDays() > 0) {
       expiration.setDays(ozoneExpiration.getDays());
+    }
+    if (ozoneExpiration.isExpiredObjectDeleteMarker()) {
+      expiration.setExpiredObjectDeleteMarker(true);
     }
 
     return expiration;

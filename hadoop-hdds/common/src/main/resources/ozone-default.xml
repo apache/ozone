@@ -5216,9 +5216,11 @@
 
   <property>
     <name>ozone.lifecycle.service.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE</tag>
-    <description>It specifies whether to enable lifecycle management service.</description>
+    <description>It specifies whether to enable lifecycle management service.
+      S3 object versioning depends on it to reclaim versions, so OM refuses to
+      enable versioning on a bucket while this is off.</description>
   </property>
   <property>
     <name>ozone.lifecycle.service.move.to.trash.enabled</name>
@@ -5284,6 +5286,24 @@
     <description>Bucket scan task will save its pointer to DB by default every 100000 keys are scanned. Bucket scan
       pointer save will happen when either ozone.lifecycle.service.state.save.interval.ms or
       ozone.lifecycle.service.state.save.keys.processed is satisfied.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.versioning.version-id-generator</name>
+    <value>org.apache.hadoop.ozone.om.helpers.UniqueIdVersionIdGenerator</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Implementation of org.apache.hadoop.ozone.om.helpers.VersionIdGenerator used to propose the
+      versionId of an object version. The default numbers a version with the time it was written,
+      through the same scheme Ozone uses for block local IDs;
+      org.apache.hadoop.ozone.om.helpers.PinnedFirstVersionIdGenerator additionally pins the first
+      version of every key to a reserved sentinel, so that it can be referenced without listing the
+      key's versions first.
+      The setting is cluster-wide and read when an OM starts, so a change takes effect on every
+      bucket once the OMs have been restarted; it is not recorded in bucket metadata. Keys written
+      under a previous generator keep the ids they were given: a proposal is taken as a floor when
+      the version is applied, so a generator proposing ids below those a previous one handed out
+      delays the new numbering on the affected keys rather than disordering them.
     </description>
   </property>
 </configuration>

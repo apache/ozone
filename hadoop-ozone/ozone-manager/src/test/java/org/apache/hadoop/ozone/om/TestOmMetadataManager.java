@@ -48,6 +48,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_ACCESS_ID_T
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_STATE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TRANSACTION_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.USER_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
@@ -127,6 +128,7 @@ public class TestOmMetadataManager {
       VOLUME_TABLE,
       BUCKET_TABLE,
       KEY_TABLE,
+      VERSIONED_KEY_TABLE,
       DELETED_TABLE,
       OPEN_KEY_TABLE,
       MULTIPART_INFO_TABLE,
@@ -179,6 +181,42 @@ public class TestOmMetadataManager {
 
     assertEquals(3, transactionInfo.getTerm());
     assertEquals(250, transactionInfo.getTransactionIndex());
+  }
+
+  @Test
+  public void testVersionedOzoneKeyOrdering() {
+    String prefix = omMetadataManager.getVersionedOzoneKeyPrefix("vol", "buck", "key");
+    assertEquals("/vol/buck/key\0", prefix);
+
+    // newer versions (larger versionId) must sort before older ones, and all
+    // versioned keys must sort under the key's prefix
+    String v1 = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", 1L);
+    String v2 = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", 42L);
+    String v3 = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", Long.MAX_VALUE - 1);
+    assertThat(v3).startsWith(prefix).isLessThan(v2);
+    assertThat(v2).startsWith(prefix).isLessThan(v1);
+
+    // fixed-width suffix: identical length regardless of versionId magnitude
+    assertEquals(v1.length(), v3.length());
+  }
+
+  @Test
+  public void testVersionedOzoneKeyIsolatedFromNestedKeys() {
+    // OBJECT_STORE key names contain '/' verbatim, so "key" and "key/001" are two
+    // unrelated keys. Every version of "key" must sort under "key"'s prefix and
+    // ahead of anything belonging to "key/001", otherwise a prefix seek for the
+    // newest noncurrent version of "key" would land on a version of "key/001".
+    String prefix = omMetadataManager.getVersionedOzoneKeyPrefix("vol", "buck", "key");
+    String nestedPrefix = omMetadataManager.getVersionedOzoneKeyPrefix("vol", "buck", "key/001");
+    assertThat(nestedPrefix).doesNotStartWith(prefix);
+
+    String oldest = omMetadataManager.getVersionedOzoneKey("vol", "buck", "key", 1L);
+    String nestedNewest =
+        omMetadataManager.getVersionedOzoneKey("vol", "buck", "key/001", Long.MAX_VALUE - 1);
+    assertThat(oldest).isLessThan(nestedNewest);
+
+    // the nested key's own current entry in keyTable also sorts after all of them
+    assertThat(oldest).isLessThan(omMetadataManager.getOzoneKey("vol", "buck", "key/001"));
   }
 
   @Test
