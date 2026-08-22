@@ -38,7 +38,9 @@
 #
 declare -a pattern_array ignore_array
 
+declare -i match_count
 matched_files=""
+CHANGED_TEST_CLASSES=""
 ignore_array=(
     "^[^/]*.md" # exclude root docs
 )
@@ -136,7 +138,8 @@ function get_regexp_from_patterns() {
 #    ignore_array - array storing regexp patterns to be ignored
 # Output:
 #    match_count - number of matched files
-#    matched_files (appended) - list of matched files
+#    new_matched_files - list of matched files
+#    matched_files (appended) - cumulative list of all files matched so far
 function filter_changed_files() {
     local add_to_list="${1:-}"
 
@@ -146,17 +149,20 @@ function filter_changed_files() {
 
     verbosity::store_exit_on_error_status
 
-    match_count=$(echo "${CHANGED_FILES}" | grep -E "${match}" | grep -cEv "${ignore}")
+    new_matched_files=$(echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}")
+    match_count=0
+    if [[ -n "${new_matched_files}" ]]; then
+        match_count=$(echo "${new_matched_files}" | wc -l)
+    fi
 
     if [[ "${add_to_list}" == "true" ]]; then
-        local additional=$(echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}")
-        matched_files="${matched_files}$(echo -e "\n${additional}")"
+        matched_files="${matched_files}$(echo -e "\n${new_matched_files}")"
     fi
 
     echo
     echo "${match_count} changed files matching the '${match}' pattern, but ignoring '${ignore}':"
     echo
-    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}"
+    echo "${new_matched_files}"
     echo
 
     verbosity::restore_exit_on_error_status
@@ -257,6 +263,37 @@ function get_count_doc_files() {
     start_end::group_end
 }
 
+function get_changed_test_classes() {
+    start_end::group_start "List changed test classes"
+    local pattern_array=(
+        "src/test/java/.*/Test.*\.java"
+        "src/test/java/org/apache/hadoop/fs/contract"
+        "src/test/java/org/apache/hadoop/fs/ozone/contract"
+    )
+    filter_changed_files true
+
+    local test_classes=""
+
+    if [[ -n "${new_matched_files}" ]]; then
+      # always run grouped integration tests
+      test_classes="org/apache/ozone/test/Test*"
+
+      local f
+      for f in ${new_matched_files}; do
+        if echo "$f" | grep -q -e '/fs/contract/' -e '/fs/ozone/contract/'; then
+          # run all contract tests
+          test_classes="${test_classes},org/apache/hadoop/fs/ozone/contract/Test*"
+        else
+          test_classes="${test_classes},${f}"
+        fi
+      done
+    fi
+
+    CHANGED_TEST_CLASSES=$(echo "${test_classes}" | sed -e 's@[^,]*/src/test/java/@@g')
+    readonly CHANGED_TEST_CLASSES
+    start_end::group_end
+}
+
 function get_count_integration_files() {
     start_end::group_start "Count integration test files"
     local pattern_array=(
@@ -268,6 +305,11 @@ function get_count_integration_files() {
         "^hadoop-ozone/mini-cluster"
         "src/test/java"
         "src/test/resources"
+    )
+    local ignore_array=(
+        "src/test/java/.*/Test.*\.java"
+        "src/test/java/org/apache/hadoop/fs/contract"
+        "src/test/java/org/apache/hadoop/fs/ozone/contract"
     )
     filter_changed_files true
     COUNT_INTEGRATION_CHANGED_FILES=${match_count}
@@ -538,6 +580,12 @@ function set_outputs() {
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
     initialization::ga_output needs-kubernetes-tests "${kubernetes_tests_needed}"
+
+    if [[ "${integration_tests_needed}" == "true" ]]; then
+        initialization::ga_output test-classes ""
+    else
+        initialization::ga_output test-classes "${CHANGED_TEST_CLASSES}"
+    fi
 }
 
 check_for_full_tests_needed_label
@@ -566,6 +614,7 @@ run_all_tests_if_environment_files_changed
 get_count_all_files
 get_count_compose_files
 get_count_doc_files
+get_changed_test_classes
 get_count_integration_files
 get_count_kubernetes_files
 get_count_robot_files
