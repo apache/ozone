@@ -250,8 +250,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           .build();
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
-      // Re-committing a key the same client already hsync'd does not add a
-      // key name, so it does not consume namespace.
+      // Same-client hsync re-commit does not consume namespace.
       if (keyToDelete != null && isSameHsyncKey) {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,

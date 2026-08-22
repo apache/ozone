@@ -520,8 +520,6 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
         omMetadataManager, bucketLayout);
     List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
 
-    // Three commits of the same key by the same client: two hsync re-commits
-    // and the final close. Only one key name is ever added.
     doKeyCommit(true, allocatedKeyLocationList.subList(0, 3));
     doKeyCommit(true, allocatedKeyLocationList.subList(0, 6));
     doKeyCommit(false, allocatedKeyLocationList);
