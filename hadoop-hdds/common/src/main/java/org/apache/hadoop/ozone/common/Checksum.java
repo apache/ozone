@@ -259,6 +259,8 @@ public class Checksum {
   /**
    * The default implementation of computeChecksum(ChunkBuffer) that does not use cache, even if cache is initialized.
    * This is a stop-gap solution before the protocol change.
+   * The input must be prepared for reading as described by
+   * {@link #computeChecksum(ChunkBuffer, boolean)}.
    * @param data ChunkBuffer
    * @return ChecksumData
    * @throws OzoneChecksumException
@@ -269,6 +271,10 @@ public class Checksum {
   }
 
   /**
+   * The input must be prepared for reading. For each buffer returned by
+   * {@link ChunkBuffer#asByteBufferList()}, the bytes in
+   * {@code [position(), limit())} must be the logical checksum data.
+   *
    * This method does not advance the positions of {@code data}'s underlying
    * buffers. Both the no-cache and cache paths slice via
    * {@link ByteBuffer#duplicate()}.
@@ -305,6 +311,7 @@ public class Checksum {
     final int checksumCount = dataLength == 0 ? 0 : 1 + (dataLength - 1) / bytesPerChecksum;
     final List<ByteString> result = new ArrayList<>(checksumCount);
     int windowRemaining = bytesPerChecksum;
+    long processed = 0;
     algo.reset();
 
     for (ByteBuffer src : data.asByteBufferList()) {
@@ -314,6 +321,7 @@ public class Checksum {
         final int n = Math.min(srcLim - srcPos, windowRemaining);
         algo.update(BufferUtils.slice(src, srcPos, n));
         srcPos += n;
+        processed += n;
         windowRemaining -= n;
         if (windowRemaining == 0) {
           result.add(algo.finish());
@@ -321,6 +329,10 @@ public class Checksum {
           windowRemaining = bytesPerChecksum;
         }
       }
+    }
+    if (processed != dataLength) {
+      throw new IllegalStateException("ChunkBuffer remaining byte count is " + dataLength
+          + ", but its underlying buffers expose " + processed + " bytes");
     }
     if (windowRemaining < bytesPerChecksum) {
       // Unaligned trailing window.
