@@ -1648,11 +1648,11 @@ public interface ClientProtocol {
       String awsIamSessionPolicy, String requestId) throws IOException;
 
   /**
-   * Revokes an STS token.
-   * @param sessionToken            The STS sessionToken
+   * Revokes STS tokens for the given original access key ID.
+   * @param originalAccessKeyId     The original long-lived access key ID whose STS tokens to revoke
    * @throws IOException            if an error occurs while revoking the STS token
    */
-  void revokeSTSToken(String sessionToken) throws IOException;
+  void revokeSTSToken(String originalAccessKeyId) throws IOException;
 
   /**
    * Gets the lifecycle configuration information.

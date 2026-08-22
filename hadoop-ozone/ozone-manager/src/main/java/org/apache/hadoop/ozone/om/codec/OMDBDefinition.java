@@ -60,7 +60,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  * |              userTable |             /user :- UserVolumeInfo           |
  * |            dTokenTable |      OzoneTokenID :- renew_time               |
  * |          s3SecretTable | s3g_access_key_id :- s3Secret                 |
- * | s3RevokedStsTokenTable | sts_session_token :- insertionTimeMillis      |
+ * | s3RevokedStsTokenTable | originalAccessKeyId :- revocationTimeMillis   |
  * |------------------------------------------------------------------------|
  * }
  * </pre>
@@ -169,7 +169,10 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           S3SecretValue.getCodec());
 
   public static final String S3_REVOKED_STS_TOKEN_TABLE = "s3RevokedStsTokenTable";
-  /** s3RevokedStsTokenTable: sts_session_token :- insertionTimeMillis.*/
+  /**
+   * s3RevokedStsTokenTable: originalAccessKeyId :- revocationTimeMillis.
+   * The value is the revocation cutoff in milliseconds.
+   */
   public static final DBColumnFamilyDefinition<String, Long> S3_REVOKED_STS_TOKEN_TABLE_DEF
       = new DBColumnFamilyDefinition<>(S3_REVOKED_STS_TOKEN_TABLE,
           StringCodec.get(),

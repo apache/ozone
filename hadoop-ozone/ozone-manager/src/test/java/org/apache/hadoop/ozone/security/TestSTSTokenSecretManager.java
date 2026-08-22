@@ -98,6 +98,7 @@ public class TestSTSTokenSecretManager {
     assertEquals(ROLE_ARN, identifier.getRoleArn());
     assertEquals(SECRET_ACCESS_KEY, identifier.getSecretAccessKey());
     assertEquals(SESSION_POLICY, identifier.getSessionPolicy());
+    assertEquals(clock.instant(), identifier.getCreationTime());
     assertNotNull(identifier.getSecretKeyId());
     assertEquals(new Text("STSToken"), identifier.getKind());
     assertEquals("STS", identifier.getService());

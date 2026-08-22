@@ -157,7 +157,7 @@ public final class STSSecurityUtil {
     try {
       token.decodeFromUrlString(encodedToken);
       return token;
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       throw new SecretManager.InvalidToken("Failed to decode STS token string: " + e);
     }
   }
@@ -179,6 +179,9 @@ public final class STSSecurityUtil {
     }
     if (StringUtils.isEmpty(stsTokenIdentifier.getSecretAccessKey())) {
       throw new SecretManager.InvalidToken("Invalid STS token - secretAccessKey is null/empty");
+    }
+    if (stsTokenIdentifier.getCreationTime() == null) {
+      throw new SecretManager.InvalidToken("Invalid STS token - creationTime is null");
     }
   }
 

@@ -22,8 +22,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
-import java.time.Clock;
-import java.time.ZoneOffset;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -37,22 +35,23 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 @CleanupTableInfo(cleanupTables = {S3_REVOKED_STS_TOKEN_TABLE})
 public class S3RevokeSTSTokenResponse extends OMClientResponse {
 
-  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
+  private final String originalAccessKeyId;
+  private final long revocationTimeMillis;
 
-  private final String sessionToken;
-
-  public S3RevokeSTSTokenResponse(String sessionToken, @Nonnull OMResponse omResponse) {
+  public S3RevokeSTSTokenResponse(String originalAccessKeyId, long revocationTimeMillis,
+      @Nonnull OMResponse omResponse) {
     super(omResponse);
-    this.sessionToken = sessionToken;
+    this.originalAccessKeyId = originalAccessKeyId;
+    this.revocationTimeMillis = revocationTimeMillis;
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager, BatchOperation batchOperation) throws IOException {
-    if (sessionToken != null && getOMResponse().hasStatus() &&  getOMResponse().getStatus() == OK) {
+    if (originalAccessKeyId != null && getOMResponse().hasStatus() && getOMResponse().getStatus() == OK) {
       final Table<String, Long> table = omMetadataManager.getS3RevokedStsTokenTable();
       if (table != null) {
-        // Store insertionTimeMillis as value
-        table.putWithBatch(batchOperation, sessionToken, CLOCK.millis());
+        // Store revocationTimeMillis as value
+        table.putWithBatch(batchOperation, originalAccessKeyId, revocationTimeMillis);
       }
     }
   }

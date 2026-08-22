@@ -75,8 +75,10 @@ public final class S3SecurityUtil {
               token, ozoneManager.getSecretKeyClient(), CLOCK);
 
           // Ensure the token is not revoked
-          if (isRevokedStsToken(token, ozoneManager)) {
-            LOG.info("Session token has been revoked: {}, {}", stsTokenIdentifier.getTempAccessKeyId(), token);
+          if (isRevokedStsToken(stsTokenIdentifier, ozoneManager)) {
+            LOG.info(
+                "STS token has been revoked for originalAccessKeyId={}, tempAccessKeyId={}",
+                stsTokenIdentifier.getOriginalAccessKeyId(), stsTokenIdentifier.getTempAccessKeyId());
             throw new OMException("STS token has been revoked", REVOKED_TOKEN);
           }
 
@@ -157,11 +159,12 @@ public final class S3SecurityUtil {
   }
 
   /**
-   * Returns true if the STS session token is present in the revoked STS token table.
+   * Returns true if the STS token was created before the revocation cutoff for its originalAccessKeyId.
    */
-  private static boolean isRevokedStsToken(String sessionToken, OzoneManager ozoneManager)
+  private static boolean isRevokedStsToken(STSTokenIdentifier stsTokenIdentifier, OzoneManager ozoneManager)
       throws OMException {
     try {
+      final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
       final OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
       if (metadataManager == null) {
         final String msg = "Could not determine STS revocation: metadataManager is null";
@@ -176,7 +179,9 @@ public final class S3SecurityUtil {
         throw new OMException(msg, INTERNAL_ERROR);
       }
 
-      return revokedStsTokenTable.getIfExist(sessionToken) != null;
+      final Long revocationTimeMillis = revokedStsTokenTable.getIfExist(originalAccessKeyId);
+      return revocationTimeMillis != null
+          && stsTokenIdentifier.getCreationTime().toEpochMilli() < revocationTimeMillis;
     } catch (Exception e) {
       final String msg = "Could not determine STS revocation because of Exception: " + e.getMessage();
       LOG.warn(msg, e);

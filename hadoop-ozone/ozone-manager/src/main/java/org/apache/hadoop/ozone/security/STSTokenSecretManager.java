@@ -85,7 +85,8 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
    */
   public String createSTSTokenString(String tempAccessKeyId, String originalAccessKeyId, String roleArn,
       int durationSeconds, String secretAccessKey, String sessionPolicy, Clock clock) throws IOException {
-    final Instant expiration = clock.instant().plusSeconds(durationSeconds);
+    final Instant creationTime = clock.instant();
+    final Instant expiration = creationTime.plusSeconds(durationSeconds);
 
     // Get the current secret key for encryption
     final ManagedSecretKey currentSecretKey = secretKeyClient.getCurrentSecretKey();
@@ -94,8 +95,16 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
     // Note - the encryptionKey will NOT be encoded in the token.  When generateToken() is called, it eventually calls
     // the write() method in STSTokenIdentifier which calls toProtoBuf(), and the encryptionKey is not
     // serialized there.
-    final STSTokenIdentifier identifier = new STSTokenIdentifier(
-        tempAccessKeyId, originalAccessKeyId, roleArn, expiration, secretAccessKey, sessionPolicy, encryptionKey);
+    final STSTokenIdentifier identifier = new STSTokenIdentifier(STSTokenIdentifier.Params.newBuilder()
+        .setTempAccessKeyId(tempAccessKeyId)
+        .setOriginalAccessKeyId(originalAccessKeyId)
+        .setRoleArn(roleArn)
+        .setCreationTime(creationTime)
+        .setExpiry(expiration)
+        .setSecretAccessKey(secretAccessKey)
+        .setSessionPolicy(sessionPolicy)
+        .setEncryptionKey(encryptionKey)
+        .build());
 
     final Token<STSTokenIdentifier> token = generateToken(identifier);
     return token.encodeToUrlString();

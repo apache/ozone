@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -683,15 +684,22 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
         if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
           // ThreadLocal carries session policy for OmMetadataReader
+          // Use Instant.MAX for creationTime so a future revocation check on this ThreadLocal
+          // identifier never treats the token as issued before a stored cutoff.
           final STSTokenIdentifier rehydratedTokenIdentifier = new STSTokenIdentifier(
-                  s3Auth.hasResolvedStsTempAccessKeyId() ? s3Auth.getResolvedStsTempAccessKeyId() : "",
-                  s3Auth.hasResolvedStsOriginalAccessKeyId() ? s3Auth.getResolvedStsOriginalAccessKeyId() : "",
-                  s3Auth.hasResolvedStsRoleArn() ? s3Auth.getResolvedStsRoleArn() : "",
-                  java.time.Instant.MAX, // ensure it deterministically is not expired
-                  "", // no secretAccessKey needed
-                  s3Auth.hasResolvedStsSessionPolicy() ? s3Auth.getResolvedStsSessionPolicy() : "",
-                  null // no encryption key needed
-              );
+              STSTokenIdentifier.Params.newBuilder()
+                  .setTempAccessKeyId(
+                      s3Auth.hasResolvedStsTempAccessKeyId() ? s3Auth.getResolvedStsTempAccessKeyId() : "")
+                  .setOriginalAccessKeyId(
+                      s3Auth.hasResolvedStsOriginalAccessKeyId() ? s3Auth.getResolvedStsOriginalAccessKeyId() : "")
+                  .setRoleArn(s3Auth.hasResolvedStsRoleArn() ? s3Auth.getResolvedStsRoleArn() : "")
+                  .setCreationTime(Instant.MAX)
+                  .setExpiry(Instant.MAX) // ensure it deterministically is not expired
+                  .setSecretAccessKey("") // no secretAccessKey needed
+                  .setSessionPolicy(
+                      s3Auth.hasResolvedStsSessionPolicy() ? s3Auth.getResolvedStsSessionPolicy() : "")
+                  .setEncryptionKey(null) // no encryption key needed
+                  .build());
           OzoneManager.setStsTokenIdentifier(rehydratedTokenIdentifier);
           isStsThreadLocalSet = true;
         }

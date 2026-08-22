@@ -1535,9 +1535,9 @@ public class TestOmMetadataManager {
     assertNotNull(omMetadataManager.getS3RevokedStsTokenTable(), "s3RevokedStsTokenTable should be initialized");
 
     final MockClock clock = MockClock.newInstance();
-    final String sessionToken1 = "test-session-token-1";
+    final String originalAccessKeyId1 = "orig-1";
     final long insertionTime1 = clock.millis();
-    final String sessionToken2 = "test-session-token-2";
+    final String originalAccessKeyId2 = "orig-2";
     final long insertionTime2 = insertionTime1 + 1234L;
 
     // This table is configured as FULL_CACHE in OmMetadataManagerImpl.
@@ -1546,25 +1546,25 @@ public class TestOmMetadataManager {
     final TypedTable<String, Long> revokedTable =
         (TypedTable<String, Long>) omMetadataManager.getS3RevokedStsTokenTable();
 
-    revokedTable.put(sessionToken1, insertionTime1);
-    revokedTable.put(sessionToken2, insertionTime2);
+    revokedTable.put(originalAccessKeyId1, insertionTime1);
+    revokedTable.put(originalAccessKeyId2, insertionTime2);
 
     // Verify the values are persisted in RocksDB.
-    assertEquals(insertionTime1, revokedTable.getSkipCache(sessionToken1));
-    assertEquals(insertionTime2, revokedTable.getSkipCache(sessionToken2));
+    assertEquals(insertionTime1, revokedTable.getSkipCache(originalAccessKeyId1));
+    assertEquals(insertionTime2, revokedTable.getSkipCache(originalAccessKeyId2));
 
     // Update cache to make get/getIfExist reflect the write for FULL_CACHE tables.
-    revokedTable.addCacheEntry(sessionToken1, insertionTime1, 1L);
-    revokedTable.addCacheEntry(sessionToken2, insertionTime2, 1L);
+    revokedTable.addCacheEntry(originalAccessKeyId1, insertionTime1, 1L);
+    revokedTable.addCacheEntry(originalAccessKeyId2, insertionTime2, 1L);
 
     // Verify get and getIfExist return the stored value
-    assertEquals(insertionTime1, revokedTable.get(sessionToken1));
-    assertEquals(insertionTime1, revokedTable.getIfExist(sessionToken1));
-    assertEquals(insertionTime2, revokedTable.get(sessionToken2));
-    assertEquals(insertionTime2, revokedTable.getIfExist(sessionToken2));
+    assertEquals(insertionTime1, revokedTable.get(originalAccessKeyId1));
+    assertEquals(insertionTime1, revokedTable.getIfExist(originalAccessKeyId1));
+    assertEquals(insertionTime2, revokedTable.get(originalAccessKeyId2));
+    assertEquals(insertionTime2, revokedTable.getIfExist(originalAccessKeyId2));
 
-    // Invalid sessionToken should return null for getIfExist
-    assertNull(revokedTable.getIfExist("INVALID_SESSION_TOKEN"));
+    // Invalid originalAccessKeyId should return null for getIfExist.
+    assertNull(revokedTable.getIfExist("INVALID_ORIGINAL_ACCESS_KEY_ID"));
   }
 
   @Test
