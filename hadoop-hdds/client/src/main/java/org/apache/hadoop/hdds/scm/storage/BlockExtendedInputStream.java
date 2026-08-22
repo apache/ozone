@@ -132,7 +132,8 @@ public abstract class BlockExtendedInputStream extends ExtendedInputStream
    * Check if this exception is because datanodes are not reachable.
    */
   protected boolean isConnectivityIssue(IOException ex) {
-    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
+    final Status.Code code = Status.fromThrowable(ex).getCode();
+    return code == Status.UNAVAILABLE.getCode() || code == Status.DEADLINE_EXCEEDED.getCode();
   }
 
 }

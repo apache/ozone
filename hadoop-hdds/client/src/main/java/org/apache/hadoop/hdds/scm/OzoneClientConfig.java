@@ -355,6 +355,19 @@ public class OzoneClientConfig {
       description = "Timeout for receiving streaming read responses.")
   private Duration streamReadTimeout = Duration.ofSeconds(10);
 
+  @Config(key = "ozone.client.stream.read.max-concurrent-streams",
+      defaultValue = "-1",
+      type = ConfigType.INT,
+      tags = {ConfigTag.CLIENT},
+      description = "Maximum number of concurrently open streaming read block streams per pipeline client. "
+          + "Each open block input stream holds one slot until it is closed; opening a stream beyond the limit "
+          + "waits up to ozone.client.stream.read.timeout for a slot and then fails. Each open stream can "
+          + "buffer up to ozone.client.stream.read.pre-read-size bytes, so this limit also bounds client "
+          + "memory per pipeline. Any non-positive value (the default) makes the limit follow "
+          + "hdds.ratis.raft.client.async.outstanding-requests.max, preserving the capacity streaming reads "
+          + "had when they were counted against the request limit.")
+  private int streamReadMaxConcurrentStreams = -1;
+
   @PostConstruct
   public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -704,6 +717,14 @@ public class OzoneClientConfig {
 
   public void setStreamReadTimeout(Duration streamReadTimeout) {
     this.streamReadTimeout = streamReadTimeout;
+  }
+
+  public int getStreamReadMaxConcurrentStreams() {
+    return streamReadMaxConcurrentStreams;
+  }
+
+  public void setStreamReadMaxConcurrentStreams(int streamReadMaxConcurrentStreams) {
+    this.streamReadMaxConcurrentStreams = streamReadMaxConcurrentStreams;
   }
 
   public boolean isDatastreamPutBlockOnCloseEnabled() {

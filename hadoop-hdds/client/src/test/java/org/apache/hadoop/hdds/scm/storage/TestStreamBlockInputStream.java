@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -268,6 +269,232 @@ public class TestStreamBlockInputStream {
       assertDoesNotThrow(() -> sbis.read(buf), "should not NPE when onCompleted fires before poll");
       assertEquals(data.length, buf.position(), "all bytes should be read");
     }
+  }
+
+  /**
+   * A datanode error response (e.g. UNKNOWN_BCSID) must surface as retryable and fail over to a
+   * fresh stream instead of being treated as a premature EOF.
+   */
+  @Test
+  public void testErrorResponseFailsOverToFreshStream() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setReadRetryInterval(0);
+    BlockID blockID = new BlockID(1L, 11L);
+    byte[] data = {1, 2, 3, 4};
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+    when(streamingReadResponse.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+
+    AtomicInteger initCount = new AtomicInteger();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      if (initCount.incrementAndGet() == 1) {
+        // First stream: the datanode streams back an error response.
+        reader.onNext(ContainerCommandResponseProto.newBuilder()
+            .setCmdType(Type.ReadBlock)
+            .setResult(ContainerProtos.Result.UNKNOWN_BCSID)
+            .setMessage("Unable to find the block with bcsID")
+            .build());
+      } else {
+        // Retried stream: the data is served successfully.
+        reader.onNext(ContainerCommandResponseProto.newBuilder()
+            .setCmdType(Type.ReadBlock)
+            .setResult(ContainerProtos.Result.SUCCESS)
+            .setReadBlock(buildReadBlockResponse(data))
+            .build());
+      }
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, data.length, pipeline, null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      assertEquals(data.length, sbis.read(buf), "read should succeed after failing over to a fresh stream");
+      assertArrayEquals(data, buf.array());
+    }
+    assertEquals(2, initCount.get(), "a fresh stream should have been initialized for the retry");
+  }
+
+  /**
+   * A terminal stream failure must not poison the stream: the failing read throws, but the next
+   * read must re-initialize a fresh stream instead of replaying the stale failure.
+   */
+  @Test
+  public void testTerminalStreamFailureDoesNotPoisonSubsequentReads() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setReadRetryInterval(0);
+    clientConfig.setMaxReadRetryCount(0);
+    BlockID blockID = new BlockID(1L, 12L);
+    byte[] data = {1, 2, 3, 4};
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+    when(streamingReadResponse.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+
+    AtomicInteger initCount = new AtomicInteger();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      if (initCount.incrementAndGet() == 1) {
+        // First stream is killed by the server/transport.
+        reader.onError(Status.DEADLINE_EXCEEDED.asRuntimeException());
+      } else {
+        reader.onNext(ContainerCommandResponseProto.newBuilder()
+            .setCmdType(Type.ReadBlock)
+            .setResult(ContainerProtos.Result.SUCCESS)
+            .setReadBlock(buildReadBlockResponse(data))
+            .build());
+      }
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, data.length, pipeline, null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      assertThrows(IOException.class, () -> sbis.read(buf), "the read that hit the failure should throw");
+      buf.clear();
+      assertEquals(data.length, sbis.read(buf), "the stream must recover on the next read");
+      assertArrayEquals(data, buf.array());
+    }
+    assertEquals(2, initCount.get(), "a fresh stream should have been initialized after the failure");
+  }
+
+  /**
+   * Tearing down a failed stream must cancel the gRPC call, not half-close it: a half-closed call
+   * to a stuck datanode stays alive indefinitely.
+   */
+  @Test
+  public void testFailedStreamIsCancelledNotHalfClosed() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setReadRetryInterval(0);
+    clientConfig.setMaxReadRetryCount(0);
+    BlockID blockID = new BlockID(1L, 22L);
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+
+    XceiverClientGrpc xceiverClient = mockCapturingStreamingReadClient(requestObserver,
+        reader -> reader.onError(Status.DEADLINE_EXCEEDED.asRuntimeException()));
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, 1024L, mockStandalonePipeline(), null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(1024);
+      assertThrows(IOException.class, () -> sbis.read(buf), "the read that hit the failure should throw");
+      verify(requestObserver, times(1)).cancel(any(), any());
+      verify(requestObserver, never()).onCompleted();
+    }
+  }
+
+  /**
+   * unbuffer() must reset the request high-water mark: a fresh stream requesting from the stale
+   * prefetch offset never receives data covering the position and stalls until the read timeout.
+   */
+  @Test
+  public void testReadAfterUnbufferResumesFromPosition() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setStreamReadPreReadSize(1024);
+    // Keep the test fast if a stale request offset makes the read wait for a response that never comes.
+    clientConfig.setStreamReadTimeout(Duration.ofMillis(500));
+    clientConfig.setMaxReadRetryCount(0);
+    byte[] data = {1, 2, 3, 4, 5, 6, 7, 8};
+    BlockID blockID = new BlockID(1L, 23L);
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+    when(streamingReadResponse.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+    // Serve exactly the requested range, like a real datanode.
+    doAnswer(inv -> {
+      ContainerCommandRequestProto request = inv.getArgument(0);
+      final int offset = (int) request.getReadBlock().getOffset();
+      final int length = (int) request.getReadBlock().getLength();
+      byte[] slice = Arrays.copyOfRange(data, offset, Math.min(offset + length, data.length));
+      readerRef.get().onNext(buildResponseProto(slice, offset));
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, data.length, pipeline, null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer first = ByteBuffer.allocate(4);
+      assertEquals(4, sbis.read(first), "first read should return the requested bytes");
+      assertArrayEquals(new byte[] {1, 2, 3, 4}, first.array());
+
+      sbis.unbuffer();
+
+      ByteBuffer second = ByteBuffer.allocate(4);
+      assertEquals(4, sbis.read(second), "read after unbuffer must resume from the current position");
+      assertArrayEquals(new byte[] {5, 6, 7, 8}, second.array());
+    }
+  }
+
+  /**
+   * A terminal failure delivered on a gRPC callback thread must release the stream permit exactly
+   * once, even while the reading thread is tearing down the client under the stream monitor.
+   */
+  @Test
+  public void testAsyncTerminalFailureReleasesStreamPermit() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setReadRetryInterval(0);
+    clientConfig.setMaxReadRetryCount(0);
+    BlockID blockID = new BlockID(1L, 24L);
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+    when(streamingReadResponse.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    AtomicReference<Thread> callbackThreadRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+    // Deliver the terminal failure from another thread, as gRPC does, while the reading thread
+    // holds the stream monitor waiting for a response.
+    doAnswer(inv -> {
+      Thread callbackThread = new Thread(() -> readerRef.get().onError(Status.INTERNAL.asRuntimeException()));
+      callbackThreadRef.set(callbackThread);
+      callbackThread.start();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, 1024L, pipeline, null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(1024);
+      assertThrows(IOException.class, () -> sbis.read(buf), "the read that hit the failure should throw");
+      callbackThreadRef.get().join();
+    }
+    verify(xceiverClient, times(1)).completeStreamRead();
   }
 
   private OzoneClientConfig newStreamReadConfig() {
@@ -703,7 +930,8 @@ public class TestStreamBlockInputStream {
       ByteBuffer buf = ByteBuffer.allocate(data.length);
       IOException thrown = assertThrows(IOException.class, () -> sbis.read(buf),
           "checksum failure should surface as an IOException");
-      assertThat(thrown).hasRootCauseInstanceOf(OzoneChecksumException.class);
+      // checkError() rethrows the original failure directly instead of wrapping it.
+      assertThat(thrown).isInstanceOf(OzoneChecksumException.class);
     }
     verify(requestObserver, times(1)).onError(any(OzoneChecksumException.class));
   }
@@ -744,7 +972,8 @@ public class TestStreamBlockInputStream {
       ByteBuffer buf = ByteBuffer.allocate(data.length);
       IOException thrown = assertThrows(IOException.class, () -> sbis.read(buf),
           "checksum failure should surface as an IOException");
-      assertThat(thrown).hasRootCauseInstanceOf(OzoneChecksumException.class);
+      // checkError() rethrows the original failure directly instead of wrapping it.
+      assertThat(thrown).isInstanceOf(OzoneChecksumException.class);
     }
     verify(requestObserver, never()).onError(any());
   }

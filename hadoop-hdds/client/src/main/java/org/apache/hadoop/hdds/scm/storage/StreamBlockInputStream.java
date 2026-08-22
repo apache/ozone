@@ -72,6 +72,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private static final Logger LOG = LoggerFactory.getLogger(StreamBlockInputStream.class);
   private static final int EOF = -1;
   private static final String STREAM_CLOSE_REASON = "StreamBlockInputStream closed";
+  private static final String STREAM_FAILED_REASON = "StreamBlockInputStream stream failed";
   private static final AtomicInteger STREAM_ID = new AtomicInteger(0);
   private static final AtomicInteger READER_ID = new AtomicInteger(0);
 
@@ -278,6 +279,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   private synchronized void closeReader(String reason) {
     readBuffer = null;
+    // Requested-but-unreceived data dies with the stream; a fresh stream must re-request from position.
+    requestedLength = position;
     if (streamingReader == null) {
       return;
     }
@@ -286,20 +289,30 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     streamingReader = null;
     LOG.debug("{} closeReader for {}", getName(reader), reason);
 
+    final boolean failed = reader.isFailed();
     reader.onCompleted();
 
     final StreamingReadResponse response = reader.getResponse();
     if (response != null) {
       final ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver =
           response.getRequestObserver();
-      try {
-        requestObserver.onCompleted();
-      } catch (RuntimeException e) {
-        LOG.warn("Failed to close gRPC request stream for {}", reader, e);
+      if (failed) {
+        // onCompleted() only half-closes the call; a stuck datanode would keep the RPC alive, so cancel.
         try {
-          requestObserver.cancel(STREAM_CLOSE_REASON, e);
-        } catch (RuntimeException cancelEx) {
-          LOG.warn("Failed to cancel gRPC request stream for {}", reader, cancelEx);
+          requestObserver.cancel(STREAM_FAILED_REASON, null);
+        } catch (RuntimeException e) {
+          LOG.warn("Failed to cancel gRPC request stream for {}", reader, e);
+        }
+      } else {
+        try {
+          requestObserver.onCompleted();
+        } catch (RuntimeException e) {
+          LOG.warn("Failed to close gRPC request stream for {}", reader, e);
+          try {
+            requestObserver.cancel(STREAM_CLOSE_REASON, e);
+          } catch (RuntimeException cancelEx) {
+            LOG.warn("Failed to cancel gRPC request stream for {}", reader, cancelEx);
+          }
         }
       }
     }
@@ -338,7 +351,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     while (streamingReader == null) {
       try {
         acquireClient();
-        final StreamingReader reader = new StreamingReader();
+        final StreamingReader reader = new StreamingReader(xceiverClient);
         LOG.debug("{}: new StreamingReader", getName(reader));
         xceiverClient.initStreamRead(blockID, reader, failedStreamingDatanodes);
         streamingReader = reader;
@@ -377,19 +390,26 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   private void handleExceptions(IOException cause) throws IOException {
     IOException root = ConnectionFailureUtils.unwrapCause(cause);
-    if (root instanceof StorageContainerException || isConnectivityIssue(root) ||
-         root instanceof TimeoutIOException) {
-      if (shouldRetryRead(root, retryPolicy, retries++)) {
-        recordFailedStreamingDatanode();
-        releaseClient();
-        refreshBlockInfo(root);
-        requestedLength = position;
-        LOG.warn("Refreshing block data to read block {} due to {}", blockID, cause.getMessage());
-      } else {
-        throw cause;
-      }
+    // Mark the reader failed so closeReader() cancels the RPC; no-op if it already failed or completed.
+    markStreamFailed(cause);
+    if ((root instanceof StorageContainerException || isConnectivityIssue(root) ||
+         root instanceof TimeoutIOException) && shouldRetryRead(root, retryPolicy, retries++)) {
+      recordFailedStreamingDatanode();
+      releaseClient();
+      refreshBlockInfo(root);
+      requestedLength = position;
+      LOG.warn("Refreshing block data to read block {} due to {}", blockID, cause.getMessage());
     } else {
+      // Tear down the failed stream so the next read re-initializes instead of replaying the stale failure.
+      releaseClient();
+      requestedLength = position;
       throw cause;
+    }
+  }
+
+  private synchronized void markStreamFailed(IOException cause) {
+    if (streamingReader != null) {
+      streamingReader.markFailed(cause);
     }
   }
 
@@ -424,12 +444,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   private void refreshBlockInfo(IOException cause) throws IOException {
     refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
-  }
-
-  private synchronized void releaseStreamResources() {
-    if (xceiverClient != null) {
-      xceiverClient.completeStreamRead();
-    }
   }
 
   @Override
@@ -485,6 +499,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   public class StreamingReader implements StreamingReaderSpi {
     private final String name = StreamBlockInputStream.this.name + "-reader" + READER_ID.getAndIncrement();
 
+    // Release the stream permit against this client directly; the outer xceiverClient field may already
+    // be null when a callback thread runs releaseResources().
+    private final XceiverClientGrpc client;
+
     /** Response queue: poll is blocking while offer is non-blocking. */
     private final BlockingQueue<ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>();
 
@@ -492,11 +510,24 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
     private final AtomicReference<StreamingReadResponse> response = new AtomicReference<>();
 
+    StreamingReader(XceiverClientGrpc client) {
+      this.client = client;
+    }
+
     void checkError() throws IOException {
       if (future.isCompletedExceptionally()) {
         try {
           future.get();
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Streaming read failed", e);
+        } catch (ExecutionException e) {
+          // Rethrow the original IOException so retry classification sees the real failure;
+          // ConnectionFailureUtils.unwrapCause cannot step through an ExecutionException.
+          final Throwable cause = e.getCause();
+          if (cause instanceof IOException) {
+            throw (IOException) cause;
+          }
           throw new IOException("Streaming read failed", e);
         }
       }
@@ -524,6 +555,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         // checked first, an item delivered by onNext() just before onCompleted()
         // fired would be silently dropped, causing data corruption.
         if (future.isDone()) {
+          // isDone() is also true for exceptional completion; re-check before treating this as end of stream.
+          checkError();
           return null; // Stream ended, queue is empty
         }
 
@@ -534,14 +567,17 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
           if (setFailed(e)) {
             throw e;
           }
+          // Another thread completed the future first; surface its failure instead of returning null.
+          checkError();
           return null;
         }
       }
     }
 
     private ReadBuffer read(int length, boolean preRead) throws IOException {
-      checkError();
       if (future.isDone()) {
+        // isDone() is also true for exceptional completion; checkError() throws in that case.
+        checkError();
         // Don't return null while items remain in the queue. onNext() may have delivered items just before
         // onCompleted() fired.
         if (responseQueue.isEmpty()) {
@@ -569,7 +605,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     private void releaseResources() {
       if (semaphoreReleased.compareAndSet(false, true)) {
-        releaseStreamResources();
+        client.completeStreamRead();
       }
     }
 
@@ -642,6 +678,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     StreamingReadResponse getResponse() {
       return response.get();
+    }
+
+    boolean isFailed() {
+      return future.isCompletedExceptionally();
+    }
+
+    /** Unlike setFailed, does not warn when the future is already completed. */
+    void markFailed(Throwable throwable) {
+      future.completeExceptionally(throwable);
     }
 
     private boolean setFailed(Throwable throwable) {
