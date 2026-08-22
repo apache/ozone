@@ -52,7 +52,7 @@ import org.junit.jupiter.api.Test;
  * <p>Run with:
  * <pre>
  *   mvn test -pl :hdds-common \
- *     -Dtest=ConcurrentMutableStatBenchmark#benchmarkBurstScalability \
+ *     -Dtest=ConcurrentMutableStatBenchmark \
  *     -Dgroups=benchmark -Dexcluded-test-groups= \
  *     -Dsurefire.failIfNoSpecifiedTests=false
  * </pre>
@@ -92,11 +92,6 @@ public class ConcurrentMutableStatBenchmark {
           threads, formatUs(baseUs), formatUs(concUs), speedup);
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Separate concrete-typed methods so the JIT sees a monomorphic add() call
-  // site for each stat type and can devirtualize / inline the hot path.
-  // ---------------------------------------------------------------------------
 
   private static double measureMutableStatBurst(int threads) throws Exception {
     MutableStat stat = new MutableStat("base", "baseline", "Ops", "Time", false);
