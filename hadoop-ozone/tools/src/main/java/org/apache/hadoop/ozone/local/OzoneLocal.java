@@ -197,11 +197,30 @@ public class OzoneLocal extends GenericCli {
     public Void call() throws Exception {
       LocalOzoneClusterConfig config = resolveConfig();
       try (LocalOzoneRuntime runtime = createRuntime(config, getOzoneConf())) {
-        runtime.start();
+        start(runtime);
         printSummary(runtime, config);
         awaitShutdown(runtime);
       }
       return null;
+    }
+
+    /**
+     * Starts {@code runtime}, naming the ways to get more detail before letting the failure
+     * through. Service logging is off by default for this command, so the detail goes to the log
+     * for {@code --loglevel INFO}; the failure itself is rethrown unchanged so
+     * {@link GenericCli#printError} prints its own message rather than a restatement of it.
+     */
+    private void start(LocalOzoneRuntime runtime) throws Exception {
+      try {
+        runtime.start();
+      } catch (Exception ex) {
+        LOG.error("Local Ozone cluster failed to start.", ex);
+        // Printed before the failure, not after: GenericCli#printError only runs once call()
+        // has thrown.
+        err().println("Local Ozone failed to start. Re-run with `ozone --loglevel INFO local run`"
+            + " for service logs, or add --verbose for the full stack trace.");
+        throw ex;
+      }
     }
 
     LocalOzoneRuntime createRuntime(LocalOzoneClusterConfig config, OzoneConfiguration seedConfiguration) {
@@ -213,6 +232,7 @@ public class OzoneLocal extends GenericCli {
       writer.println("Local Ozone is running from " + config.getDataDir());
       writer.println("SCM RPC: " + runtime.getDisplayHost() + ":" + runtime.getScmPort());
       writer.println("OM RPC: " + runtime.getDisplayHost() + ":" + runtime.getOmPort());
+      writer.println("Datanodes: " + config.getDatanodes());
       writer.println("Press Ctrl+C to stop.");
       writer.flush();
     }
@@ -293,8 +313,11 @@ public class OzoneLocal extends GenericCli {
         try {
           return LocalOzoneClusterConfig.FormatMode.fromString(value);
         } catch (IllegalArgumentException ex) {
-          throw new CommandLine.TypeConversionException(
-              "Expected one of: if-needed, always, never.");
+          // The value can come from OZONE_LOCAL_FORMAT, so name it: the user may not realize the
+          // environment supplied it. picocli's conversion-error line names the option but not the
+          // value, so the message has to carry it.
+          throw new CommandLine.TypeConversionException("Invalid format mode '" + value
+              + "'. Expected one of: if-needed, always, never.");
         }
       }
     }
@@ -304,19 +327,29 @@ public class OzoneLocal extends GenericCli {
 
       @Override
       public Duration convert(String value) {
+        String trimmed = value.trim();
         try {
-          return Duration.parse(value.trim());
+          return Duration.parse(trimmed);
         } catch (DateTimeParseException ignored) {
-          return parseHadoopStyleDuration(value);
+          return parseHadoopStyleDuration(trimmed);
         }
       }
 
       private static Duration parseHadoopStyleDuration(String value) {
+        // TimeDurationUtil.getDuration() only warns about a missing unit and then assumes the one
+        // it is given, which would read "120" as 120 milliseconds. Reject it instead of silently
+        // interpreting the value a thousand times smaller than the user meant. Every unit suffix
+        // TimeDurationUtil accepts ends in a letter, so a trailing digit means the unit is missing.
+        if (!value.isEmpty() && Character.isDigit(value.charAt(value.length() - 1))) {
+          throw new CommandLine.TypeConversionException("Missing time unit in '" + value
+              + "'. " + durationMessage());
+        }
         try {
           return TimeDurationUtil.getDuration("--startup-timeout", value,
               TimeUnit.MILLISECONDS);
         } catch (RuntimeException ex) {
-          throw new CommandLine.TypeConversionException(durationMessage());
+          throw new CommandLine.TypeConversionException("Invalid duration '" + value
+              + "'. " + durationMessage());
         }
       }
 

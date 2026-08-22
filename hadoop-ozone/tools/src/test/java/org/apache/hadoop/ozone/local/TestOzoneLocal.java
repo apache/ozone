@@ -18,20 +18,25 @@
 package org.apache.hadoop.ozone.local;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.IDefaultValueProvider;
@@ -121,6 +126,51 @@ class TestOzoneLocal {
 
     assertEquals(1, exitCode);
     assertTrue(runtime.closed);
+  }
+
+  @Test
+  void runCommandPropagatesStartupFailureAndPointsAtMoreDetail() throws Exception {
+    ByteArrayOutputStream err = new ByteArrayOutputStream();
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862);
+    runtime.failStart = true;
+    TestableRunCommand command = new TestableRunCommand(runtime);
+    CommandLine commandLine = new CommandLine(command);
+    commandLine.setErr(new PrintWriter(new OutputStreamWriter(err, UTF_8), true));
+    commandLine.parseArgs();
+
+    // Rethrown as it is, so GenericCli#printError prints the runtime's own message; wrapping it
+    // would replace the reason with a restatement.
+    IllegalStateException error = assertThrows(IllegalStateException.class, command::call);
+
+    assertEquals("startup failed", error.getMessage());
+    String hint = err.toString(UTF_8.name());
+    assertTrue(hint.contains("--loglevel INFO"), hint);
+    assertTrue(hint.contains("--verbose"), hint);
+    assertTrue(runtime.closed);
+  }
+
+  @Test
+  void conflictingConfigReachesStderrThroughGenericCli(@TempDir Path dataDir) throws Exception {
+    ByteArrayOutputStream err = new ByteArrayOutputStream();
+    OzoneLocal ozoneLocal = new OzoneLocal();
+    ozoneLocal.getCmd().setErr(new PrintWriter(new OutputStreamWriter(err, UTF_8), true));
+
+    // Drives the whole path a user hits: the cluster rejects the value, RunCommand prints the
+    // hint and rethrows, and GenericCli#printError prints the rejection on one line.
+    // Preemptive: on the success path execute() blocks in awaitShutdown() until a JVM shutdown
+    // hook fires, so a check that stopped rejecting would hang the fork instead of failing.
+    int exitCode = assertTimeoutPreemptively(Duration.ofSeconds(30),
+        () -> ozoneLocal.execute(new String[] {"-D", OZONE_REPLICATION + "=THREE",
+            "run", "--data-dir", dataDir.toString()}));
+
+    assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE, exitCode);
+    String[] lines = err.toString(UTF_8.name()).trim().split("\n");
+    assertEquals(2, lines.length, err.toString(UTF_8.name()));
+    assertTrue(lines[0].contains("--loglevel INFO"), lines[0]);
+    assertTrue(lines[0].contains("--verbose"), lines[0]);
+    // The rejection reaches the user without --verbose, which is why nothing wraps it.
+    assertTrue(lines[1].contains(OZONE_REPLICATION), lines[1]);
+    assertTrue(lines[1].contains("THREE"), lines[1]);
   }
 
   @Test
@@ -250,12 +300,33 @@ class TestOzoneLocal {
 
   @Test
   void resolveConfigRejectsInvalidDuration() {
-    assertParseError("--startup-timeout", "forever", "--startup-timeout");
+    // Pins the value echo: picocli's wrapper already names the option, so asserting on the
+    // option alone would pass even if the converter dropped the value from its message.
+    assertParseError("--startup-timeout", "forever", "Invalid duration 'forever'");
   }
 
   @Test
   void resolveConfigRejectsNonPositiveDuration() {
     assertConfigError("--startup-timeout", "0s", "--startup-timeout");
+  }
+
+  @Test
+  void resolveConfigRejectsDurationWithoutTimeUnit() {
+    // Without the unit check this parses as 120 milliseconds, so the run dies with an unrelated
+    // timeout instead of telling the user the value was misread. Asserts the quoted value: the
+    // bare digits also occur in the static "like 120s" hint, which would mask a dropped echo.
+    assertParseError("--startup-timeout", "120", "Missing time unit in '120'");
+  }
+
+  @Test
+  void resolveConfigAcceptsHadoopStyleMinutes() {
+    assertEquals(Duration.ofMinutes(2), resolve("--startup-timeout", "2m")
+        .getStartupTimeout());
+  }
+
+  @Test
+  void invalidFormatModeMessageNamesOffendingValue() {
+    assertParseError("--format", "sometimes", "sometimes");
   }
 
   @Test
