@@ -22,18 +22,19 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NO
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -271,8 +272,8 @@ public class TestFailureHandlingByClient {
     // write or not). The 3rd chunk would not exist on the first pipeline as
     // the pipeline would be closed before the last 0.5 chunk was committed
     // to the block.
-    KeyValueContainerData containerData1 =
-        ((KeyValueContainer) getContainerByID(cluster, containerId1)).getContainerData();
+    KeyValueContainerData containerData1 = waitForBlockContainer(containerId1,
+        locationList.get(0).getBlockID().getLocalID());
     try (DBHandle containerDb1 = BlockUtils.getDB(containerData1, conf)) {
       BlockData blockData1 = containerDb1.getStore().getBlockDataTable().get(
           containerData1.getBlockKey(locationList.get(0).getBlockID()
@@ -285,8 +286,8 @@ public class TestFailureHandlingByClient {
     }
 
     // Verify that the second block has the remaining 0.5*chunkSize of data
-    KeyValueContainerData containerData2 =
-        ((KeyValueContainer) getContainerByID(cluster, containerId2)).getContainerData();
+    KeyValueContainerData containerData2 = waitForBlockContainer(containerId2,
+        locationList.get(1).getBlockID().getLocalID());
     try (DBHandle containerDb2 = BlockUtils.getDB(containerData2, conf)) {
       BlockData blockData2 = containerDb2.getStore().getBlockDataTable().get(
           containerData2.getBlockKey(locationList.get(1).getBlockID()
@@ -302,6 +303,40 @@ public class TestFailureHandlingByClient {
       }
       assertEquals(expectedBlockSize, blockData2.getSize());
     }
+  }
+
+  /**
+   * Wait for a datanode replica that has both the container and the target
+   * block applied, and return its container data. A lagging Ratis follower can
+   * hold the container without the block yet, so reading a fixed replica (or one
+   * chosen only because it has the container) is racy; poll all replicas until
+   * one has the block.
+   */
+  private KeyValueContainerData waitForBlockContainer(long containerId,
+      long blockLocalId) throws Exception {
+    AtomicReference<KeyValueContainerData> found = new AtomicReference<>();
+    GenericTestUtils.waitFor(() -> {
+      for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+        KeyValueContainer container = (KeyValueContainer) dn
+            .getDatanodeStateMachine().getContainer().getContainerSet()
+            .getContainer(containerId);
+        if (container == null) {
+          continue;
+        }
+        KeyValueContainerData data = container.getContainerData();
+        try (DBHandle db = BlockUtils.getDB(data, conf)) {
+          if (db.getStore().getBlockDataTable()
+              .get(data.getBlockKey(blockLocalId)) != null) {
+            found.set(data);
+            return true;
+          }
+        } catch (IOException e) {
+          // Container DB not ready on this replica yet; try the next one.
+        }
+      }
+      return false;
+    }, 500, 30000);
+    return found.get();
   }
 
   @Test
