@@ -190,7 +190,6 @@ public class KeyLifecycleService extends BackgroundService {
         StorageUnit.BYTES);
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
-    this.ozoneTrash = ozoneManager.getOzoneTrash();
   }
 
   @Override
@@ -312,6 +311,7 @@ public class KeyLifecycleService extends BackgroundService {
 
     private long lastStateSaveTime = Time.monotonicNow();
     private long lastStateSaveKeyCount = 0;
+    private boolean scanAborted;
 
     private boolean shouldSaveState() {
       if ((Time.monotonicNow() - lastStateSaveTime) > stateSaveIntervalMs ||
@@ -437,9 +437,10 @@ public class KeyLifecycleService extends BackgroundService {
               evaluateBucket(bucket, keyTable, expirationRules, expiredKeyList, scanStateBuilder);
             }
 
+            boolean scanFinished = !scanAborted;
             if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
               LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
-              sendSaveScanStateRequest(scanStateBuilder, true);
+              sendSaveScanStateRequest(scanStateBuilder, scanFinished);
             } else {
               LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
                   expiredKeyList.size(), expiredDirList.size(), bucketKey);
@@ -447,12 +448,12 @@ public class KeyLifecycleService extends BackgroundService {
               // If trash is enabled, move files to trash, instead of send delete requests.
               // OBS bucket doesn't support trash.
               if (bucket.getBucketLayout() == OBJECT_STORE) {
-                sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList,
-                    false, scanStateBuilder, true);
+                sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
+                    bucket.getOwner(), expiredKeyList, false, scanStateBuilder, scanFinished);
               } else {
                 // handle keys first, then directories
-                handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, true);
-                handleAndClearFullList(bucket, expiredDirList, true, scanStateBuilder, true);
+                handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, scanFinished);
+                handleAndClearFullList(bucket, expiredDirList, true, scanStateBuilder, scanFinished);
               }
             }
           }
@@ -467,6 +468,11 @@ public class KeyLifecycleService extends BackgroundService {
         }
 
         onSuccess(bucketKey);
+      } else {
+        // The task was registered in inFlight when scheduled, but the service got suspended/disabled
+        // or lost leadership before the task ran. Clear the registration, otherwise this bucket is
+        // skipped as "already running" in every following getTasks() cycle.
+        inFlight.remove(bucketKey);
       }
 
       // By design, no one cares about the results of this call back.
@@ -673,10 +679,9 @@ public class KeyLifecycleService extends BackgroundService {
       HashSet<Long> deletedDirSet = new HashSet<>();
       while (!stack.isEmpty()) {
         if (!shouldRun()) {
-          LOG.info("LifecycleActionTask for bucket {} stopping. " +
-              "Service enabled: {}, suspended: {}, leader ready: {}",
-              bucketName, isServiceEnabled.get(), suspended.get(), 
-              getOzoneManager() != null ? getOzoneManager().isLeaderReady() : "N/A");
+          scanAborted = true;
+          LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
+              bucketName);
           return;
         }
 
@@ -987,8 +992,8 @@ public class KeyLifecycleService extends BackgroundService {
       boolean saved = false;
       if (expiredKeyList != null && !expiredKeyList.isEmpty()) {
         if (bucket.getBucketLayout() == OBJECT_STORE) {
-          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList,
-              false, scanStateBuilder, false);
+          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
+              bucket.getOwner(), expiredKeyList, false, scanStateBuilder, false);
         } else {
           handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, false);
         }
@@ -1024,8 +1029,9 @@ public class KeyLifecycleService extends BackgroundService {
 
         while (keyTblItr.hasNext()) {
           if (!shouldRun()) {
-            LOG.info("KeyLifecycleService is suspended or disabled. " +
-                "Stopping LifecycleActionTask for bucket {}.", bucketName);
+            scanAborted = true;
+            LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
+                bucketName);
             return;
           }
           if (shouldSaveState()) {
@@ -1089,8 +1095,9 @@ public class KeyLifecycleService extends BackgroundService {
                omMetadataManager.getMultipartInfoTable().iterator(bucketPrefix)) {
         while (mpuIterator.hasNext()) {
           if (!shouldRun()) {
-            LOG.info("KeyLifecycleService is suspended or disabled. " +
-                "Stopping multipart upload processing for bucket {}.", bucketName);
+            scanAborted = true;
+            LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
+                bucketName);
             return;
           }
           Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();
@@ -1109,43 +1116,81 @@ public class KeyLifecycleService extends BackgroundService {
           upload.setCreationTime(Instant.ofEpochMilli(mpuKeyInfo.getCreationTime()));
           String keyName = upload.getKeyName();
 
-          String multipartOpenKey;
-          try {
-            multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
-                volumeName, bucketName, keyName, upload.getUploadId(),
-                omMetadataManager, bucketInfo.getBucketLayout());
-          } catch (OMException e) {
-            LOG.warn("Failed to get multipart open key for {}/{}/{}, skipping",
-                volumeName, bucketName, keyName, e);
-            continue;
-          }
-
-          OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(bucketInfo.getBucketLayout())
-              .get(multipartOpenKey);
-          if (openKeyInfo == null) {
-            LOG.warn("Open key not found for multipart upload {}/{}/{}, skipping",
-                volumeName, bucketName, keyName);
-            continue;
-          }
-
+          OmLCRule matchingRule = null;
+          OmKeyInfo openKeyInfo = null;
+          boolean openKeyFetchAttempted = false;
+          boolean skipUpload = false;
           for (OmLCRule rule : ruleList) {
-            if (shouldAbortUpload(openKeyInfo, upload, keyName, rule)) {
-              if (expiredUploads.isFull()) {
-                LOG.info("Multipart upload batch reached part count limit {}, aborting current batch " +
-                    "({} uploads, {} parts) for bucket {}/{}",
-                    mpuAbortLimitPerTask, expiredUploads.size(), expiredUploads.getPartCount(),
-                    volumeName, bucketName);
-                abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
+            if (!passesAgeAndPrefix(upload, keyName, rule)) {
+              continue;
+            }
+            if (!rule.isTagEnable()) {
+              matchingRule = rule;
+              break;
+            }
+            if (!openKeyFetchAttempted) {
+              openKeyFetchAttempted = true;
+              try {
+                String multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
+                    volumeName, bucketName, keyName, upload.getUploadId(),
+                    omMetadataManager, bucketInfo.getBucketLayout());
+                openKeyInfo = omMetadataManager.getOpenKeyTable(
+                    bucketInfo.getBucketLayout()).get(multipartOpenKey);
+              } catch (OMException e) {
+                LOG.warn("Failed to get multipart open key for {}/{}/{}, skipping",
+                    volumeName, bucketName, keyName, e);
+                skipUpload = true;
+                break;
+              } catch (IOException e) {
+                LOG.warn("Failed to read open key table for {}/{}/{}, skipping",
+                    volumeName, bucketName, keyName, e);
+                skipUpload = true;
+                break;
               }
-
-              // Get part count for this MPU (at least 1 even if no parts uploaded yet)
-              int partCount = Math.max(1, mpuKeyInfo.getPartKeyInfoMap().size());
-              expiredUploads.add(upload, partCount);
-              LOG.debug("Multipart upload {}/{}/{} with uploadId {} ({} parts) will be aborted",
-                  volumeName, bucketName, keyName, upload.getUploadId(), partCount);
+              if (openKeyInfo == null) {
+                LOG.debug("Orphan multipart upload {}/{}/{} has no open key entry, skipping tag-requiring rules",
+                    volumeName, bucketName, keyName);
+              }
+            }
+            if (openKeyInfo == null) {
+              continue;
+            }
+            OmLCFilter filter = rule.getFilter();
+            if (filter == null || filter.match(openKeyInfo, keyName)) {
+              matchingRule = rule;
               break;
             }
           }
+
+          if (skipUpload || matchingRule == null) {
+            continue;
+          }
+
+          if (expiredUploads.isFull()) {
+            LOG.info("Multipart upload batch reached part count limit {}, aborting current batch " +
+                "({} uploads, {} parts) for bucket {}/{}",
+                mpuAbortLimitPerTask, expiredUploads.size(), expiredUploads.getPartCount(),
+                volumeName, bucketName);
+            abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
+          }
+
+          // Split-schema MPUs keep parts in multipartPartsTable (the embedded map
+          // is empty); legacy MPUs use the embedded map. An MPU with no uploaded
+          // parts is valid (S3 allows aborting it with an empty parts list).
+          int uploadedParts;
+          try {
+            uploadedParts = mpuKeyInfo.getSchemaVersion()
+                == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
+                ? OMMultipartUploadUtils.countParts(omMetadataManager, upload.getUploadId())
+                : mpuKeyInfo.getPartKeyInfoMap().size();
+          } catch (IOException e) {
+            LOG.warn("Failed to count parts for MPU {}/{}/{} uploadId {}, skipping",
+                volumeName, bucketName, keyName, upload.getUploadId(), e);
+            continue;
+          }
+          expiredUploads.add(upload, uploadedParts);
+          LOG.debug("Multipart upload {}/{}/{} with uploadId {} ({} parts) will be aborted",
+              volumeName, bucketName, keyName, upload.getUploadId(), uploadedParts);
         }
       } catch (IOException e) {
         LOG.warn("Failed to iterate multipartInfoTable for bucket {}/{}", volumeName, bucketName, e);
@@ -1160,33 +1205,16 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     /**
-     * Check if a multipart upload should be aborted based on the lifecycle rule.
-     *
-     * @param openKeyInfo the open key information with tags
-     * @param upload the multipart upload information
-     * @param keyName the key name of the upload
-     * @param rule the lifecycle rule to evaluate against
-     * @return true if the upload should be aborted, false otherwise
+     * Returns true if the upload passes the age and prefix checks for the given rule,
+     * without consulting the open key table (no tag evaluation).
      */
-    private boolean shouldAbortUpload(OmKeyInfo openKeyInfo, OmMultipartUpload upload,
-                                      String keyName, OmLCRule rule) {
-
+    private boolean passesAgeAndPrefix(OmMultipartUpload upload, String keyName, OmLCRule rule) {
       if (!rule.getAbortIncompleteMultipartUpload().shouldAbort(
           upload.getCreationTime().toEpochMilli())) {
         return false;
       }
-
       String effectivePrefix = rule.getEffectivePrefix();
-      if (effectivePrefix != null && !keyName.startsWith(effectivePrefix)) {
-        return false;
-      }
-
-      OmLCFilter filter = rule.getFilter();
-      if (filter != null && !filter.match(openKeyInfo, keyName)) {
-        return false;
-      }
-
-      return true;
+      return effectivePrefix == null || keyName.startsWith(effectivePrefix);
     }
 
     /**
@@ -1336,12 +1364,12 @@ public class KeyLifecycleService extends BackgroundService {
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList,
         boolean dir, OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
-      if (moveToTrashEnabled.get() && bucket.getBucketLayout() != OBJECT_STORE && ozoneTrash != null) {
+      if (moveToTrashEnabled.get() && bucket.getBucketLayout() != OBJECT_STORE && getEffectiveOzoneTrash() != null) {
         moveToTrash(bucket, keysList, dir);
         sendSaveScanStateRequest(scanStateBuilder, scanFinished);
       } else {
-        sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), keysList, dir,
-            scanStateBuilder, scanFinished);
+        sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
+            bucket.getOwner(), keysList, dir, scanStateBuilder, scanFinished);
       }
     }
 
@@ -1381,8 +1409,9 @@ public class KeyLifecycleService extends BackgroundService {
       }
     }
 
-    private void sendDeleteKeysRequestAndClearList(String volume, String bucket, LimitedExpiredObjectList keysList,
-        boolean dir, OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
+    private void sendDeleteKeysRequestAndClearList(String volume, String bucket, String bucketOwner,
+        LimitedExpiredObjectList keysList, boolean dir,
+        OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
       try {
         if (getInjector(1) != null) {
           try {
@@ -1392,6 +1421,7 @@ public class KeyLifecycleService extends BackgroundService {
           }
         }
 
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bucketOwner);
         int batchSize = keyDeleteBatchSize;
         int startIndex = 0;
         for (int i = 0; i < keysList.size();) {
@@ -1430,16 +1460,32 @@ public class KeyLifecycleService extends BackgroundService {
           LOG.debug("request size {} for {} keys", deleteKeysRequest.getSerializedSize(), keyCount);
 
           if (deleteKeysRequest.getSerializedSize() < ratisByteLimit) {
-            // send request out
-            OMRequest omRequest = OMRequest.newBuilder()
+            OMRequest omRequestRaw = OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
                 .setVersion(ClientVersion.CURRENT_VERSION)
                 .setClientId(clientId.toString())
                 .setDeleteKeysRequest(deleteKeysRequest)
                 .build();
             long startTime = System.nanoTime();
-            final OzoneManagerProtocolProtos.OMResponse response = OzoneManagerRatisUtils.submitRequest(
-                getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
+            final OzoneManagerProtocolProtos.OMResponse response;
+            try {
+              final OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(
+                  omRequestRaw, getOzoneManager());
+              response = ugi.doAs(new PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>() {
+                @Override
+                public OzoneManagerProtocolProtos.OMResponse run() throws Exception {
+                  // perform preExecute as ratis submit does not perform preExecute
+                  OMRequest omRequest = omClientRequest.preExecute(getOzoneManager());
+                  return OzoneManagerRatisUtils.submitRequest(
+                      getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
+                }
+              });
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new ServiceException(e);
+            } catch (IOException e) {
+              throw new ServiceException(e);
+            }
             long endTime = System.nanoTime();
             LOG.debug("DeleteKeys request with {} keys cost {} ns", keyCount, endTime - startTime);
             long deletedCount = keyCount;
@@ -1509,8 +1555,10 @@ public class KeyLifecycleService extends BackgroundService {
       try {
         checkAndCreateTrashDirIfNeeded(bucket, trashCurrent);
       } catch (IOException e) {
-        keysList.clear();
-        return;
+        String message =
+            "Failed to prepare trash root " + trashCurrent + " for bucket " + volumeName + "/" + bucketName;
+        LOG.error(message, e);
+        throw new IllegalStateException(message, e);
       }
 
       for (int i = 0; i < keysList.size(); i++) {
@@ -1561,8 +1609,10 @@ public class KeyLifecycleService extends BackgroundService {
               });
           if (omResponse != null) {
             if (!omResponse.getSuccess()) {
+              OzoneManagerProtocolProtos.Status status = omResponse.getStatus();
               // log the failure and continue the iterating
-              LOG.error("RenameKey request failed with source key: {}, dest key: {}", keyName, targetKeyName);
+              LOG.error("RenameKey request failed with source key: {}, dest key: {}, status: {}",
+                  keyName, targetKeyName, status);
               continue;
             }
           }
@@ -1578,6 +1628,9 @@ public class KeyLifecycleService extends BackgroundService {
             metrics.incrSizeKeyRenamed(keysList.getReplicatedSize(i));
           }
         } catch (IOException | InterruptedException e) {
+          if (e instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+          }
           LOG.error("Failed to send RenameKeysRequest", e);
         }
       }
@@ -1658,9 +1711,12 @@ public class KeyLifecycleService extends BackgroundService {
     this.listMaxSize = size;
   }
 
-  @VisibleForTesting
-  public void setMpuAbortLimitPerTask(int limit) {
-    this.mpuAbortLimitPerTask = limit;
+  // Returns the test-injected OzoneTrash if set, otherwise the live instance
+  // from OzoneManager. This is needed because startTrashEmptier() runs after
+  // keyManager.start() in all OzoneManager startup paths, so the field cannot
+  // be populated eagerly in the constructor.
+  private OzoneTrash getEffectiveOzoneTrash() {
+    return ozoneTrash != null ? ozoneTrash : ozoneManager.getOzoneTrash();
   }
 
   @VisibleForTesting

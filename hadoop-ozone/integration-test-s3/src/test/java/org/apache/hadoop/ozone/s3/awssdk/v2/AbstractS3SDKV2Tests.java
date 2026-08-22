@@ -48,6 +48,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -135,6 +137,8 @@ import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketLifecycleConfigurationResponse;
 import software.amazon.awssdk.services.s3.model.GetBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketTaggingResponse;
+import software.amazon.awssdk.services.s3.model.GetObjectAttributesRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectAttributesResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectTaggingRequest;
@@ -142,6 +146,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectTaggingResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.LifecycleExpiration;
 import software.amazon.awssdk.services.s3.model.LifecycleRule;
 import software.amazon.awssdk.services.s3.model.LifecycleRuleAndOperator;
 import software.amazon.awssdk.services.s3.model.LifecycleRuleFilter;
@@ -156,7 +161,9 @@ import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.ListPartsRequest;
+import software.amazon.awssdk.services.s3.model.MetadataDirective;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.ObjectAttributes;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.PutBucketTaggingRequest;
@@ -231,6 +238,37 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     if (s3AsyncClient != null) {
       s3AsyncClient.close();
     }
+  }
+
+  /**
+   * s3-tests: test_bucket_create_exists.
+   */
+  @Test
+  public void testCreateBucketAlreadyOwnedByYou() {
+    final String bucketName = getBucketName("owned-by-you");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.createBucket(b -> b.bucket(bucketName)));
+    assertEquals(409, exception.statusCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU.getCode(),
+        exception.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testCreateBucketAlreadyExistsDifferentOwner() throws IOException {
+    final String bucketName = getBucketName("other-owner");
+    final String otherOwner = "other-s3-owner";
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setOwner(otherOwner).build());
+    }
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.createBucket(b -> b.bucket(bucketName)));
+    assertEquals(409, exception.statusCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_EXISTS.getCode(),
+        exception.awsErrorDetails().errorCode());
   }
 
   @Test
@@ -586,6 +624,45 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
                     .plusSeconds(60))));
 
     assertEquals(304, exception.statusCode());
+  }
+
+  /**
+   * Adapted from ceph s3-tests test_object_read_unreadable.
+   */
+  @Test
+  public void testGetObjectUnreadableKey() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    String unreadableKey = new String(new byte[] {(byte) 0xae, (byte) 0x8a, '-'},
+        StandardCharsets.ISO_8859_1);
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(unreadableKey)));
+
+    assertEquals(400, exception.statusCode());
+    assertEquals(S3ErrorTable.INVALID_URI.getCode(), exception.awsErrorDetails().errorCode());
+    assertEquals(S3ErrorTable.INVALID_URI.getErrorMessage(), exception.awsErrorDetails().errorMessage());
+  }
+
+  @Test
+  public void testGetObjectTorrentNotImplemented() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectTorrent(b -> b.bucket(bucketName).key(keyName)));
+
+    assertEquals(501, exception.statusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), exception.awsErrorDetails().errorCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getErrorMessage(), exception.awsErrorDetails().errorMessage());
+
+    // object must be untouched
+    HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals(content.length(), headObjectResponse.contentLength());
   }
 
   @Test
@@ -1078,6 +1155,30 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(S3SDKTestUtils.S3_SPECIAL_KEY_NAMES, listedKeys);
   }
 
+  @Test
+  public void testListObjectsV2FetchOwner() {
+    final String bucketName = getBucketName("fetch-owner");
+    final String keyName = getKeyName("obj");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("x"));
+
+    ListObjectsV2Response defaultResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).build());
+    assertThat(defaultResponse.contents()).isNotEmpty();
+    assertNull(defaultResponse.contents().get(0).owner());
+
+    ListObjectsV2Response falseResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).fetchOwner(false).build());
+    assertNull(falseResponse.contents().get(0).owner());
+
+    ListObjectsV2Response trueResponse = s3Client.listObjectsV2(
+        ListObjectsV2Request.builder().bucket(bucketName).fetchOwner(true).build());
+    assertNotNull(trueResponse.contents().get(0).owner());
+    assertNotNull(trueResponse.contents().get(0).owner().displayName());
+    assertEquals(S3Owner.DEFAULT_S3OWNER_ID, trueResponse.contents().get(0).owner().id());
+  }
+
   private void testListObjectsMany(boolean isListV2) throws Exception {
     final String bucketName = getBucketName();
     s3Client.createBucket(b -> b.bucket(bucketName));
@@ -1204,6 +1305,40 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     CopyObjectResponse copyObjectResponse = s3Client.copyObject(copyReq);
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", copyObjectResponse.copyObjectResult().eTag());
+  }
+
+  @Test
+  public void testCopyObjectToSelfWithMetadataReplace() {
+    final String bucketName = getBucketName();
+    final String key = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(key).metadata(Collections.singletonMap("meta1", "v1")),
+        RequestBody.fromString(content));
+
+    // Copying an object onto itself is allowed when the metadata is replaced.
+    CopyObjectRequest copyReq = CopyObjectRequest.builder()
+        .sourceBucket(bucketName)
+        .sourceKey(key)
+        .destinationBucket(bucketName)
+        .destinationKey(key)
+        .metadataDirective(MetadataDirective.REPLACE)
+        .metadata(Collections.singletonMap("meta2", "v2"))
+        .build();
+
+    CopyObjectResponse copyObjectResponse = assertDoesNotThrow(() -> s3Client.copyObject(copyReq));
+    assertNotNull(copyObjectResponse.copyObjectResult().eTag());
+
+    // The metadata was replaced in place: the new entry is present and the old one is gone.
+    HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(key));
+    assertThat(head.metadata())
+        .containsEntry("meta2", "v2")
+        .doesNotContainKey("meta1");
+
+    // The object is still readable with its original content after the in-place copy.
+    ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(key));
+    assertEquals(content, objectBytes.asUtf8String());
   }
 
   @Test
@@ -1579,6 +1714,93 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
     assertNotNull(head.tagCount());
     assertEquals(tags.size(), head.tagCount().intValue());
+  }
+
+  @Test
+  public void testGetObjectAttributes() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "get-object-attributes-content";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse putObjectResponse = s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString(content));
+
+    GetObjectAttributesResponse attributesResponse = s3Client.getObjectAttributes(
+        GetObjectAttributesRequest.builder()
+            .bucket(bucketName)
+            .key(keyName)
+            .objectAttributes(ObjectAttributes.E_TAG, ObjectAttributes.OBJECT_SIZE,
+                ObjectAttributes.STORAGE_CLASS)
+            .build());
+
+    assertNotNull(attributesResponse.lastModified());
+    assertEquals(
+        putObjectResponse.eTag().replace("\"", ""),
+        attributesResponse.eTag());
+    assertEquals((long) content.length(), attributesResponse.objectSize());
+    assertEquals("STANDARD", attributesResponse.storageClassAsString());
+    assertNull(attributesResponse.objectParts());
+  }
+
+  @Test
+  public void testGetObjectAttributesMultipartObjectParts(@TempDir Path tempDir) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    File multipartUploadFile = Files.createFile(tempDir.resolve("get-object-attributes-mpu.txt")).toFile();
+    createFile(multipartUploadFile, (int) (15 * MB));
+    multipartUpload(bucketName, keyName, multipartUploadFile, (int) (5 * MB), new HashMap<>(),
+        Collections.emptyList());
+
+    GetObjectAttributesResponse attributesResponse = s3Client.getObjectAttributes(
+        GetObjectAttributesRequest.builder()
+            .bucket(bucketName)
+            .key(keyName)
+            .objectAttributes(ObjectAttributes.OBJECT_PARTS, ObjectAttributes.E_TAG,
+                ObjectAttributes.OBJECT_SIZE)
+            .build());
+
+    assertNotNull(attributesResponse.eTag());
+    assertTrue(attributesResponse.eTag().contains("-"));
+    assertEquals(multipartUploadFile.length(), attributesResponse.objectSize());
+    assertNotNull(attributesResponse.objectParts());
+    assertEquals(3, attributesResponse.objectParts().totalPartsCount());
+    assertFalse(attributesResponse.objectParts().isTruncated());
+  }
+
+  @Test
+  public void testGetObjectAttributesNoSuchKey() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    assertThrows(NoSuchKeyException.class, () -> s3Client.getObjectAttributes(
+        GetObjectAttributesRequest.builder()
+            .bucket(bucketName)
+            .key(keyName)
+            .objectAttributes(ObjectAttributes.E_TAG)
+            .build()));
+  }
+
+  @Test
+  public void testGetObjectAttributesChecksumOmitted() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("checksum-test"));
+
+    GetObjectAttributesResponse attributesResponse = s3Client.getObjectAttributes(
+        GetObjectAttributesRequest.builder()
+            .bucket(bucketName)
+            .key(keyName)
+            .objectAttributes(ObjectAttributes.CHECKSUM, ObjectAttributes.E_TAG)
+            .build());
+
+    assertNotNull(attributesResponse.eTag());
+    assertNull(attributesResponse.checksum());
   }
 
   @Test
@@ -2274,6 +2496,168 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testS3LifecycleConfigurationCreateSuccessfully() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    LifecycleRule rule1 = LifecycleRule.builder()
+        .id("expire-logs-after-365-days")
+        .prefix("logs/")
+        .status(ExpirationStatus.ENABLED)
+        .expiration(LifecycleExpiration.builder().days(365).build())
+        .build();
+
+    BucketLifecycleConfiguration configuration = BucketLifecycleConfiguration.builder()
+        .rules(rule1)
+        .build();
+
+    // Set lifecycle configuration
+    s3Client.putBucketLifecycleConfiguration(b -> b
+        .bucket(bucketName)
+        .lifecycleConfiguration(configuration));
+
+    // Verify the configuration was set
+    GetBucketLifecycleConfigurationResponse response =
+        s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName));
+    List<LifecycleRule> rules = response.rules();
+    assertEquals(1, rules.size());
+
+    // Verify rule 1
+    LifecycleRule retrievedRule1 = rules.get(0);
+    assertEquals("expire-logs-after-365-days", retrievedRule1.id());
+    assertEquals("logs/", retrievedRule1.prefix());
+    assertEquals(ExpirationStatus.ENABLED, retrievedRule1.status());
+    assertEquals(365, retrievedRule1.expiration().days());
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationCreationFailed() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Test 1: Invalid configuration (no prefix, filter, or expiration)
+    LifecycleRule rule = LifecycleRule.builder()
+        .id("invalid")
+        .status(ExpirationStatus.ENABLED)
+        .build();
+    BucketLifecycleConfiguration configuration = BucketLifecycleConfiguration.builder()
+        .rules(rule)
+        .build();
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.putBucketLifecycleConfiguration(b -> b
+            .bucket(bucketName)
+            .lifecycleConfiguration(configuration)));
+    assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, exception.statusCode());
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), exception.awsErrorDetails().errorCode());
+
+    // Test 2: Non-existent bucket
+    final String nonExistentBucket = getBucketName("nonexistent");
+    LifecycleRule validRule = LifecycleRule.builder()
+        .id("test-rule")
+        .prefix("test/")
+        .status(ExpirationStatus.ENABLED)
+        .expiration(LifecycleExpiration.builder().days(30).build())
+        .build();
+    BucketLifecycleConfiguration validConfig = BucketLifecycleConfiguration.builder()
+        .rules(validRule)
+        .build();
+
+    S3Exception exception2 = assertThrows(S3Exception.class,
+        () -> s3Client.putBucketLifecycleConfiguration(b -> b
+            .bucket(nonExistentBucket)
+            .lifecycleConfiguration(validConfig)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, exception2.statusCode());
+    assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), exception2.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationDelete() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Test delete lifecycle for a bucket, while it doesn't have lifecycle
+    S3Exception noConfig = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, noConfig.statusCode());
+    assertEquals(S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION.getCode(), noConfig.awsErrorDetails().errorCode());
+    // Idempotent delete: no exception expected even without an existing config
+    s3Client.deleteBucketLifecycle(b -> b.bucket(bucketName));
+
+    // First create a lifecycle configuration
+    LifecycleRule rule = LifecycleRule.builder()
+        .id("test-rule")
+        .prefix("test/")
+        .status(ExpirationStatus.ENABLED)
+        .expiration(LifecycleExpiration.builder().days(30).build())
+        .build();
+    BucketLifecycleConfiguration configuration = BucketLifecycleConfiguration.builder()
+        .rules(rule)
+        .build();
+
+    s3Client.putBucketLifecycleConfiguration(b -> b
+        .bucket(bucketName)
+        .lifecycleConfiguration(configuration));
+    // Verify it exists
+    GetBucketLifecycleConfigurationResponse response =
+        s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName));
+    assertEquals(1, response.rules().size());
+    // Delete the lifecycle configuration
+    s3Client.deleteBucketLifecycle(b -> b.bucket(bucketName));
+    S3Exception afterDelete = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, afterDelete.statusCode());
+    assertEquals(S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION.getCode(), afterDelete.awsErrorDetails().errorCode());
+    // Test delete on non-existent bucket
+    final String nonExistentBucket = getBucketName("nonexistent");
+    S3Exception noBucket = assertThrows(S3Exception.class,
+        () -> s3Client.deleteBucketLifecycle(b -> b.bucket(nonExistentBucket)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, noBucket.statusCode());
+    assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), noBucket.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationGet() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Test get on bucket without lifecycle configuration
+    S3Exception noConfig = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, noConfig.statusCode());
+    assertEquals(S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION.getCode(), noConfig.awsErrorDetails().errorCode());
+
+    // Create a comprehensive lifecycle configuration
+    LifecycleRule rule1 = LifecycleRule.builder()
+        .id("expire-old-files")
+        .prefix("old/")
+        .status(ExpirationStatus.ENABLED)
+        .expiration(LifecycleExpiration.builder().days(365).build())
+        .build();
+    BucketLifecycleConfiguration configuration = BucketLifecycleConfiguration.builder()
+        .rules(rule1)
+        .build();
+
+    // Set the configuration
+    s3Client.putBucketLifecycleConfiguration(b -> b
+        .bucket(bucketName)
+        .lifecycleConfiguration(configuration));
+
+    // Get and verify the configuration
+    GetBucketLifecycleConfigurationResponse response =
+        s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName));
+    List<LifecycleRule> rules = response.rules();
+    assertEquals(1, rules.size());
+
+    // Verify first rule
+    LifecycleRule retrievedRule1 = rules.get(0);
+    assertEquals("expire-old-files", retrievedRule1.id());
+    assertEquals("old/", retrievedRule1.prefix());
+    assertEquals(ExpirationStatus.ENABLED, retrievedRule1.status());
+    assertEquals(365, retrievedRule1.expiration().days());
+  }
+
+  @Test
   public void testGetLifecycleWithAbortIncompleteMultipartUpload() {
     final String bucketName = getBucketName();
     s3Client.createBucket(b -> b.bucket(bucketName));
@@ -2317,7 +2701,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         .prefix("")
         .status(ExpirationStatus.ENABLED)
         .abortIncompleteMultipartUpload(AbortIncompleteMultipartUpload.builder()
-            .daysAfterInitiation(30)
+            .daysAfterInitiation(29)
             .build())
         .build();
 
@@ -2362,7 +2746,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("abort-incomplete-mpu-no-filter", retrievedRule4.id());
     assertEquals("", retrievedRule4.prefix());
     assertEquals(ExpirationStatus.ENABLED, retrievedRule4.status());
-    assertEquals(30, retrievedRule4.abortIncompleteMultipartUpload().daysAfterInitiation());
+    assertEquals(29, retrievedRule4.abortIncompleteMultipartUpload().daysAfterInitiation());
   }
 
   /**
@@ -3146,6 +3530,110 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       S3Exception exception = assertThrows(S3Exception.class, function);
       assertEquals(403, exception.statusCode());
       assertEquals("Access Denied", exception.awsErrorDetails().errorCode());
+    }
+  }
+
+  static Stream<Arguments> standardObjectHeaderContentEncodingCases() {
+    return Stream.of(
+        Arguments.of("gzip", "gzip"),
+        Arguments.of("deflate, gzip", "deflate, gzip"),
+        Arguments.of("gzip, aws-chunked", "gzip"),
+        Arguments.of("aws-chunked, gzip", "gzip"),
+        Arguments.of("aws-chunked", null),
+        Arguments.of("aws-chunked, aws-chunked", null));
+  }
+
+  /**
+   * ceph s3-tests coverage for standard object headers persisted on PUT and returned on HEAD/GET.
+   */
+  @Nested
+  class StandardObjectHeaderTests {
+
+    private static final String CONTENT = "bar";
+    private static final String CACHE_CONTROL = "public, max-age=14400";
+
+    /**
+     * s3-tests: test_object_write_cache_control.
+     */
+    @Test
+    public void testObjectWriteCacheControl() {
+      final String bucketName = getBucketName("cache-control");
+      final String keyName = getKeyName("cache-control");
+      s3Client.createBucket(b -> b.bucket(bucketName));
+
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName).cacheControl(CACHE_CONTROL),
+          RequestBody.fromString(CONTENT));
+
+      HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+      assertEquals(CACHE_CONTROL, head.cacheControl());
+
+      GetObjectResponse getObject = s3Client.getObject(b -> b.bucket(bucketName).key(keyName)).response();
+      assertEquals(CACHE_CONTROL, getObject.cacheControl());
+    }
+
+    /**
+     * s3-tests: test_object_write_expires.
+     */
+    @Test
+    public void testObjectWriteExpires() {
+      final String bucketName = getBucketName("expires");
+      final String keyName = getKeyName("expires");
+      final Instant expires = Instant.now().plusSeconds(6000).truncatedTo(ChronoUnit.SECONDS);
+      s3Client.createBucket(b -> b.bucket(bucketName));
+
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName).expires(expires),
+          RequestBody.fromString(CONTENT));
+
+      HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+      assertEquals(expires, head.expires());
+
+      GetObjectResponse getObject = s3Client.getObject(b -> b.bucket(bucketName).key(keyName)).response();
+      assertEquals(expires, getObject.expires());
+    }
+
+    /**
+     * s3-tests: test_object_content_encoding_aws_chunked.
+     */
+    @ParameterizedTest
+    @MethodSource("org.apache.hadoop.ozone.s3.awssdk.v2.AbstractS3SDKV2Tests#standardObjectHeaderContentEncodingCases")
+    public void testObjectContentEncodingAwsChunked(String requestEncoding,
+        String expectedEncoding) {
+      final String bucketName = getBucketName("content-encoding");
+      final String keyName = getKeyName("encoding");
+      s3Client.createBucket(b -> b.bucket(bucketName));
+
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName)
+              .contentEncoding(requestEncoding),
+          RequestBody.fromString(CONTENT));
+
+      HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+      assertEquals(expectedEncoding, head.contentEncoding());
+
+      GetObjectResponse getObject = s3Client.getObject(b -> b.bucket(bucketName).key(keyName)).response();
+      assertEquals(expectedEncoding, getObject.contentEncoding());
+    }
+
+    @Test
+    public void testObjectWriteContentLanguageAndDisposition() {
+      final String bucketName = getBucketName("lang-disp");
+      final String keyName = getKeyName("lang-disp");
+      final String language = "en-CA";
+      final String disposition = "attachment; filename=\"test.txt\"";
+      s3Client.createBucket(b -> b.bucket(bucketName));
+
+      s3Client.putObject(b -> b.bucket(bucketName).key(keyName)
+              .contentLanguage(language)
+              .contentDisposition(disposition),
+          RequestBody.fromString(CONTENT));
+
+      HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+      assertEquals(language, head.contentLanguage());
+      assertEquals(disposition, head.contentDisposition());
+
+      GetObjectResponse getObject =
+          s3Client.getObject(b -> b.bucket(bucketName).key(keyName)).response();
+      assertEquals(language, getObject.contentLanguage());
+      assertEquals(disposition, getObject.contentDisposition());
     }
   }
 

@@ -1546,9 +1546,19 @@
     <value>30d</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
-      Controls how long multipart upload is considered active. Specifically, if a multipart info
-      has been ongoing longer than the value of this config entry, that multipart info is considered as
-      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+      Controls how long a multipart upload is considered active before MultipartUploadCleanupService
+      treats it as stale and aborts it. If a multipart upload has been ongoing longer than this
+      threshold (e.g. due to a client crash), it will be cleaned up automatically.
+      Unit can be specified with a postfix (ns, ms, s, m, h, d).
+
+      Interaction with S3 lifecycle AbortIncompleteMultipartUpload rules:
+      When a bucket lifecycle rule specifies an AbortIncompleteMultipartUpload action, its
+      daysAfterInitiation value must be strictly less than this threshold. If
+      daysAfterInitiation is greater than or equal to this threshold, MultipartUploadCleanupService
+      will abort the upload before the lifecycle rule fires, silently making the rule ineffective.
+      Ozone enforces this constraint at lifecycle configuration creation time and will reject
+      configurations that violate it. To use a longer daysAfterInitiation value, increase this
+      threshold accordingly.
     </description>
   </property>
 
@@ -2183,7 +2193,16 @@
     <value>30s</value>
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
-      Timeout for ozone grpc client during read.
+      Timeout for ozone grpc and short-circuit client during read.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.write.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone short-circuit client during write.
     </description>
   </property>
 
@@ -4003,6 +4022,16 @@
       That setting only affects future name lookups; this setting
       additionally rebuilds long-lived RPC proxies whose
       InetSocketAddress was frozen at process start.
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.heartbeat.address.refresh.missed-count-threshold</name>
+    <value>3</value>
+    <tag>OZONE, DATANODE, HA</tag>
+    <description>Consecutive heartbeat failures the DataNode tolerates
+      against one SCM endpoint before re-resolving its hostname. Only
+      consulted when ozone.client.failover.resolve-needed is true.
     </description>
   </property>
 
