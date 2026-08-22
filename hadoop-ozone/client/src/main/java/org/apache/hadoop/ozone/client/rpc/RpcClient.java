@@ -2609,9 +2609,14 @@ public class RpcClient implements ClientProtocol {
       return null;
     }
 
+    String secret = metadata.get(OzoneConsts.GDPR_SECRET);
+    String algorithm = metadata.get(OzoneConsts.GDPR_ALGORITHM);
+    if (secret == null || algorithm == null) {
+      throw new IOException("GDPR metadata is missing secret or algorithm");
+    }
+
     final GDPRSymmetricKey gk = new GDPRSymmetricKey(
-        metadata.get(OzoneConsts.GDPR_SECRET),
-        metadata.get(OzoneConsts.GDPR_ALGORITHM));
+        secret, algorithm);
     try {
       gk.getCipher().init(mode, gk.getSecretKey());
     } catch (InvalidKeyException e) {

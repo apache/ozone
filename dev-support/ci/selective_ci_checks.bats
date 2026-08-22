@@ -51,6 +51,7 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=true
+  assert_output -p needs-infer=false
   assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
 }
@@ -84,6 +85,7 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
+  assert_output -p needs-infer=true
   assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=true
 }
@@ -260,6 +262,7 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
+  assert_output -p needs-infer=true
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=true
 }
