@@ -110,7 +110,7 @@ public class KeyInputStream extends MultipartInputStream {
       BlockID blockID) {
     List<OmKeyLocationInfo> collect =
         newKeyInfo.getLatestVersionLocations()
-            .getLocationList()
+            .createLocationList()
             .stream()
             .filter(l -> l.getBlockID().equals(blockID))
             .collect(Collectors.toList());
