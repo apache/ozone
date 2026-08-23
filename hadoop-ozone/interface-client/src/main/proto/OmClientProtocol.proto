@@ -1411,8 +1411,6 @@ message GetKeyInfoResponse {
   optional KeyInfo keyInfo = 1;
   optional VolumeInfo volumeInfo = 2;
   optional string UserPrincipal = 3;
-  // Set only after OM cryptographically validates the STS session token.
-  optional string stsOriginalAccessKeyId = 4;
 }
 
 message RenameKeysRequest {
@@ -2377,8 +2375,6 @@ message GetS3VolumeContextResponse {
   optional VolumeInfo volumeInfo = 1;
   // Piggybacked username (principal) response to be used for KMS client operations
   optional string userPrincipal = 2;
-  // Set only after OM cryptographically validates the STS session token.
-  optional string stsOriginalAccessKeyId = 3;
 }
 
 /**

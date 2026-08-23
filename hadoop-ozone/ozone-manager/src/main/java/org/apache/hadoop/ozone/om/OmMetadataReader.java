@@ -202,7 +202,6 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       s3VolumeContext.ifPresent(context -> {
         builder.setVolumeArgs(context.getOmVolumeArgs());
         builder.setUserPrincipal(context.getUserPrincipal());
-        builder.setStsOriginalAccessKeyId(context.getStsOriginalAccessKeyId());
       });
       return builder.build();
     } catch (Exception ex) {

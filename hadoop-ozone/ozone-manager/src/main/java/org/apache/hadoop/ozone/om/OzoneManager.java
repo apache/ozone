@@ -4187,10 +4187,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final S3VolumeContext.Builder s3VolumeContext = S3VolumeContext.newBuilder()
         .setOmVolumeArgs(volumeInfo)
         .setUserPrincipal(userPrincipal);
-    final STSTokenIdentifier stsTokenIdentifier = getStsTokenIdentifier();
-    if (stsTokenIdentifier != null) {
-      s3VolumeContext.setStsOriginalAccessKeyId(stsTokenIdentifier.getOriginalAccessKeyId());
-    }
     perfMetrics.addS3VolumeContextLatencyNs(Time.monotonicNowNanos() - start);
     return s3VolumeContext.build();
   }

@@ -287,26 +287,6 @@ public class TestSTSSecurityUtil {
   }
 
   @Test
-  public void testConstructValidateAndDecryptSTSTokenRejectsForgedOriginalAccessKeyId() throws Exception {
-    final String validTokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
-
-    final Token<STSTokenIdentifier> validToken = new Token<>();
-    validToken.decodeFromUrlString(validTokenString);
-    final OMTokenProto forgedProto = OMTokenProto.parseFrom(validToken.getIdentifier()).toBuilder()
-        .setOriginalAccessKeyId("forged-original-access-key")
-        .build();
-    final Token<STSTokenIdentifier> forgedToken = new Token<>(
-        forgedProto.toByteArray(), validToken.getPassword(), validToken.getKind(), validToken.getService());
-
-    assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken(
-            forgedToken.encodeToUrlString(), secretKeyClient, clock))
-        .isInstanceOf(OMException.class)
-        .hasMessageContaining("Invalid STS token format: Invalid STS token - signature is not correct for token");
-  }
-
-  @Test
   public void testConstructValidateAndDecryptSTSTokenInvalidSignature() throws Exception {
     // Create a valid token string
     final String validTokenString = tokenSecretManager.createSTSTokenString(

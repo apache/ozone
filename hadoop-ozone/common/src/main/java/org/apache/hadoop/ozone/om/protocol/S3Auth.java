@@ -31,8 +31,6 @@ public class S3Auth {
   private String sessionToken;
   // S3 action without s3: prefix (e.g. PutObject), set by S3 Gateway for use in finer-grained STS permissions.
   private String s3Action;
-  // OM-validated originalAccessKeyId for the current STS session token, when present.
-  private String validatedStsOriginalAccessKeyId;
 
   public S3Auth(final String stringToSign,
                 final String signature,
@@ -78,13 +76,5 @@ public class S3Auth {
 
   public void setS3Action(String s3Action) {
     this.s3Action = s3Action;
-  }
-
-  public String getValidatedStsOriginalAccessKeyId() {
-    return validatedStsOriginalAccessKeyId;
-  }
-
-  public void setValidatedStsOriginalAccessKeyId(String validatedStsOriginalAccessKeyId) {
-    this.validatedStsOriginalAccessKeyId = validatedStsOriginalAccessKeyId;
   }
 }

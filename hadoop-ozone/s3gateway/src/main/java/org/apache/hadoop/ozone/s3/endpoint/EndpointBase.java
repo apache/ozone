@@ -312,7 +312,7 @@ public abstract class EndpointBase {
   }
 
   protected OzoneVolume getVolume() throws IOException {
-    return getClient().getObjectStore().getS3Volume();
+    return client.getObjectStore().getS3Volume();
   }
 
   /**
@@ -606,8 +606,10 @@ public abstract class EndpointBase {
     auditMap.put("x-amz-request-id", requestIdentifier.getRequestId());
     auditMap.put("x-amz-id-2", requestIdentifier.getAmzId());
     if (s3Auth != null) {
-      final String originalAccessKeyId = s3Auth.getValidatedStsOriginalAccessKeyId();
-      if (StringUtils.isNotEmpty(originalAccessKeyId)) {
+      // For STS temporary credentials, record the originalAccessKeyId (the permanent principal that
+      // created the token) so the audit trail is not limited to the opaque tempAccessKeyId.
+      final String originalAccessKeyId = AuditUtils.getStsOriginalAccessKeyId(s3Auth.getSessionToken());
+      if (originalAccessKeyId != null) {
         auditMap.put(OzoneConsts.S3_STS_ORIGINAL_ACCESS_KEY_ID, originalAccessKeyId);
       }
     }
@@ -627,7 +629,6 @@ public abstract class EndpointBase {
   }
 
   protected AuditMessage.Builder auditMessageForSuccess(AuditAction op) {
-    resolveValidatedStsOriginalAccessKeyIdForAudit();
     return auditMessageFor(op)
         .withResult(AuditEventStatus.SUCCESS);
   }
@@ -636,26 +637,6 @@ public abstract class EndpointBase {
     return auditMessageFor(op)
         .withResult(AuditEventStatus.FAILURE)
         .withException(throwable);
-  }
-
-  /**
-   * Populates {@link S3Auth#getValidatedStsOriginalAccessKeyId()} from OM when the request carries
-   * an STS session token but the validated id is not yet available (e.g. bucket-only paths).
-   * Called only from the success-audit path; failure audits must not trigger an OM round-trip.
-   * Never disrupts auditing when OM validation fails.
-   */
-  private void resolveValidatedStsOriginalAccessKeyIdForAudit() {
-    if (s3Auth == null || StringUtils.isEmpty(s3Auth.getSessionToken())) {
-      return;
-    }
-    if (StringUtils.isNotEmpty(s3Auth.getValidatedStsOriginalAccessKeyId())) {
-      return;
-    }
-    try {
-      getClient().getObjectStore().getS3VolumeContext();
-    } catch (IOException | RuntimeException e) {
-      LOG.debug("Could not resolve validated STS context for audit", e);
-    }
   }
 
   @VisibleForTesting
@@ -727,13 +708,6 @@ public abstract class EndpointBase {
   @VisibleForTesting
   public S3GatewayMetrics getMetrics() {
     return S3GatewayMetrics.getMetrics();
-  }
-
-  @VisibleForTesting
-  void setValidatedStsOriginalAccessKeyIdForTest() {
-    if (s3Auth != null) {
-      s3Auth.setValidatedStsOriginalAccessKeyId("AKIAORIGINAL123");
-    }
   }
 
   protected Map<String, String> getAuditParameters() {

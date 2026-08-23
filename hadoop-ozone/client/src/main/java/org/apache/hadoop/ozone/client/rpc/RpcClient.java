@@ -211,8 +211,6 @@ public class RpcClient implements ClientProtocol {
   private final XceiverClientFactory xceiverClientManager;
   private final UserGroupInformation ugi;
   private UserGroupInformation s3gUgi;
-  // Cached per thread for the current S3 Gateway request - cleared with thread-local S3Auth.
-  private final ThreadLocal<S3VolumeContext> cachedS3VolumeContext = new ThreadLocal<>();
   private final ClientId clientId = ClientId.randomId();
   private final boolean unsafeByteBufferConversion;
   private Text dtService;
@@ -507,29 +505,10 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public S3VolumeContext getS3VolumeContext() throws IOException {
-    final S3VolumeContext cached = cachedS3VolumeContext.get();
-    if (cached != null) {
-      return cached;
-    }
-    final S3VolumeContext resp = ozoneManagerClient.getS3VolumeContext();
-    updateS3Principal(resp.getUserPrincipal());
-    updateValidatedStsOriginalAccessKeyId(resp.getStsOriginalAccessKeyId());
-    cachedS3VolumeContext.set(resp);
+    S3VolumeContext resp = ozoneManagerClient.getS3VolumeContext();
+    String userPrincipal = resp.getUserPrincipal();
+    updateS3Principal(userPrincipal);
     return resp;
-  }
-
-  private void updateValidatedStsOriginalAccessKeyId(String stsOriginalAccessKeyId) {
-    final S3Auth s3Auth = this.getThreadLocalS3Auth();
-    if (s3Auth != null && StringUtils.isNotEmpty(stsOriginalAccessKeyId)) {
-      LOG.debug("Updating S3Auth.validatedStsOriginalAccessKeyId to {}", stsOriginalAccessKeyId);
-      s3Auth.setValidatedStsOriginalAccessKeyId(stsOriginalAccessKeyId);
-      this.setThreadLocalS3Auth(s3Auth);
-    }
-  }
-
-  private void updateS3Context(KeyInfoWithVolumeContext keyInfoWithS3Context) {
-    keyInfoWithS3Context.getUserPrincipal().ifPresent(this::updateS3Principal);
-    keyInfoWithS3Context.getStsOriginalAccessKeyId().ifPresent(this::updateValidatedStsOriginalAccessKeyId);
   }
 
   private void updateS3Principal(String userPrincipal) {
@@ -2000,7 +1979,7 @@ public class RpcClient implements ClientProtocol {
         .build();
     KeyInfoWithVolumeContext keyInfoWithS3Context =
         ozoneManagerClient.getKeyInfo(keyArgs, true);
-    updateS3Context(keyInfoWithS3Context);
+    keyInfoWithS3Context.getUserPrincipal().ifPresent(this::updateS3Principal);
     return keyInfoWithS3Context.getKeyInfo();
   }
 
@@ -2025,7 +2004,7 @@ public class RpcClient implements ClientProtocol {
         .build();
     KeyInfoWithVolumeContext keyInfoWithS3Context =
         ozoneManagerClient.getKeyInfo(keyArgs, true);
-    updateS3Context(keyInfoWithS3Context);
+    keyInfoWithS3Context.getUserPrincipal().ifPresent(this::updateS3Principal);
     return keyInfoWithS3Context.getKeyInfo();
   }
 
@@ -2917,7 +2896,6 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void setThreadLocalS3Auth(
       S3Auth ozoneSharedSecretAuth) {
-    cachedS3VolumeContext.remove();
     ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
     this.s3gUgi = UserGroupInformation.createRemoteUser(getThreadLocalS3Auth().getUserPrincipal());
   }
@@ -2930,7 +2908,6 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void clearThreadLocalS3Auth() {
     ozoneManagerClient.clearThreadLocalS3Auth();
-    cachedS3VolumeContext.remove();
   }
 
   @Override

@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.io.IOException;
 import java.util.Optional;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
 
 /**
@@ -36,24 +35,13 @@ public class KeyInfoWithVolumeContext {
    */
   private final Optional<String> userPrincipal;
 
-  /**
-   * OM-validated originalAccessKeyId for the current STS session token, when present.
-   */
-  private final Optional<String> stsOriginalAccessKeyId;
-
   private final OmKeyInfo keyInfo;
 
   public KeyInfoWithVolumeContext(OmVolumeArgs volumeArgs,
                                   String userPrincipal,
                                   OmKeyInfo keyInfo) {
-    this(volumeArgs, userPrincipal, null, keyInfo);
-  }
-
-  public KeyInfoWithVolumeContext(OmVolumeArgs volumeArgs, String userPrincipal, String stsOriginalAccessKeyId,
-      OmKeyInfo keyInfo) {
     this.volumeArgs = Optional.ofNullable(volumeArgs);
     this.userPrincipal = Optional.ofNullable(userPrincipal);
-    this.stsOriginalAccessKeyId = Optional.ofNullable(stsOriginalAccessKeyId);
     this.keyInfo = keyInfo;
   }
 
@@ -63,7 +51,6 @@ public class KeyInfoWithVolumeContext {
         .setVolumeArgs(proto.hasVolumeInfo() ?
             OmVolumeArgs.getFromProtobuf(proto.getVolumeInfo()) : null)
         .setUserPrincipal(proto.getUserPrincipal())
-        .setStsOriginalAccessKeyId(proto.hasStsOriginalAccessKeyId() ? proto.getStsOriginalAccessKeyId() : null)
         .setKeyInfo(OmKeyInfo.getFromProtobuf(proto.getKeyInfo()))
         .build();
   }
@@ -72,7 +59,6 @@ public class KeyInfoWithVolumeContext {
     GetKeyInfoResponse.Builder builder = GetKeyInfoResponse.newBuilder();
     volumeArgs.ifPresent(v -> builder.setVolumeInfo(v.getProtobuf()));
     userPrincipal.ifPresent(builder::setUserPrincipal);
-    stsOriginalAccessKeyId.filter(StringUtils::isNotEmpty).ifPresent(builder::setStsOriginalAccessKeyId);
     builder.setKeyInfo(keyInfo.getProtobuf(clientVersion));
     return builder.build();
   }
@@ -89,10 +75,6 @@ public class KeyInfoWithVolumeContext {
     return userPrincipal;
   }
 
-  public Optional<String> getStsOriginalAccessKeyId() {
-    return stsOriginalAccessKeyId;
-  }
-
   public static Builder newBuilder() {
     return new Builder();
   }
@@ -103,7 +85,6 @@ public class KeyInfoWithVolumeContext {
   public static class Builder {
     private OmVolumeArgs volumeArgs;
     private String userPrincipal;
-    private String stsOriginalAccessKeyId;
     private OmKeyInfo keyInfo;
 
     public Builder setVolumeArgs(OmVolumeArgs volumeArgs) {
@@ -116,18 +97,13 @@ public class KeyInfoWithVolumeContext {
       return this;
     }
 
-    public Builder setStsOriginalAccessKeyId(String stsOriginalAccessKeyId) {
-      this.stsOriginalAccessKeyId = stsOriginalAccessKeyId;
-      return this;
-    }
-
     public Builder setKeyInfo(OmKeyInfo keyInfo) {
       this.keyInfo = keyInfo;
       return this;
     }
 
     public KeyInfoWithVolumeContext build() {
-      return new KeyInfoWithVolumeContext(volumeArgs, userPrincipal, stsOriginalAccessKeyId, keyInfo);
+      return new KeyInfoWithVolumeContext(volumeArgs, userPrincipal, keyInfo);
     }
   }
 }

@@ -404,9 +404,9 @@ public class BucketEndpoint extends BucketOperationHandler {
     if (!result.getErrors().isEmpty()) {
       auditMultiDeleteFailure(context, deleteKeys, new Exception("MultiDelete Exception"));
     } else {
-      AuditMessage.Builder message = auditMessageForSuccess(context.getAction());
+      AuditMessage.Builder message = auditMessageFor(context.getAction());
       message.getParams().put("failedDeletes", deleteKeys.toString());
-      AUDIT.logWriteSuccess(message.build());
+      AUDIT.logWriteSuccess(message.withResult(AuditEventStatus.SUCCESS).build());
     }
 
     return result;
