@@ -17,19 +17,26 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import java.nio.ByteBuffer;
+import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.util.JavaUtils;
+import org.apache.ratis.util.function.CheckedFunction;
 
 class LocalStream implements StateMachine.DataStream {
   private final StateMachine.DataChannel dataChannel;
   private final Executor executor;
+  private final CheckedFunction<ByteBuffer, ByteBuffer, IOException> commandHandler;
 
-  LocalStream(StateMachine.DataChannel dataChannel, Executor executor) {
+  LocalStream(StateMachine.DataChannel dataChannel, Executor executor,
+      CheckedFunction<ByteBuffer, ByteBuffer, IOException> commandHandler) {
     this.dataChannel = dataChannel;
     this.executor = executor;
+    this.commandHandler = commandHandler;
   }
 
   @Override
@@ -51,5 +58,20 @@ class LocalStream implements StateMachine.DataStream {
   @Override
   public Executor getExecutor() {
     return executor;
+  }
+
+  @Override
+  public CompletableFuture<ByteBuffer> onCommand(ByteBuffer command, long streamOffset) {
+    if (commandHandler == null) {
+      return CompletableFuture.completedFuture(null);
+    }
+    final Executor exec = executor != null ? executor : Runnable::run;
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        return commandHandler.apply(command);
+      } catch (Exception e) {
+        throw new CompletionException(e);
+      }
+    }, exec);
   }
 }

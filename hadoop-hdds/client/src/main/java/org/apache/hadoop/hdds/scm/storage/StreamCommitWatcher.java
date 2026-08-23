@@ -35,8 +35,12 @@ class StreamCommitWatcher extends AbstractCommitWatcher<StreamBuffer> {
 
   @Override
   void releaseBuffers(long index) {
+    releaseBuffers(remove(index));
+  }
+
+  void releaseBuffers(List<StreamBuffer> buffers) {
     long acked = 0;
-    for (StreamBuffer buffer : remove(index)) {
+    for (StreamBuffer buffer : buffers) {
       acked += buffer.position();
       bufferList.remove(buffer);
     }

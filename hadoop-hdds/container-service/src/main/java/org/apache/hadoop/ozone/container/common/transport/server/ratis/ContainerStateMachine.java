@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
@@ -111,6 +112,7 @@ import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.TaskQueue;
 import org.apache.ratis.util.function.CheckedConsumer;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -733,11 +735,26 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   void streamPutBlock(ContainerCommandRequestProto request) throws IOException {
+    streamCommandPutBlock(request);
+  }
+
+  private ContainerCommandResponseProto streamCommandPutBlock(
+      ContainerCommandRequestProto request) {
     final DispatcherContext context = DispatcherContext.newBuilder(DispatcherContext.Op.STREAM_LINK)
         .setStage(DispatcherContext.WriteChunkStage.COMBINED)
         .setContainer2BCSIDMap(container2BCSIDMap)
         .build();
-    dispatchCommand(request, context);
+    return dispatchCommand(request, context);
+  }
+
+  private ByteBuffer streamCommand(ByteBuffer command) throws IOException {
+    final ContainerCommandRequestProto request =
+        ContainerCommandRequestMessage.toProto(ByteString.copyFrom(command), getGroupId());
+    if (request.getCmdType() != Type.PutBlock) {
+      throw new IOException("Unexpected stream command: " + request.getCmdType());
+    }
+    final ContainerCommandResponseProto response = streamCommandPutBlock(request);
+    return response.toByteString().asReadOnlyByteBuffer();
   }
 
   @Override
@@ -755,7 +772,9 @@ public class ContainerStateMachine extends BaseStateMachine {
         final DataChannel channel = getStreamDataChannel(requestProto, context);
         final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
             getChunkExecutor(requestProto.getWriteChunk()) : null;
-        return new LocalStream(channel, chunkExecutor);
+        final CheckedFunction<ByteBuffer, ByteBuffer, IOException> streamCommandHandler =
+            requestProto.getCmdType() == Type.StreamInitWithPutBlock ? this::streamCommand : null;
+        return new LocalStream(channel, chunkExecutor, streamCommandHandler);
       } catch (IOException e) {
         throw new CompletionException("Failed to create data stream", e);
       }
