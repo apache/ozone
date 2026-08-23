@@ -1504,7 +1504,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .setKeyName(openKeyInfo.getKeyName())
                 .setDataSize(info.getDataSize());
             java.util.Optional.ofNullable(info.getLatestVersionLocations())
-                .map(OmKeyLocationInfoGroup::getLocationList)
+                .map(OmKeyLocationInfoGroup::createLocationList)
                 .map(Collection::stream)
                 .orElseGet(Stream::empty)
                 .map(loc -> loc.getProtobuf(ClientVersion.CURRENT_VERSION))

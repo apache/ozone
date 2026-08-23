@@ -691,10 +691,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .getKeyLocationVersions().get(0);
 
       // Set partNumber in each block.
-      currentKeyInfoGroup.getLocationList().forEach(
+      currentKeyInfoGroup.createLocationList().forEach(
           omKeyLocationInfo -> omKeyLocationInfo.setPartNumber(partNumber));
 
-      partLocationInfos.addAll(currentKeyInfoGroup.getLocationList());
+      partLocationInfos.addAll(currentKeyInfoGroup.createLocationList());
       dataSize += currentPartKeyInfo.getDataSize();
     }
     return dataSize;

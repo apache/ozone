@@ -443,7 +443,7 @@ public class TestS3MultipartUploadCommitPartRequest
             .collect(Collectors.toList());
 
     assertEquals(overwriteKeyLocationInfos, locationsInfoListFromCommitPartRequest);
-    assertEquals(overwriteKeyLocationInfos, newPartOmKeyInfo.getLatestVersionLocations().getLocationList());
+    assertEquals(overwriteKeyLocationInfos, newPartOmKeyInfo.getLatestVersionLocations().createLocationList());
     assertEquals(1, newPartOmKeyInfo.getKeyLocationVersions().size());
 
     Map<String, RepeatedOmKeyInfo> toDeleteKeyList =
@@ -453,7 +453,7 @@ public class TestS3MultipartUploadCommitPartRequest
     assertEquals(1, toDeleteKeyList.size());
     assertEquals(originalKeyLocationList.size(), toDeleteKeyList.values().stream()
         .findFirst().get().cloneOmKeyInfoList().get(0).getKeyLocationVersions()
-        .get(0).getLocationList().size());
+        .get(0).createLocationList().size());
   }
 
   @Test
@@ -516,7 +516,7 @@ public class TestS3MultipartUploadCommitPartRequest
     assertEquals(1, toDeleteKeyList.size());
     assertEquals(2, toDeleteKeyList.values().stream()
         .findFirst().get().cloneOmKeyInfoList().get(0).getKeyLocationVersions()
-        .get(0).getLocationList().size());
+        .get(0).createLocationList().size());
 
     String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
         keyName, multipartUploadID);
@@ -653,7 +653,7 @@ public class TestS3MultipartUploadCommitPartRequest
             .collect(Collectors.toList());
 
     assertEquals(overwriteCommittedBlockList, locationsInfoListFromCommitPartRequest);
-    assertEquals(overwriteCommittedBlockList, newPartOmKeyInfo.getLatestVersionLocations().getLocationList());
+    assertEquals(overwriteCommittedBlockList, newPartOmKeyInfo.getLatestVersionLocations().createLocationList());
     assertEquals(1, newPartOmKeyInfo.getKeyLocationVersions().size());
 
     Map<String, RepeatedOmKeyInfo> toDeleteKeyMap =
