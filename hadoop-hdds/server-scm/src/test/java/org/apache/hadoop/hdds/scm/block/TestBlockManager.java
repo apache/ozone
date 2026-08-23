@@ -226,7 +226,7 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockWithStoragePolicy() throws Exception {
-    List<DatanodeInfo> dns = nodeManager.getAllNodes();
+    List<DatanodeDetails> dns = nodeManager.getNodes(NodeStatus.inServiceHealthy());
     AllocatedBlock block = null;
 
     for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
@@ -240,7 +240,7 @@ public class TestBlockManager {
       // Stale specific creation StorageTier to simulate all the specific StorageTier Datanodes
       // cannot be used.
       assertTrue(storagePolicy.getCreationTier().isUniform());
-      staleDatanodeForStorageType(storagePolicy.getCreationTier().getStorageTypes(1).get(0), dns);
+      staleDatanodeForStorageType(storagePolicy.getCreationTier().getUniformStorageType(), dns);
       // Do not allow fallback StoragePolicy, Since all the specific creation StorageTier had been
       // disabled, so there is not a Block can be allocated
       try {
@@ -658,8 +658,8 @@ public class TestBlockManager {
     return pipelineManager.openContainerLimit(pipeline.getNodes());
   }
 
-  private void staleDatanodeForStorageType(StorageType storageType, List<DatanodeInfo> dns) {
-    for (DatanodeInfo dn : dns) {
+  private void staleDatanodeForStorageType(StorageType storageType, List<DatanodeDetails> dns) {
+    for (DatanodeDetails dn : dns) {
       if (nodeManager.getDatanodeInfo(dn).getStorageReports().get(0).getStorageType() ==
           StorageTypeUtils.getStorageTypeProto(storageType)) {
         nodeManager.setNodeState(dn, STALE);
