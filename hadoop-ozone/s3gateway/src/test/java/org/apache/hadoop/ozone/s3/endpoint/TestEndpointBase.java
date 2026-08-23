@@ -169,7 +169,7 @@ public class TestEndpointBase {
     final AuditEndpoint endpointBase = newAuditEndpoint(signatureInfo);
 
     assertThat(endpointBase.auditMessageForTest().getParams())
-        .containsEntry(ORIGINAL_ACCESS_KEY_ID_PARAM, originalAccessKeyId);
+        .containsEntry(ORIGINAL_ACCESS_KEY_ID_PARAM, originalAccessKeyId + " (unverified)");
   }
 
   @Test

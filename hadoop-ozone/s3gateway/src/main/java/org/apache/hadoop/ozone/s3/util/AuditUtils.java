@@ -36,9 +36,10 @@ public final class AuditUtils {
 
   /**
    * Extracts (if possible) the STS {@code originalAccessKeyId} from a session token so it can be
-   * recorded in the S3 Gateway audit log. Like the S3 access id already recorded as the
-   * audit user, this reflects what the client presented. Returns {@code null} when no usable value
-   * can be extracted so the audit path is never disrupted by a missing or malformed token.
+   * recorded in the S3 Gateway audit log. Like the S3 access id already recorded as the audit user,
+   * this reflects what the client presented and is not cryptographically validated by S3 Gateway.
+   * Returns {@code null} when no usable value can be extracted so the audit path is never disrupted
+   * by a missing or malformed token.
    */
   public static String getStsOriginalAccessKeyId(String sessionToken) {
     if (sessionToken == null || sessionToken.isEmpty()) {
