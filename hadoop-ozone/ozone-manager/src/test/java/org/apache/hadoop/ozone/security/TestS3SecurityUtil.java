@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REVOKED_TOKEN;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.MockClock;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
@@ -63,6 +65,11 @@ public class TestS3SecurityUtil {
 
   {
     ThreadLocalRandom.current().nextBytes(ENCRYPTION_KEY);
+  }
+
+  @AfterEach
+  public void tearDown() {
+    OzoneManager.setStsTokenIdentifier(null);
   }
 
   @Test
@@ -161,6 +168,15 @@ public class TestS3SecurityUtil {
   }
 
   @Test
+  public void testValidateS3CredentialFailsWhenAwsSignatureInvalid() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setAwsSignatureValid(false)
+            .setExpectedResult(INVALID_TOKEN)
+            .setExpectedMessage("STS token validation failed for token"));
+  }
+
+  @Test
   public void testValidateS3CredentialSuccessWhenTokenCreatedAfterRevocationCutoff() throws Exception {
     validateS3CredentialHelper(
         new TestConfig()
@@ -221,7 +237,7 @@ public class TestS3SecurityUtil {
 
         // Mock AWS V4 signature validation
         awsV4AuthValidatorMock.when(() -> AWSV4AuthValidator.validateRequest(anyString(), anyString(), anyString()))
-            .thenReturn(true);
+            .thenReturn(config.awsSignatureValid);
 
         final OMRequest omRequest = createRequestWithSessionToken(
             config.requestAccessId, config.includeAccessId);
@@ -236,8 +252,11 @@ public class TestS3SecurityUtil {
                 "Expected exception message to contain: '" + config.expectedMessage + "' but was: '" +
                     omException.getMessage() + "'");
           }
+          assertNull(
+              OzoneManager.getStsTokenIdentifier(), "STS token identifier must not be set when validation fails");
         } else {
           assertDoesNotThrow(() -> S3SecurityUtil.validateS3Credential(omRequest, ozoneManager));
+          assertEquals(stsTokenIdentifier, OzoneManager.getStsTokenIdentifier());
         }
       }
     }
@@ -284,6 +303,7 @@ public class TestS3SecurityUtil {
     private boolean shouldOriginalAccessKeyIdCheckThrowError = false;
     private String requestAccessId = TEMP_ACCESS_KEY_ID;
     private boolean includeAccessId = true;
+    private boolean awsSignatureValid = true;
     private OMException.ResultCodes expectedResult = null;
     private String expectedMessage = null;
 
@@ -323,6 +343,11 @@ public class TestS3SecurityUtil {
     @SuppressWarnings("SameParameterValue")
     TestConfig setIncludeAccessId(boolean includeAccessId) {
       this.includeAccessId = includeAccessId;
+      return this;
+    }
+
+    TestConfig setAwsSignatureValid(boolean awsSignatureValid) {
+      this.awsSignatureValid = awsSignatureValid;
       return this;
     }
 

@@ -315,6 +315,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
         .setKeyInfo(denormalizeOmKeyInfo(k.getKeyInfo()))
         .setVolumeArgs(k.getVolumeArgs().orElse(null))
         .setUserPrincipal(k.getUserPrincipal().orElse(null))
+        .setStsOriginalAccessKeyId(k.getStsOriginalAccessKeyId().orElse(null))
         .build();
   }
 

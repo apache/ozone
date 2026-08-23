@@ -26,13 +26,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -40,8 +49,14 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.S3GAction;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
@@ -49,6 +64,7 @@ import org.apache.hadoop.security.token.Token;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.stubbing.Answer;
 
 /**
  * Tests the s3 EndpointBase class methods.
@@ -56,6 +72,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestEndpointBase {
   private static final String ORIGINAL_ACCESS_KEY_ID_PARAM = "originalAccessKeyId";
+  private static final String FORGED_STS_ORIGINAL_ACCESS_KEY_ID = "FORGED-ORIGINAL-ACCESS-KEY";
+  private static final String STS_TEMP_ACCESS_KEY_ID = "ASIAEXAMPLE123";
 
   /**
    * Verify s3 metadata key "gdprEnabled" can't be set up directly
@@ -154,22 +172,77 @@ public class TestEndpointBase {
   }
 
   @Test
-  public void testAuditMessageIncludesStsOriginalAccessKeyId() throws Exception {
+  public void testAuditMessageIncludesValidatedStsOriginalAccessKeyId() throws Exception {
     final String originalAccessKeyId = "AKIAORIGINAL123";
-    final OMTokenProto proto = OMTokenProto.newBuilder()
-        .setType(OMTokenProto.Type.S3_STS_TOKEN)
-        .setOriginalAccessKeyId(originalAccessKeyId)
-        .build();
-    final SignatureInfo signatureInfo = new SignatureInfo.Builder(SignatureInfo.Version.V4)
-        .setAwsAccessId("ASIAEXAMPLE123")
-        .setSignature("signature")
-        .setStringToSign("string-to-sign")
-        .setSessionToken(encodeSessionToken(proto))
-        .build();
-    final AuditEndpoint endpointBase = newAuditEndpoint(signatureInfo);
+    // Pass the forged token to newAuditEndpoint because we need a session token present (so the request is
+    // for STS), but deliberately make its embedded originalAccessKeyId wrong, so the test can prove the audit path
+    // ignores it and only trusts the validated field.
+    final AuditEndpoint endpointBase = newAuditEndpoint(stsSignatureInfoWithForgedOriginalAccessKeyId());
+    endpointBase.setValidatedStsOriginalAccessKeyIdForTest();
 
     assertThat(endpointBase.auditMessageForTest().getParams())
-        .containsEntry(ORIGINAL_ACCESS_KEY_ID_PARAM, originalAccessKeyId);
+        .containsEntry(ORIGINAL_ACCESS_KEY_ID_PARAM, originalAccessKeyId)
+        .doesNotContainValue(FORGED_STS_ORIGINAL_ACCESS_KEY_ID);
+  }
+
+  @Test
+  public void testAuditMessageResolvesValidatedStsOriginalAccessKeyIdFromOm() throws Exception {
+    final String originalAccessKeyId = "AKIAORIGINAL123";
+    final StsAuditEndpointFixture fixture = newStsAuditEndpointFixture(
+        stsSignatureInfoWithForgedOriginalAccessKeyId(),
+        (objectStore, s3AuthRef) -> stubGetS3VolumeContext(
+            objectStore, invocation -> {
+            final S3Auth auth = s3AuthRef.get();
+            if (auth != null) {
+              auth.setValidatedStsOriginalAccessKeyId(originalAccessKeyId);
+            }
+            final OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
+                .setVolume("s3v")
+                .setAdminName("admin")
+                .setOwnerName("owner")
+                .build();
+            return S3VolumeContext.newBuilder()
+                .setOmVolumeArgs(volumeArgs)
+                .setUserPrincipal("alice")
+                .setStsOriginalAccessKeyId(originalAccessKeyId)
+                .build();
+            }));
+
+    assertThat(fixture.getEndpoint().auditMessageForTest().getParams())
+        .containsEntry(ORIGINAL_ACCESS_KEY_ID_PARAM, originalAccessKeyId)
+        .doesNotContainValue(FORGED_STS_ORIGINAL_ACCESS_KEY_ID);
+    verify(fixture.getObjectStore()).getS3VolumeContext();
+  }
+
+  @Test
+  public void testAuditMessageOmitsStsOriginalAccessKeyIdWhenNotValidated() throws Exception {
+    final AuditEndpoint endpointBase = newAuditEndpoint(stsSignatureInfoWithForgedOriginalAccessKeyId());
+
+    assertThat(endpointBase.auditMessageForTest().getParams())
+        .doesNotContainKey(ORIGINAL_ACCESS_KEY_ID_PARAM);
+  }
+
+  @Test
+  public void testFailureAuditOmitsStsOriginalAccessKeyIdWhenNotValidated() throws Exception {
+    final StsAuditEndpointFixture fixture = newStsAuditEndpointFixture(stsSignatureInfoWithForgedOriginalAccessKeyId());
+
+    assertThat(fixture.getEndpoint().auditMessageForFailureTest(
+        new OMException("STS token validation failed", ResultCodes.INVALID_TOKEN)).getParams())
+        .doesNotContainKey(ORIGINAL_ACCESS_KEY_ID_PARAM)
+        .doesNotContainValue(FORGED_STS_ORIGINAL_ACCESS_KEY_ID);
+    verify(fixture.getObjectStore(), never()).getS3VolumeContext();
+  }
+
+  @Test
+  public void testAuditMessageSuccessIgnoresRuntimeExceptionFromOmResolution() throws Exception {
+    final StsAuditEndpointFixture fixture = newStsAuditEndpointFixture(
+        stsSignatureInfoWithForgedOriginalAccessKeyId(), objectStore -> stubGetS3VolumeContextToThrow(
+            objectStore, new RuntimeException("OM unavailable")));
+
+    assertThat(fixture.getEndpoint().auditMessageForTest().getParams())
+        .doesNotContainKey(ORIGINAL_ACCESS_KEY_ID_PARAM)
+        .doesNotContainValue(FORGED_STS_ORIGINAL_ACCESS_KEY_ID);
+    verify(fixture.getObjectStore()).getS3VolumeContext();
   }
 
   @Test
@@ -254,15 +327,102 @@ public class TestEndpointBase {
     return token.encodeToUrlString();
   }
 
+  private static SignatureInfo stsSignatureInfoWithForgedOriginalAccessKeyId() throws Exception {
+    final OMTokenProto proto = OMTokenProto.newBuilder()
+        .setType(OMTokenProto.Type.S3_STS_TOKEN)
+        .setOriginalAccessKeyId(FORGED_STS_ORIGINAL_ACCESS_KEY_ID)
+        .build();
+    return new SignatureInfo.Builder(SignatureInfo.Version.V4)
+        .setAwsAccessId(STS_TEMP_ACCESS_KEY_ID)
+        .setSignature("signature")
+        .setStringToSign("string-to-sign")
+        .setSessionToken(encodeSessionToken(proto))
+        .build();
+  }
+
+  private static void stubGetS3VolumeContext(ObjectStore objectStore, Answer<S3VolumeContext> answer) {
+    try {
+      doAnswer(answer).when(objectStore).getS3VolumeContext();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void stubGetS3VolumeContextToThrow(ObjectStore objectStore, RuntimeException toThrow) {
+    try {
+      doThrow(toThrow).when(objectStore).getS3VolumeContext();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static StsAuditEndpointFixture newStsAuditEndpointFixture(SignatureInfo signatureInfo)
+      throws Exception {
+    return newStsAuditEndpointFixture(signatureInfo, (Consumer<ObjectStore>) objectStore -> { });
+  }
+
+  private static StsAuditEndpointFixture newStsAuditEndpointFixture(
+      SignatureInfo signatureInfo,
+      Consumer<ObjectStore> objectStoreConfigurer) throws Exception {
+    return newStsAuditEndpointFixture(signatureInfo, (objectStore, s3AuthRef) ->
+        objectStoreConfigurer.accept(objectStore));
+  }
+
+  private static StsAuditEndpointFixture newStsAuditEndpointFixture(
+      SignatureInfo signatureInfo,
+      BiConsumer<ObjectStore, AtomicReference<S3Auth>> objectStoreConfigurer) throws Exception {
+    final OzoneClient client = mock(OzoneClient.class);
+    final ObjectStore objectStore = mock(ObjectStore.class);
+    final ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    final AtomicReference<S3Auth> s3AuthRef = new AtomicReference<>();
+
+    doAnswer(invocation -> {
+      s3AuthRef.set(invocation.getArgument(0));
+      return null;
+    }).when(clientProtocol).setThreadLocalS3Auth(any(S3Auth.class));
+    when(clientProtocol.getThreadLocalS3Auth()).thenAnswer(invocation -> s3AuthRef.get());
+    when(client.getObjectStore()).thenReturn(objectStore);
+    when(objectStore.getClientProxy()).thenReturn(clientProtocol);
+    objectStoreConfigurer.accept(objectStore, s3AuthRef);
+
+    final AuditEndpoint endpoint = new EndpointBuilder<>(AuditEndpoint::new)
+        .setClient(client)
+        .setSignatureInfo(signatureInfo)
+        .build();
+    return new StsAuditEndpointFixture(endpoint, objectStore);
+  }
+
   private static AuditEndpoint newAuditEndpoint(SignatureInfo signatureInfo) {
     return new EndpointBuilder<>(AuditEndpoint::new)
         .setSignatureInfo(signatureInfo)
         .build();
   }
 
+  private static final class StsAuditEndpointFixture {
+    private final AuditEndpoint endpoint;
+    private final ObjectStore objectStore;
+
+    private StsAuditEndpointFixture(AuditEndpoint endpoint, ObjectStore objectStore) {
+      this.endpoint = endpoint;
+      this.objectStore = objectStore;
+    }
+
+    private AuditEndpoint getEndpoint() {
+      return endpoint;
+    }
+
+    private ObjectStore getObjectStore() {
+      return objectStore;
+    }
+  }
+
   private static final class AuditEndpoint extends EndpointBase {
     private AuditMessage.Builder auditMessageForTest() {
-      return auditMessageFor(S3GAction.GET_KEY);
+      return auditMessageForSuccess(S3GAction.GET_KEY);
+    }
+
+    private AuditMessage.Builder auditMessageForFailureTest(Throwable throwable) {
+      return auditMessageForFailure(S3GAction.GET_KEY, throwable);
     }
   }
 
