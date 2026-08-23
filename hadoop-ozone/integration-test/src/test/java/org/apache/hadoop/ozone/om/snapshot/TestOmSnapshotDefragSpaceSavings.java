@@ -68,9 +68,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Uses inode-aware sizing (matching {@link OMSnapshotDirectoryMetrics}) so hardlinked SST files
  * are not double-counted across snapshot checkpoint directories. Version-0 checkpoints hardlink to
- * AOS SST files, so savings are measured by comparing a duplicate-inclusive pre-defrag total (each
- * snapshot counted independently) against the post-defrag chain total with cross-snapshot inode
- * deduplication.
+ * AOS SST files, so their on-disk byte totals are not comparable to materialized post-defrag
+ * checkpoints. Savings are validated by cross-snapshot SST reference reduction in the chain.
  *
  * <p>Covers a three-snapshot chain with AOS compactions and insert/overwrite/delete churn on OBS
  * and FSO buckets, full-then-incremental defrag paths, footprint checks after deleting the
@@ -251,8 +250,9 @@ public class TestOmSnapshotDefragSpaceSavings {
 
   private void runChurnFootprintScenario(BucketLayout layout) throws Exception {
     List<SnapshotInfo> snapshots = createSnapshotChainWithChurn(layout).snapshots;
-    CheckpointFootprint footprintBeforeDefrag =
+    CheckpointFootprint duplicateInclusiveBefore =
         measureDuplicateInclusiveAggregateFootprint(snapshots, 0);
+    CheckpointFootprint dedupedBefore = measureAggregateCheckpointFootprint(snapshots, 0);
 
     OmSnapshotInternalMetrics metrics = cluster.getOzoneManager().getOmSnapshotIntMetrics();
     long fullDefragBefore = metrics.getNumSnapshotFullDefrag();
@@ -260,8 +260,7 @@ public class TestOmSnapshotDefragSpaceSavings {
 
     triggerDefragUntilDone(snapshots);
 
-    assertDefragReducedChainFootprint(footprintBeforeDefrag,
-        measureActiveAggregateCheckpointFootprint(snapshots));
+    assertDefragReducedChainFootprint(snapshots, duplicateInclusiveBefore, dedupedBefore);
     if (layout == BucketLayout.OBJECT_STORE) {
       assertTrue(metrics.getNumSnapshotFullDefrag() >= fullDefragBefore + 1,
           "Expected at least one full defrag for the chain head snapshot");
@@ -274,24 +273,52 @@ public class TestOmSnapshotDefragSpaceSavings {
     }
   }
 
-  private void assertDefragReducedChainFootprint(CheckpointFootprint duplicateInclusiveBefore,
-      CheckpointFootprint dedupedAfter) {
-    assertTrue(dedupedAfter.getTotalBytes() < duplicateInclusiveBefore.getTotalBytes(),
+  private void assertDefragReducedChainFootprint(List<SnapshotInfo> snapshots,
+      CheckpointFootprint duplicateInclusiveBefore, CheckpointFootprint dedupedBefore)
+      throws IOException {
+    CheckpointFootprint dedupedAfter = measureActiveAggregateCheckpointFootprint(snapshots);
+    CheckpointFootprint duplicateInclusiveAfter = measureDuplicateInclusiveActiveFootprint(snapshots);
+
+    assertTrue(duplicateInclusiveBefore.getSstFileCount() > dedupedBefore.getSstFileCount(),
         () -> String.format(
-            "Expected defragged chain footprint to beat duplicate-inclusive pre-defrag total: "
-                + "before=%d bytes (%d SST files), after=%d bytes (%d SST files)",
-            duplicateInclusiveBefore.getTotalBytes(), duplicateInclusiveBefore.getSstFileCount(),
-            dedupedAfter.getTotalBytes(), dedupedAfter.getSstFileCount()));
+            "Expected pre-defrag chain to carry redundant SST references: duplicate-inclusive=%d, "
+                + "deduped=%d",
+            duplicateInclusiveBefore.getSstFileCount(), dedupedBefore.getSstFileCount()));
     assertTrue(dedupedAfter.getSstFileCount() < duplicateInclusiveBefore.getSstFileCount(),
         () -> String.format(
-            "Expected deduped SST file count to drop: before=%d, after=%d",
+            "Expected defragged chain to drop SST references vs duplicate-inclusive pre-defrag "
+                + "baseline: before=%d, after=%d",
             duplicateInclusiveBefore.getSstFileCount(), dedupedAfter.getSstFileCount()));
+
+    long sstRedundancyBefore = duplicateInclusiveBefore.getSstFileCount()
+        - dedupedBefore.getSstFileCount();
+    long sstRedundancyAfter = duplicateInclusiveAfter.getSstFileCount()
+        - dedupedAfter.getSstFileCount();
+    assertTrue(sstRedundancyAfter < sstRedundancyBefore,
+        () -> String.format(
+            "Expected defrag to reduce cross-snapshot SST redundancy: before=%d, after=%d",
+            sstRedundancyBefore, sstRedundancyAfter));
   }
 
   /**
    * Sums each snapshot checkpoint independently, counting every file path without inode dedup, so
    * hardlinked SST paths in version-0 checkpoints are charged once per snapshot directory.
    */
+  private CheckpointFootprint measureDuplicateInclusiveActiveFootprint(
+      List<SnapshotInfo> snapshots) throws IOException {
+    long totalBytes = 0;
+    long sstFileCount = 0;
+    OMMetadataManager metadataManager = cluster.getOzoneManager().getMetadataManager();
+    for (SnapshotInfo snapshotInfo : snapshots) {
+      Path checkpointDir = OmSnapshotManager.getSnapshotPath(metadataManager,
+          snapshotInfo.getSnapshotId(), readSnapshotVersion(snapshotInfo));
+      CheckpointFootprint footprint = calculateDirectoryFootprintWithoutDedup(checkpointDir);
+      totalBytes += footprint.getTotalBytes();
+      sstFileCount += footprint.getSstFileCount();
+    }
+    return new CheckpointFootprint(totalBytes, sstFileCount);
+  }
+
   private CheckpointFootprint measureDuplicateInclusiveAggregateFootprint(
       List<SnapshotInfo> snapshots, int version) throws IOException {
     long totalBytes = 0;
