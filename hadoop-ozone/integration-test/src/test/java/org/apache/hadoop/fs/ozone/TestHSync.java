@@ -1298,27 +1298,37 @@ public class TestHSync {
         + OZONE_URI_DELIMITER + bucket.getName();
     final Path file = new Path(dir, "file-hsync-used-namespace");
 
-    OzoneVolume volume = client.getObjectStore().getVolume(bucket.getVolumeName());
-    final long usedNamespace = volume.getBucket(bucket.getName()).getUsedNamespace();
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    String bucketKey = metadataManager.getBucketKey(bucket.getVolumeName(), bucket.getName());
+    final long usedNamespace = metadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      try (FSDataOutputStream out = fs.create(file, true)) {
-        // Each block triggers an hsync commit; only the first adds the key.
-        byte[] blockData = RandomStringUtils.secure().nextAlphabetic(BLOCK_SIZE)
-            .getBytes(UTF_8);
-        for (int i = 0; i < 4; i++) {
-          out.write(blockData);
-          out.hsync();
+      try {
+        try (FSDataOutputStream out = fs.create(file, true)) {
+          // Each block triggers an hsync commit; only the first adds the key.
+          byte[] blockData = RandomStringUtils.secure().nextAlphabetic(BLOCK_SIZE)
+              .getBytes(UTF_8);
+          for (int i = 0; i < 4; i++) {
+            out.write(blockData);
+            out.hsync();
+          }
+        }
+        assertEquals(usedNamespace + 1,
+            metadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
+
+        assertTrue(fs.delete(file, false));
+        GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
+            metadataManager.getBucketTable().get(bucketKey).getUsedNamespace() == usedNamespace,
+            100, 30000);
+      } finally {
+        try {
+          fs.delete(file, false);
+          waitForEmptyDeletedTable();
+        } finally {
+          cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
         }
       }
-      assertEquals(usedNamespace + 1,
-          volume.getBucket(bucket.getName()).getUsedNamespace());
-
-      assertTrue(fs.delete(file, false));
-      // Client usage includes pending-delete namespace, so wait for purge.
-      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
-          volume.getBucket(bucket.getName()).getUsedNamespace() == usedNamespace,
-          100, 30000);
     }
   }
 

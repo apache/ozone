@@ -526,6 +526,15 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(1, bucketInfo.getUsedNamespace());
+
+    clientID = Time.now();
+    version += 1;
+    Map<String, RepeatedOmKeyInfo> keyToDeleteMap =
+        doKeyCommit(false, getKeyLocation(20).subList(10, 20));
+    assertThat(keyToDeleteMap).isNotEmpty();
+
+    bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(1, bucketInfo.getUsedNamespace());
   }
 
   private Map<String, RepeatedOmKeyInfo> doKeyCommit(boolean isHSync,
