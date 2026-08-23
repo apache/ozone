@@ -142,8 +142,9 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * @return Raw GetS3VolumeContextResponse.
-   * S3Auth won't be updated with actual userPrincipal by this call.
+   * @return S3 volume context from OM.
+   * When thread-local {@link S3Auth} is set, implementations update it with OM-returned
+   * {@code userPrincipal} and, when present, validated STS {@code originalAccessKeyId}.
    * @throws IOException
    */
   S3VolumeContext getS3VolumeContext() throws IOException;

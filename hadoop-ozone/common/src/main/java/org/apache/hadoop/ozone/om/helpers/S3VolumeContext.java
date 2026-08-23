@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 
 /**
@@ -35,9 +36,19 @@ public class S3VolumeContext {
    */
   private final String userPrincipal;
 
+  /**
+   * OM-validated originalAccessKeyId for the current STS session token, when present.
+   */
+  private final String stsOriginalAccessKeyId;
+
   public S3VolumeContext(OmVolumeArgs omVolumeArgs, String userPrincipal) {
+    this(omVolumeArgs, userPrincipal, null);
+  }
+
+  public S3VolumeContext(OmVolumeArgs omVolumeArgs, String userPrincipal, String stsOriginalAccessKeyId) {
     this.omVolumeArgs = omVolumeArgs;
     this.userPrincipal = userPrincipal;
+    this.stsOriginalAccessKeyId = stsOriginalAccessKeyId;
   }
 
   public OmVolumeArgs getOmVolumeArgs() {
@@ -48,17 +59,25 @@ public class S3VolumeContext {
     return userPrincipal;
   }
 
+  public String getStsOriginalAccessKeyId() {
+    return stsOriginalAccessKeyId;
+  }
+
   public static S3VolumeContext fromProtobuf(GetS3VolumeContextResponse resp) {
     return new S3VolumeContext(
         OmVolumeArgs.getFromProtobuf(resp.getVolumeInfo()),
-        resp.getUserPrincipal());
+        resp.getUserPrincipal(),
+        resp.hasStsOriginalAccessKeyId() ? resp.getStsOriginalAccessKeyId() : null);
   }
 
   public GetS3VolumeContextResponse getProtobuf() {
-    return GetS3VolumeContextResponse.newBuilder()
+    final GetS3VolumeContextResponse.Builder builder = GetS3VolumeContextResponse.newBuilder()
         .setVolumeInfo(omVolumeArgs.getProtobuf())
-        .setUserPrincipal(userPrincipal)
-        .build();
+        .setUserPrincipal(userPrincipal);
+    if (StringUtils.isNotEmpty(stsOriginalAccessKeyId)) {
+      builder.setStsOriginalAccessKeyId(stsOriginalAccessKeyId);
+    }
+    return builder.build();
   }
 
   public static S3VolumeContext.Builder newBuilder() {
@@ -71,6 +90,7 @@ public class S3VolumeContext {
   public static final class Builder {
     private OmVolumeArgs omVolumeArgs;
     private String userPrincipal;
+    private String stsOriginalAccessKeyId;
 
     private Builder() {
     }
@@ -85,8 +105,13 @@ public class S3VolumeContext {
       return this;
     }
 
+    public Builder setStsOriginalAccessKeyId(String stsOriginalAccessKeyId) {
+      this.stsOriginalAccessKeyId = stsOriginalAccessKeyId;
+      return this;
+    }
+
     public S3VolumeContext build() {
-      return new S3VolumeContext(omVolumeArgs, userPrincipal);
+      return new S3VolumeContext(omVolumeArgs, userPrincipal, stsOriginalAccessKeyId);
     }
   }
 }
