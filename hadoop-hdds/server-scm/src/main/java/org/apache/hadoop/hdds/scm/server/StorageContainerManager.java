@@ -55,7 +55,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -67,6 +66,7 @@ import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -2095,20 +2095,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Get the safe mode status of all rules.
    *
-   * @return map of rule statuses.
+   * @return list of rule statuses.
    */
-  public Map<String, Pair<Boolean, String>> getRuleStatus() {
+  public List<SafeModeRuleStatusProto> getRuleStatus() {
     return scmSafeModeManager.getRuleStatus();
   }
 
   @Override
   public Map<String, String[]> getSafeModeRuleStatus() {
     Map<String, String[]> map = new HashMap<>();
-    for (Map.Entry<String, Pair<Boolean, String>> entry :
-        scmSafeModeManager.getRuleStatus().entrySet()) {
-      String[] status =
-          {entry.getValue().getRight(), entry.getValue().getLeft().toString()};
-      map.put(entry.getKey(), status);
+    for (SafeModeRuleStatusProto entry : scmSafeModeManager.getRuleStatus()) {
+      String[] status = {entry.getStatusText(), Boolean.toString(entry.getValidate())};
+      map.put(entry.getRuleName(), status);
     }
     return map;
   }
