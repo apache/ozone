@@ -110,7 +110,8 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
 
   @Override
   protected InputStream createFSInputStream(InputStream inputStream) {
-    return new CapableOzoneFSInputStream(inputStream, statistics);
+    return new CapableOzoneFSInputStream(inputStream, statistics,
+        isSynchronizePositionedReadsEnabled());
   }
 
   @Override

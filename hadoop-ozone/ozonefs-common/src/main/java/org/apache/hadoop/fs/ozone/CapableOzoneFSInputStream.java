@@ -26,7 +26,12 @@ final class CapableOzoneFSInputStream extends OzoneFSInputStream
     implements StreamCapabilities {
 
   CapableOzoneFSInputStream(InputStream inputStream, Statistics statistics) {
-    super(inputStream, statistics);
+    this(inputStream, statistics, false);
+  }
+
+  CapableOzoneFSInputStream(InputStream inputStream, Statistics statistics,
+      boolean synchronizePositionedReads) {
+    super(inputStream, statistics, synchronizePositionedReads);
   }
 
   @Override
