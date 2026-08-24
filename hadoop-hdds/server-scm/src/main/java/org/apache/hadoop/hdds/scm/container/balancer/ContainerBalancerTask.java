@@ -107,6 +107,7 @@ public class ContainerBalancerTask implements Runnable {
 
   private Set<DatanodeDetails> selectedTargets;
   private Set<DatanodeDetails> selectedSources;
+  private final Set<ContainerID> excludeContainersNotFound = new HashSet<>();
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
   private Map<ContainerMoveSelection, CompletableFuture<MoveManager.MoveResult>>
@@ -264,6 +265,12 @@ public class ContainerBalancerTask implements Runnable {
 
       if (!isBalancerRunning()) {
         return;
+      }
+
+      if (!excludeContainersNotFound.isEmpty()) {
+        LOG.info("ContainerBalancer iteration {}: {} containers permanently " +
+                "excluded (ContainerNotFoundException across prior iterations).",
+            i + 1, excludeContainersNotFound.size());
       }
 
       // initialize this iteration. stop balancing on initialization failure
@@ -632,7 +639,7 @@ public class ContainerBalancerTask implements Runnable {
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
         nodeManager, replicationManager, containerManager, findSourceStrategy,
-        containerToSourceMap);
+        containerToSourceMap, excludeContainersNotFound);
     return true;
   }
 
@@ -737,8 +744,8 @@ public class ContainerBalancerTask implements Runnable {
           "starting a container move", containerID, e);
       // add source back to queue as a different container can be selected in next run.
       findSourceStrategy.addBackSourceDataNode(source);
-      // exclude the container which caused failure of move to avoid error in next run.
-      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
+      // exclude the permanently missing container across balancer iterations.
+      selectionCriteria.addToExcludeNotFoundContainers(moveSelection.getContainerID());
       return false;
     }
     LOG.info("ContainerBalancer is trying to move container {} with size " +
@@ -1029,8 +1036,8 @@ public class ContainerBalancerTask implements Runnable {
           containerID, e);
       // add source back to queue as a different container can be selected in next run.
       findSourceStrategy.addBackSourceDataNode(source);
-      // exclude the container which caused failure of move to avoid error in next run.
-      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
+      // exclude the permanently missing container across balancer iterations.
+      selectionCriteria.addToExcludeNotFoundContainers(moveSelection.getContainerID());
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     } catch (NodeNotFoundException e) {
@@ -1191,6 +1198,7 @@ public class ContainerBalancerTask implements Runnable {
       LOG.warn("Could not find Container {} while matching source and " +
               "target nodes in ContainerBalancer",
           moveSelection.getContainerID(), e);
+      selectionCriteria.addToExcludeNotFoundContainers(moveSelection.getContainerID());
       return;
     }
     long size = container.getUsedBytes();
