@@ -97,6 +97,14 @@ destroy the versions the bucket already holds — S3's data-protection promise. 
 enforces this on `SetBucketProperty` and rejects a transition to `UNVERSIONED`
 with `INVALID_REQUEST`.
 
+The only inbound edge is `PutBucketVersioning`, as in S3, where `CreateBucket`
+carries no versioning parameter: a bucket is always created Unversioned. OM
+rejects a `CreateBucket` that carries a versioning status, also with
+`INVALID_REQUEST`, so the state a bucket starts in cannot be chosen and every
+status it ever holds has been through the transition check above. The field is
+on `BucketInfo` because that message is the bucket's on-disk record and the
+shape `InfoBucket` and `ListBuckets` return, not because a create needs it.
+
 A `BucketVersioningStatusProto` enum (`UNVERSIONED` / `VERSIONING_ENABLED` /
 `VERSIONING_SUSPENDED`) is added as an optional field on `BucketInfo` and
 `BucketArgs`. The legacy `isVersionEnabled` boolean is kept and maintained in
@@ -569,7 +577,7 @@ left unguarded).
 
 | Task | Scope |
 |---|---|
-| T1 Metadata foundation | proto three-state enum + legacy-boolean sync, set-property state machine, `OmKeyInfo` version fields, versionedKeyTable column family, layout feature gate |
+| T1 Metadata foundation | proto three-state enum + legacy-boolean sync, state machine on set-property plus rejection of a versioning status at create, `OmKeyInfo` version fields, versionedKeyTable column family, layout feature gate |
 | T2 VersionId generator framework | `VersionIdGenerator` interface with class-name configuration, `UniqueId`-based default proposed in `preExecute`, commit-time ordering floor, pinned-first generator |
 | T3 ENABLED write paths | PUT two-table update, DELETE marker insertion on both the single-key and the batch request, quota accounting |
 | T4 Read / permanent delete / promotion | `?versionId=` reads including null-slot addressing, reporting a delete-marker-addressed read as a condition distinct from not-found; permanent delete by versionId with quota accounting; version promotion |
