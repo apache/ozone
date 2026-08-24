@@ -33,6 +33,15 @@ import org.apache.hadoop.metrics2.util.SampleStat;
  * <p>This avoids the {@code synchronized} contention of the base class when
  * many threads release locks simultaneously and all attempt to record a
  * measurement on the same metric instance.
+ *
+ * <p><b>Standard deviation accuracy:</b> {@code drainPending()} batches all
+ * pending samples except the min and max into a single
+ * {@code super.add(n, sum)} call. {@link org.apache.hadoop.metrics2.util.SampleStat}
+ * treats a batch as {@code n} identical samples equal to their mean, so the
+ * within-batch variance is lost. The reported standard deviation is therefore
+ * underestimated. Callers that need accurate standard deviation should use
+ * {@link org.apache.hadoop.metrics2.lib.MutableStat} directly, or pass
+ * {@code extended=false} to suppress the stdev metric.
  */
 public class ConcurrentMutableStat extends MutableStat {
 

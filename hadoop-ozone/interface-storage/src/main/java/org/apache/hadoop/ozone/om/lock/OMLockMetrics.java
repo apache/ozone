@@ -44,16 +44,16 @@ public final class OMLockMetrics implements MetricsSource {
   private OMLockMetrics() {
     readLockWaitingTimeMsStat = new ConcurrentMutableStat("ReadLockWaitingTime",
         "Time (in milliseconds) spent waiting for acquiring the read lock",
-        "Ops", "Time", true);
+        "Ops", "Time", false);
     readLockHeldTimeMsStat = new ConcurrentMutableStat("ReadLockHeldTime",
         "Time (in milliseconds) spent holding the read lock",
-        "Ops", "Time", true);
+        "Ops", "Time", false);
     writeLockWaitingTimeMsStat = new ConcurrentMutableStat("WriteLockWaitingTime",
         "Time (in milliseconds) spent waiting for acquiring the write lock",
-        "Ops", "Time", true);
+        "Ops", "Time", false);
     writeLockHeldTimeMsStat = new ConcurrentMutableStat("WriteLockHeldTime",
         "Time (in milliseconds) spent holding the write lock",
-        "Ops", "Time", true);
+        "Ops", "Time", false);
   }
 
   /**
