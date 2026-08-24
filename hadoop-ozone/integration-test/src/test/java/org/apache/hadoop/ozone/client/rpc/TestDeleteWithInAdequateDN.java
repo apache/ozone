@@ -255,7 +255,7 @@ public class TestDeleteWithInAdequateDN {
         .setKeyName(keyName).build();
     OmKeyInfo info = cluster.getOzoneManager().lookupKey(keyArgs);
     BlockID blockID = info.getKeyLocationVersions().get(0)
-        .getLocationList().get(0).getBlockID();
+        .createLocationList().get(0).getBlockID();
     OzoneContainer ozoneContainer;
     final DatanodeStateMachine dnStateMachine =
         leader.getDatanodeStateMachine();

@@ -724,7 +724,7 @@ public class KeyManagerImpl implements KeyManager {
     if (grpcBlockTokenEnabled) {
       String remoteUser = getRemoteUser().getShortUserName();
       for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-        key.getLocationList().forEach(k -> {
+        key.createLocationList().forEach(k -> {
           k.setToken(secretManager.generateToken(remoteUser, k.getBlockID(),
               EnumSet.of(READ), k.getLength()));
         });
@@ -2264,7 +2264,7 @@ public class KeyManagerImpl implements KeyManager {
           LOG.warn("No location for key {}", keyInfo);
           continue;
         }
-        for (OmKeyLocationInfo k : key.getLocationList()) {
+        for (OmKeyLocationInfo k : key.createLocationList()) {
           Pipeline pipeline = k.getPipeline();
           List<DatanodeDetails> nodes = pipeline.getNodes();
           if (nodes.isEmpty()) {
@@ -2570,7 +2570,7 @@ public class KeyManagerImpl implements KeyManager {
   @Nonnull
   private Stream<Long> extractContainerIDs(OmKeyInfo keyInfo) {
     return keyInfo.getKeyLocationVersions().stream()
-        .flatMap(v -> v.getLocationList().stream())
+        .flatMap(v -> v.createLocationList().stream())
         .map(BlockLocationInfo::getContainerID);
   }
 }
