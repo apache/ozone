@@ -752,15 +752,13 @@ public abstract class EndpointBase {
       InputStream body, long contentLength, String amzDecodedLength, String keyPath) throws OS3Exception {
     final String amzContentSha256Header = validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
     final InputStream chunkInputStream;
-    SignedChunksInputStream signedChunksInputStream = null;
     final long effectiveLength;
     if (hasMultiChunksPayload(amzContentSha256Header)) {
       validateMultiChunksUpload(getHeaders(), amzDecodedLength, keyPath);
       if (hasUnsignedPayload(amzContentSha256Header)) {
         chunkInputStream = new UnsignedChunksInputStream(body);
       } else {
-        signedChunksInputStream = new SignedChunksInputStream(body);
-        chunkInputStream = signedChunksInputStream;
+        chunkInputStream = new SignedChunksInputStream(body);
       }
       effectiveLength = Long.parseLong(amzDecodedLength);
     } else {
@@ -781,8 +779,7 @@ public abstract class EndpointBase {
     }
     MultiDigestInputStream multiDigestInputStream =
         new MultiDigestInputStream(chunkInputStream, digests);
-    return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength,
-        signedChunksInputStream);
+    return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength);
   }
 
   /**
@@ -790,7 +787,7 @@ public abstract class EndpointBase {
    * signing key so the chunk signatures can be verified (HDDS-15140/15141).
    */
   protected boolean wantsChunkSignatureVerification(S3ChunkInputStreamInfo info) {
-    return info.getSignedChunksInputStream() != null;
+    return info.getMultiDigestInputStream().getWrappedStream() instanceof SignedChunksInputStream;
   }
 
   /**
@@ -805,10 +802,11 @@ public abstract class EndpointBase {
    */
   protected void attachChunkValidator(S3ChunkInputStreamInfo info, ByteBuffer derivedKey)
       throws OS3Exception {
-    SignedChunksInputStream signed = info.getSignedChunksInputStream();
-    if (signed == null) {
+    InputStream wrapped = info.getMultiDigestInputStream().getWrappedStream();
+    if (!(wrapped instanceof SignedChunksInputStream)) {
       return;
     }
+    SignedChunksInputStream signed = (SignedChunksInputStream) wrapped;
     if (derivedKey == null) {
       if (OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())) {
         throw S3ErrorTable.newError(S3ErrorTable.INTERNAL_ERROR,
@@ -901,14 +899,10 @@ public abstract class EndpointBase {
   protected static final class S3ChunkInputStreamInfo {
     private final MultiDigestInputStream multiDigestInputStream;
     private final long effectiveLength;
-    /** The signed chunk stream, if the payload is a signed multi-chunk upload. */
-    private final SignedChunksInputStream signedChunksInputStream;
 
-    S3ChunkInputStreamInfo(MultiDigestInputStream multiDigestInputStream, long effectiveLength,
-        SignedChunksInputStream signedChunksInputStream) {
+    S3ChunkInputStreamInfo(MultiDigestInputStream multiDigestInputStream, long effectiveLength) {
       this.multiDigestInputStream = multiDigestInputStream;
       this.effectiveLength = effectiveLength;
-      this.signedChunksInputStream = signedChunksInputStream;
     }
 
     public MultiDigestInputStream getMultiDigestInputStream() {
@@ -917,10 +911,6 @@ public abstract class EndpointBase {
 
     public long getEffectiveLength() {
       return effectiveLength;
-    }
-
-    public SignedChunksInputStream getSignedChunksInputStream() {
-      return signedChunksInputStream;
     }
   }
 }

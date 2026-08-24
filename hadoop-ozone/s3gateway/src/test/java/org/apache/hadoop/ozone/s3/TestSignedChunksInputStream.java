@@ -20,16 +20,16 @@ package org.apache.hadoop.ozone.s3;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
+import org.apache.hadoop.ozone.s3.signature.SignatureTestUtils;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -305,6 +305,67 @@ public class TestSignedChunksInputStream {
     assertThrows(IllegalStateException.class, () -> is.attachValidator(newValidator()));
   }
 
+  @Test
+  void rejectsBodyMissingFinalZeroChunk() throws Exception {
+    String body = "10000;chunk-signature=" + CHUNK1_SIGNATURE + "\r\n"
+        + repeat('a', 65536) + "\r\n"
+        + "400;chunk-signature=" + CHUNK2_SIGNATURE + "\r\n"
+        + repeat('a', 1024) + "\r\n";
+    InputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(body.getBytes(UTF_8)), newValidator());
+    assertThrows(Exception.class, () -> IOUtils.toString(is, UTF_8));
+  }
+
+  @Test
+  void rejectsBodyTruncatedMidPayload() throws Exception {
+    String body = "10000;chunk-signature=" + CHUNK1_SIGNATURE + "\r\n" + repeat('a', 100);
+    InputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(body.getBytes(UTF_8)), newValidator());
+    assertThrows(Exception.class, () -> IOUtils.toString(is, UTF_8));
+  }
+
+  @Test
+  void rejectsOversizedChunkSize() throws Exception {
+    InputStream is = wrapContent("FFFFFFFFFF;chunk-signature=sig\r\nsomepayloadbytes\r\n");
+    assertThrows(IOException.class, () -> IOUtils.toString(is, UTF_8));
+  }
+
+  @Test
+  void rejectsTamperedChunkSignatureHeader() throws IOException {
+    String tamperedSig = CHUNK1_SIGNATURE.substring(0, 1)
+        + (CHUNK1_SIGNATURE.charAt(1) == 'a' ? 'b' : 'a') + CHUNK1_SIGNATURE.substring(2);
+    String tamperedBody = signedChunkedBody('a').replace(CHUNK1_SIGNATURE, tamperedSig);
+    InputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(tamperedBody.getBytes(UTF_8)), newValidator());
+    assertThrows(OS3Exception.class, () -> IOUtils.toString(is, UTF_8));
+  }
+
+  @Test
+  void closeClosesUnderlyingStream() throws IOException {
+    TrackingInputStream underlying = new TrackingInputStream("1234567890\r\n".getBytes(UTF_8));
+    SignedChunksInputStream wrapper = new SignedChunksInputStream(underlying);
+    wrapper.close();
+    assertTrue(underlying.isClosed());
+  }
+
+  private static final class TrackingInputStream extends ByteArrayInputStream {
+    private boolean closed;
+
+    TrackingInputStream(byte[] buf) {
+      super(buf);
+    }
+
+    @Override
+    public void close() throws IOException {
+      super.close();
+      closed = true;
+    }
+
+    boolean isClosed() {
+      return closed;
+    }
+  }
+
   private static String signedChunkedBody(char payloadChar) {
     return "10000;chunk-signature=" + CHUNK1_SIGNATURE + "\r\n"
         + repeat(payloadChar, 65536) + "\r\n"
@@ -314,7 +375,8 @@ public class TestSignedChunksInputStream {
   }
 
   private static ChunksValidator newValidator() {
-    return new ChunksValidator(signingKey("20130524", "us-east-1", "s3"),
+    return new ChunksValidator(
+        SignatureTestUtils.signingKey(SECRET_KEY, "20130524", "us-east-1", "s3"),
         DATE_TIME, SCOPE, SEED_SIGNATURE);
   }
 
@@ -322,23 +384,6 @@ public class TestSignedChunksInputStream {
     char[] chars = new char[count];
     Arrays.fill(chars, c);
     return new String(chars);
-  }
-
-  private static byte[] signingKey(String date, String region, String service) {
-    byte[] key = hmac(("AWS4" + SECRET_KEY).getBytes(UTF_8), date);
-    key = hmac(key, region);
-    key = hmac(key, service);
-    return hmac(key, "aws4_request");
-  }
-
-  private static byte[] hmac(byte[] key, String msg) {
-    try {
-      Mac mac = Mac.getInstance("HmacSHA256");
-      mac.init(new SecretKeySpec(key, "HmacSHA256"));
-      return mac.doFinal(msg.getBytes(UTF_8));
-    } catch (Exception e) {
-      throw new IllegalStateException(e);
-    }
   }
 
   private InputStream wrapContent(String content) {

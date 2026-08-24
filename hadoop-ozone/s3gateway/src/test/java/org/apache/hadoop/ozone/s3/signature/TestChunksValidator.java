@@ -17,13 +17,10 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
 
@@ -52,7 +49,8 @@ class TestChunksValidator {
       "b6c6ea8a5354eaf15b3cb7646744f4275b71ea724fed81ceb9323e279d449df9";
 
   private ChunksValidator newValidator() {
-    return new ChunksValidator(signingKey("20130524", "us-east-1", "s3"),
+    return new ChunksValidator(
+        SignatureTestUtils.signingKey(SECRET_KEY, "20130524", "us-east-1", "s3"),
         DATE_TIME, SCOPE, SEED_SIGNATURE);
   }
 
@@ -97,23 +95,5 @@ class TestChunksValidator {
     byte[] bytes = new byte[count];
     Arrays.fill(bytes, (byte) c);
     return bytes;
-  }
-
-  /** Derive the SigV4 signing key, as the caller (S3G/OM) would. */
-  private static byte[] signingKey(String date, String region, String service) {
-    byte[] key = hmac(("AWS4" + SECRET_KEY).getBytes(UTF_8), date);
-    key = hmac(key, region);
-    key = hmac(key, service);
-    return hmac(key, "aws4_request");
-  }
-
-  private static byte[] hmac(byte[] key, String msg) {
-    try {
-      Mac mac = Mac.getInstance("HmacSHA256");
-      mac.init(new SecretKeySpec(key, "HmacSHA256"));
-      return mac.doFinal(msg.getBytes(UTF_8));
-    } catch (Exception e) {
-      throw new IllegalStateException(e);
-    }
   }
 }

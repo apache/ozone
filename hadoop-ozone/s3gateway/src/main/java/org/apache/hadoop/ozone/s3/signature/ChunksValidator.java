@@ -64,6 +64,22 @@ public class ChunksValidator {
   private static final String EMPTY_STRING_SHA256 =
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
+  private static final ThreadLocal<Mac> HMAC = ThreadLocal.withInitial(() -> {
+    try {
+      return Mac.getInstance(HMAC_SHA256);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(HMAC_SHA256 + " not available", e);
+    }
+  });
+
+  private static final ThreadLocal<MessageDigest> SHA256 = ThreadLocal.withInitial(() -> {
+    try {
+      return MessageDigest.getInstance(SHA_256);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(SHA_256 + " not available", e);
+    }
+  });
+
   private final byte[] signingKey;
   private final String dateTime;
   private final String credentialScope;
@@ -101,21 +117,18 @@ public class ChunksValidator {
 
   /** @return hex SHA-256 of {@code data[off, off+len)}. */
   public static String sha256Hex(byte[] data, int off, int len) {
-    try {
-      MessageDigest md = MessageDigest.getInstance(SHA_256);
-      md.update(data, off, len);
-      return hex(md.digest());
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException(SHA_256 + " not available", e);
-    }
+    MessageDigest md = SHA256.get();
+    md.reset();
+    md.update(data, off, len);
+    return hex(md.digest());
   }
 
   private static byte[] hmacSha256(byte[] key, String msg) {
     try {
-      Mac mac = Mac.getInstance(HMAC_SHA256);
+      Mac mac = HMAC.get();
       mac.init(new SecretKeySpec(key, HMAC_SHA256));
       return mac.doFinal(msg.getBytes(StandardCharsets.UTF_8));
-    } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+    } catch (InvalidKeyException e) {
       throw new IllegalStateException("Failed to compute " + HMAC_SHA256, e);
     }
   }

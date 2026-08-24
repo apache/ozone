@@ -142,10 +142,13 @@ public class SignedChunksInputStream extends InputStream {
     }
     if (remainingData > 0) {
       int curr = originalStream.read();
-      remainingData--;
-      if (curr != -1) {
-        updateDigest((byte) curr);
+      if (curr == -1) {
+        checkNotTruncated();
+        isFinalChunkEncountered = true;
+        return -1;
       }
+      remainingData--;
+      updateDigest((byte) curr);
       if (remainingData == 0) {
         //read the "\r\n" at the end of the data section
         originalStream.read();
@@ -161,6 +164,7 @@ public class SignedChunksInputStream extends InputStream {
         isFinalChunkEncountered = true;
         return -1;
       } else if (remainingData < 0) {
+        checkNotTruncated();
         isFinalChunkEncountered = true;
         return -1;
       }
@@ -191,6 +195,8 @@ public class SignedChunksInputStream extends InputStream {
         maxReadLen = Math.min(remainingData, currentLen);
         realReadLen = originalStream.read(b, currentOff, maxReadLen);
         if (realReadLen == -1) {
+          checkNotTruncated();
+          isFinalChunkEncountered = true;
           break;
         }
         updateDigest(b, currentOff, realReadLen);
@@ -210,13 +216,32 @@ public class SignedChunksInputStream extends InputStream {
           // final zero-byte chunk: verify it (empty payload) and stop reading
           validateChunk();
           isFinalChunkEncountered = true;
+        } else if (remainingData < 0) {
+          checkNotTruncated();
+          isFinalChunkEncountered = true;
         }
-        if (isFinalChunkEncountered || remainingData == -1) {
+        if (isFinalChunkEncountered) {
           break;
         }
       }
     } while (currentLen > 0);
     return totalReadBytes > 0 ? totalReadBytes : -1;
+  }
+
+  @Override
+  public void close() throws IOException {
+    originalStream.close();
+  }
+
+  /**
+   * A verified stream must end with the terminating 0-byte chunk. Reaching EOF before it means the
+   * body was truncated, so the payload read so far was never fully authenticated. Without a validator
+   * the stream keeps its lenient behavior.
+   */
+  private void checkNotTruncated() throws IOException {
+    if (validator != null) {
+      throw new IOException("Chunked stream ended before the terminating 0-byte chunk");
+    }
   }
 
   private int readContentLengthFromHeader() throws IOException {
@@ -248,7 +273,11 @@ public class SignedChunksInputStream extends InputStream {
     Matcher matcher = signatureLinePattern.matcher(signatureLine);
     if (matcher.matches()) {
       chunkSignature = matcher.group(2);
-      return Integer.parseInt(matcher.group(1), 16);
+      try {
+        return Integer.parseInt(matcher.group(1), 16);
+      } catch (NumberFormatException e) {
+        throw new IOException("Invalid chunk size: " + matcher.group(1), e);
+      }
     } else {
       throw new IOException("Invalid signature line: " + signatureLine);
     }
