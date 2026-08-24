@@ -333,7 +333,6 @@ message OMRequest {
   optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 155;
   optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 156;
   optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 157;
-  optional UpdateRevokeSTSTokenRequest      updateRevokeSTSTokenRequest    = 158;
 }
 
 message OMResponse {
@@ -2536,15 +2535,8 @@ message UpdateAssumeRoleRequest {
 
 message RevokeSTSTokenRequest {
   required string originalAccessKeyId = 1;
-}
-
-/**
-  This request will be used internally by OM to replicate the revocation cutoff captured by the leader
-  across the OMs in HA mode.
-*/
-message UpdateRevokeSTSTokenRequest {
-  required string originalAccessKeyId = 1;
-  required uint64 revocationTimeMillis = 2;
+  // Leader-generated revocation cutoff, replicated across OMs in HA mode.
+  optional uint64 revocationTimeMillis = 2;
 }
 
 message RevokeSTSTokenResponse {

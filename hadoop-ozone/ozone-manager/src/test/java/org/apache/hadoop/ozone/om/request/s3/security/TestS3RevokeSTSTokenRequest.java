@@ -126,9 +126,9 @@ public class TestS3RevokeSTSTokenRequest {
     final OMRequest result = omClientRequest.preExecute(ozoneManager);
 
     assertEquals(Type.RevokeSTSToken, result.getCmdType());
-    assertTrue(result.hasUpdateRevokeSTSTokenRequest());
-    assertEquals(originalAccessKeyId, result.getUpdateRevokeSTSTokenRequest().getOriginalAccessKeyId());
-    assertTrue(result.getUpdateRevokeSTSTokenRequest().getRevocationTimeMillis() > 0L);
+    assertTrue(result.getRevokeSTSTokenRequest().hasRevocationTimeMillis());
+    assertEquals(originalAccessKeyId, result.getRevokeSTSTokenRequest().getOriginalAccessKeyId());
+    assertTrue(result.getRevokeSTSTokenRequest().getRevocationTimeMillis() > 0L);
   }
 
   @Test
@@ -273,10 +273,6 @@ public class TestS3RevokeSTSTokenRequest {
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
         OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
             .setOriginalAccessKeyId(originalAccessKeyId)
-            .build();
-    final OzoneManagerProtocolProtos.UpdateRevokeSTSTokenRequest updateRevokeRequest =
-        OzoneManagerProtocolProtos.UpdateRevokeSTSTokenRequest.newBuilder()
-            .setOriginalAccessKeyId(originalAccessKeyId)
             .setRevocationTimeMillis(revocationTimeMillis)
             .build();
 
@@ -284,7 +280,6 @@ public class TestS3RevokeSTSTokenRequest {
         .setClientId(UUID.randomUUID().toString())
         .setCmdType(Type.RevokeSTSToken)
         .setRevokeSTSTokenRequest(revokeRequest)
-        .setUpdateRevokeSTSTokenRequest(updateRevokeRequest)
         .build();
 
     final S3RevokeSTSTokenRequest s3RevokeSTSTokenRequest = new S3RevokeSTSTokenRequest(omRequest);
@@ -300,7 +295,7 @@ public class TestS3RevokeSTSTokenRequest {
   }
 
   @Test
-  public void testValidateAndUpdateCacheRejectsMissingUpdateRevokeSTSTokenRequest() {
+  public void testValidateAndUpdateCacheRejectsMissingRevocationTimeMillis() {
     final String originalAccessKeyId = "original-access-key-id";
 
     final OzoneManager ozoneManager = mock(OzoneManager.class);
@@ -330,36 +325,28 @@ public class TestS3RevokeSTSTokenRequest {
   }
 
   @Test
-  public void testValidateAndUpdateCacheRejectsMismatchedOriginalAccessKeyId() {
+  public void testPreExecuteRejectsClientSuppliedRevocationTimeMillis() throws Exception {
     final String originalAccessKeyId = "original-access-key-id";
-    final String mismatchedAccessKeyId = "other-access-key-id";
-    final long revocationTimeMillis = 1_700_000_000_000L;
+    final UserGroupInformation callerUgi = UserGroupInformation.createRemoteUser(originalAccessKeyId);
+    Server.getCurCall().set(new StubCall(callerUgi));
 
-    final OzoneManager ozoneManager = mock(OzoneManager.class);
-    final OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
-    @SuppressWarnings("unchecked")
-    final Table<String, Long> s3RevokedStsTokenTable = mock(Table.class);
-    final ExecutionContext context = mock(ExecutionContext.class);
-
-    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    when(omMetadataManager.getS3RevokedStsTokenTable()).thenReturn(s3RevokedStsTokenTable);
-
+    final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
+        OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
+            .setOriginalAccessKeyId(originalAccessKeyId)
+            .setRevocationTimeMillis(1_700_000_000_000L)
+            .build();
     final OMRequest omRequest = OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
         .setCmdType(Type.RevokeSTSToken)
-        .setRevokeSTSTokenRequest(OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-            .setOriginalAccessKeyId(originalAccessKeyId)
-            .build())
-        .setUpdateRevokeSTSTokenRequest(OzoneManagerProtocolProtos.UpdateRevokeSTSTokenRequest.newBuilder()
-            .setOriginalAccessKeyId(mismatchedAccessKeyId)
-            .setRevocationTimeMillis(revocationTimeMillis)
-            .build())
+        .setRevokeSTSTokenRequest(revokeRequest)
         .build();
 
-    final S3RevokeSTSTokenRequest s3RevokeSTSTokenRequest = new S3RevokeSTSTokenRequest(omRequest);
-    final OMClientResponse omClientResponse =
-        s3RevokeSTSTokenRequest.validateAndUpdateCache(ozoneManager, context);
-    assertEquals(OzoneManagerProtocolProtos.Status.INTERNAL_ERROR, omClientResponse.getOMResponse().getStatus());
+    try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
+      configureOzoneManagerForPreExecute(ozoneManager, originalAccessKeyId, true);
+      final OMClientRequest omClientRequest = new S3RevokeSTSTokenRequest(omRequest);
+      final OMException ex = assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+    }
   }
 
   @Test

@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeSTSTokenRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateRevokeSTSTokenRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,8 +50,8 @@ import org.slf4j.LoggerFactory;
  * Handles S3RevokeSTSTokenRequest request.
  *
  * <p>The client submits {@link RevokeSTSTokenRequest} with {@code originalAccessKeyId} only. On the
- * leader, {@code preExecute} captures the revocation cutoff and builds an {@link UpdateRevokeSTSTokenRequest}
- * that is replicated through Ratis so every OM applies the same cutoff.</p>
+ * leader, {@code preExecute} captures the revocation cutoff in {@code revocationTimeMillis} and
+ * replicates the updated request through Ratis so every OM applies the same cutoff.</p>
  *
  * <p>This request records a revocation cutoff for the given {@code originalAccessKeyId} in the
  * {@code s3RevokedStsTokenTable}. Subsequent S3 requests authenticated with STS tokens whose
@@ -89,13 +88,12 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     }
 
     final long revocationTimeMillis = CLOCK.millis();
-    final UpdateRevokeSTSTokenRequest updateRevokeSTSTokenRequest = UpdateRevokeSTSTokenRequest.newBuilder()
-        .setOriginalAccessKeyId(originalAccessKeyId)
+    final RevokeSTSTokenRequest updatedRevokeReq = revokeReq.toBuilder()
         .setRevocationTimeMillis(revocationTimeMillis)
         .build();
 
     return omRequest.toBuilder()
-        .setUpdateRevokeSTSTokenRequest(updateRevokeSTSTokenRequest)
+        .setRevokeSTSTokenRequest(updatedRevokeReq)
         .build();
   }
 
@@ -107,10 +105,9 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     String originalAccessKeyId = null;
 
     try {
-      validateReplicatedRevokeRequestFields(getOmRequest());
-      final UpdateRevokeSTSTokenRequest updateRevokeSTSTokenRequest = getOmRequest().getUpdateRevokeSTSTokenRequest();
-      originalAccessKeyId = updateRevokeSTSTokenRequest.getOriginalAccessKeyId();
-      final long revocationTimeMillis = updateRevokeSTSTokenRequest.getRevocationTimeMillis();
+      final RevokeSTSTokenRequest revokeReq = validateReplicatedRevokeRequestFields(getOmRequest());
+      originalAccessKeyId = revokeReq.getOriginalAccessKeyId();
+      final long revocationTimeMillis = revokeReq.getRevocationTimeMillis();
 
       // All actual DB mutations are done in the response's addToDBBatch().
       omClientResponse = new S3RevokeSTSTokenResponse(originalAccessKeyId, revocationTimeMillis, omResponse.build());
@@ -147,18 +144,19 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     if (originalAccessKeyId.length() >= OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH) {
       throw new OMException("originalAccessKeyId length is invalid: " + originalAccessKeyId.length(), INVALID_REQUEST);
     }
+    if (revokeReq.hasRevocationTimeMillis()) {
+      throw new OMException("revocationTimeMillis must not be set by client", INVALID_REQUEST);
+    }
   }
 
-  private static void validateReplicatedRevokeRequestFields(OMRequest omRequest) throws OMException {
-    if (!omRequest.hasUpdateRevokeSTSTokenRequest()) {
-      throw new OMException("updateRevokeSTSTokenRequest is required for STS token revocation", INTERNAL_ERROR);
+  private static RevokeSTSTokenRequest validateReplicatedRevokeRequestFields(OMRequest omRequest) throws OMException {
+    if (!omRequest.hasRevokeSTSTokenRequest()) {
+      throw new OMException("revokeSTSTokenRequest is required for STS token revocation", INTERNAL_ERROR);
     }
-    final String originalAccessKeyId = omRequest.getRevokeSTSTokenRequest().getOriginalAccessKeyId();
-    final UpdateRevokeSTSTokenRequest updateRevokeSTSTokenRequest = omRequest.getUpdateRevokeSTSTokenRequest();
-    if (!originalAccessKeyId.equals(updateRevokeSTSTokenRequest.getOriginalAccessKeyId())) {
-      throw new OMException(
-          "originalAccessKeyId mismatch between revokeSTSTokenRequest and updateRevokeSTSTokenRequest",
-          INTERNAL_ERROR);
+    final RevokeSTSTokenRequest revokeReq = omRequest.getRevokeSTSTokenRequest();
+    if (!revokeReq.hasRevocationTimeMillis()) {
+      throw new OMException("revocationTimeMillis is required for STS token revocation", INTERNAL_ERROR);
     }
+    return revokeReq;
   }
 }
