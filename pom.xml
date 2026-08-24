@@ -2613,6 +2613,9 @@
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
                 <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
                 <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                <!-- Forces the compiler process to output in English -->
+                <arg>-J-Duser.language=en</arg>
+                <arg>-J-Duser.country=US</arg>
               </compilerArgs>
             </configuration>
           </plugin>
