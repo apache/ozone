@@ -291,7 +291,7 @@ public class TestS3RevokeSTSTokenRequest {
     assertNotNull(s3RevokeSTSTokenRequest.getAuditBuilder().getAuditMap());
     assertEquals(
         originalAccessKeyId, s3RevokeSTSTokenRequest.getAuditBuilder().getAuditMap().get(
-            OzoneConsts.S3_STS_ORIGINAL_ACCESS_KEY_ID));
+            OzoneConsts.S3_REVOKESTSTOKEN_USER));
   }
 
   @Test

@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3RevokeSTSTokenResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeSTSTokenRequest;
@@ -102,11 +101,12 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     final OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
     IOException exception = null;
     OMClientResponse omClientResponse;
-    String originalAccessKeyId = null;
+    final Map<String, String> auditMap = new HashMap<>();
 
     try {
       final RevokeSTSTokenRequest revokeReq = validateReplicatedRevokeRequestFields(getOmRequest());
-      originalAccessKeyId = revokeReq.getOriginalAccessKeyId();
+      final String originalAccessKeyId = revokeReq.getOriginalAccessKeyId();
+      auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_USER, originalAccessKeyId);
       final long revocationTimeMillis = revokeReq.getRevocationTimeMillis();
 
       // All actual DB mutations are done in the response's addToDBBatch().
@@ -125,14 +125,9 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     }
 
     // Audit log
-    final Map<String, String> auditMap = new HashMap<>();
-    final OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_USER, userInfo.getUserName());
-    if (originalAccessKeyId != null) {
-      auditMap.put(OzoneConsts.S3_STS_ORIGINAL_ACCESS_KEY_ID, originalAccessKeyId);
-    }
     markForAudit(
-        ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.REVOKE_STS_TOKEN, auditMap, exception, userInfo));
+        ozoneManager.getAuditLogger(), buildAuditMessage(
+            OMAction.REVOKE_STS_TOKEN, auditMap, exception, getOmRequest().getUserInfo()));
     return omClientResponse;
   }
 
