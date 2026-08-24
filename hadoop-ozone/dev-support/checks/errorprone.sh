@@ -31,7 +31,7 @@ MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipDocs -DskipReco
 declare -i rc
 
 #shellcheck disable=SC2086
-mvn $MAVEN_OPTIONS test-compile "$@" | tee "${REPORT_DIR}/output.log"
+mvn $MAVEN_OPTIONS clean test-compile "$@" | tee "${REPORT_DIR}/output.log"
 rc=$?
 
 grep -E "^\[(ERROR|WARNING)\] .*:\[[0-9]+,[0-9]+\] \[[A-Za-z][A-Za-z0-9]+\]" \
