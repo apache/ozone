@@ -23,6 +23,7 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -76,7 +77,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private XceiverClientShortCircuit xceiverClientShortCircuit;
   private final AtomicBoolean fallbackToGrpc = new AtomicBoolean(false);
   private volatile FileInputStream blockFileInputStream;
-  private boolean initialized = false;
+  private volatile boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy;
 
@@ -486,6 +487,57 @@ public class BlockInputStream extends BlockExtendedInputStream {
    *    2. chunkStream[2] will be seeked to position 10
    *       (= 90 - chunkOffset[2] (= 80)).
    */
+  /**
+   * Stateless positioned read across this block's chunks. Fills up to
+   * {@code dst.remaining()} bytes starting from {@code blockRelativePosition}
+   * without mutating this stream's cursor ({@code chunkIndex},
+   * {@code blockPosition}) or the chunk streams' buffered state, so it is safe
+   * for concurrent callers. Metadata ({@code chunkOffsets}, {@code
+   * chunkStreams}, {@code length}) is published once by {@link #initialize()};
+   * {@link #initialized} is {@code volatile} so callers observe a consistent
+   * snapshot after initialization completes.
+   *
+   * @return bytes copied into {@code dst}, or {@link #EOF} at EOF
+   */
+  int readPositioned(long blockRelativePosition, ByteBuffer dst)
+      throws IOException {
+    if (!initialized) {
+      initialize();
+    }
+    final List<ChunkInputStream> streams = chunkStreams;
+    final long[] offsets = chunkOffsets;
+    final long blockLength = length;
+    if (streams == null || streams.isEmpty()
+        || blockRelativePosition < 0 || blockRelativePosition >= blockLength) {
+      return EOF;
+    }
+
+    int total = 0;
+    long pos = blockRelativePosition;
+    while (dst.hasRemaining() && pos < blockLength) {
+      int idx = chunkIndexForPosition(pos, offsets);
+      ChunkInputStream chunk = streams.get(idx);
+      long chunkPos = pos - offsets[idx];
+      int n = chunk.readPositioned(chunkPos, dst);
+      if (n <= 0) {
+        break;
+      }
+      total += n;
+      pos += n;
+    }
+    return total == 0 ? EOF : total;
+  }
+
+  private static int chunkIndexForPosition(long pos, long[] offsets) {
+    int idx = Arrays.binarySearch(offsets, pos);
+    if (idx < 0) {
+      // binarySearch returns -insertionPoint - 1; the containing chunk is
+      // insertionPoint - 1.
+      idx = -idx - 2;
+    }
+    return idx;
+  }
+
   @Override
   public synchronized void seek(long pos) throws IOException {
     if (!initialized) {

@@ -4716,6 +4716,39 @@
     </description>
   </property>
   <property>
+    <name>ozone.fs.synchronize.positioned.reads.enabled</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Controls thread-safety of the fallback positioned-read
+      (ByteBufferPositionedReadable, e.g. HBase pread) path in
+      OzoneFSInputStream, where the read is emulated as a stateful
+      seek-read-restore on a single shared stream cursor. When multiple
+      threads issue positioned reads on the same shared input stream, that
+      sequence can interleave and return wrong bytes; setting this to true
+      serializes those positioned reads to make them correct.
+
+      This flag only affects the fallback path. It does NOT apply to, and is
+      not needed for, the following:
+      1. Replicated (Ratis) reads: positioned reads are served by a native,
+         stateless path that never touches the shared cursor. They are already
+         thread-safe and run in parallel with no lock, so this flag has no
+         effect on them.
+      2. StreamBlock reads (ozone.client.stream.readblock.enable = true):
+         positioned reads are serialized internally regardless of this flag.
+
+      When to enable:
+      - Set to true only when positioned reads fall back to the stateful path
+        and are issued concurrently on a shared stream - primarily erasure
+        coded (EC) buckets under concurrent pread. Enabling it
+        trades some pread parallelism (positioned reads on a stream are
+        serialized) for correctness.
+      Leave false (default) when:
+      - Buckets are replicated (Ratis); the native stateless path already
+        handles concurrency without serialization.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.lease.soft.limit</name>
     <value>60s</value>
     <tag>OZONE, OM</tag>
