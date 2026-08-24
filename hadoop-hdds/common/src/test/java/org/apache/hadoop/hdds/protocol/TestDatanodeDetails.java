@@ -77,8 +77,7 @@ public class TestDatanodeDetails {
         dn.toProtoBuilder(ClientVersion.CURRENT, requiredPorts);
     protoBuilder.clearCurrentVersion();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.DEFAULT_VERSION,
-        dn2.getCurrentVersion());
+    assertEquals(HDDSVersion.DEFAULT_VERSION, dn2.getCurrentVersion());
 
     // When the proto field is present, it round-trips correctly.
     protoBuilder =
@@ -86,8 +85,7 @@ public class TestDatanodeDetails {
     DatanodeDetails dn3 = DatanodeDetails.newBuilder(
         protoBuilder.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION.serialize()).build())
         .build();
-    assertEquals(HDDSVersion.SOFTWARE_VERSION,
-        dn3.getCurrentVersion());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION, dn3.getCurrentVersion());
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,

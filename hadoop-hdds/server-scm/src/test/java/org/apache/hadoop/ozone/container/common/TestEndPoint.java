@@ -437,17 +437,16 @@ public class TestEndPoint {
         .thenReturn(HDDSVersion.SOFTWARE_VERSION);
     when(versionManager.getSoftwareVersion())
         .thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getVersionForClient())
+        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
     DatanodeStateMachine dn = mock(DatanodeStateMachine.class);
     when(dn.getVersionManager()).thenReturn(versionManager);
+    if (!clearDatanodeDetails) {
+      when(dn.getDatanodeDetails()).thenReturn(randomDatanodeDetails());
+    }
     StateContext context = mock(StateContext.class);
     when(context.getParent()).thenReturn(dn);
-    RegisterEndpointTask endpointTask =
-        new RegisterEndpointTask(rpcEndPoint, ozoneContainer, context);
-    if (!clearDatanodeDetails) {
-      DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      endpointTask.setDatanodeDetails(datanodeDetails);
-    }
-    return endpointTask;
+    return new RegisterEndpointTask(rpcEndPoint, ozoneContainer, context);
   }
 
   private EndpointStateMachine registerTaskHelper(InetSocketAddress scmAddress,
@@ -467,6 +466,26 @@ public class TestEndPoint {
         registerTaskHelper(serverAddress, 1000, false)) {
       // Successful register should move us to Heartbeat state.
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndpoint.getState());
+    }
+  }
+
+  @Test
+  public void testRegisterAssignsCurrentVersionFromVersionManager()
+      throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+    try (EndpointStateMachine rpcEndPoint =
+        createEndpoint(conf, serverAddress, 1000)) {
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
+      RegisterEndpointTask endpointTask =
+          getRegisterEndpointTask(false, conf, rpcEndPoint);
+      // Simulate stale version on the persisted datanode details. The task
+      // should overwrite it with the version manager's current value, matching
+      // the heartbeat behavior.
+      endpointTask.getDatanodeDetails()
+          .setCurrentVersion(HDDSVersion.DEFAULT_VERSION);
+      endpointTask.call();
+      assertEquals(HDDSVersion.SOFTWARE_VERSION,
+          endpointTask.getDatanodeDetails().getCurrentVersion());
     }
   }
 

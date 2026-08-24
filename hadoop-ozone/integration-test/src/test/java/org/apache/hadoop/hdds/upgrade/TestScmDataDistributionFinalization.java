@@ -127,7 +127,7 @@ public class TestScmDataDistributionFinalization {
         .setSCMConfigurator(configurator)
         .setNumDatanodes(NUM_DATANODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
+            .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION)
             .build());
     this.cluster = clusterBuilder.build();
 
