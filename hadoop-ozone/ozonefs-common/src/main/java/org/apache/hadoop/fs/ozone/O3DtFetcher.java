@@ -27,7 +27,7 @@ import org.apache.hadoop.security.token.Token;
 /**
  * A DT fetcher for Ozone RPC URLs.
  */
-public class O3DtFetcher extends O3fsDtFetcher {
+public class O3DtFetcher extends AbstractOzoneDtFetcher {
   @Override
   public Text getServiceName() {
     return new Text(OzoneConsts.OZONE_RPC_SCHEME);

@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 /**
  * A DT fetcher for RootedOzoneFileSystem.
  */
-public class OfsDtFetcher extends O3fsDtFetcher {
+public class OfsDtFetcher extends AbstractOzoneDtFetcher {
   @Override
   public Text getServiceName() {
     return new Text(OzoneConsts.OZONE_OFS_URI_SCHEME);
