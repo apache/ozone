@@ -195,7 +195,7 @@ public class ContainerBalancerSelectionCriteria {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not find Container {} to check if it should be a " +
           "candidate container. Excluding it.", containerID);
-       addToExcludeNotFoundContainers(containerID);
+      addToExcludeNotFoundContainers(containerID);
       return true;
     }
 
@@ -215,7 +215,7 @@ public class ContainerBalancerSelectionCriteria {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
           "this container.", container.getContainerID(), e);
-       addToExcludeNotFoundContainers(containerID);
+      addToExcludeNotFoundContainers(containerID);
       return true;
     }
 
