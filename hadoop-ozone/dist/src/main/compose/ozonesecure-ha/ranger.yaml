@@ -42,7 +42,7 @@ x-om-ranger-config:
     # JDK17+ no longer ships javax.annotation, but the Ranger Ozone plugin's Jersey2
     # client needs javax.annotation.Priority. Copy the jar into the plugin impl dir
     # so the isolated RangerPluginClassLoader can find it.
-    command: bash -c 'sudo mkdir -p /opt/ranger/ozone-plugin/lib/libext/ranger-ozone-plugin-impl && for j in /opt/hadoop/share/ozone/lib/javax.annotation-api-*.jar; do [ -e "$$j" ] || continue; sudo cp -n "$$j" /opt/ranger/ozone-plugin/lib/libext/ranger-ozone-plugin-impl/; done && sudo --preserve-env /opt/ranger/ozone-plugin/enable-ozone-plugin.sh && exec /opt/hadoop/bin/ozone om'
+    command: bash -c 'sudo mkdir -p /opt/ranger/ozone-plugin/lib/libext/ranger-ozone-plugin-impl && for j in /opt/hadoop/share/ozone/lib/javax.annotation-api-*.jar; do [ -e "$$j" ] || continue; dest="/opt/ranger/ozone-plugin/lib/libext/ranger-ozone-plugin-impl/$$(basename "$$j")"; sudo test -e "$$dest" || sudo cp -n "$$j" "$$dest" || sudo test -e "$$dest"; done && sudo --preserve-env /opt/ranger/ozone-plugin/enable-ozone-plugin.sh && exec /opt/hadoop/bin/ozone om'
 
 services:
   om1:
