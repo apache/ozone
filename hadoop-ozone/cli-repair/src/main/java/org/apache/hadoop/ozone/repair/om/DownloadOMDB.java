@@ -150,10 +150,14 @@ public class DownloadOMDB extends RepairTool {
         }
         continue;
       }
+      String providerNodeId = omNodeDetails.getNodeId();
+      if (providerNodeId == null) {
+        providerNodeId = "non-ha";
+      }
       try (OmRatisSnapshotProvider provider = new OmRatisSnapshotProvider(
           conf, snapshotWorkDir.toFile(),
-          Collections.singletonMap(omNodeDetails.getNodeId(), omNodeDetails))) {
-        return provider.downloadDBSnapshotFromLeader(omNodeDetails.getNodeId());
+          Collections.singletonMap(providerNodeId, omNodeDetails))) {
+        return provider.downloadDBSnapshotFromLeader(providerNodeId);
       } catch (Exception ex) {
         lastFailure = ex;
         if (nodeId != null) {
