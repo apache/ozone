@@ -93,27 +93,28 @@ public class ContainerMapper {
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));
             for (OmKeyLocationInfoGroup keyLocationInfoGroup : keyInfo
                 .getKeyLocationVersions()) {
-              List<OmKeyLocationInfo> keyLocationInfo = keyLocationInfoGroup
-                  .createLocationList();
-              for (OmKeyLocationInfo keyLocation : keyLocationInfo) {
-                BlockIdDetails blockIdDetails = new BlockIdDetails();
-                Map<Long, BlockIdDetails> innerMap = new HashMap<>();
+              for (List<OmKeyLocationInfo> keyLocationInfo : keyLocationInfoGroup
+                  .getLocationLists()) {
+                for (OmKeyLocationInfo keyLocation : keyLocationInfo) {
+                  BlockIdDetails blockIdDetails = new BlockIdDetails();
+                  Map<Long, BlockIdDetails> innerMap = new HashMap<>();
 
-                long containerID = keyLocation.getBlockID().getContainerID();
-                long blockID = keyLocation.getBlockID().getLocalID();
-                blockIdDetails.setBucketName(keyInfo.getBucketName());
-                blockIdDetails.setBlockVol(keyInfo.getVolumeName());
-                blockIdDetails.setKeyName(keyInfo.getKeyName());
+                  long containerID = keyLocation.getBlockID().getContainerID();
+                  long blockID = keyLocation.getBlockID().getLocalID();
+                  blockIdDetails.setBucketName(keyInfo.getBucketName());
+                  blockIdDetails.setBlockVol(keyInfo.getVolumeName());
+                  blockIdDetails.setKeyName(keyInfo.getKeyName());
 
-                List<Map<Long, BlockIdDetails>> innerList = new ArrayList<>();
-                innerMap.put(blockID, blockIdDetails);
+                  List<Map<Long, BlockIdDetails>> innerList = new ArrayList<>();
+                  innerMap.put(blockID, blockIdDetails);
 
-                if (dataMap.containsKey(containerID)) {
-                  innerList = dataMap.get(containerID);
+                  if (dataMap.containsKey(containerID)) {
+                    innerList = dataMap.get(containerID);
+                  }
+
+                  innerList.add(innerMap);
+                  dataMap.put(containerID, innerList);
                 }
-
-                innerList.add(innerMap);
-                dataMap.put(containerID, innerList);
               }
             }
           }
