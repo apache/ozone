@@ -91,6 +91,24 @@ class TestChunksValidator {
         ChunksValidator.sha256Hex(tampered, 0, tampered.length)));
   }
 
+  @Test
+  void interleavedValidatorsWithDifferentKeysDoNotCrossContaminate() {
+    // The Mac is a shared ThreadLocal re-init'd with each validator's key per call. Interleaving a
+    // wrong-key and a correct-key validator on the same thread must not leak the key between them.
+    ChunksValidator correct = newValidator();
+    ChunksValidator wrongKey = new ChunksValidator(
+        SignatureTestUtils.signingKey("wrong-secret", "20130524", "us-east-1", "s3"),
+        DATE_TIME, SCOPE, SEED_SIGNATURE);
+    String sha65536 = ChunksValidator.sha256Hex(repeat('a', 65536), 0, 65536);
+    String sha1024 = ChunksValidator.sha256Hex(repeat('a', 1024), 0, 1024);
+
+    assertThrows(OS3Exception.class, () -> wrongKey.validateChunk(CHUNK1_SIGNATURE, sha65536));
+    // If the shared Mac were not re-keyed, this would still hold the wrong key and fail.
+    assertDoesNotThrow(() -> correct.validateChunk(CHUNK1_SIGNATURE, sha65536));
+    assertThrows(OS3Exception.class, () -> wrongKey.validateChunk(CHUNK1_SIGNATURE, sha65536));
+    assertDoesNotThrow(() -> correct.validateChunk(CHUNK2_SIGNATURE, sha1024));
+  }
+
   private static byte[] repeat(char c, int count) {
     byte[] bytes = new byte[count];
     Arrays.fill(bytes, (byte) c);
