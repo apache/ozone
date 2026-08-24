@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -165,9 +164,9 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
 
     LOG.debug("UsedList: {}, size {}. ExcludeList: {}, size: {}. ",
         used, used.size(), excluded, excluded.size());
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
+
     return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
-        additionalRequired, used, excluded, currentContainerSize, containerInfo, StorageType.DEFAULT);
+        additionalRequired, used, excluded, currentContainerSize, containerInfo);
   }
 
 }

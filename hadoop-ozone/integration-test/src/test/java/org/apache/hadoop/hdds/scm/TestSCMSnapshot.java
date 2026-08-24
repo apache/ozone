@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -62,13 +61,12 @@ public class TestSCMSnapshot {
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            RatisReplicationConfig.getInstance(THREE), "Owner1", StorageTier.getDefaultTier())
+            RatisReplicationConfig.getInstance(THREE), "Owner1")
             .getPipelineID());
     pipelineManager.openPipeline(ratisPipeline1.getId());
     Pipeline ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            RatisReplicationConfig.getInstance(ONE), "Owner2",
-            StorageTier.getDefaultTier()).getPipelineID());
+            RatisReplicationConfig.getInstance(ONE), "Owner2").getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     long snapshotInfo2 = scm.getScmHAManager().asSCMHADBTransactionBuffer()
         .getLatestTrxInfo().getTransactionIndex();

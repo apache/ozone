@@ -329,18 +329,16 @@ public class ContainerReplicaPendingOps {
   private void addReplica(ContainerReplicaOp.PendingOpType opType,
       ContainerID containerID, DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
       long deadlineEpochMillis, long containerSize, long scheduledEpochMillis) {
-    ContainerReplicaOp op = new ContainerReplicaOp(opType,
-        target, replicaIndex, command, deadlineEpochMillis, containerSize);
     Lock lock = writeLock(containerID);
     lock(lock);
-    boolean found;
     try {
       // Remove any existing duplicate op for the same target and replicaIndex before adding
       // the new one. Especially for delete ops, they could be getting resent after expiry.
-      found = completeOp(opType, containerID, target, replicaIndex, false);
+      completeOp(opType, containerID, target, replicaIndex, false);
       List<ContainerReplicaOp> ops = pendingOps.computeIfAbsent(
           containerID, s -> new ArrayList<>());
-      ops.add(op);
+      ops.add(new ContainerReplicaOp(opType,
+          target, replicaIndex, command, deadlineEpochMillis, containerSize));
       DatanodeID id = target.getID();
       if (opType == ADD) {
         containerSizeScheduled.compute(id, (k, v) -> {
@@ -354,10 +352,6 @@ public class ContainerReplicaPendingOps {
       incrementCounter(opType, replicaIndex);
     } finally {
       unlock(lock);
-    }
-    // Notify for ADD ops to record container slot.
-    if (opType == ADD && !found) {
-      notifySubscribersOpAdded(op, containerID);
     }
   }
 
@@ -420,16 +414,6 @@ public class ContainerReplicaPendingOps {
       for (ContainerReplicaPendingOpsSubscriber subscriber : subscribers) {
         subscriber.opCompleted(op, containerID, timedOut);
       }
-    }
-  }
-
-  /**
-   * Notifies subscribers that an ADD op was added for the given containerID.
-   */
-  private void notifySubscribersOpAdded(ContainerReplicaOp op,
-      ContainerID containerID) {
-    for (ContainerReplicaPendingOpsSubscriber subscriber : subscribers) {
-      subscriber.opAdded(op, containerID);
     }
   }
 

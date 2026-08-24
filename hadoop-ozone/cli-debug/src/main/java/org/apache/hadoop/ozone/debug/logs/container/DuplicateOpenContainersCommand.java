@@ -19,9 +19,7 @@ package org.apache.hadoop.ozone.debug.logs.container;
 
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
-import org.apache.hadoop.ozone.shell.ListLimitOptions;
 import picocli.CommandLine;
 
 /**
@@ -33,11 +31,8 @@ import picocli.CommandLine;
     description = "List all containers which have duplicate open states." +
         "Outputs the container ID along with the count of OPEN state entries."
 )
-public class DuplicateOpenContainersCommand extends AbstractSubcommand implements Callable<Void> {
+public class DuplicateOpenContainersCommand implements Callable<Void> {
 
-  @CommandLine.Mixin
-  private ListLimitOptions listOptions;
-  
   @CommandLine.ParentCommand
   private ContainerLogController parent;
 
@@ -46,7 +41,7 @@ public class DuplicateOpenContainersCommand extends AbstractSubcommand implement
     Path dbPath = parent.resolveDbPath();
 
     ContainerDatanodeDatabase cdd = new ContainerDatanodeDatabase(dbPath.toString());
-    cdd.findDuplicateOpenContainer(listOptions.getLimit());
+    cdd.findDuplicateOpenContainer();
 
     return null;
   }

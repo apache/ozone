@@ -38,23 +38,15 @@ public final class CoderUtil {
    * @return empty chunk of zero bytes
    */
   static byte[] getEmptyChunk(int leastLength) {
-    byte[] chunk = emptyChunk;
-    if (chunk.length >= leastLength) {
-      return chunk; // In most time
+    if (emptyChunk.length >= leastLength) {
+      return emptyChunk; // In most time
     }
 
     synchronized (CoderUtil.class) {
-      // Recheck under the lock: another caller may already have grown the
-      // cache while this caller waited. A larger cached chunk is valid for a
-      // smaller request, so only allocate when the cache is still too small.
-      chunk = emptyChunk;
-      if (chunk.length < leastLength) {
-        chunk = new byte[leastLength];
-        emptyChunk = chunk;
-      }
+      emptyChunk = new byte[leastLength];
     }
 
-    return chunk;
+    return emptyChunk;
   }
 
   /**

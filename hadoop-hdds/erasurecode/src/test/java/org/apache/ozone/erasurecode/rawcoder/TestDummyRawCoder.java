@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Test dummy raw coder.
  */
-public class TestDummyRawCoder extends RawCoderTests {
+public class TestDummyRawCoder extends TestRawCoderBase {
 
   public TestDummyRawCoder() {
     super(DummyRawErasureCoderFactory.class, DummyRawErasureCoderFactory.class);

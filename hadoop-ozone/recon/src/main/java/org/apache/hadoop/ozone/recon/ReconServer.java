@@ -30,6 +30,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,7 +40,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
-import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -91,10 +91,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   private OzoneAdmins reconAdmins;
 
   private volatile boolean isStarted = false;
-
-  public OzoneConfiguration getConf() {
-    return configuration;
-  }
 
   public static void main(String[] args) {
     OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
@@ -397,7 +393,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
           reconConfig.getKerberosPrincipal(),
           reconConfig.getKerberosKeytab());
       UserGroupInformation.setConfiguration(conf);
-      final HostAndPort socAddr = HddsServerUtil.getReconAddressForDatanodes(conf);
+      InetSocketAddress socAddr = HddsServerUtil.getReconAddressForDatanodes(conf);
       SecurityUtil.login(conf,
           OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY,
           OZONE_RECON_KERBEROS_PRINCIPAL_KEY,

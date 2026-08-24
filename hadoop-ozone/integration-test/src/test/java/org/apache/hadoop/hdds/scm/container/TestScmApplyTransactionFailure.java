@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -83,8 +82,7 @@ public abstract class TestScmApplyTransactionFailure implements HATests.TestCase
 
     // verify that SCMStateMachine is still functioning after the rejected
     // transaction.
-    assertNotNull(containerManager.allocateContainer(replication, "test",
-        StorageTier.getDefaultTier()));
+    assertNotNull(containerManager.allocateContainer(replication, "test"));
   }
 
   @Test

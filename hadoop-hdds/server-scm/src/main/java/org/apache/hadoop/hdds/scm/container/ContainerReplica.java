@@ -17,15 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import jakarta.annotation.Nullable;
-import java.util.List;
 import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -51,7 +46,6 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private final long bytesUsed;
   private final boolean isEmpty;
   private final ContainerChecksums checksums;
-  private final StorageType storageType;
 
   private ContainerReplica(ContainerReplicaBuilder b) {
     this.containerID = Objects.requireNonNull(b.containerID, "containerID == null");
@@ -64,7 +58,6 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     this.isEmpty = b.isEmpty;
     this.sequenceId = b.sequenceId;
     this.checksums = Objects.requireNonNull(b.checksums, "checksums == null");
-    this.storageType = b.storageType;
   }
 
   public ContainerID getContainerID() {
@@ -137,11 +130,6 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return checksums.getDataChecksum();
   }
 
-  @Nullable
-  public StorageType getStorageType() {
-    return storageType;
-  }
-
   @Override
   public int hashCode() {
     return new HashCodeBuilder(61, 71)
@@ -177,12 +165,6 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         .build();
   }
 
-  public static List<DatanodeDetails> toDatanodeDetailsList(Set<ContainerReplica> replicas) {
-    return replicas.stream()
-        .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList());
-  }
-
   /**
    * Returns a new Builder to construct ContainerReplica.
    *
@@ -203,7 +185,6 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         .setReplicaIndex(replicaIndex)
         .setSequenceId(sequenceId)
         .setEmpty(isEmpty)
-        .setStorageType(storageType)
         .setChecksums(checksums);
   }
 
@@ -219,7 +200,6 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         + ", bytesUsed=" + bytesUsed
         + ", " + (isEmpty ? "empty" : "non-empty")
         + ", checksums=" + checksums
-        + ", storageType=" + storageType
         + '}';
   }
 
@@ -238,7 +218,6 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private int replicaIndex;
     private boolean isEmpty;
     private ContainerChecksums checksums;
-    private StorageType storageType;
 
     /**
      * Set Container Id.
@@ -315,11 +294,6 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
     public ContainerReplicaBuilder setChecksums(ContainerChecksums checksums) {
       this.checksums = checksums;
-      return this;
-    }
-
-    public ContainerReplicaBuilder setStorageType(StorageType storageType) {
-      this.storageType = storageType;
       return this;
     }
 

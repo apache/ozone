@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -114,15 +113,6 @@ public class ResolvedBucket {
   }
 
   public KeyArgs update(KeyArgs args) {
-    return isLink()
-        ? args.toBuilder()
-            .setVolumeName(realVolume())
-            .setBucketName(realBucket())
-            .build()
-        : args;
-  }
-
-  public BucketArgs update(BucketArgs args) {
     return isLink()
         ? args.toBuilder()
             .setVolumeName(realVolume())

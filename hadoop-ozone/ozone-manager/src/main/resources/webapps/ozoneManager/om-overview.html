@@ -91,3 +91,62 @@
     </tr>
     </tbody>
 </table>
+
+<!-- Only display Deletion Progress on OM leader -->
+<div ng-show="$ctrl.role.Role.trim() === 'LEADER'">
+  <h2>Deletion Progress [{{$ctrl.overview.jmx.MetricsResetTimeStamp ? 'since ' + ($ctrl.overview.jmx.MetricsResetTimeStamp * 1000 | date:'yyyy-MM-dd HH:mm:ss') : 'Initializing'}}]
+    &nbsp;&nbsp;•&nbsp;&nbsp;
+    <b>Size Reclaimed:</b> {{$ctrl.formatBytes($ctrl.overview.jmx.ReclaimedSizeInInterval)}}
+    &nbsp;&nbsp;•&nbsp;&nbsp;
+    <b>Keys Reclaimed:</b> {{$ctrl.overview.jmx.KeysReclaimedInInterval || 0}}
+  </h2>
+  <div class="mt-4">
+      <div class="mt-3">
+          <div class="col-md-12">
+              <button class="btn btn-sm btn-link p-0" ng-click="lastRunDetailsVisible = !lastRunDetailsVisible">
+                  {{ lastRunDetailsVisible ? 'Last Run Details(-)' : 'Last Run Details(+)' }}
+              </button>
+          </div>
+          <div ng-show="lastRunDetailsVisible">
+              <div class="mt-3">
+                  <div class="row mb-2" ng-if="$ctrl.overview.jmx.KdsCurRunTimestamp">
+                      <div class="col-md-3"><b>Current Run Started:</b></div>
+                      <div class="col-md-9">{{$ctrl.convertMsToTime($ctrl.Date.now() - $ctrl.overview.jmx.KdsCurRunTimestamp)}} ago</div>
+                  </div>
+                  <div class="row mb-2" ng-if="$ctrl.overview.jmx.KdsLastRunTimestamp">
+                      <div class="col-md-3"><b>Last Run:</b></div>
+                      <div class="col-md-9">{{$ctrl.convertMsToTime($ctrl.Date.now() - $ctrl.overview.jmx.KdsLastRunTimestamp)}} ago</div>
+                  </div>
+              </div>
+              <div style="margin-bottom: 2px;"></div>
+              <table class="table table-sm table-bordered mt-2">
+                  <thead>
+                      <tr>
+                          <th>Store</th>
+                          <th>Reclaimed Size</th>
+                          <th>#Reclaimed Keys</th>
+                          <th>#Iterated Keys</th>
+                          <th>#NotReclaimable Keys (Referred by Snapshots)</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <tr>
+                          <td>Active Object Store</td>
+                          <td>{{$ctrl.formatBytes($ctrl.overview.jmx.AosReclaimedSizeLast)}}</td>
+                          <td>{{$ctrl.overview.jmx.AosKeysReclaimedLast || 0}}</td>
+                          <td>{{$ctrl.overview.jmx.AosKeysIteratedLast || 0}}</td>
+                          <td>{{$ctrl.overview.jmx.AosKeysNotReclaimableLast || 0}}</td>
+                      </tr>
+                      <tr>
+                          <td>Snapshots</td>
+                          <td>{{$ctrl.formatBytes($ctrl.overview.jmx.SnapReclaimedSizeLast)}}</td>
+                          <td>{{$ctrl.overview.jmx.SnapKeysReclaimedLast || 0}}</td>
+                          <td>{{$ctrl.overview.jmx.SnapKeysIteratedLast || 0}}</td>
+                          <td>{{$ctrl.overview.jmx.SnapKeysNotReclaimableLast || 0}}</td>
+                      </tr>
+                  </tbody>
+              </table>
+          </div>
+      </div>
+  </div>
+</div>

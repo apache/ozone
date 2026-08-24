@@ -20,11 +20,9 @@ package org.apache.hadoop.ozone.om.service;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -40,15 +38,14 @@ public final class CompactDBUtil {
   private CompactDBUtil() {
   }
 
-  public static void compactTable(OMMetadataManager omMetadataManager, String tableName,
-      ManagedCompactRangeOptions.BottommostLevelCompaction compactionType) throws IOException {
+  public static void compactTable(OMMetadataManager omMetadataManager,
+                                  String tableName) throws IOException {
     long startTime = Time.monotonicNow();
+    LOG.info("Compacting column family: {}", tableName);
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
-      options.setBottommostLevelCompaction(compactionType);
-      LOG.info("Compacting column family: {} with {} bottommost level compaction",
-          tableName, options.bottommostLevelCompaction());
-      // Note that setExclusiveManualCompaction should not be set to true
-      // since this can cause write stall in high write throughput cluster. See HDDS-15990.
+      options.setBottommostLevelCompaction(
+          ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+      options.setExclusiveManualCompaction(true);
       RocksDatabase rocksDatabase =
           ((RDBStore) omMetadataManager.getStore()).getDb();
 
@@ -65,51 +62,14 @@ public final class CompactDBUtil {
     }
   }
 
-  public static CompletableFuture<Void> compactTableAsync(OMMetadataManager metadataManager, String tableName,
-      ManagedCompactRangeOptions.BottommostLevelCompaction compactionType) {
+  public static CompletableFuture<Void> compactTableAsync(OMMetadataManager metadataManager, String tableName) {
     return CompletableFuture.runAsync(() -> {
       try {
-        compactTable(metadataManager, tableName, compactionType);
+        compactTable(metadataManager, tableName);
       } catch (Exception e) {
         LOG.warn("Failed to compact column family: {}", tableName, e);
         throw new CompletionException("Compaction failed for column family: " + tableName, e);
       }
     });
-  }
-
-  public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
-      OzoneConfiguration configuration) {
-    ManagedCompactRangeOptions.BottommostLevelCompaction blc =
-        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
-
-    try {
-      blc = configuration.getEnum(
-          OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
-          OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
-    } catch (IllegalArgumentException e) {
-      LOG.warn("Invalid value for bottommost level compaction configuration '{}'",
-          configuration.get(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION), e);
-    }
-
-    return blc;
-  }
-
-  /**
-   * Converts the given RocksDB id to a
-   * {@link ManagedCompactRangeOptions.BottommostLevelCompaction} enum value.
-   * Defaults to {@code kSkip} if the id is invalid.
-   *
-   * @param bottommostLevelCompaction RocksDB id
-   *                                  (0=kSkip, 1=kIfHaveCompactionFilter, 2=kForce, 3=kForceOptimized).
-   */
-  public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
-      int bottommostLevelCompaction) {
-    ManagedCompactRangeOptions.BottommostLevelCompaction level =
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(bottommostLevelCompaction);
-    if (level == null) {
-      LOG.warn("Invalid bottommost level compaction id: {}. Using default: kSkip.", bottommostLevelCompaction);
-      return ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip;
-    }
-    return level;
   }
 }

@@ -18,13 +18,8 @@
 package org.apache.hadoop.ozone.client.checksum;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -34,7 +29,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -76,7 +70,6 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
     Pipeline pipeline = keyLocationInfo.getPipeline();
 
     List<DatanodeDetails> nodes = new ArrayList<>();
-    Map<DatanodeDetails, Integer> selectedReplicaIndexes = new HashMap<>();
     ECReplicationConfig repConfig = (ECReplicationConfig)
         pipeline.getReplicationConfig();
 
@@ -86,31 +79,13 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
         // The stripe checksum we need to calculate checksums is only stored on
         // replica_index = 1 and all the parity nodes.
         nodes.add(dn);
-        selectedReplicaIndexes.put(dn, replicaIndex);
       }
     }
 
-    // Build a deterministic pipeline ID from the sorted node UUIDs so that
-    // XceiverClientManager can cache and reuse the gRPC connection across files
-    // that share the same EC placement group (avoids a new connection per file).
-    String nodeKey = nodes.stream()
-        .map(DatanodeDetails::getUuidString)
-        .sorted()
-        .collect(Collectors.joining(","));
-    PipelineID deterministicId = PipelineID.valueOf(
-        UUID.nameUUIDFromBytes(nodeKey.getBytes(StandardCharsets.UTF_8)));
-
-    // Use Pipeline.newBuilder() (not toBuilder()) so that nodeStatus starts null.
-    // toBuilder() would copy the 5-node EC nodeStatus, causing setNodes(3 nodes)
-    // to detect the size mismatch and call PipelineID.randomId() -> SecureRandom
-    // even though setId(deterministicId) immediately overrides it.
-    pipeline = Pipeline.newBuilder()
-        .setId(deterministicId)
+    pipeline = pipeline.toBuilder()
         .setReplicationConfig(StandaloneReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.THREE))
-        .setState(pipeline.getPipelineState())
         .setNodes(nodes)
-        .setReplicaIndexes(selectedReplicaIndexes)
         .build();
 
     List<ContainerProtos.ChunkInfo> chunks;

@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 /**
  * This class tests OMVolumeCreateResponse.
  */
-public class TestOMVolumeSetOwnerResponse extends OMVolumeResponseTests {
+public class TestOMVolumeSetOwnerResponse extends TestOMVolumeResponse {
 
   @Test
   public void testAddToDBBatch() throws Exception {

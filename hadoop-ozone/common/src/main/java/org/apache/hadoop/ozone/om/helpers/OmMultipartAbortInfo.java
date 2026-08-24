@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -30,21 +28,13 @@ public final class OmMultipartAbortInfo {
   private final String multipartOpenKey;
   private final OmMultipartKeyInfo omMultipartKeyInfo;
   private final BucketLayout bucketLayout;
-  private final List<OmKeyInfo> partsKeyInfoToDelete;
-  private final List<OmMultipartPartKey> partsTableKeysToDelete;
 
   private OmMultipartAbortInfo(String multipartKey, String multipartOpenKey,
-      OmMultipartKeyInfo omMultipartKeyInfo, BucketLayout bucketLayout,
-      List<OmKeyInfo> partsKeyInfoToDelete,
-      List<OmMultipartPartKey> partsTableKeysToDelete) {
+      OmMultipartKeyInfo omMultipartKeyInfo, BucketLayout bucketLayout) {
     this.multipartKey = multipartKey;
     this.multipartOpenKey = multipartOpenKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.bucketLayout = bucketLayout;
-    this.partsKeyInfoToDelete = partsKeyInfoToDelete == null ?
-        Collections.emptyList() : partsKeyInfoToDelete;
-    this.partsTableKeysToDelete = partsTableKeysToDelete == null ?
-        Collections.emptyList() : partsTableKeysToDelete;
   }
 
   public String getMultipartKey() {
@@ -63,14 +53,6 @@ public final class OmMultipartAbortInfo {
     return bucketLayout;
   }
 
-  public List<OmKeyInfo> getPartsKeyInfoToDelete() {
-    return partsKeyInfoToDelete;
-  }
-
-  public List<OmMultipartPartKey> getPartsTableKeysToDelete() {
-    return partsTableKeysToDelete;
-  }
-
   /**
    * Builder of OmMultipartAbortInfo.
    */
@@ -79,8 +61,6 @@ public final class OmMultipartAbortInfo {
     private String multipartOpenKey;
     private OmMultipartKeyInfo omMultipartKeyInfo;
     private BucketLayout bucketLayout;
-    private List<OmKeyInfo> partsKeyInfoToDelete;
-    private List<OmMultipartPartKey> partsTableKeysToDelete;
 
     public Builder setMultipartKey(String mpuKey) {
       this.multipartKey = mpuKey;
@@ -102,20 +82,9 @@ public final class OmMultipartAbortInfo {
       return this;
     }
 
-    public Builder setPartsKeyInfoToDelete(List<OmKeyInfo> keyInfos) {
-      this.partsKeyInfoToDelete = keyInfos;
-      return this;
-    }
-
-    public Builder setPartsTableKeysToDelete(List<OmMultipartPartKey> partKeys) {
-      this.partsTableKeysToDelete = partKeys;
-      return this;
-    }
-
     public OmMultipartAbortInfo build() {
       return new OmMultipartAbortInfo(multipartKey,
-          multipartOpenKey, omMultipartKeyInfo, bucketLayout,
-          partsKeyInfoToDelete, partsTableKeysToDelete);
+          multipartOpenKey, omMultipartKeyInfo, bucketLayout);
     }
   }
 
@@ -134,16 +103,13 @@ public final class OmMultipartAbortInfo {
     return this.multipartKey.equals(that.multipartKey) &&
         this.multipartOpenKey.equals(that.multipartOpenKey) &&
         this.bucketLayout.equals(that.bucketLayout) &&
-        this.omMultipartKeyInfo.equals(that.omMultipartKeyInfo) &&
-        this.partsKeyInfoToDelete.equals(that.partsKeyInfoToDelete) &&
-        this.partsTableKeysToDelete.equals(that.partsTableKeysToDelete);
+        this.omMultipartKeyInfo.equals(that.omMultipartKeyInfo);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(multipartKey, multipartOpenKey,
-        bucketLayout, omMultipartKeyInfo, partsKeyInfoToDelete,
-        partsTableKeysToDelete);
+        bucketLayout, omMultipartKeyInfo);
   }
 
 }

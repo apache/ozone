@@ -24,8 +24,6 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentity
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
@@ -35,6 +33,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -84,6 +83,26 @@ public final class OzoneAclUtil {
       LOG.warn("Failed to get primary group from user {}", ugi);
     }
     return listOfAcls;
+  }
+
+  /**
+   * Helper function to get acl list for one user/group.
+   *
+   * @param identityName
+   * @param type
+   * @param aclList
+   * @return list of OzoneAcls
+   * */
+  public static List<OzoneAcl> filterAclList(String identityName,
+      IAccessAuthorizer.ACLIdentityType type, List<OzoneAcl> aclList) {
+
+    if (aclList == null || aclList.isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    List retList = aclList.stream().filter(acl -> acl.getType() == type
+        && acl.getName().equals(identityName)).collect(Collectors.toList());
+    return retList;
   }
 
   private static boolean checkAccessInAcl(OzoneAcl a, UserGroupInformation ugi,
@@ -144,7 +163,7 @@ public final class OzoneAclUtil {
    * @param scope scope applied to inherited ACL
    * @return true if any ACL was inherited from parent, false otherwise
    */
-  public static boolean inheritDefaultAcls(Collection<OzoneAcl> acls,
+  public static boolean inheritDefaultAcls(List<OzoneAcl> acls,
       List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
     return inheritDefaultAcls(acl -> addAcl(acls, acl), parentAcls, scope);
   }
@@ -200,19 +219,20 @@ public final class OzoneAclUtil {
    * Add an OzoneAcl to existing list of OzoneAcls.
    * @return true if current OzoneAcls are changed, false otherwise.
    */
-  public static boolean addAcl(Collection<OzoneAcl> existingAcls, OzoneAcl acl) {
+  public static boolean addAcl(List<OzoneAcl> existingAcls, OzoneAcl acl) {
     if (existingAcls == null || acl == null) {
       return false;
     }
 
-    for (Iterator<OzoneAcl> i = existingAcls.iterator(); i.hasNext();) {
-      final OzoneAcl a = i.next();
-      if (a.sameNameTypeScope(acl)) {
+    for (int i = 0; i < existingAcls.size(); i++) {
+      final OzoneAcl a = existingAcls.get(i);
+      if (a.getName().equals(acl.getName()) &&
+          a.getType().equals(acl.getType()) &&
+          a.getAclScope().equals(acl.getAclScope())) {
         final OzoneAcl updated = a.add(acl);
         final boolean changed = !Objects.equals(updated, a);
         if (changed) {
-          i.remove();
-          existingAcls.add(updated);
+          existingAcls.set(i, updated);
         }
         return changed;
       }
@@ -222,7 +242,7 @@ public final class OzoneAclUtil {
     return true;
   }
 
-  public static boolean addAllAcl(Collection<OzoneAcl> existingAcls, Collection<OzoneAcl> acls) {
+  public static boolean addAllAcl(List<OzoneAcl> existingAcls, List<OzoneAcl> acls) {
     // TOOD optimize
     boolean changed = false;
     for (OzoneAcl acl : acls) {
@@ -235,21 +255,22 @@ public final class OzoneAclUtil {
    * remove OzoneAcl from existing list of OzoneAcls.
    * @return true if current OzoneAcls are changed, false otherwise.
    */
-  static boolean removeAcl(Collection<OzoneAcl> existingAcls, OzoneAcl acl) {
+  public static boolean removeAcl(List<OzoneAcl> existingAcls, OzoneAcl acl) {
     if (existingAcls == null || existingAcls.isEmpty() || acl == null) {
       return false;
     }
 
-    for (Iterator<OzoneAcl> i = existingAcls.iterator(); i.hasNext();) {
-      final OzoneAcl a = i.next();
-      if (a.sameNameTypeScope(acl)) {
+    for (int i = 0; i < existingAcls.size(); i++) {
+      final OzoneAcl a = existingAcls.get(i);
+      if (a.getName().equals(acl.getName()) &&
+          a.getType().equals(acl.getType()) &&
+          a.getAclScope().equals(acl.getAclScope())) {
         final OzoneAcl updated = a.remove(acl);
         final boolean changed = !Objects.equals(updated, a);
         if (updated.isEmpty()) {
-          i.remove();
+          existingAcls.remove(i);
         } else if (changed) {
-          i.remove();
-          existingAcls.add(updated);
+          existingAcls.set(i, updated);
         }
         return changed;
       }

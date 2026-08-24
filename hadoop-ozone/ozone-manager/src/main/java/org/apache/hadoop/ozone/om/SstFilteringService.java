@@ -197,7 +197,8 @@ public class SstFilteringService extends BackgroundService
       Table<String, SnapshotInfo> snapshotInfoTable =
           ozoneManager.getMetadataManager().getSnapshotInfoTable();
 
-      try (TableIterator<String, Table.KeyValue
+
+      try (TableIterator<String, ? extends Table.KeyValue
               <String, SnapshotInfo>> iterator = snapshotInfoTable
               .iterator()) {
         iterator.seekToFirst();

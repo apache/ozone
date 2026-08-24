@@ -36,7 +36,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -54,7 +53,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -161,7 +159,7 @@ class TestUpgradeContainerSchema {
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     final AtomicInteger loopCount = new AtomicInteger(0);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenAnswer(invocation -> {
           final int ii = loopCount.getAndIncrement() % volumes.size();
           return volumes.get(ii);
@@ -320,7 +318,7 @@ class TestUpgradeContainerSchema {
       data.setSchemaVersion(SCHEMA_V2);
 
       KeyValueContainer container = new KeyValueContainer(data, conf);
-      container.create(volumeSet, volumeChoosingPolicy, SCM_ID, StorageType.DISK);
+      container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
 
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(containerId)

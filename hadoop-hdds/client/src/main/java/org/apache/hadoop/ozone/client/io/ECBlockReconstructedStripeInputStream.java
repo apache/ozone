@@ -597,13 +597,13 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       } catch (ExecutionException ee) {
         boolean added = failedDataIndexes.add(index);
         Throwable t = ee.getCause() != null ? ee.getCause() : ee;
-        StringBuilder msg = new StringBuilder("{}: error reading [{}]");
+        String msg = "{}: error reading [{}]";
         if (added) {
-          msg.append(", marked as failed");
+          msg += ", marked as failed";
         } else {
-          msg.append(", already had failed"); // should not really happen
+          msg += ", already had failed"; // should not really happen
         }
-        LOG.info(msg.toString(), this, index, t);
+        LOG.info(msg, this, index, t);
 
         exceptionOccurred = true;
       } catch (InterruptedException ie) {

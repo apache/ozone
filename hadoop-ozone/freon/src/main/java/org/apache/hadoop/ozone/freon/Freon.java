@@ -57,8 +57,9 @@ public class Freon extends GenericCli implements ExtensibleParentCommand {
   public int execute(String[] argv) {
     conf = getOzoneConf();
     HddsServerUtil.initializeMetrics(conf, "ozone-freon");
+    TracingUtil.initTracing("freon", conf);
     String spanName = "ozone freon " + String.join(" ", argv);
-    return TracingUtil.execute("freon", spanName, conf, () -> super.execute(argv));
+    return TracingUtil.executeInNewSpan(spanName, () -> super.execute(argv));
   }
 
   @Override

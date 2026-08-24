@@ -77,7 +77,8 @@ public class LegacyBucketHandler extends BucketHandler {
 
     Table<String, OmKeyInfo> keyTable = getKeyTable();
 
-    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iterator = keyTable.iterator()) {
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = keyTable.iterator()) {
 
       iterator.seek(key);
       if (iterator.hasNext()) {
@@ -149,7 +150,7 @@ public class LegacyBucketHandler extends BucketHandler {
       seekPrefix += dirName;
     }
     String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
-    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
              iterator = keyTable.iterator()) {
 
       iterator.seek(seekPrefix);

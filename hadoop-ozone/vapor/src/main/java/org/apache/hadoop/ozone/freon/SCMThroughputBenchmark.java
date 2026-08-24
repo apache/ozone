@@ -33,6 +33,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,7 +49,6 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
@@ -70,8 +70,8 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -156,7 +156,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
       defaultValue = "4")
   private int numHeartbeats = 4;
 
-  @CommandLine.Option(names = {"--scm-host"},
+  @CommandLine.Option(names = {"--scmHost", "--scm-host"},
       required = true,
       description = "The leader scm host x.x.x.x.")
   private String scm;
@@ -796,7 +796,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
     public void register() throws IOException {
       SCMRegisteredResponseProto response = datanodeScmClient.register(
           datanodeDetails.getExtendedProtoBufMessage(),
-          createNodeReport(datanodeDetails.getID()),
+          createNodeReport(datanodeDetails.getUuid()),
           createContainerReport(),
           createPipelineReport(),
           UpgradeUtils.defaultLayoutVersionProto());
@@ -852,6 +852,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
   }
 
   private static DatanodeDetails createRandomDatanodeDetails() {
+    UUID uuid = UUID.randomUUID();
     String ipAddress =
         RANDOM.nextInt(256) + "." + RANDOM.nextInt(256) + "." + RANDOM
             .nextInt(256) + "." + RANDOM.nextInt(256);
@@ -860,8 +861,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
     DatanodeDetails.Port ratisPort = DatanodeDetails.newRatisPort(0);
     DatanodeDetails.Port restPort = DatanodeDetails.newRestPort(0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setID(DatanodeID.randomID())
-        .setHostName("localhost")
+    builder.setUuid(uuid).setHostName("localhost")
         .setIpAddress(ipAddress)
         .addPort(containerPort)
         .addPort(ratisPort)
@@ -869,7 +869,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
     return builder.build();
   }
 
-  private static NodeReportProto createNodeReport(DatanodeID nodeId) {
+  private static NodeReportProto createNodeReport(UUID nodeId) {
     List<StorageReportProto> storageReports = new ArrayList<>();
     List<MetadataStorageReportProto> metadataStorageReports =
         new ArrayList<>();
@@ -881,7 +881,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
     return nb.build();
   }
 
-  private static StorageReportProto createStorageReport(DatanodeID nodeId) {
+  private static StorageReportProto createStorageReport(UUID nodeId) {
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
     srb.setStorageUuid(nodeId.toString())
         .setStorageLocation("/data")

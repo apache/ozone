@@ -73,7 +73,6 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -255,9 +254,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           DeleteCmdInfo cmd = deleteCommandQueues.poll();
           try {
             processCmd(cmd);
-          } catch (Error e) {
-            ExitUtils.terminate(1,
-                "Fatal error while processing delete blocks command", e, LOG);
           } catch (Throwable e) {
             LOG.error("taskProcess failed.", e);
           }
@@ -307,31 +303,19 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           if (keyValueContainer.
               writeLockTryLock(tryLockTimeoutMs, TimeUnit.MILLISECONDS)) {
             try {
-              // Re-fetch the container after acquiring the lock. DiskBalancer may have relocated
-              // this container to a different disk while we waited — in that case, the container
-              // object in ContainerSet has changed and containerData points to the old replica.
-              Container<?> current = containerSet.getContainer(containerId);
-              if (current == null || current.getContainerData() != containerData) {
-                LOG.debug("DeleteBlocks: containerData for container {} is stale "
-                    + ", Will retry on the new replica.",
-                    containerId);
-                lockAcquisitionFailed = true;
-                txResultBuilder.setContainerID(containerId).setSuccess(false);
+              String schemaVersion = containerData
+                  .getSupportedSchemaVersionOrDefault();
+              if (getSchemaHandlers().containsKey(schemaVersion)) {
+                schemaHandlers.get(schemaVersion).handle(containerData, tx);
               } else {
-                String schemaVersion = containerData
-                    .getSupportedSchemaVersionOrDefault();
-                if (getSchemaHandlers().containsKey(schemaVersion)) {
-                  schemaHandlers.get(schemaVersion).handle(containerData, tx);
-                } else {
-                  throw new UnsupportedOperationException(
-                      "Only schema version 1,2,3 are supported.");
-                }
-                txResultBuilder.setContainerID(containerId)
-                    .setSuccess(true);
+                throw new UnsupportedOperationException(
+                    "Only schema version 1,2,3 are supported.");
               }
             } finally {
               keyValueContainer.writeUnlock();
             }
+            txResultBuilder.setContainerID(containerId)
+                .setSuccess(true);
           } else {
             lockAcquisitionFailed = true;
             txResultBuilder.setContainerID(containerId)
@@ -504,9 +488,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         DeleteBlockTransactionExecutionResult result = f.get();
         handler.accept(result);
       } catch (ExecutionException e) {
-        if (e.getCause() instanceof Error) {
-          throw (Error) e.getCause();
-        }
         LOG.error("task failed.", e);
       } catch (InterruptedException e) {
         LOG.error("task interrupted.", e);

@@ -17,10 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.interfaces;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -35,7 +32,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.util.function.CheckedConsumer;
 
 /**
  * Chunk Manager allows read, write, delete and listing of chunks in a container.
@@ -80,20 +76,6 @@ public interface ChunkManager {
       DispatcherContext dispatcherContext) throws StorageContainerException;
 
   /**
-   * Get the RandomAccessFile of a given chunk, to share with client for short circuit read.
-   *
-   * @param container - Container for the chunk
-   * @param blockID - ID of the block.
-   * @return RandomAccessFile  - file for block file
-   * @throws StorageContainerException
-   */
-  default RandomAccessFile getShortCircuitFd(Container container, BlockID blockID)
-      throws StorageContainerException {
-    throw new StorageContainerException("Operation is not supported for " + this.getClass().getSimpleName(),
-        UNSUPPORTED_REQUEST);
-  }
-
-  /**
    * Deletes a given chunk.
    *
    * @param container - Container for the chunk
@@ -132,9 +114,7 @@ public interface ChunkManager {
   }
 
   default StateMachine.DataChannel getStreamDataChannel(
-          Container container, BlockID blockID,
-          CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException> putBlock,
-          ContainerMetrics metrics)
+          Container container, BlockID blockID, ContainerMetrics metrics)
           throws StorageContainerException {
     return null;
   }

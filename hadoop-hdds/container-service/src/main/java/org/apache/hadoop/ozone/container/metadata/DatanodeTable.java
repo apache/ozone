@@ -29,13 +29,11 @@ import org.apache.hadoop.hdds.utils.db.Table;
 /**
  * Wrapper class to represent a table in a datanode RocksDB instance.
  * This class can wrap any existing {@link Table} instance, but will throw
- * {@link UnsupportedOperationException} for {@link Table#iterator} and
- * {@link Table#clear()}.
+ * {@link UnsupportedOperationException} for {@link Table#iterator}.
  * This is because differing schema versions used in datanode DB layouts may
  * have differing underlying table structures, so iterating a table instance
  * directly, without taking into account key prefixes, may yield unexpected
- * results, while clearing it may delete data belonging to other logical
- * tables or containers.
+ * results.
  */
 public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
@@ -68,12 +66,6 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public void deleteRange(KEY beginKey, KEY endKey) throws RocksDatabaseException, CodecException {
     table.deleteRange(beginKey, endKey);
-  }
-
-  @Override
-  public void clear() {
-    throw new UnsupportedOperationException("Clearing tables directly is not supported for datanode containers due to "
-        + "differing schema versions.");
   }
 
   @Override

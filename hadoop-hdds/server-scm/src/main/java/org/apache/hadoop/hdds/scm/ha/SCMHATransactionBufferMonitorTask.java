@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
+import org.apache.ratis.statemachine.SnapshotInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,7 @@ import org.slf4j.LoggerFactory;
 public class SCMHATransactionBufferMonitorTask implements Runnable {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMHATransactionBufferMonitorTask.class);
+  private final SCMRatisServer server;
   private final SCMHADBTransactionBuffer transactionBuffer;
   private final long flushInterval;
 
@@ -35,17 +37,31 @@ public class SCMHATransactionBufferMonitorTask implements Runnable {
    * SCMService related variables.
    */
   public SCMHATransactionBufferMonitorTask(
-      SCMHADBTransactionBuffer transactionBuffer, long flushInterval) {
+      SCMHADBTransactionBuffer transactionBuffer,
+      SCMRatisServer server, long flushInterval) {
     this.flushInterval = flushInterval;
     this.transactionBuffer = transactionBuffer;
+    this.server = server;
   }
 
   @Override
   public void run() {
-    try {
-      transactionBuffer.flushIfNeeded(flushInterval);
-    } catch (IOException e) {
-      LOG.error("TransactionFlushTask is failed", e);
+    if (transactionBuffer.shouldFlush(flushInterval)) {
+      LOG.debug("Running TransactionFlushTask");
+      // set latest snapshot to null for force snapshot
+      // the value will be reset again when snapshot is taken
+      final SnapshotInfo lastSnapshot = transactionBuffer
+          .getLatestSnapshotRef().getAndSet(null);
+      try {
+        server.triggerSnapshot();
+      } catch (IOException e) {
+        LOG.error("Snapshot request is failed", e);
+      } finally {
+        // under failure case, if unable to take snapshot, its value
+        // is reset to previous known value
+        transactionBuffer.getLatestSnapshotRef().compareAndSet(
+            null, lastSnapshot);
+      }
     }
   }
 }

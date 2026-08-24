@@ -97,7 +97,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     if (keyArgs.hasExpectedDataGeneration()) {
       if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+          == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
         ozoneManager.checkFeatureEnabled(
             OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
       } else {
@@ -127,6 +127,16 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs = null;
     UserInfo userInfo = getUserInfo();
     if (!keyArgs.getIsMultipartKey()) {
+
+      long scmBlockSize = ozoneManager.getScmBlockSize();
+
+      // NOTE size of a key is not a hard limit on anything, it is a value that
+      // client should expect, in terms of current size of key. If client sets
+      // a value, then this value is used, otherwise, we allocate a single
+      // block which is the current size, if read by the client.
+      final long requestedSize = keyArgs.getDataSize() > 0 ?
+          keyArgs.getDataSize() : scmBlockSize;
+
       HddsProtos.ReplicationFactor factor = keyArgs.getFactor();
       HddsProtos.ReplicationType type = keyArgs.getType();
 
@@ -143,7 +153,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  As for a client for the first time this can be executed on any OM,
       //  till leader is identified.
 
-      final List<OmKeyLocationInfo> omKeyLocationInfoList;
+      List<OmKeyLocationInfo> omKeyLocationInfoList;
       final long effectiveDataSize;
       // Skip block allocation if dataSize <= 0. We also consider unspecified dataSize as
       // empty key since the client will not set dataSize if the key is empty (i.e. dataSize <= 0),
@@ -151,10 +161,17 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         omKeyLocationInfoList = Collections.emptyList();
         effectiveDataSize = 0;
       } else {
-        effectiveDataSize = keyArgs.getDataSize();
         omKeyLocationInfoList = captureLatencyNs(perfMetrics.getCreateKeyAllocateBlockLatencyNs(),
-            () -> allocateBlock(repConfig, new ExcludeList(), effectiveDataSize,
-                keyArgs.getSortDatanodes(), userInfo, ozoneManager));
+            () -> allocateBlock(ozoneManager.getScmClient(),
+                ozoneManager.getBlockTokenSecretManager(), repConfig,
+                new ExcludeList(), requestedSize, scmBlockSize,
+                ozoneManager.getPreallocateBlocksMax(),
+                ozoneManager.isGrpcBlockTokenEnabled(),
+                ozoneManager.getOMServiceId(),
+                ozoneManager.getMetrics(),
+                keyArgs.getSortDatanodes(),
+                userInfo));
+        effectiveDataSize = requestedSize;
       }
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())

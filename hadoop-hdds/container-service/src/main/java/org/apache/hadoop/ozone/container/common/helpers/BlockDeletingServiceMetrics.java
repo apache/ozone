@@ -87,7 +87,7 @@ public final class BlockDeletingServiceMetrics {
   private BlockDeletingServiceMetrics() {
   }
 
-  public static synchronized BlockDeletingServiceMetrics create() {
+  public static BlockDeletingServiceMetrics create() {
     if (instance == null) {
       MetricsSystem ms = DefaultMetricsSystem.instance();
       instance = ms.register(SOURCE_NAME, "BlockDeletingService",
@@ -100,7 +100,7 @@ public final class BlockDeletingServiceMetrics {
   /**
    * Unregister the metrics instance.
    */
-  public static synchronized void unRegister() {
+  public static void unRegister() {
     instance = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);

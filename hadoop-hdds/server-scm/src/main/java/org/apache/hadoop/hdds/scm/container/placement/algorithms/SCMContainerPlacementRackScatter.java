@@ -29,13 +29,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -67,7 +64,6 @@ public final class SCMContainerPlacementRackScatter
   // INNER_LOOP is to choose node in each rack
   private static final int INNER_LOOP_MAX_RETRY = 5;
   private final SCMContainerPlacementMetrics metrics;
-  private final boolean capacityAwareNodeSelectionEnabled;
 
   /**
    * Constructs a Container Placement with rack awareness.
@@ -81,9 +77,6 @@ public final class SCMContainerPlacementRackScatter
     super(nodeManager, conf);
     this.networkTopology = networkTopology;
     this.metrics = metrics;
-    this.capacityAwareNodeSelectionEnabled = conf.getBoolean(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED_DEFAULT);
   }
 
   /**
@@ -97,9 +90,6 @@ public final class SCMContainerPlacementRackScatter
     super(nodeManager, conf);
     this.networkTopology = nodeManager.getClusterNetworkTopologyMap();
     this.metrics = null;
-    this.capacityAwareNodeSelectionEnabled = conf.getBoolean(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED_DEFAULT);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
@@ -108,7 +98,7 @@ public final class SCMContainerPlacementRackScatter
       List<DatanodeDetails> mutableFavoredNodes,
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired,
       int maxOuterLoopIterations, Map<Node, Integer> rackCntMap,
-      int maxReplicasPerRack, StorageType storageType) {
+      int maxReplicasPerRack) {
     if (nodesRequired <= 0) {
       return Collections.emptySet();
     }
@@ -166,7 +156,7 @@ public final class SCMContainerPlacementRackScatter
           continue;
         }
         Node node = chooseNode(rack.getNetworkFullPath(), unavailableNodes,
-                metadataSizeRequired, dataSizeRequired, storageType);
+                metadataSizeRequired, dataSizeRequired);
         if (node != null) {
           chosenNodes.add((DatanodeDetails) node);
           rackCntMap.merge(rack, 1, Math::addExact);
@@ -219,7 +209,7 @@ public final class SCMContainerPlacementRackScatter
           final List<DatanodeDetails> excludedNodes,
           final List<DatanodeDetails> favoredNodes,
           final int nodesRequired, final long metadataSizeRequired,
-          final long dataSizeRequired, StorageType storageType) throws SCMException {
+          final long dataSizeRequired) throws SCMException {
     if (nodesRequired <= 0) {
       String errorMsg = "num of nodes required to choose should bigger" +
           "than 0, but the given num is " + nodesRequired;
@@ -253,7 +243,7 @@ public final class SCMContainerPlacementRackScatter
       // Generate mutableFavoredNodes, only stores valid favoredNodes
       for (DatanodeDetails datanodeDetails : favoredNodes) {
         if (isValidNode(datanodeDetails, metadataSizeRequired,
-            dataSizeRequired, storageType)) {
+            dataSizeRequired)) {
           mutableFavoredNodes.add(datanodeDetails);
         }
       }
@@ -319,7 +309,7 @@ public final class SCMContainerPlacementRackScatter
         chooseNodesFromRacks(racks, unavailableNodes,
             mutableFavoredNodes, additionalRacksRequired,
             metadataSizeRequired, dataSizeRequired, maxReplicasPerRack,
-            usedRacksCntMap, maxReplicasPerRack, storageType));
+            usedRacksCntMap, maxReplicasPerRack));
 
     if (chosenNodes.size() < additionalRacksRequired) {
       String reason = "Chosen nodes size from Unique Racks: " + chosenNodes
@@ -342,7 +332,7 @@ public final class SCMContainerPlacementRackScatter
       chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
               mutableFavoredNodes, nodesRequired - chosenNodes.size(),
               metadataSizeRequired, dataSizeRequired,
-              Integer.MAX_VALUE, usedRacksCntMap, maxReplicasPerRack, storageType));
+              Integer.MAX_VALUE, usedRacksCntMap, maxReplicasPerRack));
     }
     List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
     if (nodesRequired != chosenNodes.size()) {
@@ -447,7 +437,7 @@ public final class SCMContainerPlacementRackScatter
    * @return the chosen datanode.
    */
   private Node chooseNode(String scope, List<Node> excludedNodes,
-      long metadataSizeRequired, long dataSizeRequired, StorageType storageType) {
+      long metadataSizeRequired, long dataSizeRequired) {
     int maxRetry = INNER_LOOP_MAX_RETRY;
     while (true) {
       if (metrics != null) {
@@ -455,9 +445,7 @@ public final class SCMContainerPlacementRackScatter
       }
       Node node = null;
       try {
-        node = capacityAwareNodeSelectionEnabled
-            ? chooseLessUtilizedNode(scope, excludedNodes)
-            : networkTopology.chooseRandom(scope, excludedNodes);
+        node = networkTopology.chooseRandom(scope, excludedNodes);
       } catch (Exception e) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Error while choosing Node: Scope: {}, Excluded Nodes: " +
@@ -469,7 +457,7 @@ public final class SCMContainerPlacementRackScatter
       if (node != null) {
         DatanodeDetails datanodeDetails = (DatanodeDetails) node;
         if (isValidNode(datanodeDetails, metadataSizeRequired,
-            dataSizeRequired, storageType)) {
+            dataSizeRequired)) {
           if (metrics != null) {
             metrics.incrDatanodeChooseSuccessCount();
           }
@@ -491,42 +479,6 @@ public final class SCMContainerPlacementRackScatter
         return null;
       }
     }
-  }
-
-  /**
-   * Pick two distinct candidate nodes within the rack and return the one with
-   * lower space utilization, so a nearly-full datanode is not chosen as often
-   * as an emptier peer in the same rack.
-   *
-   * @param scope - the rack we are searching nodes under
-   * @param excludedNodes - list of the datanodes to exclude. Can be null.
-   * @return the chosen datanode, or null if none is available.
-   */
-  private Node chooseLessUtilizedNode(String scope, List<Node> excludedNodes) {
-    Node first = networkTopology.chooseRandom(scope, excludedNodes);
-    if (first == null) {
-      return null;
-    }
-    // Exclude the first pick so the second candidate is a distinct node.
-    // Otherwise a small rack often draws the same node twice and the capacity
-    // comparison below is skipped.
-    List<Node> secondExcludedNodes = excludedNodes == null
-        ? new ArrayList<>() : new ArrayList<>(excludedNodes);
-    secondExcludedNodes.add(first);
-    Node second = networkTopology.chooseRandom(scope, secondExcludedNodes);
-    if (second == null) {
-      LOG.debug("Unable to select a second datanode in rack {} for capacity-aware selection", scope);
-      return first;
-    }
-    SCMNodeMetric firstMetric =
-        getNodeManager().getNodeStat((DatanodeDetails) first);
-    SCMNodeMetric secondMetric =
-        getNodeManager().getNodeStat((DatanodeDetails) second);
-    if (firstMetric == null || secondMetric == null) {
-      LOG.debug("Missing node metric for capacity-aware selection between {} and {}", first, second);
-      return first;
-    }
-    return firstMetric.isGreater(secondMetric.get()) ? second : first;
   }
 
   /**

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -42,12 +43,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
 
   // Store statuses for non-JSON mode consolidation
   private final Map<String, DatanodeDiskBalancerInfoProto> statuses =
-      new LinkedHashMap<>();
-
-  @Override
-  protected void resetCommandState() {
-    statuses.clear();
-  }
+      new ConcurrentHashMap<>();
 
   @Override
   protected Object executeCommand(String hostName) throws IOException {
@@ -58,7 +54,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
       
       // Only create JSON result object if JSON mode is enabled
       if (getOptions().isJson()) {
-        return createStatusResult(hostName, status);
+        return createStatusResult(status);
       }
       
       // For non-JSON mode, store the proto for later consolidation
@@ -86,23 +82,15 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
 
     // Display consolidated status for successful nodes
     if (!successNodes.isEmpty() && !statuses.isEmpty()) {
-      List<DatanodeDiskBalancerInfoProto> statusList = new ArrayList<>();
-      List<String> displayNames = new ArrayList<>();
-      for (String successNode : successNodes) {
-        DatanodeDiskBalancerInfoProto proto = statuses.get(successNode);
-        if (proto != null) {
-          statusList.add(proto);
-          displayNames.add(formatDatanodeDisplayName(successNode, proto.getNode()));
-        }
-      }
-      System.out.println(generateStatus(statusList, displayNames));
+      List<DatanodeDiskBalancerInfoProto> statusList =
+          new ArrayList<>(statuses.values());
+      System.out.println(generateStatus(statusList));
     }
   }
 
-  private String generateStatus(
-      List<DatanodeDiskBalancerInfoProto> protos, List<String> datanodeDisplayNames) {
+  private String generateStatus(List<DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
-        "%-60s %-10s %-15s %-15s %-10s %-18s %-30s %-12s %-12s %-15s %-18s %-20s%n");
+        "%-60s %-12s %-15s %-15s %-12s %-20s %-40s %-12s %-12s %-15s %-18s %-20s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
@@ -118,14 +106,16 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
     contentList.add("EstBytesToMove(MB)");
     contentList.add("EstTimeLeft(min)");
 
-    for (int i = 0; i < protos.size(); i++) {
-      HddsProtos.DatanodeDiskBalancerInfoProto proto = protos.get(i);
-      formatBuilder.append("%-60s %-10s %-15s %-15s %-10s %-18s %-30s %-12s %-12s %-15s %-18s %-20s%n");
+    for (HddsProtos.DatanodeDiskBalancerInfoProto proto : protos) {
+      formatBuilder.append("%-60s %-12s %-15s %-15s %-12s %-20s %-40s %-12s %-12s %-15s %-18s %-20s%n");
       long estimatedTimeLeft = calculateEstimatedTimeLeft(proto);
       long bytesMovedMB = (long) Math.ceil(proto.getBytesMoved() / (1024.0 * 1024.0));
       long bytesToMoveMB = (long) Math.ceil(proto.getBytesToMove() / (1024.0 * 1024.0));
 
-      contentList.add(datanodeDisplayNames.get(i));
+      // Format datanode string with hostname and IP address
+      String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
+          proto.getNode());
+      contentList.add(formattedDatanode);
       contentList.add(proto.getRunningStatus().name());
       contentList.add(
           String.format("%.4f", proto.getDiskBalancerConf().getThreshold()));
@@ -154,7 +144,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
             " by default, CLOSED and QUASI_CLOSED are allowed.");
 
     return String.format(formatBuilder.toString(),
-        contentList.toArray(new Object[0]));
+        contentList.toArray(new String[0]));
   }
 
   @Override
@@ -168,10 +158,11 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
    * @param status the DiskBalancer status proto
    * @return JSON result map
    */
-  private Map<String, Object> createStatusResult(
-      String hostName, DatanodeDiskBalancerInfoProto status) {
+  private Map<String, Object> createStatusResult(DatanodeDiskBalancerInfoProto status) {
     Map<String, Object> result = new LinkedHashMap<>();
-    String formattedDatanode = formatDatanodeDisplayName(hostName, status.getNode());
+    // Format datanode string with hostname and IP address
+    String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
+        status.getNode());
     result.put("datanode", formattedDatanode);
     result.put("action", "status");
     result.put("status", "success");

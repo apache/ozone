@@ -141,7 +141,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.io_.retry.RetryProxy;
+import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
 import org.apache.hadoop.ipc_.RPC;
@@ -259,22 +259,20 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public ContainerWithPipeline allocateContainer(
       HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
-      String owner, HddsProtos.StorageTierProto storageTier) throws IOException {
+      String owner) throws IOException {
     ReplicationConfig replicationConfig =
         ReplicationConfig.fromProtoTypeAndFactor(type, factor);
-    return allocateContainer(replicationConfig, owner, storageTier);
+    return allocateContainer(replicationConfig, owner);
   }
 
   @Override
   public ContainerWithPipeline allocateContainer(
-      ReplicationConfig replicationConfig, String owner,
-      HddsProtos.StorageTierProto storageTier) throws IOException {
+      ReplicationConfig replicationConfig, String owner) throws IOException {
 
     ContainerRequestProto.Builder request = ContainerRequestProto.newBuilder()
           .setTraceID(TracingUtil.exportCurrentSpan())
           .setReplicationType(replicationConfig.getReplicationType())
-          .setOwner(owner)
-          .setStorageTier(storageTier);
+          .setOwner(owner);
 
     if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
       HddsProtos.ECReplicationConfig ecProto =
@@ -1007,9 +1005,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     }
     if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
       int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
-      Preconditions.checkState(mdti > 0,
+      Preconditions.checkState(mdti >= 0,
           "Max Datanodes Percentage To Involve Per Iteration must be " +
-              "greater than zero.");
+              "greater than equal to zero.");
       Preconditions.checkState(mdti <= 100,
           "Max Datanodes Percentage To Involve Per Iteration must be " +
               "lesser than equal to hundred.");
@@ -1250,12 +1248,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException {
     GetContainerCountRequestProto request =
-        GetContainerCountRequestProto.newBuilder()
-            .setState(state)
-            .build();
+        GetContainerCountRequestProto.newBuilder().build();
 
     GetContainerCountResponseProto response =
-        submitRequest(Type.GetContainerCount,
+        submitRequest(Type.GetClosedContainerCount,
             builder -> builder.setGetContainerCountRequest(request))
             .getGetContainerCountResponse();
     return response.getContainerCount();

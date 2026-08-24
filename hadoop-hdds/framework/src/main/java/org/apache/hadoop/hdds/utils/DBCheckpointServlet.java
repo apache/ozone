@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -237,7 +238,8 @@ public class DBCheckpointServlet extends HttpServlet
                file + ".tar\"");
 
       Instant start = Instant.now();
-      writeDbDataToStream(checkpoint, request, response, receivedSstFiles, tmpdir);
+      writeDbDataToStream(checkpoint, request, response.getOutputStream(),
+          receivedSstFiles, tmpdir);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
@@ -366,18 +368,18 @@ public class DBCheckpointServlet extends HttpServlet
    * @param checkpoint The checkpoint to be written.
    * @param ignoredRequest The httpRequest which generated this checkpoint.
    *        (Parameter is ignored in this class but used in child classes).
-   * @param response The HTTP response; the body is written to {@link HttpServletResponse#getOutputStream()}.
+   * @param destination The stream to write to.
    * @param toExcludeList the files to be excluded
    *
    */
   public void writeDbDataToStream(DBCheckpoint checkpoint,
       HttpServletRequest ignoredRequest,
-      HttpServletResponse response,
+      OutputStream destination,
       Set<String> toExcludeList,
       Path tmpdir)
       throws IOException, InterruptedException {
     Objects.requireNonNull(toExcludeList);
-    writeDBCheckpointToStream(checkpoint, response.getOutputStream(), toExcludeList);
+    writeDBCheckpointToStream(checkpoint, destination, toExcludeList);
   }
 
   public DBStore getDbStore() {

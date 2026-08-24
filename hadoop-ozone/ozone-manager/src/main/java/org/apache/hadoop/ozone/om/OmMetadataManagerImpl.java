@@ -42,7 +42,6 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_T
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
@@ -108,8 +107,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
-import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -178,8 +175,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, OmPrefixInfo> prefixTable;
   private Table<String, TransactionInfo> transactionInfoTable;
   private Table<String, String> metaTable;
-  private Table<String, OmLifecycleConfiguration> lifecycleConfigurationTable;
-  private Table<String, OmLifecycleScanState> lifecycleScanStateTable;
 
   // Tables required for multi-tenancy
   private Table<String, OmDBAccessIdInfo> tenantAccessIdTable;
@@ -247,12 +242,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
       OzoneConfiguration conf, DBCheckpoint checkpoint, boolean readOnly) throws IOException {
-    return createCheckpointMetadataManager(conf, checkpoint, readOnly, true);
-  }
-
-  public static OmMetadataManagerImpl createCheckpointMetadataManager(
-      OzoneConfiguration conf, DBCheckpoint checkpoint, boolean readOnly,
-      boolean enableRocksDbMetrics) throws IOException {
     Path path = checkpoint.getCheckpointLocation();
     Path parent = path.getParent();
     if (parent == null) {
@@ -265,8 +254,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throw new IllegalStateException("DB checkpoint dir name should not "
           + "have been null. Checkpoint path is " + path);
     }
-    return new OmMetadataManagerImpl(
-        conf, dir, name.toString(), readOnly, enableRocksDbMetrics);
+    return new OmMetadataManagerImpl(conf, dir, name.toString(), readOnly);
   }
 
   protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name) throws IOException {
@@ -283,24 +271,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   public OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name, boolean readOnly)
       throws IOException {
-    this(conf, dir, name, readOnly, true);
-  }
-
-  /**
-   * Metadata constructor for checkpoints.
-   *
-   * @param conf - Ozone conf.
-   * @param dir - Checkpoint parent directory.
-   * @param name - Checkpoint directory name.
-   * @param readOnly - Whether to open the checkpoint DB read-only.
-   * @param enableRocksDbMetrics - Whether to register generic RocksDB metrics.
-   *     Pass false for transient checkpoint DBs whose column families may be
-   *     dropped or recreated while the DB is open.
-   * @throws IOException
-   */
-  protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir,
-      String name, boolean readOnly, boolean enableRocksDbMetrics)
-      throws IOException {
     lock = new OmReadOnlyLock();
     hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
     omEpoch = 0;
@@ -312,7 +282,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setMaxNumberOfOpenFiles(maxOpenFiles)
         .setEnableCompactionDag(false, null)
         .setCreateCheckpointDirs(false)
-        .setEnableRocksDbMetrics(enableRocksDbMetrics)
+        .setEnableRocksDbMetrics(true)
         .build();
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
@@ -537,9 +507,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
-
-    lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF, cacheType);
-    lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF, cacheType);
   }
 
   /**
@@ -648,7 +615,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     StringBuilder builder = new StringBuilder()
         .append(OM_KEY_PREFIX).append(volume)
         .append(OM_KEY_PREFIX).append(bucket); // TODO : Throw if the Bucket is null?
-    if (StringUtils.isNotEmpty(key)) {
+    if (StringUtils.isNotBlank(key)) {
       builder.append(OM_KEY_PREFIX);
       if (!key.equals(OM_KEY_PREFIX)) {
         builder.append(key);
@@ -860,7 +827,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private <T> boolean isKeyPresentInTable(String keyPrefix,
                                           Table<String, T> table)
           throws IOException {
-    try (TableIterator<String, Table.KeyValue<String, T>> keyIter = table.iterator(keyPrefix)) {
+    try (TableIterator<String, ? extends KeyValue<String, T>>
+                 keyIter = table.iterator(keyPrefix)) {
       KeyValue<String, T> kv = null;
       if (keyIter.hasNext()) {
         kv = keyIter.next();
@@ -999,7 +967,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public TableIterator<String, KeyValue<String, OmKeyInfo>>
+  public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
       getKeyIterator() throws IOException {
     return keyTable.iterator();
   }
@@ -1025,7 +993,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     okTable = getOpenKeyTable(bucketLayout);
 
     // No lock required since table iterator creates a "snapshot"
-    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> openKeyIter = okTable.iterator()) {
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+             openKeyIter = okTable.iterator()) {
       KeyValue<String, OmKeyInfo> kv;
       kv = openKeyIter.seek(dbContTokenPrefix);
       if (hasContToken && kv.getKey().equals(dbContTokenPrefix)) {
@@ -1101,11 +1070,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     } else {
       // This allows us to seek directly to the first key with the right prefix.
       seekKey = getOzoneKey(volumeName, bucketName,
-          StringUtils.isNotEmpty(keyPrefix) ? keyPrefix : OM_KEY_PREFIX);
+          StringUtils.isNotBlank(keyPrefix) ? keyPrefix : OM_KEY_PREFIX);
     }
 
     String seekPrefix;
-    if (StringUtils.isNotEmpty(keyPrefix)) {
+    if (StringUtils.isNotBlank(keyPrefix)) {
       seekPrefix = getOzoneKey(volumeName, bucketName, keyPrefix);
     } else {
       seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
@@ -1141,7 +1110,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     int currentCount = 0;
     long readFromRDbStartNs, readFromRDbStopNs = 0;
     // Get maxKeys from DB if it has.
-    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
              keyIter = getKeyTable(getBucketLayout()).iterator()) {
       readFromRDbStartNs = Time.monotonicNowNanos();
       KeyValue< String, OmKeyInfo > kv;
@@ -1451,7 +1420,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // Only check for expired keys in the open key table, not its cache.
     // If a key expires while it is in the cache, it will be cleaned
     // up after the cache is flushed.
-    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
         keyValueTableIterator = getOpenKeyTable(bucketLayout).iterator()) {
 
       final long expiredCreationTimestamp =
@@ -1529,7 +1498,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     Map<String, ExpiredMultipartUploadsBucket.Builder> expiredMPUs =
         new HashMap<>();
 
-    try (TableIterator<String, Table.KeyValue<String, OmMultipartKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
              mpuInfoTableIterator = getMultipartInfoTable().iterator()) {
 
       final long expiredCreationTimestamp =
@@ -1559,13 +1528,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           expiredMPUs.get(mapKey)
               .addMultipartUploads(builder.setName(dbMultipartInfoKey)
                   .build());
-
-          if (omMultipartKeyInfo.getSchemaVersion()
-              == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
-            numParts += OMMultipartUploadUtils.countParts(this, expiredMultipartUpload.getUploadId());
-          } else {
-            numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
-          }
+          numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
+          // TODO: Add the expired part handling from the new table when the complete flow is done
         }
 
       }
@@ -1581,7 +1545,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throws IOException {
     long count = 0;
     if (table != null) {
-      try (TableIterator<KEY, Table.KeyValue<KEY, VALUE>>
+      try (TableIterator<KEY, ? extends KeyValue<KEY, VALUE>>
           keyValueTableIterator = table.iterator()) {
         while (keyValueTableIterator.hasNext()) {
           keyValueTableIterator.next();
@@ -1653,7 +1617,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     int dbKeysCount = 0;
     // the prefix iterator will only iterate keys that match the given prefix
     // so we don't need to check if the key is started with prefixKey again
-    try (TableIterator<String, Table.KeyValue<String, OmMultipartKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
         iterator = getMultipartInfoTable().iterator(prefixKey)) {
       iterator.seek(seekKey);
 
@@ -1743,75 +1707,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, CompactionLogEntry> getCompactionLogTable() {
     return compactionLogTable;
-  }
-
-  @Override
-  public Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable() {
-    return lifecycleConfigurationTable;
-  }
-
-  @Override
-  public Table<String, OmLifecycleScanState> getLifecycleScanStateTable() {
-    return lifecycleScanStateTable;
-  }
-
-  /**
-   * @return list all LifecycleConfigurations.
-   */
-  @Override
-  public List<OmLifecycleConfiguration> listLifecycleConfigurations() {
-    List<OmLifecycleConfiguration> result = Lists.newArrayList();
-
-    /* lifecycleConfigurationTable is full-cache, so we use cacheIterator. */
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmLifecycleConfiguration>>>
-        cacheIterator = getLifecycleConfigurationTable().cacheIterator();
-
-    OmLifecycleConfiguration lifecycleConfiguration;
-    while (cacheIterator.hasNext()) {
-      Map.Entry<CacheKey<String>, CacheValue<OmLifecycleConfiguration>> entry =
-          cacheIterator.next();
-      lifecycleConfiguration = entry.getValue().getCacheValue();
-      if (lifecycleConfiguration == null) {
-        // lifecycleConfiguration null means it's a deleted.
-        continue;
-      }
-      result.add(lifecycleConfiguration);
-    }
-
-    return result;
-  }
-
-
-  /**
-   * Fetches the lifecycle configuration by bucketName.
-   *
-   * @param bucketName bucketName of the lifecycle configuration
-   * @return OmLifecycleConfiguration
-   * @throws IOException
-   */
-  @Override
-  public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
-      String bucketName) throws IOException {
-    Objects.requireNonNull(bucketName, "bucketName == null");
-    OmLifecycleConfiguration value = null;
-    try {
-      String bucketKey = getBucketKey(volumeName, bucketName);
-      value = getLifecycleConfigurationTable().get(bucketKey);
-      if (value == null) {
-        LOG.debug("lifecycle configuration of bucket /{}/{} not found.",
-            volumeName, bucketName);
-        throw new OMException("Lifecycle configuration not found",
-            LIFECYCLE_CONFIGURATION_NOT_FOUND);
-      }
-      value.valid();
-      return value;
-    } catch (IOException ex) {
-      LOG.error("Exception while getting lifecycle configuration for " +
-          "bucket: /{}/{}, LifecycleConfiguration {}", volumeName, bucketName,
-          value != null ? value.getProtobuf() : "", ex);
-
-      throw ex;
-    }
   }
 
   /**

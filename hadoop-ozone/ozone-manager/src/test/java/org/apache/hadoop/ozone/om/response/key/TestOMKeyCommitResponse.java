@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
  * Tests OMKeyCommitResponse.
  */
 @SuppressWarnings("visibilitymodifier")
-public class TestOMKeyCommitResponse extends OMKeyResponseTests {
+public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatch() throws Exception {
@@ -122,7 +122,7 @@ public class TestOMKeyCommitResponse extends OMKeyResponseTests {
 
     String deletedKey = omMetadataManager.getOzoneKey(volumeName,
         omBucketInfo.getBucketName(), keyName);
-    List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
         null, 100, deletedKey);
     assertThat(rangeKVs.size()).isGreaterThan(0);

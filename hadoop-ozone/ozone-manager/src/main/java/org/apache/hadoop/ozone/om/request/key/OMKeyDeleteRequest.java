@@ -146,8 +146,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
 
-      validateIfMatchETag(keyArgs, omKeyInfo);
-
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
           .setUpdateID(trxnLogIndex)

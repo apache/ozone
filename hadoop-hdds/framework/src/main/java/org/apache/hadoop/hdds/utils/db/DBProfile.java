@@ -87,7 +87,6 @@ public enum DBProfile {
       ManagedBlockBasedTableConfig config = new ManagedBlockBasedTableConfig();
       config.setBlockCache(new ManagedLRUCache(blockCacheSize))
           .setBlockSize(blockSize)
-          .setFormatVersion(ManagedBlockBasedTableConfig.FORMAT_VERSION)
           .setPinL0FilterAndIndexBlocksInCache(true)
           .setFilterPolicy(new ManagedBloomFilter());
       return config;

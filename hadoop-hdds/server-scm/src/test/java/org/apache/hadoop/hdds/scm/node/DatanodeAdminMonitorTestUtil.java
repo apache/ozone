@@ -101,7 +101,7 @@ public final class DatanodeAdminMonitorTestUtil {
           MockDatanodeDetails.randomDatanodeDetails()));
     }
     ContainerInfo container = new ContainerInfo.Builder()
-        .setContainerID(containerID.getIdForTesting())
+        .setContainerID(containerID.getId())
         .setState(containerState)
         .build();
 
@@ -132,7 +132,7 @@ public final class DatanodeAdminMonitorTestUtil {
           t.getRight(), t.getMiddle()));
     }
     ContainerInfo container = new ContainerInfo.Builder()
-        .setContainerID(containerID.getIdForTesting())
+        .setContainerID(containerID.getId())
         .setState(containerState)
         .setReplicationConfig(repConfig)
         .build();

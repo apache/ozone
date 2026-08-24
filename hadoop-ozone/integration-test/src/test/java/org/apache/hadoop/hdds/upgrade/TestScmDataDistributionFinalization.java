@@ -34,7 +34,6 @@ import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
@@ -68,9 +67,9 @@ import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -81,7 +80,6 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
@@ -197,14 +195,15 @@ public class TestScmDataDistributionFinalization {
     assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
-    assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
+    assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
-    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
-    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
     assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
@@ -310,14 +309,15 @@ public class TestScmDataDistributionFinalization {
           }
         });
     finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
-    assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
+    assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
-    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
-    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
     assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
@@ -335,7 +335,7 @@ public class TestScmDataDistributionFinalization {
     final String keyName = "key" + System.nanoTime();
     // Create the key
     String value = "sample value";
-    DataTestUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value.getBytes(UTF_8));
+    TestDataUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value.getBytes(UTF_8));
     // update scmInfo in OM
     OzoneKeyDetails keyDetails = bucket.getKey(keyName);
     // delete the key

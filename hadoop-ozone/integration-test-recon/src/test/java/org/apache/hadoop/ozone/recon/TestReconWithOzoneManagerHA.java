@@ -18,16 +18,12 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitForEventBufferEmpty;
-import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -45,8 +41,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
@@ -57,7 +51,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Integration tests for Recon when Ozone Manager runs in HA mode on a mini cluster.
+ * This class sets up a MiniOzoneOMHACluster to test with Recon.
  */
 public class TestReconWithOzoneManagerHA {
 
@@ -67,6 +61,7 @@ public class TestReconWithOzoneManagerHA {
   private static final String VOL_NAME = "testrecon";
   private OzoneClient client;
   private ReconService recon;
+  private TestReconOmMetaManagerUtils omMetaManagerUtils = new TestReconOmMetaManagerUtils();
 
   @BeforeEach
   public void setup() throws Exception {
@@ -112,13 +107,21 @@ public class TestReconWithOzoneManagerHA {
       ozoneManager.set(om);
       return om != null;
     }, 100, 120000);
-    assertNotNull(ozoneManager.get(),
-        "Expected an elected OM leader after the cluster became ready.");
-    assertTrue(ozoneManager.get().isLeaderReady(), "OM leader should be ready to serve.");
+    assertNotNull(ozoneManager, "Timed out waiting OM leader election to finish: "
+        + "no leader or more than one leader.");
+    assertTrue(ozoneManager.get().isLeaderReady(), "Should have gotten the leader!");
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         recon.getReconServer().getOzoneManagerServiceProvider();
 
+    String hostname =
+        ozoneManager.get().getHttpServer().getHttpAddress().getHostName();
+    String expectedUrl = "http://" +
+        (hostname.equals("0.0.0.0") ? "localhost" : hostname) + ":" +
+        ozoneManager.get().getHttpServer().getHttpAddress().getPort() +
+        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+    String snapshotUrl = impl.getOzoneManagerSnapshotUrl();
+    assertEquals(expectedUrl, snapshotUrl);
     // Write some data
     String keyPrefix = "ratis";
     OzoneOutputStream key = objectStore.getVolume(VOL_NAME)
@@ -136,16 +139,11 @@ public class TestReconWithOzoneManagerHA {
     ReconTaskControllerImpl reconTaskController =
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
 
     final ReconContainerMetadataManagerImpl reconContainerMetadataManager =
         (ReconContainerMetadataManagerImpl) recon.getReconServer().getReconContainerMetadataManager();
-    long containerId = getContainerIdForKey(ozoneManager.get(), VOL_NAME, VOL_NAME, keyPrefix);
-    Map<Long, Integer> requiredKeyCountByContainer =
-        Collections.singletonMap(containerId, 1);
-    waitUntilReconKeyCounts(reconContainerMetadataManager,
-        requiredKeyCountByContainer);
     try (Table.KeyValueIterator<ContainerKeyPrefix, Integer> iterator
         = reconContainerMetadataManager.getContainerKeyTableForTesting().iterator()) {
       String reconKeyPrefix = null;
@@ -156,24 +154,5 @@ public class TestReconWithOzoneManagerHA {
           String.format("/%s/%s/%s", VOL_NAME, VOL_NAME, keyPrefix),
           reconKeyPrefix);
     }
-  }
-
-  /**
-   * Looks up the object key on the given OM instance and returns the container id for its first block.
-   * In HA tests, pass the current leader so the read goes to the right node.
-   */
-  private static long getContainerIdForKey(OzoneManager omLeader, String volumeName,
-      String bucketName, String keyName) throws IOException {
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .build();
-    OmKeyLocationInfo location = omLeader.lookupKey(keyArgs)
-        .getKeyLocationVersions()
-        .get(0)
-        .getBlocksLatestVersionOnly()
-        .get(0);
-    return location.getContainerID();
   }
 }

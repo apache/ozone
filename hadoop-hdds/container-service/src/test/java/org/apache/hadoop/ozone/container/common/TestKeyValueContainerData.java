@@ -25,7 +25,6 @@ import static org.mockito.Mockito.mock;
 
 import java.util.UUID;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -95,9 +94,8 @@ public class TestKeyValueContainerData {
     kvData.incrPendingDeletionBlocks(1, 256);
     kvData.setSchemaVersion(
         VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf));
-    long expectedDataHash = 1234L;
+    long expectedDataHash =  1234L;
     kvData.setDataChecksum(expectedDataHash);
-    kvData.setStorageType(StorageType.SSD);
 
     assertEquals(state, kvData.getState());
     assertEquals(containerDBType, kvData.getContainerDBType());
@@ -112,14 +110,12 @@ public class TestKeyValueContainerData {
     assertEquals(VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf),
         kvData.getSchemaVersion());
     assertEquals(expectedDataHash, kvData.getDataChecksum());
-    assertEquals(StorageType.SSD, kvData.getStorageType());
 
     KeyValueContainerData newKvData = new KeyValueContainerData(kvData);
     assertEquals(kvData.getReplicaIndex(), newKvData.getReplicaIndex());
     assertEquals(0, newKvData.getNumPendingDeletionBlocks());
     assertEquals(0, newKvData.getDeleteTransactionId());
     assertEquals(kvData.getSchemaVersion(), newKvData.getSchemaVersion());
-    assertEquals(kvData.getStorageType(), newKvData.getStorageType());
   }
 
   @ContainerTestVersionInfo.ContainerTest

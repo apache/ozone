@@ -44,7 +44,6 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -195,7 +194,7 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlock() throws Exception {
-    pipelineManager.createPipeline(replicationConfig, StorageTier.getDefaultTier());
+    pipelineManager.createPipeline(replicationConfig);
     HddsTestUtils.openAllRatisPipelines(pipelineManager);
     AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
         replicationConfig, OzoneConsts.OZONE, new ExcludeList());
@@ -206,7 +205,7 @@ public class TestBlockManager {
   public void testAllocateBlockWithExclusion() throws Exception {
     try {
       while (true) {
-        pipelineManager.createPipeline(replicationConfig, StorageTier.getDefaultTier());
+        pipelineManager.createPipeline(replicationConfig);
       }
     } catch (IOException e) {
     }
@@ -273,7 +272,7 @@ public class TestBlockManager {
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
     }
-    pipelineManager.createPipeline(replicationConfig, StorageTier.getDefaultTier());
+    pipelineManager.createPipeline(replicationConfig);
     HddsTestUtils.openAllRatisPipelines(pipelineManager);
     Map<Long, List<AllocatedBlock>> allocatedBlockMap =
             new ConcurrentHashMap<>();
@@ -329,7 +328,7 @@ public class TestBlockManager {
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
     }
-    pipelineManager.createPipeline(replicationConfig, StorageTier.getDefaultTier());
+    pipelineManager.createPipeline(replicationConfig);
     HddsTestUtils.openAllRatisPipelines(pipelineManager);
     Map<Long, List<AllocatedBlock>> allocatedBlockMap =
             new ConcurrentHashMap<>();
@@ -389,7 +388,7 @@ public class TestBlockManager {
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
     }
-    pipelineManager.createPipeline(replicationConfig, StorageTier.getDefaultTier());
+    pipelineManager.createPipeline(replicationConfig);
     HddsTestUtils.openAllRatisPipelines(pipelineManager);
     Map<Long, List<AllocatedBlock>> allocatedBlockMap =
         new ConcurrentHashMap<>();
@@ -467,8 +466,8 @@ public class TestBlockManager {
   public void testMultipleBlockAllocation()
       throws IOException, TimeoutException, InterruptedException {
 
-    pipelineManager.createPipeline(replicationConfig, StorageTier.getDefaultTier());
-    pipelineManager.createPipeline(replicationConfig, StorageTier.getDefaultTier());
+    pipelineManager.createPipeline(replicationConfig);
+    pipelineManager.createPipeline(replicationConfig);
     HddsTestUtils.openAllRatisPipelines(pipelineManager);
 
     AllocatedBlock allocatedBlock = blockManager
@@ -514,7 +513,7 @@ public class TestBlockManager {
     for (int i = 0;
          i < nodeManager.getNodes(NodeStatus.inServiceHealthy()).size()
              / replicationConfig.getRequiredNodes(); i++) {
-      pipelineManager.createPipeline(replicationConfig, StorageTier.getDefaultTier());
+      pipelineManager.createPipeline(replicationConfig);
     }
     HddsTestUtils.openAllRatisPipelines(pipelineManager);
 

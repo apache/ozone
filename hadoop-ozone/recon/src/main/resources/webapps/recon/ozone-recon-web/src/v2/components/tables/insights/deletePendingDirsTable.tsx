@@ -87,6 +87,7 @@ const DeletePendingDirTable: React.FC<DeletePendingDirTableProps> = ({
     DEFAULT_DELETE_PENDING_DIRS_RESPONSE,
     {
       retryAttempts: 2,
+      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -97,6 +98,11 @@ const DeletePendingDirTable: React.FC<DeletePendingDirTableProps> = ({
       setData(deletePendingDirsData.data.deletedDirInfo);
     }
   }, [deletePendingDirsData.data]);
+
+  // Refetch when limit changes
+  useEffect(() => {
+    deletePendingDirsData.refetch();
+  }, [limit.value]);
 
   function filterData(data: DeletedDirInfo[] | undefined) {
     return data?.filter(

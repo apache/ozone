@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -143,7 +142,7 @@ public class TestRatisPipelineCreateAndDestroy {
     // try creating another pipeline now
     SCMException ioe = assertThrows(SCMException.class, () ->
         pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), StorageTier.getDefaultTier()),
+            ReplicationFactor.THREE)),
         "pipeline creation should fail after shutting down pipeline");
     assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE, ioe.getResult());
 

@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.KEY_CONTAINER;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY_V2;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -33,10 +34,10 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -126,15 +127,9 @@ public class ReconContainerMetadataManagerImpl
                                      containerKeyPrefixCounts)
       throws IOException {
     // clear and re-init all container-related tables
-    if (containerKeyTable != null) {
-      containerKeyTable.clear();
-    }
-    if (keyContainerTable != null) {
-      keyContainerTable.clear();
-    }
-    if (containerKeyCountTable != null) {
-      containerKeyCountTable.clear();
-    }
+    truncateTable(this.containerKeyTable);
+    truncateTable(this.keyContainerTable);
+    truncateTable(this.containerKeyCountTable);
     initializeTables();
 
     if (containerKeyPrefixCounts != null) {
@@ -220,9 +215,9 @@ public class ReconContainerMetadataManagerImpl
    */
   @Override
   public void storeContainerReplicaHistory(Long containerID,
-      Map<DatanodeID, ContainerReplicaHistory> tsMap) throws IOException {
+      Map<UUID, ContainerReplicaHistory> tsMap) throws IOException {
     List<ContainerReplicaHistory> tsList = new ArrayList<>();
-    for (Map.Entry<DatanodeID, ContainerReplicaHistory> e : tsMap.entrySet()) {
+    for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
       tsList.add(e.getValue());
     }
 
@@ -238,17 +233,17 @@ public class ReconContainerMetadataManagerImpl
    */
   @Override
   public void batchStoreContainerReplicaHistory(
-      Map<Long, Map<DatanodeID, ContainerReplicaHistory>> replicaHistoryMap)
+      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
       throws IOException {
     try (BatchOperation batchOperation =
              containerDbStore.initBatchOperation()) {
-      for (Map.Entry<Long, Map<DatanodeID, ContainerReplicaHistory>> entry :
+      for (Map.Entry<Long, Map<UUID, ContainerReplicaHistory>> entry :
           replicaHistoryMap.entrySet()) {
         final long containerId = entry.getKey();
-        final Map<DatanodeID, ContainerReplicaHistory> tsMap = entry.getValue();
+        final Map<UUID, ContainerReplicaHistory> tsMap = entry.getValue();
 
         List<ContainerReplicaHistory> tsList = new ArrayList<>();
-        for (Map.Entry<DatanodeID, ContainerReplicaHistory> e : tsMap.entrySet()) {
+        for (Map.Entry<UUID, ContainerReplicaHistory> e : tsMap.entrySet()) {
           tsList.add(e.getValue());
         }
 
@@ -281,7 +276,7 @@ public class ReconContainerMetadataManagerImpl
    * @throws IOException
    */
   @Override
-  public Map<DatanodeID, ContainerReplicaHistory> getContainerReplicaHistory(
+  public Map<UUID, ContainerReplicaHistory> getContainerReplicaHistory(
       Long containerID) throws IOException {
 
     final ContainerReplicaHistoryList tsList =
@@ -291,12 +286,12 @@ public class ReconContainerMetadataManagerImpl
       return new HashMap<>();
     }
 
-    Map<DatanodeID, ContainerReplicaHistory> res = new HashMap<>();
+    Map<UUID, ContainerReplicaHistory> res = new HashMap<>();
     // Populate result map with entries from the DB.
     // The list should be fairly short (< 10 entries).
     for (ContainerReplicaHistory ts : tsList.getList()) {
-      final DatanodeID id = ts.getId();
-      res.put(id, ts);
+      final UUID uuid = ts.getUuid();
+      res.put(uuid, ts);
     }
     return res;
   }
@@ -356,7 +351,8 @@ public class ReconContainerMetadataManagerImpl
       long containerId, String prevKeyPrefix, int limit) throws IOException {
 
     Map<ContainerKeyPrefix, Integer> prefixes = new LinkedHashMap<>();
-    try (TableIterator<ContainerKeyPrefix, Table.KeyValue<ContainerKeyPrefix, Integer>>
+    try (TableIterator<ContainerKeyPrefix,
+        ? extends KeyValue<ContainerKeyPrefix, Integer>>
              containerIterator = containerKeyTable.iterator()) {
       ContainerKeyPrefix seekKey;
       boolean skipPrevKey = false;
@@ -443,7 +439,7 @@ public class ReconContainerMetadataManagerImpl
   }
 
   private class ContainerMetadataIterator implements SeekableIterator<Long, ContainerMetadata> {
-    private TableIterator<ContainerKeyPrefix, Table.KeyValue<ContainerKeyPrefix, Integer>> containerIterator;
+    private TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix, Integer>> containerIterator;
     private KeyValue<ContainerKeyPrefix, Integer> currentKey;
 
     ContainerMetadataIterator()
@@ -617,7 +613,8 @@ public class ReconContainerMetadataManagerImpl
       String keyPrefix, long keyVersion) throws IOException {
 
     Map<KeyPrefixContainer, Integer> containers = new LinkedHashMap<>();
-    try (TableIterator<KeyPrefixContainer, Table.KeyValue<KeyPrefixContainer, Integer>> keyIterator =
+    try (TableIterator<KeyPrefixContainer,
+        ? extends KeyValue<KeyPrefixContainer, Integer>> keyIterator =
              keyContainerTable.iterator()) {
       KeyPrefixContainer seekKey;
       if (keyVersion != -1) {

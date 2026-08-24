@@ -62,20 +62,16 @@ public class RDBCheckpointManager implements Closeable {
     try {
       long currentTime = System.currentTimeMillis();
 
-      StringBuilder checkpointDir = new StringBuilder();
+      String checkpointDir = StringUtils.EMPTY;
       if (StringUtils.isNotEmpty(checkpointNamePrefix)) {
-        checkpointDir.append(checkpointNamePrefix);
+        checkpointDir += checkpointNamePrefix;
       }
-
       if (name == null) {
-        checkpointDir.append('_')
-            .append(RDB_CHECKPOINT_DIR_PREFIX)
-            .append(currentTime);
-      } else {
-        checkpointDir.append(name);
+        name = "_" + RDB_CHECKPOINT_DIR_PREFIX + currentTime;
       }
+      checkpointDir += name;
 
-      Path checkpointPath = Paths.get(parentDir, checkpointDir.toString());
+      Path checkpointPath = Paths.get(parentDir, checkpointDir);
       Instant start = Instant.now();
 
       // Flush the DB WAL and mem table.

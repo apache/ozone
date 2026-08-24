@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.OzoneTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -103,6 +103,7 @@ public class TestMultiBlockWritesWithDnFailures {
         .setNumDatanodes(datanodes)
         .build();
     cluster.waitForClusterToBeReady();
+    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
@@ -218,12 +219,12 @@ public class TestMultiBlockWritesWithDnFailures {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
                                       long size) throws Exception {
-    return OzoneTestHelper
+    return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    OzoneTestHelper
+    TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 

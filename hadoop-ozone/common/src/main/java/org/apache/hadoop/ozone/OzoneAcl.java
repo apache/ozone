@@ -76,7 +76,7 @@ public final class OzoneAcl {
   @JsonIgnore
   private final Supplier<String> toStringMethod;
   @JsonIgnore
-  private final MemoizedSupplier<Integer> hashCodeMethod;
+  private final Supplier<Integer> hashCodeMethod;
 
   public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
     return new OzoneAcl(type, name, scope, toInt(acls));
@@ -348,13 +348,6 @@ public final class OzoneAcl {
     return type;
   }
 
-  public boolean sameNameTypeScope(OzoneAcl that) {
-    return this.getType() == that.getType()
-        && this.getAclScope() == that.getAclScope()
-        // compare string at last since it is expensive
-        && this.getName().equals(that.getName());
-  }
-
   /**
    * Indicates whether some other object is "equal to" this one.
    *
@@ -371,14 +364,11 @@ public final class OzoneAcl {
     if (obj == null || getClass() != obj.getClass()) {
       return false;
     }
-    final OzoneAcl that = (OzoneAcl) obj;
-    if (this.hashCodeMethod.isInitialized() && that.hashCodeMethod.isInitialized()) {
-      if (!Objects.equals(this.hashCodeMethod.get(), that.hashCodeMethod.get())) {
-        return false;
-      }
-    }
-    return this.aclBits == that.aclBits
-        && sameNameTypeScope(that);
+    OzoneAcl otherAcl = (OzoneAcl) obj;
+    return otherAcl.getName().equals(this.getName()) &&
+        otherAcl.getType().equals(this.getType()) &&
+        this.aclBits == otherAcl.aclBits &&
+        otherAcl.getAclScope().equals(this.getAclScope());
   }
 
   /**

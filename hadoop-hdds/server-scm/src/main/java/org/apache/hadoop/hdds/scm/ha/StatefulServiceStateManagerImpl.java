@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.Objects;
-import org.apache.hadoop.hdds.scm.ha.invoker.StatefulServiceStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.slf4j.Logger;
@@ -130,11 +129,11 @@ public final class StatefulServiceStateManagerImpl
       Objects.requireNonNull(statefulServiceConfig, "statefulServiceConfig == null");
       Objects.requireNonNull(transactionBuffer, "transactionBuffer == null");
 
-      final StatefulServiceStateManager impl =
+      final StatefulServiceStateManager stateManager =
           new StatefulServiceStateManagerImpl(statefulServiceConfig,
               transactionBuffer);
 
-      return scmRatisServer.getProxyHandler(new StatefulServiceStateManagerInvoker(impl, scmRatisServer));
+      return scmRatisServer.getProxyHandler(StatefulServiceStateManager.class, stateManager);
     }
   }
 }

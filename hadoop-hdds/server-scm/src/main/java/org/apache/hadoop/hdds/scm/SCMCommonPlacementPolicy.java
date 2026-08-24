@@ -34,8 +34,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -89,7 +87,7 @@ public abstract class SCMCommonPlacementPolicy implements
    * RackAwarePlacementPolicy that needs to know if the old or new interface is
    * used to be able to use the node lists correctly.
    */
-  public static final List<DatanodeDetails> UNSET_USED_NODES
+  private static final List<DatanodeDetails> UNSET_USED_NODES
       = Collections.unmodifiableList(new ArrayList<>());
 
   /**
@@ -137,10 +135,10 @@ public abstract class SCMCommonPlacementPolicy implements
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes, int nodesRequired,
           long metadataSizeRequired,
-          long dataSizeRequired, StorageType storageType) throws SCMException {
+          long dataSizeRequired) throws SCMException {
     return this.chooseDatanodes(UNSET_USED_NODES, excludedNodes,
           favoredNodes, nodesRequired, metadataSizeRequired,
-          dataSizeRequired, storageType);
+          dataSizeRequired);
   }
 
   /**
@@ -177,14 +175,12 @@ public abstract class SCMCommonPlacementPolicy implements
    * 2. We place containers on nodes with enough space for that container.
    * 3. if a set of containers are requested, we either meet the required
    * number of nodes or we fail that request.
-   *
-   * @param usedNodes            - datanodes with existing replicas
-   * @param excludedNodes        - datanodes with failures
-   * @param favoredNodes         - list of nodes preferred.
-   * @param nodesRequired        - number of datanodes required.
+   * @param usedNodes - datanodes with existing replicas
+   * @param excludedNodes - datanodes with failures
+   * @param favoredNodes  - list of nodes preferred.
+   * @param nodesRequired - number of datanodes required.
+   * @param dataSizeRequired - size required for the container.
    * @param metadataSizeRequired - size required for Ratis metadata.
-   * @param dataSizeRequired     - size required for the container.
-   * @param storageType          - StorageType required for the container.
    * @return list of datanodes chosen.
    * @throws SCMException SCM exception.
    */
@@ -193,8 +189,7 @@ public abstract class SCMCommonPlacementPolicy implements
           List<DatanodeDetails> usedNodes,
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes,
-          int nodesRequired, long metadataSizeRequired, long dataSizeRequired,
-          StorageType storageType)
+          int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
           throws SCMException {
 /*
   This method calls the chooseDatanodeInternal after fixing
@@ -211,28 +206,25 @@ public abstract class SCMCommonPlacementPolicy implements
  */
     return chooseDatanodesInternal(validateDatanodes(usedNodes),
             validateDatanodes(excludedNodes), favoredNodes, nodesRequired,
-            metadataSizeRequired, dataSizeRequired, storageType);
+            metadataSizeRequired, dataSizeRequired);
   }
 
   /**
    * Pipeline placement choose datanodes to join the pipeline.
-   *
-   * @param usedNodes            - list of the datanodes to already chosen in the
-   *                             pipeline.
-   * @param excludedNodes        - excluded nodes
-   * @param favoredNodes         - list of nodes preferred.
-   * @param nodesRequired        - number of datanodes required.
+   * @param usedNodes - list of the datanodes to already chosen in the
+   *                      pipeline.
+   * @param excludedNodes - excluded nodes
+   * @param favoredNodes  - list of nodes preferred.
+   * @param nodesRequired - number of datanodes required.
+   * @param dataSizeRequired - size required for the container.
    * @param metadataSizeRequired - size required for Ratis metadata.
-   * @param dataSizeRequired     - size required for the container.
-   * @param storageType          - StorageType required for the container.
    * @return a list of chosen datanodeDetails
    * @throws SCMException when chosen nodes are not enough in numbers
    */
   protected List<DatanodeDetails> chooseDatanodesInternal(
       List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes,
       List<DatanodeDetails> favoredNodes,
-      int nodesRequired, long metadataSizeRequired, long dataSizeRequired,
-      StorageType storageType)
+      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
@@ -259,8 +251,8 @@ public abstract class SCMCommonPlacementPolicy implements
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
 
-    return filterNodesWithSpaceAndStorageType(healthyNodes, nodesRequired,
-        metadataSizeRequired, dataSizeRequired, storageType);
+    return filterNodesWithSpace(healthyNodes, nodesRequired,
+        metadataSizeRequired, dataSizeRequired);
   }
 
   /**
@@ -277,19 +269,18 @@ public abstract class SCMCommonPlacementPolicy implements
     return list != UNSET_USED_NODES;
   }
 
-  public List<DatanodeDetails> filterNodesWithSpaceAndStorageType(List<DatanodeDetails> nodes,
-      int nodesRequired, long metadataSizeRequired, long dataSizeRequired,
-      StorageType storageType)
+  public List<DatanodeDetails> filterNodesWithSpace(List<DatanodeDetails> nodes,
+      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
-        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, storageType, nodeManager))
+        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired))
         .collect(Collectors.toList());
 
     if (nodesWithSpace.size() < nodesRequired) {
       String msg = String.format("Unable to find enough nodes that meet the " +
-              "space requirement of %d bytes for metadata and %d bytes in storageType %s for " +
+              "space requirement of %d bytes for metadata and %d bytes for " +
               "data in healthy node set. Required %d. Found %d.",
-          metadataSizeRequired, dataSizeRequired, storageType, nodesRequired,
+          metadataSizeRequired, dataSizeRequired, nodesRequired,
           nodesWithSpace.size());
       LOG.warn(msg);
       throw new SCMException(msg,
@@ -300,46 +291,24 @@ public abstract class SCMCommonPlacementPolicy implements
   }
 
   /**
-   * Returns true if this node has enough space to satisfy the placement request.
+   * Returns true if this node has enough space to meet our requirement.
    *
-   * <p>Data-space is checked via {@link NodeManager#hasAvailableSpace}, which
-   * delegates to {@link org.apache.hadoop.hdds.scm.node.PendingContainerTracker}
-   * and accounts for both current disk usage and in-flight allocations.
-   * The check always uses {@code maxContainerSize} as the unit of allocation,
-   * regardless of the actual container's used bytes.
-   *
-   * @param datanodeDetails the datanode to evaluate
-   * @param metadataSizeRequired minimum metadata volume space required in bytes
-   * @param nodeManager used to check slot availability via PendingContainerTracker
-   * @return true if the datanode has both an available data slot and enough metadata space
+   * @param datanodeDetails DatanodeDetails
+   * @return true if we have enough space.
    */
   public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
                                        long metadataSizeRequired,
-                                       long dataSizeRequired, StorageType storageType,
-                                       NodeManager nodeManager) {
+                                       long dataSizeRequired) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
+    boolean enoughForData = false;
     boolean enoughForMeta = false;
 
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
 
-    // Data-space check: use PendingContainerTracker slot availability.
-    // This accounts for both current disk usage and in-flight allocations.
-    // Always slot-based (maxContainerSize unit).
-    if (!nodeManager.hasAvailableSpace(datanodeInfo)) {
-      LOG.debug("Datanode {} has no available container slots.", datanodeDetails);
-      return false;
-    }
-
-    // Tier-aware data check (StorageType feature): when a specific storageType is
-    // requested, ensure the node has a volume of that tier with enough usable space.
-    // When storageType is null (any tier), rely on the slot check above (master behavior).
-    boolean enoughForData = false;
-    if (dataSizeRequired > 0 && storageType != null) {
+    if (dataSizeRequired > 0) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        boolean matchesTier = StorageTypeUtils.getFromProtobuf(
-            reportProto.getStorageType()).equals(storageType);
-        if (matchesTier && VolumeUsage.getUsableSpace(reportProto) > dataSizeRequired) {
+        if (VolumeUsage.getUsableSpace(reportProto) > dataSizeRequired) {
           enoughForData = true;
           break;
         }
@@ -442,18 +411,6 @@ public abstract class SCMCommonPlacementPolicy implements
    * @return The max number of replicas per rack
    */
   protected int getMaxReplicasPerRack(int numReplicas, int numberOfRacks) {
-    if (numberOfRacks <= 0) {
-      // No rack information means there is no per-rack constraint to
-      // enforce. Callers are expected to short-circuit before reaching
-      // here, but guard the divide site against transient empty-topology
-      // windows (HDDS-15350). The WARN makes the silent path observable;
-      // configure log4j appender-side filtering if it floods.
-      LOG.warn("Empty rack topology in placement validation: numReplicas={} "
-          + "numberOfRacks={}; returning numReplicas to avoid divide-by-zero "
-          + "(HDDS-15350).",
-          numReplicas, numberOfRacks);
-      return numReplicas;
-    }
     return numReplicas / numberOfRacks
             + Math.min(numReplicas % numberOfRacks, 1);
   }
@@ -479,16 +436,7 @@ public abstract class SCMCommonPlacementPolicy implements
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     // We have a network topology so calculate if it is satisfied or not.
     int requiredRacks = getRequiredRackCount(replicas, 0);
-    // The leaf nodes are all at max level, so the number of nodes at
-    // maxLevel - 1 is the rack count. Compute up front so we can
-    // short-circuit when the topology has no rack information, which
-    // would otherwise reach getMaxReplicasPerRack with numberOfRacks
-    // == 0 (HDDS-15350: transient empty-topology window during a DN
-    // decommission crashed the ReplicationMonitor with "/ by zero").
-    final int numRacks = topology == null ? 0
-        : topology.getNumOfNodes(topology.getMaxLevel() - 1);
-    if (topology == null || replicas == 1 || requiredRacks <= 1
-        || numRacks <= 0) {
+    if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (!dns.isEmpty()) {
         // placement is always satisfied if there is at least one DN.
         return validPlacement;
@@ -523,6 +471,10 @@ public abstract class SCMCommonPlacementPolicy implements
             Function.identity(),
             Collectors.reducing(0, e -> 1, Integer::sum)))
         .values());
+    final int maxLevel = topology.getMaxLevel();
+    // The leaf nodes are all at max level, so the number of nodes at
+    // leafLevel - 1 is the rack count
+    int numRacks = topology.getNumOfNodes(maxLevel - 1);
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }
@@ -561,7 +513,7 @@ public abstract class SCMCommonPlacementPolicy implements
    * @return true if the datanode is available.
    */
   public boolean isValidNode(DatanodeDetails datanodeDetails,
-      long metadataSizeRequired, long dataSizeRequired, StorageType storageType) {
+      long metadataSizeRequired, long dataSizeRequired) {
     DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
         .getNode(datanodeDetails.getID());
     if (datanodeInfo == null) {
@@ -570,8 +522,7 @@ public abstract class SCMCommonPlacementPolicy implements
       return false;
     }
     NodeStatus nodeStatus = datanodeInfo.getNodeStatus();
-    if (nodeStatus.isNodeWritable() && (hasEnoughSpace(datanodeInfo,
-        metadataSizeRequired, dataSizeRequired, storageType, nodeManager))) {
+    if (nodeStatus.isNodeWritable() && (hasEnoughSpace(datanodeInfo, metadataSizeRequired, dataSizeRequired))) {
       LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
               "required data size is {} and NodeStatus is {}",
           datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);

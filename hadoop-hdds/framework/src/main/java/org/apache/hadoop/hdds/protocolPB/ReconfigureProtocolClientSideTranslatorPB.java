@@ -44,8 +44,10 @@ import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.StartReco
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.ProtocolMetaInterface;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
 import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.RpcClientUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -59,7 +61,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public class ReconfigureProtocolClientSideTranslatorPB implements
-    ReconfigureProtocol, ProtocolTranslator {
+    ProtocolMetaInterface, ReconfigureProtocol, ProtocolTranslator {
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconfigureProtocolClientSideTranslatorPB.class);
 
@@ -199,5 +201,14 @@ public class ReconfigureProtocolClientSideTranslatorPB implements
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
+  }
+
+  @Override
+  public boolean isMethodSupported(String methodName) throws IOException {
+    return RpcClientUtil.isMethodSupported(rpcProxy,
+        ReconfigureProtocolPB.class,
+        RPC.RpcKind.RPC_PROTOCOL_BUFFER,
+        RPC.getProtocolVersion(ReconfigureProtocolPB.class),
+        methodName);
   }
 }

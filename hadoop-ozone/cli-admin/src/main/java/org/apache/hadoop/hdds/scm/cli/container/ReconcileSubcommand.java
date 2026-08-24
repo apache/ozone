@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -55,10 +54,6 @@ public class ReconcileSubcommand extends ScmSubcommand {
       fallbackValue = "true",
       description = "Display the reconciliation status of this container's replicas")
   private boolean status;
-
-  private static boolean isAuthenticationFailure(Throwable t) {
-    return HddsUtils.formatAccessControlExceptionLine(t) != null;
-  }
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
@@ -107,8 +102,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
             .append(". Reconciliation is not supported for open containers")
             .append(System.lineSeparator());
         return false;
-      }
-      if (containerInfo.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
+      } else if (containerInfo.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
         errorBuilder.append("Cannot get status of container ").append(containerID)
             .append(". Reconciliation is only supported for Ratis replicated containers")
             .append(System.lineSeparator());
@@ -118,12 +112,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
       arrayWriter.write(new ContainerWrapper(containerInfo, replicas));
       arrayWriter.flush();
     } catch (Exception ex) {
-      if (isAuthenticationFailure(ex)) {
-        rootCommand().printError(ex);
-      }
       errorBuilder.append("Failed to get reconciliation status of container ")
-          .append(containerID).append(": ").append(getExceptionMessage(ex))
-          .append(System.lineSeparator());
+          .append(containerID).append(": ").append(getExceptionMessage(ex)).append(System.lineSeparator());
       return false;
     }
     return true;
@@ -138,7 +128,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
         System.out.println("Reconciliation has been triggered for container " + containerID);
         successCount++;
       } catch (Exception ex) {
-        rootCommand().printError(ex);
+        System.err.println("Failed to trigger reconciliation for container " + containerID + ": " +
+            getExceptionMessage(ex));
         failureCount++;
       }
     }

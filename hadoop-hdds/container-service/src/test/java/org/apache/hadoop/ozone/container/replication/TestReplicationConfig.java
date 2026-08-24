@@ -18,16 +18,10 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.OUTOFSERVICE_FACTOR_DEFAULT;
-import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.OUTOFSERVICE_FACTOR_MAX;
-import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.OUTOFSERVICE_FACTOR_MIN;
-import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.PER_VOLUME_STREAMS_LIMIT_DEFAULT;
-import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.PER_VOLUME_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_MAX_STREAMS_DEFAULT;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_OUTOFSERVICE_FACTOR_KEY;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
@@ -58,11 +52,14 @@ public class TestReplicationConfig {
   }
 
   @Test
-  public void overridesInvalidReplicationLimit() {
+  public void overridesInvalidValues() {
     // GIVEN
     int invalidReplicationLimit = -5;
+    double invalidOutOfServiceFactor = 0.5;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(REPLICATION_STREAMS_LIMIT_KEY, invalidReplicationLimit);
+    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
+        invalidOutOfServiceFactor);
 
     // WHEN
     ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
@@ -70,62 +67,7 @@ public class TestReplicationConfig {
     // THEN
     assertEquals(REPLICATION_MAX_STREAMS_DEFAULT,
         subject.getReplicationMaxStreams());
-  }
-
-  @Test
-  public void clampsOutOfServiceFactorBelowMinToMin() {
-    // GIVEN
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
-        OUTOFSERVICE_FACTOR_MIN - 0.5);
-
-    // WHEN
-    ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
-
-    // THEN
-    assertEquals(OUTOFSERVICE_FACTOR_MIN,
-        subject.getOutOfServiceFactor(), 0.001);
-  }
-
-  @Test
-  public void clampsOutOfServiceFactorAboveMaxToMax() {
-    // GIVEN
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
-        OUTOFSERVICE_FACTOR_MAX + 10);
-
-    // WHEN
-    ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
-
-    // THEN
-    assertEquals(OUTOFSERVICE_FACTOR_MAX,
-        subject.getOutOfServiceFactor(), 0.001);
-  }
-
-  @Test
-  public void acceptsOutOfServiceFactorBoundaryValues() {
-    // GIVEN
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
-        OUTOFSERVICE_FACTOR_MIN);
-
-    // WHEN
-    ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
-
-    // THEN
-    assertEquals(OUTOFSERVICE_FACTOR_MIN,
-        subject.getOutOfServiceFactor(), 0.001);
-
-    // GIVEN
-    conf = new OzoneConfiguration();
-    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
-        OUTOFSERVICE_FACTOR_MAX);
-
-    // WHEN
-    subject = conf.getObject(ReplicationConfig.class);
-
-    // THEN
-    assertEquals(OUTOFSERVICE_FACTOR_MAX,
+    assertEquals(OUTOFSERVICE_FACTOR_DEFAULT,
         subject.getOutOfServiceFactor(), 0.001);
   }
 
@@ -142,32 +84,6 @@ public class TestReplicationConfig {
         subject.getReplicationMaxStreams());
     assertEquals(OUTOFSERVICE_FACTOR_DEFAULT,
         subject.getOutOfServiceFactor(), 0.001);
-    assertFalse(subject.isPerVolumeEnabled());
-    assertEquals(PER_VOLUME_STREAMS_LIMIT_DEFAULT,
-        subject.getPerVolumeStreamsLimit());
-  }
-
-  @Test
-  public void acceptsPerVolumeConfigValues() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ReplicationConfig.PER_VOLUME_ENABLED_KEY, true);
-    conf.setInt(PER_VOLUME_STREAMS_LIMIT_KEY, 3);
-
-    ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
-
-    assertTrue(subject.isPerVolumeEnabled());
-    assertEquals(3, subject.getPerVolumeStreamsLimit());
-  }
-
-  @Test
-  public void overridesInvalidPerVolumeStreamsLimit() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(PER_VOLUME_STREAMS_LIMIT_KEY, 0);
-
-    ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
-
-    assertEquals(PER_VOLUME_STREAMS_LIMIT_DEFAULT,
-        subject.getPerVolumeStreamsLimit());
   }
 
 }

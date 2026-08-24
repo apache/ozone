@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
@@ -118,7 +119,7 @@ public class DNContainerOperationClient implements AutoCloseable {
   public static Pipeline createSingleNodePipeline(DatanodeDetails dn) {
     return Pipeline.newBuilder()
         .setNodes(ImmutableList.of(dn))
-        .setId(dn.getID().toPipelineID())
+        .setId(PipelineID.valueOf(dn.getUuid()))
         .setState(Pipeline.PipelineState.CLOSED)
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE)).build();

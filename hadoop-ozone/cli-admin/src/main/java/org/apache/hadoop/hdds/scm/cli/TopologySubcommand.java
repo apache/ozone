@@ -300,15 +300,15 @@ public class TopologySubcommand extends ScmSubcommand
   }
 
   private static class NodeTopologyFull extends NodeTopologyDefault {
-    private final String id;
+    private String uuid;
 
     NodeTopologyFull(DatanodeDetails node, String state) {
       super(node, state);
-      id = node.getID().toString();
+      uuid = node.getUuid().toString();
     }
 
-    public String getId() {
-      return id;
+    public String getUuid() {
+      return uuid;
     }
   }
 }

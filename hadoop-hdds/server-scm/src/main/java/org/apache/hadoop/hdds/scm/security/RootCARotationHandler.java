@@ -59,5 +59,4 @@ public interface RootCARotationHandler extends SCMHandler {
   default RequestType getType() {
     return RequestType.CERT_ROTATE;
   }
-
 }

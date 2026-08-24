@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransaction
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ha.SCMHandler;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
 
@@ -75,4 +76,7 @@ public interface DeletedBlockLogStateManager extends SCMHandler {
   void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
       Table<String, ByteString> statefulConfigTable);
 
+  static void main(String[] args) {
+    ScmInvokerCodeGenerator.generate(DeletedBlockLogStateManager.class, true);
+  }
 }

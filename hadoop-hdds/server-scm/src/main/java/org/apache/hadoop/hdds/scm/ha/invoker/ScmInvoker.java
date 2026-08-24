@@ -17,21 +17,16 @@
 
 package org.apache.hadoop.hdds.scm.ha.invoker;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+import static org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler.translateException;
+
 import java.util.function.Function;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
-import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
  * Invokes methods without using reflection.
@@ -79,48 +74,9 @@ public abstract class ScmInvoker<T extends SCMHandler> {
     }
   }
 
-  /** For @Replicate CLIENT methods. */
-  final Object invokeReplicateClient(NameAndParameterTypes method, Object[] args) throws SCMException {
-    try {
-      final SCMRatisRequest request = SCMRatisRequest.of(
-          getType(), method.name(), method.getParameterTypes(args.length), args);
-      final SCMRatisResponse response = HASecurityUtils.submitScmRequestToRatis(
-          ratisHandler.getDivision().getGroup(),
-          ratisHandler.getGrpcTlsConfig(),
-          request.encode());
-      if (response.isSuccess()) {
-        return response.getResult();
-      }
-      throw response.getException();
-    } catch (Exception e) {
-      throw translateException(e);
-    }
-  }
-
-  static SCMException translateException(Throwable t) {
-    if (t instanceof SCMException) {
-      return (SCMException) t;
-    }
-    if (t instanceof ExecutionException || t instanceof InvocationTargetException) {
-      return translateException(t.getCause());
-    }
-
-    final ResultCodes result;
-    if (t instanceof TimeoutException) {
-      result = ResultCodes.TIMEOUT;
-    } else if (t instanceof NotLeaderException) {
-      result = ResultCodes.SCM_NOT_LEADER;
-    } else if (t instanceof IOException) {
-      result = ResultCodes.IO_EXCEPTION;
-    } else {
-      result = ResultCodes.INTERNAL_ERROR;
-    }
-    return new SCMException(t, result);
-  }
-
   interface NameAndParameterTypes {
     String name();
-
+    
     Class<?>[] getParameterTypes(int numArgs);
   }
 }

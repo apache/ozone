@@ -24,8 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -48,9 +46,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
@@ -79,7 +75,7 @@ public class TestReconIncrementalContainerReportHandler
     when(reportMock.getDatanodeDetails()).thenReturn(datanodeDetails);
 
     ContainerWithPipeline containerWithPipeline = getTestContainer(
-        containerID.getIdForTesting(), OPEN);
+        containerID.getId(), OPEN);
     List<ContainerWithPipeline> containerWithPipelineList = new ArrayList<>();
     containerWithPipelineList.add(containerWithPipeline);
     ReconContainerManager containerManager = getContainerManager();
@@ -133,17 +129,15 @@ public class TestReconIncrementalContainerReportHandler
           containerId++, OPEN);
       ContainerID containerID =
           containerWithPipeline.getContainerInfo().containerID();
-      LifeCycleState expectedState = getContainerStateFromReplicaState(state);
 
       ReconContainerManager containerManager = getContainerManager();
       containerManager.addNewContainer(containerWithPipeline);
 
-      DatanodeInfo datanodeInfo = new DatanodeInfo(
-          containerWithPipeline.getPipeline().getFirstNode(),
-          NodeStatus.inServiceHealthy(), null, 1000);
+      DatanodeDetails datanodeDetails =
+          containerWithPipeline.getPipeline().getFirstNode();
       NodeManager nodeManagerMock = mock(NodeManager.class);
       when(nodeManagerMock.getNode(any(DatanodeID.class)))
-          .thenReturn(datanodeInfo);
+          .thenReturn(datanodeDetails);
       IncrementalContainerReportFromDatanode reportMock =
           mock(IncrementalContainerReportFromDatanode.class);
       when(reportMock.getDatanodeDetails())
@@ -151,7 +145,7 @@ public class TestReconIncrementalContainerReportHandler
 
       IncrementalContainerReportProto containerReport =
           getIncrementalContainerReportProto(containerID, state,
-              datanodeInfo.getUuidString());
+              datanodeDetails.getUuidString());
       when(reportMock.getReport()).thenReturn(containerReport);
       ReconIncrementalContainerReportHandler reconIcr =
           new ReconIncrementalContainerReportHandler(nodeManagerMock,
@@ -161,46 +155,12 @@ public class TestReconIncrementalContainerReportHandler
       assertTrue(containerManager.containerExist(containerID));
       assertEquals(1,
           containerManager.getContainerReplicas(containerID).size());
+      LifeCycleState expectedState = getContainerStateFromReplicaState(state);
       LifeCycleState actualState =
           containerManager.getContainer(containerID).getState();
       assertEquals(expectedState, actualState,
           String.format("Expecting %s in container state for replica state %s",
               expectedState, state));
-      verify(containerManager.getScmClient(), never())
-          .getContainerWithPipeline(containerID.getIdForTesting());
-    }
-  }
-
-  @Test
-  public void testClosingContainerAdvancesViaScmHandlerWithoutScmLookup()
-      throws IOException, NodeNotFoundException, TimeoutException {
-    long containerId = 200;
-    for (State state : Arrays.asList(State.QUASI_CLOSED, State.CLOSED)) {
-      ContainerWithPipeline containerWithPipeline =
-          getTestContainer(containerId++, LifeCycleState.CLOSING);
-      ContainerID containerID =
-          containerWithPipeline.getContainerInfo().containerID();
-      LifeCycleState expectedState = getContainerStateFromReplicaState(state);
-      ReconContainerManager containerManager = getContainerManager();
-      containerManager.addNewContainer(containerWithPipeline);
-
-      DatanodeDetails datanodeDetails =
-          containerWithPipeline.getPipeline().getFirstNode();
-      ReconIncrementalContainerReportHandler reconIcr =
-          new ReconIncrementalContainerReportHandler(
-              getNodeManagerMock(datanodeDetails), containerManager,
-              SCMContext.emptyContext());
-      IncrementalContainerReportFromDatanode reportMock =
-          getReportMock(containerID, state, datanodeDetails);
-
-      reconIcr.onMessage(reportMock, mock(EventPublisher.class));
-
-      assertEquals(expectedState,
-          containerManager.getContainer(containerID).getState(),
-          String.format("Expecting %s in container state for replica state %s",
-              expectedState, state));
-      verify(containerManager.getScmClient(), never())
-          .getContainerWithPipeline(containerID.getIdForTesting());
     }
   }
 
@@ -239,28 +199,6 @@ public class TestReconIncrementalContainerReportHandler
     }
   }
 
-  private static NodeManager getNodeManagerMock(DatanodeDetails datanodeDetails)
-      throws NodeNotFoundException {
-    NodeManager nodeManagerMock = mock(NodeManager.class);
-    DatanodeInfo datanodeInfo = new DatanodeInfo(
-        datanodeDetails, NodeStatus.inServiceHealthy(), null, 1000);
-    when(nodeManagerMock.getNode(any(DatanodeID.class)))
-        .thenReturn(datanodeInfo);
-    return nodeManagerMock;
-  }
-
-  private static IncrementalContainerReportFromDatanode getReportMock(
-      ContainerID containerID, State state, DatanodeDetails datanodeDetails) {
-    IncrementalContainerReportFromDatanode reportMock =
-        mock(IncrementalContainerReportFromDatanode.class);
-    when(reportMock.getDatanodeDetails()).thenReturn(datanodeDetails);
-    IncrementalContainerReportProto containerReport =
-        getIncrementalContainerReportProto(containerID, state,
-            datanodeDetails.getUuidString());
-    when(reportMock.getReport()).thenReturn(containerReport);
-    return reportMock;
-  }
-
   private static IncrementalContainerReportProto
       getIncrementalContainerReportProto(final ContainerID containerId,
                                          final State state,
@@ -269,7 +207,7 @@ public class TestReconIncrementalContainerReportHandler
         IncrementalContainerReportProto.newBuilder();
     final ContainerReplicaProto replicaProto =
         ContainerReplicaProto.newBuilder()
-            .setContainerID(containerId.getIdForTesting())
+            .setContainerID(containerId.getId())
             .setState(state)
             .setOriginNodeId(originNodeId)
             .build();

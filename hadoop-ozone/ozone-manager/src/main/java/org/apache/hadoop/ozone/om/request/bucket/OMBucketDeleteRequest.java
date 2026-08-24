@@ -146,7 +146,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
             ResultCodes.BUCKET_NOT_EMPTY);
       }
 
-      // appending '/' to end to eliminate cases where 2 buckets start with same characters.
+      // appending '/' to end to eliminate cases where 2 buckets start with same
+      // characters.
       String snapshotBucketKey = bucketKey + OzoneConsts.OM_KEY_PREFIX;
 
       if (bucketContainsSnapshot(omMetadataManager, snapshotBucketKey)) {
@@ -166,11 +167,10 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
           CacheValue.get(transactionLogIndex));
-      // Update lifecycle configuration table as well.
-      omMetadataManager.getLifecycleConfigurationTable().addCacheEntry(
-          new CacheKey<>(bucketKey),
-          CacheValue.get(transactionLogIndex));
-      omResponse.setDeleteBucketResponse(DeleteBucketResponse.newBuilder().build());
+
+      omResponse.setDeleteBucketResponse(
+          DeleteBucketResponse.newBuilder().build());
+
       // update used namespace for volume
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs =
@@ -234,8 +234,10 @@ public class OMBucketDeleteRequest extends OMClientRequest {
   private boolean bucketContainsSnapshotInTable(
       OMMetadataManager omMetadataManager, String snapshotBucketKey)
       throws IOException {
-    try (TableIterator<String, Table.KeyValue<String, SnapshotInfo>> snapshotIterator
-        = omMetadataManager.getSnapshotInfoTable().iterator()) {
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+            snapshotIterator = omMetadataManager
+            .getSnapshotInfoTable().iterator()) {
       snapshotIterator.seek(snapshotBucketKey);
       if (snapshotIterator.hasNext()) {
         return snapshotIterator.next().getKey().startsWith(snapshotBucketKey);

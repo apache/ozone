@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
+import com.google.protobuf.Parser;
 import java.io.IOException;
 
 /**
@@ -27,22 +28,24 @@ import java.io.IOException;
  * @param <CONF> The configuration type, which is a protobuf {@link Message}.
  */
 public abstract class StatefulService<CONF extends Message> implements SCMService {
+  private final String name;
   private final StatefulServiceStateManager stateManager;
-  private final StatefulServiceDefinition<CONF> definition;
+  private final Parser<CONF> parser;
 
   /**
    * Initialize a StatefulService from an extending class.
    * @param stateManager a reference to the
    * {@link StatefulServiceStateManager} from SCM.
    */
-  protected StatefulService(StatefulServiceStateManager stateManager, StatefulServiceDefinition<CONF> definition) {
-    this.definition = definition;
+  protected StatefulService(StatefulServiceStateManager stateManager, Parser<CONF> parser) {
+    this.name = getClass().getSimpleName();
     this.stateManager = stateManager;
+    this.parser = parser;
   }
 
   @Override
   public final String getServiceName() {
-    return definition.getServiceName();
+    return name;
   }
 
   /**
@@ -67,7 +70,7 @@ public abstract class StatefulService<CONF extends Message> implements SCMServic
     if (byteString == null) {
       return null;
     }
-    return definition.deserialize(byteString);
+    return parser.parseFrom(byteString);
   }
 
   /**

@@ -19,6 +19,10 @@
 export const overviewLocators = {
   'datanodeRow': 'overview-Health-Datanodes',
   'containersRow': 'overview-Health-Containers',
+  'capacityOzoneUsed': 'capacity-ozone-used',
+  'capacityNonOzoneUsed': 'capacity-non-ozone-used',
+  'capacityRemaining': 'capacity-remaining',
+  'capacityPreAllocated': 'capacity-pre-allocated',
   'volumesCard': 'overview-Volumes',
   'bucketsCard': 'overview-Buckets',
   'keysCard': 'overview-Keys',

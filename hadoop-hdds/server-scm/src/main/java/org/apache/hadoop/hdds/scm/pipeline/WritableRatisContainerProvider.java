@@ -17,13 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -57,8 +55,7 @@ public class WritableRatisContainerProvider
 
   @Override
   public ContainerInfo getContainer(final long size,
-      ReplicationConfig repConfig, String owner, ExcludeList excludeList,
-      @Nonnull StorageTier storageTier)
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
     /*
       Here is the high level logic.
@@ -83,7 +80,7 @@ public class WritableRatisContainerProvider
         PipelineRequestInformation.Builder.getBuilder().setSize(size).build();
 
     ContainerInfo containerInfo =
-        getContainer(repConfig, owner, excludeList, req, storageTier);
+        getContainer(repConfig, owner, excludeList, req);
     if (containerInfo != null) {
       return containerInfo;
     }
@@ -91,19 +88,19 @@ public class WritableRatisContainerProvider
     try {
       // TODO: #CLUTIL Remove creation logic when all replication types
       //  and factors are handled by pipeline creator
-      Pipeline pipeline = pipelineManager.createPipeline(repConfig, storageTier);
+      Pipeline pipeline = pipelineManager.createPipeline(repConfig);
 
       // wait until pipeline is ready
       pipelineManager.waitPipelineReady(pipeline.getId(), 0);
 
     } catch (SCMException se) {
-      LOG.warn("Pipeline creation failed for repConfig: {} storageTier: {} " +
+      LOG.warn("Pipeline creation failed for repConfig {} " +
           "Datanodes may be used up. Try to see if any pipeline is in " +
               "ALLOCATED state, and then will wait for it to be OPEN",
-              repConfig, storageTier, se);
+              repConfig, se);
       List<Pipeline> allocatedPipelines = findPipelinesByState(repConfig,
               excludeList,
-              Pipeline.PipelineState.ALLOCATED, storageTier);
+              Pipeline.PipelineState.ALLOCATED);
       if (!allocatedPipelines.isEmpty()) {
         List<PipelineID> allocatedPipelineIDs =
                 allocatedPipelines.stream()
@@ -122,14 +119,14 @@ public class WritableRatisContainerProvider
         failureReason = se.getMessage();
       }
     } catch (IOException e) {
-      LOG.warn("Pipeline creation failed for repConfig: {} storageTier: {}. "
-          + "Retrying get pipelines call once.", repConfig, storageTier, e);
+      LOG.warn("Pipeline creation failed for repConfig: {}. "
+          + "Retrying get pipelines call once.", repConfig, e);
       failureReason = e.getMessage();
     }
 
     // If Exception occurred or successful creation of pipeline do one
     // final try to fetch pipelines.
-    containerInfo = getContainer(repConfig, owner, excludeList, req, storageTier);
+    containerInfo = getContainer(repConfig, owner, excludeList, req);
     if (containerInfo != null) {
       return containerInfo;
     }
@@ -137,27 +134,24 @@ public class WritableRatisContainerProvider
     // we have tried all strategies we know but somehow we are not able
     // to get a container for this block. Log that info and throw an exception.
     LOG.error(
-        "Unable to allocate a block for the size: {}, repConfig: {}, storageTier: {}.",
-        size, repConfig, storageTier);
+        "Unable to allocate a block for the size: {}, repConfig: {}",
+        size, repConfig);
     throw new IOException(
         "Unable to allocate a container to the block of size: " + size
-            + ", replicationConfig: " + repConfig
-            + " for storageTier: " + storageTier + ". " + failureReason);
+            + ", replicationConfig: " + repConfig + ". " + failureReason);
   }
 
   @Nullable
   private ContainerInfo getContainer(ReplicationConfig repConfig, String owner,
-      ExcludeList excludeList, PipelineRequestInformation req,
-      @Nonnull StorageTier storageTier) {
+      ExcludeList excludeList, PipelineRequestInformation req) {
     // Acquire pipeline manager lock, to avoid any updates to pipeline
     // while allocate container happens. This is to avoid scenario like
     // mentioned in HDDS-5655.
     pipelineManager.acquireReadLock();
     try {
       List<Pipeline> availablePipelines = findPipelinesByState(repConfig,
-          excludeList, Pipeline.PipelineState.OPEN, storageTier);
-      return selectContainer(availablePipelines, req, owner, excludeList,
-          storageTier);
+          excludeList, Pipeline.PipelineState.OPEN);
+      return selectContainer(availablePipelines, req, owner, excludeList);
     } finally {
       pipelineManager.releaseReadLock();
     }
@@ -166,24 +160,21 @@ public class WritableRatisContainerProvider
   private List<Pipeline> findPipelinesByState(
           final ReplicationConfig repConfig,
           final ExcludeList excludeList,
-          final Pipeline.PipelineState pipelineState,
-          @Nonnull StorageTier storageTier) {
+          final Pipeline.PipelineState pipelineState) {
     List<Pipeline> pipelines = pipelineManager.getPipelines(repConfig,
             pipelineState, excludeList.getDatanodes(),
-            excludeList.getPipelineIds(), storageTier);
+            excludeList.getPipelineIds());
     if (pipelines.isEmpty() && !excludeList.isEmpty()) {
       // if no pipelines can be found, try finding pipeline without
       // exclusion
-      pipelines = pipelineManager.getPipelines(repConfig, pipelineState,
-          storageTier);
+      pipelines = pipelineManager.getPipelines(repConfig, pipelineState);
     }
     return pipelines;
   }
 
   private @Nullable ContainerInfo selectContainer(
       List<Pipeline> availablePipelines, PipelineRequestInformation req,
-      String owner, ExcludeList excludeList,
-      @Nonnull StorageTier storageTier) {
+      String owner, ExcludeList excludeList) {
 
     while (!availablePipelines.isEmpty()) {
       Pipeline pipeline = pipelineChoosePolicy.choosePipeline(
@@ -191,7 +182,7 @@ public class WritableRatisContainerProvider
 
       // look for OPEN containers that match the criteria.
       final ContainerInfo containerInfo = containerManager.getMatchingContainer(
-          req.getSize(), owner, pipeline, excludeList.getContainerIds(), storageTier);
+          req.getSize(), owner, pipeline, excludeList.getContainerIds());
 
       if (containerInfo != null) {
         return containerInfo;

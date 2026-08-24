@@ -111,7 +111,7 @@ public class TestOMKeysDeleteResponseWithFSO
       OmBucketInfo omBucketInfo) {
     return new OMKeysDeleteResponseWithFSO(
         omResponse, getOmKeyInfoList(), dirDeleteList, omBucketInfo,
-        volId, Collections.emptyMap(), null);
+        volId, Collections.emptyMap());
   }
 
   @Test

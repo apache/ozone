@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Tests OzoneManagerLock.Resource.KEY_PATH_LOCK.
  */
-class TestKeyPathLock {
+class TestKeyPathLock extends TestOzoneManagerLock {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyPathLock.class);
@@ -216,7 +216,7 @@ class TestKeyPathLock {
     // Waiting for all the threads to be instantiated/to reach
     // acquireWriteLock.
     countDown.countDown();
-    assertEquals(1, lock.getCurrentLockSizeForTesting());
+    assertEquals(1, lock.getCurrentLocks().size());
 
     lock.releaseWriteLock(resource, sampleResourceName);
     LOG.info("Write Lock Released by " + Thread.currentThread().getName());
@@ -233,11 +233,12 @@ class TestKeyPathLock {
 
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    String[] resourceName = new String[]{volumeName, bucketName, keyName};
+    String[] resourceName = new String[]{volumeName, bucketName, keyName},
+        higherResourceName = new String[]{volumeName, bucketName};
 
     lock.acquireWriteLock(resource, resourceName);
     RuntimeException ex =
-        assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(higherResource, volumeName, bucketName));
+        assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(higherResource, higherResourceName));
     String message = "cannot acquire " + higherResource.getName() + " lock " +
         "while holding [" + resource.getName() + "] lock(s).";
     assertThat(ex).hasMessageContaining(message);
@@ -254,11 +255,12 @@ class TestKeyPathLock {
 
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    String[] resourceName = new String[]{volumeName, bucketName, keyName};
+    String[] resourceName = new String[]{volumeName, bucketName, keyName},
+        higherResourceName = new String[]{volumeName, bucketName};
 
     lock.acquireReadLock(resource, resourceName);
-    RuntimeException ex = assertThrows(RuntimeException.class,
-        () -> lock.acquireWriteLock(higherResource, volumeName, bucketName));
+    RuntimeException ex =
+        assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(higherResource, higherResourceName));
     String message = "cannot acquire " + higherResource.getName() + " lock " +
         "while holding [" + resource.getName() + "] lock(s).";
     assertThat(ex).hasMessageContaining(message);
@@ -275,11 +277,12 @@ class TestKeyPathLock {
 
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    String[] resourceName = new String[]{volumeName, bucketName, keyName};
+    String[] resourceName = new String[]{volumeName, bucketName, keyName},
+        higherResourceName = new String[]{volumeName, bucketName};
 
     lock.acquireReadLock(resource, resourceName);
     RuntimeException ex =
-        assertThrows(RuntimeException.class, () -> lock.acquireReadLock(higherResource, volumeName, bucketName));
+        assertThrows(RuntimeException.class, () -> lock.acquireReadLock(higherResource, higherResourceName));
     String message = "cannot acquire " + higherResource.getName() + " lock " +
         "while holding [" + resource.getName() + "] lock(s).";
     assertThat(ex).hasMessageContaining(message);
@@ -296,11 +299,12 @@ class TestKeyPathLock {
 
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    String[] resourceName = new String[]{volumeName, bucketName, keyName};
+    String[] resourceName = new String[]{volumeName, bucketName, keyName},
+        higherResourceName = new String[]{volumeName, bucketName};
 
     lock.acquireWriteLock(resource, resourceName);
     RuntimeException ex =
-        assertThrows(RuntimeException.class, () -> lock.acquireReadLock(higherResource, volumeName, bucketName));
+        assertThrows(RuntimeException.class, () -> lock.acquireReadLock(higherResource, higherResourceName));
     String message = "cannot acquire " + higherResource.getName() + " lock " +
         "while holding [" + resource.getName() + "] lock(s).";
     assertThat(ex).hasMessageContaining(message);

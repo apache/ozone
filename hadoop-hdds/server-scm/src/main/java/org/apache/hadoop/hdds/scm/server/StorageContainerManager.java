@@ -24,8 +24,6 @@ import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecr
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DEFAULT_STORAGE_TIER_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DEFAULT_STORAGE_TIER_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -48,7 +46,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -63,7 +60,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -100,7 +96,6 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconcileContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOpsSubscriber;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerEventHandler;
@@ -342,15 +337,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     this(conf, new SCMConfigurator());
   }
 
-  @VisibleForTesting
-  static StorageTier getConfiguredDefaultStorageTier(
-      ConfigurationSource conf) {
-    String configuredTier = conf.get(
-        OZONE_DEFAULT_STORAGE_TIER_KEY, OZONE_DEFAULT_STORAGE_TIER_DEFAULT);
-    return StorageTier.valueOf(
-        configuredTier.trim().toUpperCase(Locale.ROOT));
-  }
-
   /**
    * This constructor offers finer control over how SCM comes up.
    * To use this, user needs to create a SCMConfigurator and set various
@@ -472,7 +458,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmAdmins = OzoneAdmins.getOzoneAdmins(scmStarterUser, conf);
     scmReadOnlyAdmins = OzoneAdmins.getReadonlyAdmins(conf);
     LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
-    StorageTier.setDefault(getConfiguredDefaultStorageTier(conf));
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue, scmContext);
@@ -484,10 +469,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     moveManager = new MoveManager(replicationManager, containerManager);
     containerReplicaPendingOps.registerSubscriber(moveManager);
-    if (scmNodeManager instanceof ContainerReplicaPendingOpsSubscriber) {
-      containerReplicaPendingOps.registerSubscriber(
-          (ContainerReplicaPendingOpsSubscriber) scmNodeManager);
-    }
     containerBalancer = new ContainerBalancer(this);
 
     // Emit initial safe mode status, as now handlers are registered.
@@ -1599,13 +1580,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     getBlockProtocolServer().start();
 
-    // In HA mode, defer starting the datanode protocol server until the SCM
-    // state machine has caught up with the leader's committed log entries
-    // (see SCMStateMachine#tryStartDNServerAndRefreshSafeMode). In non-HA mode
-    // there is no Ratis state machine, so start it here as before.
-    if (!scmStorageConfig.isSCMHAEnabled()) {
-      getDatanodeProtocolServer().start();
-    }
+    // start datanode protocol server
+    getDatanodeProtocolServer().start();
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
       persistSCMCertificates();
@@ -2260,11 +2236,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public String getHostname() {
     return scmHostName;
-  }
-
-  @Override
-  public String getRatisEvents() {
-    return metrics != null ? metrics.getRatisEvents() : "";
   }
 
   public Collection<String> getScmAdminUsernames() {

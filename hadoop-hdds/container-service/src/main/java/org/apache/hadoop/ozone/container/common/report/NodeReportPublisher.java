@@ -56,7 +56,7 @@ public class NodeReportPublisher extends ReportPublisher<NodeReportProto> {
   }
 
   @Override
-  protected NodeReportProto getReport() throws IOException, IllegalArgumentException {
+  protected NodeReportProto getReport() throws IOException {
     return getContext().getParent().getContainer().getNodeReport();
   }
 }

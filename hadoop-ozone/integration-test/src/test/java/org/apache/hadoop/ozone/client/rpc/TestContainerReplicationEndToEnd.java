@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.OzoneTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -111,6 +111,7 @@ public class TestContainerReplicationEndToEnd {
             .build();
     cluster.waitForClusterToBeReady();
     cluster.getStorageContainerManager().getReplicationManager().start();
+    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
@@ -202,7 +203,7 @@ public class TestContainerReplicationEndToEnd {
 
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       Predicate<DatanodeDetails> p =
-          i -> i.getID().equals(dn.getDatanodeDetails().getID());
+          i -> i.getUuid().equals(dn.getDatanodeDetails().getUuid());
       if (!pipeline.getNodes().stream().anyMatch(p)) {
         dnService = dn;
       }
@@ -228,7 +229,7 @@ public class TestContainerReplicationEndToEnd {
     }
     // This will try to read the data from the dn to which the container got
     // replicated after the container got closed.
-    OzoneTestHelper
+    TestHelper
         .validateData(keyName, testData, objectStore, volumeName, bucketName);
   }
 }

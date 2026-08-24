@@ -16,6 +16,6 @@
  */
 
 /**
- * Internal local Ozone cluster runtime support.
+ * Internal local single-node Ozone runtime support.
  */
 package org.apache.hadoop.ozone.local;

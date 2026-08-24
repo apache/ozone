@@ -41,6 +41,4 @@ public interface OMMXBean extends ServiceRuntimeInfo {
    * @return the OM hostname for the datanode.
    */
   String getHostname();
-
-  String getRatisEvents();
 }

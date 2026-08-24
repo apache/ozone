@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client.io;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,7 +27,6 @@ import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
-import org.apache.ratis.util.function.CheckedRunnable;
 
 /**
  * OzoneDataStreamOutput is used to write data into Ozone.
@@ -102,65 +100,38 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
-    if (keyCommitOutput != null) {
-      return keyCommitOutput.getCommitUploadPartInfo();
+    KeyDataStreamOutput keyDataStreamOutput = getKeyDataStreamOutput();
+    if (keyDataStreamOutput != null) {
+      return keyDataStreamOutput.getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
   }
 
   public KeyDataStreamOutput getKeyDataStreamOutput() {
-    if (byteBufferStreamOutput instanceof KeyDataStreamOutput) {
+    if (byteBufferStreamOutput instanceof OzoneOutputStream) {
+      OutputStream outputStream =
+          ((OzoneOutputStream) byteBufferStreamOutput).getOutputStream();
+      if (outputStream instanceof KeyDataStreamOutput) {
+        return ((KeyDataStreamOutput) outputStream);
+      } else if (outputStream instanceof CryptoOutputStream) {
+        OutputStream wrappedStream =
+            ((CryptoOutputStream) outputStream).getWrappedStream();
+        if (wrappedStream instanceof KeyDataStreamOutput) {
+          return ((KeyDataStreamOutput) wrappedStream);
+        }
+      } else if (outputStream instanceof CipherOutputStreamOzone) {
+        OutputStream wrappedStream =
+            ((CipherOutputStreamOzone) outputStream).getWrappedStream();
+        if (wrappedStream instanceof KeyDataStreamOutput) {
+          return ((KeyDataStreamOutput) wrappedStream);
+        }
+      }
+    } else if (byteBufferStreamOutput instanceof KeyDataStreamOutput) {
       return ((KeyDataStreamOutput) byteBufferStreamOutput);
     }
-    if (byteBufferStreamOutput instanceof OzoneOutputStream) {
-      OutputStream outputStream =
-          ((OzoneOutputStream) byteBufferStreamOutput).getOutputStream();
-      OutputStream unwrappedStream = unwrap(outputStream);
-      if (unwrappedStream instanceof KeyDataStreamOutput) {
-        return ((KeyDataStreamOutput) unwrappedStream);
-      }
-    }
     // Otherwise return null.
     return null;
-  }
-
-  private KeyCommitOutput getKeyCommitOutput() {
-    if (byteBufferStreamOutput instanceof KeyCommitOutput) {
-      return (KeyCommitOutput) byteBufferStreamOutput;
-    }
-    if (byteBufferStreamOutput instanceof OzoneOutputStream) {
-      OutputStream outputStream =
-          ((OzoneOutputStream) byteBufferStreamOutput).getOutputStream();
-      OutputStream unwrappedStream = unwrap(outputStream);
-      if (unwrappedStream instanceof KeyCommitOutput) {
-        return (KeyCommitOutput) unwrappedStream;
-      }
-    }
-    // Otherwise return null.
-    return null;
-  }
-
-  public void setPreCommits(
-      List<CheckedRunnable<IOException>> preCommits) {
-    KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
-    if (keyCommitOutput != null) {
-      keyCommitOutput.setPreCommits(preCommits);
-      return;
-    }
-    throw new IllegalStateException(
-        "Output stream is not backed by KeyCommitOutput: " +
-            byteBufferStreamOutput.getClass());
-  }
-
-  private static OutputStream unwrap(OutputStream outputStream) {
-    if (outputStream instanceof CryptoOutputStream) {
-      return ((CryptoOutputStream) outputStream).getWrappedStream();
-    } else if (outputStream instanceof CipherOutputStreamOzone) {
-      return ((CipherOutputStreamOzone) outputStream).getWrappedStream();
-    }
-    return outputStream;
   }
 
   @Override

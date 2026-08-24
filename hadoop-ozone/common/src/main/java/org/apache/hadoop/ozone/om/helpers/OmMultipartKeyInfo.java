@@ -41,12 +41,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKey
  * upload part information of the key.
  */
 public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject<OmMultipartKeyInfo> {
-  // This stores the schema version of the multipart key.
-  // 0 - Legacy Schema -> Uses the same table to store the multipart part info
-  // 1 - New Schema -> Uses a separate table to store the multipart part info
-  public static final int LEGACY_SCHEMA_VERSION = 0;
-  public static final int SPLIT_PARTS_TABLE_SCHEMA_VERSION = 1;
-
   private static final Codec<OmMultipartKeyInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(MultipartKeyInfo.getDefaultInstance()),
       OmMultipartKeyInfo::getFromProto,
@@ -90,7 +84,10 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
    */
   private final long parentID;
 
-  private final int schemaVersion;
+  // This stores the schema version of the multipart key.
+  // 0 - Legacy Schema -> Uses the same table to store the multipart part info
+  // 1 - New Schema -> Uses a separate table to store the multipart part info
+  private final byte schemaVersion;
 
   public static Codec<OmMultipartKeyInfo> getCodec() {
     return CODEC;
@@ -261,8 +258,9 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   }
 
   public void addPartKeyInfo(PartKeyInfo partKeyInfo) {
-    if (schemaVersion == SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
-      throw new IllegalStateException("PartKeyInfoMap is not supported for schemaVersion 1");
+    if (schemaVersion == 1) {
+      throw new IllegalStateException(
+          "PartKeyInfoMap is not supported for schemaVersion 1");
     }
     this.partKeyInfoMap = PartKeyInfoMap.put(partKeyInfo, partKeyInfoMap);
   }
@@ -275,7 +273,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     return replicationConfig;
   }
 
-  public int getSchemaVersion() {
+  public byte getSchemaVersion() {
     return schemaVersion;
   }
 
@@ -297,7 +295,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     private final AclListBuilder acls;
     private final TreeMap<Integer, PartKeyInfo> partKeyInfoList;
     private long parentID;
-    private int schemaVersion;
+    private byte schemaVersion;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -316,7 +314,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       this.acls = AclListBuilder.of(multipartKeyInfo.acls);
       this.partKeyInfoList = new TreeMap<>();
 
-      if (multipartKeyInfo.getSchemaVersion() == LEGACY_SCHEMA_VERSION) {
+      if (multipartKeyInfo.getSchemaVersion() == 0) {
         for (PartKeyInfo partKeyInfo : multipartKeyInfo.partKeyInfoMap) {
           this.partKeyInfoList.put(partKeyInfo.getPartNumber(), partKeyInfo);
         }
@@ -410,8 +408,8 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       return this;
     }
 
-    public Builder setSchemaVersion(int schemaVersion) {
-      this.schemaVersion = validateAndConvertSchemaVersion(schemaVersion);
+    public Builder setSchemaVersion(byte schemaVersion) {
+      this.schemaVersion = schemaVersion;
       return this;
     }
 
@@ -429,7 +427,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   public static Builder builderFromProto(
       MultipartKeyInfo multipartKeyInfo) {
     final SortedMap<Integer, PartKeyInfo> list = new TreeMap<>();
-    if (!multipartKeyInfo.hasSchemaVersion() || multipartKeyInfo.getSchemaVersion() == LEGACY_SCHEMA_VERSION) {
+    if (!multipartKeyInfo.hasSchemaVersion() || multipartKeyInfo.getSchemaVersion() == 0) {
       multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
           list.put(partKeyInfo.getPartNumber(), partKeyInfo));
     }
@@ -457,7 +455,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
         .setObjectID(multipartKeyInfo.getObjectID())
         .setUpdateID(multipartKeyInfo.getUpdateID())
         .setParentID(multipartKeyInfo.getParentID())
-        .setSchemaVersion(validateAndConvertSchemaVersion(multipartKeyInfo.getSchemaVersion()));
+        .setSchemaVersion((byte) multipartKeyInfo.getSchemaVersion());
   }
 
   /**
@@ -475,8 +473,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
    * @return MultipartKeyInfo
    */
   public MultipartKeyInfo getProto() {
-    if (schemaVersion == SPLIT_PARTS_TABLE_SCHEMA_VERSION
-        && partKeyInfoMap != null && partKeyInfoMap.size() > 0) {
+    if (schemaVersion == 1 && partKeyInfoMap != null && partKeyInfoMap.size() > 0) {
       throw new IllegalStateException(
           "PartKeyInfoMap must be empty for schemaVersion 1");
     }
@@ -510,18 +507,10 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     }
 
     builder.addAllAcls(OzoneAclUtil.toProtobuf(acls));
-    if (schemaVersion == LEGACY_SCHEMA_VERSION) {
+    if (schemaVersion == 0) {
       builder.addAllPartKeyInfoList(partKeyInfoMap);
     }
     return builder.build();
-  }
-
-  private static int validateAndConvertSchemaVersion(int schemaVersion) {
-    if (schemaVersion != LEGACY_SCHEMA_VERSION && schemaVersion != SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
-      throw new IllegalArgumentException("Unsupported schemaVersion: "
-          + schemaVersion + ". Expected one of [0, 1].");
-    }
-    return schemaVersion;
   }
 
   @Override

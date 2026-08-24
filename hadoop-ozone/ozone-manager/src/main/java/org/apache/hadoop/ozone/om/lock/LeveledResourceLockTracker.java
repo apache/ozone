@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.lock;
 
 import java.util.Arrays;
 import java.util.stream.Stream;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource;
 
 /**
  * The LeveledResourceLockTracker class is a singleton that extends the
@@ -56,11 +55,6 @@ final class LeveledResourceLockTracker extends ResourceLockTracker<OzoneManagerL
   private static volatile LeveledResourceLockTracker instance = null;
 
   private LeveledResourceLockTracker() {
-  }
-
-  @Override
-  Class<LeveledResource> getResourceClass() {
-    return LeveledResource.class;
   }
 
   public static LeveledResourceLockTracker get() {

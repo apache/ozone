@@ -88,7 +88,7 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
   public void setUp() throws Exception {
     dao = getDao(UnhealthyContainersDao.class);
     schemaManagerV2 = new ContainerHealthSchemaManager(
-        getSchemaDefinition(ContainerSchemaDefinition.class), new OzoneConfiguration());
+        getSchemaDefinition(ContainerSchemaDefinition.class));
 
     containerManager = mock(ContainerManager.class);
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);

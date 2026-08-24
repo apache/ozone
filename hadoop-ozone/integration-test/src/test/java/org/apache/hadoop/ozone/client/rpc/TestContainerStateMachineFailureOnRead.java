@@ -165,22 +165,23 @@ public class TestContainerStateMachineFailureOnRead {
     }
 
     OmKeyLocationInfo omKeyLocationInfo;
-    try (OzoneOutputStream key = objectStore.getVolume(volumeName)
+    OzoneOutputStream key = objectStore.getVolume(volumeName)
         .getBucket(bucketName)
         .createKey("ratis", 1024, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>())) {
-      // First write and flush creates a container in the datanode.
-      key.write("ratis".getBytes(UTF_8));
-      key.flush();
+            ReplicationFactor.THREE, new HashMap<>());
+    // First write and flush creates a container in the datanode
+    key.write("ratis".getBytes(UTF_8));
+    key.flush();
+    
+    // get the name of a valid container
+    KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
 
-      // Get the name of a valid container.
-      KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
-
-      List<OmKeyLocationInfo> locationInfoList =
-          groupOutputStream.getLocationInfoList();
-      assertEquals(1, locationInfoList.size());
-      omKeyLocationInfo = locationInfoList.get(0);
-    }
+    List<OmKeyLocationInfo> locationInfoList =
+        groupOutputStream.getLocationInfoList();
+    assertEquals(1, locationInfoList.size());
+    omKeyLocationInfo = locationInfoList.get(0);
+    key.close();
+    groupOutputStream.close();
 
     Optional<HddsDatanodeService> leaderDn =
         cluster.getHddsDatanodes().stream().filter(dn -> {
@@ -193,7 +194,7 @@ public class TestContainerStateMachineFailureOnRead {
         }).findFirst();
 
     assertTrue(leaderDn.isPresent());
-    // Delete the container directory from leader.
+    // delete the container dir from leader
     FileUtil.fullyDelete(new File(
         leaderDn.get().getDatanodeStateMachine()
             .getContainer().getContainerSet()
@@ -212,7 +213,7 @@ public class TestContainerStateMachineFailureOnRead {
       assertEquals(Pipeline.PipelineState.CLOSED, pipeline.getPipelineState(),
           "Pipeline " + pipeline.getId() + "should be in CLOSED state");
     } catch (PipelineNotFoundException e) {
-      // Do nothing.
+      // do nothing
     }
   }
 }

@@ -21,9 +21,6 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -37,16 +34,14 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.GlobalNamespaceReport;
@@ -76,6 +71,7 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/storageDistribution")
 @Produces("application/json")
+@AdminOnly
 public class StorageDistributionEndpoint {
   private final ReconNodeManager nodeManager;
   private final NSSummaryEndpoint nsSummaryEndpoint;
@@ -83,23 +79,18 @@ public class StorageDistributionEndpoint {
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private final ReconGlobalMetricsService reconGlobalMetricsService;
   private final DataNodeMetricsService dataNodeMetricsService;
-  private final ReconContext reconContext;
-  private static final DateTimeFormatter TIMESTAMP_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyyMMdd_HHmm'Z'");
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
                                      NSSummaryEndpoint nsSummaryEndpoint,
                                      ReconGlobalStatsManager reconGlobalStatsManager,
                                      ReconGlobalMetricsService reconGlobalMetricsService,
-                                     DataNodeMetricsService dataNodeMetricsService,
-                                     ReconContext reconContext) {
+                                     DataNodeMetricsService dataNodeMetricsService) {
     this.nodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
     this.nsSummaryEndpoint = nsSummaryEndpoint;
     this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.reconGlobalMetricsService = reconGlobalMetricsService;
     this.dataNodeMetricsService = dataNodeMetricsService;
-    this.reconContext = reconContext;
   }
 
   @GET
@@ -149,12 +140,7 @@ public class StorageDistributionEndpoint {
    * The CSV includes the following headers: HostName, Datanode UUID, Filesystem Capacity,
    * Filesystem Used Space, Filesystem Remaining Space, Ozone Capacity, Ozone Used Space,
    * Ozone Remaining Space, PreAllocated Container Space, Reserved Space, Minimum Free
-   * Space, and Pending Block Size. The values for all size-related headers are represented
-   * in bytes.
-   *
-   * The downloaded csv file is dynamically named using the cluster ID and a UTC timestamp,
-   * to ensure clear timezone-independent record keeping.
-   * Example: Datanode_Insights_<clusterId>_yyyyMMdd_HHmmZ.csv
+   * Space, and Pending Block Size.
    *
    * @return A Response object. Depending on the state of metrics collection, this can be:
    *         - An HTTP 202 (Accepted) response with a status and metrics data if the
@@ -168,26 +154,18 @@ public class StorageDistributionEndpoint {
   @Path("/download")
   public Response downloadDataNodeStorageDistribution() {
 
-    Object metricsResponse = dataNodeMetricsService.getCollectedMetrics(null);
+    DataNodeMetricsServiceResponse metricsResponse =
+        dataNodeMetricsService.getCollectedMetrics(null);
 
-    if (!(metricsResponse instanceof DataNodeMetricsCompleteResponse)) {
+    if (metricsResponse.getStatus() != DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
       return Response.status(Response.Status.ACCEPTED)
           .entity(metricsResponse)
           .type(MediaType.APPLICATION_JSON)
           .build();
     }
 
-    DataNodeMetricsCompleteResponse completeResponse =
-        (DataNodeMetricsCompleteResponse) metricsResponse;
-
-    if (completeResponse.getStatus() != DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
-      return Response.status(Response.Status.ACCEPTED)
-          .entity(completeResponse)
-          .type(MediaType.APPLICATION_JSON)
-          .build();
-    }
     List<DatanodePendingDeletionMetrics> pendingDeletionMetrics =
-        completeResponse.getPendingDeletionPerDataNode();
+        metricsResponse.getPendingDeletionPerDataNode();
 
     if (pendingDeletionMetrics == null) {
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
@@ -212,16 +190,16 @@ public class StorageDistributionEndpoint {
     List<String> headers = Arrays.asList(
         "HostName",
         "Datanode UUID",
-        "Filesystem Capacity (Bytes)",
-        "Filesystem Used Space (Bytes)",
-        "Filesystem Remaining Space (Bytes)",
-        "Ozone Capacity (Bytes)",
-        "Ozone Used Space (Bytes)",
-        "Ozone Remaining Space (Bytes)",
-        "PreAllocated Container Space (Bytes)",
-        "Reserved Space (Bytes)",
-        "Minimum Free Space (Bytes)",
-        "Pending Block Size (Bytes)"
+        "Filesystem Capacity",
+        "Filesystem Used Space",
+        "Filesystem Remaining Space",
+        "Ozone Capacity",
+        "Ozone Used Space",
+        "Ozone Remaining Space",
+        "PreAllocated Container Space",
+        "Reserved Space",
+        "Minimum Free Space",
+        "Pending Block Size"
     );
 
     List<Function<DataNodeStoragePendingDeletionView, Object>> columns =
@@ -237,17 +215,10 @@ public class StorageDistributionEndpoint {
             v -> v.getReport() != null ? v.getReport().getCommitted() : -1,
             v -> v.getReport() != null ? v.getReport().getReserved() : -1,
             v -> v.getReport() != null ? v.getReport().getMinimumFreeSpace() : -1,
-            v -> v.getMetric() != null ? v.getMetric().getPendingBlockSize() : -1
+            v -> v.getReport() != null ? v.getMetric().getPendingBlockSize() : -1
         );
 
-    String timestamp = LocalDateTime.now(ZoneOffset.UTC).format(TIMESTAMP_FORMATTER);
-    String clusterId = "UnknownCluster";
-    if (StringUtils.isNotBlank(reconContext.getClusterId())) {
-      clusterId = reconContext.getClusterId();
-    }
-    String fileName = String.format("Datanode_Insights_%s_%s.csv", clusterId, timestamp);
-
-    return ReconUtils.downloadCsv(fileName, headers, data, columns);
+    return ReconUtils.downloadCsv("datanode_storage_and_pending_deletion_stats.csv", headers, data, columns);
   }
 
   /**

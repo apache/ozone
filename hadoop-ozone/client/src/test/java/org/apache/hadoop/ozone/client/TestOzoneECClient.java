@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -338,7 +337,7 @@ public class TestOzoneECClient {
       HddsProtos.DatanodeDetailsProto member =
           blockList.getKeyLocations(0).getPipeline().getMembers(i);
       MockDatanodeStorage mockDatanodeStorage =
-          storages.get(getMatchingStorage(storages, DatanodeID.fromProto(member.getId())));
+          storages.get(getMatchingStorage(storages, member.getUuid()));
       dns.add(mockDatanodeStorage);
     }
     String firstBlockData = dns.get(0).getFullBlockData(new BlockID(
@@ -397,8 +396,8 @@ public class TestOzoneECClient {
       for (int i = 0; i < dataBlocks + parityBlocks; i++) {
         MockDatanodeStorage mockDatanodeStorage = storages.get(
             getMatchingStorage(storages,
-                DatanodeID.fromProto(blockList.getKeyLocations(0).getPipeline().getMembers(i)
-                    .getId())));
+                blockList.getKeyLocations(0).getPipeline().getMembers(i)
+                    .getUuid()));
         final OzoneKeyDetails keyDetails = bucket.getKey(keyName);
 
         ContainerProtos.BlockData block = mockDatanodeStorage.getBlock(
@@ -422,11 +421,11 @@ public class TestOzoneECClient {
   }
 
   private static DatanodeDetails getMatchingStorage(
-      Map<DatanodeDetails, MockDatanodeStorage> storages, DatanodeID id) {
+      Map<DatanodeDetails, MockDatanodeStorage> storages, String uuid) {
     Iterator<DatanodeDetails> iterator = storages.keySet().iterator();
     while (iterator.hasNext()) {
       DatanodeDetails dn = iterator.next();
-      if (dn.getID().equals(id)) {
+      if (dn.getUuid().toString().equals(uuid)) {
         return dn;
       }
     }

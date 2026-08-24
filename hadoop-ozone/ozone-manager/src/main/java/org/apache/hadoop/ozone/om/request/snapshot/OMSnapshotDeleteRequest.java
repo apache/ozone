@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAP
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -182,13 +181,6 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       snapshotInfo.setSnapshotStatus(
           SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
       snapshotInfo.setDeletionTime(deletionTime);
-      // Stamp the deletion transaction so that areSnapshotChangesFlushedToDB() reports the deletion as
-      // unflushed until the double buffer persists it. SnapshotDeletingService relies on this
-      // (shouldIgnoreSnapshot) to defer moveTableKeys/purge; without the stamp the purge can be applied and
-      // empty the in-memory snapshot chain while the on-disk snapshotInfoTable still holds the snapshot as
-      // ACTIVE, letting KeyDeletingService reclaim blocks that the on-disk snapshot still references.
-      snapshotInfo.setLastTransactionInfo(
-          TransactionInfo.valueOf(context.getTermIndex()).toByteString());
 
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
@@ -236,12 +228,12 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     if (exception == null) {
       omMetrics.decNumSnapshotActive();
       omMetrics.incNumSnapshotDeleted();
-      LOG.info("Deleted snapshot '{}' (snapshotId='{}') under path '{}'",
-          snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
+      LOG.info("Deleted snapshot '{}' under path '{}'",
+          snapshotName, snapshotPath);
     } else {
       omMetrics.incNumSnapshotDeleteFails();
-      LOG.error("Failed to delete snapshot '{}' (snapshotId='{}') under path '{}'",
-          snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
+      LOG.error("Failed to delete snapshot '{}' under path '{}'",
+          snapshotName, snapshotPath);
     }
     return omClientResponse;
   }

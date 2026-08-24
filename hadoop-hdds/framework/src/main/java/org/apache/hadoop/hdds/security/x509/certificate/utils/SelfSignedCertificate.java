@@ -26,7 +26,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -35,8 +34,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
@@ -220,9 +219,10 @@ public final class SelfSignedCertificate {
 
     public Builder addInetAddresses() throws CertificateException {
       try {
+        DomainValidator validator = DomainValidator.getInstance();
         // Add all valid ips.
         List<InetAddress> inetAddresses = getValidInetsForCurrentHost();
-        this.addInetAddresses(inetAddresses);
+        this.addInetAddresses(inetAddresses, validator);
       } catch (IOException e) {
         throw new CertificateException("Error while getting Inet addresses " +
             "for the CSR builder", e, CSR_ERROR);
@@ -230,61 +230,18 @@ public final class SelfSignedCertificate {
       return this;
     }
 
-    public Builder addInetAddresses(List<InetAddress> addresses) {
+    public Builder addInetAddresses(List<InetAddress> addresses,
+        DomainValidator validator) {
       addresses.forEach(
           ip -> {
             this.addIpAddress(ip.getHostAddress());
-            Optional<String> dnsName = DnsNames.toDnsSanValue(ip.getCanonicalHostName());
-            if (dnsName.isPresent()) {
-              if (!hasDnsName(dnsName.get())) {
-                this.addDnsName(dnsName.get());
-              }
+            if (validator.isValid(ip.getCanonicalHostName())) {
+              this.addDnsName(ip.getCanonicalHostName());
             } else {
-              LOG.warn("Rejected DNS SAN candidate '{}': not a valid RFC 1123 DNS name",
-                  ip.getCanonicalHostName());
+              LOG.error("Invalid domain {}", ip.getCanonicalHostName());
             }
           });
-
-      if (!hasDnsName()) {
-        Optional<String> dnsName;
-        try {
-          dnsName = DnsNames.toDnsSanValue(InetAddress.getLocalHost().getCanonicalHostName());
-        } catch (UnknownHostException e) {
-          dnsName = Optional.empty();
-        }
-        if (dnsName.isPresent()) {
-          this.addDnsName(dnsName.get());
-        } else {
-          LOG.warn("Certificate will have no DNS SAN; by-name TLS connections " +
-              "to this node will fail");
-        }
-      }
       return this;
-    }
-
-    private boolean hasDnsName() {
-      if (altNames == null) {
-        return false;
-      }
-      for (GeneralName name : altNames) {
-        if (name.getTagNo() == GeneralName.dNSName) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    private boolean hasDnsName(String candidate) {
-      if (altNames == null) {
-        return false;
-      }
-      for (GeneralName name : altNames) {
-        if (name.getTagNo() == GeneralName.dNSName
-            && name.getName().toString().equalsIgnoreCase(candidate)) {
-          return true;
-        }
-      }
-      return false;
     }
 
     // Support SAN extension with DNS and RFC822 Name

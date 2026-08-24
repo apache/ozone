@@ -97,7 +97,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * This class tests the OM Key Create Request.
  */
-public class TestOMKeyCreateRequest extends OMKeyRequestTests {
+public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   public static Collection<Object[]> data() {
     return Arrays.asList(
@@ -156,7 +156,7 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
 
     OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
         false, 0, 100L, replicationConfig,
-        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT));
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS));
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
 
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
@@ -170,7 +170,7 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(getOpenKey(id));
     assertNotNull(openKeyInfo);
-    assertEquals(OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT,
+    assertEquals(OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS,
         openKeyInfo.getExpectedDataGeneration());
   }
 
@@ -183,7 +183,7 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
 
     OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
         false, 0, 100L, replicationConfig,
-        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT));
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS));
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
 
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());

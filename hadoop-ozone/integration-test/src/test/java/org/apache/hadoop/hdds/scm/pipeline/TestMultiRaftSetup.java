@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -99,7 +98,7 @@ public class  TestMultiRaftSetup {
     // datanode pipeline limit is set to 2, but only one set of 3 pipelines
     // will be created. Further pipeline creation should fail
     assertEquals(1, pipelineManager.getPipelines(RATIS_THREE).size());
-    assertThrows(IOException.class, () -> pipelineManager.createPipeline(RATIS_THREE, StorageTier.getDefaultTier()));
+    assertThrows(IOException.class, () -> pipelineManager.createPipeline(RATIS_THREE));
     shutdown();
   }
 
@@ -120,7 +119,7 @@ public class  TestMultiRaftSetup {
         .filter((dn) -> nodeManager.getPipelinesCount(dn) > 2).collect(
             Collectors.toList());
     assertEquals(1, dns.size());
-    assertThrows(IOException.class, () -> pipelineManager.createPipeline(RATIS_THREE, StorageTier.getDefaultTier()));
+    assertThrows(IOException.class, () -> pipelineManager.createPipeline(RATIS_THREE));
     Collection<PipelineID> pipelineIds = nodeManager.getPipelines(dns.get(0));
     // Only one dataode should have 3 pipelines in total, 1 RATIS ONE pipeline
     // and 2 RATIS 3 pipeline

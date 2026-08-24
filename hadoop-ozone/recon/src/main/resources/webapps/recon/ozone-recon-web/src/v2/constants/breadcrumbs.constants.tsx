@@ -30,7 +30,5 @@ export const breadcrumbNameMap: BreadcrumbNameMap = {
   '/Insights': 'Insights',
   '/NamespaceUsage': 'Namespace Usage',
   '/Heatmap': 'Heatmap',
-  '/Om': 'OM DB Insights',
-  '/Capacity': 'Cluster Capacity',
-  '/Assistant': 'Recon AI'
+  '/Om': 'OM DB Insights'
 };

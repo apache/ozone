@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -113,7 +112,7 @@ public class InfoSubcommand extends ScmSubcommand {
       container = scmClient.getContainerWithPipeline(containerID);
       Objects.requireNonNull(container, "Container cannot be null");
     } catch (IOException e) {
-      rootCommand().printError(e);
+      printError("Unable to retrieve the container details for " + containerID);
       return;
     }
 
@@ -121,7 +120,7 @@ public class InfoSubcommand extends ScmSubcommand {
     try {
       replicas = scmClient.getContainerReplicas(containerID);
     } catch (IOException e) {
-      rootCommand().printError(e);
+      printError("Unable to retrieve the replica details: " + e.getMessage());
     }
 
     if (json) {
@@ -157,9 +156,6 @@ public class InfoSubcommand extends ScmSubcommand {
         if (SCMHAUtils.unwrapException(
             ioe) instanceof PipelineNotFoundException) {
           System.out.println("Write Pipeline State: CLOSED");
-        } else if (HddsUtils.formatAccessControlExceptionLine(ioe) != null) {
-          rootCommand().printError(ioe);
-          return;
         } else {
           printError("Failed to retrieve pipeline info");
         }

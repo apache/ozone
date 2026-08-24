@@ -30,7 +30,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -119,10 +118,6 @@ public class TestSCMContainerPlacementCapacity {
                 .filter(dn -> dn.getID().equals(invocation.getArgument(0)))
                 .findFirst()
                 .orElse(null));
-    when(mockNodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
-      DatanodeInfo di = invocation.getArgument(0);
-      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() >= 15L);
-    });
 
     SCMContainerPlacementCapacity scmContainerPlacementRandom =
         new SCMContainerPlacementCapacity(mockNodeManager, conf, null, true,
@@ -141,7 +136,7 @@ public class TestSCMContainerPlacementCapacity {
 
       //when
       List<DatanodeDetails> datanodeDetails = scmContainerPlacementRandom
-          .chooseDatanodes(existingNodes, null, 1, 15, 15, StorageType.DEFAULT);
+          .chooseDatanodes(existingNodes, null, 1, 15, 15);
 
       //then
       assertEquals(1, datanodeDetails.size());

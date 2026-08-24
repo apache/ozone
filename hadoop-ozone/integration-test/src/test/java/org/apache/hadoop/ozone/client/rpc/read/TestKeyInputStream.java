@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.ozone.container.OzoneTestHelper.countReplicas;
+import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -44,10 +44,10 @@ import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
-import org.apache.hadoop.ozone.container.OzoneTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
-import org.apache.hadoop.ozone.om.BucketForTesting;
+import org.apache.hadoop.ozone.om.TestBucket;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -64,13 +64,13 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class TestKeyInputStream extends InputStreamTests {
+class TestKeyInputStream extends TestInputStreamBase {
 
   /**
    * This method does random seeks and reads and validates the reads are
    * correct or not.
    */
-  private void randomSeek(BucketForTesting bucket, int dataLength,
+  private void randomSeek(TestBucket bucket, int dataLength,
       KeyInputStream keyInputStream, byte[] inputData) throws Exception {
     // Do random seek.
     for (int i = 0; i < dataLength - 300; i += 20) {
@@ -94,7 +94,7 @@ class TestKeyInputStream extends InputStreamTests {
    * This method does random seeks and reads and validates the reads are
    * correct or not.
    */
-  private void randomPositionSeek(BucketForTesting bucket, int dataLength,
+  private void randomPositionSeek(TestBucket bucket, int dataLength,
       KeyInputStream keyInputStream,
       byte[] inputData, int readSize) throws Exception {
     for (int i = 0; i < 100; i++) {
@@ -107,7 +107,7 @@ class TestKeyInputStream extends InputStreamTests {
    * This method seeks to specified seek value and read the data specified by
    * readLength and validate the read is correct or not.
    */
-  private void validate(BucketForTesting bucket, KeyInputStream keyInputStream,
+  private void validate(TestBucket bucket, KeyInputStream keyInputStream,
       byte[] inputData, long seek, int readLength) throws Exception {
     keyInputStream.seek(seek);
 
@@ -126,7 +126,7 @@ class TestKeyInputStream extends InputStreamTests {
     try (OzoneClient client = getCluster().newClient()) {
       updateConfig(layout);
 
-      BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
+      TestBucket bucket = TestBucket.newBuilder(client).build();
 
       testInputStreams(bucket);
       testSeekRandomly(bucket);
@@ -138,7 +138,7 @@ class TestKeyInputStream extends InputStreamTests {
     }
   }
 
-  private void testInputStreams(BucketForTesting bucket) throws Exception {
+  private void testInputStreams(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE) + 1;
     bucket.writeRandomBytes(keyName, dataLength);
@@ -178,7 +178,7 @@ class TestKeyInputStream extends InputStreamTests {
     }
   }
 
-  private void testSeekRandomly(BucketForTesting bucket) throws Exception {
+  private void testSeekRandomly(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
     byte[] inputData = bucket.writeRandomBytes(keyName, dataLength);
@@ -208,7 +208,7 @@ class TestKeyInputStream extends InputStreamTests {
     keyInputStream.close();
   }
 
-  public void testECSeek(BucketForTesting bucket) throws Exception {
+  public void testECSeek(TestBucket bucket) throws Exception {
     int ecChunkSize = 1024 * 1024;
     ECReplicationConfig repConfig = new ECReplicationConfig(3, 2, RS,
         ecChunkSize);
@@ -239,7 +239,7 @@ class TestKeyInputStream extends InputStreamTests {
     }
   }
 
-  public void testSeek(BucketForTesting bucket) throws Exception {
+  public void testSeek(TestBucket bucket) throws Exception {
     XceiverClientManager.resetXceiverClientMetrics();
     XceiverClientMetrics metrics = XceiverClientManager
         .getXceiverClientMetrics();
@@ -284,7 +284,7 @@ class TestKeyInputStream extends InputStreamTests {
     }
   }
 
-  private void testReadChunkWithByteArray(BucketForTesting bucket) throws Exception {
+  private void testReadChunkWithByteArray(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
 
     // write data spanning multiple blocks/chunks
@@ -304,7 +304,7 @@ class TestKeyInputStream extends InputStreamTests {
     }
   }
 
-  public void testReadChunkWithByteBuffer(BucketForTesting bucket) throws Exception {
+  public void testReadChunkWithByteBuffer(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
 
     // write data spanning multiple blocks/chunks
@@ -324,7 +324,7 @@ class TestKeyInputStream extends InputStreamTests {
     }
   }
 
-  private void testSkip(BucketForTesting bucket) throws Exception {
+  private void testSkip(TestBucket bucket) throws Exception {
     XceiverClientManager.resetXceiverClientMetrics();
     XceiverClientMetrics metrics = XceiverClientManager
         .getXceiverClientMetrics();
@@ -382,13 +382,13 @@ class TestKeyInputStream extends InputStreamTests {
   @Order(Integer.MAX_VALUE) // shuts down datanodes
   void readAfterReplication(boolean doUnbuffer) throws Exception {
     try (OzoneClient client = getCluster().newClient()) {
-      BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
+      TestBucket bucket = TestBucket.newBuilder(client).build();
 
       testReadAfterReplication(bucket, doUnbuffer);
     }
   }
 
-  private void testReadAfterReplication(BucketForTesting bucket, boolean doUnbuffer) throws Exception {
+  private void testReadAfterReplication(TestBucket bucket, boolean doUnbuffer) throws Exception {
     int dataLength = 2 * CHUNK_SIZE;
     String keyName = getNewKeyName();
     byte[] data = bucket.writeRandomBytes(keyName, dataLength);
@@ -411,7 +411,7 @@ class TestKeyInputStream extends InputStreamTests {
     long containerID = loc.getContainerID();
     assertEquals(3, countReplicas(containerID, getCluster()));
 
-    OzoneTestHelper.waitForContainerClose(getCluster(), containerID);
+    TestHelper.waitForContainerClose(getCluster(), containerID);
 
     List<DatanodeDetails> pipelineNodes = loc.getPipeline().getNodes();
 

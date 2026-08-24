@@ -83,6 +83,7 @@ import org.apache.ozone.lib.service.Instrumentation;
 import org.apache.ozone.lib.servlet.FileSystemReleaseFilter;
 import org.apache.ozone.lib.wsrs.InputStreamEntity;
 import org.apache.ozone.lib.wsrs.Parameters;
+import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -401,7 +402,7 @@ public class HttpFSServer {
     Response response;
     FSOperations.FSGetStoragePolicy command =
         new FSOperations.FSGetStoragePolicy(path);
-    Map json = fsExecute(user, command);
+    JSONObject json = fsExecute(user, command);
     AUDIT_LOG.info("[{}]", path);
     response = Response.ok(json).type(MediaType.APPLICATION_JSON).build();
     return response;
@@ -413,7 +414,7 @@ public class HttpFSServer {
     Response response;
     FSOperations.FSGetAllStoragePolicies command =
         new FSOperations.FSGetAllStoragePolicies();
-    Map json = fsExecute(user, command);
+    JSONObject json = fsExecute(user, command);
     AUDIT_LOG.info("[{}]", path);
     response = Response.ok(json).type(MediaType.APPLICATION_JSON).build();
     return response;
@@ -648,7 +649,7 @@ public class HttpFSServer {
     AUDIT_LOG.info("[{}] recursive [{}]", path, recursive);
     FSOperations.FSDelete command
         = new FSOperations.FSDelete(path, recursive);
-    Map json = fsExecute(user, command);
+    JSONObject json = fsExecute(user, command);
     response = Response.ok(json).type(MediaType.APPLICATION_JSON).build();
     return response;
   }
@@ -768,7 +769,7 @@ public class HttpFSServer {
     Long newLength = params.get(NewLengthParam.NAME, NewLengthParam.class);
     FSOperations.FSTruncate command
         = new FSOperations.FSTruncate(path, newLength);
-    Map json = fsExecute(user, command);
+    JSONObject json = fsExecute(user, command);
     AUDIT_LOG.info("Truncate [{}] to length [{}]", path, newLength);
     response = Response.ok(json).type(MediaType.APPLICATION_JSON).build();
     return response;
@@ -830,7 +831,7 @@ public class HttpFSServer {
         uploadOperation)
         .queryParam(DataParam.NAME, Boolean.TRUE)
         .replaceQueryParam(NoRedirectParam.NAME, (Object[]) null);
-    return uriBuilder.build();
+    return uriBuilder.build(null);
   }
 
   /**
@@ -1077,7 +1078,7 @@ public class HttpFSServer {
     String toPath = params.get(DestinationParam.NAME, DestinationParam.class);
     FSOperations.FSRename command
         = new FSOperations.FSRename(path, toPath);
-    Map json = fsExecute(user, command);
+    JSONObject json = fsExecute(user, command);
     AUDIT_LOG.info("[{}] to [{}]", path, toPath);
     response = Response.ok(json).type(MediaType.APPLICATION_JSON).build();
     return response;
@@ -1094,7 +1095,7 @@ public class HttpFSServer {
         UnmaskedPermissionParam.class);
     FSOperations.FSMkdirs command =
         new FSOperations.FSMkdirs(path, permission, unmaskedPermission);
-    Map json = fsExecute(user, command);
+    JSONObject json = fsExecute(user, command);
     AUDIT_LOG.info("[{}] permission [{}] unmaskedpermission [{}]",
         path, permission, unmaskedPermission);
     response = Response.ok(json).type(MediaType.APPLICATION_JSON).build();

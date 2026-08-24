@@ -25,9 +25,6 @@ x-new-config:
     - ../..:/opt/hadoop
     - ../_keytabs:/etc/security/keytabs
     - ./krb5.conf:/etc/krb5.conf
-  depends_on:
-    kdc:
-      condition: service_healthy
 
 services:
   kdc:
@@ -66,8 +63,7 @@ services:
     hostname: om
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      OZONE_OM_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
-      OZONE_OPTS:
+      OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
     ports:
       - 9874:9874
       - 9862:9862

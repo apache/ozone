@@ -25,7 +25,6 @@ import java.nio.file.FileSystemException;
 import java.nio.file.NoSuchFileException;
 import java.util.Map;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
@@ -56,8 +55,7 @@ public abstract class GenericCli implements GenericParentCommand {
     configOverrides.forEach(config::set);
   }
 
-  @Option(names = {"--conf"},
-      description = "Path to custom configuration file.")
+  @Option(names = {"-conf"})
   public void setConfigurationPath(String configPath) {
     config.addResource(new Path(configPath));
   }
@@ -68,16 +66,12 @@ public abstract class GenericCli implements GenericParentCommand {
 
   public GenericCli(CommandLine.IFactory factory) {
     cmd = new CommandLine(this, factory);
-    ExtensibleParentCommand.addSubcommands(cmd);
-    cmd.getCommandSpec().preprocessor((args, commandSpec, argSpec, info) -> {
-      args.replaceAll(arg -> DeprecatedCliOption.toNonDeprecated(arg, cmd.getErr()));
-      return false;
-    });
-
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
     });
+
+    ExtensibleParentCommand.addSubcommands(cmd);
   }
 
   public void run(String[] argv) {
@@ -99,19 +93,14 @@ public abstract class GenericCli implements GenericParentCommand {
     final String rawMessage = error.getMessage();
     if (verbose || rawMessage == null || rawMessage.isEmpty()) {
       error.printStackTrace(cmd.getErr());
-      return;
+    } else {
+      if (error instanceof FileSystemException) {
+        String errorMessage = handleFileSystemException((FileSystemException) error);
+        cmd.getErr().println(errorMessage);
+      } else {
+        cmd.getErr().println(rawMessage.split("\n")[0]);
+      }
     }
-    String aclLine = HddsUtils.formatAccessControlExceptionLine(error);
-    if (aclLine != null) {
-      cmd.getErr().println(aclLine);
-      ExitUtils.terminate(EXECUTION_ERROR_EXIT_CODE, aclLine, null);
-    }
-    if (error instanceof FileSystemException) {
-      String errorMessage = handleFileSystemException((FileSystemException) error);
-      cmd.getErr().println(errorMessage);
-      return;
-    }
-    cmd.getErr().println(rawMessage.split("\n")[0]);
   }
 
   @Override
@@ -145,23 +134,22 @@ public abstract class GenericCli implements GenericParentCommand {
   }
 
   private static String handleFileSystemException(FileSystemException e) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("Error: ");
+    String errorMessage = e.getMessage();
 
     // If reason is set, return the exception's message as it is.
     // Otherwise, construct a custom message based on the type of exception
     if (e.getReason() == null) {
       if (e instanceof NoSuchFileException) {
-        sb.append("File not found: ");
+        errorMessage = "File not found: " + errorMessage;
       } else if (e instanceof AccessDeniedException) {
-        sb.append("Access denied: ");
+        errorMessage = "Access denied: " + errorMessage;
       } else if (e instanceof FileAlreadyExistsException) {
-        sb.append("File already exists: ");
+        errorMessage = "File already exists: " + errorMessage;
       } else {
-        sb.append(e.getClass().getSimpleName()).append(": ");
+        errorMessage = e.getClass().getSimpleName() + ": " + errorMessage;
       }
     }
 
-    return sb.append(e.getMessage()).toString();
+    return "Error: " + errorMessage;
   }
 }

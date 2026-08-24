@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -154,12 +153,11 @@ public abstract class MisReplicationHandler implements
 
     int requiredNodes = replicasToBeReplicated.size();
 
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
     List<DatanodeDetails> targetDatanodes = ReplicationManagerUtil
         .getTargetDatanodes(containerPlacement, requiredNodes,
             excludedAndUsedNodes.getUsedNodes(),
             excludedAndUsedNodes.getExcludedNodes(), currentContainerSize,
-            container, StorageType.DEFAULT);
+            container);
     List<DatanodeDetails> availableSources = sources.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());

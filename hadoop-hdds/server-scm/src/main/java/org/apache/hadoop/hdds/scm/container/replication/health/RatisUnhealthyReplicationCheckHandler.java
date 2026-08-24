@@ -105,12 +105,6 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
       return true;
     }
 
-    if (health.getHealthState() == ContainerHealthResult.HealthState.UNHEALTHY) {
-      // Container is UNHEALTHY + SUFFICIENTLY REPLICATED
-      report.incrementAndSample(ContainerHealthState.UNHEALTHY, container);
-      LOG.debug("Container {} is sufficiently replicated with all unhealthy replicas", container);
-    }
-    
     return false;
   }
 

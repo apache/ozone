@@ -36,7 +36,8 @@ public class TestSimpleStriped {
   }
 
   private void testReadWriteLocks(boolean fair) {
-    Striped<ReentrantReadWriteLock> striped = SimpleStriped.readWriteLock(128, fair);
+    Striped<ReadWriteLock> striped = SimpleStriped.readWriteLock(128,
+        fair);
     assertEquals(128, striped.size());
     ReadWriteLock lock = striped.get("key1");
     assertEquals(fair, ((ReentrantReadWriteLock) lock).isFair());

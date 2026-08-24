@@ -33,7 +33,6 @@ import javax.management.ObjectName;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -87,9 +86,6 @@ public abstract class TestSCMMXBean implements NonHATests.TestCase {
     double containerThreshold = (double) mbs.getAttribute(bean,
         "SafeModeCurrentContainerThreshold");
     assertEquals(scm.getCurrentContainerThreshold(), containerThreshold, 0);
-
-    String ratisEvents = (String) mbs.getAttribute(bean, "RatisEvents");
-    assertEquals(scm.getMetrics().getRatisEvents(), ratisEvents);
   }
 
   @Test
@@ -112,7 +108,7 @@ public abstract class TestSCMMXBean implements NonHATests.TestCase {
       containerInfoList.add(
           scmContainerManager.allocateContainer(
               StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE),
-              UUID.randomUUID().toString(), StorageTier.getDefaultTier()));
+              UUID.randomUUID().toString()));
     }
     long containerID;
     for (int i = 0; i < 10; i++) {

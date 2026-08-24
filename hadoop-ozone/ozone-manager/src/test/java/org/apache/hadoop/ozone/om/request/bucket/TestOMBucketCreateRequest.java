@@ -59,7 +59,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests OMBucketCreateRequest class, which handles CreateBucket request.
  */
-public class TestOMBucketCreateRequest extends BucketRequestTests {
+public class TestOMBucketCreateRequest extends TestBucketRequest {
 
   @Test
   public void testPreExecute() throws Exception {

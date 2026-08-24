@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
-import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -51,13 +50,14 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -146,7 +146,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     om = cluster.getOzoneManager();
-    bucket1 = DataTestUtil.createVolumeAndBucket(
+    bucket1 = TestDataUtil.createVolumeAndBucket(
         client, VOLUME_NAME, BUCKET_NAME_ONE, BucketLayout.DEFAULT);
   }
 
@@ -195,7 +195,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     OmSnapshot bucket1snap3 = getOmSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3").get();
 
     // Check bucket1key1 added to next non deleted snapshot db.
-    List<Table.KeyValue<String, RepeatedOmKeyInfo>> omKeyInfos =
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> omKeyInfos =
         bucket1snap3.getMetadataManager()
             .getDeletedTable().getRangeKVs(null, 100,
                 "/vol1/bucket1/bucket1key1");
@@ -218,11 +218,11 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         .setBucketLayout(BucketLayout.LEGACY)
         .build();
 
-    OzoneBucket bucket2 = DataTestUtil.createBucket(
+    OzoneBucket bucket2 = TestDataUtil.createBucket(
         client, VOLUME_NAME, bucketArgs, BUCKET_NAME_TWO);
     // Create key1 and key2
-    DataTestUtil.createKey(bucket2, "bucket2key1", CONTENT.array());
-    DataTestUtil.createKey(bucket2, "bucket2key2", CONTENT.array());
+    TestDataUtil.createKey(bucket2, "bucket2key1", CONTENT.array());
+    TestDataUtil.createKey(bucket2, "bucket2key2", CONTENT.array());
 
     // Create Snapshot
     client.getObjectStore().createSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
@@ -275,7 +275,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     BucketArgs bucketArgs = new BucketArgs.Builder()
         .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
         .build();
-    OzoneBucket bucket2 = DataTestUtil.createBucket(
+    OzoneBucket bucket2 = TestDataUtil.createBucket(
         client, VOLUME_NAME, bucketArgs, BUCKET_NAME_FSO);
 
     assertTableRowCount(snapshotInfoTable, 0);
@@ -286,12 +286,12 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     om.getKeyManager().getDeletingService().suspend();
     // Create 10 keys
     for (int i = 1; i <= 10; i++) {
-      DataTestUtil.createKey(bucket2, "key" + i, CONTENT.array());
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
 
     // Create 5 keys to overwrite
     for (int i = 11; i <= 15; i++) {
-      DataTestUtil.createKey(bucket2, "key" + i, CONTENT.array());
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
 
     // Create Directory and Sub
@@ -304,7 +304,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         String childDir = "/childDir" + j;
         client.getProxy().createDirectory(VOLUME_NAME,
             BUCKET_NAME_FSO, parent + childDir);
-        DataTestUtil.createKey(bucket2, parent + childFile, CONTENT.array());
+        TestDataUtil.createKey(bucket2, parent + childFile, CONTENT.array());
       }
     }
 
@@ -320,7 +320,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Overwrite 3 keys -> Moves previous version to deletedTable
     for (int i = 11; i <= 13; i++) {
-      DataTestUtil.createKey(bucket2, "key" + i, CONTENT.array());
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
     assertTableRowCount(keyTable, 24);
 
@@ -384,7 +384,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Overwrite 2 keys
     for (int i = 14; i <= 15; i++) {
-      DataTestUtil.createKey(bucket2, "key" + i, CONTENT.array());
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
 
     // Delete 2 more keys
@@ -565,8 +565,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         om.getMetadataManager();
 
-    DataTestUtil.createKey(bucket, bucket.getName() + "key0", CONTENT.array());
-    DataTestUtil.createKey(bucket, bucket.getName() + "key1", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key0", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key1", CONTENT.array());
     assertTableRowCount(keyTable, 2);
 
     // Create Snapshot 1.
@@ -576,8 +576,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Overwrite bucket1key0, This is a newer version of the key which should
     // reclaimed as this is a different version of the key.
-    DataTestUtil.createKey(bucket, bucket.getName() + "key0", CONTENT.array());
-    DataTestUtil.createKey(bucket, bucket.getName() + "key2", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key0", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key2", CONTENT.array());
 
     // Key 1 cannot be reclaimed as it is still referenced by Snapshot 1.
     client.getProxy().deleteKey(bucket.getVolumeName(), bucket.getName(),
@@ -601,8 +601,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     // deletedTable when Snapshot 2 is taken.
     assertTableRowCount(deletedTable, 0);
 
-    DataTestUtil.createKey(bucket, bucket.getName() + "key3", CONTENT.array());
-    DataTestUtil.createKey(bucket, bucket.getName() + "key4", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key3", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key4", CONTENT.array());
     client.getProxy().deleteKey(bucket.getVolumeName(), bucket.getName(),
         bucket.getName() + "key4", false);
     assertTableRowCount(keyTable, 1);
@@ -681,8 +681,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     om.getKeyManager().getDirDeletingService().suspend();
     om.getKeyManager().getDeletingService().suspend();
     om.getKeyManager().getSnapshotDeletingService().suspend();
-    String volume = uniqueObjectName("vol");
-    String bucket = uniqueObjectName("bucket");
+    String volume = "vol" + RandomStringUtils.secure().nextNumeric(3),
+        bucket = "bucket" + RandomStringUtils.secure().nextNumeric(3);
     client.getObjectStore().createVolume(volume);
     OzoneVolume ozoneVolume = client.getObjectStore().getVolume(volume);
     ozoneVolume.createBucket(bucket);
@@ -694,7 +694,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     UUID snap1Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap0").getSnapshotId();
 
     // Create snap1
-    DataTestUtil.createKey(ozoneBucket, "key", CONTENT.array());
+    TestDataUtil.createKey(ozoneBucket, "key", CONTENT.array());
     client.getObjectStore().createSnapshot(volume, bucket, "snap1");
     UUID snap2Id = client.getObjectStore().getSnapshotInfo(volume, bucket, "snap1").getSnapshotId();
 

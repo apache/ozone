@@ -63,8 +63,8 @@ import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -413,26 +413,21 @@ public final class HAUtils {
     try {
       return retriableTask.call();
     } catch (Exception ex) {
-      AccessControlException ace = accessControlExceptionInCauseChain(ex);
-      if (ace != null) {
-        throw new IOException(ace.getMessage(), ex);
+      if (containsAccessControlException(ex)) {
+        throw new AccessControlException();
       }
       throw new SCMSecurityException("Unable to obtain complete CA list", ex);
     }
   }
 
-  private static AccessControlException accessControlExceptionInCauseChain(Throwable e) {
+  private static boolean containsAccessControlException(Throwable e) {
     while (e != null) {
       if (e instanceof AccessControlException) {
-        return (AccessControlException) e;
+        return true;
       }
       e = e.getCause();
     }
-    return null;
-  }
-
-  private static boolean containsAccessControlException(Throwable e) {
-    return accessControlExceptionInCauseChain(e) != null;
+    return false;
   }
 
   private static List<String> waitForCACerts(

@@ -25,7 +25,6 @@ import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -129,7 +128,7 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
       throws PipelineNotFoundException {
     lock.readLock().lock();
     try {
-      return pipelineStateMap.getPipeline(pipelineID).getPipeline();
+      return pipelineStateMap.getPipeline(pipelineID);
     } finally {
       lock.readLock().unlock();
     }
@@ -170,37 +169,13 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
 
   @Override
   public List<Pipeline> getPipelines(
-      ReplicationConfig replicationConfig, StorageTier storageTier) {
-    lock.readLock().lock();
-    try {
-      return pipelineStateMap.getPipelines(replicationConfig, storageTier);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(
-      ReplicationConfig replicationConfig,
-      Pipeline.PipelineState state, StorageTier storageTier) {
-    lock.readLock().lock();
-    try {
-      return pipelineStateMap.getPipelines(replicationConfig, state, storageTier);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(
       ReplicationConfig replicationConfig,
       Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
-      Collection<PipelineID> excludePipelines, StorageTier storageTier) {
+      Collection<PipelineID> excludePipelines) {
     lock.readLock().lock();
     try {
       return pipelineStateMap
-          .getPipelines(replicationConfig, state, excludeDns, excludePipelines,
-              storageTier);
+          .getPipelines(replicationConfig, state, excludeDns, excludePipelines);
     } finally {
       lock.readLock().unlock();
     }

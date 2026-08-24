@@ -22,10 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
-import org.apache.hadoop.hdds.client.StorageTierUtil;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -64,18 +61,17 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
     return stateManager;
   }
 
-  protected abstract Pipeline create(REPLICATION_CONFIG replicationConfig,
-      StorageTier storageTier) throws IOException;
+  protected abstract Pipeline create(REPLICATION_CONFIG replicationConfig)
+      throws IOException;
 
   protected abstract Pipeline create(REPLICATION_CONFIG replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      StorageTier storageTier)
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException;
 
   protected abstract Pipeline create(
       REPLICATION_CONFIG replicationConfig,
-      List<DatanodeDetails> nodes,
-      StorageTier storageTier) throws IOException;
+      List<DatanodeDetails> nodes
+  );
 
   protected abstract Pipeline createForRead(
       REPLICATION_CONFIG replicationConfig,
@@ -86,15 +82,12 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
 
   List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig,
                                          long metadataSizeRequired,
-                                         long dataSizeRequired, StorageTier storageTier)
+                                         long dataSizeRequired)
       throws SCMException {
-    StorageTierUtil.validateNotEmpty(storageTier);
-    StorageType storageType = storageTier.getUniformStorageType();
     int nodesRequired = replicationConfig.getRequiredNodes();
     List<DatanodeDetails> healthyDNs = pickAllNodesNotUsed(replicationConfig);
     List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
-        .filter(dn -> SCMCommonPlacementPolicy.hasEnoughSpace(
-            dn, metadataSizeRequired, dataSizeRequired, storageType, nodeManager))
+        .filter(dn -> SCMCommonPlacementPolicy.hasEnoughSpace(dn, metadataSizeRequired, dataSizeRequired))
         .limit(nodesRequired)
         .collect(Collectors.toList());
 
@@ -145,12 +138,5 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
     return dns;
-  }
-
-  protected Pipeline.Builder newPipelineBuilder(ReplicationConfig replicationConfig, List<DatanodeDetails> nodes) {
-    return Pipeline.newBuilder()
-        .setNodes(nodes)
-        .setReplicationConfig(replicationConfig)
-        .setState(Pipeline.PipelineState.ALLOCATED);
   }
 }

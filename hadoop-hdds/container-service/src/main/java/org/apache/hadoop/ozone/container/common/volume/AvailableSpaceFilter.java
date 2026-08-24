@@ -24,9 +24,6 @@ import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 
 /**
  * Filter for selecting volumes with enough space for a new container.
- * Uses the <em>hard</em> min-free spare (same as write checks), not the SCM-reported spare in
- * {@link StorageLocationReport#getFreeSpaceToSpare()}. The gap between reported and hard is the
- * soft band (e.g. 40GB − 30GB on a 2000GB disk with 2% vs 1.5%).
  * Keeps track of ineligible volumes for logging/debug purposes.
  */
 public class AvailableSpaceFilter implements Predicate<HddsVolume> {
@@ -42,22 +39,8 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   @Override
   public boolean test(HddsVolume vol) {
     StorageLocationReport report = vol.getReport();
-    long capacity = report.getCapacity();
-    long spareAtHardLimit = vol.getFreeSpaceToSpare(capacity);
-    long available =
-        report.getRemaining() - report.getCommitted() - spareAtHardLimit;
-    long availableAtReportedSpare = report.getUsableSpace();
-
+    long available = report.getUsableSpace();
     boolean hasEnoughSpace = available > requiredSpace;
-
-    VolumeInfoMetrics stats = vol.getVolumeInfoStats();
-    if (stats != null) {
-      if (!hasEnoughSpace) {
-        stats.incNumContainerCreateRequestsRejectedHardMinFreeSpace();
-      } else if (availableAtReportedSpare <= requiredSpace) {
-        stats.incNumContainerCreateRequestsInSoftBandMinFreeSpace();
-      }
-    }
 
     mostAvailableSpace = Math.max(available, mostAvailableSpace);
 

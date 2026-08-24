@@ -83,6 +83,7 @@ public class TestCloseContainerHandler {
   public void test() throws Exception {
     cluster.waitForClusterToBeReady();
 
+    //the easiest way to create an open container is creating a key
     try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
       ObjectStore objectStore = client.getObjectStore();
       objectStore.createVolume("test");
@@ -113,25 +114,25 @@ public class TestCloseContainerHandler {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
 
-    assertFalse(isContainerClosed(cluster, containerId.getIdForTesting()));
+    assertFalse(isContainerClosed(cluster, containerId.getId()));
 
     DatanodeDetails datanodeDetails =
         cluster.getHddsDatanodes().get(0).getDatanodeDetails();
     //send the order to close the container
     SCMCommand<?> command = new CloseContainerCommand(
-        containerId.getIdForTesting(), pipeline.getId());
+        containerId.getId(), pipeline.getId());
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(datanodeDetails.getID(), command);
 
     GenericTestUtils.waitFor(() ->
-            isContainerClosed(cluster, containerId.getIdForTesting()),
+            isContainerClosed(cluster, containerId.getId()),
             500,
             5 * 1000);
 
     //double check if it's really closed (waitFor also throws an exception)
-    assertTrue(isContainerClosed(cluster, containerId.getIdForTesting()));
+    assertTrue(isContainerClosed(cluster, containerId.getId()));
   }
 
   private static Boolean isContainerClosed(MiniOzoneCluster cluster,

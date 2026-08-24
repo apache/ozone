@@ -17,13 +17,16 @@
  */
 
 import {setupServer} from "msw/node";
-import { http, HttpResponse } from "msw";
+import {rest} from "msw";
 
 import * as mockResponses from "./pipelineResponseMocks";
 
 const handlers = [
-  http.get("/api/v1/pipelines", () => {
-    return HttpResponse.json(mockResponses.PipelinesResponse);
+  rest.get("api/v1/pipelines", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(mockResponses.PipelinesResponse)
+    );
   })
 ];
 

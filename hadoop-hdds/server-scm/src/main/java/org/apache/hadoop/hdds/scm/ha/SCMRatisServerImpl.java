@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
@@ -66,8 +67,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Default {@link SCMRatisServer} implementation backed by a Ratis
- * {@link RaftServer} running the {@link SCMStateMachine}.
+ * TODO.
  */
 public class SCMRatisServerImpl implements SCMRatisServer {
   private static final Logger LOG =
@@ -222,8 +222,13 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
-  public void registerStateMachineHandler(final ScmInvoker<?> handler) {
-    stateMachine.registerInvoker(handler.getType(), handler);
+  public void registerStateMachineHandler(final RequestType handlerType,
+                                          final Object handler) {
+    if (handler instanceof ScmInvoker) {
+      stateMachine.registerInvoker(handlerType, (ScmInvoker) handler);
+    } else {
+      stateMachine.registerHandler(handlerType, handler);
+    }
   }
 
   @Override
@@ -397,18 +402,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final RaftGroupId groupId = buildRaftGroupId(clusterId);
     RaftPeerId selfPeerId = getSelfPeerId(scmId);
 
-    // Pass the configured host:port string through verbatim. The
-    // invariant is "do not pre-resolve" -- never construct an
-    // InetSocketAddress from the configured address and hand the
-    // resolved form to RaftPeer.setAddress, which would freeze the peer
-    // at one IP for the channel's lifetime. Ratis routes the string to
-    // gRPC's NettyChannelBuilder, whose default DnsNameResolver
-    // re-resolves hostname addresses on connection failure (peer pod
-    // restarts recover automatically in Kubernetes-style environments
-    // where DNS names are stable but IPs are not). IP-literal configs
-    // are still honored exactly as configured. See HDDS-15514
-    // (DNS-refresh-on-failure for all RPC paths).
     RaftPeer localRaftPeer = RaftPeer.newBuilder().setId(selfPeerId)
+        // TODO : Should we use IP instead of hostname??
         .setAddress(details.getRatisHostPortStr()).build();
 
     List<RaftPeer> raftPeers = new ArrayList<>();

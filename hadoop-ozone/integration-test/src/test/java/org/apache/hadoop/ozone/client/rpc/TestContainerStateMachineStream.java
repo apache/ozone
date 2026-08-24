@@ -18,23 +18,19 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-import static org.apache.hadoop.ozone.container.OzoneTestHelper.createStreamKey;
-import static org.apache.hadoop.ozone.container.OzoneTestHelper.getDatanodeService;
+import static org.apache.hadoop.ozone.container.TestHelper.createStreamKey;
+import static org.apache.hadoop.ozone.container.TestHelper.getDatanodeService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Stream;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -44,8 +40,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests the containerStateMachine stream handling.
@@ -53,6 +48,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class TestContainerStateMachineStream implements NonHATests.TestCase {
   private OzoneClient client;
+  private ObjectStore objectStore;
   private String volumeName;
   private String bucketName;
   private int chunkSize;
@@ -62,7 +58,7 @@ public abstract class TestContainerStateMachineStream implements NonHATests.Test
     chunkSize = (int) cluster().getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 1024 * 1024, StorageUnit.BYTES);
 
     client = cluster().newClient();
-    ObjectStore objectStore = client.getObjectStore();
+    objectStore = client.getObjectStore();
 
     volumeName = "vol-" + UUID.randomUUID();
     bucketName = "teststreambucket";
@@ -75,26 +71,14 @@ public abstract class TestContainerStateMachineStream implements NonHATests.Test
     IOUtils.closeQuietly(client);
   }
 
-  private static Stream<Arguments> streamingParameters() {
-    return Stream.of(-1, +1).flatMap(offset ->
-        Stream.of(false, true).map(putBlockOnCloseEnabled ->
-            Arguments.of(offset, putBlockOnCloseEnabled)));
-  }
-
   @ParameterizedTest
-  @MethodSource("streamingParameters")
-  void testContainerStateMachineForStreaming(int offset, boolean putBlockOnCloseEnabled)
-      throws Exception {
+  @ValueSource(ints = {-1, +1})
+  void testContainerStateMachineForStreaming(int offset) throws Exception {
     final int size = chunkSize + offset;
-    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
-    conf.setFromObject(clientConfig);
 
     final List<OmKeyLocationInfo> locationInfoList;
-    try (OzoneClient streamingClient = OzoneClientFactory.getRpcClient(conf);
-         OzoneDataStreamOutput key = createStreamKey("key" + offset + "-" + putBlockOnCloseEnabled,
-             ReplicationType.RATIS, size, streamingClient.getObjectStore(), volumeName, bucketName)) {
+    try (OzoneDataStreamOutput key = createStreamKey("key" + offset, ReplicationType.RATIS, size,
+        objectStore, volumeName, bucketName)) {
 
       byte[] data = ContainerTestHelper.generateData(size, true);
       key.write(ByteBuffer.wrap(data));

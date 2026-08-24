@@ -24,7 +24,6 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -41,12 +40,12 @@ import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 public interface Container<CONTAINERDATA extends ContainerData> {
 
   /**
-   * Creates a container and optionally constrains the destination volume to a
-   * specific storage type.
+   * Creates a container.
+   *
+   * @throws StorageContainerException
    */
-  void create(VolumeSet volumeSet,
-      VolumeChoosingPolicy volumeChoosingPolicy, String scmId,
-      StorageType storageType) throws StorageContainerException;
+  void create(VolumeSet volumeSet, VolumeChoosingPolicy volumeChoosingPolicy,
+              String scmId) throws StorageContainerException;
 
   /**
    * Deletes the container.

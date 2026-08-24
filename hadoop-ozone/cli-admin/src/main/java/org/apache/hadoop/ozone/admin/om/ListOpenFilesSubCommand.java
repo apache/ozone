@@ -142,42 +142,40 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     for (OpenKeySession e : openFileList) {
       long clientId = e.getId();
       OmKeyInfo omKeyInfo = e.getKeyInfo();
-      StringBuilder line = new StringBuilder()
-          .append(clientId).append('\t')
-          .append(Instant.ofEpochMilli(omKeyInfo.getCreationTime())).append('\t');
+      String line = clientId + "\t" + Instant.ofEpochMilli(omKeyInfo.getCreationTime()) + "\t";
 
       if (omKeyInfo.isHsync()) {
         String hsyncClientIdStr =
             omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
         long hsyncClientId = Long.parseLong(hsyncClientIdStr);
         if (clientId == hsyncClientId) {
-          line.append("Yes\t\t");
+          line += "Yes\t\t";
         } else {
           // last hsync'ed with a different client ID than the client that
           // initially opens the file (!)
-          line.append("Yes w/ cid ").append(hsyncClientIdStr).append('\t');
+          line += "Yes w/ cid " + hsyncClientIdStr + "\t";
         }
 
         if (showDeleted) {
           if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY)) {
-            line.append("Yes\t\t");
+            line += "Yes\t\t";
           } else {
-            line.append("No\t\t");
+            line += "No\t\t";
           }
         }
         if (showOverwritten) {
           if (omKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
-            line.append("Yes\t");
+            line += "Yes\t";
           } else {
-            line.append("No\t");
+            line += "No\t";
           }
         }
       } else {
-        line.append(showDeleted ? "No\t\tNo\t\t" : "No\t\t")
-            .append(showOverwritten ? "No\t" : "");
+        line += showDeleted ? "No\t\tNo\t\t" : "No\t\t";
+        line += showOverwritten ? "No\t" : "";
       }
 
-      line.append(getFullPathFromKeyInfo(omKeyInfo));
+      line += getFullPathFromKeyInfo(omKeyInfo);
 
       System.out.println(line);
     }
@@ -233,16 +231,16 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
    * @return the command to get the next batch of open keys
    */
   private String getCmdForNextBatch(String lastElementFullPath) {
-    StringBuilder nextBatchCmd = new StringBuilder("ozone admin om lof ").append(omAddressOptions);
+    String nextBatchCmd = "ozone admin om lof " + omAddressOptions;
     if (json) {
-      nextBatchCmd.append(" --json");
+      nextBatchCmd += " --json";
     }
-    nextBatchCmd.append(" --length=").append(limit);
+    nextBatchCmd += " --length=" + limit;
     if (pathPrefix != null && !pathPrefix.isEmpty()) {
-      nextBatchCmd.append(" --prefix=").append(pathPrefix);
+      nextBatchCmd += " --prefix=" + pathPrefix;
     }
-    nextBatchCmd.append(" --start=").append(lastElementFullPath);
-    return nextBatchCmd.toString();
+    nextBatchCmd += " --start=" + lastElementFullPath;
+    return nextBatchCmd;
   }
 
   private String getFullPathFromKeyInfo(OmKeyInfo oki) {

@@ -95,7 +95,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     if (keyArgs.hasExpectedDataGeneration()) {
       if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+          == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
         ozoneManager.checkFeatureEnabled(
             OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
       } else {
@@ -303,6 +303,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
 
       validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
+      // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
+      // not persisted in the key table.
+      // Combination
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
           .setExpectedDataGeneration(null)
@@ -622,7 +625,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       Long expectedGen = toCommit.getExpectedDataGeneration();
       auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(expectedGen));
 
-      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
         if (existing != null) {
           throw new OMException("Atomic create-if-not-exists conflicted with an existing key",
               OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);

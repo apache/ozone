@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests delete volume request.
  */
-public class TestOMVolumeDeleteRequest extends OMVolumeRequestTests {
+public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
 
   @Test
   public void testPreExecute() throws Exception {

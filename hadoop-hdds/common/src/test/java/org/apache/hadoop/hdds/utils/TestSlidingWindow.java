@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
-import org.apache.ozone.test.MockClock;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -32,11 +32,11 @@ import org.junit.jupiter.api.Test;
  */
 class TestSlidingWindow {
 
-  private MockClock testClock;
+  private TestClock testClock;
 
   @BeforeEach
   void setup() {
-    testClock = MockClock.newInstance();
+    testClock = TestClock.newInstance();
   }
   
   @Test

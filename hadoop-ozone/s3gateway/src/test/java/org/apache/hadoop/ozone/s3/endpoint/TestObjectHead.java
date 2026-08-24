@@ -19,29 +19,17 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CACHE_CONTROL_CUSTOM;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_DISPOSITION_CUSTOM;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_ENCODING_CUSTOM;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_LANGUAGE_CUSTOM;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_TYPE_CUSTOM;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.EXPIRES_CUSTOM;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
-import static org.apache.hadoop.ozone.s3.endpoint.TestObjectGet.EXPIRES1;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -50,10 +38,7 @@ import java.io.OutputStream;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -61,16 +46,11 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test head object.
@@ -111,22 +91,11 @@ public class TestObjectHead {
 
     DateTimeFormatter.RFC_1123_DATE_TIME
         .parse(response.getHeaderString("Last-Modified"));
-
-    assertNull(response.getHeaderString(TAG_COUNT_HEADER),
-        "HeadObject must omit x-amz-tagging-count (AWS TagCount) when object has no tags");
   }
 
   @Test
   public void testHeadFailByBadName() throws Exception {
     assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, "badKeyName"));
-  }
-
-  @Test
-  public void testHeadWithNegativePartNumber() throws Exception {
-    keyEndpoint.queryParamsForTest()
-        .setInt(S3Consts.QueryParams.PART_NUMBER, -1);
-    assertErrorResponse(INVALID_ARGUMENT,
-        () -> keyEndpoint.head(bucketName, "key1"));
   }
 
   @Test
@@ -239,86 +208,6 @@ public class TestObjectHead {
     createKey(keyPath);
 
     assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, keyPath + "/"));
-  }
-
-  @Test
-  public void testHeadObjectIncludesTagCount()
-      throws Exception {
-    String keyName = "head-with-tags";
-    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
-    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "c"));
-
-    Response response = keyEndpoint.head(bucketName, keyName);
-    assertEquals(HttpStatus.SC_OK, response.getStatus());
-    // S3 HeadObject TagCount in the AWS API is driven by x-amz-tagging-count
-    assertNotNull(response.getHeaderString(TAG_COUNT_HEADER),
-        "HeadObject must include x-amz-tagging-count when object has tags (AWS TagCount)");
-    assertEquals("2", response.getHeaderString(TAG_COUNT_HEADER));
-  }
-
-  @ParameterizedTest
-  @MethodSource("reservedMetadataCollisionCases")
-  public void testHeadSeparatesUserMetadataFromSystemHeader(
-      String headerName, String customKey, String systemValue, String userValue)
-      throws Exception {
-    String keyName = "reserved-" + customKey;
-    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
-    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + headerName.toLowerCase(), userValue);
-    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
-    if (HttpHeaders.CONTENT_TYPE.equals(headerName)) {
-      when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
-          .thenReturn(systemValue);
-    } else {
-      when(headers.getHeaderString(headerName)).thenReturn(systemValue);
-    }
-
-    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "body"));
-
-    assertEquals(systemValue, bucket.getKey(keyName).getMetadata().get(headerName));
-    assertEquals(userValue,
-        bucket.getKey(keyName).getMetadata().get(customKey));
-
-    Response response = keyEndpoint.head(bucketName, keyName);
-    assertEquals(HttpStatus.SC_OK, response.getStatus());
-    assertEquals(systemValue, response.getHeaderString(headerName));
-    assertEquals(userValue,
-        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + headerName.toLowerCase()));
-  }
-
-  @Test
-  public void testUserMetadataSuffixDoesNotCollideWithInternalKey() throws Exception {
-    String keyName = "reserved-cache-control-suffix";
-    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
-    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "cache-control", "user-cache");
-    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "cache-control-custom", "suffix-value");
-    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
-    when(headers.getHeaderString(HttpHeaders.CACHE_CONTROL)).thenReturn("no-cache");
-
-    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "body"));
-
-    assertEquals("no-cache",
-        bucket.getKey(keyName).getMetadata().get(HttpHeaders.CACHE_CONTROL));
-    assertEquals("user-cache",
-        bucket.getKey(keyName).getMetadata().get(CACHE_CONTROL_CUSTOM));
-    assertEquals("suffix-value",
-        bucket.getKey(keyName).getMetadata().get("cache-control-custom"));
-
-    Response response = keyEndpoint.head(bucketName, keyName);
-    assertEquals("no-cache", response.getHeaderString(HttpHeaders.CACHE_CONTROL));
-    assertEquals("user-cache",
-        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "cache-control"));
-    assertEquals("suffix-value",
-        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "cache-control-custom"));
-  }
-
-  private static Stream<Arguments> reservedMetadataCollisionCases() {
-    return Stream.of(
-        Arguments.of(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM, "image/jpeg", "user/custom-type"),
-        Arguments.of(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_CUSTOM, "no-cache", "user-cache"),
-        Arguments.of(HttpHeaders.EXPIRES, EXPIRES_CUSTOM, EXPIRES1, "user-expires"),
-        Arguments.of(HttpHeaders.CONTENT_ENCODING, CONTENT_ENCODING_CUSTOM, "gzip", "user-encoding"),
-        Arguments.of(HttpHeaders.CONTENT_LANGUAGE, CONTENT_LANGUAGE_CUSTOM, "en-CA", "user-lang"),
-        Arguments.of(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION_CUSTOM, "inline", "user-disp"));
   }
 
   private byte[] createKey(String keyPath) throws IOException {

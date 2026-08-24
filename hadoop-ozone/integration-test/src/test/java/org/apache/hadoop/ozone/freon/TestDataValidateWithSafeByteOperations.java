@@ -26,7 +26,7 @@ import org.junit.jupiter.api.BeforeAll;
  * Tests Freon, with MiniOzoneCluster and validate data.
  */
 
-public class TestDataValidateWithSafeByteOperations extends DataValidateTests {
+public class TestDataValidateWithSafeByteOperations extends TestDataValidate {
 
   @BeforeAll
   public static void init() throws Exception {

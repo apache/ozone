@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
-import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
@@ -53,7 +52,6 @@ import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -157,20 +155,6 @@ public interface ClientProtocol {
    * @return OzoneKey which gives basic information about the key.
    */
   OzoneKey headS3Object(String bucketName, String keyName) throws IOException;
-
-  /**
-   * Look up metadata for a single part of a multipart object in S3 context.
-   * Uses HEAD semantics (no block tokens or pipeline refresh), while still
-   * validating the requested part number.
-   *
-   * @param bucketName Name of the Bucket
-   * @param keyName Key name
-   * @param partNumber Multipart-upload part number
-   * @return {@link OzoneKey} for the requested part
-   * @throws IOException
-   */
-  OzoneKey headS3Object(String bucketName, String keyName, int partNumber)
-      throws IOException;
 
   /**
    * Get OzoneKey in S3 context.
@@ -555,20 +539,6 @@ public interface ClientProtocol {
    */
   void deleteKey(String volumeName, String bucketName, String keyName,
                  boolean recursive)
-      throws IOException;
-
-  /**
-   * Deletes an existing key if the key's current ETag matches expectedETag.
-   * @param volumeName Name of the Volume
-   * @param bucketName Name of the Bucket
-   * @param keyName Name of the Key
-   * @param recursive recursive deletion of all sub path keys if true,
-   *                  otherwise non-recursive
-   * @param expectedETag expected ETag, or "*" to require the key to exist
-   * @throws IOException
-   */
-  void deleteKey(String volumeName, String bucketName, String keyName,
-                 boolean recursive, String expectedETag)
       throws IOException;
 
   /**
@@ -1004,28 +974,8 @@ public interface ClientProtocol {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
-  default OzoneFileStatus getOzoneFileStatus(String volumeName,
-      String bucketName, String keyName) throws IOException {
-    return getOzoneFileStatus(volumeName, bucketName, keyName, false);
-  }
-
-  /**
-   * Get the Ozone File Status for a particular Ozone key.
-   *
-   * @param volumeName volume name.
-   * @param bucketName bucket name.
-   * @param keyName    key name.
-   * @param headOp     when true, this is a metadata-only (type) check: the OM
-   *                   skips the pipeline refresh (SCM round-trip) and datanode
-   *                   sorting since block locations are not needed.
-   * @return OzoneFileStatus for the key.
-   * @throws OMException if file does not exist
-   *                     if bucket does not exist
-   * @throws IOException if there is error in the db
-   *                     invalid arguments
-   */
   OzoneFileStatus getOzoneFileStatus(String volumeName, String bucketName,
-      String keyName, boolean headOp) throws IOException;
+      String keyName) throws IOException;
 
   /**
    * Creates directory with keyName as the absolute path for the directory.
@@ -1273,6 +1223,8 @@ public interface ClientProtocol {
    * @param s3Auth authentication information for each S3 API call.
    */
   void setThreadLocalS3Auth(S3Auth s3Auth);
+
+  void setIsS3Request(boolean isS3Request);
 
   /**
    * Gets the S3 Authentication information that is attached to the thread.
@@ -1543,60 +1495,4 @@ public interface ClientProtocol {
   void deleteObjectTagging(String volumeName, String bucketName, String keyName)
       throws IOException;
 
-  /**
-   * Gets the lifecycle configuration information.
-   * @param volumeName - Volume name.
-   * @param bucketName - Bucket name.
-   * @return OzoneLifecycleConfiguration or exception is thrown.
-   * @throws IOException
-   */
-  OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
-      throws IOException;
-
-  /**
-   * Creates a new lifecycle configuration.
-   * This operation will completely overwrite any existing lifecycle configuration on the bucket.
-   * If the bucket already has a lifecycle configuration, it will be replaced with the new one.
-   * @param lifecycleConfiguration - lifecycle configuration info.
-   * @throws IOException
-   */
-  void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration)
-      throws IOException;
-
-  /**
-   * Deletes existing lifecycle configuration.
-   * @param volumeName - Volume name.
-   * @param bucketName - Bucket name.
-   * @throws IOException
-   */
-  void deleteLifecycleConfiguration(String volumeName, String bucketName)
-      throws IOException;
-
-  /**
-   * Gets the tags for an existing bucket.
-   * @param volumeName Volume name.
-   * @param bucketName Bucket name.
-   * @return Tags for the specified bucket.
-   * @throws IOException
-   */
-  Map<String, String> getBucketTagging(String volumeName, String bucketName)
-      throws IOException;
-
-  /**
-   * Sets tags on an existing bucket (replaces existing tag set).
-   * @param volumeName Volume name.
-   * @param bucketName Bucket name.
-   * @param tags Tags to set on the bucket.
-   * @throws IOException
-   */
-  void putBucketTagging(String volumeName, String bucketName,
-      Map<String, String> tags) throws IOException;
-
-  /**
-   * Removes all tags from the specified bucket.
-   * @param volumeName Volume name.
-   * @param bucketName Bucket name.
-   * @throws IOException
-   */
-  void deleteBucketTagging(String volumeName, String bucketName) throws IOException;
 }

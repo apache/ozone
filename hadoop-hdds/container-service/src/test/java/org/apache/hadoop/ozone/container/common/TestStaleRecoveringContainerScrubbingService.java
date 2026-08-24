@@ -22,11 +22,8 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -45,14 +42,11 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.BackgroundTask;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -64,7 +58,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
-import org.apache.ozone.test.MockClock;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -83,8 +77,8 @@ public class TestStaleRecoveringContainerScrubbingService {
   private int containerIdNum = 0;
   private MutableVolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
-  private final MockClock testClock =
-      new MockClock(Instant.now(), ZoneOffset.UTC);
+  private final TestClock testClock =
+      new TestClock(Instant.now(), ZoneOffset.UTC);
 
   private void initVersionInfo(ContainerTestVersionInfo versionInfo)
       throws IOException {
@@ -109,7 +103,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     volumeSet = mock(MutableVolumeSet.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
   }
 
@@ -139,7 +133,7 @@ public class TestStaleRecoveringContainerScrubbingService {
           new KeyValueContainer(recoveringContainerData,
               conf);
       recoveringKeyValueContainer.create(
-          volumeSet, volumeChoosingPolicy, clusterID, StorageType.DISK);
+          volumeSet, volumeChoosingPolicy, clusterID);
       containerSet.addContainer(recoveringKeyValueContainer);
       createdIds.add((long) containerIdNum);
     }
@@ -192,51 +186,5 @@ public class TestStaleRecoveringContainerScrubbingService {
       assertEquals(entry.getContainerState(),
               containerStateMap.get(entry.getContainerData().getContainerID()));
     }
-  }
-
-  @ContainerTestVersionInfo.ContainerTest
-  public void testUpdateRecoveringContainerTimeoutExtendsScrubDeadline(
-      ContainerTestVersionInfo versionInfo) throws Exception {
-    initVersionInfo(versionInfo);
-    ContainerSet containerSet = newContainerSet(1000, testClock);
-    StaleRecoveringContainerScrubbingService srcss =
-        new StaleRecoveringContainerScrubbingService(
-            50, TimeUnit.MILLISECONDS, 10,
-            Duration.ofSeconds(300).toMillis(),
-            containerSet);
-    List<Long> ids = createTestContainers(containerSet, 1, RECOVERING);
-    long containerId = ids.get(0);
-    testClock.fastForward(800L);
-    containerSet.updateRecoveringContainerTimeout(containerId);
-    testClock.fastForward(800L);
-    srcss.runPeriodicalTaskNow();
-    assertEquals(RECOVERING, containerSet.getContainer(containerId).getContainerState());
-    testClock.fastForward(500L);
-    srcss.runPeriodicalTaskNow();
-    assertEquals(UNHEALTHY, containerSet.getContainer(containerId).getContainerState());
-  }
-
-  @ContainerTestVersionInfo.ContainerTest
-  public void testScrubSkippedWhenDeadlineExtendedBeforeTaskRuns(
-      ContainerTestVersionInfo versionInfo) throws Exception {
-    initVersionInfo(versionInfo);
-    ContainerSet containerSet = newContainerSet(1000, testClock);
-    StaleRecoveringContainerScrubbingService srcss =
-        new StaleRecoveringContainerScrubbingService(
-            50, TimeUnit.MILLISECONDS, 10,
-            Duration.ofSeconds(300).toMillis(),
-            containerSet);
-    List<Long> ids = createTestContainers(containerSet, 1, RECOVERING);
-    long containerId = ids.get(0);
-    testClock.fastForward(1000L);
-    BackgroundTaskQueue tasks = srcss.getTasks();
-    assertFalse(containerSet.getRecoveringContainerMap().containsKey(containerId));
-    containerSet.updateRecoveringContainerTimeout(containerId);
-    while (!tasks.isEmpty()) {
-      BackgroundTask task = tasks.poll();
-      task.call();
-    }
-    assertEquals(RECOVERING, containerSet.getContainer(containerId).getContainerState());
-    assertTrue(containerSet.getRecoveringContainerMap().containsKey(containerId));
   }
 }

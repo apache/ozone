@@ -17,18 +17,13 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static java.nio.charset.StandardCharsets.ISO_8859_1;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MODIFIED_SINCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
@@ -49,7 +44,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -58,10 +52,8 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneClientTestUtils;
-import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -112,31 +104,6 @@ public class TestObjectGet {
     // Create a key with object tags
     when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT));
-  }
-
-  @Test
-  public void testGetWithNegativePartNumber() throws Exception {
-    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, -1);
-    assertErrorResponse(INVALID_ARGUMENT,
-        () -> get(rest, BUCKET_NAME, KEY_NAME));
-  }
-
-  @Test
-  public void testGetUnreadableKey() {
-    String unreadableKey = new String(new byte[] {(byte) 0xae, (byte) 0x8a, '-'}, ISO_8859_1);
-    assertErrorResponse(INVALID_URI, () -> get(rest, BUCKET_NAME, unreadableKey));
-
-    String malformedUtf8Key = new String(new byte[] {(byte) 0xff}, UTF_8);
-    assertErrorResponse(INVALID_URI, () -> get(rest, BUCKET_NAME, malformedUtf8Key));
-  }
-
-  @Test
-  public void testGetValidUnicodeKey() throws Exception {
-    String unicodeKey = "café.txt";
-    assertSucceeds(() -> put(rest, BUCKET_NAME, unicodeKey, CONTENT));
-    Response response = get(rest, BUCKET_NAME, unicodeKey);
-    assertEquals(String.valueOf(CONTENT.length()),
-        response.getHeaderString("Content-Length"));
   }
 
   @Test
@@ -229,21 +196,6 @@ public class TestObjectGet {
   }
 
   @Test
-  public void getKeyWithCustomMetadata() throws IOException, OS3Exception {
-    final String keyName = "key-with-meta";
-    final String metaValue = "mymeta";
-    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
-    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1", metaValue);
-    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
-
-    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
-
-    Response response = get(rest, BUCKET_NAME, keyName);
-    assertEquals(metaValue,
-        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
-  }
-
-  @Test
   public void getKeyWithTag() throws IOException, OS3Exception {
     //WHEN
     Response response = get(rest, BUCKET_NAME, KEY_WITH_TAG);
@@ -259,13 +211,12 @@ public class TestObjectGet {
   }
 
   @Test
-  public void storedObjectHeadersOnGetAndHead() throws IOException, OS3Exception {
+  public void inheritRequestHeader() throws IOException, OS3Exception {
     setDefaultHeader();
-    assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_NAME, CONTENT));
-    clearRequestHeaderMocks();
 
     Response response = get(rest, BUCKET_NAME, KEY_NAME);
-    assertEquals("binary/octet-stream",
+
+    assertEquals(CONTENT_TYPE1,
         response.getHeaderString("Content-Type"));
     assertEquals(CONTENT_LANGUAGE1,
         response.getHeaderString("Content-Language"));
@@ -277,16 +228,11 @@ public class TestObjectGet {
         response.getHeaderString("Content-Disposition"));
     assertEquals(CONTENT_ENCODING1,
         response.getHeaderString("Content-Encoding"));
-
-    assertEquals(CONTENT_ENCODING1,
-        rest.head(BUCKET_NAME, KEY_NAME).getHeaderString("Content-Encoding"));
   }
 
   @Test
   public void overrideResponseHeader() throws IOException, OS3Exception {
     setDefaultHeader();
-    assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_NAME, CONTENT));
-    clearRequestHeaderMocks();
 
     MultivaluedMap<String, String> queryParameter = rest.getContext().getUriInfo().getQueryParameters();
     // overrider request header
@@ -352,55 +298,6 @@ public class TestObjectGet {
     assertNull(response.getHeaderString(TAG_COUNT_HEADER));
   }
 
-  @Test
-  public void getAndHeadReturnStoredContentType()
-      throws IOException, OS3Exception {
-    // Store a Content-Type, then read with no request Content-Type.
-    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
-        .thenReturn(CONTENT_TYPE1);
-    assertSucceeds(() -> put(rest, BUCKET_NAME, "typed-key", CONTENT));
-    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
-        .thenReturn(null);
-
-    // GET and HEAD return the stored Content-Type.
-    assertEquals(CONTENT_TYPE1,
-        get(rest, BUCKET_NAME, "typed-key").getHeaderString("Content-Type"));
-    assertEquals(CONTENT_TYPE1,
-        rest.head(BUCKET_NAME, "typed-key").getHeaderString("Content-Type"));
-
-    // An object stored without a Content-Type falls back to the default.
-    assertEquals("binary/octet-stream",
-        get(rest, BUCKET_NAME, KEY_NAME).getHeaderString("Content-Type"));
-    assertEquals("binary/octet-stream",
-        rest.head(BUCKET_NAME, KEY_NAME).getHeaderString("Content-Type"));
-  }
-
-  @Test
-  public void getIgnoresRequestContentTypeUsesStored()
-      throws IOException, OS3Exception {
-    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
-        .thenReturn(CONTENT_TYPE1);
-    assertSucceeds(() -> put(rest, BUCKET_NAME, "typed-key", CONTENT));
-    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
-        .thenReturn(null);
-
-    // A request Content-Type is ignored; the stored value is returned.
-    doReturn(CONTENT_TYPE2).when(headers).getHeaderString("Content-Type");
-    assertEquals(CONTENT_TYPE1,
-        get(rest, BUCKET_NAME, "typed-key").getHeaderString("Content-Type"));
-
-    // No stored Content-Type: request still ignored, default returned.
-    assertEquals("binary/octet-stream",
-        get(rest, BUCKET_NAME, KEY_NAME).getHeaderString("Content-Type"));
-
-    // response-content-type still overrides.
-    MultivaluedMap<String, String> queryParameter =
-        rest.getContext().getUriInfo().getQueryParameters();
-    queryParameter.putSingle("response-content-type", CONTENT_TYPE2);
-    assertEquals(CONTENT_TYPE2,
-        get(rest, BUCKET_NAME, "typed-key").getHeaderString("Content-Type"));
-  }
-
   private void setDefaultHeader() {
     doReturn(CONTENT_TYPE1)
         .when(headers).getHeaderString("Content-Type");
@@ -414,15 +311,6 @@ public class TestObjectGet {
         .when(headers).getHeaderString("Content-Disposition");
     doReturn(CONTENT_ENCODING1)
         .when(headers).getHeaderString("Content-Encoding");
-  }
-
-  private void clearRequestHeaderMocks() {
-    doReturn(null).when(headers).getHeaderString("Content-Type");
-    doReturn(null).when(headers).getHeaderString("Content-Language");
-    doReturn(null).when(headers).getHeaderString("Expires");
-    doReturn(null).when(headers).getHeaderString("Cache-Control");
-    doReturn(null).when(headers).getHeaderString("Content-Disposition");
-    doReturn(null).when(headers).getHeaderString("Content-Encoding");
   }
 
   @Test

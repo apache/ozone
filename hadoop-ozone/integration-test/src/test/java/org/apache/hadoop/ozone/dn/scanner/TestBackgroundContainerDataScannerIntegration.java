@@ -46,7 +46,7 @@ import org.junit.jupiter.params.provider.EnumSource;
  * checks all data and metadata in the container.
  */
 class TestBackgroundContainerDataScannerIntegration
-    extends ContainerScannerIntegrationTests {
+    extends TestContainerScannerIntegrationAbstract {
 
   @BeforeAll
   static void init() throws Exception {

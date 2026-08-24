@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableList;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -32,7 +31,7 @@ public final class AclListBuilder {
   /** The original list being built from, used if no changes are made, to reduce copying. */
   private final ImmutableList<OzoneAcl> originalList;
   /** The updated list being built, created lazily on the first modification. */
-  private Collection<OzoneAcl> updatedList;
+  private List<OzoneAcl> updatedList;
   /** Whether any changes were made. */
   private boolean changed;
 
@@ -81,7 +80,7 @@ public final class AclListBuilder {
     return added;
   }
 
-  public boolean addAll(@Nullable Collection<OzoneAcl> newAcls) {
+  public boolean addAll(@Nullable List<OzoneAcl> newAcls) {
     if (newAcls == null || newAcls.isEmpty()) {
       return false;
     }
@@ -92,7 +91,7 @@ public final class AclListBuilder {
   }
 
   /** Set the list being built to {@code acls}.  For further mutations to work, it must be modifiable. */
-  public boolean set(@Nonnull Collection<OzoneAcl> acls) {
+  public boolean set(@Nonnull List<OzoneAcl> acls) {
     Objects.requireNonNull(acls, "acls == null");
     boolean set = !acls.equals(updatedList != null ? updatedList : originalList);
     changed |= set;

@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -63,30 +62,27 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
   /**
    * Choose datanodes called by the SCM to choose the datanode.
    *
-   * @param usedNodes            - list of the datanodes to already chosen in the
-   *                             pipeline.
-   * @param excludedNodes        - list of the datanodes to exclude.
-   * @param favoredNodes         - list of nodes preferred.
-   * @param nodesRequired        - number of datanodes required.
+   * @param usedNodes - list of the datanodes to already chosen in the
+   *                      pipeline.
+   * @param excludedNodes - list of the datanodes to exclude.
+   * @param favoredNodes - list of nodes preferred.
+   * @param nodesRequired - number of datanodes required.
+   * @param dataSizeRequired - size required for the container.
    * @param metadataSizeRequired - size required for Ratis metadata.
-   * @param dataSizeRequired     - size required for the container.
-   * @param storageType          - StorageType required for the container.
    * @return List of Datanodes.
-   * @throws SCMException SCMException
+   * @throws SCMException  SCMException
    */
   @Override
   protected List<DatanodeDetails> chooseDatanodesInternal(
           List<DatanodeDetails> usedNodes,
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes, final int nodesRequired,
-          long metadataSizeRequired, long dataSizeRequired,
-      StorageType storageType)
+          long metadataSizeRequired, long dataSizeRequired)
           throws SCMException {
     metrics.incrDatanodeRequestCount(nodesRequired);
     List<DatanodeDetails> healthyNodes =
         super.chooseDatanodesInternal(usedNodes, excludedNodes, favoredNodes,
-                nodesRequired, metadataSizeRequired, dataSizeRequired,
-            storageType);
+                nodesRequired, metadataSizeRequired, dataSizeRequired);
 
     if (healthyNodes.size() == nodesRequired) {
       return healthyNodes;

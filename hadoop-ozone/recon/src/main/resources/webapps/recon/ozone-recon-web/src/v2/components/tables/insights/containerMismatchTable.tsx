@@ -80,6 +80,7 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
     DEFAULT_MISMATCH_RESPONSE,
     {
       retryAttempts: 2,
+      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -90,6 +91,11 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
       setData(mismatchData.data.containerDiscrepancyInfo);
     }
   }, [mismatchData.data]);
+
+  // Refetch when limit or missingIn changes
+  useEffect(() => {
+    mismatchData.refetch();
+  }, [limit.value, missingIn]);
 
   const handleExistAtChange: FilterMenuProps['onClick'] = ({ key }) => {
     if (key === 'OM') {

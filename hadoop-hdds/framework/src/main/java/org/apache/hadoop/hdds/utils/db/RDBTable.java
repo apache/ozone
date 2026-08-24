@@ -99,16 +99,16 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public boolean isExist(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyMayExistChecks();
-    final Supplier<byte[]> valueSupplier = db.keyMayExist(family, key);
-    if (valueSupplier == null) {
+    final Supplier<byte[]> holder = db.keyMayExist(family, key);
+    if (holder == null) {
       return false;  // definitely not exists
     }
-    final byte[] value = valueSupplier.get();
+    final byte[] value = holder.get();
     if (value != null) {
       return true; // definitely exists
     }
 
-    // keyMayExist could not return the value; confirm via point-get.
+    // inconclusive: the key may or may not exist
     final boolean exists = get(key) != null;
     if (!exists) {
       rdbMetrics.incNumDBKeyMayExistMisses();
@@ -141,16 +141,15 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public byte[] getIfExist(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
-    final Supplier<byte[]> valueSupplier = db.keyMayExist(family, key);
-    if (valueSupplier == null) {
+    final Supplier<byte[]> value = db.keyMayExist(family, key);
+    if (value == null) {
       return null; // definitely not exists
     }
-    final byte[] value = valueSupplier.get();
-    if (value != null) {
-      return value; // definitely exists
+    if (value.get() != null) {
+      return value.get(); // definitely exists
     }
 
-    // keyMayExist could not return the value; confirm via point-get.
+    // inconclusive: the key may or may not exist
     rdbMetrics.incNumDBKeyGetIfExistGets();
     final byte[] val = get(key);
     if (val == null) {
@@ -161,24 +160,19 @@ class RDBTable implements Table<byte[], byte[]> {
 
   Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
-    // Note: RocksDatabase.keyMayExist duplicates the key internally, so the caller's
-    // key buffer position is preserved for the fallback point-get below.
     final Supplier<Integer> value = db.keyMayExist(
         family, key, outValue.duplicate());
     if (value == null) {
       return null; // definitely not exists
     }
-    final Integer length = value.get();
-    if (length != null) {
+    if (value.get() != null) {
       // definitely exists, return value size.
-      return length;
+      return value.get();
     }
 
-    // keyMayExist could not return the value; confirm via point-get. get()
-    // advances the key position, so pass a duplicate to leave the caller's
-    // key buffer unchanged.
+    // inconclusive: the key may or may not exist
     rdbMetrics.incNumDBKeyGetIfExistGets();
-    final Integer val = get(key.duplicate(), outValue);
+    final Integer val = get(key, outValue);
     if (val == null) {
       rdbMetrics.incNumDBKeyGetIfExistMisses();
     }

@@ -139,7 +139,7 @@ public final class AutoCompletion extends GenericCli {
     private String debug;
 
     @Option(names = {"--daemon"},
-        description = "operate on a daemon")
+        description = "attempt to add class files from build tree")
     private String daemon;
 
     @Option(names = {"--help"},
@@ -168,8 +168,8 @@ public final class AutoCompletion extends GenericCli {
     private String jvmargs;
 
     @Option(names = {"--validate"},
-        description = "validate that all required jars are present on the classpath; " +
-            "with 'continue', keep running even if validation fails")
+        description = "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath " +
+            "file are present, command execution shall continue post validation failure if 'continue' is passed")
     private String validate;
   }
 }

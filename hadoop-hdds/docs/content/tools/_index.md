@@ -43,8 +43,6 @@ Client commands:
 
    * **sh** -  Primary command line interface for ozone to manage volumes/buckets/keys.
    * **fs** - Runs a command on ozone file system (similar to `hdfs dfs`)
-   * **local** - Runs a single-node local Ozone cluster (SCM, OM, and datanodes)
-   in one process for development.
    * **version** - Prints the version of Ozone and HDDS.
 
 
@@ -56,7 +54,7 @@ Admin commands:
    * **classpath** - Prints the class path needed to get the hadoop jar and the
     required libraries.
    * **dtutil**    - Operations related to delegation tokens
-   * **envvars** - Display computed Ozone environment variables.
+   * **envvars** - Display computed Hadoop environment variables.
    * **getconf** -  Reads ozone config values from configuration.
    * **genconf** -  Generate minimally required ozone configs and output to
    ozone-site.xml.

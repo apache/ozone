@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  */
 
 public class TestDataValidateWithDummyContainers
-    extends DataValidateTests {
+    extends TestDataValidate {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDataValidateWithDummyContainers.class);
 

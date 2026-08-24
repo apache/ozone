@@ -164,13 +164,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
   private final int pathLimitPerTask;
-  private long ddsRunStartMs;
-  private final AtomicLong ddsRoundAosDirDel = new AtomicLong(0);
-  private final AtomicLong ddsRoundAosSubDir = new AtomicLong(0);
-  private final AtomicLong ddsRoundAosSubFile = new AtomicLong(0);
-  private final AtomicLong ddsRoundSnapDirDel = new AtomicLong(0);
-  private final AtomicLong ddsRoundSnapSubDir = new AtomicLong(0);
-  private final AtomicLong ddsRoundSnapSubFile = new AtomicLong(0);
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -204,7 +197,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     });
   }
 
-  void updateAndRestart(OzoneConfiguration conf) {
+  private synchronized void updateAndRestart(OzoneConfiguration conf) {
     long newInterval = conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
         OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
     int newCorePoolSize = conf.getInt(OZONE_THREAD_NUMBER_DIR_DELETION,
@@ -212,22 +205,15 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     LOG.info("Updating and restarting DirectoryDeletingService with interval {} {}" +
             " and core pool size {}",
         newInterval, TimeUnit.SECONDS.name().toLowerCase(), newCorePoolSize);
-    // shutdown() awaits the executor; do not hold this monitor (same object as
-    // BackgroundService.PeriodicalTask) or the pool thread can deadlock.
     shutdown();
-    synchronized (this) {
-      setInterval(newInterval, TimeUnit.SECONDS);
-      setPoolSize(newCorePoolSize);
-      this.numberOfParallelThreadsPerStore.set(newCorePoolSize);
-      start();
-    }
+    setInterval(newInterval, TimeUnit.SECONDS);
+    setPoolSize(newCorePoolSize);
+    this.numberOfParallelThreadsPerStore.set(newCorePoolSize);
+    start();
   }
 
   @Override
   public DeletingServiceTaskQueue getTasks() {
-    resetDdsRoundStats();
-    ddsRunStartMs = System.currentTimeMillis();
-    getMetrics().setDdsCurRunTimestamp(ddsRunStartMs);
     DeletingServiceTaskQueue queue = new DeletingServiceTaskQueue();
     queue.add(new DirDeletingTask(null));
     if (deepCleanSnapshots) {
@@ -244,36 +230,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       }
     }
     return queue;
-  }
-
-  private void resetDdsRoundStats() {
-    ddsRoundAosDirDel.set(0);
-    ddsRoundAosSubDir.set(0);
-    ddsRoundAosSubFile.set(0);
-    ddsRoundSnapDirDel.set(0);
-    ddsRoundSnapSubDir.set(0);
-    ddsRoundSnapSubFile.set(0);
-  }
-
-  private void addDdsRoundContribution(String snapTableKey, long dirDel, long subDirs, long subFiles) {
-    if (snapTableKey == null) {
-      ddsRoundAosDirDel.addAndGet(dirDel);
-      ddsRoundAosSubDir.addAndGet(subDirs);
-      ddsRoundAosSubFile.addAndGet(subFiles);
-    } else {
-      ddsRoundSnapDirDel.addAndGet(dirDel);
-      ddsRoundSnapSubDir.addAndGet(subDirs);
-      ddsRoundSnapSubFile.addAndGet(subFiles);
-    }
-  }
-
-  @Override
-  protected void execTaskCompletion() {
-    getMetrics().updateAosDdsLastRunMetrics(
-        ddsRoundAosDirDel.get(), ddsRoundAosSubDir.get(), ddsRoundAosSubFile.get());
-    getMetrics().updateSnapDdsLastRunMetrics(
-        ddsRoundSnapDirDel.get(), ddsRoundSnapSubDir.get(), ddsRoundSnapSubFile.get());
-    getMetrics().setDdsLastRunTimestamp(ddsRunStartMs);
   }
 
   @Override
@@ -379,15 +335,15 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
           timeTakenInIteration, rnCnt);
       getMetrics().incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
-      addDdsRoundContribution(snapTableKey, dirNum + subdirDelNum, subDirNum, subFileNum);
       getPerfMetrics().setDirectoryDeletingServiceLatencyMs(timeTakenInIteration);
     }
   }
 
   private static final class DeletedDirSupplier implements Closeable {
-    private final TableIterator<String, Table.KeyValue<String, OmKeyInfo>> deleteTableIterator;
+    private final TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+        deleteTableIterator;
 
-    private DeletedDirSupplier(TableIterator<String, Table.KeyValue<String, OmKeyInfo>> deleteTableIterator) {
+    private DeletedDirSupplier(TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> deleteTableIterator) {
       this.deleteTableIterator = deleteTableIterator;
     }
 

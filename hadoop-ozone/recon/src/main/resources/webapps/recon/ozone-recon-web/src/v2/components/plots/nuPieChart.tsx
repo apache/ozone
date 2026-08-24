@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import type { EChartsOption } from 'echarts';
 
 import EChart from '@/v2/components/eChart/eChart';
 import { byteToSize } from '@/utils/common';
@@ -37,11 +36,6 @@ type PieChartProps = {
 //-------Constants---------//
 const OTHER_PATH_NAME = 'Other Objects';
 const MIN_BLOCK_SIZE = 0.05;
-const getValidSizeValue = (sizeValue: unknown) => (
-  (typeof sizeValue === 'number' && Number.isFinite(sizeValue))
-    ? sizeValue
-    : 0
-);
 
 
 //----------Component---------//
@@ -54,35 +48,14 @@ const NUPieChart: React.FC<PieChartProps> = ({
   sizeWithReplica,
   loading
 }) => {
-  const safePath = (typeof path === 'string' && path.trim().length > 0)
-    ? path
-    : '/';
-  const safeSize = (typeof size === 'number' && Number.isFinite(size))
-    ? size
-    : 0;
-  const safeSizeWithReplica = (typeof sizeWithReplica === 'number' && Number.isFinite(sizeWithReplica))
-    ? sizeWithReplica
-    : -1;
-  const safeSubPaths = React.useMemo(() => {
-    if (!Array.isArray(subPaths)) {
-      return [] as NUSubpath[];
-    }
-    return subPaths.filter((subpath): subpath is NUSubpath => (
-      Boolean(subpath && typeof subpath.path === 'string')
-    ));
-  }, [subPaths]);
-  const safeSubPathCount = (typeof subPathCount === 'number' && Number.isFinite(subPathCount))
-    ? subPathCount
-    : safeSubPaths.length;
   const [subpathSize, setSubpathSize]  = React.useState<number>(0);
 
   function getSubpathSize(subpaths: NUSubpath[]): number {
-    const subpathSize = subpaths.reduce((acc, curr) => {
-      const currentSize = getValidSizeValue(curr.size);
-      return acc + currentSize;
-    }, 0);
+    const subpathSize = subpaths
+      .map((subpath) => subpath.size)
+      .reduce((acc, curr) => acc + curr, 0);
     // If there is no subpaths, then the size will be total size of path
-    return (subpaths.length === 0) ? safeSize : subpathSize;
+    return (subPaths.length === 0) ? size : subpathSize;
   }
 
   function updatePieData() {
@@ -96,36 +69,36 @@ const NUPieChart: React.FC<PieChartProps> = ({
      *     but we can't check on that, as the response will always have
      *     30 subpaths, but from the total size and the subpaths size we can calculate it).
      */
-    let subpaths: NUSubpath[] = safeSubPaths.slice();
+    let subpaths: NUSubpath[] = subPaths;
 
     let pathLabels: string[] = [];
     let percentage: string[] = [];
     let sizeStr: string[];
     let valuesWithMinBlockSize: number[] = [];
 
-    if (safeSubPathCount > limit) {
+    if (subPathCount > limit) {
       // If the subpath count is greater than the provided limit
       // Slice the subpath to the limit
       subpaths = subpaths.slice(0, limit);
       // Add the size of the subpath
       const limitedSize = getSubpathSize(subpaths);
-      const remainingSize = Math.max(0, safeSize - limitedSize);
+      const remainingSize = size - limitedSize;
       subpaths.push({
         path: OTHER_PATH_NAME,
         size: remainingSize,
-        sizeWithReplica: (safeSizeWithReplica === -1)
+        sizeWithReplica: (sizeWithReplica === -1)
           ? -1
-          : safeSizeWithReplica - remainingSize,
+          : sizeWithReplica - remainingSize,
         isKey: false
       })
     }
 
-    if (safeSubPathCount === 0 || subpaths.length === 0) {
+    if (subPathCount === 0 || subpaths.length === 0) {
       // No more subpaths available
-      pathLabels = [safePath.split('/').pop() ?? ''];
+      pathLabels = [(path ?? '/').split('/').pop() ?? ''];
       valuesWithMinBlockSize = [0.1];
       percentage = ['100.00'];
-      sizeStr = [byteToSize(safeSize, 1)];
+      sizeStr = [byteToSize(size, 1)];
     } else {
       pathLabels = subpaths.map(subpath => {
         const subpathName = subpath.path.split('/').pop() ?? '';
@@ -136,18 +109,19 @@ const NUPieChart: React.FC<PieChartProps> = ({
       });
 
       let values: number[] = [0];
-      if (safeSize > 0) {
+      if (size > 0) {
         values = subpaths.map(
-          subpath => (getValidSizeValue(subpath.size) / safeSize)
+          subpath => (subpath.size / size)
         );
       }
-      valuesWithMinBlockSize = values.map(
+      const valueClone = structuredClone(values);
+      valuesWithMinBlockSize = valueClone?.map(
         (val: number) => (val > 0)
           ? val + MIN_BLOCK_SIZE
           : val
       );
       percentage = values.map(value => (value * 100).toFixed(2));
-      sizeStr = subpaths.map((subpath) => byteToSize(getValidSizeValue(subpath.size), 1));
+      sizeStr = subpaths.map((subpath) => byteToSize(subpath.size, 1));
     }
 
     return valuesWithMinBlockSize.map((key, idx) => {
@@ -161,24 +135,20 @@ const NUPieChart: React.FC<PieChartProps> = ({
   }
 
   React.useEffect(() => {
-    setSubpathSize(getSubpathSize(safeSubPaths));
-  }, [safeSubPaths, safeSize]);
+    setSubpathSize(getSubpathSize(subPaths));
+  }, [subPaths, limit]);
 
-  const pieData = React.useMemo(
-    () => updatePieData(),
-    [safePath, safeSubPaths, safeSubPathCount, safeSize, safeSizeWithReplica, limit]
-  );
+  const pieData = React.useMemo(() => updatePieData(), [path, subPaths, limit]);
 
-  const eChartsOptions: EChartsOption = {
+  const eChartsOptions = {
     title: {
-      text: `${byteToSize(subpathSize, 1)} /  ${byteToSize(safeSize, 1)}`,
+      text: `${byteToSize(subpathSize, 1)} /  ${byteToSize(size, 1)}`,
       left: 'center',
       top: '95%'
     },
     tooltip: {
-      trigger: 'item' as const,
-      formatter: (params: any) => {
-        const { dataIndex, name, color } = params;
+      trigger: 'item',
+      formatter: ({ dataIndex, name, color }) => {
         const nameEl = `<strong style='color: ${color}'>${name}</strong><br>`;
         const dataEl = `Total Data Size: ${pieData[dataIndex]['size']}<br>`
         const percentageEl = `Percentage: ${pieData[dataIndex]['percentage']} %`
@@ -210,16 +180,11 @@ const NUPieChart: React.FC<PieChartProps> = ({
   };
 
   const handleLegendChange = ({selected}: {selected: Record<string, boolean>}) => {
-    if (!selected) {
-      return;
-    }
-
-    const filteredPath = safeSubPaths.filter((value) => {
+    const filteredPath = subPaths.filter((value) => {
       // In case of any leading '/' remove them and add a / at end
       // to make it similar to legend
       const splitPath = value.path?.split('/');
-      const finalPathName = splitPath[splitPath.length - 1] ?? '';
-      const pathName = `${finalPathName}${(value.isKey) ? '' : '/'}`;
+      const pathName = splitPath[splitPath.length - 1] ?? '' + ((value.isKey) ? '' : '/');
       return selected[pathName];
     })
     const newSize = getSubpathSize(filteredPath);

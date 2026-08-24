@@ -62,7 +62,6 @@ import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.Error;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.util.Time;
@@ -106,20 +105,15 @@ public class BucketEndpoint extends BucketOperationHandler {
   @Override
   Response handleGetRequest(S3RequestContext context, String bucketName) throws IOException, OS3Exception {
     final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
-    final String delimiter = queryParams().containsKey(QueryParams.DELIMITER) ?
-        queryParams().get(QueryParams.DELIMITER) : null;
+    final String delimiter = queryParams().get(QueryParams.DELIMITER);
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
     final String marker = queryParams().get(QueryParams.MARKER);
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
     String prefix = queryParams().get(QueryParams.PREFIX, "");
     String startAfter = queryParams().get(QueryParams.START_AFTER);
-    boolean includeOwner = shouldIncludeOwnerInListResponse();
+
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
-    // AWS S3 treats an empty continuation-token as no token: list from the
-    // start and echo the empty token back (see setContinueToken below).
-    ContinueToken decodedToken =
-        (continueToken == null || continueToken.isEmpty())
-            ? null : ContinueToken.decodeFromString(continueToken);
+    ContinueToken decodedToken = ContinueToken.decodeFromString(continueToken);
     OzoneBucket bucket = null;
 
     try {
@@ -132,7 +126,7 @@ public class BucketEndpoint extends BucketOperationHandler {
 
       // If continuation token and start after both are provided, then we
       // ignore start After
-      String prevKey = decodedToken != null ? decodedToken.getLastKey()
+      String prevKey = continueToken != null ? decodedToken.getLastKey()
           : startAfter;
 
       // If shallow is true, only list immediate children
@@ -162,16 +156,15 @@ public class BucketEndpoint extends BucketOperationHandler {
     if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
     }
+
     // If you specify the encoding-type request parameter,should return
-    // encoded key name values in the following response elements: Delimiter, Prefix, Key, and StartAfter
+    // encoded key name values in the following response elements:
+    //   Delimiter, Prefix, Key, and StartAfter.
     //
     // For detail refer:
     // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html#AmazonS3-ListObjectsV2-response-EncodingType
     ListObjectResponse response = new ListObjectResponse();
-    // AWS omits Delimiter from the response when the client passes delimiter= or does not specify delimiter at all.
-    if (StringUtils.isNotEmpty(delimiter)) {
-      response.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
-    }
+    response.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
     response.setName(bucketName);
     response.setPrefix(EncodingTypeObject.createNullable(prefix, encodingType));
     response.setMarker(marker == null ? "" : marker);
@@ -181,13 +174,17 @@ public class BucketEndpoint extends BucketOperationHandler {
     response.setContinueToken(continueToken);
     response.setStartAfter(EncodingTypeObject.createNullable(startAfter, encodingType));
 
-    String prevDir = decodedToken != null ? decodedToken.getLastDir() : null;
+    String prevDir = continueToken != null ? decodedToken.getLastDir() : null;
     String lastKey = null;
     int count = 0;
     if (maxKeys > 0) {
       while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
         OzoneKey next = ozoneKeyIterator.next();
-        if (StringUtils.isNotEmpty(prefix) && !next.getName().startsWith(prefix)) {
+        if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
+            StringUtils.isNotEmpty(prefix) &&
+            !next.getName().startsWith(prefix)) {
+          // prefix has delimiter but key don't have
+          // example prefix: dir1/ key: dir123
           continue;
         }
         if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
@@ -217,11 +214,11 @@ public class BucketEndpoint extends BucketOperationHandler {
           } else {
             // means our key is matched with prefix if prefix is given and it
             // does not have any common prefix.
-            addKey(response, next, includeOwner);
+            addKey(response, next);
             count++;
           }
         } else {
-          addKey(response, next, includeOwner);
+          addKey(response, next);
           count++;
         }
 
@@ -272,9 +269,6 @@ public class BucketEndpoint extends BucketOperationHandler {
     try {
       return handler.handlePutRequest(context, bucketName, body);
     } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.BUCKET_ALREADY_EXISTS) {
-        throw newDuplicateBucketError(bucketName, ex);
-      }
       throw newError(bucketName, ex);
     }
   }
@@ -347,11 +341,6 @@ public class BucketEndpoint extends BucketOperationHandler {
   ) throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.MULTI_DELETE;
 
-    if (request.getObjects() != null
-        && request.getObjects().size() > S3Consts.S3_DELETE_OBJECTS_MAX_KEYS) {
-      throw newError(S3ErrorTable.MALFORMED_XML, bucketName);
-    }
-
     OzoneBucket bucket = getVolume().getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
     List<String> deleteKeys = new ArrayList<>();
@@ -402,7 +391,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     return result;
   }
 
-  private void addKey(ListObjectResponse response, OzoneKey next, boolean includeOwner) {
+  private void addKey(ListObjectResponse response, OzoneKey next) {
     KeyMetadata keyMetadata = new KeyMetadata();
     keyMetadata.setKey(EncodingTypeObject.createNullable(next.getName(),
         response.getEncodingType()));
@@ -414,9 +403,8 @@ public class BucketEndpoint extends BucketOperationHandler {
     keyMetadata.setStorageClass(S3StorageType.fromReplicationConfig(
         next.getReplicationConfig()).toString());
     keyMetadata.setLastModified(next.getModificationTime());
-    if (includeOwner) {
-      keyMetadata.setOwner(S3Owner.of(next.getOwner()));
-    }
+    String displayName = next.getOwner();
+    keyMetadata.setOwner(S3Owner.of(displayName));
     response.addKey(keyMetadata);
   }
 
@@ -431,20 +419,11 @@ public class BucketEndpoint extends BucketOperationHandler {
 
     // initialize handlers
     BucketOperationHandler chain = BucketOperationHandlerChain.newBuilder(this)
-        .add(new BucketGetLocationHandler())
         .add(new BucketAclHandler())
         .add(new ListMultipartUploadsHandler())
-        .add(new BucketTaggingHandler())
-        .add(new BucketLifecycleHandler())
         .add(new BucketCrudHandler())
         .add(this)
         .build();
     handler = new AuditingBucketOperationHandler(chain);
-  }
-
-  private boolean shouldIncludeOwnerInListResponse() {
-    int listType = queryParams().getInt(QueryParams.LIST_TYPE, 1);
-    boolean fetchOwner = queryParams().getBoolean(QueryParams.FETCH_OWNER, false);
-    return listType != 2 || fetchOwner;
   }
 }

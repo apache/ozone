@@ -33,14 +33,14 @@ import org.junit.jupiter.api.Test;
  */
 public class TestChecksumByteBuffer {
   @Test
-  public void testCrc32ByteBufferFactory() {
+  public void testPureJavaCrc32ByteBuffer() {
     final Checksum expected = new PureJavaCrc32();
     final ChecksumByteBuffer testee = ChecksumByteBufferFactory.crc32Impl();
     new VerifyChecksumByteBuffer(expected, testee).testCorrectness();
   }
 
   @Test
-  public void testCrc32CByteBufferFactory() {
+  public void testPureJavaCrc32CByteBuffer() {
     final Checksum expected = new PureJavaCrc32C();
     final ChecksumByteBuffer testee = ChecksumByteBufferFactory.crc32CImpl();
     new VerifyChecksumByteBuffer(expected, testee).testCorrectness();

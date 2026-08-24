@@ -103,7 +103,11 @@ public abstract class NodeDetails {
   }
 
   public String getRatisHostPortStr() {
-    return HddsUtils.getHostPortString(getHostName(), ratisPort);
+    StringBuilder hostPort = new StringBuilder();
+    hostPort.append(getHostName())
+        .append(':')
+        .append(ratisPort);
+    return hostPort.toString();
   }
 
   public int getRatisPort() {

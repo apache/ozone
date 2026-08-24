@@ -98,6 +98,7 @@ const DeletedContainerKeysTable: React.FC<DeletedContainerKeysTableProps> = ({
     DEFAULT_DELETED_CONTAINER_KEYS_RESPONSE,
     {
       retryAttempts: 2,
+      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -108,6 +109,11 @@ const DeletedContainerKeysTable: React.FC<DeletedContainerKeysTableProps> = ({
       setData(deletedContainerKeysData.data.containers);
     }
   }, [deletedContainerKeysData.data]);
+
+  // Refetch when limit changes
+  useEffect(() => {
+    deletedContainerKeysData.refetch();
+  }, [limit.value]);
 
   function filterData(data: Container[] | undefined) {
     return data?.filter(

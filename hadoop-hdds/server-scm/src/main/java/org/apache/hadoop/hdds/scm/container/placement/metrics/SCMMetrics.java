@@ -180,9 +180,7 @@ public class SCMMetrics {
     }
   }
 
-  // Ratis state machine events are multi-line logs, which should not be
-  // published as time-series metrics to metrics systems like Prometheus.
-  // Instead, they are exposed via JMX / MXBean endpoints.
+  @Metric("Ratis state machine events")
   public String getRatisEvents() {
     synchronized (ratisEvents) {
       return String.join("\n", ratisEvents);

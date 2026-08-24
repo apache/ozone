@@ -35,7 +35,7 @@ Create new bucket
 Create bucket which already exists
     ${bucket} =         Create bucket
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket ${bucket}   255
-                        Should contain          ${result}           BucketAlreadyOwnedByYou
+                        Should contain          ${result}           BucketAlreadyExists
 
 Create bucket with invalid bucket name
     ${randStr} =        Generate Ozone String

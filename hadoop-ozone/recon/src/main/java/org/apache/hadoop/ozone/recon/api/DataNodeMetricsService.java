@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT;
 
@@ -31,12 +29,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -44,12 +42,11 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsProgressResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.tasks.DataNodeMetricsCollectionTask;
@@ -64,9 +61,11 @@ import org.slf4j.LoggerFactory;
 public class DataNodeMetricsService {
   
   private static final Logger LOG = LoggerFactory.getLogger(DataNodeMetricsService.class);
+  private static final int MAX_POOL_SIZE = 500;
+  private static final int KEEP_ALIVE_TIME = 5;
   private static final int POLL_INTERVAL_MS = 200;
 
-  private final ExecutorService executorService;
+  private final ThreadPoolExecutor executorService;
   private final ReconNodeManager reconNodeManager;
   private final boolean httpsEnabled;
   private final int minimumApiDelayMs;
@@ -75,7 +74,6 @@ public class DataNodeMetricsService {
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
   
   private MetricCollectionStatus currentStatus = MetricCollectionStatus.NOT_STARTED;
-  private volatile String failedMessage = "Metrics collection task failed. Please retry after some time.";
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
   private Long totalPendingDeletion = 0L;
   private int totalNodesQueried;
@@ -98,15 +96,14 @@ public class DataNodeMetricsService {
         OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.metricsServiceProviderFactory = metricsServiceProviderFactory;
     this.lastCollectionEndTime.set(-minimumApiDelayMs);
-    int corePoolSize = config.getInt(OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT,
-        OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT);
-    corePoolSize = corePoolSize > 0
-        ? corePoolSize
-        : OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT;
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat("DataNodeMetricsCollector-%d")
-        .build();
-    this.executorService = Executors.newFixedThreadPool(corePoolSize, threadFactory);
+    int corePoolSize = Runtime.getRuntime().availableProcessors() * 2;
+    this.executorService = new ThreadPoolExecutor(
+        corePoolSize, MAX_POOL_SIZE,
+        KEEP_ALIVE_TIME, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(),
+        new ThreadFactoryBuilder()
+            .setNameFormat("DataNodeMetricsCollector-%d")
+            .build());
   }
 
   /**
@@ -126,7 +123,7 @@ public class DataNodeMetricsService {
       return;
     }
 
-    List<DatanodeInfo> nodes = reconNodeManager.getAllNodes();
+    Set<DatanodeDetails> nodes = reconNodeManager.getNodeStats().keySet();
     if (nodes.isEmpty()) {
       LOG.warn("No datanodes found to query");
       resetState();
@@ -154,7 +151,7 @@ public class DataNodeMetricsService {
   /**
    * Collects metrics from all datanodes. Processes completed tasks first, waits for all.
    */
-  private void collectMetrics(List<DatanodeInfo> nodes) {
+  private void collectMetrics(Set<DatanodeDetails> nodes) {
     try {
       CollectionContext context = submitMetricsCollectionTasks(nodes);
       processCollectionFutures(context);
@@ -162,7 +159,6 @@ public class DataNodeMetricsService {
     } catch (Exception e) {
       resetState();
       currentStatus = MetricCollectionStatus.FAILED;
-      failedMessage = e.getLocalizedMessage();
       isRunning.set(false);
     }
   }
@@ -171,14 +167,14 @@ public class DataNodeMetricsService {
    * Submits metrics collection tasks for all given datanodes.
    * @return A context object containing tracking structures for the submitted futures.
    */
-  private CollectionContext submitMetricsCollectionTasks(List<DatanodeInfo> nodes) {
+  private CollectionContext submitMetricsCollectionTasks(Set<DatanodeDetails> nodes) {
     // Initialize state
     List<DatanodePendingDeletionMetrics> results = new ArrayList<>(nodes.size());
     // Submit all collection tasks
     Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures = new HashMap<>();
 
     long submissionTime = System.currentTimeMillis();
-    for (DatanodeInfo node : nodes) {
+    for (DatanodeDetails node : nodes) {
       DataNodeMetricsCollectionTask task = new DataNodeMetricsCollectionTask(
           node, httpsEnabled, metricsServiceProviderFactory);
       DatanodePendingDeletionMetrics key = new DatanodePendingDeletionMetrics(
@@ -304,40 +300,27 @@ public class DataNodeMetricsService {
     totalNodesFailed = 0;
   }
 
-  /**
-   * Returns either {@link DataNodeMetricsCompleteResponse} when collection is
-   * finished, or {@link DataNodeMetricsProgressResponse} otherwise.
-   */
-  public Object getCollectedMetrics(Integer limit) {
+  public DataNodeMetricsServiceResponse getCollectedMetrics(Integer limit) {
     startTask();
     if (currentStatus == MetricCollectionStatus.FINISHED) {
-      List<DatanodePendingDeletionMetrics> list =
-          (limit == null) ? pendingDeletionList :
-              pendingDeletionList.subList(0, Math.min(limit, pendingDeletionList.size()));
-      return new DataNodeMetricsCompleteResponse(
-          currentStatus,
-          totalNodesQueried,
-          totalNodesFailed,
-          totalPendingDeletion,
-          list);
-    }
+      DataNodeMetricsServiceResponse.Builder dnMetricsBuilder = DataNodeMetricsServiceResponse.newBuilder();
+      dnMetricsBuilder
+          .setStatus(currentStatus)
+          .setTotalPendingDeletionSize(totalPendingDeletion)
+          .setTotalNodesQueried(totalNodesQueried)
+          .setTotalNodeQueryFailures(totalNodesFailed);
 
-    return new DataNodeMetricsProgressResponse(
-        currentStatus,
-        buildProgressMessage(currentStatus, failedMessage));
-  }
-
-  private static String buildProgressMessage(MetricCollectionStatus status, String failedMessage) {
-    switch (status) {
-    case IN_PROGRESS:
-      return "Metrics collection task is currently running. Please wait for task to finish.";
-    case FAILED:
-      return failedMessage;
-    case NOT_STARTED:
-      return "Metrics collection task has not started yet. Please retry shortly.";
-    default:
-      return "Metrics collection task is not complete yet. Please retry shortly.";
+      if (null == limit) {
+        return dnMetricsBuilder.setPendingDeletion(pendingDeletionList).build();
+      } else {
+        return dnMetricsBuilder.setPendingDeletion(
+            pendingDeletionList.subList(0, Math.min(limit, pendingDeletionList.size())
+        )).build();
+      }
     }
+    return DataNodeMetricsServiceResponse.newBuilder()
+        .setStatus(currentStatus)
+        .build();
   }
 
   @PreDestroy

@@ -183,13 +183,13 @@ public class TestScmHAFinalization {
     // Client should complete exceptionally since the original SCM it
     // requested to was restarted.
     finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
-    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
-    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
   }
 
@@ -229,14 +229,14 @@ public class TestScmHAFinalization {
     cluster.waitForClusterToBeReady();
 
     finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Once the leader tells the client finalization is complete, wait for all
     // followers to catch up so we can check their state.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
-    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
-    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
   }
 
@@ -268,13 +268,13 @@ public class TestScmHAFinalization {
 
     // Wait for finalization from the client perspective.
     finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Wait for two running SCMs to finish finalization.
     waitForScmsToFinalize(activeScms);
 
-    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         activeScms, 0, NUM_DATANODES);
-    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
 
     // Move SCM log index farther ahead to make sure a snapshot install
@@ -290,7 +290,7 @@ public class TestScmHAFinalization {
     cluster.startInactiveSCM(inactiveScm.getSCMNodeId());
     waitForScmToFinalize(inactiveScm);
 
-    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
+    TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         inactiveScm, 0, NUM_DATANODES);
 
     // Use log to verify a snapshot was installed.

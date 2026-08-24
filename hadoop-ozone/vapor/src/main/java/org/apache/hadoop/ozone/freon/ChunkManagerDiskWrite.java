@@ -28,7 +28,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -131,7 +130,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
         KeyValueContainer keyValueContainer =
             new KeyValueContainer(keyValueContainerData, ozoneConfiguration);
 
-        keyValueContainer.create(volumeSet, volumeChoicePolicy, "scmid", StorageType.DISK);
+        keyValueContainer.create(volumeSet, volumeChoicePolicy, "scmid");
 
         containersPerThread.put(i, keyValueContainer);
       }

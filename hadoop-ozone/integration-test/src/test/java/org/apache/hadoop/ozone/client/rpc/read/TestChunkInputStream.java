@@ -31,14 +31,14 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
-import org.apache.hadoop.ozone.om.BucketForTesting;
+import org.apache.hadoop.ozone.om.TestBucket;
 import org.junit.jupiter.api.TestInstance;
 
 /**
  * Tests {@link ChunkInputStream}.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TestChunkInputStream extends InputStreamTests {
+class TestChunkInputStream extends TestInputStreamBase {
 
   /**
    * Run the tests as a single test method to avoid needing a new mini-cluster
@@ -49,7 +49,7 @@ class TestChunkInputStream extends InputStreamTests {
     try (OzoneClient client = getCluster().newClient()) {
       updateConfig(layout);
 
-      BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
+      TestBucket bucket = TestBucket.newBuilder(client).build();
 
       testChunkReadBuffers(bucket);
       testBufferRelease(bucket);
@@ -61,10 +61,10 @@ class TestChunkInputStream extends InputStreamTests {
    * Test to verify that data read from chunks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.
    */
-  protected void testChunkReadBuffers(BucketForTesting bucket) throws Exception {
+  private void testChunkReadBuffers(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
-    byte[] inputData = bucket.writeRandomBytes(keyName, getRepConfig(), dataLength);
+    byte[] inputData = bucket.writeRandomBytes(keyName, dataLength);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
@@ -123,9 +123,9 @@ class TestChunkInputStream extends InputStreamTests {
     }
   }
 
-  protected void testCloseReleasesBuffers(BucketForTesting bucket) throws Exception {
+  private void testCloseReleasesBuffers(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
-    bucket.writeRandomBytes(keyName, getRepConfig(), CHUNK_SIZE);
+    bucket.writeRandomBytes(keyName, CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
       BlockInputStream block0Stream =
@@ -146,9 +146,9 @@ class TestChunkInputStream extends InputStreamTests {
    * Test that ChunkInputStream buffers are released as soon as the last byte
    * of the buffer is read.
    */
-  protected void testBufferRelease(BucketForTesting bucket) throws Exception {
+  private void testBufferRelease(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
-    byte[] inputData = bucket.writeRandomBytes(keyName, getRepConfig(), CHUNK_SIZE);
+    byte[] inputData = bucket.writeRandomBytes(keyName, CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
@@ -204,7 +204,7 @@ class TestChunkInputStream extends InputStreamTests {
     }
   }
 
-  protected byte[] readDataFromChunk(ChunkInputStream chunkInputStream,
+  private byte[] readDataFromChunk(ChunkInputStream chunkInputStream,
       int offset, int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
     chunkInputStream.seek(offset);
@@ -228,7 +228,7 @@ class TestChunkInputStream extends InputStreamTests {
    * @param expectedBufferCapacity expected buffer capacity of unreleased
    *                               buffers
    */
-  protected void checkBufferSizeAndCapacity(ByteBuffer[] buffers,
+  private void checkBufferSizeAndCapacity(ByteBuffer[] buffers,
       int expectedNumBuffers, int numReleasedBuffers,
       long expectedBufferCapacity) {
     assertEquals(expectedNumBuffers, buffers.length,

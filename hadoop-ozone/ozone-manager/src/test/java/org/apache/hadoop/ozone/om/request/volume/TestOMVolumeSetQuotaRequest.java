@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests set volume property request.
  */
-public class TestOMVolumeSetQuotaRequest extends OMVolumeRequestTests {
+public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
   @Test
   public void testPreExecute() throws Exception {

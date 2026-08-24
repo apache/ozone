@@ -107,7 +107,8 @@ public class ReconNodeManager extends SCMNodeManager {
   }
 
   private void loadExistingNodes() {
-    try (TableIterator<DatanodeID, Table.KeyValue<DatanodeID, DatanodeDetails>> iterator = nodeDB.iterator()) {
+    try (TableIterator<DatanodeID, ? extends Table.KeyValue<DatanodeID, DatanodeDetails>>
+             iterator = nodeDB.iterator()) {
       int nodeCount = 0;
       while (iterator.hasNext()) {
         DatanodeDetails datanodeDetails = iterator.next().getValue();
@@ -265,7 +266,8 @@ public class ReconNodeManager extends SCMNodeManager {
   @VisibleForTesting
   public long getNodeDBKeyCount() throws IOException {
     long nodeCount = 0;
-    try (TableIterator<DatanodeID, Table.KeyValue<DatanodeID, DatanodeDetails>> iterator = nodeDB.iterator()) {
+    try (TableIterator<DatanodeID, ? extends Table.KeyValue<DatanodeID, DatanodeDetails>>
+        iterator = nodeDB.iterator()) {
       while (iterator.hasNext()) {
         iterator.next();
         nodeCount++;

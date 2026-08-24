@@ -193,7 +193,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     if (metrics != null) {
       metrics.addRatisEvent("Ready to serve requests as the leader");
     }
-    ozoneManager.getOMServiceManager().notifyStatusChanged();
   }
 
   @Override
@@ -203,7 +202,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     if (metrics != null) {
       metrics.addRatisEvent("current leader OM steps down.");
     }
-    ozoneManager.getOMServiceManager().notifyStatusChanged();
   }
 
   @Override
@@ -221,8 +219,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     previousLeaderId = newLeaderId;
     // Initialize OMHAMetrics
     ozoneManager.omHAMetricsInit(newLeaderId.toString());
-    // Notify OM service of leader change
-    ozoneManager.getOMServiceManager().notifyStatusChanged();
 
     Map<String, String> auditParams = new LinkedHashMap<>();
     auditParams.put(AUDIT_PARAM_PREVIOUS_LEADER,

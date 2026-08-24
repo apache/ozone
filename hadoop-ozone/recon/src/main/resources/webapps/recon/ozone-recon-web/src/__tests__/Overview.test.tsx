@@ -32,7 +32,6 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { overviewLocators } from '@tests/locators/locators';
 import { faultyOverviewServer, overviewServer } from '@tests/mocks/overviewMocks/overviewServer';
 import Overview from '@/v2/pages/overview/overview';
-import { vi } from 'vitest';
 
 const WrappedOverviewComponent = () => {
   return (
@@ -50,34 +49,19 @@ const WrappedOverviewComponent = () => {
  */
 vi.mock('@/v2/components/eChart/eChart', () => ({
   default: () => (<></>)
-}));
-
-vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
-  return {
-    ...actual,
-    useApiData: <T,>(url: string, defaultValue: T, options = {}) =>
-      actual.useApiData(url, defaultValue, {
-        ...options,
-        retryAttempts: 0,
-        retryDelay: 0,
-      }),
-  };
-});
+}))
 
 describe.each([
   true,
   false
 ])('Overview Tests - Data is present = %s', (scenario) => {
   beforeAll(async () => {
-    scenario ? overviewServer.listen() : faultyOverviewServer.listen();
-    render(<WrappedOverviewComponent />);
-    /**
-     * Setting a timeout of 100ms to allow requests to be resolved and states to be set
-     */
-    await new Promise((r) => {
-      setTimeout(r, 100);
-    });
+    (scenario) ? overviewServer.listen() : faultyOverviewServer.listen();
+    render(
+      <WrappedOverviewComponent />
+    );
+    //Setting a timeout of 100ms to allow requests to be resolved and states to be set
+    await new Promise((r) => { setTimeout(r, 100) })
   });
 
   afterAll(() => {
@@ -96,70 +80,76 @@ describe.each([
   it('Datanode row has the correct count of Datanodes', () => {
     const datanodeRow = screen.getByTestId(overviewLocators.datanodeRow);
     expect(datanodeRow).toBeVisible();
-    expect(datanodeRow).toHaveTextContent((scenario) ? '3/5' : '0/0');
+    expect(datanodeRow).toHaveTextContent((scenario) ? '3/5' : 'N/A');
   });
 
   it('Containers row has the correct count of containers', () => {
     const containerRow = screen.getByTestId(overviewLocators.containersRow);
     expect(containerRow).toBeVisible();
-    expect(containerRow).toHaveTextContent((scenario) ? '20' : '0/0');
+    expect(containerRow).toHaveTextContent((scenario) ? '20' : 'N/A');
   });
 
   it('Capacity card has the correct capacity data', () => {
-    const getStatistic = (title: string) => {
-      const titleEl = screen.getByText(title);
-      const statistic = titleEl.closest('.cluster-card-statistic');
-      expect(statistic).not.toBeNull();
-      return statistic!;
-    };
-
-    const capacityOzoneUsed = getStatistic('OZONE USED SPACE');
-    const capacityOtherUsed = getStatistic('OTHER USED SPACE');
-    const capacityPreAllocated = getStatistic('CONTAINER PRE-ALLOCATED');
+    const capacityOzoneUsed = screen.getByTestId(overviewLocators.capacityOzoneUsed);
+    const capacityNonOzoneUsed = screen.getByTestId(overviewLocators.capacityNonOzoneUsed);
+    const capacityRemaining = screen.getByTestId(overviewLocators.capacityRemaining);
+    const capacityPreAllocated = screen.getByTestId(overviewLocators.capacityPreAllocated);
 
     expect(capacityOzoneUsed).toBeVisible();
-    expect(capacityOtherUsed).toBeVisible();
+    expect(capacityNonOzoneUsed).toBeVisible();
+    expect(capacityRemaining).toBeVisible();
     expect(capacityPreAllocated).toBeVisible();
 
     expect(capacityOzoneUsed).toHaveTextContent(
-      scenario ? /OZONE USED SPACE\s*784.7\s*MB/ : /OZONE USED SPACE\s*0\s*B/
+      (scenario)
+        ? /Ozone Used\s*784.7 MB/
+        : /Ozone Used\s*0 B/
     );
-    expect(capacityOtherUsed).toHaveTextContent(
-      scenario ? /OTHER USED SPACE\s*263.1\s*GB/ : /OTHER USED SPACE\s*0\s*B/
+    expect(capacityNonOzoneUsed).toHaveTextContent(
+      (scenario)
+        ? /Non Ozone Used\s*263.1 GB/
+        : /Non Ozone Used\s*0 B/
+    );
+    expect(capacityRemaining).toHaveTextContent(
+      (scenario)
+        ? /Remaining\s*995.4 GB/
+        : /Remaining\s*0 B/
     );
     expect(capacityPreAllocated).toHaveTextContent(
-      scenario ? /CONTAINER PRE-ALLOCATED\s*11.2\s*GB/ : /CONTAINER PRE-ALLOCATED\s*0\s*B/
+      (scenario)
+        ? /Container Pre-allocated\s*11.2 GB/
+        : /Container Pre-allocated\s*0 B/
     );
   });
 
   it('Volumes card has the correct number of volumes', () => {
     const volumeCard = screen.getByTestId(overviewLocators.volumesCard);
     expect(volumeCard).toBeVisible();
-    expect(volumeCard).toHaveTextContent((scenario) ? '2' : '0');
+    expect(volumeCard).toHaveTextContent((scenario) ? '2' : 'N/A');
   });
 
   it('Buckets card has the correct number of buckets', () => {
     const bucketsCard = screen.getByTestId(overviewLocators.bucketsCard);
     expect(bucketsCard).toBeVisible();
-    expect(bucketsCard).toHaveTextContent((scenario) ? '24' : '0');
+    expect(bucketsCard).toHaveTextContent((scenario) ? '24' : 'N/A');
   });
 
   it('Keys card has the correct number of keys', () => {
     const keysCard = screen.getByTestId(overviewLocators.keysCard);
     expect(keysCard).toBeVisible();
-    expect(keysCard).toHaveTextContent((scenario) ? '1,424' : '0');
+    expect(keysCard).toHaveTextContent((scenario) ? '1424' : 'N/A');
   });
 
   it('Pipelines card has the correct count of Pipelines', () => {
     const pipelinesCard = screen.getByTestId(overviewLocators.pipelinesCard);
     expect(pipelinesCard).toBeVisible();
-    expect(pipelinesCard).toHaveTextContent((scenario) ? '7' : '0');
+    expect(pipelinesCard).toHaveTextContent((scenario) ? '7' : 'N/A');
   });
 
   it('Deleted Containers card has the correct count of deleted containers', () => {
     const deletedContainersCard = screen.getByTestId(overviewLocators.deletedContainersCard);
     expect(deletedContainersCard).toBeVisible();
-    expect(deletedContainersCard).toHaveTextContent((scenario) ? '10' : '0')
+    expect(deletedContainersCard).toHaveTextContent((scenario) ? '10' : 'N/A')
   })
 
   it('Delete Pending Summary has the correct data', () => {

@@ -17,10 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 
@@ -47,14 +45,12 @@ public interface WritableContainerProvider<T extends ReplicationConfig> {
    * @param owner The owner of the container
    * @param excludeList A set of datanodes, container and pipelines which should
    *                    not be considered.
-   * @param storageTier The storageTier of the container
    * @return A ContainerInfo which is open and has the capacity to store the
    *         desired block size.
    * @throws IOException
    */
   ContainerInfo getContainer(long size, T repConfig,
-      String owner, ExcludeList excludeList,
-      @Nonnull StorageTier storageTier)
+      String owner, ExcludeList excludeList)
       throws IOException;
 
 }

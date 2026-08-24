@@ -692,10 +692,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   }
 
   @Nonnull
-  public OFSPath getSnapshotRootPath(String volume, String bucket) {
+  public static OFSPath getSnapshotRootPath(String volume, String bucket) {
     org.apache.hadoop.fs.Path bucketPath = new org.apache.hadoop.fs.Path(
         OZONE_URI_DELIMITER + volume + OZONE_URI_DELIMITER + bucket);
-    return new OFSPath(bucketPath, ozoneManager.getConfiguration());
+    return new OFSPath(bucketPath, new OzoneConfiguration());
   }
 
   @VisibleForTesting

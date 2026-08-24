@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.NAMESPACE_SUMMARY;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 
 import java.io.IOException;
 import javax.inject.Inject;
@@ -65,7 +66,7 @@ public class ReconNamespaceSummaryManagerImpl
 
   @Override
   public void clearNSSummaryTable() throws IOException {
-    nsSummaryTable.clear();
+    truncateTable(nsSummaryTable);
   }
 
   @Override

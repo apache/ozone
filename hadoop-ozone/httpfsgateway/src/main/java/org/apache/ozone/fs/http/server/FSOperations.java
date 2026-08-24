@@ -21,7 +21,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -61,6 +60,8 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.fs.http.HttpFSConstants;
 import org.apache.ozone.fs.http.HttpFSConstants.FILETYPE;
 import org.apache.ozone.lib.service.FileSystemAccess;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 
 /**
  * FileSystem operation executors used by {@link HttpFSServer}.
@@ -106,7 +107,7 @@ public final class FSOperations {
       boolean isFile) {
     Map<String, Object> json = new LinkedHashMap<>();
     Map<String, Object> inner = new LinkedHashMap<>();
-    List<Map<String, Object>> statuses = new ArrayList<>();
+    JSONArray statuses = new JSONArray();
     for (FileStatus f : fileStatuses) {
       statuses.add(toJsonInner(f, isFile));
     }
@@ -208,7 +209,7 @@ public final class FSOperations {
   private static Map<String, Object> aclStatusToJSON(AclStatus aclStatus) {
     Map<String, Object> json = new LinkedHashMap<String, Object>();
     Map<String, Object> inner = new LinkedHashMap<String, Object>();
-    List<String> entriesArray = new ArrayList<>();
+    JSONArray entriesArray = new JSONArray();
     inner.put(HttpFSConstants.OWNER_JSON, aclStatus.getOwner());
     inner.put(HttpFSConstants.GROUP_JSON, aclStatus.getGroup());
     inner.put(HttpFSConstants.PERMISSION_JSON,
@@ -253,13 +254,14 @@ public final class FSOperations {
    * @return The JSON representation of the xAttrs.
    * @throws IOException 
    */
-  private static Map<String, Object> xAttrsToJSON(Map<String, byte[]> xAttrs,
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static Map xAttrsToJSON(Map<String, byte[]> xAttrs, 
       XAttrCodec encoding) throws IOException {
-    Map<String, Object> jsonMap = new LinkedHashMap<>();
-    List<Map<String, Object>> jsonArray = new ArrayList<>();
+    Map jsonMap = new LinkedHashMap();
+    JSONArray jsonArray = new JSONArray();
     if (xAttrs != null) {
       for (Entry<String, byte[]> e : xAttrs.entrySet()) {
-        Map<String, Object> json = new LinkedHashMap<>();
+        Map json = new LinkedHashMap();
         json.put(HttpFSConstants.XATTR_NAME_JSON, e.getKey());
         if (e.getValue() != null) {
           json.put(HttpFSConstants.XATTR_VALUE_JSON,
@@ -284,7 +286,7 @@ public final class FSOperations {
   private static Map xAttrNamesToJSON(List<String> names) throws IOException {
     Map jsonMap = new LinkedHashMap();
     jsonMap.put(HttpFSConstants.XATTRNAMES_JSON,
-        JsonUtil.toJsonString(names));
+        JSONArray.toJSONString(names));
     return jsonMap;
   }
 
@@ -362,26 +364,27 @@ public final class FSOperations {
   }
 
   /**
-   * Converts an object into a Json Map with one key-value entry.
+   * Converts an object into a Json Map with with one key-value entry.
    * <p/>
-   * The value may be a JSON primitive, a Map or List, or any object that
-   * Jackson can serialize.
+   * It assumes the given value is either a JSON primitive type or a
+   * <code>JsonAware</code> instance.
    *
    * @param name name for the key of the entry.
    * @param value for the value of the entry.
    *
    * @return the JSON representation of the key-value pair.
    */
-  private static Map<String, Object> toJSON(String name, Object value) {
-    Map<String, Object> json = new LinkedHashMap<>();
+  @SuppressWarnings("unchecked")
+  private static JSONObject toJSON(String name, Object value) {
+    JSONObject json = new JSONObject();
     json.put(name, value);
     return json;
   }
 
-  private static Map<String, Object> storagePolicyToJSON(
-      BlockStoragePolicySpi policy) {
+  @SuppressWarnings({ "unchecked" })
+  private static JSONObject storagePolicyToJSON(BlockStoragePolicySpi policy) {
     BlockStoragePolicy p = (BlockStoragePolicy) policy;
-    Map<String, Object> policyJson = new LinkedHashMap<>();
+    JSONObject policyJson = new JSONObject();
     policyJson.put("id", p.getId());
     policyJson.put("name", p.getName());
     policyJson.put("storageTypes", toJsonArray(p.getStorageTypes()));
@@ -392,22 +395,24 @@ public final class FSOperations {
     return policyJson;
   }
 
-  private static List<String> toJsonArray(StorageType[] storageTypes) {
-    List<String> jsonArray = new ArrayList<>();
+  @SuppressWarnings("unchecked")
+  private static JSONArray toJsonArray(StorageType[] storageTypes) {
+    JSONArray jsonArray = new JSONArray();
     for (StorageType type : storageTypes) {
       jsonArray.add(type.toString());
     }
     return jsonArray;
   }
 
-  private static Map<String, Object> storagePoliciesToJSON(
+  @SuppressWarnings("unchecked")
+  private static JSONObject storagePoliciesToJSON(
       Collection<? extends BlockStoragePolicySpi> storagePolicies) {
-    Map<String, Object> json = new LinkedHashMap<>();
-    List<Map<String, Object>> jsonArray = new ArrayList<>();
-    Map<String, Object> policies = new LinkedHashMap<>();
+    JSONObject json = new JSONObject();
+    JSONArray jsonArray = new JSONArray();
+    JSONObject policies = new JSONObject();
     if (storagePolicies != null) {
       for (BlockStoragePolicySpi policy : storagePolicies) {
-        Map<String, Object> policyMap = storagePolicyToJSON(policy);
+        JSONObject policyMap = storagePolicyToJSON(policy);
         jsonArray.add(policyMap);
       }
     }
@@ -502,8 +507,8 @@ public final class FSOperations {
    * Executor that performs a truncate FileSystemAccess files system operation.
    */
   @InterfaceAudience.Private
-  public static class FSTruncate implements
-      FileSystemAccess.FileSystemExecutor<Map> {
+  public static class FSTruncate implements 
+      FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
     private long newLength;
 
@@ -532,7 +537,7 @@ public final class FSOperations {
      * @throws IOException thrown if an IO error occurred.
      */
     @Override
-    public Map execute(FileSystem fs) throws IOException {
+    public JSONObject execute(FileSystem fs) throws IOException {
       boolean result = fs.truncate(path, newLength);
       HttpFSServerWebApp.get().getMetrics().incrOpsTruncate();
       return toJSON(
@@ -725,7 +730,7 @@ public final class FSOperations {
    */
   @InterfaceAudience.Private
   public static class FSDelete
-      implements FileSystemAccess.FileSystemExecutor<Map> {
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
     private boolean recursive;
 
@@ -751,7 +756,7 @@ public final class FSOperations {
      * @throws IOException thrown if an IO error occurred.
      */
     @Override
-    public Map execute(FileSystem fs) throws IOException {
+    public JSONObject execute(FileSystem fs) throws IOException {
       boolean deleted = fs.delete(path, recursive);
       HttpFSServerWebApp.get().getMetrics().incrOpsDelete();
       return toJSON(
@@ -837,7 +842,7 @@ public final class FSOperations {
    */
   @InterfaceAudience.Private
   public static class FSHomeDir
-      implements FileSystemAccess.FileSystemExecutor<Map> {
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
 
     /**
      * Executes the filesystem operation.
@@ -849,9 +854,10 @@ public final class FSOperations {
      * @throws IOException thrown if an IO error occurred.
      */
     @Override
-    public Map execute(FileSystem fs) throws IOException {
+    @SuppressWarnings("unchecked")
+    public JSONObject execute(FileSystem fs) throws IOException {
       Path homeDir = fs.getHomeDirectory();
-      Map<String, Object> json = new LinkedHashMap<>();
+      JSONObject json = new JSONObject();
       json.put(HttpFSConstants.HOME_DIR_JSON, homeDir.toUri().getPath());
       return json;
     }
@@ -949,7 +955,7 @@ public final class FSOperations {
    */
   @InterfaceAudience.Private
   public static class FSMkdirs
-      implements FileSystemAccess.FileSystemExecutor<Map> {
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
 
     private Path path;
     private short permission;
@@ -980,7 +986,7 @@ public final class FSOperations {
      * @throws IOException thrown if an IO error occurred.
      */
     @Override
-    public Map execute(FileSystem fs) throws IOException {
+    public JSONObject execute(FileSystem fs) throws IOException {
       FsPermission fsPermission = new FsPermission(permission);
       if (unmaskedPermission != -1) {
         fsPermission = FsCreateModes.create(fsPermission,
@@ -1033,7 +1039,7 @@ public final class FSOperations {
    */
   @InterfaceAudience.Private
   public static class FSRename
-      implements FileSystemAccess.FileSystemExecutor<Map> {
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
     private Path toPath;
 
@@ -1059,7 +1065,7 @@ public final class FSOperations {
      * @throws IOException thrown if an IO error occurred.
      */
     @Override
-    public Map execute(FileSystem fs) throws IOException {
+    public JSONObject execute(FileSystem fs) throws IOException {
       boolean renamed = fs.rename(path, toPath);
       HttpFSServerWebApp.get().getMetrics().incrOpsRename();
       return toJSON(HttpFSConstants.RENAME_JSON, renamed);
@@ -1337,7 +1343,7 @@ public final class FSOperations {
    */
   @InterfaceAudience.Private
   public static class FSTrashRoot
-      implements FileSystemAccess.FileSystemExecutor<Map> {
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
 
     public FSTrashRoot(String path) {
@@ -1345,9 +1351,10 @@ public final class FSOperations {
     }
 
     @Override
-    public Map execute(FileSystem fs) throws IOException {
+    @SuppressWarnings("unchecked")
+    public JSONObject execute(FileSystem fs) throws IOException {
       Path trashRoot = fs.getTrashRoot(this.path);
-      Map<String, Object> json = new LinkedHashMap<>();
+      JSONObject json = new JSONObject();
       json.put(HttpFSConstants.TRASH_DIR_JSON, trashRoot.toUri().getPath());
       return json;
     }
@@ -1394,7 +1401,7 @@ public final class FSOperations {
    */
   @InterfaceAudience.Private
   public static class FSSetReplication
-      implements FileSystemAccess.FileSystemExecutor<Map> {
+      implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
     private short replication;
 
@@ -1420,9 +1427,10 @@ public final class FSOperations {
      * @throws IOException thrown if an IO error occurred.
      */
     @Override
-    public Map execute(FileSystem fs) throws IOException {
+    @SuppressWarnings("unchecked")
+    public JSONObject execute(FileSystem fs) throws IOException {
       boolean ret = fs.setReplication(path, replication);
-      Map<String, Object> json = new LinkedHashMap<>();
+      JSONObject json = new JSONObject();
       json.put(HttpFSConstants.SET_REPLICATION_JSON, ret);
       return json;
     }
@@ -1602,12 +1610,13 @@ public final class FSOperations {
    * Executor that performs a getAllStoragePolicies FileSystemAccess files
    * system operation.
    */
+  @SuppressWarnings({ "unchecked" })
   @InterfaceAudience.Private
   public static class FSGetAllStoragePolicies implements
-      FileSystemAccess.FileSystemExecutor<Map> {
+      FileSystemAccess.FileSystemExecutor<JSONObject> {
 
     @Override
-    public Map execute(FileSystem fs) throws IOException {
+    public JSONObject execute(FileSystem fs) throws IOException {
       Collection<? extends BlockStoragePolicySpi> storagePolicies = fs
           .getAllStoragePolicies();
       return storagePoliciesToJSON(storagePolicies);
@@ -1618,9 +1627,10 @@ public final class FSOperations {
    * Executor that performs a getStoragePolicy FileSystemAccess files system
    * operation.
    */
+  @SuppressWarnings({ "unchecked" })
   @InterfaceAudience.Private
   public static class FSGetStoragePolicy implements
-      FileSystemAccess.FileSystemExecutor<Map> {
+      FileSystemAccess.FileSystemExecutor<JSONObject> {
 
     private Path path;
 
@@ -1629,9 +1639,9 @@ public final class FSOperations {
     }
 
     @Override
-    public Map execute(FileSystem fs) throws IOException {
+    public JSONObject execute(FileSystem fs) throws IOException {
       BlockStoragePolicySpi storagePolicy = fs.getStoragePolicy(path);
-      Map<String, Object> json = new LinkedHashMap<>();
+      JSONObject json = new JSONObject();
       json.put(HttpFSConstants.STORAGE_POLICY_JSON,
           storagePolicyToJSON(storagePolicy));
       return json;
@@ -1783,9 +1793,9 @@ public final class FSOperations {
     @Override
     public String execute(FileSystem fs) throws IOException {
       Path snapshotPath = fs.createSnapshot(path, snapshotName);
-      Map<String, Object> json = toJSON(HttpFSConstants.HOME_DIR_JSON,
+      JSONObject json = toJSON(HttpFSConstants.HOME_DIR_JSON,
           snapshotPath.toString());
-      return JsonUtil.toJsonString(json);
+      return json.toJSONString().replaceAll("\\\\", "");
     }
   }
 

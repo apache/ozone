@@ -51,8 +51,8 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotRequestAndResponseTests;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.Assertions;
@@ -63,7 +63,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Test class to test OMSnapshotMoveTableKeysResponse.
  */
-public class TestOMSnapshotMoveTableKeysResponse extends SnapshotRequestAndResponseTests {
+public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndResponse {
 
   private String snapshotName1;
   private String snapshotName2;
@@ -128,9 +128,9 @@ public class TestOMSnapshotMoveTableKeysResponse extends SnapshotRequestAndRespo
         getVolumeName(), getBucketName(), snapshotName1);
          UncheckedAutoCloseableSupplier<OmSnapshot> snapshot2 = nextSnapshotExists ? getOmSnapshotManager().getSnapshot(
              getVolumeName(), getBucketName(), snapshotName2) : null) {
-      final List<String> first = Collections.singletonList(snapshot1.get().getSnapshotID().toString());
-      final List<List<String>> expectedSnapshotIdLocks = !nextSnapshotExists ? Collections.singletonList(first)
-          : Arrays.asList(first, Collections.singletonList(snapshot2.get().getSnapshotID().toString()));
+      List<List<String>> expectedSnapshotIdLocks =
+          Arrays.asList(Collections.singletonList(snapshot1.get().getSnapshotID().toString()),
+          nextSnapshotExists ? Collections.singletonList(snapshot2.get().getSnapshotID().toString()) : null);
       List<List<String>> locks = new ArrayList<>();
       doAnswer(i -> {
         for (String[] id : (Collection<String[]>)i.getArgument(1)) {

@@ -70,7 +70,9 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
+import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.GrpcContainerUploader;
 import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
@@ -78,6 +80,7 @@ import org.apache.hadoop.ozone.container.replication.PushReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisorMetrics;
+import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -122,6 +125,7 @@ public class DatanodeStateMachine implements Closeable {
    * constructor in a non-thread-safe way - see HDDS-3116.
    */
   private final ReadWriteLock constructionLock = new ReentrantReadWriteLock();
+  private final MeasuredReplicator pullReplicatorWithMetrics;
   private final MeasuredReplicator pushReplicatorWithMetrics;
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
   private final NettyMetrics nettyMetrics;
@@ -191,11 +195,21 @@ public class DatanodeStateMachine implements Closeable {
     }
     nextHB = new AtomicLong(Time.monotonicNow());
 
+    ContainerImporter importer = new ContainerImporter(conf,
+        container.getContainerSet(),
+        container.getController(),
+        container.getVolumeSet(),
+        volumeChoosingPolicy);
+    ContainerReplicator pullReplicator = new DownloadAndImportReplicator(
+        conf, container.getContainerSet(),
+        importer,
+        new SimpleContainerDownloader(conf, certClient));
     ContainerReplicator pushReplicator = new PushReplicator(conf,
         new OnDemandContainerReplicationSource(container.getController()),
         new GrpcContainerUploader(conf, certClient, container.getController())
     );
 
+    pullReplicatorWithMetrics = new MeasuredReplicator(pullReplicator, "pull");
     pushReplicatorWithMetrics = new MeasuredReplicator(pushReplicator, "push");
 
     ReplicationConfig replicationConfig =
@@ -204,15 +218,8 @@ public class DatanodeStateMachine implements Closeable {
         .stateContext(context)
         .datanodeConfig(dnConf)
         .replicationConfig(replicationConfig)
-        .containerSet(container.getContainerSet())
-        .volumeSet(container.getVolumeSet())
         .clock(clock)
         .build();
-
-    container.getVolumeSet().setFailedVolumeListener(() -> {
-      container.handleVolumeFailures();
-      supervisor.shutdownFailedVolumePools(container.getVolumeSet());
-    });
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
@@ -259,7 +266,8 @@ public class DatanodeStateMachine implements Closeable {
             dnConf.getCommandQueueLimit(), threadNamePrefix))
         .addHandler(new DeleteBlocksCommandHandler(getContainer(),
             conf, dnConf, threadNamePrefix))
-        .addHandler(new ReplicateContainerCommandHandler(supervisor, pushReplicatorWithMetrics))
+        .addHandler(new ReplicateContainerCommandHandler(conf, supervisor,
+            pullReplicatorWithMetrics, pushReplicatorWithMetrics))
         .addHandler(reconstructECContainersCommandHandler)
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads(), clock,
@@ -644,7 +652,7 @@ public class DatanodeStateMachine implements Closeable {
    */
   public synchronized void stopDaemon() {
     try {
-      IOUtils.close(LOG, pushReplicatorWithMetrics);
+      IOUtils.close(LOG, pushReplicatorWithMetrics, pullReplicatorWithMetrics);
       supervisor.stop();
       context.setShutdownGracefully();
       context.setState(DatanodeStates.SHUTDOWN);

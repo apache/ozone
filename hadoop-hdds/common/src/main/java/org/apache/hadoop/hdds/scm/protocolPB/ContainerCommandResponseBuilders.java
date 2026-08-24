@@ -65,15 +65,11 @@ public final class ContainerCommandResponseBuilders {
   public static Builder getContainerCommandResponse(
       ContainerCommandRequestProto request, Result result, String message) {
 
-    ContainerCommandResponseProto.Builder builder = ContainerCommandResponseProto.newBuilder()
+    return ContainerCommandResponseProto.newBuilder()
         .setCmdType(request.getCmdType())
         .setTraceID(request.getTraceID())
         .setResult(result)
         .setMessage(message);
-    if (request.hasClientId() && request.hasCallId()) {
-      builder.setClientId(request.getClientId()).setCallId(request.getCallId());
-    }
-    return builder;
   }
 
   /**
@@ -86,14 +82,10 @@ public final class ContainerCommandResponseBuilders {
   public static Builder getSuccessResponseBuilder(
       ContainerCommandRequestProto request) {
 
-    ContainerCommandResponseProto.Builder builder =  ContainerCommandResponseProto.newBuilder()
+    return ContainerCommandResponseProto.newBuilder()
         .setCmdType(request.getCmdType())
         .setTraceID(request.getTraceID())
         .setResult(Result.SUCCESS);
-    if (request.hasClientId() && request.hasCallId()) {
-      builder.setClientId(request.getClientId()).setCallId(request.getCallId());
-    }
-    return builder;
   }
 
   /**
@@ -157,10 +149,10 @@ public final class ContainerCommandResponseBuilders {
   }
 
   public static ContainerCommandResponseProto getBlockDataResponse(
-      ContainerCommandRequestProto msg, BlockData data, boolean shortCircuitGranted) {
+      ContainerCommandRequestProto msg, BlockData data) {
 
     GetBlockResponseProto.Builder getBlock = GetBlockResponseProto.newBuilder()
-        .setBlockData(data).setShortCircuitAccessGranted(shortCircuitGranted);
+        .setBlockData(data);
 
     return getSuccessResponseBuilder(msg)
         .setGetBlock(getBlock)
@@ -389,7 +381,9 @@ public final class ContainerCommandResponseBuilders {
             .newBuilder()
             .setPayload(UnsafeByteOperations.unsafeWrap(RandomUtils.secure().randomBytes(responsePayload)));
 
-    return getSuccessResponseBuilder(msg).setEcho(echo).build();
+    return getSuccessResponseBuilder(msg)
+        .setEcho(echo)
+        .build();
   }
 
   public static ContainerCommandResponseProto getGetContainerMerkleTreeResponse(

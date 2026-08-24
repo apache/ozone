@@ -33,6 +33,9 @@ import picocli.CommandLine;
     description = "Assign user accessId to tenant")
 public class TenantAssignUserAccessIdHandler extends TenantHandler {
 
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
   @CommandLine.Parameters(description = "User name", arity = "1..1")
   private String userPrincipal;
 
@@ -40,7 +43,7 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
       description = "Tenant name", required = true)
   private String tenantId;
 
-  @CommandLine.Option(names = {"-a", "--access-id"},
+  @CommandLine.Option(names = {"-a", "--access-id", "--accessId"},
       description = "(Optional) Specify the accessId for user in this tenant. "
           + "If unspecified, accessId would be in the form of "
           + "TenantName$Principal.",

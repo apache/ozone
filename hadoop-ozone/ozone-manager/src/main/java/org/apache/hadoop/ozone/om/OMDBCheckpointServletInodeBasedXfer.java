@@ -20,12 +20,12 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.includeSnapshotData;
+import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.logEstimatedTarballSize;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_SUFFIX;
 
@@ -49,7 +49,6 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -72,7 +71,6 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
-import org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
@@ -146,8 +144,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
-    if (!om.isLeader()) {
-      String msg = "Unable to process metadata snapshot request as this OM is not the leader";
+    boolean isOmLeader = om.isLeaderReady();
+    if (!isOmLeader) {
+      String msg = "Unable to process metadata snapshot request as "
+          + "this OM is not the leader or not ready to serve requests";
       LOG.warn(msg);
       try {
         response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, msg);
@@ -175,10 +175,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       response.setContentType("application/x-tar");
       response.setHeader("Content-Disposition", "attachment; filename=\"" + tarName + "\"");
       Instant start = Instant.now();
-      OptionalLong estimatedSstBytes =
-          collectDbDataToTransfer(request, receivedSstFiles, omdbArchiver);
-      estimatedSstBytes.ifPresent(bytes -> response.setHeader(
-          OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER, Long.toString(bytes)));
+      collectDbDataToTransfer(request, receivedSstFiles, omdbArchiver);
       Instant end = Instant.now();
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to collect the DB data : {} milliseconds", duration);
@@ -237,10 +234,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    *
    * @param request           The HTTP servlet request containing parameters for the snapshot.
    * @param sstFilesToExclude Set of SST file identifiers to exclude from the archive.
-   * @return estimated total uncompressed SST bytes for a full checkpoint
-   *         (no SST exclusions), or empty if not computed
+   * @throws IOException if an I/O error occurs during processing or streaming.
    */
-  public OptionalLong collectDbDataToTransfer(HttpServletRequest request,
+  public void collectDbDataToTransfer(HttpServletRequest request,
       Set<String> sstFilesToExclude,  OMDBArchiver omdbArchiver) throws IOException {
     DBCheckpoint checkpoint = null;
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
@@ -258,17 +254,8 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       snapshotPaths = getSnapshotDirsFromDB(omMetadataManager, omMetadataManager, snapshotLocalDataManager).values();
     }
 
-    OptionalLong estimateForHeader = OptionalLong.empty();
     if (sstFilesToExclude.isEmpty()) {
-      try {
-        OMDBCheckpointUtils.SstSizeEstimate estimate = OMDBCheckpointUtils
-            .estimateCheckpointTarballSstDetails(getDbStore().getDbLocation().toPath(), snapshotPaths);
-        OMDBCheckpointUtils.logEstimatedTarballSize(estimate, snapshotPaths.size());
-        estimateForHeader = OptionalLong.of(estimate.getTotalBytes());
-      } catch (IOException e) {
-        LOG.warn("Could not estimate checkpoint tarball SST size for response header: {}",
-            e.getMessage());
-      }
+      logEstimatedTarballSize(getDbStore().getDbLocation().toPath(), snapshotPaths);
     }
 
     boolean shouldContinue = true;
@@ -352,7 +339,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     } finally {
       cleanupCheckpoint(checkpoint);
     }
-    return estimateForHeader;
   }
 
   /**
@@ -481,7 +467,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   Map<UUID, Path> getSnapshotDirsFromDB(OMMetadataManager activeOMMetadataManager, OMMetadataManager omMetadataManager,
       OmSnapshotLocalDataManager localDataManager) throws IOException {
     Map<UUID, Path> snapshotPaths = new HashMap<>();
-    try (TableIterator<String, Table.KeyValue<String, SnapshotInfo>> iter =
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iter =
         omMetadataManager.getSnapshotInfoTable().iterator()) {
       while (iter.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> kv = iter.next();

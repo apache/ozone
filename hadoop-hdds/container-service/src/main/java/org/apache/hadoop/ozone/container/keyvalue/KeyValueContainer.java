@@ -56,7 +56,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -148,8 +147,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void create(VolumeSet volumeSet, VolumeChoosingPolicy
-      volumeChoosingPolicy, String clusterId, StorageType storageType)
-      throws StorageContainerException {
+      volumeChoosingPolicy, String clusterId) throws StorageContainerException {
     Objects.requireNonNull(volumeChoosingPolicy, "VolumeChoosingPolicy == null");
     Objects.requireNonNull(volumeSet, "volumeSet == null");
     Objects.requireNonNull(clusterId, "clusterId == null");
@@ -165,22 +163,19 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         HddsVolume containerVolume;
         String hddsVolumeDir;
         try {
-          containerVolume = volumeChoosingPolicy.chooseVolume(volumes, maxSize, storageType);
+          containerVolume = volumeChoosingPolicy.chooseVolume(volumes, maxSize);
           hddsVolumeDir = containerVolume.getHddsRootDir().toString();
           // Set volume before getContainerDBFile(), because we may need the
           // volume to deduce the db file.
           containerData.setVolume(containerVolume);
-          containerData.setStorageType(containerVolume.getStorageType());
           // commit bytes have been reserved in volumeChoosingPolicy#chooseVolume
           containerData.setCommittedSpace(true);
         } catch (DiskOutOfSpaceException ex) {
           throw new StorageContainerException("Container creation failed, " +
-              "due to disk out of space" + storageTypeMessage(storageType),
-              ex, DISK_OUT_OF_SPACE);
+              "due to disk out of space", ex, DISK_OUT_OF_SPACE);
         } catch (IOException ex) {
           throw new StorageContainerException(
-              "Container creation failed" + storageTypeMessage(storageType) +
-                  ". " + ex.getMessage(), ex,
+              "Container creation failed. " + ex.getMessage(), ex,
               CONTAINER_INTERNAL_ERROR);
         }
 
@@ -344,10 +339,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     writeToContainerFile(containerFile, false);
   }
 
-  private static String storageTypeMessage(StorageType storageType) {
-    return storageType == null ? "" : " on StorageType: " + storageType;
-  }
-
   @Override
   public void delete() throws StorageContainerException {
     try {
@@ -400,17 +391,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     writeLock();
     final State prevState = containerData.getState();
     try {
-      if (!getContainerFile().getParentFile().exists()) {
-        // Metadata directory is absent (e.g. MISSING_METADATA_DIR detected by scanner).
-        // Attempting to write the .container file would fail
-        // The in-memory UNHEALTHY state is sufficient: SCM will receive it via ICR
-        // and schedule deletion without requiring a persisted .container file.
-        containerData.setState(UNHEALTHY);
-        LOG.debug("Skipping .container file update for container {} with missing metadata directory",
-            containerData.getContainerID());
-      } else {
-        updateContainerState(UNHEALTHY);
-      }
+      updateContainerState(UNHEALTHY);
       clearPendingPutBlockCache();
     } finally {
       writeUnlock();
@@ -683,22 +664,13 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
         BlockUtils.removeContainerFromDB(containerData, config);
       }
-      File containerDir = new File(getContainerData().getContainerPath());
-      if (containerDir.exists()) {
-        KeyValueContainerUtil.moveToDeletedContainerDir(containerData,
-            containerData.getVolume());
-        deleteDirectory(KeyValueContainerUtil.getTmpDirectoryPath(containerData,
-            containerData.getVolume()).toFile());
-      }
+      FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
+      FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
+      FileUtils.deleteDirectory(new File(getContainerData().getContainerPath()));
     } catch (Exception ex) {
       LOG.error("Failed to cleanup destination directories for container {}",
           containerData.getContainerID(), ex);
     }
-  }
-
-  @VisibleForTesting
-  void deleteDirectory(File directory) throws IOException {
-    FileUtils.deleteDirectory(directory);
   }
 
   @Override

@@ -29,7 +29,6 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentity
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
-import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -95,7 +94,7 @@ import org.junit.jupiter.api.Test;
  * Ozone Manager HA tests where all OMs are running throughout all tests.
  * @see TestOzoneManagerHAWithStoppedNodes
  */
-class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
+class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   void testFileOperationsWithRecursive() throws Exception {
@@ -236,7 +235,7 @@ class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
 
   @Test
   public void testAllVolumeOperations() throws Exception {
-    String volumeName = uniqueObjectName("volume");
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     createAndCheckVolume(volumeName);
 
@@ -252,8 +251,8 @@ class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
 
   @Test
   public void testAllBucketOperations() throws Exception {
-    String volumeName = uniqueObjectName("volume");
-    String bucketName = uniqueObjectName("bucket");
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     OzoneVolume retVolume = createAndCheckVolume(volumeName);
 
@@ -355,7 +354,7 @@ class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
 
   @Test
   public void testReadRequest() throws Exception {
-    String volumeName = uniqueObjectName("volume");
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
     ObjectStore objectStore = getObjectStore();
     objectStore.createVolume(volumeName);
 
@@ -1035,8 +1034,8 @@ class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
   void testOMRatisSnapshot() throws Exception {
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = uniqueObjectName("volume");
-    String bucketName = uniqueObjectName("bucket");
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)

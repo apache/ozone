@@ -38,8 +38,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -66,6 +66,7 @@ public class TestHybridPipelineOnDatanode {
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
+    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
   }
@@ -96,14 +97,14 @@ public class TestHybridPipelineOnDatanode {
     String keyName1 = UUID.randomUUID().toString();
 
     // Write data into a key
-    DataTestUtil.createKey(bucket, keyName1,
+    TestDataUtil.createKey(bucket, keyName1,
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
             ReplicationFactor.ONE), value.getBytes(UTF_8));
 
     String keyName2 = UUID.randomUUID().toString();
 
     // Write data into a key
-    DataTestUtil.createKey(bucket, keyName2,
+    TestDataUtil.createKey(bucket, keyName2,
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
             ReplicationFactor.THREE), value.getBytes(UTF_8));
 

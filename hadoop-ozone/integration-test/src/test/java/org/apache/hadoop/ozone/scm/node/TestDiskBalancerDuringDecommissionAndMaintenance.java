@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.scm.node;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
-import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -76,6 +77,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
   @BeforeAll
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY, true);
     conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
     conf.setTimeDuration("hdds.datanode.disk.balancer.service.interval", 2, TimeUnit.SECONDS);
@@ -137,13 +139,20 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
   }
 
   /**
+   * Helper method to get all IN_SERVICE datanodes.
+   */
+  private List<DatanodeDetails> getInServiceDatanodes(NodeManager nm) {
+    return nm.getNodes(IN_SERVICE, HddsProtos.NodeState.HEALTHY);
+  }
+
+  /**
    * Helper method to query DiskBalancer info from all IN_SERVICE datanodes.
    * Similar to --in-service-datanodes option in CLI.
    */
   private <T> List<T> queryAllInServiceDatanodes(
       DiskBalancerQuery<T> query) throws IOException {
     NodeManager nm = cluster.getStorageContainerManager().getScmNodeManager();
-    final List<DatanodeInfo> inServiceDatanodes = nm.getNodes(IN_SERVICE, HddsProtos.NodeState.HEALTHY);
+    List<DatanodeDetails> inServiceDatanodes = getInServiceDatanodes(nm);
     List<T> results = new ArrayList<>();
     
     for (DatanodeDetails dn : inServiceDatanodes) {
@@ -213,16 +222,16 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     // in DiskBalancer report and status (since we only queried IN_SERVICE nodes)
     boolean isDecommissionedDnInReport = reportProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToDecommission.getID().toString()));
+            equals(dnToDecommission.getUuid().toString()));
     boolean isMaintenanceDnInReport = reportProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToMaintenance.getID().toString()));
+            equals(dnToMaintenance.getUuid().toString()));
     boolean isDecommissionedDnInStatus = statusProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToDecommission.getID().toString()));
+            equals(dnToDecommission.getUuid().toString()));
     boolean isMaintenanceDnInStatus = statusProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToMaintenance.getID().toString()));
+            equals(dnToMaintenance.getUuid().toString()));
 
     // Assert that the decommissioned DN is not present in both report and status
     assertFalse(isDecommissionedDnInReport);
@@ -253,10 +262,10 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     boolean isRecommissionedDnInReport = reportProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(recommissionedDn.getID().toString()));
+            equals(recommissionedDn.getUuid().toString()));
     boolean isRecommissionedDnInStatus = statusProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(recommissionedDn.getID().toString()));
+            equals(recommissionedDn.getUuid().toString()));
 
     // Verify that the recommissioned DN is included in both report and status
     assertTrue(isRecommissionedDnInReport);

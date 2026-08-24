@@ -57,7 +57,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -100,6 +99,7 @@ import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -112,7 +112,6 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -445,16 +444,15 @@ public class TestContainerCommandsEC {
   }
 
   @Test
-  @Unhealthy("Need EC Pipeline to set supported StorageTier value")
   public void testCreateRecoveryContainer() throws Exception {
     try (XceiverClientManager xceiverClientManager =
         new XceiverClientManager(config)) {
       ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
       Pipeline newPipeline =
-          scm.getPipelineManager().createPipeline(replicationConfig, StorageTier.getDefaultTier());
+          scm.getPipelineManager().createPipeline(replicationConfig);
       scm.getPipelineManager().activatePipeline(newPipeline.getId());
       final ContainerInfo container = scm.getContainerManager()
-          .allocateContainer(replicationConfig, "test", StorageTier.getDefaultTier());
+          .allocateContainer(replicationConfig, "test");
       Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
           .generateToken(ANY_USER, container.containerID());
       scm.getContainerManager().getContainerStateManager()
@@ -535,16 +533,15 @@ public class TestContainerCommandsEC {
   }
 
   @Test
-  @Unhealthy("Need EC Pipeline to set supported StorageTier value")
   public void testCreateRecoveryContainerAfterDNRestart() throws Exception {
     try (XceiverClientManager xceiverClientManager =
              new XceiverClientManager(config)) {
       ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
       Pipeline newPipeline =
-          scm.getPipelineManager().createPipeline(replicationConfig, StorageTier.getDefaultTier());
+          scm.getPipelineManager().createPipeline(replicationConfig);
       scm.getPipelineManager().activatePipeline(newPipeline.getId());
       final ContainerInfo container = scm.getContainerManager()
-          .allocateContainer(replicationConfig, "test", StorageTier.getDefaultTier());
+          .allocateContainer(replicationConfig, "test");
       Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
           .generateToken(ANY_USER, container.containerID());
       scm.getContainerManager().getContainerStateManager()
@@ -937,7 +934,7 @@ public class TestContainerCommandsEC {
   }
 
   private void closeContainer(long conID)
-      throws IOException {
+      throws IOException, InvalidStateTransitionException {
     //Close the container first.
     scm.getContainerManager().getContainerStateManager().updateContainerStateWithSequenceId(
         HddsProtos.ContainerID.newBuilder().setId(conID).build(),
@@ -1040,7 +1037,7 @@ public class TestContainerCommandsEC {
                     .map(ContainerInfo::containerID)
                     .collect(Collectors.toList());
     assertEquals(1, containerIDs.size());
-    containerID = containerIDs.get(0).getIdForTesting();
+    containerID = containerIDs.get(0).getId();
     List<Pipeline> pipelines = scm.getPipelineManager().getPipelines(repConfig);
     assertEquals(1, pipelines.size());
     pipeline = pipelines.get(0);

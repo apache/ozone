@@ -245,9 +245,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
       // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
       // not persisted in the key table.
-      omKeyInfo = omKeyInfo.toBuilder()
-          .setExpectedDataGeneration(null)
-          .build();
+      omKeyInfo.setExpectedDataGeneration(null);
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
       // if keyToDelete isn't null, usedNamespace shouldn't check and increase.

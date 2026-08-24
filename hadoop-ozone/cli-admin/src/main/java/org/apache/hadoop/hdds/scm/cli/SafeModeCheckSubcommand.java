@@ -122,7 +122,7 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
 
       return null;
     } catch (IOException e) {
-      throw new IOException("Could not determine leader node. " + e.getMessage(), e);
+      throw new IOException("Could not determine leader node", e);
     }
   }
 
@@ -171,7 +171,8 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
         }
       }
     } catch (Exception e) {
-      rootCommand().printError(e);
+      System.out.printf("%s [%s]: ERROR: Failed to get safe mode status for SCM node: %s%n",
+          node.getScmClientAddress(), nodeId, e.getMessage());
     }
   }
 

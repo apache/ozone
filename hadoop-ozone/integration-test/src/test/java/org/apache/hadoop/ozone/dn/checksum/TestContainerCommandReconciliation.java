@@ -101,7 +101,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.OzoneTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
@@ -130,7 +130,6 @@ import org.slf4j.LoggerFactory;
 /**
  * This class tests container commands for reconciliation.
  */
-@Flaky("HDDS-13401")
 public class TestContainerCommandReconciliation {
 
   private static MiniOzoneHAClusterImpl cluster;
@@ -374,6 +373,7 @@ public class TestContainerCommandReconciliation {
   }
 
   @Test
+  @Flaky("HDDS-13401")
   public void testContainerChecksumWithBlockMissing() throws Exception {
     // 1. Write data to a container.
     // Read the key back and check its hash.
@@ -430,7 +430,7 @@ public class TestContainerCommandReconciliation {
     ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
     assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
         newContainerChecksumInfo.getContainerMerkleTree());
-    OzoneTestHelper.validateData(KEY_NAME, data, store, volume, bucket);
+    TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
   }
 
   @Test
@@ -481,10 +481,11 @@ public class TestContainerCommandReconciliation {
     assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
         newContainerChecksumInfo.getContainerMerkleTree());
     assertEquals(oldDataChecksum, newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum());
-    OzoneTestHelper.validateData(KEY_NAME, data, store, volume, bucket);
+    TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
   }
 
   @Test
+  @Flaky("HDDS-13401")
   public void testDataChecksumReportedAtSCM() throws Exception {
     // 1. Write data to a container.
     // Read the key back and check its hash.
@@ -564,7 +565,7 @@ public class TestContainerCommandReconciliation {
     for (HddsProtos.SCMContainerReplicaProto containerReplica: containerReplicas) {
       assertNotEquals(0, containerReplica.getDataChecksum());
     }
-    OzoneTestHelper.validateData(KEY_NAME, data, store, volume, bucket);
+    TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
   }
 
   private void waitForDataChecksumsAtSCM(long containerID, int expectedSize) throws Exception {
@@ -592,16 +593,15 @@ public class TestContainerCommandReconciliation {
 
     byte[] data = randomAlphabetic(dataLen).getBytes(UTF_8);
     // Write Key
-    try (OzoneOutputStream os = OzoneTestHelper.createKey(
-        KEY_NAME, RATIS, THREE, dataLen, store, volumeName, bucketName)) {
+    try (OzoneOutputStream os = TestHelper.createKey(KEY_NAME, RATIS, THREE, dataLen, store, volumeName, bucketName)) {
       IOUtils.write(data, os);
     }
 
     long containerID = bucket.getKey(KEY_NAME).getOzoneKeyLocations().stream()
         .findFirst().get().getContainerID();
     if (close) {
-      OzoneTestHelper.waitForContainerClose(cluster, containerID);
-      OzoneTestHelper.waitForScmContainerState(cluster, containerID, HddsProtos.LifeCycleState.CLOSED);
+      TestHelper.waitForContainerClose(cluster, containerID);
+      TestHelper.waitForScmContainerState(cluster, containerID, HddsProtos.LifeCycleState.CLOSED);
     }
     return Pair.of(containerID, data);
   }

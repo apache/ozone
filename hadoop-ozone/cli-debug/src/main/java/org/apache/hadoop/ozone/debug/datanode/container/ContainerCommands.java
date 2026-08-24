@@ -58,7 +58,6 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.apache.hadoop.ozone.debug.datanode.container.analyze.AnalyzeSubcommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -76,8 +75,7 @@ import picocli.CommandLine.Command;
         ListSubcommand.class,
         InfoSubcommand.class,
         ExportSubcommand.class,
-        InspectSubcommand.class,
-        AnalyzeSubcommand.class
+        InspectSubcommand.class
     })
 public class ContainerCommands extends AbstractSubcommand {
 

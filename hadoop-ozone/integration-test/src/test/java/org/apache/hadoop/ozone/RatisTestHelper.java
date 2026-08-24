@@ -65,7 +65,7 @@ public interface RatisTestHelper {
       HddsDatanodeService dn, Pipeline pipeline) throws Exception {
     if (!pipeline.getNodes().contains(dn.getDatanodeDetails())) {
       throw new IllegalArgumentException("Pipeline:" + pipeline.getId() +
-          " not exist in datanode:" + dn.getDatanodeDetails().getID());
+          " not exist in datanode:" + dn.getDatanodeDetails().getUuid());
     }
 
     XceiverServerRatis server =

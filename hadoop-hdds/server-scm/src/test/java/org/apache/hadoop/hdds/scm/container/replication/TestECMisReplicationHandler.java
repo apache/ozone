@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -58,7 +57,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests the ECMisReplicationHandling functionality.
  */
-public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
+public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   private static final int DATA = 3;
   private static final int PARITY = 2;
 
@@ -94,8 +93,8 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
     when(placementPolicy.validateContainerPlacement(anyList(),
         anyInt())).thenReturn(mockedContainerPlacementStatus);
     when(placementPolicy.chooseDatanodes(
-        any(), any(), any(), anyInt(), anyLong(), anyLong(), any(StorageType.class)))
-            .thenThrow(new SCMException("No nodes found", SCMException.ResultCodes.NO_SUCH_DATANODE));
+        any(), any(), any(), anyInt(), anyLong(), anyLong()))
+            .thenThrow(new IOException("No nodes found"));
     assertThrows(SCMException.class, () -> testMisReplication(
             availableReplicas, placementPolicy, Collections.emptyList(),
             0, 2, 0));
@@ -209,7 +208,7 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     List<DatanodeDetails> targetDatanodes = singletonList(
         availableReplicas.iterator().next().getDatanodeDetails());
-    when(placementPolicy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong(), any(StorageType.class)))
+    when(placementPolicy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong()))
         .thenReturn(targetDatanodes);
     assertThrows(InsufficientDatanodesException.class,
         () -> testMisReplication(availableReplicas, Collections.emptyList(),

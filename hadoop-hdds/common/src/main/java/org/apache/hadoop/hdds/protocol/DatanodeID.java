@@ -44,6 +44,11 @@ public final class DatanodeID implements Comparable<DatanodeID> {
     this.uuidByteString = StringWithByteString.valueOf(uuid.toString());
   }
 
+  // Mainly used for JSON conversion
+  public String getID() {
+    return toString();
+  }
+
   @Override
   public int compareTo(final DatanodeID that) {
     return this.uuid.compareTo(that.uuid);
@@ -63,11 +68,6 @@ public final class DatanodeID implements Comparable<DatanodeID> {
   @Override
   public String toString() {
     return uuidByteString.getString();
-  }
-
-  // Mainly used for JSON conversion
-  public String getUuid() {
-    return toString();
   }
 
   /**
@@ -120,5 +120,12 @@ public final class DatanodeID implements Comparable<DatanodeID> {
         .setMostSigBits(id.getMostSignificantBits())
         .setLeastSigBits(id.getLeastSignificantBits())
         .build();
+  }
+
+  // TODO: Remove this in follow-up Jira. (HDDS-12015)
+  //   Exposing this temporarily to help with refactoring.
+  @Deprecated
+  public UUID getUuid() {
+    return uuid;
   }
 }

@@ -36,7 +36,6 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -59,6 +58,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
@@ -107,7 +107,7 @@ public class TestPipelineClose {
   void createContainer() throws IOException {
     ContainerInfo containerInfo = containerManager
         .allocateContainer(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "testOwner", StorageTier.getDefaultTier());
+            ReplicationFactor.THREE), "testOwner");
     ratisContainer = new ContainerWithPipeline(containerInfo,
         pipelineManager.getPipeline(containerInfo.getPipelineID()));
     // At this stage, there should be 2 pipeline one with 1 open container each.
@@ -123,7 +123,8 @@ public class TestPipelineClose {
   }
 
   @Test
-  public void testPipelineCloseWithClosedContainer() throws IOException {
+  public void testPipelineCloseWithClosedContainer() throws IOException,
+      InvalidStateTransitionException, TimeoutException {
     Set<ContainerID> set = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
 
@@ -220,7 +221,7 @@ public class TestPipelineClose {
 
     ContainerInfo containerInfo = containerManager
         .allocateContainer(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "testOwner", StorageTier.getDefaultTier());
+            ReplicationFactor.THREE), "testOwner");
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo,
             pipelineManager.getPipeline(containerInfo.getPipelineID()));
@@ -258,7 +259,7 @@ public class TestPipelineClose {
   void testPipelineCloseTriggersSkippedWhenAlreadyInProgress() throws Exception {
     ContainerInfo allocateContainer = containerManager
         .allocateContainer(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "newTestOwner", StorageTier.getDefaultTier());
+            ReplicationFactor.THREE), "newTestOwner");
     ContainerWithPipeline containerWithPipeline = new ContainerWithPipeline(allocateContainer,
         pipelineManager.getPipeline(allocateContainer.getPipelineID()));
     

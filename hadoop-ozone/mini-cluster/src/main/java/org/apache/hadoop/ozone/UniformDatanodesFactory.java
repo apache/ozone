@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_INITIAL_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL;
@@ -34,20 +33,18 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATAS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -66,7 +63,6 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
   private final Integer layoutVersion;
   private final DatanodeVersion initialVersion;
   private final DatanodeVersion currentVersion;
-  private final List<List<StorageType>> datanodeStorageType;
 
   protected UniformDatanodesFactory(Builder builder) {
     numDataVolumes = builder.numDataVolumes;
@@ -74,7 +70,6 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     reservedSpace = builder.reservedSpace;
     currentVersion = builder.currentVersion;
     initialVersion = builder.initialVersion != null ? builder.initialVersion : builder.currentVersion;
-    datanodeStorageType = builder.datanodeStorageType;
   }
 
   @Override
@@ -90,31 +85,12 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     Files.createDirectories(metaDir);
     dnConf.set(OZONE_METADATA_DIRS, metaDir.toString());
 
-    // Look up this datanode's per-volume StorageType list, if configured. `i` is 1-based.
-    List<StorageType> volumeStorageTypes = Collections.emptyList();
-    if (datanodeStorageType != null && !datanodeStorageType.isEmpty()) {
-      if (i - 1 >= datanodeStorageType.size()) {
-        throw new IOException("Datanode index " + (i - 1)
-            + " has no entry in datanodeStorageType list (size="
-            + datanodeStorageType.size() + ").");
-      }
-      volumeStorageTypes = datanodeStorageType.get(i - 1);
-      if (!volumeStorageTypes.isEmpty() && volumeStorageTypes.size() != numDataVolumes) {
-        throw new IOException("Datanode " + (i - 1) + " storageType list size "
-            + volumeStorageTypes.size() + " must equal numDataVolumes " + numDataVolumes + ".");
-      }
-    }
-
     List<String> dataDirs = new ArrayList<>();
     List<String> reservedSpaceList = new ArrayList<>();
     for (int j = 0; j < numDataVolumes; j++) {
       Path dir = baseDir.resolve("data-" + j);
       Files.createDirectories(dir);
-      if (!volumeStorageTypes.isEmpty()) {
-        dataDirs.add("[" + volumeStorageTypes.get(j) + "]" + dir);
-      } else {
-        dataDirs.add(dir.toString());
-      }
+      dataDirs.add(dir.toString());
       if (reservedSpace != null) {
         reservedSpaceList.add(dir + ":" + reservedSpace);
       }
@@ -147,9 +123,8 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
   }
 
   private void configureDatanodePorts(ConfigurationTarget conf) {
-    conf.set(HDDS_DATANODE_HOST_NAME_KEY, "127.0.0.1");
-    conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, localhostWithFreePort());
-    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, localhostWithFreePort());
+    conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, anyHostWithFreePort());
+    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, anyHostWithFreePort());
     conf.setInt(HDDS_CONTAINER_IPC_PORT, getFreePort());
     conf.setInt(HDDS_CONTAINER_RATIS_IPC_PORT, getFreePort());
     conf.setInt(HDDS_CONTAINER_RATIS_ADMIN_PORT, getFreePort());
@@ -172,7 +147,6 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     private Integer layoutVersion;
     private DatanodeVersion initialVersion;
     private DatanodeVersion currentVersion;
-    private List<List<StorageType>> datanodeStorageType = Collections.emptyList();
 
     /**
      * Sets the number of data volumes per datanode.
@@ -210,30 +184,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
       return this;
     }
 
-    /**
-     * Per-datanode storage type list. Outer list is indexed by datanode; inner list
-     * is indexed by volume within a datanode. Each inner list, when non-empty, must
-     * have size == numDataVolumes. When set, each data dir is prefixed with
-     * {@code "[StorageType]"} so the DN advertises the requested type.
-     */
-    public Builder setDatanodeStorageType(List<List<StorageType>> datanodeStorageType) {
-      this.datanodeStorageType = datanodeStorageType == null
-          ? Collections.emptyList() : datanodeStorageType;
-      return this;
-    }
-
     public UniformDatanodesFactory build() {
-      for (int i = 0; i < datanodeStorageType.size(); i++) {
-        List<StorageType> storageTypes = Objects.requireNonNull(
-            datanodeStorageType.get(i),
-            "Datanode storageType list cannot be null");
-        if (!storageTypes.isEmpty()
-            && storageTypes.size() != numDataVolumes) {
-          throw new IllegalArgumentException("Datanode " + i
-              + " storageType list size " + storageTypes.size()
-              + " must equal numDataVolumes " + numDataVolumes + ".");
-        }
-      }
       return new UniformDatanodesFactory(this);
     }
 

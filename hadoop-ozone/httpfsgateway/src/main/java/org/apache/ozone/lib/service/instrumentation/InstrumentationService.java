@@ -17,7 +17,8 @@
 
 package org.apache.ozone.lib.service.instrumentation;
 
-import com.fasterxml.jackson.annotation.JsonValue;
+import java.io.IOException;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +34,9 @@ import org.apache.ozone.lib.server.BaseService;
 import org.apache.ozone.lib.server.ServiceException;
 import org.apache.ozone.lib.service.Instrumentation;
 import org.apache.ozone.lib.service.Scheduler;
+import org.json.simple.JSONAware;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONStreamAware;
 
 /**
  * Hadoop server instrumentation.
@@ -191,7 +195,7 @@ public class InstrumentationService extends BaseService
 
   }
 
-  static class Timer {
+  static class Timer implements JSONAware, JSONStreamAware {
     static final int LAST_TOTAL = 0;
     static final int LAST_OWN = 1;
     static final int AVG_TOTAL = 2;
@@ -247,15 +251,25 @@ public class InstrumentationService extends BaseService
       }
     }
 
-    @JsonValue
-    Map<String, Object> getJSON() {
+    @SuppressWarnings("unchecked")
+    private JSONObject getJSON() {
       long[] values = getValues();
-      Map<String, Object> json = new LinkedHashMap<>();
+      JSONObject json = new JSONObject();
       json.put("lastTotal", values[0]);
       json.put("lastOwn", values[1]);
       json.put("avgTotal", values[2]);
       json.put("avgOwn", values[3]);
       return json;
+    }
+
+    @Override
+    public String toJSONString() {
+      return getJSON().toJSONString();
+    }
+
+    @Override
+    public void writeJSONString(Writer out) throws IOException {
+      getJSON().writeJSONString(out);
     }
 
   }
@@ -281,9 +295,9 @@ public class InstrumentationService extends BaseService
     timer.addCron((Cron) cron);
   }
 
-  static class VariableHolder<E> {
-    // Package-private and mutable so the enclosing service can assign it
-    // directly; suppress the visibility check.
+  static class VariableHolder<E> implements JSONAware, JSONStreamAware {
+    // Supressed, because it is only used in this class or in test files,
+    // but the tests will be removed later.
     @SuppressWarnings("checkstyle:VisibilityModifier")
     Variable<E> var;
 
@@ -294,11 +308,21 @@ public class InstrumentationService extends BaseService
       this.var = var;
     }
 
-    @JsonValue
-    Map<String, Object> getJSON() {
-      Map<String, Object> json = new LinkedHashMap<>();
+    @SuppressWarnings("unchecked")
+    private JSONObject getJSON() {
+      JSONObject json = new JSONObject();
       json.put("value", var.getValue());
       return json;
+    }
+
+    @Override
+    public String toJSONString() {
+      return getJSON().toJSONString();
+    }
+
+    @Override
+    public void writeJSONString(Writer out) throws IOException {
+      out.write(toJSONString());
     }
 
   }
@@ -310,7 +334,7 @@ public class InstrumentationService extends BaseService
     holder.var = variable;
   }
 
-  static class Sampler {
+  static class Sampler implements JSONAware, JSONStreamAware {
     private Variable<Long> variable;
     private long[] values;
     private AtomicLong sum;
@@ -338,12 +362,22 @@ public class InstrumentationService extends BaseService
           ((full) ? values.length : ((last == 0) ? 1 : last));
     }
 
-    @JsonValue
-    Map<String, Object> getJSON() {
-      Map<String, Object> json = new LinkedHashMap<>();
+    @SuppressWarnings("unchecked")
+    private JSONObject getJSON() {
+      JSONObject json = new JSONObject();
       json.put("sampler", getRate());
       json.put("size", (full) ? values.length : last);
       return json;
+    }
+
+    @Override
+    public String toJSONString() {
+      return getJSON().toJSONString();
+    }
+
+    @Override
+    public void writeJSONString(Writer out) throws IOException {
+      out.write(toJSONString());
     }
   }
 

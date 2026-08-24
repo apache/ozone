@@ -37,7 +37,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -273,7 +272,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     cData.setSchemaVersion(OzoneConsts.SCHEMA_V2);
     KeyValueContainer container = new KeyValueContainer(cData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-        clusterID, StorageType.DISK);
+        clusterID);
 
     // populate with some blocks
     // metadata will be updated here, too

@@ -31,8 +31,6 @@ abstract class ResourceLockTracker<T extends IOzoneManagerLock.Resource> {
 
   private final ThreadLocal<OMLockDetails> omLockDetails = ThreadLocal.withInitial(OMLockDetails::new);
 
-  abstract Class<T> getResourceClass();
-
   abstract boolean canLockResource(T resource);
 
   abstract Stream<T> getCurrentLockedResources();

@@ -183,7 +183,7 @@ public class TestSecureContainerServer {
         ContainerProtos.ContainerType.values()) {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(containerType, conf,
-              dd.getID().toString(),
+              dd.getUuid().toString(),
               containerSet, volumeSet, volumeChoosingPolicy, metrics,
               c -> { }, new ContainerChecksumTreeManager(conf)));
     }

@@ -42,7 +42,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
@@ -791,14 +790,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public ContainerResponseProto allocateContainer(ContainerRequestProto request,
       int clientVersion) throws IOException {
-    ReplicationConfig replicationConfig = ReplicationConfig.fromProto(request.getReplicationType(),
+    ReplicationConfig replicationConfig = ReplicationConfig.fromProto(request.getReplicationType(), 
         request.getReplicationFactor(),
         request.getEcReplicationConfig()
     );
-    HddsProtos.StorageTierProto storageTier = request.hasStorageTier()
-        ? request.getStorageTier()
-        : StorageTier.getDefaultTier().toProto();
-    ContainerWithPipeline cp = impl.allocateContainer(replicationConfig, request.getOwner(), storageTier);
+    ContainerWithPipeline cp = impl.allocateContainer(replicationConfig, request.getOwner());
     return ContainerResponseProto.newBuilder()
         .setContainerWithPipeline(cp.getProtobuf(clientVersion))
         .setErrorCode(ContainerResponseProto.Error.success)
@@ -1354,12 +1350,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public GetContainerCountResponseProto getContainerCount(
       StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
       request) throws IOException {
-    long containerCount = request.hasState()
-        ? impl.getContainerCount(request.getState())
-        : impl.getContainerCount();
 
     return GetContainerCountResponseProto.newBuilder()
-      .setContainerCount(containerCount)
+      .setContainerCount(impl.getContainerCount())
       .build();
   }
 

@@ -61,7 +61,7 @@ import org.apache.hadoop.ozone.client.io.BlockDataStreamOutputEntry;
 import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.OzoneTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -152,10 +152,8 @@ public class TestBlockDataStreamOutput {
 
   private static Stream<Arguments> clientParameters() {
     return Stream.of(
-        Arguments.of(true, true),
-        Arguments.of(true, false),
-        Arguments.of(false, true),
-        Arguments.of(false, false)
+        Arguments.of(true),
+        Arguments.of(false)
     );
   }
 
@@ -168,19 +166,11 @@ public class TestBlockDataStreamOutput {
     );
   }
 
-  private static Stream<Arguments> streamWriteParameters() {
-    return dataLengthParameters().flatMap(dataLength ->
-        Stream.of(true, false).map(putBlockOnCloseEnabled ->
-            Arguments.of(dataLength.get()[0], putBlockOnCloseEnabled)));
-  }
-
   static OzoneClientConfig newClientConfig(ConfigurationSource source,
-                                           boolean flushDelay,
-                                           boolean putBlockOnCloseEnabled) {
+                                           boolean flushDelay) {
     OzoneClientConfig clientConfig = source.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(flushDelay);
-    clientConfig.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
     return clientConfig;
   }
 
@@ -208,17 +198,13 @@ public class TestBlockDataStreamOutput {
   }
 
   @ParameterizedTest
-  @MethodSource("streamWriteParameters")
+  @MethodSource("dataLengthParameters")
   @Flaky("HDDS-12027")
-  public void testStreamWrite(int dataLength, boolean putBlockOnCloseEnabled) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), false, putBlockOnCloseEnabled);
+  public void testStreamWrite(int dataLength) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), false);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       testWrite(client, dataLength);
-      // Forced container close before stream close relies on async PutBlock recovery;
-      // that path is not used when PutBlock is committed only on data stream close.
-      if (!putBlockOnCloseEnabled) {
-        testWriteWithFailure(client, dataLength);
-      }
+      testWriteWithFailure(client, dataLength);
     }
   }
 
@@ -247,7 +233,7 @@ public class TestBlockDataStreamOutput {
     ByteBufferStreamOutput stream =
         keyDataStreamOutput.getStreamEntries().get(0).getByteBufStreamOutput();
     assertInstanceOf(BlockDataStreamOutput.class, stream);
-    OzoneTestHelper.waitForContainerClose(key, cluster);
+    TestHelper.waitForContainerClose(key, cluster);
     key.write(b);
     key.close();
     String dataString = new String(data, UTF_8);
@@ -256,20 +242,19 @@ public class TestBlockDataStreamOutput {
 
   static OzoneDataStreamOutput createKey(OzoneClient client, String keyName,
                                          long size) throws Exception {
-    return OzoneTestHelper.createStreamKey(keyName, ReplicationType.RATIS, size,
+    return TestHelper.createStreamKey(keyName, ReplicationType.RATIS, size,
         client.getObjectStore(), VOLUME_NAME, BUCKET_NAME);
   }
 
   static void validateData(OzoneClient client, String keyName, byte[] data) throws Exception {
-    OzoneTestHelper.validateData(
+    TestHelper.validateData(
         keyName, data, client.getObjectStore(), VOLUME_NAME, BUCKET_NAME);
   }
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testPutBlockAtBoundary(boolean flushDelay, boolean putBlockOnCloseEnabled)
-      throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+  public void testPutBlockAtBoundary(boolean flushDelay) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       int dataLength = 500;
       XceiverClientMetrics metrics =
@@ -288,21 +273,19 @@ public class TestBlockDataStreamOutput {
       assertThat(metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock))
           .isLessThanOrEqualTo(pendingPutBlockCount + 1);
       key.close();
-      // Since data length is 500, first putBlock will be at 400 (flush boundary).
-      // Close commits via WriteAsync PutBlock only when putBlockOnClose is disabled.
-      int expectedPutBlocks = putBlockOnCloseEnabled ? 1 : 2;
+      // Since data length is 500 , first putBlock will be at 400(flush boundary)
+      // and the other at 500
       assertEquals(
           metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
-          putBlockCount + expectedPutBlocks);
+          putBlockCount + 2);
       validateData(client, keyName, data);
     }
   }
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testMinPacketSize(boolean flushDelay, boolean putBlockOnCloseEnabled)
-      throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+  public void testMinPacketSize(boolean flushDelay) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       XceiverClientMetrics metrics =
@@ -329,9 +312,8 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testTotalAckDataLength(boolean flushDelay, boolean putBlockOnCloseEnabled)
-      throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+  public void testTotalAckDataLength(boolean flushDelay) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       int dataLength = 400;
       String keyName = getKeyName();
@@ -352,9 +334,8 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testDatanodeVersion(boolean flushDelay, boolean putBlockOnCloseEnabled)
-      throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+  public void testDatanodeVersion(boolean flushDelay) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       // Verify all DNs internally have versions set correctly
       List<HddsDatanodeService> dns = cluster.getHddsDatanodes();

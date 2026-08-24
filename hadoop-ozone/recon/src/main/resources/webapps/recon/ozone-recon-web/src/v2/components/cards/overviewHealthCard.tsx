@@ -111,7 +111,6 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
 
   return (
     <Card
-      data-testid={`overview-Health-${title}`}
       size='small'
       className={'overview-card'}
       loading={loading}
@@ -132,7 +131,7 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
         </Col>
       </Row>
     </Card>
-  );
+  )
 }
 
 export default OverviewSummaryCard;

@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -103,7 +102,7 @@ public interface SCMMetadataStore extends DBStoreHAManager {
   /**
    * Table that maintains sequence id information.
    */
-  Table<SequenceIdType, Long> getSequenceIdTable();
+  Table<String, Long> getSequenceIdTable();
 
   /**
    * Table that maintains move information.

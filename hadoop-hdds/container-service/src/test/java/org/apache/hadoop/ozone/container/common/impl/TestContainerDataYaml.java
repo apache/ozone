@@ -17,11 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_STORAGE_TYPE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,7 +30,8 @@ import java.time.Instant;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.fs.FileSystemTestHelper;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -42,9 +41,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * This class tests create/read .container files.
@@ -53,8 +49,7 @@ public class TestContainerDataYaml {
 
   private long testContainerID = 1234;
 
-  @TempDir
-  private File testRoot;
+  private static String testRoot = new FileSystemTestHelper().getTestRootDir();
 
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
   private static final Instant SCAN_TIME = Instant.now();
@@ -70,20 +65,22 @@ public class TestContainerDataYaml {
   }
 
   /**
-   * Creates a .container file.
+   * Creates a .container file. cleanup() should be called at the end of the
+   * test when container file is created.
    */
-  private File createContainerFile(long containerID, int replicaIndex, StorageType storageType)
+  private File createContainerFile(long containerID, int replicaIndex)
       throws IOException {
+    assertTrue(new File(testRoot).mkdirs());
+
     String containerPath = containerID + ".container";
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
         containerID, layoutVersion, MAXSIZE,
         UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
-    keyValueContainerData.setStorageType(storageType);
     keyValueContainerData.setContainerDBType(CONTAINER_DB_TYPE);
-    keyValueContainerData.setMetadataPath(testRoot.getAbsolutePath());
-    keyValueContainerData.setChunksPath(testRoot.getAbsolutePath());
+    keyValueContainerData.setMetadataPath(testRoot);
+    keyValueContainerData.setChunksPath(testRoot);
     keyValueContainerData.updateDataScanTime(SCAN_TIME);
     keyValueContainerData.setSchemaVersion(
         VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
@@ -101,18 +98,21 @@ public class TestContainerDataYaml {
     return containerFile;
   }
 
+  private void cleanup() {
+    FileUtil.fullyDelete(new File(testRoot));
+  }
+
   @ContainerLayoutTestInfo.ContainerTest
   public void testCreateContainerFile(ContainerLayoutVersion layout)
       throws IOException {
     setLayoutVersion(layout);
     long containerID = testContainerID++;
 
-    File containerFile = createContainerFile(containerID, 7, StorageType.SSD);
+    File containerFile = createContainerFile(containerID, 7);
 
     // Read from .container file, and verify data.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
-    assertEquals(StorageType.SSD, kvData.getStorageType());
     assertEquals(containerID, kvData.getContainerID());
     assertEquals(ContainerProtos.ContainerType.KeyValueContainer, kvData
         .getContainerType());
@@ -127,9 +127,9 @@ public class TestContainerDataYaml {
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
     assertEquals(SCAN_TIME.toEpochMilli(),
-        kvData.lastDataScanTime().get().toEpochMilli());
+                 kvData.lastDataScanTime().get().toEpochMilli());
     assertEquals(SCAN_TIME.toEpochMilli(),
-        kvData.getDataScanTimestamp().longValue());
+                 kvData.getDataScanTimestamp().longValue());
     assertEquals(VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(),
         kvData.getSchemaVersion());
     assertEquals(7, kvData.getReplicaIndex());
@@ -143,7 +143,7 @@ public class TestContainerDataYaml {
     ContainerDataYaml.createContainerFile(kvData, containerFile);
 
     // Reading newly updated data from .container file
-    kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(
+    kvData =  (KeyValueContainerData) ContainerDataYaml.readContainerFile(
         containerFile);
 
     // verify data.
@@ -166,6 +166,8 @@ public class TestContainerDataYaml {
         kvData.lastDataScanTime().get().toEpochMilli());
     assertEquals(SCAN_TIME.toEpochMilli(),
         kvData.getDataScanTimestamp().longValue());
+
+    cleanup();
   }
 
   @ContainerLayoutTestInfo.ContainerTest
@@ -174,7 +176,7 @@ public class TestContainerDataYaml {
     setLayoutVersion(layout);
     long containerID = testContainerID++;
 
-    File containerFile = createContainerFile(containerID, 0, null);
+    File containerFile = createContainerFile(containerID, 0);
 
     final String content =
         FileUtils.readFileToString(containerFile, Charset.defaultCharset());
@@ -182,6 +184,7 @@ public class TestContainerDataYaml {
     assertThat(content)
         .withFailMessage("ReplicaIndex shouldn't be persisted if zero")
         .doesNotContain("replicaIndex");
+    cleanup();
   }
 
   @ContainerLayoutTestInfo.ContainerTest
@@ -231,18 +234,20 @@ public class TestContainerDataYaml {
   }
 
   /**
-   * Test to verify {@link ContainerUtils#verifyContainerFileChecksum(ContainerData, ConfigurationSource)}.
+   * Test to verify {@link ContainerUtils#verifyContainerFileChecksum(ContainerData,ConfigurationSource)}.
    */
   @ContainerLayoutTestInfo.ContainerTest
   public void testChecksumInContainerFile(ContainerLayoutVersion layout) throws IOException {
     setLayoutVersion(layout);
     long containerID = testContainerID++;
 
-    File containerFile = createContainerFile(containerID, 0, null);
+    File containerFile = createContainerFile(containerID, 0);
 
     // Read from .container file, and verify data.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
     ContainerUtils.verifyContainerFileChecksum(kvData, conf);
+
+    cleanup();
   }
 
   /**
@@ -254,16 +259,18 @@ public class TestContainerDataYaml {
     setLayoutVersion(layout);
     long containerID = testContainerID++;
 
-    File containerFile = createContainerFile(containerID, 0, null);
+    File containerFile = createContainerFile(containerID, 0);
 
     // Read from .container file. The kvData object should not have a data hash because it was not persisted in this
     // file.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
     assertEquals(0, kvData.getDataChecksum());
+
+    cleanup();
   }
 
   /**
-   * Test to verify {@link ContainerUtils#verifyContainerFileChecksum(ContainerData, ConfigurationSource)}.
+   * Test to verify {@link ContainerUtils#verifyContainerFileChecksum(ContainerData,ConfigurationSource)}.
    */
   @ContainerLayoutTestInfo.ContainerTest
   public void testChecksumInContainerFileWithReplicaIndex(
@@ -271,48 +278,14 @@ public class TestContainerDataYaml {
     setLayoutVersion(layout);
     long containerID = testContainerID++;
 
-    File containerFile = createContainerFile(containerID, 10, null);
+    File containerFile = createContainerFile(containerID, 10);
 
     // Read from .container file, and verify data.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
     ContainerUtils.verifyContainerFileChecksum(kvData, conf);
-  }
 
-  @Test
-  public void testChecksumCanBeVerifiedAfterRollbackWithStorageType()
-      throws IOException {
-    setLayoutVersion(FILE_PER_CHUNK);
-    long containerID = testContainerID++;
-
-    File containerFile = createContainerFile(containerID, 7, StorageType.SSD);
-
-    final String content =
-        FileUtils.readFileToString(containerFile, Charset.defaultCharset());
-    assertThat(content).contains(CONTAINER_STORAGE_TYPE);
-
-    KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
-        .readContainerFile(containerFile);
-    String storedChecksum = kvData.getContainerFileChecksum();
-
-    assertEquals(computeContainerFileChecksum(kvData, null), storedChecksum);
-    assertThat(computeContainerFileChecksum(kvData, kvData.getStorageType()))
-        .isNotEqualTo(storedChecksum);
-    ContainerUtils.verifyContainerFileChecksum(kvData, conf);
-  }
-
-  private String computeContainerFileChecksum(KeyValueContainerData kvData,
-      StorageType storageType) throws IOException {
-    String storedChecksum = kvData.getContainerFileChecksum();
-    try {
-      kvData.setContainerFileChecksum(ContainerData.ZERO_CHECKSUM);
-      Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-          kvData.getContainerType(), kvData.getReplicaIndex() > 0,
-          storageType);
-      return ContainerUtils.getContainerFileChecksum(yaml.dump(kvData));
-    } finally {
-      kvData.setContainerFileChecksum(storedChecksum);
-    }
+    cleanup();
   }
 
   private KeyValueContainerData getKeyValueContainerData() throws IOException {
@@ -348,19 +321,5 @@ public class TestContainerDataYaml {
     conf.setBoolean(HddsConfigKeys.
         HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, false);
     ContainerUtils.verifyContainerFileChecksum(kvData, conf);
-  }
-
-  @Test
-  public void testCreateContainerFileWithoutStorageType() throws IOException {
-    setLayoutVersion(FILE_PER_CHUNK);
-    long containerID = testContainerID++;
-
-    File containerFile = createContainerFile(containerID, 0, null);
-
-    final String content =
-        FileUtils.readFileToString(containerFile, Charset.defaultCharset());
-
-    assertFalse(content.contains(CONTAINER_STORAGE_TYPE),
-        "StorageType shouldn't be persisted if it is null");
   }
 }

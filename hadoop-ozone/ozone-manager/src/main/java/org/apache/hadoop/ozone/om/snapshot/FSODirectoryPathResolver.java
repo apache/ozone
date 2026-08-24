@@ -85,7 +85,8 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
 
     while (!objectIdPathVals.isEmpty() && !objIds.isEmpty()) {
       Pair<Long, Path> parent = objectIdPathVals.poll();
-      try (TableIterator<String, Table.KeyValue<String, OmDirectoryInfo>>
+      try (TableIterator<String,
+              ? extends Table.KeyValue<String, OmDirectoryInfo>>
               subDirIter = dirInfoTable.iterator(
                   prefix + parent.getKey() + OM_KEY_PREFIX)) {
         while (!objIds.isEmpty() && subDirIter.hasNext()) {

@@ -228,6 +228,7 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
         "hdds-server-framework",
         "hdds-server-scm",
         "ozone-common",
+        "ozone-csi",
         "ozone-manager",
         "ozone-recon",
     };

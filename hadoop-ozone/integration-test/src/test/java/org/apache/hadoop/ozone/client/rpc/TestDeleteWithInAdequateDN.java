@@ -153,6 +153,7 @@ public class TestDeleteWithInAdequateDN {
         .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(THREE, 60000);
+    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);

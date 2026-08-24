@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.spi;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.recon.api.types.OMDBReprocessResponse;
 
 /**
  * Interface to access OM endpoints.
@@ -46,10 +45,4 @@ public interface OzoneManagerServiceProvider {
    * @return whether the trigger happened or not
    */
   boolean triggerSyncDataFromOMImmediately();
-
-  /**
-   * Trigger the OM DB rebuild process.
-   * @return OMDBReprocessResponse containing the status of the request.
-   */
-  OMDBReprocessResponse triggerTaskRebuild();
 }

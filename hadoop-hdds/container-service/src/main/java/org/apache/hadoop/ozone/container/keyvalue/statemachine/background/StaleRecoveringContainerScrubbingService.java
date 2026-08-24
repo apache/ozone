@@ -55,15 +55,16 @@ public class StaleRecoveringContainerScrubbingService
     BackgroundTaskQueue backgroundTaskQueue =
         new BackgroundTaskQueue();
     long currentTime = containerSet.getCurrentTime();
-    Iterator<Map.Entry<Long, Long>> it = containerSet.getRecoveringContainerMap().entrySet().iterator();
+    Iterator<Map.Entry<Long, Long>> it =
+        containerSet.getRecoveringContainerIterator();
     while (it.hasNext()) {
       Map.Entry<Long, Long> entry = it.next();
-      long containerId = entry.getKey();
-      long deadline = entry.getValue();
-      if (currentTime >= deadline) {
+      if (currentTime >= entry.getKey()) {
         backgroundTaskQueue.add(new RecoveringContainerScrubbingTask(
-            containerSet, containerId));
+            containerSet, entry.getValue()));
         it.remove();
+      } else {
+        break;
       }
     }
     return backgroundTaskQueue;
@@ -81,12 +82,6 @@ public class StaleRecoveringContainerScrubbingService
 
     @Override
     public BackgroundTaskResult call() throws Exception {
-      Long deadline = containerSet.getRecoveringContainerMap().get(containerID);
-      if (deadline != null && containerSet.getCurrentTime() < deadline) {
-        LOG.debug("Skipping stale recovering scrub for container {} - deadline extended",
-            containerID);
-        return new BackgroundTaskResult.EmptyTaskResult();
-      }
       Container con = containerSet.getContainer(containerID);
       if (null != con) {
         con.markContainerUnhealthy();

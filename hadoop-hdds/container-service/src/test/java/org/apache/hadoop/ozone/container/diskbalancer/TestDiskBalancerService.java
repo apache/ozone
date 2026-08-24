@@ -17,11 +17,9 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.volume.StorageVolume.TMP_DIR_NAME;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -48,7 +46,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -202,38 +199,6 @@ public class TestDiskBalancerService {
     svc.shutdown();
   }
 
-  @ParameterizedTest
-  @MethodSource("invalidDiskBalancerInfo")
-  public void testRefreshRejectsInvalidDiskBalancerInfo(
-      ContainerTestVersionInfo versionInfo, DiskBalancerInfo diskBalancerInfo)
-      throws Exception {
-    setLayoutAndSchemaForTest(versionInfo);
-    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
-    KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        }, new ContainerChecksumTreeManager(conf));
-    DiskBalancerServiceTestImpl svc =
-        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
-
-    assertThrows(IllegalArgumentException.class,
-        () -> svc.refresh(diskBalancerInfo));
-
-    svc.shutdown();
-  }
-
-  public static Stream<Arguments> invalidDiskBalancerInfo() {
-    return ContainerTestVersionInfo.getLayoutList().stream()
-        .flatMap(versionInfo -> Stream.of(
-            Arguments.arguments(versionInfo, new DiskBalancerInfo(
-                DiskBalancerRunningStatus.RUNNING, 0.0d, 100L, 5, true)),
-            Arguments.arguments(versionInfo, new DiskBalancerInfo(
-                DiskBalancerRunningStatus.RUNNING, 10.0d, 0L, 5, true)),
-            Arguments.arguments(versionInfo, new DiskBalancerInfo(
-                DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 0, true))));
-  }
-
   @ContainerTestVersionInfo.ContainerTest
   public void testPolicyClassInitialization(ContainerTestVersionInfo versionInfo) throws IOException {
     setLayoutAndSchemaForTest(versionInfo);
@@ -271,29 +236,6 @@ public class TestDiskBalancerService {
         mockDependencies(containerSet, keyValueHandler, controller);
     return new DiskBalancerServiceTestImpl(ozoneContainer, 1000, config,
         threadCount);
-  }
-
-  private DiskBalancerServiceTestImpl getDiskBalancerService(
-      OzoneConfiguration config) throws IOException {
-    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
-    ContainerMetrics metrics = ContainerMetrics.create(config);
-    KeyValueHandler keyValueHandler =
-        new KeyValueHandler(config, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        }, new ContainerChecksumTreeManager(config));
-    return getDiskBalancerService(containerSet, config, keyValueHandler, null, 1);
-  }
-
-  private OzoneConfiguration confWithDiskBalancerInfoDir(File infoDir) {
-    OzoneConfiguration testConf = new OzoneConfiguration(conf);
-    testConf.set("hdds.datanode.disk.balancer.info.dir",
-        infoDir.getAbsolutePath());
-    return testConf;
-  }
-
-  private File getDiskBalancerInfoFile(File infoDir) {
-    return new File(infoDir,
-        OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
   }
 
   public static Stream<Arguments> values() {
@@ -403,102 +345,6 @@ public class TestDiskBalancerService {
     GenericTestUtils.waitFor(() -> serviceLog.getOutput().contains("No available thread " +
             "for disk balancer service. Current thread count is 3."),
         100, 5000);
-  }
-
-  @ContainerTestVersionInfo.ContainerTest
-  public void testDiskBalancerInfoWriteCreatesParentDirectory(
-      ContainerTestVersionInfo versionInfo) throws Exception {
-    setLayoutAndSchemaForTest(versionInfo);
-    File infoDir = tmpDir.resolve("nested").toFile();
-    DiskBalancerServiceTestImpl svc =
-        getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
-    DiskBalancerInfo info = new DiskBalancerInfo(
-        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
-
-    svc.refresh(info);
-
-    assertEquals(info,
-        DiskBalancerYaml.readDiskBalancerInfoFile(
-            getDiskBalancerInfoFile(infoDir)));
-    svc.shutdown();
-  }
-
-  @ContainerTestVersionInfo.ContainerTest
-  public void testDiskBalancerInfoWriteReportsDirectoryCreationFailure(
-      ContainerTestVersionInfo versionInfo) throws Exception {
-    setLayoutAndSchemaForTest(versionInfo);
-    File infoDir = tmpDir.resolve("diskBalancer-parent").toFile();
-    assertTrue(infoDir.createNewFile());
-
-    IOException exception = assertThrows(IOException.class,
-        () -> getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir)));
-
-    assertThat(exception)
-        .hasMessageStartingWith("Unable to create DiskBalancerInfo directories: ");
-  }
-
-  @ContainerTestVersionInfo.ContainerTest
-  public void testNodeStateUpdatedRetainsPausedWhenPersistFails(
-      ContainerTestVersionInfo versionInfo) throws Exception {
-    setLayoutAndSchemaForTest(versionInfo);
-    File infoDir = tmpDir.resolve("diskBalancer-pause-persist-failure").toFile();
-    DiskBalancerServiceTestImpl svc =
-        getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
-    svc.refresh(new DiskBalancerInfo(DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true));
-    breakDiskBalancerInfoPersistence(infoDir);
-
-    svc.nodeStateUpdated(NodeOperationalState.DECOMMISSIONING);
-
-    assertEquals(DiskBalancerRunningStatus.PAUSED,
-        svc.getDiskBalancerInfo().getOperationalState());
-    assertTrue(svc.getTasks().isEmpty());
-    svc.shutdown();
-  }
-
-  @ContainerTestVersionInfo.ContainerTest
-  public void testNodeStateUpdatedRevertsToPausedWhenResumePersistFails(
-      ContainerTestVersionInfo versionInfo) throws Exception {
-    setLayoutAndSchemaForTest(versionInfo);
-    File infoDir = tmpDir.resolve("diskBalancer-resume-persist-failure").toFile();
-    DiskBalancerServiceTestImpl svc =
-        getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
-    svc.refresh(new DiskBalancerInfo(DiskBalancerRunningStatus.PAUSED, 10.0d, 100L, 5, true));
-    breakDiskBalancerInfoPersistence(infoDir);
-
-    svc.nodeStateUpdated(NodeOperationalState.IN_SERVICE);
-
-    assertEquals(DiskBalancerRunningStatus.PAUSED,
-        svc.getDiskBalancerInfo().getOperationalState());
-    assertTrue(svc.getTasks().isEmpty());
-    svc.shutdown();
-  }
-
-  private void breakDiskBalancerInfoPersistence(File infoDir) throws IOException {
-    File infoFile = getDiskBalancerInfoFile(infoDir);
-    FileUtils.deleteQuietly(infoFile);
-    assertTrue(infoFile.mkdirs(), "Failed to replace diskBalancer.info with a directory");
-  }
-
-  @ContainerTestVersionInfo.ContainerTest
-  public void testDiskBalancerInfoWriteReportsFileWriteFailure(
-      ContainerTestVersionInfo versionInfo) throws Exception {
-    setLayoutAndSchemaForTest(versionInfo);
-    File infoDir = tmpDir.resolve("diskBalancer-info-dir").toFile();
-    DiskBalancerServiceTestImpl svc =
-        getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
-    File infoFile = getDiskBalancerInfoFile(infoDir);
-    assertTrue(infoFile.delete());
-    assertTrue(infoFile.mkdirs());
-    assertTrue(new File(infoFile, "existing").createNewFile());
-    DiskBalancerInfo info = new DiskBalancerInfo(
-        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
-
-    IOException exception = assertThrows(IOException.class,
-        () -> svc.refresh(info));
-
-    assertThat(exception)
-        .hasMessageStartingWith("Unable to write DiskBalancerInfo file: ");
-    svc.shutdown();
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,
@@ -674,8 +520,8 @@ public class TestDiskBalancerService {
             new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
         Arguments.of("  QUASI_CLOSED  ", true,
             new HashSet<>(Arrays.asList(State.QUASI_CLOSED)), null),
-        Arguments.of("CLOSING,CLOSED", false, new HashSet<>(Arrays.
-                asList(State.CLOSING, State.CLOSED)), "State CLOSING is not movable"),
+        Arguments.of("CLOSING,CLOSED", true,
+            new HashSet<>(Arrays.asList(State.CLOSING, State.CLOSED)), null),
         Arguments.of("  QUASI_CLOSED,CLOSED ", true,
             new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
         Arguments.of("  QUASI_CLOSED , CLOSED ", true,

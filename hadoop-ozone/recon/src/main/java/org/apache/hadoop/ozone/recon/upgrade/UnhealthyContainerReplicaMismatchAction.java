@@ -25,6 +25,7 @@ import static org.jooq.impl.DSL.name;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
 import javax.sql.DataSource;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
@@ -72,13 +73,18 @@ public class UnhealthyContainerReplicaMismatchAction implements ReconUpgradeActi
    * Adds the updated constraint directly within this class.
    */
   private void addUpdatedConstraint() {
+    String[] enumStates = Arrays
+        .stream(ContainerSchemaDefinition.UnHealthyContainerStates.values())
+        .map(Enum::name)
+        .toArray(String[]::new);
+
     dslContext.alterTable(ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME)
         .add(DSL.constraint(ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
             .check(field(name("container_state"))
-                .in(ContainerSchemaDefinition.UnHealthyContainerStates.NAMES)))
+                .in(enumStates)))
         .execute();
 
     LOG.info("Added the updated constraint to the UNHEALTHY_CONTAINERS table for enum state values: {}",
-        ContainerSchemaDefinition.UnHealthyContainerStates.NAMES);
+        Arrays.toString(enumStates));
   }
 }

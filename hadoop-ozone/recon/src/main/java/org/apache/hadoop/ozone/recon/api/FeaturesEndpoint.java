@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/features")
 @Produces(MediaType.APPLICATION_JSON)
+@AdminOnly
 public class FeaturesEndpoint {
 
   private static final Logger LOG =

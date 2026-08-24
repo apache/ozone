@@ -59,9 +59,9 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   @CommandLine.Mixin
   private NodeSelectionMixin nodeSelectionMixin;
 
-  @CommandLine.Spec
+  @CommandLine.Spec 
   private CommandLine.Model.CommandSpec spec;
-
+  
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     if (!nodeSelectionMixin.getHostname().isEmpty()) {
@@ -135,7 +135,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   }
 
   private void printDetails(DatanodeDetails datanode) {
-    System.out.println("\nDatanode: " + datanode.getID() +
+    System.out.println();
+    System.out.println("Datanode: " + datanode.getUuid().toString() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
         + "/" + datanode.getHostName() + ")");
   }

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.commontypes;
 
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MultivaluedMap;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -43,15 +44,13 @@ public interface RequestParameters {
     try {
       return Integer.parseInt(value);
     } catch (NumberFormatException e) {
-      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, key, e);
+      throw translateException(e);
     }
   }
 
-  /**
-   * @return true if the query parameter is present, even when its value is
-   * an empty string (eg. {@code delimiter=}).
-   */
-  boolean containsKey(String key);
+  default WebApplicationException translateException(RuntimeException e) {
+    return new WebApplicationException(e.getMessage(), S3ErrorTable.INVALID_ARGUMENT.getHttpCode());
+  }
 
   /** Additional methods for tests. */
   interface Mutable extends RequestParameters {
@@ -65,20 +64,6 @@ public interface RequestParameters {
     }
   }
 
-  default boolean getBoolean(String key, boolean defaultValue) {
-    final String value = get(key);
-    if (value == null) {
-      return defaultValue;
-    }
-    if ("true".equalsIgnoreCase(value)) {
-      return true;
-    }
-    if ("false".equalsIgnoreCase(value)) {
-      return false;
-    }
-    throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, key);
-  }
-
   /** Mutable implementation based on {@link MultivaluedMap}. */
   final class MultivaluedMapImpl implements Mutable {
     private final MultivaluedMap<String, String> params;
@@ -90,11 +75,6 @@ public interface RequestParameters {
     @Override
     public String get(String key) {
       return params.getFirst(key);
-    }
-
-    @Override
-    public boolean containsKey(String key) {
-      return params.containsKey(key);
     }
 
     @Override

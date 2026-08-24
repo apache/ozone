@@ -24,8 +24,6 @@ import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -37,7 +35,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
@@ -81,8 +78,7 @@ class TestWritableRatisContainerProvider {
 
     existingPipelines(pipeline);
 
-    ContainerInfo container = createSubject().getContainer(
-        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier());
+    ContainerInfo container = createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
 
     assertSame(existingContainer, container);
     verifyPipelineNotCreated();
@@ -96,8 +92,7 @@ class TestWritableRatisContainerProvider {
     Pipeline pipelineWithoutContainer = MockPipeline.createPipeline(3);
     existingPipelines(pipelineWithoutContainer, pipeline);
 
-    ContainerInfo container = createSubject().getContainer(
-        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier());
+    ContainerInfo container = createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
 
     assertSame(existingContainer, container);
     verifyPipelineNotCreated();
@@ -107,8 +102,7 @@ class TestWritableRatisContainerProvider {
   void createsNewContainerIfNoneFound() throws Exception {
     ContainerInfo newContainer = createNewContainerOnDemand();
 
-    ContainerInfo container = createSubject().getContainer(
-        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier());
+    ContainerInfo container = createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
 
     assertSame(newContainer, container);
     verifyPipelineCreated();
@@ -119,8 +113,7 @@ class TestWritableRatisContainerProvider {
     throwWhenCreatePipeline();
 
     assertThrows(IOException.class,
-        () -> createSubject().getContainer(
-            CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, StorageTier.getDefaultTier()));
+        () -> createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION));
 
     verifyPipelineCreated();
   }
@@ -130,8 +123,7 @@ class TestWritableRatisContainerProvider {
   }
 
   private void existingPipelines(List<Pipeline> pipelines) {
-    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet(),
-        StorageTier.getDefaultTier()))
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
         .thenReturn(pipelines);
   }
 
@@ -141,8 +133,7 @@ class TestWritableRatisContainerProvider {
         .setPipelineID(pipeline.getId())
         .build();
 
-    when(containerManager.getMatchingContainer(
-        CONTAINER_SIZE, OWNER, pipeline, emptySet(), StorageTier.getDefaultTier()))
+    when(containerManager.getMatchingContainer(CONTAINER_SIZE, OWNER, pipeline, emptySet()))
         .thenReturn(container);
 
     return container;
@@ -150,11 +141,10 @@ class TestWritableRatisContainerProvider {
 
   private ContainerInfo createNewContainerOnDemand() throws IOException {
     Pipeline newPipeline = MockPipeline.createPipeline(3);
-    when(pipelineManager.createPipeline(eq(REPLICATION_CONFIG), any(StorageTier.class)))
+    when(pipelineManager.createPipeline(REPLICATION_CONFIG))
         .thenReturn(newPipeline);
 
-    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet(),
-        StorageTier.getDefaultTier()))
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
         .thenReturn(emptyList())
         .thenReturn(new ArrayList<>(singletonList(newPipeline)));
 
@@ -162,7 +152,7 @@ class TestWritableRatisContainerProvider {
   }
 
   private void throwWhenCreatePipeline() throws IOException {
-    when(pipelineManager.createPipeline(REPLICATION_CONFIG, StorageTier.getDefaultTier()))
+    when(pipelineManager.createPipeline(REPLICATION_CONFIG))
         .thenThrow(new SCMException(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE));
   }
 
@@ -173,18 +163,16 @@ class TestWritableRatisContainerProvider {
 
   private void verifyPipelineCreated() throws IOException {
     verify(pipelineManager, times(2))
-        .getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet(),
-            StorageTier.getDefaultTier());
+        .getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet());
     verify(pipelineManager)
-        .createPipeline(REPLICATION_CONFIG, StorageTier.getDefaultTier());
+        .createPipeline(REPLICATION_CONFIG);
   }
 
   private void verifyPipelineNotCreated() throws IOException {
     verify(pipelineManager, times(1))
-        .getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet(),
-            StorageTier.getDefaultTier());
+        .getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet());
     verify(pipelineManager, never())
-        .createPipeline(REPLICATION_CONFIG, StorageTier.getDefaultTier());
+        .createPipeline(REPLICATION_CONFIG);
   }
 
 }

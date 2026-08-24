@@ -234,7 +234,7 @@ public class TestInfoSubCommand {
 
     // Ensure each DN UUID is mentioned in the message:
     for (DatanodeDetails dn : datanodes) {
-      Pattern uuidPattern = Pattern.compile(".*" + dn.getID().toString() + ".*",
+      Pattern uuidPattern = Pattern.compile(".*" + dn.getUuid().toString() + ".*",
           Pattern.DOTALL);
       assertThat(replica).matches(uuidPattern);
     }
@@ -270,7 +270,10 @@ public class TestInfoSubCommand {
         .collect(Collectors.toList());
     assertEquals(0, replica.size());
 
-    assertThat(errContent.toString(DEFAULT_ENCODING)).contains("Error getting Replicas");
+    Pattern p = Pattern.compile(
+        "^Unable to retrieve the replica details.*", Pattern.MULTILINE);
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
   }
 
   @Test
@@ -321,7 +324,7 @@ public class TestInfoSubCommand {
     assertTrue(json.matches("(?s).*replicas.*"));
     for (DatanodeDetails dn : datanodes) {
       Pattern pattern = Pattern.compile(
-          ".*replicas.*" + dn.getID().toString() + ".*", Pattern.DOTALL);
+          ".*replicas.*" + dn.getUuid().toString() + ".*", Pattern.DOTALL);
       Matcher matcher = pattern.matcher(json);
       assertTrue(matcher.matches());
     }
@@ -340,7 +343,7 @@ public class TestInfoSubCommand {
           .setContainerID(1)
           .setBytesUsed(1234)
           .setState("CLOSED")
-          .setPlaceOfBirth(dn.getID())
+          .setPlaceOfBirth(dn.getUuid())
           .setDatanodeDetails(dn)
           .setKeyCount(1)
           .setSequenceId(1);

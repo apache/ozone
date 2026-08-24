@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,8 +59,8 @@ public final class OmKeyInfo extends WithParentObjectId
     implements CopyObject<OmKeyInfo>, WithTags {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
 
-  private static final Codec<OmKeyInfo> CODEC = newCodec(true);
-  private static final Codec<OmKeyInfo> CODEC_KEY_TABLE = newCodec(false);
+  private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
+  private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
   /**
    * Metadata key flag to indicate whether a deleted key was a committed key.
    * The flag is set when a committed key is deleted from AOS but still held in
@@ -110,7 +109,7 @@ public final class OmKeyInfo extends WithParentObjectId
   // generation unchanged.
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
-  private final Long expectedDataGeneration;
+  private Long expectedDataGeneration = null;
 
   private OmKeyInfo(Builder b) {
     super(b);
@@ -132,39 +131,17 @@ public final class OmKeyInfo extends WithParentObjectId
     this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
-  /**
-   * Creates a new codec for OmKeyInfo.
-   *
-   * @param isOpenKey true for openKeyTable (includes expectedDataGeneration),
-   *                  false for keyTable (excludes these fields)
-   * @return the codec
-   */
-  private static Codec<OmKeyInfo> newCodec(boolean isOpenKey) {
+  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
     return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.getDefaultInstance()),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION, isOpenKey),
+        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION),
         OmKeyInfo.class);
   }
 
-  /**
-   * Gets the codec for openKeyTable. This codec includes expectedDataGeneration
-   * field during serialization.
-   *
-   * @return the codec for openKeyTable
-   */
-  public static Codec<OmKeyInfo> getOpenKeyTableCodec() {
-    return CODEC;
-  }
-
-  /**
-   * Gets the codec for keyTable. This codec excludes fields that are only
-   * meaningful for open keys.
-   *
-   * @return the codec for keyTable
-   */
-  public static Codec<OmKeyInfo> getKeyTableCodec() {
-    return CODEC_KEY_TABLE;
+  public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
+    LOG.debug("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
+    return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
   }
 
   public String getVolumeName() {
@@ -202,6 +179,10 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public String getFileName() {
     return fileName;
+  }
+
+  public void setExpectedDataGeneration(Long generation) {
+    this.expectedDataGeneration = generation;
   }
 
   public Long getExpectedDataGeneration() {
@@ -638,7 +619,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setAcls(Collection<OzoneAcl> listOfAcls) {
+    public Builder setAcls(List<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
         this.acls.set(listOfAcls);
       }
@@ -757,20 +738,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * @return KeyInfo
    */
   public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
-    return getProtobuf(ignorePipeline, null, clientVersion, false, true);
-  }
-
-  /**
-   * Gets KeyInfo for persistence with control over fields only used in openKeyTable.
-   *
-   * @param ignorePipeline true for persist to DB, false for network transmit.
-   * @param clientVersion the client version
-   * @param isOpenKey true for openKeyTable, false for keyTable
-   * @return KeyInfo
-   */
-  public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion,
-                             boolean isOpenKey) {
-    return getProtobuf(ignorePipeline, null, clientVersion, false, isOpenKey);
+    return getProtobuf(ignorePipeline, null, clientVersion, false);
   }
 
   /**
@@ -782,22 +750,6 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName,
                               int clientVersion, boolean latestVersionBlocks) {
-    return getProtobuf(ignorePipeline, fullKeyName, clientVersion, latestVersionBlocks, true);
-  }
-
-  /**
-   * Gets KeyInfo with all parameters.
-   *
-   * @param ignorePipeline   ignore pipeline flag
-   * @param fullKeyName user given key name
-   * @param clientVersion the client version
-   * @param latestVersionBlocks whether to include only latest version blocks
-   * @param isOpenKey true for openKeyTable, false for keyTable
-   * @return key info object
-   */
-  private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName,
-                              int clientVersion, boolean latestVersionBlocks,
-                              boolean isOpenKey) {
     long latestVersion = keyLocationVersions.isEmpty() ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
@@ -849,7 +801,7 @@ public final class OmKeyInfo extends WithParentObjectId
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
     kb.setIsFile(isFile);
-    if (isOpenKey && expectedDataGeneration != null) {
+    if (expectedDataGeneration != null) {
       kb.setExpectedDataGeneration(expectedDataGeneration);
     }
     if (ownerName != null) {

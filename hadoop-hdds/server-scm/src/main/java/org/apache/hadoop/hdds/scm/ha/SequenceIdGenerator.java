@@ -26,8 +26,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
-import java.util.Collections;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,7 +38,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.invoker.SequenceIdGeneratorStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -63,9 +61,22 @@ public class SequenceIdGenerator {
   private static final Logger LOG =
       LoggerFactory.getLogger(SequenceIdGenerator.class);
 
+  /**
+   * Ids supported.
+   */
+  public static final String LOCAL_ID = "localId";
+  public static final String DEL_TXN_ID = "delTxnId";
+  public static final String CONTAINER_ID = "containerId";
+
+  // Certificate ID for all services, including root certificates, whose ID
+  // were using "rootCertificateId" before.
+  public static final String CERTIFICATE_ID = "CertificateId";
+  @Deprecated
+  public static final String ROOT_CERTIFICATE_ID = "rootCertificateId";
+
   private static final long INVALID_SEQUENCE_ID = 0;
 
-  private final Map<SequenceIdType, Batch> sequenceIdToBatchMap;
+  private final Map<String, Batch> sequenceIdToBatchMap;
 
   private final Lock lock;
   private final long batchSize;
@@ -77,8 +88,8 @@ public class SequenceIdGenerator {
    * @param sequenceIdTable : sequenceIdTable
    */
   public SequenceIdGenerator(ConfigurationSource conf,
-      SCMHAManager scmhaManager, Table<SequenceIdType, Long> sequenceIdTable) {
-    this.sequenceIdToBatchMap = newSequenceIdToBatchMap();
+      SCMHAManager scmhaManager, Table<String, Long> sequenceIdTable) {
+    this.sequenceIdToBatchMap = new HashMap<>();
     this.lock = new ReentrantLock();
     this.batchSize = conf.getInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE,
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
@@ -87,16 +98,8 @@ public class SequenceIdGenerator {
     this.stateManager = createStateManager(scmhaManager, sequenceIdTable);
   }
 
-  static Map<SequenceIdType, Batch> newSequenceIdToBatchMap() {
-    final EnumMap<SequenceIdType, Batch> map = new EnumMap<>(SequenceIdType.class);
-    for (SequenceIdType type : SequenceIdType.values()) {
-      map.put(type, new Batch());
-    }
-    return Collections.unmodifiableMap(map);
-  }
-
   public StateManager createStateManager(SCMHAManager scmhaManager,
-      Table<SequenceIdType, Long> sequenceIdTable) {
+      Table<String, Long> sequenceIdTable) {
     Objects.requireNonNull(scmhaManager, "scmhaManager == null");
     return new StateManagerImpl.Builder()
         .setRatisServer(scmhaManager.getRatisServer())
@@ -105,13 +108,14 @@ public class SequenceIdGenerator {
   }
 
   /**
-   * @param idType : supported sequence ID type
-   * @return next id of this sequence ID.
+   * @param sequenceIdName : name of the sequenceId
+   * @return : next id of this sequenceId.
    */
-  public long getNextId(SequenceIdType idType) throws SCMException {
+  public long getNextId(String sequenceIdName) throws SCMException {
     lock.lock();
     try {
-      Batch batch = sequenceIdToBatchMap.get(idType);
+      Batch batch = sequenceIdToBatchMap.computeIfAbsent(
+          sequenceIdName, key -> new Batch());
 
       if (batch.nextId <= batch.lastId) {
         return batch.nextId++;
@@ -124,18 +128,18 @@ public class SequenceIdGenerator {
 
         Preconditions.checkArgument(Long.MAX_VALUE - batch.lastId >= batchSize);
         long nextLastId = batch.lastId +
-            (idType == SequenceIdType.CertificateId ? 1 : batchSize);
+            ((sequenceIdName.equals(CERTIFICATE_ID)) ? 1 : batchSize);
 
-        if (stateManager.allocateBatch(idType.name(),
+        if (stateManager.allocateBatch(sequenceIdName,
             prevLastId, nextLastId)) {
           batch.lastId = nextLastId;
           LOG.info("Allocate a batch for {}, change lastId from {} to {}.",
-              idType, prevLastId, batch.lastId);
+              sequenceIdName, prevLastId, batch.lastId);
           break;
         }
 
         // reload lastId from RocksDB.
-        batch.lastId = stateManager.getLastId(idType);
+        batch.lastId = stateManager.getLastId(sequenceIdName);
       }
 
       Preconditions.checkArgument(batch.nextId <= batch.lastId);
@@ -168,7 +172,7 @@ public class SequenceIdGenerator {
    * Reinitialize the SequenceIdGenerator with the latest sequenceIdTable
    * during SCM reload.
    */
-  public void reinitialize(Table<SequenceIdType, Long> sequenceIdTable)
+  public void reinitialize(Table<String, Long> sequenceIdTable)
       throws IOException {
     LOG.info("reinitialize SequenceIdGenerator.");
     lock.lock();
@@ -183,7 +187,7 @@ public class SequenceIdGenerator {
   /**
    * Maintain SequenceIdTable in RocksDB.
    */
-  public interface StateManager extends SCMHandler {
+  interface StateManager extends SCMHandler {
     /**
      * Compare And Swap lastId saved in db from expectedLastId to newLastId.
      * If based on Ratis, it will submit a raft client request.
@@ -199,16 +203,16 @@ public class SequenceIdGenerator {
         throws SCMException;
 
     /**
-     * @param idType : supported sequence ID type.
+     * @param sequenceIdName : name of the sequence id.
      * @return lastId saved in db
      */
-    Long getLastId(SequenceIdType idType);
+    Long getLastId(String sequenceIdName);
 
     /**
      * Reinitialize the SequenceIdGenerator with the latest sequenceIdTable
      * during SCM reload.
      */
-    void reinitialize(Table<SequenceIdType, Long> sequenceIdTable) throws IOException;
+    void reinitialize(Table<String, Long> sequenceIdTable) throws IOException;
 
     @Override
     default RequestType getType() {
@@ -221,11 +225,11 @@ public class SequenceIdGenerator {
    * DBTransactionBuffer until a snapshot is taken.
    */
   static final class StateManagerImpl implements StateManager {
-    private Table<SequenceIdType, Long> sequenceIdTable;
+    private Table<String, Long> sequenceIdTable;
     private final DBTransactionBuffer transactionBuffer;
-    private final Map<SequenceIdType, Long> sequenceIdToLastIdMap;
+    private final Map<String, Long> sequenceIdToLastIdMap;
 
-    private StateManagerImpl(Table<SequenceIdType, Long> sequenceIdTable,
+    private StateManagerImpl(Table<String, Long> sequenceIdTable,
                                DBTransactionBuffer trxBuffer) {
       this.sequenceIdTable = sequenceIdTable;
       this.transactionBuffer = trxBuffer;
@@ -236,8 +240,7 @@ public class SequenceIdGenerator {
     @Override
     public Boolean allocateBatch(String sequenceIdName,
                                  Long expectedLastId, Long newLastId) {
-      SequenceIdType idType = SequenceIdType.valueOf(sequenceIdName);
-      Long lastId = sequenceIdToLastIdMap.computeIfAbsent(idType,
+      Long lastId = sequenceIdToLastIdMap.computeIfAbsent(sequenceIdName,
           key -> {
             try {
               Long idInDb = this.sequenceIdTable.get(key);
@@ -255,22 +258,22 @@ public class SequenceIdGenerator {
 
       try {
         transactionBuffer
-            .addToBuffer(sequenceIdTable, idType, newLastId);
+            .addToBuffer(sequenceIdTable, sequenceIdName, newLastId);
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to put lastId to Batch", ioe);
       }
 
-      sequenceIdToLastIdMap.put(idType, newLastId);
+      sequenceIdToLastIdMap.put(sequenceIdName, newLastId);
       return true;
     }
 
     @Override
-    public Long getLastId(SequenceIdType idType) {
-      return sequenceIdToLastIdMap.get(idType);
+    public Long getLastId(String sequenceIdName) {
+      return sequenceIdToLastIdMap.get(sequenceIdName);
     }
 
     @Override
-    public void reinitialize(Table<SequenceIdType, Long> seqIdTable)
+    public void reinitialize(Table<String, Long> seqIdTable)
         throws IOException {
       this.sequenceIdTable = seqIdTable;
       this.sequenceIdToLastIdMap.clear();
@@ -278,17 +281,17 @@ public class SequenceIdGenerator {
     }
 
     private void initialize() throws IOException {
-      try (Table.KeyValueIterator<SequenceIdType, Long> iterator = sequenceIdTable.iterator()) {
+      try (Table.KeyValueIterator<String, Long> iterator = sequenceIdTable.iterator()) {
 
         while (iterator.hasNext()) {
-          Table.KeyValue<SequenceIdType, Long> kv = iterator.next();
-          final SequenceIdType idType = kv.getKey();
+          Table.KeyValue<String, Long> kv = iterator.next();
+          final String sequenceIdName = kv.getKey();
           final Long lastId = kv.getValue();
-          Objects.requireNonNull(idType,
-              "idType should not be null");
+          Objects.requireNonNull(sequenceIdName,
+              "sequenceIdName should not be null");
           Objects.requireNonNull(lastId,
               "lastId should not be null");
-          sequenceIdToLastIdMap.put(idType, lastId);
+          sequenceIdToLastIdMap.put(sequenceIdName, lastId);
         }
       }
     }
@@ -297,7 +300,7 @@ public class SequenceIdGenerator {
      * Builder for Ratis based StateManager.
      */
     public static class Builder {
-      private Table<SequenceIdType, Long> table;
+      private Table<String, Long> table;
       private DBTransactionBuffer buffer;
       private SCMRatisServer ratisServer;
 
@@ -307,7 +310,7 @@ public class SequenceIdGenerator {
       }
 
       public Builder setSequenceIdTable(
-          final Table<SequenceIdType, Long> sequenceIdTable) {
+          final Table<String, Long> sequenceIdTable) {
         table = sequenceIdTable;
         return this;
       }
@@ -323,7 +326,7 @@ public class SequenceIdGenerator {
 
         final StateManager impl = new StateManagerImpl(table, buffer);
 
-        return ratisServer.getProxyHandler(new SequenceIdGeneratorStateManagerInvoker(impl, ratisServer));
+        return ratisServer.getProxyHandler(StateManager.class, impl);
       }
     }
   }
@@ -337,7 +340,7 @@ public class SequenceIdGenerator {
    */
   public static void upgradeToSequenceId(SCMMetadataStore scmMetadataStore)
       throws IOException {
-    Table<SequenceIdType, Long> sequenceIdTable = scmMetadataStore.getSequenceIdTable();
+    Table<String, Long> sequenceIdTable = scmMetadataStore.getSequenceIdTable();
 
     // upgrade localId
     // Short-term solution: when setup multi SCM from scratch, they need
@@ -345,29 +348,29 @@ public class SequenceIdGenerator {
     // Long-term solution: the bootstrapped SCM will explicitly download
     // scm.db from leader SCM, and drop its own scm.db. Thus the upgrade
     // operations can take effect exactly once in a SCM HA cluster.
-    if (sequenceIdTable.get(SequenceIdType.localId) == null) {
+    if (sequenceIdTable.get(LOCAL_ID) == null) {
       long millisSinceEpoch = TimeUnit.DAYS.toMillis(
           LocalDate.of(LocalDate.now().getYear() + 1, 1, 1).toEpochDay());
 
       long localId = millisSinceEpoch << Short.SIZE;
       Preconditions.checkArgument(localId > UniqueId.next());
 
-      sequenceIdTable.put(SequenceIdType.localId, localId);
-      LOG.info("upgrade {} to {}", SequenceIdType.localId, sequenceIdTable.get(SequenceIdType.localId));
+      sequenceIdTable.put(LOCAL_ID, localId);
+      LOG.info("upgrade {} to {}", LOCAL_ID, sequenceIdTable.get(LOCAL_ID));
     }
 
     // upgrade delTxnId
-    if (sequenceIdTable.get(SequenceIdType.delTxnId) == null) {
+    if (sequenceIdTable.get(DEL_TXN_ID) == null) {
       // fetch delTxnId from DeletedBlocksTXTable
       // check HDDS-4477 for details.
       DeletedBlocksTransaction txn
           = scmMetadataStore.getDeletedBlocksTXTable().get(0L);
-      sequenceIdTable.put(SequenceIdType.delTxnId, txn != null ? txn.getTxID() : 0L);
-      LOG.info("upgrade {} to {}", SequenceIdType.delTxnId, sequenceIdTable.get(SequenceIdType.delTxnId));
+      sequenceIdTable.put(DEL_TXN_ID, txn != null ? txn.getTxID() : 0L);
+      LOG.info("upgrade {} to {}", DEL_TXN_ID, sequenceIdTable.get(DEL_TXN_ID));
     }
 
     // upgrade containerId
-    if (sequenceIdTable.get(SequenceIdType.containerId) == null) {
+    if (sequenceIdTable.get(CONTAINER_ID) == null) {
       long largestContainerId = 0;
       try (TableIterator<ContainerID, ContainerInfo> iterator
           = scmMetadataStore.getContainerTable().valueIterator()) {
@@ -378,9 +381,9 @@ public class SequenceIdGenerator {
         }
       }
 
-      sequenceIdTable.put(SequenceIdType.containerId, largestContainerId);
+      sequenceIdTable.put(CONTAINER_ID, largestContainerId);
       LOG.info("upgrade {} to {}",
-          SequenceIdType.containerId, sequenceIdTable.get(SequenceIdType.containerId));
+          CONTAINER_ID, sequenceIdTable.get(CONTAINER_ID));
     }
 
     upgradeToCertificateSequenceId(scmMetadataStore, false);
@@ -388,10 +391,10 @@ public class SequenceIdGenerator {
 
   public static void upgradeToCertificateSequenceId(
       SCMMetadataStore scmMetadataStore, boolean force) throws IOException {
-    Table<SequenceIdType, Long> sequenceIdTable = scmMetadataStore.getSequenceIdTable();
+    Table<String, Long> sequenceIdTable = scmMetadataStore.getSequenceIdTable();
 
     // upgrade certificate ID table
-    if (sequenceIdTable.get(SequenceIdType.CertificateId) == null || force) {
+    if (sequenceIdTable.get(CERTIFICATE_ID) == null || force) {
       // Start from ID 2.
       // ID 1 - root certificate, ID 2 - first SCM certificate.
       long largestCertId = BigInteger.ONE.add(BigInteger.ONE).longValueExact();
@@ -413,15 +416,15 @@ public class SequenceIdGenerator {
         }
       }
 
-      sequenceIdTable.put(SequenceIdType.CertificateId, largestCertId);
-      LOG.info("upgrade {} to {}", SequenceIdType.CertificateId,
-          sequenceIdTable.get(SequenceIdType.CertificateId));
+      sequenceIdTable.put(CERTIFICATE_ID, largestCertId);
+      LOG.info("upgrade {} to {}", CERTIFICATE_ID,
+          sequenceIdTable.get(CERTIFICATE_ID));
     }
 
     // delete the ROOT_CERTIFICATE_ID record if exists
     // ROOT_CERTIFICATE_ID is replaced with CERTIFICATE_ID now
-    if (sequenceIdTable.get(SequenceIdType.rootCertificateId) != null) {
-      sequenceIdTable.delete(SequenceIdType.rootCertificateId);
+    if (sequenceIdTable.get(ROOT_CERTIFICATE_ID) != null) {
+      sequenceIdTable.delete(ROOT_CERTIFICATE_ID);
     }
   }
 

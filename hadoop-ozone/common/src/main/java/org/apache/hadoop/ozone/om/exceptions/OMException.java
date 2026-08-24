@@ -281,8 +281,5 @@ public class OMException extends IOException {
     ETAG_NOT_AVAILABLE,
 
     ATOMIC_WRITE_CONFLICT,
-
-    LIFECYCLE_CONFIGURATION_NOT_FOUND,
-    UPDATE_ID_NOT_MATCH
   }
 }

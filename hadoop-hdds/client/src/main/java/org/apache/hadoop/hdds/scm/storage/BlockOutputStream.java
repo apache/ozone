@@ -597,7 +597,7 @@ public class BlockOutputStream extends OutputStream {
 
       // if block is full, send the eof
       boolean isBlockFull = (blockSize != -1 && flushPos == blockSize);
-      asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString, containerAutoCreate());
+      asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString);
       CompletableFuture<ContainerCommandResponseProto> future = asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
         try {
@@ -963,11 +963,8 @@ public class BlockOutputStream extends OutputStream {
         byteBufferList = null;
       }
 
-      // TODO: Pass the requested storage type from allocation/storage policy
-      // once that context is wired through BlockOutputStream. Null preserves
-      // the current any-volume behavior.
       asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, tokenString, replicationIndex, blockData, close, null, containerAutoCreate());
+          blockID.get(), data, tokenString, replicationIndex, blockData, close);
       CompletableFuture<ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       validateFuture = respFuture.thenApplyAsync(e -> {
@@ -1161,18 +1158,6 @@ public class BlockOutputStream extends OutputStream {
       revisedChunkInfo.addMetadata(FULL_CHUNK_KV);
     }
     return revisedChunkInfo.build();
-  }
-
-  /**
-   * @return true when the DataNode may auto-create a missing container for this write.
-   */
-  protected boolean containerAutoCreate() {
-    return true;
-  }
-
-  @VisibleForTesting
-  public boolean isContainerAutoCreate() {
-    return containerAutoCreate();
   }
 
   private boolean isFullChunk(ChunkInfo chunkInfo) {

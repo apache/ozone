@@ -80,8 +80,10 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
     PlacementPolicy policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
     replicationManager = mock(ReplicationManager.class);
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setBoolean("hdds.scm.replication.push", true);
     when(replicationManager.getConfig())
-        .thenReturn(new OzoneConfiguration().getObject(
+        .thenReturn(ozoneConfiguration.getObject(
             ReplicationManager.ReplicationManagerConfiguration.class));
     ReplicationManagerMetrics metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);

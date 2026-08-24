@@ -31,8 +31,6 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,7 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -61,9 +58,6 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.apache.hadoop.security.AccessControlException;
-import org.apache.ratis.util.ExitUtils;
-import org.apache.ratis.util.ExitUtils.ExitException;
 import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -89,9 +83,6 @@ public class TestReconcileSubcommand {
 
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
-  private static final class TestGenericCliRoot extends GenericCli {
-  }
-
   @BeforeEach
   public void setup() throws IOException {
     scmClient = mock(ScmClient.class);
@@ -100,7 +91,6 @@ public class TestReconcileSubcommand {
 
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
-    ExitUtils.disableSystemExit();
   }
 
   @AfterEach
@@ -108,7 +98,6 @@ public class TestReconcileSubcommand {
     System.setOut(originalOut);
     System.setErr(originalErr);
     System.setIn(originalIn);
-    ExitUtils.clear();
   }
 
   @Test
@@ -243,7 +232,7 @@ public class TestReconcileSubcommand {
 
     RuntimeException exception = assertThrows(RuntimeException.class, () -> executeReconcileFromArgs(1));
 
-    assertThatOutput(errContent).contains(mockMessage);
+    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 1: " + mockMessage);
 
     assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 1 container");
 
@@ -313,7 +302,8 @@ public class TestReconcileSubcommand {
     });
 
     // Should have error messages for EC containers
-    assertThatOutput(errContent).contains(EC_CONTAINER_MESSAGE);
+    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 1: " + EC_CONTAINER_MESSAGE);
+    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 3: " + EC_CONTAINER_MESSAGE);
     assertThatOutput(errContent).doesNotContain("Failed to trigger reconciliation for container 2");
 
     // Exception message should indicate 2 failed containers
@@ -323,30 +313,6 @@ public class TestReconcileSubcommand {
     validateReconcileOutput(2);
     assertThatOutput(outContent).doesNotContain("container 1");
     assertThatOutput(outContent).doesNotContain("container 3");
-  }
-
-  /**
-   * Tests that the reconciliation loop terminates immediately upon an
-   * authentication failure.
-   */
-  @Test
-  public void testReconcileStopsAfterAuthenticationFailure() throws Exception {
-    mockContainer(1, 3, RatisReplicationConfig.getInstance(THREE), true);
-    mockContainer(2, 3, RatisReplicationConfig.getInstance(THREE), true);
-
-    IOException authWrapped = new IOException(
-        "RPC failed",
-        new AccessControlException("Client cannot authenticate via:[KERBEROS]"));
-    doThrow(authWrapped).when(scmClient).reconcileContainer(1L);
-
-    assertThrows(ExitException.class, () -> executeReconcileFromArgs(1, 2));
-
-    verify(scmClient, times(1)).reconcileContainer(1L);
-    verify(scmClient, never()).reconcileContainer(2L);
-
-    assertThat(errContent.toString(DEFAULT_ENCODING))
-        .contains("AccessControlException")
-        .contains("Client cannot authenticate via:[KERBEROS]");
   }
 
   /**
@@ -401,7 +367,7 @@ public class TestReconcileSubcommand {
 
     assertThrows(RuntimeException.class, () -> parseArgsAndExecute("123", "456"));
     // Should have error message for unreachable container
-    assertThatOutput(errContent).contains(exceptionMessage);
+    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 456: " + exceptionMessage);
     assertThatOutput(errContent).doesNotContain("123");
     assertThatOutput(outContent).doesNotContain("Reconciliation has been triggered for container 456");
     validateReconcileOutput(123);
@@ -418,13 +384,7 @@ public class TestReconcileSubcommand {
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
 
     ReconcileSubcommand cmd = new ReconcileSubcommand();
-    TestGenericCliRoot root = new TestGenericCliRoot();
-    CommandLine commandLine = new CommandLine(root);
-    commandLine.addSubcommand("reconcile", cmd);
-    String[] fullArgs = new String[args.length + 1];
-    fullArgs[0] = "reconcile";
-    System.arraycopy(args, 0, fullArgs, 1, args.length);
-    commandLine.parseArgs(fullArgs);
+    new CommandLine(cmd).parseArgs(args);
     cmd.execute(scmClient);
   }
 

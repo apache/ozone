@@ -33,7 +33,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LOCK_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE_DEFAULT;
 
 import com.google.common.util.concurrent.Striped;
-import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -47,7 +46,6 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -243,16 +241,6 @@ public final class ContainerStateManagerImpl
         Objects.requireNonNull(container, "container == null");
         containers.addContainer(container);
         if (container.getState() == LifeCycleState.OPEN) {
-          if (container.getPipelineID() == null) {
-            // This can happen in Recon when SCM returns an OPEN container after
-            // its pipeline metadata has already been cleaned up. Keep the
-            // container record, but skip pipeline registration because there is
-            // no pipeline ID to look up.
-            LOG.warn("Found container {} which is in OPEN state without a "
-                + "pipeline ID. Skipping pipeline registration during SCM "
-                + "start.", container);
-            continue;
-          }
           try {
             pipelineManager.addContainerToPipelineSCMStart(
                 container.getPipelineID(), container.containerID());
@@ -273,20 +261,15 @@ public final class ContainerStateManagerImpl
       getContainerStateChangeActions() {
     final Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
         actions = new EnumMap<>(LifeCycleEvent.class);
-    actions.put(FINALIZE, info -> {
-      if (info.getPipelineID() != null) {
-        pipelineManager.removeContainerFromPipeline(
-            info.getPipelineID(), info.containerID());
-      }
-    });
+    actions.put(FINALIZE, info -> pipelineManager
+        .removeContainerFromPipeline(info.getPipelineID(), info.containerID()));
     return actions;
   }
 
   @Override
-  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerHealthState healthState,
-      ContainerID start, int count) {
+  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count) {
     try (AutoCloseableLock ignored = readLock()) {
-      return containers.getContainerIDs(state, healthState, start, count);
+      return containers.getContainerIDs(state, start, count);
     }
   }
 
@@ -352,23 +335,12 @@ public final class ContainerStateManagerImpl
           transactionBuffer.addToBuffer(containerStore,
               containerID, container);
           containers.addContainer(container);
-          if (pipelineID != null && pipelineManager.containsPipeline(pipelineID)) {
+          if (pipelineManager.containsPipeline(pipelineID)) {
             pipelineManager.addContainerToPipeline(pipelineID, containerID);
           } else if (containerInfo.getState().
               equals(LifeCycleState.OPEN)) {
-            if (pipelineID != null) {
-              // The container names a pipeline, but that pipeline is not in
-              // the pipeline manager. Preserve the existing failure path for
-              // this inconsistent OPEN container state.
-              throw new PipelineNotFoundException();
-            }
-            // There is no pipeline ID to look up or register. This can happen
-            // on Recon sync paths when SCM returns an OPEN container after its
-            // pipeline metadata has already been cleaned up. Keep the
-            // container record so Recon does not miss it permanently, but skip
-            // pipeline tracking until later reports/syncs advance the state.
-            LOG.warn("Adding OPEN container {} without pipeline tracking "
-                    + "because its pipeline ID is null.", containerID);
+            // Pipeline should exist, but not
+            throw new PipelineNotFoundException();
           }
           //recon may receive report of closed container,
           // no corresponding Pipeline can be synced for scm.
@@ -392,7 +364,7 @@ public final class ContainerStateManagerImpl
   public void updateContainerStateWithSequenceId(final HddsProtos.ContainerID containerID,
                                                   final LifeCycleEvent event,
                                                   final Long sequenceId)
-      throws IOException {
+      throws IOException, InvalidStateTransitionException {
     // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
@@ -407,11 +379,10 @@ public final class ContainerStateManagerImpl
           LOG.warn("Container sequenceId is {} greater than the leader container sequenceId {}",
               containerInfo.getSequenceId(), sequenceId);
         }
-
+        
         final LifeCycleState oldState = containerInfo.getState();
         final LifeCycleState newState = stateMachine.getNextState(
             oldState, event);
-
         if (newState.getNumber() > oldState.getNumber()) {
           ExecutionUtil.create(() -> {
             containers.updateState(id, oldState, newState);
@@ -427,9 +398,6 @@ public final class ContainerStateManagerImpl
               .accept(containerInfo);
         }
       }
-    } catch (InvalidStateTransitionException e) {
-      LOG.warn("Failed to updateContainerStateWithSequenceId for container {} at sequenceId {}, ignoring it.",
-          id, sequenceId, e);
     }
   }
 
@@ -492,9 +460,30 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public ContainerInfo getMatchingContainerAndStorageTier(final long size, String owner,
-      PipelineID pipelineID, NavigableSet<ContainerID> containerIDs,
-      StorageTier storageTier) {
+  public void updateDeleteTransactionId(
+      final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
+
+    // TODO: Refactor this. Error handling is not done.
+    for (Map.Entry<ContainerID, Long> transaction :
+        deleteTransactionMap.entrySet()) {
+      ContainerID containerID = transaction.getKey();
+      try (AutoCloseableLock ignored = writeLock(containerID)) {
+        final ContainerInfo info = containers.getContainerInfo(
+            transaction.getKey());
+        if (info == null) {
+          LOG.warn("Cannot find container {}, transaction id is {}",
+              transaction.getKey(), transaction.getValue());
+          continue;
+        }
+        info.updateDeleteTransactionId(transaction.getValue());
+        transactionBuffer.addToBuffer(containerStore, info.containerID(), info);
+      }
+    }
+  }
+
+  @Override
+  public ContainerInfo getMatchingContainer(final long size, String owner,
+      PipelineID pipelineID, NavigableSet<ContainerID> containerIDs) {
     if (containerIDs.isEmpty()) {
       return null;
     }
@@ -512,8 +501,7 @@ public final class ContainerStateManagerImpl
     if (resultSet.isEmpty()) {
       resultSet = containerIDs;
     }
-    ContainerInfo selectedContainer =
-        findContainerWithSpaceAndStorageTier(size, resultSet, storageTier);
+    ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet);
     if (selectedContainer == null) {
 
       // If we did not find any space in the tailSet, we need to look for
@@ -525,7 +513,7 @@ public final class ContainerStateManagerImpl
       // last element in the sorted set.
 
       resultSet = containerIDs.headSet(lastID, true);
-      selectedContainer = findContainerWithSpaceAndStorageTier(size, resultSet, storageTier);
+      selectedContainer = findContainerWithSpace(size, resultSet);
     }
 
     // TODO: cleanup entries in lastUsedMap
@@ -535,15 +523,14 @@ public final class ContainerStateManagerImpl
     return selectedContainer;
   }
 
-  private ContainerInfo findContainerWithSpaceAndStorageTier(final long size,
-      final NavigableSet<ContainerID> searchSet, @Nonnull StorageTier storageTier) {
-    // Get the container with space to meet our request and exact tier.
+  private ContainerInfo findContainerWithSpace(final long size,
+                                               final NavigableSet<ContainerID>
+                                                   searchSet) {
+      // Get the container with space to meet our request.
     for (ContainerID id : searchSet) {
       try (AutoCloseableLock ignored = readLock(id)) {
         final ContainerInfo containerInfo = containers.getContainerInfo(id);
-        if (containerInfo.getUsedBytes() + size <= this.containerSize &&
-            containerInfo.getStorageTier() != null &&
-            containerInfo.getStorageTier().equals(storageTier)) {
+        if (containerInfo.getUsedBytes() + size <= this.containerSize) {
           containerInfo.updateLastUsedTime();
           return containerInfo;
         }

@@ -30,7 +30,7 @@ import picocli.CommandLine.Command;
 /**
  * Shell commands for native rpc object manipulation.
  */
-@Command(name = "ozone sh", aliases = {"sh", "shell"},
+@Command(name = "ozone sh",
     description = "Shell for Ozone object store",
     subcommands = {
         BucketCommands.class,

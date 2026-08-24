@@ -60,20 +60,20 @@ import org.mockito.Mockito;
 
 /**
  * Class for test used for setting up testable StorageContainerManager.
- * Provides an access to {@link MockCluster} and to necessary mocked instances
+ * Provides an access to {@link TestableCluster} and to necessary mocked instances
  */
 public final class MockedSCM {
   private final StorageContainerManager scm;
-  private final MockCluster cluster;
+  private final TestableCluster cluster;
   private final MockNodeManager mockNodeManager;
   private final MockedReplicationManager mockedReplicaManager;
   private final MoveManager moveManager;
   private final ContainerManager containerManager;
   private MockedPlacementPolicies mockedPlacementPolicies;
 
-  public MockedSCM(@Nonnull MockCluster mockCluster) {
+  public MockedSCM(@Nonnull TestableCluster testableCluster) {
     scm = mock(StorageContainerManager.class);
-    cluster = mockCluster;
+    cluster = testableCluster;
     mockNodeManager = new MockNodeManager(cluster.getDatanodeToContainersMap());
     try {
       moveManager = mockMoveManager();
@@ -185,7 +185,7 @@ public final class MockedSCM {
     return scm;
   }
 
-  public @Nonnull MockCluster getCluster() {
+  public @Nonnull TestableCluster getCluster() {
     return cluster;
   }
 
@@ -201,7 +201,7 @@ public final class MockedSCM {
     return mockedPlacementPolicies.ecPlacementPolicy;
   }
 
-  private static @Nonnull ContainerManager mockContainerManager(@Nonnull MockCluster cluster)
+  private static @Nonnull ContainerManager mockContainerManager(@Nonnull TestableCluster cluster)
       throws ContainerNotFoundException {
     ContainerManager containerManager = mock(ContainerManager.class);
     Mockito

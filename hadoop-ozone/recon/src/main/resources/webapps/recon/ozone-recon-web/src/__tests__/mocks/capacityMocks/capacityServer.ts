@@ -17,26 +17,40 @@
  */
 
 import { setupServer } from 'msw/node';
-import { HttpResponse, http } from 'msw';
+import { rest } from 'msw';
 
 import * as mockResponses from './capacityResponseMocks';
 
 const handlers = [
-  http.get('/api/v1/storageDistribution', () => {
-    return HttpResponse.json(mockResponses.StorageDistribution);
+  rest.get('api/v1/storageDistribution', (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(mockResponses.StorageDistribution)
+    );
   }),
-  http.get('/api/v1/pendingDeletion', ({ request }) => {
-    const url = new URL(request.url);
-    const component = url.searchParams.get("component");
+  rest.get('api/v1/pendingDeletion', (req, res, ctx) => {
+    const component = req.url.searchParams.get('component');
     switch (component) {
     case 'scm':
-      return HttpResponse.json(mockResponses.ScmPendingDeletion);
+      return res(
+        ctx.status(200),
+        ctx.json(mockResponses.ScmPendingDeletion)
+      );
     case 'om':
-      return HttpResponse.json(mockResponses.OmPendingDeletion);
+      return res(
+        ctx.status(200),
+        ctx.json(mockResponses.OmPendingDeletion)
+      );
     case 'dn':
-      return HttpResponse.json(mockResponses.DnPendingDeletion);
+      return res(
+        ctx.status(200),
+        ctx.json(mockResponses.DnPendingDeletion)
+      );
     default:
-      return HttpResponse.json({ message: 'Unsupported pending deletion component.' }, { status: 400 });
+      return res(
+        ctx.status(400),
+        ctx.json({ message: 'Unsupported pending deletion component.' })
+      );
     }
   })
 ];

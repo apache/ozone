@@ -50,7 +50,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -100,8 +99,10 @@ public class TestRatisUnderReplicationHandler {
     policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
     replicationManager = mock(ReplicationManager.class);
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setBoolean("hdds.scm.replication.push", true);
     when(replicationManager.getConfig())
-        .thenReturn(new OzoneConfiguration().getObject(
+        .thenReturn(ozoneConfiguration.getObject(
             ReplicationManagerConfiguration.class));
     metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);
@@ -468,7 +469,7 @@ public class TestRatisUnderReplicationHandler {
   public void testCorrectUsedAndExcludedNodesPassed() throws IOException {
     PlacementPolicy mockPolicy = mock(PlacementPolicy.class);
     when(mockPolicy.chooseDatanodes(any(), any(), any(),
-        anyInt(), anyLong(), anyLong(), any(StorageType.class)))
+        anyInt(), anyLong(), anyLong()))
         .thenReturn(Collections.singletonList(
             MockDatanodeDetails.randomDatanodeDetails()));
 
@@ -511,9 +512,10 @@ public class TestRatisUnderReplicationHandler {
     handler.processAndSendCommands(replicas, pendingOps,
         getUnderReplicatedHealthResult(), 2);
 
+
     verify(mockPolicy, times(1)).chooseDatanodes(
         usedNodesCaptor.capture(), excludedNodesCaptor.capture(), any(),
-        anyInt(), anyLong(), anyLong(), any(StorageType.class));
+        anyInt(), anyLong(), anyLong());
 
     List<DatanodeDetails> usedNodes = usedNodesCaptor.getValue();
     List<DatanodeDetails> excludedNodes = excludedNodesCaptor.getValue();

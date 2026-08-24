@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_PARTS_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 
 import jakarta.annotation.Nonnull;
@@ -34,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -48,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * 3) Delete unused parts.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, FILE_TABLE, DELETED_TABLE,
-    MULTIPART_INFO_TABLE, MULTIPART_PARTS_TABLE, DIRECTORY_TABLE})
+    MULTIPART_INFO_TABLE, DIRECTORY_TABLE})
 public class S3MultipartUploadCompleteResponseWithFSO
         extends S3MultipartUploadCompleteResponse {
 
@@ -70,11 +68,9 @@ public class S3MultipartUploadCompleteResponseWithFSO
       OmBucketInfo omBucketInfo,
       @Nonnull long volumeId, @Nonnull long bucketId,
       List<OmDirectoryInfo> missingParentInfos,
-      OmMultipartKeyInfo multipartKeyInfo,
-      List<OmMultipartPartKey> multipartPartKeysToDelete) {
+      OmMultipartKeyInfo multipartKeyInfo) {
     super(omResponse, multipartKey, multipartOpenKey, omKeyInfo,
-        allKeyInfoToRemove, bucketLayout, omBucketInfo, bucketId,
-        multipartPartKeysToDelete);
+        allKeyInfoToRemove, bucketLayout, omBucketInfo, bucketId);
     this.volumeId = volumeId;
     this.bucketId = bucketId;
     this.missingParentInfos = missingParentInfos;

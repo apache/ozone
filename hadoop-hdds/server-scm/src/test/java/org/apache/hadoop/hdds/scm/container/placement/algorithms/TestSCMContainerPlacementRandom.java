@@ -22,14 +22,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -91,10 +89,6 @@ public class TestSCMContainerPlacementRandom {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
-    when(mockNodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
-      DatanodeInfo di = invocation.getArgument(0);
-      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() >= 15L);
-    });
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
@@ -107,7 +101,7 @@ public class TestSCMContainerPlacementRandom {
     for (int i = 0; i < 100; i++) {
       //when
       List<DatanodeDetails> datanodeDetails = scmContainerPlacementRandom
-          .chooseDatanodes(existingNodes, null, 1, 15, 15, StorageType.DEFAULT);
+          .chooseDatanodes(existingNodes, null, 1, 15, 15);
 
       //then
       assertEquals(1, datanodeDetails.size());
@@ -215,21 +209,17 @@ public class TestSCMContainerPlacementRandom {
         .thenReturn(datanodes.get(1));
     when(mockNodeManager.getNode(datanodes.get(2).getID()))
         .thenReturn(datanodes.get(2));
-    when(mockNodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
-      DatanodeInfo di = invocation.getArgument(0);
-      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() >= 15L);
-    });
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
             mock(SCMContainerPlacementMetrics.class));
 
     assertTrue(
-        scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L, StorageType.DEFAULT));
+        scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L));
     assertFalse(
-        scmContainerPlacementRandom.isValidNode(datanodes.get(1), 15L, 15L, StorageType.DEFAULT));
+        scmContainerPlacementRandom.isValidNode(datanodes.get(1), 15L, 15L));
     assertFalse(
-        scmContainerPlacementRandom.isValidNode(datanodes.get(2), 15L, 15L, StorageType.DEFAULT));
+        scmContainerPlacementRandom.isValidNode(datanodes.get(2), 15L, 15L));
 
   }
 

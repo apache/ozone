@@ -124,12 +124,6 @@ public class OMQuotaRepairRequest extends OMClientRequest {
       }
       bucketInfo.incrUsedBytes(bucketCountInfo.getDiffUsedBytes());
       bucketInfo.incrUsedNamespace(bucketCountInfo.getDiffUsedNamespace());
-      if (bucketCountInfo.hasDiffSnapshotUsedBytes()) {
-        bucketInfo.incrSnapshotUsedBytes(bucketCountInfo.getDiffSnapshotUsedBytes());
-      }
-      if (bucketCountInfo.hasDiffSnapshotUsedNamespace()) {
-        bucketInfo.incrSnapshotUsedNamespace(bucketCountInfo.getDiffSnapshotUsedNamespace());
-      }
       if (bucketCountInfo.getSupportOldQuota()) {
         OmBucketInfo.Builder builder = bucketInfo.toBuilder();
         if (bucketInfo.getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
@@ -156,7 +150,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
       OMMetadataManager metadataManager, long transactionLogIndex) throws IOException {
     LOG.info("Starting volume quota support update");
     Map<String, OmVolumeArgs> volUpdateMap = new HashMap<>();
-    try (TableIterator<String, Table.KeyValue<String, OmVolumeArgs>>
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
              iterator = metadataManager.getVolumeTable().iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmVolumeArgs> entry = iterator.next();

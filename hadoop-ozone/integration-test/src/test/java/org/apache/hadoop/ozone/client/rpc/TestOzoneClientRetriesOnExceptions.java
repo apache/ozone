@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.OzoneTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -109,6 +109,7 @@ public class TestOzoneClientRetriesOnExceptions {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
+    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
@@ -162,7 +163,7 @@ public class TestOzoneClientRetriesOnExceptions {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
-    OzoneTestHelper.waitForPipelineClose(key, cluster, false);
+    TestHelper.waitForPipelineClose(key, cluster, false);
     key.flush();
     assertInstanceOf(GroupMismatchException.class,
         HddsClientUtils.checkForException(blockOutputStream.getIoException()));
@@ -210,7 +211,7 @@ public class TestOzoneClientRetriesOnExceptions {
       key.write(data1);
       OutputStream stream = entries.get(0).getOutputStream();
       BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
-      OzoneTestHelper.waitForContainerClose(key, cluster);
+      TestHelper.waitForContainerClose(key, cluster);
       // Ensure that blocks for the key have been allocated to at least N+1
       // containers so that write request will be tried on N+1 different blocks
       // of N+1 different containers and it will finally fail as it will hit
@@ -236,13 +237,13 @@ public class TestOzoneClientRetriesOnExceptions {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
                                       long size) throws Exception {
-    return OzoneTestHelper
+    return TestHelper
         .createKey(keyName, type, ReplicationFactor.ONE,
             size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    OzoneTestHelper
+    TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

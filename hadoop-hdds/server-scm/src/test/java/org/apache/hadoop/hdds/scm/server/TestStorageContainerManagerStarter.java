@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DEFAULT_STORAGE_TIER_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,7 +29,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -138,15 +136,6 @@ public class TestStorageContainerManagerStarter {
   public void testGenClusterIdWithInvalidParamDoesNotRun() {
     assertEquals(ExitCode.USAGE, executeCommand("--genclusterid", "--invalid"));
     assertFalse(mock.generateCalled);
-  }
-
-  @Test
-  public void testConfiguredDefaultStorageTierIgnoresCaseAndWhitespace() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_DEFAULT_STORAGE_TIER_KEY, " aRcHiVe ");
-
-    assertEquals(StorageTier.ARCHIVE,
-        StorageContainerManager.getConfiguredDefaultStorageTier(conf));
   }
 
   @Test

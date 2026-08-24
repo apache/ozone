@@ -52,10 +52,8 @@ public interface XceiverClientFactory extends AutoCloseable {
    * @return XceiverClientSpi connected to a container
    * @throws IOException if a XceiverClientSpi cannot be acquired
    */
-  default XceiverClientSpi acquireClientForReadData(Pipeline pipeline)
-      throws IOException {
-    return acquireClientForReadData(pipeline, false);
-  }
+  XceiverClientSpi acquireClientForReadData(Pipeline pipeline)
+      throws IOException;
 
   /**
    * Releases a read XceiverClientSpi after use.
@@ -74,17 +72,10 @@ public interface XceiverClientFactory extends AutoCloseable {
    * @return XceiverClientSpi connected to a container
    * @throws IOException if a XceiverClientSpi cannot be acquired
    */
-  XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware) throws IOException;
-
-  XceiverClientSpi acquireClientForReadData(Pipeline pipeline, boolean allowShortCircuit)
+  XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware)
       throws IOException;
 
-  XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit)
-      throws IOException;
+  void releaseClient(XceiverClientSpi xceiverClient, boolean invalidateClient,
+                     boolean topologyAware);
 
-  void releaseClient(XceiverClientSpi xceiverClient, boolean invalidateClient, boolean topologyAware);
-
-  default boolean isShortCircuitEnabled() {
-    return false;
-  }
 }

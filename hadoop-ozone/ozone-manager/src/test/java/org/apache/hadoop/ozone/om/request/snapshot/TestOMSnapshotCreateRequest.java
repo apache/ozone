@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createSnapshotRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateSnapshot;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -54,11 +53,10 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseWithFSO;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotRequestAndResponseTests;
+import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -68,7 +66,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests OMSnapshotCreateRequest class, which handles CreateSnapshot request.
  */
-public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests {
+public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse {
   private String snapshotName1;
   private String snapshotName2;
   private String snapshotName3;
@@ -180,7 +178,6 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
     assertNull(getOmMetadataManager().getSnapshotInfoTable().get(key));
 
     // Run validateAndUpdateCache.
-    LogCapturer logCapturer = LogCapturer.captureLogs(OMSnapshotCreateRequest.class);
     OMClientResponse omClientResponse =
         omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 1);
 
@@ -214,10 +211,6 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
     assertEquals(0, getOmMetrics().getNumSnapshotCreateFails());
     assertEquals(1, getOmMetrics().getNumSnapshotActive());
     assertEquals(1, getOmMetrics().getNumSnapshotCreates());
-    assertThat(logCapturer.getOutput()).contains(String.format(
-        "Created snapshot '%s' (snapshotId='%s') under path '%s'",
-        snapshotName1, snapshotInfoInCache.getSnapshotId(),
-        snapshotInfoInCache.getSnapshotPath()));
   }
 
   @Test
@@ -259,7 +252,7 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
     createSnapshotForBucket(volumeName, bucket1Name, snapshotName2);
     assertEquals(2, getOmMetadataManager().countRowsInTable(snapshotRenamedTable));
     // Verify the remaining entries are from bucket2
-    try (TableIterator<String, Table.KeyValue<String, String>> iter =
+    try (TableIterator<String, ? extends Table.KeyValue<String, String>> iter =
              snapshotRenamedTable.iterator()) {
       iter.seekToFirst();
       while (iter.hasNext()) {
@@ -419,7 +412,7 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
     // 5. Verify deletedTable now only contains the key from bucket2 (1 row)
     assertEquals(1, getOmMetadataManager().countRowsInTable(deletedTable));
     // Verify the remaining entry is from bucket2
-    try (TableIterator<String, Table.KeyValue<String, RepeatedOmKeyInfo>> iter = deletedTable.iterator()) {
+    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> iter = deletedTable.iterator()) {
       iter.seekToFirst();
       while (iter.hasNext()) {
         String key = iter.next().getKey();
@@ -457,7 +450,7 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
     // 5. Verify deletedTable now only contains the key from bucket2 (1 row)
     assertEquals(1, getOmMetadataManager().countRowsInTable(deletedDirTable));
     // Verify the remaining entry is from bucket2
-    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iter = deletedDirTable.iterator()) {
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iter = deletedDirTable.iterator()) {
       while (iter.hasNext()) {
         String key = iter.next().getKey();
         assertTrue(key.startsWith(getOmMetadataManager().getBucketKeyPrefixFSO(volumeName, bucket2Name)),

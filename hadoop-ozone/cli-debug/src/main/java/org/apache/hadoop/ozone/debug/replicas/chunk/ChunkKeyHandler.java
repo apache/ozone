@@ -126,11 +126,11 @@ public class ChunkKeyHandler extends KeyHandler {
             // Process each datanode individually
             for (DatanodeDetails datanodeDetails : pipeline.getNodes()) {
               try {
+                // Get block from THIS ONE datanode only
                 ContainerProtos.GetBlockResponseProto blockResponse =
-                    ContainerProtocolCalls.getBlockFromDatanode(xceiverClient,
+                    ContainerProtocolCalls.getBlock(xceiverClient,
                         keyLocation.getBlockID(),
                         keyLocation.getToken(),
-                        datanodeDetails,
                         pipeline.getReplicaIndexes());
 
                 if (blockResponse == null || !blockResponse.hasBlockData()) {

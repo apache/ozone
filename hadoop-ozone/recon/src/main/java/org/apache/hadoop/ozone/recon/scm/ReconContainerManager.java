@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
@@ -44,7 +45,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -69,8 +69,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconContainerMetadataManager cdbServiceProvider;
   private final Table<DatanodeID, DatanodeDetails> nodeDB;
-  // Container ID -> DatanodeID -> Timestamp
-  private final Map<Long, Map<DatanodeID, ContainerReplicaHistory>> replicaHistoryMap;
+  // Container ID -> Datanode UUID -> Timestamp
+  private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
   // Pipeline -> # of open containers
   private final Map<PipelineID, Integer> pipelineToOpenContainer;
 
@@ -114,9 +114,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
           datanodeDetails.getHostName());
       ContainerWithPipeline containerWithPipeline =
           scmClient.getContainerWithPipeline(containerID.getId());
-      Pipeline pipeline = containerWithPipeline.getPipeline();
       LOG.debug("Verified new container from SCM {}, {} ",
-          containerID, pipeline != null ? pipeline.getId() : "<null-pipeline>");
+          containerID, containerWithPipeline.getPipeline().getId());
       // no need call "containerExist" to check, because
       // 1 containerExist and addNewContainer can not be atomic
       // 2 addNewContainer will double check the existence
@@ -180,62 +179,33 @@ public class ReconContainerManager extends ContainerManagerImpl {
   }
 
   /**
-   * Transitions a container from OPEN to CLOSING, keeping the per-pipeline
-   * open-container count in {@link #pipelineToOpenContainer} accurate.
+   *  Check if container state is not open. In SCM, container state
+   *  changes to CLOSING first, and then the close command is pushed down
+   *  to Datanodes. Recon 'learns' this from DN, and hence replica state
+   *  will move container state to 'CLOSING'.
    *
-   * <p>Must be called whenever an OPEN container is moved to CLOSING so that
-   * the pipeline's open-container count stays consistent. Both the DN-report
-   * driven path ({@link #checkContainerStateAndUpdate}) and the periodic
-   * targeted sync path use this method to avoid divergence in the count exposed
-   * to the Recon Node API.
-   *
-   * <p>If the container was recorded without a pipeline (null pipeline at
-   * {@code addNewContainer} time) the count decrement is safely skipped.
-   *
-   * @param containerID   container to advance from OPEN to CLOSING
-   * @param containerInfo already-fetched {@code ContainerInfo} for the container
-   *                      (avoids a redundant lookup inside this method)
-   * @throws IOException                     if the state update fails
-   * @throws InvalidStateTransitionException if the container is not in OPEN state
+   * @param containerID containerID to check
+   * @param state  state to be compared
    */
-  void transitionOpenToClosing(ContainerID containerID, ContainerInfo containerInfo)
-      throws IOException, InvalidStateTransitionException {
-    PipelineID pipelineID = containerInfo.getPipelineID();
-    updateContainerState(containerID, FINALIZE);  // OPEN → CLOSING
-    if (pipelineID != null) {
+
+  private void checkContainerStateAndUpdate(ContainerID containerID,
+                                            ContainerReplicaProto.State state)
+          throws IOException, InvalidStateTransitionException {
+    ContainerInfo containerInfo = getContainer(containerID);
+    if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)
+        && !state.equals(ContainerReplicaProto.State.OPEN)
+        && isHealthy(state)) {
+      LOG.info("Container {} has state OPEN, but given state is {}.",
+          containerID, state);
+      final PipelineID pipelineID = containerInfo.getPipelineID();
+      // subtract open container count from the map
       int curCnt = pipelineToOpenContainer.getOrDefault(pipelineID, 0);
       if (curCnt == 1) {
         pipelineToOpenContainer.remove(pipelineID);
       } else if (curCnt > 0) {
         pipelineToOpenContainer.put(pipelineID, curCnt - 1);
       }
-    }
-  }
-
-  /**
-   * Check if Recon's container lifecycle state needs the Recon-specific
-   * pre-processing required before SCM's shared report handler processes the
-   * replica.
-   *
-   * <p>Recon only handles OPEN to CLOSING here to keep the per-pipeline open
-   * container count accurate. All other known-container lifecycle transitions
-   * are left to SCM's common ICR/FCR state machine, which is invoked after this
-   * method by Recon's report handlers.
-   *
-   * @param containerID containerID to check
-   * @param replicaState replica state reported by a DataNode
-   */
-  private void checkContainerStateAndUpdate(ContainerID containerID,
-                                            ContainerReplicaProto.State replicaState)
-      throws IOException, InvalidStateTransitionException {
-    ContainerInfo containerInfo = getContainer(containerID);
-    HddsProtos.LifeCycleState reconState = containerInfo.getState();
-
-    if (reconState == HddsProtos.LifeCycleState.OPEN
-        && replicaState != ContainerReplicaProto.State.OPEN && isHealthy(replicaState)) {
-      LOG.info("Container {} has state OPEN, but given state is {}.",
-          containerID, replicaState);
-      transitionOpenToClosing(containerID, containerInfo);
+      updateContainerState(containerID, FINALIZE);
     }
   }
 
@@ -248,13 +218,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   /**
    * Adds a new container to Recon's container manager.
    *
-   * <p>For OPEN containers a valid pipeline is expected. If the pipeline is
-   * {@code null} (e.g., returned by SCM when the pipeline has already been
-   * cleaned up for a QUASI_CLOSED container that arrived via the sync path),
-   * the container is still recorded in the state manager without pipeline
-   * tracking so that it is not permanently absent from Recon.
-   *
-   * @param containerWithPipeline containerInfo with pipeline info (pipeline may be null)
+   * @param containerWithPipeline containerInfo with pipeline info
    * @throws IOException on Error.
    */
   public void addNewContainer(ContainerWithPipeline containerWithPipeline)
@@ -263,41 +227,33 @@ public class ReconContainerManager extends ContainerManagerImpl {
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
-        Pipeline pipeline = containerWithPipeline.getPipeline();
-        if (pipeline != null) {
-          PipelineID pipelineID = pipeline.getId();
-          // Check if the pipeline is present in Recon; add it if not.
-          if (reconPipelineManager.addPipeline(pipeline)) {
-            LOG.info("Added new pipeline {} to Recon pipeline metadata from SCM.", pipelineID);
-          }
-          getContainerStateManager().addContainer(containerInfo.getProtobuf());
-          pipelineManager.addContainerToPipeline(pipelineID, containerInfo.containerID());
-          // Update open container count on all datanodes on this pipeline.
-          pipelineToOpenContainer.put(pipelineID,
-              pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
-          LOG.info("Successfully added OPEN container {} with pipeline {} to Recon.",
-              containerInfo.containerID(), pipelineID);
-        } else {
-          // Pipeline not available (cleaned up in SCM). Record the container
-          // without pipeline tracking so it is not permanently absent from Recon.
-          getContainerStateManager().addContainer(containerInfo.getProtobuf());
-          LOG.warn("Added OPEN container {} to Recon without pipeline "
-              + "(pipeline was null — likely cleaned up on SCM side). "
-              + "Pipeline tracking unavailable for this container.",
-              containerInfo.containerID());
+        PipelineID pipelineID = containerWithPipeline.getPipeline().getId();
+        // Check if the pipeline is present in Recon if not add it.
+        if (reconPipelineManager.addPipeline(containerWithPipeline.getPipeline())) {
+          LOG.info("Added new pipeline {} to Recon pipeline metadata from SCM.", pipelineID);
         }
+
+        getContainerStateManager().addContainer(containerInfo.getProtobuf());
+        pipelineManager.addContainerToPipeline(
+            containerWithPipeline.getPipeline().getId(),
+            containerInfo.containerID());
+        // update open container count on all datanodes on this pipeline
+        pipelineToOpenContainer.put(pipelineID,
+            pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
+        LOG.info("Successfully added container {} to Recon.",
+            containerInfo.containerID());
+
       } else {
         getContainerStateManager().addContainer(containerInfo.getProtobuf());
-        LOG.info("Successfully added container {} in state {} to Recon.",
-            containerInfo.containerID(), containerInfo.getState());
+        LOG.info("Successfully added no open container {} to Recon.",
+            containerInfo.containerID());
       }
     } catch (IOException ex) {
-      LOG.info("Exception while adding container {}.", containerInfo.containerID(), ex);
-      PipelineID pipelineID = containerInfo.getPipelineID();
-      if (pipelineID != null) {
-        pipelineManager.removeContainerFromPipeline(
-            pipelineID, ContainerID.valueOf(containerInfo.getContainerID()));
-      }
+      LOG.info("Exception while adding container {} .",
+          containerInfo.containerID(), ex);
+      pipelineManager.removeContainerFromPipeline(
+          containerInfo.getPipelineID(),
+          ContainerID.valueOf(containerInfo.getContainerID()));
       throw ex;
     }
   }
@@ -312,13 +268,13 @@ public class ReconContainerManager extends ContainerManagerImpl {
     super.updateContainerReplica(containerID, replica);
 
     final long currTime = System.currentTimeMillis();
-    final long cid = containerID.getId();
+    final long id = containerID.getId();
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
-    final DatanodeID id = dnInfo.getID();
+    final UUID uuid = dnInfo.getUuid();
 
-    // Map from DataNode ID to replica last seen time
-    final Map<DatanodeID, ContainerReplicaHistory> replicaLastSeenMap =
-        replicaHistoryMap.get(cid);
+    // Map from DataNode UUID to replica last seen time
+    final Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
+        replicaHistoryMap.get(id);
 
     boolean flushToDB = false;
     long bcsId = replica.getSequenceId() != null ? replica.getSequenceId() : -1;
@@ -328,19 +284,19 @@ public class ReconContainerManager extends ContainerManagerImpl {
     // If replica doesn't exist in in-memory map, add to DB and add to map
     if (replicaLastSeenMap == null) {
       // putIfAbsent to avoid TOCTOU
-      replicaHistoryMap.putIfAbsent(cid,
-          new ConcurrentHashMap<DatanodeID, ContainerReplicaHistory>() {{
-            put(id, new ContainerReplicaHistory(id, currTime, currTime,
+      replicaHistoryMap.putIfAbsent(id,
+          new ConcurrentHashMap<UUID, ContainerReplicaHistory>() {{
+            put(uuid, new ContainerReplicaHistory(uuid, currTime, currTime,
                 bcsId, state, checksums));
           }});
       flushToDB = true;
     } else {
       // ContainerID exists, update timestamp in memory
-      final ContainerReplicaHistory ts = replicaLastSeenMap.get(id);
+      final ContainerReplicaHistory ts = replicaLastSeenMap.get(uuid);
       if (ts == null) {
         // New Datanode
-        replicaLastSeenMap.put(id,
-            new ContainerReplicaHistory(id, currTime, currTime, bcsId,
+        replicaLastSeenMap.put(uuid,
+            new ContainerReplicaHistory(uuid, currTime, currTime, bcsId,
                 state, checksums));
         flushToDB = true;
       } else {
@@ -353,7 +309,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     }
 
     if (flushToDB) {
-      upsertContainerHistory(cid, id, currTime, bcsId, state, checksums);
+      upsertContainerHistory(id, uuid, currTime, bcsId, state, checksums);
     }
   }
 
@@ -366,20 +322,20 @@ public class ReconContainerManager extends ContainerManagerImpl {
       ContainerReplicaNotFoundException {
     super.removeContainerReplica(containerID, replica);
 
-    final long cid = containerID.getId();
+    final long id = containerID.getId();
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
-    final DatanodeID id = dnInfo.getID();
+    final UUID uuid = dnInfo.getUuid();
     String state = replica.getState().toString();
 
-    final Map<DatanodeID, ContainerReplicaHistory> replicaLastSeenMap =
-        replicaHistoryMap.get(cid);
+    final Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
+        replicaHistoryMap.get(id);
     if (replicaLastSeenMap != null) {
-      final ContainerReplicaHistory ts = replicaLastSeenMap.get(id);
+      final ContainerReplicaHistory ts = replicaLastSeenMap.get(uuid);
       if (ts != null) {
         // Flush to DB, then remove from in-memory map
-        upsertContainerHistory(cid, id, ts.getLastSeenTime(), ts.getBcsId(),
+        upsertContainerHistory(id, uuid, ts.getLastSeenTime(), ts.getBcsId(),
             state, ts.getChecksums());
-        replicaLastSeenMap.remove(id);
+        replicaLastSeenMap.remove(uuid);
       }
     }
   }
@@ -390,13 +346,13 @@ public class ReconContainerManager extends ContainerManagerImpl {
   }
 
   @VisibleForTesting
-  public Map<Long, Map<DatanodeID, ContainerReplicaHistory>> getReplicaHistoryMap() {
+  public Map<Long, Map<UUID, ContainerReplicaHistory>> getReplicaHistoryMap() {
     return replicaHistoryMap;
   }
 
   public List<ContainerHistory> getAllContainerHistory(long containerID) {
     // First, get the existing entries from DB
-    Map<DatanodeID, ContainerReplicaHistory> resMap;
+    Map<UUID, ContainerReplicaHistory> resMap;
     try {
       resMap = cdbServiceProvider.getContainerReplicaHistory(containerID);
     } catch (IOException ex) {
@@ -406,10 +362,10 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
     // Then, update the entries with the latest in-memory info, if available
     if (replicaHistoryMap != null) {
-      Map<DatanodeID, ContainerReplicaHistory> replicaLastSeenMap =
+      Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
           replicaHistoryMap.get(containerID);
       if (replicaLastSeenMap != null) {
-        Map<DatanodeID, ContainerReplicaHistory> finalResMap = resMap;
+        Map<UUID, ContainerReplicaHistory> finalResMap = resMap;
         replicaLastSeenMap.forEach((k, v) ->
             finalResMap.merge(k, v, (old, latest) -> latest));
         resMap = finalResMap;
@@ -418,19 +374,19 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
     // Finally, convert map to list for output
     List<ContainerHistory> resList = new ArrayList<>();
-    for (Map.Entry<DatanodeID, ContainerReplicaHistory> entry : resMap.entrySet()) {
-      final DatanodeID id = entry.getKey();
+    for (Map.Entry<UUID, ContainerReplicaHistory> entry : resMap.entrySet()) {
+      final UUID uuid = entry.getKey();
       String hostname = "N/A";
       // Attempt to retrieve hostname from NODES table
       if (nodeDB != null) {
         try {
-          final DatanodeDetails dnDetails = nodeDB.get(id);
+          final DatanodeDetails dnDetails = nodeDB.get(DatanodeID.of(uuid));
           if (dnDetails != null) {
             hostname = dnDetails.getHostName();
           }
         } catch (IOException ex) {
           LOG.debug("Unable to retrieve from NODES table of node {}. {}",
-              id, ex.getMessage());
+              uuid, ex.getMessage());
         }
       }
       final long firstSeenTime = entry.getValue().getFirstSeenTime();
@@ -439,7 +395,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       String state = entry.getValue().getState();
       long dataChecksum = entry.getValue().getDataChecksum();
 
-      resList.add(new ContainerHistory(containerID, id.toString(), hostname,
+      resList.add(new ContainerHistory(containerID, uuid.toString(), hostname,
           firstSeenTime, lastSeenTime, bcsId, state, dataChecksum));
     }
     return resList;
@@ -474,15 +430,15 @@ public class ReconContainerManager extends ContainerManagerImpl {
     }
   }
 
-  public void upsertContainerHistory(long containerID, DatanodeID id, long time,
+  public void upsertContainerHistory(long containerID, UUID uuid, long time,
                                      long bcsId, String state, ContainerChecksums checksums) {
-    Map<DatanodeID, ContainerReplicaHistory> tsMap;
+    Map<UUID, ContainerReplicaHistory> tsMap;
     try {
       tsMap = cdbServiceProvider.getContainerReplicaHistory(containerID);
-      ContainerReplicaHistory ts = tsMap.get(id);
+      ContainerReplicaHistory ts = tsMap.get(uuid);
       if (ts == null) {
         // New entry
-        tsMap.put(id, new ContainerReplicaHistory(id, time, time, bcsId,
+        tsMap.put(uuid, new ContainerReplicaHistory(uuid, time, time, bcsId,
             state, checksums));
       } else {
         // Entry exists, update last seen time and put it back to DB.

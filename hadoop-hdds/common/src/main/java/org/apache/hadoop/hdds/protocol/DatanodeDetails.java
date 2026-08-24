@@ -30,10 +30,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -85,7 +83,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   private final String threadNamePrefix;
   private StringWithByteString ipAddress;
   private StringWithByteString hostName;
-  private final Map<Port.Name, Port> ports;
+  private final List<Port> ports;
   private String certSerialId;
   private String version;
   private long setupTime;
@@ -146,6 +144,17 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
 
   public DatanodeID getID() {
     return id;
+  }
+
+  /**
+   * Returns the DataNode UUID.
+   *
+   * @return UUID of DataNode
+   */
+  // TODO: Remove this in follow-up Jira (HDDS-12015)
+  @Deprecated
+  public UUID getUuid() {
+    return id.getUuid();
   }
 
   /**
@@ -245,8 +254,10 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    * @param port DataNode port
    */
   public synchronized void setPort(Port port) {
-    // Overwrites any existing port with the same name.
-    ports.put(port.getName(), port);
+    // If the port is already in the list remove it first and add the
+    // new/updated port value.
+    ports.remove(port);
+    ports.add(port);
   }
 
   public synchronized void setPort(Name name, int port) {
@@ -271,11 +282,11 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    * @return DataNode Ports
    */
   public synchronized List<Port> getPorts() {
-    return new ArrayList<>(ports.values());
+    return new ArrayList<>(ports);
   }
 
   public synchronized boolean hasPort(int port) {
-    for (Port p : ports.values()) {
+    for (Port p : ports) {
       if (p.getValue() == port) {
         return true;
       }
@@ -355,51 +366,38 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    * @return Port
    */
   public synchronized Port getPort(Port.Name name) {
-    final Port port = ports.get(name);
-    if (port != null) {
-      return port;
+    Port ratisPort = null;
+    for (Port port : ports) {
+      if (port.getName().equals(name)) {
+        return port;
+      }
+      if (port.getName().equals(Name.RATIS)) {
+        ratisPort = port;
+      }
     }
     // if no separate admin/server/datastream port,
     // return single Ratis one for compatibility
     if (name == Name.RATIS_ADMIN || name == Name.RATIS_SERVER ||
         name == Name.RATIS_DATASTREAM) {
-      return ports.get(Name.RATIS);
+      return ratisPort;
     }
     return null;
   }
 
-  // Checks whether a port is explicitly present without applying the
-  // compatibility fallback in getPort.
+  // CHANGE: add a helper to check whether a port is explicitly present
+  // without applying compatibility fallback.
   public synchronized boolean hasPort(Port.Name name) {
-    return ports.containsKey(name);
-  }
-
-  /**
-   * Whether this datanode's exposed ports differ from {@code other}'s.
-   * Compared by name and value, since {@link Port#equals} ignores the port
-   * value.
-   *
-   * @param other another snapshot of this datanode
-   * @return true if the two port sets are not identical
-   */
-  public boolean portsChanged(DatanodeDetails other) {
-    return !portValues().equals(other.portValues());
-  }
-
-  /**
-   * A name-to-value snapshot of this datanode's ports, taken under its lock
-   * so {@link #portsChanged} can compare two nodes value-aware without holding
-   * both locks at once.
-   */
-  private synchronized Map<Port.Name, Integer> portValues() {
-    final Map<Port.Name, Integer> values = new EnumMap<>(Port.Name.class);
-    ports.forEach((name, port) -> values.put(name, port.getValue()));
-    return values;
+    for (Port port : ports) {
+      if (port.getName().equals(name)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
    * Helper method to get the Ratis port.
-   *
+   * 
    * @return Port
    */
   public Port getRatisPort() {
@@ -589,7 +587,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
         .compareTo(VERSION_HANDLES_UNKNOWN_DN_PORTS) >= 0;
     final int requestedPortCount = filterPorts.size();
     final boolean maySkip = requestedPortCount > 0;
-    for (Port port : ports.values()) {
+    for (Port port : ports) {
       if (maySkip && !filterPorts.contains(port.getName())) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Skip adding {} port {} to proto message",
@@ -732,7 +730,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     private StringWithByteString networkName;
     private StringWithByteString networkLocation;
     private int level;
-    private Map<Port.Name, Port> ports;
+    private List<Port> ports;
     private String certSerialId;
     private String version;
     private long setupTime;
@@ -747,7 +745,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
      * DatanodeDetails#newBuilder.
      */
     private Builder() {
-      ports = new EnumMap<>(Port.Name.class);
+      ports = new ArrayList<>();
     }
 
     /**
@@ -763,8 +761,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       this.networkName = details.getNetworkNameAsByteString();
       this.networkLocation = details.getNetworkLocationAsByteString();
       this.level = details.getLevel();
-      this.ports = new EnumMap<>(Port.Name.class);
-      details.getPorts().forEach(this::addPort);
+      this.ports = details.getPorts();
       this.certSerialId = details.getCertSerialId();
       this.version = details.getVersion();
       this.setupTime = details.getSetupTime();
@@ -880,7 +877,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
      * @return DatanodeDetails.Builder
      */
     public Builder addPort(Port port) {
-      this.ports.put(port.getName(), port);
+      this.ports.add(port);
       return this;
     }
 

@@ -23,12 +23,10 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersi
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
@@ -42,7 +40,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,12 +79,10 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-          Container container, BlockID blockID,
-          CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException> putBlock,
-          ContainerMetrics metrics)
+          Container container, BlockID blockID, ContainerMetrics metrics)
           throws StorageContainerException {
     return selectHandler(container)
-            .getStreamDataChannel(container, blockID, putBlock, metrics);
+            .getStreamDataChannel(container, blockID, metrics);
   }
 
   @Override
@@ -143,12 +138,6 @@ public class ChunkManagerDispatcher implements ChunkManager {
     // will be updated while deleting the block from the DB
 
     selectHandler(container).deleteChunks(container, blockData);
-  }
-
-  @Override
-  public RandomAccessFile getShortCircuitFd(Container container, BlockID blockID)
-      throws StorageContainerException {
-    return selectHandler(container).getShortCircuitFd(container, blockID);
   }
 
   @Override

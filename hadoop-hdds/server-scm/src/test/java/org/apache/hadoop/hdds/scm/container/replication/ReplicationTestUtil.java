@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -320,7 +319,7 @@ public final class ReplicationTestUtil {
               List<DatanodeDetails> usedNodes,
               List<DatanodeDetails> excludedNodes,
               List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
-              long metadataSizeRequired, long dataSizeRequired, StorageType storageType) {
+              long metadataSizeRequired, long dataSizeRequired) {
         List<DatanodeDetails> dns = new ArrayList<>();
         for (int i = 0; i < nodesRequiredToChoose; i++) {
           dns.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -356,7 +355,7 @@ public final class ReplicationTestUtil {
               List<DatanodeDetails> usedNodes,
               List<DatanodeDetails> excludedNodes,
               List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
-              long metadataSizeRequired, long dataSizeRequired, StorageType storageType)
+              long metadataSizeRequired, long dataSizeRequired)
               throws SCMException {
         long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -387,7 +386,7 @@ public final class ReplicationTestUtil {
               List<DatanodeDetails> usedNodes,
               List<DatanodeDetails> excludedNodes,
               List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
-              long metadataSizeRequired, long dataSizeRequired, StorageType storageType)
+              long metadataSizeRequired, long dataSizeRequired)
               throws SCMException {
         long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -417,7 +416,7 @@ public final class ReplicationTestUtil {
           List<DatanodeDetails> usedNodes,
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
-          long metadataSizeRequired, long dataSizeRequired, StorageType storageType)
+          long metadataSizeRequired, long dataSizeRequired)
           throws SCMException {
         long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);

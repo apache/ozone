@@ -41,15 +41,15 @@ import org.junit.jupiter.api.Test;
  */
 public class TestHDDSLayoutVersionManager {
 
-  private static final String UPGRADE_ACTIONS_TEST_PACKAGE =
-      "org.apache.hadoop.hdds.upgrade.test";
+  private static final String[] UPGRADE_ACTIONS_TEST_PACKAGES = new String[] {
+      "org.apache.hadoop.hdds.upgrade.test"};
 
   @Test
   public void testUpgradeActionsRegistered() throws Exception {
 
     HDDSLayoutVersionManager lvm =
         new HDDSLayoutVersionManager(maxLayoutVersion());
-    lvm.registerUpgradeActions(UPGRADE_ACTIONS_TEST_PACKAGE);
+    lvm.registerUpgradeActions(UPGRADE_ACTIONS_TEST_PACKAGES);
 
     //Cluster is finalized, hence should not register.
     Optional<HDDSUpgradeAction> action = INITIAL_VERSION.scmAction();
@@ -62,7 +62,7 @@ public class TestHDDSLayoutVersionManager {
     when(lvm.getMetadataLayoutVersion()).thenReturn(-1);
 
     doCallRealMethod().when(lvm).registerUpgradeActions(any());
-    lvm.registerUpgradeActions(UPGRADE_ACTIONS_TEST_PACKAGE);
+    lvm.registerUpgradeActions(UPGRADE_ACTIONS_TEST_PACKAGES);
 
     action = INITIAL_VERSION.scmAction();
     assertTrue(action.isPresent());

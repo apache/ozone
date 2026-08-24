@@ -31,7 +31,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -158,8 +157,8 @@ public class TestReconTasks {
   }
 
   /**
-   * Verifies that {@code triggerTargetedSCMContainerSync()} pulls CLOSED
-   * containers from SCM into Recon when they are not yet known to Recon.
+   * Verifies that {@code syncWithSCMContainerInfo()} pulls CLOSED containers
+   * from SCM into Recon when they are not yet known to Recon.
    */
   @Test
   public void testSyncSCMContainerInfo() throws Exception {
@@ -171,9 +170,9 @@ public class TestReconTasks {
     ContainerManager reconCm = reconScm.getContainerManager();
 
     final ContainerInfo container1 = scmContainerManager.allocateContainer(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), "admin", StorageTier.getDefaultTier());
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), "admin");
     final ContainerInfo container2 = scmContainerManager.allocateContainer(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), "admin", StorageTier.getDefaultTier());
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), "admin");
     scmContainerManager.updateContainerState(container1.containerID(),
         HddsProtos.LifeCycleEvent.FINALIZE);
     scmContainerManager.updateContainerState(container2.containerID(),
@@ -186,7 +185,7 @@ public class TestReconTasks {
     int scmContainersCount = scmContainerManager.getContainers().size();
     int reconContainersCount = reconCm.getContainers().size();
     assertNotEquals(scmContainersCount, reconContainersCount);
-    reconScm.triggerSCMContainerSync();
+    reconScm.syncWithSCMContainerInfo();
     reconContainersCount = reconCm.getContainers().size();
     assertEquals(scmContainersCount, reconContainersCount);
   }
@@ -223,7 +222,7 @@ public class TestReconTasks {
 
     ContainerInfo containerInfo = scmContainerManager.allocateContainer(
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        "test", StorageTier.getDefaultTier());
+        "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 
@@ -265,8 +264,8 @@ public class TestReconTasks {
     //   RatisReplicationCheckHandler → only reached for CLOSED/QUASI_CLOSED containers;
     //                                  this is the ONLY handler that records UNDER_REPLICATED
     //
-    // Apply the transition to both managers directly so this test can focus on
-    // the health-check handler chain rather than targeted sync state correction.
+    // syncWithSCMContainerInfo() only discovers *new* CLOSED containers, not state
+    // changes to already-known ones, so we apply the transition to both managers directly.
     scmContainerManager.updateContainerState(containerInfo.containerID(),
         HddsProtos.LifeCycleEvent.FINALIZE);
     scmContainerManager.updateContainerState(containerInfo.containerID(),
@@ -362,7 +361,7 @@ public class TestReconTasks {
     ReconContainerManager reconCm = (ReconContainerManager) reconScm.getContainerManager();
 
     ContainerInfo containerInfo = scm.getContainerManager()
-        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test", StorageTier.getDefaultTier());
+        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 
@@ -465,7 +464,7 @@ public class TestReconTasks {
         (ReconContainerManager) reconScm.getContainerManager();
 
     ContainerInfo containerInfo = scm.getContainerManager()
-        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test", StorageTier.getDefaultTier());
+        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 
@@ -570,7 +569,7 @@ public class TestReconTasks {
         (ReconContainerManager) reconScm.getContainerManager();
 
     ContainerInfo containerInfo = scm.getContainerManager()
-        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test", StorageTier.getDefaultTier());
+        .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 
@@ -605,7 +604,7 @@ public class TestReconTasks {
     DatanodeDetails primaryDn = pipeline.getFirstNode();
     DatanodeDetails secondDn = cluster.getHddsDatanodes().stream()
         .map(HddsDatanodeService::getDatanodeDetails)
-        .filter(dd -> !dd.getID().equals(primaryDn.getID()))
+        .filter(dd -> !dd.getUuid().equals(primaryDn.getUuid()))
         .findFirst()
         .orElseThrow(() -> new AssertionError("No second datanode available"));
 
@@ -693,7 +692,7 @@ public class TestReconTasks {
 
     ContainerInfo containerInfo = scm.getContainerManager().allocateContainer(
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        "test", StorageTier.getDefaultTier());
+        "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 

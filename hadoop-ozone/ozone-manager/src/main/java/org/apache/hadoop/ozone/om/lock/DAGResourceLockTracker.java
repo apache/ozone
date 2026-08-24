@@ -72,11 +72,6 @@ final class DAGResourceLockTracker extends ResourceLockTracker<DAGLeveledResourc
     return instance;
   }
 
-  @Override
-  Class<DAGLeveledResource> getResourceClass() {
-    return DAGLeveledResource.class;
-  }
-
   /**
    * Performs a Depth-First Search (DFS) traversal on a directed acyclic graph (DAG)
    * composed of {@code DAGLeveledResource} objects. This method populates a mapping

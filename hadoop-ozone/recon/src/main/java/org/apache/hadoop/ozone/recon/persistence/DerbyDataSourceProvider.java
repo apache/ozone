@@ -51,8 +51,7 @@ public class DerbyDataSourceProvider implements Provider<DataSource> {
       LOG.error("Error creating Recon Derby DB.", e);
     }
     EmbeddedDataSource dataSource = new EmbeddedDataSource();
-    String dbName = jdbcUrl.replaceFirst("^jdbc:derby:", "");
-    dataSource.setDatabaseName(dbName);
+    dataSource.setDatabaseName(jdbcUrl.split(":")[2]);
     dataSource.setUser(RECON_SCHEMA_NAME);
     return dataSource;
   }

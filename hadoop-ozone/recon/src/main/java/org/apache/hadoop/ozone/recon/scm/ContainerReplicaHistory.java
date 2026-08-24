@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import org.apache.hadoop.hdds.protocol.DatanodeID;
+import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryProto;
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 
@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
  * of one DN but later moved back to the same DN.
  */
 public class ContainerReplicaHistory {
-  // Datanode ID
-  private final DatanodeID id;
+  // Datanode UUID
+  private final UUID uuid;
   // First reported time of the replica on this datanode
   private final Long firstSeenTime;
   // Last reported time of the replica
@@ -42,9 +42,9 @@ public class ContainerReplicaHistory {
   private String state;
   private ContainerChecksums checksums;
 
-  public ContainerReplicaHistory(DatanodeID id, Long firstSeenTime,
+  public ContainerReplicaHistory(UUID id, Long firstSeenTime,
       Long lastSeenTime, long bcsId, String state, ContainerChecksums checksums) {
-    this.id = id;
+    this.uuid = id;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
     this.bcsId = bcsId;
@@ -60,8 +60,8 @@ public class ContainerReplicaHistory {
     this.bcsId = bcsId;
   }
 
-  public DatanodeID getId() {
-    return id;
+  public UUID getUuid() {
+    return uuid;
   }
 
   public Long getFirstSeenTime() {
@@ -98,13 +98,13 @@ public class ContainerReplicaHistory {
 
   public static ContainerReplicaHistory fromProto(
       ContainerReplicaHistoryProto proto) {
-    return new ContainerReplicaHistory(DatanodeID.fromUuidString(proto.getUuid()),
+    return new ContainerReplicaHistory(UUID.fromString(proto.getUuid()),
         proto.getFirstSeenTime(), proto.getLastSeenTime(), proto.getBcsId(),
         proto.getState(), ContainerChecksums.of(proto.getDataChecksum()));
   }
 
   public ContainerReplicaHistoryProto toProto() {
-    return ContainerReplicaHistoryProto.newBuilder().setUuid(id.toString())
+    return ContainerReplicaHistoryProto.newBuilder().setUuid(uuid.toString())
         .setFirstSeenTime(firstSeenTime).setLastSeenTime(lastSeenTime)
         .setBcsId(bcsId).setState(state)
         .setDataChecksum(checksums.getDataChecksum())

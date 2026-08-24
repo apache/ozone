@@ -52,7 +52,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -206,7 +205,7 @@ public class TestContainerPersistence {
     KeyValueContainer container = new KeyValueContainer(data, conf);
     commitBytesBefore = StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()).get(0).getCommittedBytes();
 
-    container.create(volumeSet, volumeChoosingPolicy, SCM_ID, StorageType.DISK);
+    container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
     cSet.addContainer(container);
 
     commitBytesAfter = container.getContainerData()

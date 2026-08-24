@@ -44,7 +44,6 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -57,14 +56,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,7 +75,7 @@ import org.mockito.quality.Strictness;
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class TestBackgroundContainerDataScanner extends
-    ContainerScannerTests {
+    TestContainerScannersAbstract {
 
   private BackgroundContainerDataScanner scanner;
 
@@ -404,29 +401,5 @@ public class TestBackgroundContainerDataScanner extends
       verify(controller, times(1))
           .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
     }
-  }
-
-  /**
-   * When data scan reports only "too many open files" errors due to file-descriptor exhaustion,
-   * the container must not be marked UNHEALTHY.
-   */
-  @Test
-  public void testDataScanOnlyTooManyOpenFilesDoesNotMarkUnhealthy() throws Exception {
-    Container<?> container = mockKeyValueContainer();
-    IOException ex = new IOException("Too many open files");
-    DataScanResult scanResult = DataScanResult.fromErrors(Collections.singletonList(
-                    new ContainerScanError(FailureType.CORRUPT_CHUNK, new File("."), ex)),
-            new ContainerMerkleTreeWriter());
-    when(container.scanData(any(DataTransferThrottler.class), any(Canceler.class))).thenReturn(scanResult);
-
-    setContainers(container);
-    scanner.runIteration();
-
-    verify(controller, never()).markContainerUnhealthy(anyLong(), any(ScanResult.class));
-    verify(controller, never()).updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
-    verify(controller, never()).updateDataScanTimestamp(eq(container.getContainerData().getContainerID()), any());
-    assertEquals(1, scanner.getMetrics().getNumScanIterations());
-    assertEquals(0, scanner.getMetrics().getNumContainersScanned());
-    assertEquals(0, scanner.getMetrics().getNumUnHealthyContainers());
   }
 }

@@ -69,12 +69,12 @@ class TestClosePipelinesSubCommand {
             "with empty parameters"
         ),
         arguments(
-            new String[]{"--all", "--filter-by-factor", "THREE"},
+            new String[]{"--all", "-ffc", "THREE"},
             "Sending close command for 1 pipelines...\n",
             "by filter factor, opened"
         ),
         arguments(
-            new String[]{"--all", "--filter-by-factor", "ONE"},
+            new String[]{"--all", "-ffc", "ONE"},
             "Sending close command for 0 pipelines...\n",
             "by filter factor, closed"
         ),

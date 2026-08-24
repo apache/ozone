@@ -90,7 +90,7 @@ Verify Balancer Iteration
 
 Verify Balancer Iteration History
     [arguments]       ${output}
-    Should Contain                  ${output}             Completed iteration history:
+    Should Contain                  ${output}             Iteration history list:
     Should Contain X Times          ${output}             Size scheduled to move                    1      collapse_spaces=True
     Should Contain X Times          ${output}             Moved data size                           1      collapse_spaces=True
     Should Contain X Times          ${output}             Scheduled to move containers              1      collapse_spaces=True
@@ -160,7 +160,7 @@ Get All Container IDs
 
 Get Datanode Ozone Used Bytes Info
     [arguments]             ${uuid}
-    ${output} =    Execute    export DATANODES=$(ozone admin datanode list --json) && for datanode in $(echo "$\{DATANODES\}" | jq -r '.[].id'); do ozone admin datanode usageinfo --uuid=$\{datanode\} --json | jq '{(.[0].datanodeDetails.id.uuid) : .[0].ozoneUsed}'; done | jq -s add
+    ${output} =    Execute    export DATANODES=$(ozone admin datanode list --json) && for datanode in $(echo "$\{DATANODES\}" | jq -r '.[].id'); do ozone admin datanode usageinfo --uuid=$\{datanode\} --json | jq '{(.[0].datanodeDetails.uuid) : .[0].ozoneUsed}'; done | jq -s add
     ${result} =    Execute    echo '${output}' | jq '. | to_entries | .[] | select(.key == "${uuid}") | .value'
     [return]          ${result}
 

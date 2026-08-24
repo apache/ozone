@@ -24,16 +24,11 @@ import java.nio.charset.StandardCharsets;
  * using {@link StandardCharsets#UTF_8},
  * a variable-length character encoding.
  */
-public final class StringCodec extends StringCodecBase.WithFallback {
-  private static final StringCodec CODEC_WITH_FALLBACK = new StringCodec();
-  private static final Codec<String> CODEC_NO_FALLBACK = new StringCodecBase(StandardCharsets.UTF_8) { };
+public final class StringCodec extends StringCodecBase {
+  private static final StringCodec CODEC = new StringCodec();
 
   public static StringCodec get() {
-    return CODEC_WITH_FALLBACK;
-  }
-
-  public static Codec<String> getCodecNoFallback() {
-    return CODEC_NO_FALLBACK;
+    return CODEC;
   }
 
   private StringCodec() {

@@ -37,13 +37,13 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
-import org.apache.ratis.thirdparty.io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,16 +61,20 @@ public class ReplicationServer {
 
   private CertificateClient caClient;
 
+  private ContainerController controller;
+
   private int port;
   private final ContainerImporter importer;
 
   private ThreadPoolExecutor executor;
 
-  public ReplicationServer(ReplicationConfig replicationConfig,
-      SecurityConfig secConf, CertificateClient caClient,
-      ContainerImporter importer, String threadNamePrefix) {
+  public ReplicationServer(ContainerController controller,
+      ReplicationConfig replicationConfig, SecurityConfig secConf,
+      CertificateClient caClient, ContainerImporter importer,
+      String threadNamePrefix) {
     this.secConf = secConf;
     this.caClient = caClient;
+    this.controller = controller;
     this.importer = importer;
     this.port = replicationConfig.getPort();
 
@@ -98,7 +102,8 @@ public class ReplicationServer {
   }
 
   public void init() {
-    GrpcReplicationService grpcReplicationService = new GrpcReplicationService(importer);
+    GrpcReplicationService grpcReplicationService = new GrpcReplicationService(
+        new OnDemandContainerReplicationSource(controller), importer);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .addService(ServerInterceptors.intercept(
@@ -116,9 +121,7 @@ public class ReplicationServer {
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
         sslContextBuilder.trustManager(caClient.getTrustManager());
         sslContextBuilder.protocols(secConf.getGrpcTlsProtocols());
-        sslContextBuilder.ciphers(
-            secConf.getGrpcTlsCiphers(),
-            SupportedCipherSuiteFilter.INSTANCE);
+        sslContextBuilder.ciphers(secConf.getGrpcTlsCiphers());
 
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (IOException ex) {
@@ -176,37 +179,23 @@ public class ReplicationServer {
     public static final int REPLICATION_MAX_STREAMS_DEFAULT = 10;
     private static final String OUTOFSERVICE_FACTOR_KEY =
         "outofservice.limit.factor";
-    static final double OUTOFSERVICE_FACTOR_MIN = 1;
+    private static final double OUTOFSERVICE_FACTOR_MIN = 1;
     static final double OUTOFSERVICE_FACTOR_DEFAULT = 2;
     private static final String OUTOFSERVICE_FACTOR_DEFAULT_VALUE = "2.0";
-    static final double OUTOFSERVICE_FACTOR_MAX = 10;
+    private static final double OUTOFSERVICE_FACTOR_MAX = 10;
     static final String REPLICATION_OUTOFSERVICE_FACTOR_KEY =
         PREFIX + "." + OUTOFSERVICE_FACTOR_KEY;
 
-    public static final String PER_VOLUME_ENABLED_KEY =
-        PREFIX + ".per.volume.enabled";
-    public static final String PER_VOLUME_STREAMS_LIMIT_KEY =
-        PREFIX + ".per.volume.streams.limit";
-    public static final int PER_VOLUME_STREAMS_LIMIT_DEFAULT = 2;
-
     /**
-     * Base size of the global replication handler executor and inbound
-     * replication server executor.
+     * The maximum number of replication commands a single datanode can execute
+     * simultaneously.
      */
     @Config(key = "hdds.datanode.replication.streams.limit",
         type = ConfigType.INT,
         defaultValue = "10",
         tags = {DATANODE},
-        description = "Sets both the base size of the global replication "
-            + "handler executor and the inbound replication server executor. "
-            + "The global executor is subject to outofservice.limit.factor "
-            + "scaling. When "
-            + "hdds.datanode.replication.per.volume.enabled is false (default), "
-            + "all source-side replication tasks use the global executor. "
-            + "When per.volume.enabled is true, per-volume executors handle "
-            + "normal source-side push tasks, while this limit still applies "
-            + "to non-push and fallback source tasks and target-side inbound "
-            + "push requests."
+        description = "The maximum number of replication commands a single " +
+            "datanode can execute simultaneously"
     )
     private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 
@@ -237,34 +226,6 @@ public class ReplicationServer {
             "executor pool size."
     )
     private double outOfServiceFactor = OUTOFSERVICE_FACTOR_DEFAULT;
-
-    @Config(key = PER_VOLUME_ENABLED_KEY,
-        type = ConfigType.BOOLEAN,
-        defaultValue = "false",
-        tags = {DATANODE},
-        description = "When true, push-based container replication uses a " +
-            "separate replication handler thread pool per data volume so " +
-            "that slow replication on one disk does not block replication " +
-            "on other disks. Pull replication and other replication tasks " +
-            "continue to use the global replication handler thread pool."
-    )
-    private boolean perVolumeEnabled = false;
-
-    @Config(key = PER_VOLUME_STREAMS_LIMIT_KEY,
-        type = ConfigType.INT,
-        defaultValue = "2",
-        reconfigurable = true,
-        tags = {DATANODE},
-        description = "When hdds.datanode.replication.per.volume.enabled is "
-            + "true, maximum concurrent push replication commands per data "
-            + "volume (each volume has its own handler thread pool; effective "
-            + "push parallelism on the datanode is roughly the number of "
-            + "volumes times this limit, with outofservice.limit.factor "
-            + "applied per pool on decommissioning or maintenance nodes). "
-            + "Push replication is usually disk-bound, so one or two "
-            + "concurrent transfers per volume often saturates the disk."
-    )
-    private int perVolumeStreamsLimit = PER_VOLUME_STREAMS_LIMIT_DEFAULT;
 
     public double getOutOfServiceFactor() {
       return outOfServiceFactor;
@@ -299,22 +260,6 @@ public class ReplicationServer {
       this.replicationQueueLimit = limit;
     }
 
-    public boolean isPerVolumeEnabled() {
-      return perVolumeEnabled;
-    }
-
-    public void setPerVolumeEnabled(boolean enabled) {
-      this.perVolumeEnabled = enabled;
-    }
-
-    public int getPerVolumeStreamsLimit() {
-      return perVolumeStreamsLimit;
-    }
-
-    public void setPerVolumeStreamsLimit(int limit) {
-      this.perVolumeStreamsLimit = limit;
-    }
-
     @PostConstruct
     public void validate() {
       if (replicationMaxStreams < 1) {
@@ -326,23 +271,14 @@ public class ReplicationServer {
 
       if (outOfServiceFactor < OUTOFSERVICE_FACTOR_MIN ||
           outOfServiceFactor > OUTOFSERVICE_FACTOR_MAX) {
-        double clamped = Math.min(OUTOFSERVICE_FACTOR_MAX,
-            Math.max(OUTOFSERVICE_FACTOR_MIN, outOfServiceFactor));
         LOG.warn(
-            "{} must be between {} and {} but was set to {}. Clamping to {}",
+            "{} must be between {} and {} but was set to {}. Defaulting to {}",
             REPLICATION_OUTOFSERVICE_FACTOR_KEY,
             OUTOFSERVICE_FACTOR_MIN,
             OUTOFSERVICE_FACTOR_MAX,
             outOfServiceFactor,
-            clamped);
-        outOfServiceFactor = clamped;
-      }
-
-      if (perVolumeStreamsLimit < 1) {
-        LOG.warn(PER_VOLUME_STREAMS_LIMIT_KEY + " must be greater than zero " +
-                "and was set to {}. Defaulting to {}",
-            perVolumeStreamsLimit, PER_VOLUME_STREAMS_LIMIT_DEFAULT);
-        perVolumeStreamsLimit = PER_VOLUME_STREAMS_LIMIT_DEFAULT;
+            OUTOFSERVICE_FACTOR_DEFAULT);
+        outOfServiceFactor = OUTOFSERVICE_FACTOR_DEFAULT;
       }
     }
 

@@ -17,34 +17,52 @@
  */
 
 import { setupServer } from "msw/node";
-import { http, HttpResponse } from "msw";
+import { rest } from "msw";
 
 import * as mockResponses from "./datanodeResponseMocks";
 
 const handlers = [
-  http.get("/api/v1/datanodes", () => {
-    return HttpResponse.json(mockResponses.DatanodeResponse);
+  rest.get("api/v1/datanodes", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(mockResponses.DatanodeResponse)
+    );
   }),
-  http.get("/api/v1/datanodes/decommission/info", () => {
-    return HttpResponse.json(mockResponses.DecommissionInfo);
+  rest.get("api/v1/datanodes/decommission/info", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(mockResponses.DecommissionInfo)
+    );
   })
 ];
 
 const nullDatanodeResponseHandler = [
-  http.get("/api/v1/datanodes", () => {
-    return HttpResponse.json(mockResponses.NullDatanodeResponse);
+  rest.get("api/v1/datanodes", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(mockResponses.NullDatanodeResponse)
+    );
   }),
-  http.get("/api/v1/datanodes/decommission/info", () => {
-    return HttpResponse.json(mockResponses.DecommissionInfo);
+  rest.get("api/v1/datanodes/decommission/info", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(mockResponses.DecommissionInfo)
+    );
   })
 ]
 
 const nullDatanodeHandler = [
-  http.get("/api/v1/datanodes", () => {
-    return HttpResponse.json(mockResponses.NullDatanodes);
+  rest.get("api/v1/datanodes", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(mockResponses.NullDatanodes)
+    );
   }),
-  http.get("/api/v1/datanodes/decommission/info", () => {
-    return HttpResponse.json(mockResponses.DecommissionInfo);
+  rest.get("api/v1/datanodes/decommission/info", (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json(mockResponses.DecommissionInfo)
+    );
   })
 ]
 

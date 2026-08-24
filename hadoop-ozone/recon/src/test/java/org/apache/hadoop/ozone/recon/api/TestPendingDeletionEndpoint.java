@@ -28,8 +28,7 @@ import java.util.Map;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsProgressResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.junit.jupiter.api.BeforeEach;
@@ -106,12 +105,14 @@ public class TestPendingDeletionEndpoint {
 
   @Test
   public void testDnComponentReturnsOkWhenFinished() {
-    DataNodeMetricsCompleteResponse metricsResponse = new DataNodeMetricsCompleteResponse(
-        DataNodeMetricsService.MetricCollectionStatus.FINISHED,
-        1,
-        0,
-        100L,
-        Arrays.asList(new DatanodePendingDeletionMetrics("dn1", "uuid-1", 100L)));
+    DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
+        .setStatus(DataNodeMetricsService.MetricCollectionStatus.FINISHED)
+        .setTotalPendingDeletionSize(100L)
+        .setTotalNodesQueried(1)
+        .setTotalNodeQueryFailures(0)
+        .setPendingDeletion(Arrays.asList(
+            new DatanodePendingDeletionMetrics("dn1", "uuid-1", 100L)))
+        .build();
     when(dataNodeMetricsService.getCollectedMetrics(5)).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.getPendingDeletionByComponent("DN", 5);
@@ -122,12 +123,12 @@ public class TestPendingDeletionEndpoint {
 
   @Test
   public void testDnComponentAllowsNullLimit() {
-    DataNodeMetricsCompleteResponse metricsResponse = new DataNodeMetricsCompleteResponse(
-        DataNodeMetricsService.MetricCollectionStatus.FINISHED,
-        1,
-        0,
-        100L,
-        Arrays.asList(new DatanodePendingDeletionMetrics("dn1", "uuid-1", 100L)));
+    DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
+        .setStatus(DataNodeMetricsService.MetricCollectionStatus.FINISHED)
+        .setTotalPendingDeletionSize(100L)
+        .setTotalNodesQueried(1)
+        .setTotalNodeQueryFailures(0)
+        .build();
     when(dataNodeMetricsService.getCollectedMetrics(null)).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.getPendingDeletionByComponent("dn", null);
@@ -138,9 +139,9 @@ public class TestPendingDeletionEndpoint {
 
   @Test
   public void testDnComponentReturnsAcceptedWhenInProgress() {
-    DataNodeMetricsProgressResponse metricsResponse = new DataNodeMetricsProgressResponse(
-        DataNodeMetricsService.MetricCollectionStatus.IN_PROGRESS,
-        "Metrics collection task is currently running. Please wait for task to finish.");
+    DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
+        .setStatus(DataNodeMetricsService.MetricCollectionStatus.IN_PROGRESS)
+        .build();
     when(dataNodeMetricsService.getCollectedMetrics(2)).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.getPendingDeletionByComponent("dn", 2);

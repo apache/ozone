@@ -30,7 +30,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
-import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.PER_VOLUME_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -40,6 +39,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -71,7 +71,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -97,7 +96,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer;
-import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -250,7 +248,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       serviceRuntimeInfo.setHostName(hostname);
-      serviceRuntimeInfo.setDatanodeUuid(datanodeDetails.getUuidString());
       datanodeDetails.validateDatanodeIpAddress();
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
@@ -320,9 +317,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
               .register(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
                   this::reconfigBlockDeletingServiceTimeout)
               .register(REPLICATION_STREAMS_LIMIT_KEY,
-                  this::reconfigReplicationStreamsLimit)
-              .register(PER_VOLUME_STREAMS_LIMIT_KEY,
-                  this::reconfigPerVolumeStreamsLimit);
+                  this::reconfigReplicationStreamsLimit);
 
       scmServiceId = HddsUtils.getScmServiceId(conf);
 
@@ -715,33 +710,8 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   }
 
   private String reconfigReplicationStreamsLimit(String value) {
-    int poolSize = Integer.parseInt(value);
     getDatanodeStateMachine().getContainer().getReplicationServer()
-        .setPoolSize(poolSize);
-    getDatanodeStateMachine().getSupervisor()
-        .setReplicationMaxStreams(poolSize);
-    return value;
-  }
-
-  private String reconfigPerVolumeStreamsLimit(String value) {
-    int newSize = Integer.parseInt(value);
-    Preconditions.checkArgument(newSize >= 1,
-        PER_VOLUME_STREAMS_LIMIT_KEY + " must be at least 1 but was %s",
-        value);
-    ReplicationConfig replicationConfig =
-        getDatanodeStateMachine().getSupervisor().getReplicationConfig();
-    if (!replicationConfig.isPerVolumeEnabled()) {
-      LOG.warn("Ignoring reconfiguration of {} to {} because per-volume "
-          + "replication is disabled", PER_VOLUME_STREAMS_LIMIT_KEY, value);
-      return value;
-    }
-    try {
-      getDatanodeStateMachine().getSupervisor().setPerVolumePoolSize(newSize);
-    } catch (RuntimeException e) {
-      LOG.warn("Failed to apply per-volume replication thread pool resize to "
-          + "{}: {}", value, e.getMessage(), e);
-      throw e;
-    }
+        .setPoolSize(Integer.parseInt(value));
     return value;
   }
 
@@ -790,12 +760,12 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     LOG.info("Reconfiguring SCM nodes for service ID {} with new SCM nodes {} and remove SCM nodes {}",
         scmServiceId, scmNodesIdsToAdd, scmNodesIdsToRemove);
 
-    final Collection<Pair<String, HostAndPort>> scmToAdd = HddsServerUtil.getSCMAddressForDatanodes(
+    Collection<Pair<String, InetSocketAddress>> scmToAdd = HddsServerUtil.getSCMAddressForDatanodes(
         getConf(), scmServiceId, scmNodesIdsToAdd);
     if (scmToAdd == null) {
       throw new IllegalStateException("Reconfiguration failed to get SCM address to add due to wrong configuration");
     }
-    final Collection<Pair<String, HostAndPort>> scmToRemove = HddsServerUtil.getSCMAddressForDatanodes(
+    Collection<Pair<String, InetSocketAddress>> scmToRemove = HddsServerUtil.getSCMAddressForDatanodes(
         getConf(), scmServiceId, scmNodesIdsToRemove);
     if (scmToRemove == null) {
       throw new IllegalArgumentException(
@@ -816,10 +786,10 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
 
     // Add the new SCM servers
-    for (Pair<String, HostAndPort> pair : scmToAdd) {
+    for (Pair<String, InetSocketAddress> pair : scmToAdd) {
       String scmNodeId = pair.getLeft();
-      final HostAndPort scmAddress = pair.getRight();
-      if (scmAddress.getAddress().isUnresolved()) {
+      InetSocketAddress scmAddress = pair.getRight();
+      if (scmAddress.isUnresolved()) {
         LOG.warn("Reconfiguration failed to add SCM address {} for SCM service {} since it can't " +
             "be resolved, skipping", scmAddress, scmServiceId);
         continue;
@@ -835,9 +805,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
 
     // Remove the old SCM server
-    for (Pair<String, HostAndPort> pair : scmToRemove) {
+    for (Pair<String, InetSocketAddress> pair : scmToRemove) {
       String scmNodeId = pair.getLeft();
-      final HostAndPort scmAddress = pair.getRight();
+      InetSocketAddress scmAddress = pair.getRight();
       try {
         connectionManager.removeSCMServer(scmAddress);
         context.removeEndpoint(scmAddress);

@@ -62,7 +62,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * This class tests the OM Open Keys Delete Request.
  */
-public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
+public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
 
   private BucketLayout bucketLayout;
 

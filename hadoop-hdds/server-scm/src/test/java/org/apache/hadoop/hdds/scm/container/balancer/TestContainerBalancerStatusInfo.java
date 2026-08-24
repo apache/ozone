@@ -22,9 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Map;
@@ -32,7 +29,6 @@ import org.apache.commons.math3.util.ArithmeticUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.LambdaTestUtils;
@@ -46,7 +42,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testGetIterationStatistics() {
-    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -67,7 +63,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testReRequestIterationStatistics() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -87,7 +83,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testGetCurrentStatisticsRequestInPeriodBetweenIterations() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -108,7 +104,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testCurrentStatisticsDoesntChangeWhenReRequestInPeriodBetweenIterations() throws InterruptedException {
-    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -132,7 +128,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testGetCurrentStatisticsWithDelay() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -152,7 +148,7 @@ class TestContainerBalancerStatusInfo {
 
   @Test
   void testGetCurrentStatisticsWhileBalancingInProgress() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(20, OzoneConsts.GB));
 
     ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
 
@@ -242,7 +238,7 @@ class TestContainerBalancerStatusInfo {
    */
   @Test
   void testGetCurrentIterationsStatisticDoesNotThrowNullPointerExceptionWhenBalancingThreadIsSleeping() {
-    MockedSCM mockedScm = new MockedSCM(new MockCluster(10, OzoneConsts.GB));
+    MockedSCM mockedScm = new MockedSCM(new TestableCluster(10, OzoneConsts.GB));
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ContainerBalancerConfiguration config = ozoneConfig.getObject(ContainerBalancerConfiguration.class);
 
@@ -261,67 +257,5 @@ class TestContainerBalancerStatusInfo {
     thread.setDaemon(true);
     thread.start();
     Assertions.assertDoesNotThrow(task::getCurrentIterationsStatistic);
-  }
-
-  @Test
-  void testFinalizeInProgressIterationOnStop() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
-
-    ContainerBalancerConfiguration config =
-        new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
-    config.setIterations(3);
-    config.setBalancingInterval(0);
-    config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    config.setTriggerDuEnable(false);
-
-    ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(config, false);
-    LambdaTestUtils.await(5000, 10,
-        () -> !task.getCurrentIterationsStatistic().isEmpty()
-            && task.getCurrentIterationsStatistic().stream()
-            .anyMatch(it -> it.getContainerMovesScheduled() > 0));
-    
-    task.stop();
-    LambdaTestUtils.await(5000, 10,
-        () -> task.getBalancerStatus() == ContainerBalancerTask.Status.STOPPED);
-    assertNotNull(task.getStoppedAt());
-    assertEquals(ContainerBalancerStopReason.UNKNOWN.name(), task.getStopReason());
-    assertEquals(ContainerBalancerStopReason.UNKNOWN.getMessage(), task.getStopMessage());
-
-    boolean hasInterruptedIteration = task.getCurrentIterationsStatistic().stream()
-        .anyMatch(it -> "ITERATION_INTERRUPTED".equals(it.getIterationResult()));
-    assertTrue(hasInterruptedIteration);
-  }
-
-  @Test
-  void testAbnormalStopRecordsErrorReasonAndFinalizesIteration() throws Exception {
-    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
-
-    ContainerBalancerConfiguration config =
-        new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
-    config.setIterations(3);
-    config.setBalancingInterval(0);
-    config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
-    config.setTriggerDuEnable(false);
-
-    mockedScm.init(config, new OzoneConfiguration());
-    NodeManager throwingNodeManager = mock(NodeManager.class);
-    when(throwingNodeManager.getMostOrLeastUsedDatanodes(anyBoolean()))
-        .thenThrow(new RuntimeException());
-    when(mockedScm.getStorageContainerManager().getScmNodeManager())
-        .thenReturn(throwingNodeManager);
-
-    ContainerBalancerTask task = mockedScm.startBalancerTaskAsync(
-        new ContainerBalancer(mockedScm.getStorageContainerManager()), config, false);
-    LambdaTestUtils.await(5000, 10,
-        () -> task.getBalancerStatus() == ContainerBalancerTask.Status.STOPPED);
-    assertEquals(ContainerBalancerStopReason.ERROR.name(), task.getStopReason());
-    assertEquals(ContainerBalancerStopReason.ERROR.formatMessage(
-            ContainerBalancerStopReason.exceptionDetails(new RuntimeException())),
-        task.getStopMessage());
-    assertNotNull(task.getStoppedAt());
-
-    boolean hasInterruptedIteration = task.getCurrentIterationsStatistic().stream()
-        .anyMatch(it -> "ITERATION_INTERRUPTED".equals(it.getIterationResult()));
-    assertTrue(hasInterruptedIteration);
   }
 }

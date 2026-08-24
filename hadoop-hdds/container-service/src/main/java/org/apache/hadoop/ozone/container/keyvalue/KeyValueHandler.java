@@ -33,7 +33,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_ARGUMENT;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.MALFORMED_REQUEST;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNCLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
@@ -62,7 +61,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getBlockMapKey;
 import static org.apache.ratis.util.Preconditions.assertSame;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
@@ -75,7 +73,6 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -93,15 +90,12 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -129,7 +123,6 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -172,14 +165,12 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
-import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -204,9 +195,6 @@ public class KeyValueHandler extends Handler {
   private final Striped<Lock> containerCreationLocks;
   private final ContainerChecksumTreeManager checksumManager;
   private static FaultInjector injector;
-  // map temporarily carries the RandomAccessFile for short-circuit read requests
-  private final Map<String, RandomAccessFile> blockFileMap = new ConcurrentHashMap<>();
-  private OzoneContainer ozoneContainer;
   private final Clock clock;
   private final BlockInputStreamFactoryImpl blockInputStreamFactory;
 
@@ -217,7 +205,7 @@ public class KeyValueHandler extends Handler {
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender,
                          ContainerChecksumTreeManager checksumManager) {
-    this(config, datanodeId, contSet, volSet, null, metrics, icrSender, Clock.systemUTC(), checksumManager, null);
+    this(config, datanodeId, contSet, volSet, null, metrics, icrSender, Clock.systemUTC(), checksumManager);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -229,10 +217,8 @@ public class KeyValueHandler extends Handler {
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender,
                          Clock clock,
-                         ContainerChecksumTreeManager checksumManager,
-                         OzoneContainer ozoneContainer) {
+                         ContainerChecksumTreeManager checksumManager) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
-    this.ozoneContainer = ozoneContainer;
     this.clock = clock;
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
@@ -284,8 +270,7 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-      Container container, ContainerCommandRequestProto msg,
-      CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock)
+      Container container, ContainerCommandRequestProto msg)
       throws StorageContainerException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     checkContainerOpen(kvContainer);
@@ -295,7 +280,7 @@ public class KeyValueHandler extends Handler {
           BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
 
       return chunkManager.getStreamDataChannel(kvContainer,
-          blockID, putBlock, metrics);
+          blockID, metrics);
     } else {
       throw new StorageContainerException("Malformed request.",
           ContainerProtos.Result.IO_EXCEPTION);
@@ -366,7 +351,6 @@ public class KeyValueHandler extends Handler {
     case WriteChunk:
       return handler.handleWriteChunk(request, kvContainer, dispatcherContext);
     case StreamInit:
-    case StreamInitWithPutBlock:
       return handler.handleStreamInit(request, kvContainer, dispatcherContext);
     case ListChunk:
       return handler.handleUnsupportedOp(request);
@@ -485,18 +469,6 @@ public class KeyValueHandler extends Handler {
     }
     newContainerData.setReplicaIndex(request.getCreateContainer()
         .getReplicaIndex());
-    StorageType storageType = null;
-    if (request.getCreateContainer().hasStorageTypeID()) {
-      try {
-        storageType = StorageTypeUtils.getStorageTypeFromID(
-            request.getCreateContainer().getStorageTypeID());
-      } catch (IllegalArgumentException ex) {
-        return ContainerUtils.logAndReturnError(LOG,
-            new StorageContainerException(ex.getMessage(), ex,
-                INVALID_ARGUMENT), request);
-      }
-    }
-    newContainerData.setStorageType(storageType);
 
     // TODO: Add support to add metadataList to ContainerData. Add metadata
     // to container during creation.
@@ -508,7 +480,7 @@ public class KeyValueHandler extends Handler {
     containerIdLock.lock();
     try {
       if (containerSet.getContainer(containerID) == null) {
-        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId, storageType);
+        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
         if (RECOVERING == newContainer.getContainerState()) {
           created = containerSet.addContainerByOverwriteMissingContainer(newContainer);
         } else {
@@ -543,7 +515,6 @@ public class KeyValueHandler extends Handler {
       HddsVolume hddsVolume) throws IOException {
     volumeSet.readLock();
     try {
-      // TODO StoragePolicy Check whether need to adapt storageType
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
           hddsVolume, clusterId);
       container.populatePathFields(idDir, hddsVolume);
@@ -569,6 +540,7 @@ public class KeyValueHandler extends Handler {
     return getReadContainerResponse(
         request, containerData.getProtoBufMessage());
   }
+
 
   /**
    * Handles Update Container Request. If successful, the container metadata
@@ -713,17 +685,12 @@ public class KeyValueHandler extends Handler {
       metrics.incContainerBytesStats(Type.PutBlock, numBytes);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
-    } catch (CodecException ex) {
-      return ContainerUtils.logAndReturnError(LOG,
-          new StorageContainerException("Malformed PutBlock request", ex,
-              MALFORMED_REQUEST), request);
     } catch (IOException ex) {
       return ContainerUtils.logAndReturnError(LOG,
           new StorageContainerException("Put Key failed", ex, IO_EXCEPTION),
           request);
     }
 
-    updateRecoveringContainerTimeout(kvContainer);
     return putBlockResponseSuccess(request, blockDataProto);
   }
 
@@ -856,30 +823,14 @@ public class KeyValueHandler extends Handler {
     }
 
     ContainerProtos.BlockData responseData;
-    boolean shortCircuitGranted = false;
     try {
-      ContainerProtos.GetBlockRequestProto getBlock = request.getGetBlock();
-      BlockID blockID = BlockID.getFromProtobuf(getBlock.getBlockID());
+      BlockID blockID = BlockID.getFromProtobuf(
+          request.getGetBlock().getBlockID());
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
-      if (getBlock.hasRequestShortCircuitAccess() && getBlock.getRequestShortCircuitAccess()) {
-        boolean domainSocketServerEnabled = ozoneContainer != null
-            && ozoneContainer.getReadDomainSocketChannel() != null
-            && ozoneContainer.getReadDomainSocketChannel().isStarted();
-        if (domainSocketServerEnabled) {
-          RandomAccessFile file = chunkManager.getShortCircuitFd(kvContainer, blockID);
-          Preconditions.checkState(file != null);
-          String mapKey = getBlockMapKey(request);
-          blockFileMap.put(mapKey, file);
-          shortCircuitGranted = true;
-        }
-      }
       final long numBytes = responseData.getSerializedSize();
-      if (shortCircuitGranted) {
-        metrics.incContainerLocalBytesStats(Type.GetBlock, numBytes);
-      } else {
-        metrics.incContainerBytesStats(Type.GetBlock, numBytes);
-      }
+      metrics.incContainerBytesStats(Type.GetBlock, numBytes);
+
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -888,21 +839,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return getBlockDataResponse(request, responseData, shortCircuitGranted);
-  }
-
-  @Override
-  public RandomAccessFile getBlockFile(ContainerCommandRequestProto request) throws IOException {
-    if (request.getCmdType() != Type.GetBlock) {
-      throw new StorageContainerException("Request type mismatch, expected " +  Type.GetBlock +
-          ", received " + request.getCmdType(), ContainerProtos.Result.MALFORMED_REQUEST);
-    }
-    String mapKey = getBlockMapKey(request);
-    RandomAccessFile file = blockFileMap.remove(mapKey);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("File removed from blockFileMap for {}", mapKey);
-    }
-    return file;
+    return getBlockDataResponse(request, responseData);
   }
 
   /**
@@ -1162,15 +1099,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    updateRecoveringContainerTimeout(kvContainer);
     return getWriteChunkResponseSuccess(request, blockDataProto);
-  }
-
-  private void updateRecoveringContainerTimeout(KeyValueContainer kvContainer) {
-    if (kvContainer.getContainerState() != RECOVERING) {
-      return;
-    }
-    containerSet.updateRecoveringContainerTimeout(kvContainer.getContainerData().getContainerID());
   }
 
   /**
@@ -1582,17 +1511,10 @@ public class KeyValueHandler extends Handler {
   @Override
   public void markContainerUnhealthy(Container container, ScanResult reason)
       throws IOException {
+    container.writeLock();
     long containerID = container.getContainerData().getContainerID();
-    Container<?> lockedContainer = containerSet.getContainerWithWriteLock(containerID);
-    if (lockedContainer == null) {
-      // null means container retries exhausted ;
-      // container not-found throws StorageContainerException.
-      LOG.warn("Exceeded {} attempts locking live container {}; skipping markContainerUnhealthy.",
-          ContainerSet.maxContainerMapSwapRetries(), containerID);
-      return;
-    }
     try {
-      if (lockedContainer.getContainerState() == State.UNHEALTHY) {
+      if (container.getContainerState() == State.UNHEALTHY) {
         LOG.debug("Call to mark already unhealthy container {} as unhealthy",
             containerID);
         return;
@@ -1600,25 +1522,25 @@ public class KeyValueHandler extends Handler {
       // If the volume is unhealthy, no action is needed. The container has
       // already been discarded and SCM notified. Once a volume is failed, it
       // cannot be restored without a restart.
-      HddsVolume containerVolume = lockedContainer.getContainerData().getVolume();
+      HddsVolume containerVolume = container.getContainerData().getVolume();
       if (containerVolume.isFailed()) {
         LOG.debug("Ignoring unhealthy container {} detected on an " +
             "already failed volume {}", containerID, containerVolume);
         return;
       }
-      lockedContainer.markContainerUnhealthy();
+      container.markContainerUnhealthy();
     } catch (StorageContainerException ex) {
       LOG.warn("Unexpected error while marking container {} unhealthy",
           containerID, ex);
     } finally {
-      lockedContainer.writeUnlock();
+      container.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(lockedContainer);
+    updateContainerChecksumFromMetadataIfNeeded(container);
     // Even if the container file is corrupted/missing and the unhealthy
     // update fails, the unhealthy state is kept in memory and sent to
     // SCM. Write a corresponding entry to the container log as well.
-    ContainerLogger.logUnhealthy(lockedContainer.getContainerData(), reason);
-    sendICR(lockedContainer);
+    ContainerLogger.logUnhealthy(container.getContainerData(), reason);
+    sendICR(container);
   }
 
   @Override
@@ -1652,24 +1574,17 @@ public class KeyValueHandler extends Handler {
   @Override
   public void closeContainer(Container container)
       throws IOException {
-    long containerID = container.getContainerData().getContainerID();
-    Container<?> lockedContainer = containerSet.getContainerWithWriteLock(containerID);
-    if (lockedContainer == null) {
-      // null means container locking retries exhausted ;
-      // container not-found throws StorageContainerException.
-      LOG.warn("Exceeded {} attempts locking live container {}; skipping closeContainer.",
-          ContainerSet.maxContainerMapSwapRetries(), containerID);
-      return;
-    }
+    container.writeLock();
     try {
-      final State state = lockedContainer.getContainerState();
+      final State state = container.getContainerState();
       // Close call is idempotent.
       if (state == State.CLOSED) {
         return;
       }
       if (state == State.UNHEALTHY) {
         throw new StorageContainerException(
-            "Cannot close container #" + containerID + " while in " + state + " state.",
+            "Cannot close container #" + container.getContainerData()
+                .getContainerID() + " while in " + state + " state.",
             ContainerProtos.Result.CONTAINER_UNHEALTHY);
       }
       // The container has to be either in CLOSING or in QUASI_CLOSED state.
@@ -1678,15 +1593,16 @@ public class KeyValueHandler extends Handler {
             state == State.INVALID ? INVALID_CONTAINER_STATE :
                 CONTAINER_INTERNAL_ERROR;
         throw new StorageContainerException(
-            "Cannot close container #" + containerID + " while in " + state + " state.", error);
+            "Cannot close container #" + container.getContainerData()
+                .getContainerID() + " while in " + state + " state.", error);
       }
-      lockedContainer.close();
+      container.close();
     } finally {
-      lockedContainer.writeUnlock();
+      container.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(lockedContainer);
-    ContainerLogger.logClosed(lockedContainer.getContainerData());
-    sendICR(lockedContainer);
+    updateContainerChecksumFromMetadataIfNeeded(container);
+    ContainerLogger.logClosed(container.getContainerData());
+    sendICR(container);
   }
 
   @Override
@@ -2134,11 +2050,6 @@ public class KeyValueHandler extends Handler {
     // Since the putBlock request may fail, we don't know if the chunk exists,
     // thus we need to check it when receiving the request to delete such blocks
     String[] chunkNames = getFilesWithPrefix(prefix, chunkDir);
-    if (chunkNames == null) {
-      throw new IOException("Failed to list chunks under " + chunkDir
-          + " for unreferenced block " + localID + " in container "
-          + containerID);
-    }
     if (chunkNames.length == 0) {
       LOG.warn("Missing delete block(Container = {}, Block = {}",
           containerID, localID);
@@ -2149,18 +2060,10 @@ public class KeyValueHandler extends Handler {
       if (!file.isFile()) {
         continue;
       }
-      if (!deleteUnreferencedFile(file)) {
-        throw new IOException("Failed to delete unreferenced chunk/block "
-            + file + " in container " + containerID);
-      }
+      FileUtil.fullyDelete(file);
       LOG.info("Deleted unreferenced chunk/block {} in container {}", name,
           containerID);
     }
-  }
-
-  @VisibleForTesting
-  boolean deleteUnreferencedFile(File file) {
-    return FileUtil.fullyDelete(file);
   }
 
   @Override
@@ -2390,33 +2293,24 @@ public class KeyValueHandler extends Handler {
 
   private void deleteInternal(Container container, boolean force)
       throws StorageContainerException {
-    final long containerId = container.getContainerData().getContainerID();
     long startTime = clock.millis();
-    Container<?> containerLocked = containerSet.getContainerWithWriteLock(containerId);
-    if (containerLocked == null) {
-      // null means container locking retries exhausted ;
-      // container not-found throws StorageContainerException.
-      LOG.info("Exceeded {} retries to lock container {}; Now SCM will resend for delete with " +
-              "the current container replica", ContainerSet.maxContainerMapSwapRetries(),
-          containerId);
-      return;
-    }
+    container.writeLock();
     try {
-      final ContainerData data = containerLocked.getContainerData();
-      if (containerLocked.getContainerData().getVolume().isFailed()) {
+      final ContainerData data = container.getContainerData();
+      if (container.getContainerData().getVolume().isFailed()) {
         // if the  volume in which the container resides fails
         // don't attempt to delete/move it. When a volume fails,
         // failedVolumeListener will pick it up and clear the container
         // from the container set.
         LOG.info("Delete container issued on containerID {} which is in a " +
-                "failed volume. Skipping", containerLocked.getContainerData()
+                "failed volume. Skipping", container.getContainerData()
             .getContainerID());
         return;
       }
       // If force is false, we check container state.
       if (!force) {
         // Check if container is open
-        if (containerLocked.getContainerData().isOpen()) {
+        if (container.getContainerData().isOpen()) {
           throw new StorageContainerException(
               "Deletion of Open Container is not allowed.",
               DELETE_ON_OPEN_CONTAINER);
@@ -2425,14 +2319,14 @@ public class KeyValueHandler extends Handler {
         // If the container is not empty, it should not be deleted unless the
         // container is being forcefully deleted (which happens when
         // container is unhealthy or over-replicated).
-        if (containerLocked.hasBlocks()) {
+        if (container.hasBlocks()) {
           metrics.incContainerDeleteFailedNonEmpty();
           LOG.error("Received container deletion command for non-empty {}: {}", data, data.getStatistics());
           // blocks table for future debugging.
           // List blocks
-          logBlocksIfNonZero(containerLocked);
+          logBlocksIfNonZero(container);
           // Log chunks
-          logBlocksFoundOnDisk(containerLocked);
+          logBlocksFoundOnDisk(container);
           throw new StorageContainerException("Non-force deletion of " +
               "non-empty container is not allowed.",
               DELETE_ON_NON_EMPTY_CONTAINER);
@@ -2440,9 +2334,9 @@ public class KeyValueHandler extends Handler {
       } else {
         metrics.incContainersForceDelete();
       }
-      if (containerLocked.getContainerData() instanceof KeyValueContainerData) {
+      if (container.getContainerData() instanceof KeyValueContainerData) {
         KeyValueContainerData keyValueContainerData =
-            (KeyValueContainerData) containerLocked.getContainerData();
+            (KeyValueContainerData) container.getContainerData();
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
         // Steps to delete
@@ -2456,20 +2350,21 @@ public class KeyValueHandler extends Handler {
           if (waitTime > maxDeleteLockWaitMs) {
             LOG.warn("An attempt to delete container {} took {} ms acquiring locks and pre-checks. " +
                     "The delete has been skipped and should be retried automatically by SCM.",
-                containerLocked.getContainerData().getContainerID(), waitTime);
+                container.getContainerData().getContainerID(), waitTime);
             return;
           }
-          containerLocked.markContainerForDelete();
+          container.markContainerForDelete();
+          long containerId = container.getContainerData().getContainerID();
           containerSet.removeContainer(containerId);
-          ContainerLogger.logDeleted(containerLocked.getContainerData(), force);
+          ContainerLogger.logDeleted(container.getContainerData(), force);
           KeyValueContainerUtil.removeContainer(keyValueContainerData, conf);
         } catch (IOException ioe) {
           LOG.error("Failed to move container under " + hddsVolume
               .getDeletedContainerDir());
           String errorMsg =
-              "Failed to move container" + containerLocked.getContainerData()
+              "Failed to move container" + container.getContainerData()
                   .getContainerID();
-          triggerVolumeScanAndThrowException(containerLocked, errorMsg,
+          triggerVolumeScanAndThrowException(container, errorMsg,
               CONTAINER_INTERNAL_ERROR);
         }
       }
@@ -2479,20 +2374,20 @@ public class KeyValueHandler extends Handler {
       // All other IO Exceptions should be treated as if the container is not
       // empty as a defensive check.
       LOG.error("Could not determine if the container {} is empty",
-          containerLocked.getContainerData().getContainerID(), e);
+          container.getContainerData().getContainerID(), e);
       String errorMsg =
-          "Failed to read container dir" + containerLocked.getContainerData()
+          "Failed to read container dir" + container.getContainerData()
               .getContainerID();
-      triggerVolumeScanAndThrowException(containerLocked, errorMsg,
+      triggerVolumeScanAndThrowException(container, errorMsg,
           CONTAINER_INTERNAL_ERROR);
     } finally {
-      containerLocked.writeUnlock();
+      container.writeUnlock();
     }
     // Avoid holding write locks for disk operations
-    sendICR(containerLocked);
-    long bytesUsed = containerLocked.getContainerData().getBytesUsed();
-    HddsVolume volume = containerLocked.getContainerData().getVolume();
-    containerLocked.delete();
+    sendICR(container);
+    long bytesUsed = container.getContainerData().getBytesUsed();
+    HddsVolume volume = container.getContainerData().getVolume();
+    container.delete();
     volume.decrementUsedSpace(bytesUsed);
   }
 

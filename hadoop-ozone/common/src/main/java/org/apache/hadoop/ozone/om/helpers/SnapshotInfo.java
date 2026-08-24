@@ -72,34 +72,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private String snapshotPath; // snapshot mask
   private boolean deepClean;
   private boolean sstFiltered;
-  /**
-   * The total logical data size (in bytes, unreplicated) referenced by the snapshot
-   * at the time of its creation.
-   */
   private long referencedSize;
-  /**
-   * The total replicated data size (in bytes, replicated) referenced by the snapshot
-   * at the time of its creation.
-   */
   private long referencedReplicatedSize;
-  /**
-   * The amount of data (in bytes, unreplicated) exclusively referenced by this snapshot,
-   * determined during key-level deep cleaning when KeyDeletingService processes deleted keys.
-   */
   private long exclusiveSize;
-  /**
-   * Same as exclusiveSize, but accounts for the replication factor.
-   */
   private long exclusiveReplicatedSize;
-  /**
-   * The additional exclusive size (in bytes, unreplicated) discovered during directory-level
-   * deep cleaning when SnapshotDirectoryCleaningService processes deleted directories.
-   * Kept separate from exclusiveSize to avoid write overwrites between asynchronous services.
-   */
   private long exclusiveSizeDeltaFromDirDeepCleaning;
-  /**
-   * Same as exclusiveSizeDeltaFromDirDeepCleaning, but accounts for the replication factor.
-   */
   private long exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
   private boolean deepCleanedDeletedDir;
   private ByteString createTransactionInfo;
@@ -353,53 +330,37 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
-    /**
-     * @param referencedSize - The total logical data size (in bytes, unreplicated)
-     * referenced by the snapshot at the time of its creation.
-     */
+    /** @param referencedSize - Snapshot referenced size. */
     public Builder setReferencedSize(long referencedSize) {
       this.referencedSize = referencedSize;
       return this;
     }
 
-    /**
-     * @param referencedReplicatedSize - Same as referencedSize, but scaled by the replication factor.
-     */
+    /** @param referencedReplicatedSize - Snapshot referenced size w/ replication. */
     public Builder setReferencedReplicatedSize(long referencedReplicatedSize) {
       this.referencedReplicatedSize = referencedReplicatedSize;
       return this;
     }
 
-    /**
-     * @param exclusiveSize - The amount of data (in bytes, unreplicated) exclusively
-     * referenced by this snapshot, determined during key-level deep cleaning.
-     */
+    /** @param exclusiveSize - Snapshot exclusive size. */
     public Builder setExclusiveSize(long exclusiveSize) {
       this.exclusiveSize = exclusiveSize;
       return this;
     }
 
-    /**
-     * @param exclusiveReplicatedSize - Same as exclusiveSize, but scaled by the replication factor.
-     */
+    /** @param exclusiveReplicatedSize - Snapshot exclusive size w/ replication. */
     public Builder setExclusiveReplicatedSize(long exclusiveReplicatedSize) {
       this.exclusiveReplicatedSize = exclusiveReplicatedSize;
       return this;
     }
 
-    /**
-     * @param exclusiveSizeDeltaFromDirDeepCleaning - The additional exclusive size (in bytes,
-     * unreplicated) discovered during directory-level deep cleaning.
-     */
+    /** @param exclusiveSizeDeltaFromDirDeepCleaning - Snapshot exclusive size. */
     public Builder setExclusiveSizeDeltaFromDirDeepCleaning(long exclusiveSizeDeltaFromDirDeepCleaning) {
       this.exclusiveSizeDeltaFromDirDeepCleaning = exclusiveSizeDeltaFromDirDeepCleaning;
       return this;
     }
 
-    /**
-     * @param exclusiveReplicatedSizeDeltaFromDirDeepCleaning - Same as
-     * exclusiveSizeDeltaFromDirDeepCleaning, but scaled by the replication factor.
-     */
+    /** @param exclusiveReplicatedSizeDeltaFromDirDeepCleaning - Snapshot exclusive size w/ replication. */
     public Builder setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(
         long exclusiveReplicatedSizeDeltaFromDirDeepCleaning) {
       this.exclusiveReplicatedSizeDeltaFromDirDeepCleaning = exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
@@ -606,10 +567,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.referencedSize = referencedSize;
   }
 
-  /**
-   * Returns the total logical data size (in bytes, unreplicated) referenced by the snapshot
-   * at the time of its creation.
-   */
   public long getReferencedSize() {
     return referencedSize;
   }
@@ -618,10 +575,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.referencedReplicatedSize = referencedReplicatedSize;
   }
 
-  /**
-   * Returns the total replicated data size (in bytes, replicated) referenced by the snapshot
-   * at the time of its creation.
-   */
   public long getReferencedReplicatedSize() {
     return referencedReplicatedSize;
   }
@@ -630,10 +583,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.exclusiveSize = exclusiveSize;
   }
 
-  /**
-   * Returns the unreplicated data size exclusively referenced by this snapshot,
-   * calculated during key-level deep cleaning.
-   */
   public long getExclusiveSize() {
     return exclusiveSize;
   }
@@ -642,10 +591,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.exclusiveSizeDeltaFromDirDeepCleaning = exclusiveSizeDeltaFromDirDeepCleaning;
   }
 
-  /**
-   * Returns the additional unreplicated data size discovered exclusively by this snapshot
-   * during directory-level deep cleaning.
-   */
   public long getExclusiveSizeDeltaFromDirDeepCleaning() {
     return exclusiveSizeDeltaFromDirDeepCleaning;
   }
@@ -658,18 +603,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.exclusiveReplicatedSizeDeltaFromDirDeepCleaning = exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
   }
 
-  /**
-   * Returns the additional replicated data size discovered exclusively by this snapshot
-   * during directory-level deep cleaning.
-   */
   public long getExclusiveReplicatedSizeDeltaFromDirDeepCleaning() {
     return exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
   }
 
-  /**
-   * Returns the replicated data size exclusively referenced by this snapshot,
-   * calculated during key-level deep cleaning.
-   */
   public long getExclusiveReplicatedSize() {
     return exclusiveReplicatedSize;
   }

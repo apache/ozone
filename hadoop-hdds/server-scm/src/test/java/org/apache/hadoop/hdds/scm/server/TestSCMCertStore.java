@@ -21,7 +21,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.DATANODE
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.AdditionalAnswers.returnsLastArg;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -36,7 +38,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -70,11 +71,9 @@ public class TestSCMCertStore {
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
 
     final SCMRatisServer ratisServer = mock(SCMRatisServer.class);
-    when(ratisServer.getProxyHandler(any(ScmInvoker.class)))
-        .thenAnswer(invocation -> {
-          ScmInvoker<?> invoker = invocation.getArgument(0);
-          return invoker.getImpl();
-        });
+    when(ratisServer.getProxyHandler(
+        eq(CertificateStore.class), any(CertificateStore.class)))
+        .then(returnsLastArg());
     scmMetadataStore = new SCMMetadataStoreImpl(config);
     scmCertStore = new SCMCertStore.Builder().setRatisServer(ratisServer)
         .setMetadaStore(scmMetadataStore)

@@ -52,7 +52,6 @@ import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -145,7 +144,7 @@ public class TestWritableECContainerProvider {
       containers.put(container.containerID(), container);
       return container;
     }).when(containerManager).getMatchingContainer(anyLong(),
-        anyString(), any(Pipeline.class), any(), any(StorageTier.class));
+        anyString(), any(Pipeline.class));
 
     doAnswer(call ->
         containers.get((ContainerID)call.getArguments()[0]))
@@ -184,13 +183,13 @@ public class TestWritableECContainerProvider {
   void testPipelinesCreatedBasedOnTotalDiskCountWithFactor(
       PipelineChoosePolicy policy) throws IOException {
     provider = createSubject(policy);
-    double factor = 0.5;
+    int factor = 10;
     providerConf.setMinimumPipelines(1);
     providerConf.setPipelinePerVolumeFactor(factor);
-    nodeManager.setNumHealthyVolumes(20);
+    nodeManager.setNumHealthyVolumes(5);
 
     int volumeCount = nodeManager.totalHealthyVolumeCount();
-    int pipelineLimit = (int) (factor * volumeCount / repConfig.getRequiredNodes());
+    int pipelineLimit = factor * volumeCount / repConfig.getRequiredNodes();
     Set<ContainerInfo> allocated = assertDistinctContainers(pipelineLimit);
     assertReusesExisting(allocated, pipelineLimit);
   }
@@ -210,7 +209,7 @@ public class TestWritableECContainerProvider {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < n; i++) {
       ContainerInfo container =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+          provider.getContainer(1, repConfig, OWNER, new ExcludeList());
       assertThat(allocatedContainers)
           .withFailMessage("Provided existing container for request " + i)
           .doesNotContain(container);
@@ -223,7 +222,7 @@ public class TestWritableECContainerProvider {
       throws IOException {
     for (int i = 0; i < 3 * n; i++) {
       ContainerInfo container =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+          provider.getContainer(1, repConfig, OWNER, new ExcludeList());
       assertThat(existing)
           .withFailMessage("Provided new container for request " + i)
           .contains(container);
@@ -238,7 +237,7 @@ public class TestWritableECContainerProvider {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
       ContainerInfo container = provider.getContainer(
-          1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+          1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
     // We have the min limit of pipelines, but then exclude one. It should use
@@ -249,7 +248,7 @@ public class TestWritableECContainerProvider {
         .stream().findFirst().get().getPipelineID();
     exclude.addPipeline(excludedID);
 
-    ContainerInfo c = provider.getContainer(1, repConfig, OWNER, exclude, StorageTier.getDefaultTier());
+    ContainerInfo c = provider.getContainer(1, repConfig, OWNER, exclude);
     assertNotEquals(excludedID, c.getPipelineID());
     assertThat(allocatedContainers).contains(c);
   }
@@ -264,7 +263,7 @@ public class TestWritableECContainerProvider {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
       ContainerInfo container = provider.getContainer(
-          1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+          1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
     // We have the min limit of pipelines, but then exclude them all
@@ -273,7 +272,7 @@ public class TestWritableECContainerProvider {
       exclude.addPipeline(c.getPipelineID());
     }
     assertThrows(IOException.class, () -> provider.getContainer(
-        1, repConfig, OWNER, exclude, StorageTier.getDefaultTier()));
+        1, repConfig, OWNER, exclude));
   }
 
   @ParameterizedTest
@@ -284,7 +283,7 @@ public class TestWritableECContainerProvider {
     providerConf.setMinimumPipelines(1);
     provider = createSubject(policy);
     ContainerInfo container = provider.getContainer(
-        1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+        1, repConfig, OWNER, new ExcludeList());
 
     ExcludeList exclude = new ExcludeList();
     exclude.addPipeline(container.getPipelineID());
@@ -292,7 +291,7 @@ public class TestWritableECContainerProvider {
         pipelineManager.getPipeline(container.getPipelineID()).getFirstNode());
 
     ContainerInfo newContainer = provider.getContainer(
-        1, repConfig, OWNER, exclude, StorageTier.getDefaultTier());
+        1, repConfig, OWNER, exclude);
     assertNotSame(container, newContainer);
   }
 
@@ -306,7 +305,7 @@ public class TestWritableECContainerProvider {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
       ContainerInfo container = provider.getContainer(
-          1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+          1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
     // We have the min limit of pipelines, but then exclude all the associated
@@ -316,7 +315,7 @@ public class TestWritableECContainerProvider {
       exclude.addConatinerId(c.containerID());
     }
     assertThrows(IOException.class, () -> provider.getContainer(
-        1, repConfig, OWNER, exclude, StorageTier.getDefaultTier()));
+        1, repConfig, OWNER, exclude));
   }
 
   @ParameterizedTest
@@ -328,15 +327,14 @@ public class TestWritableECContainerProvider {
       @Override
       public Pipeline createPipeline(ReplicationConfig repConf,
           List<DatanodeDetails> excludedNodes,
-          List<DatanodeDetails> favoredNodes,
-          StorageTier storageTier) throws IOException {
+          List<DatanodeDetails> favoredNodes) throws IOException {
         throw new IOException("Cannot create pipelines");
       }
     };
     provider = createSubject(policy);
 
     IOException ioException = assertThrows(IOException.class,
-        () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier()));
+        () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
     assertThat(ioException.getMessage())
         .contains("Cannot create pipelines");
   }
@@ -353,26 +351,25 @@ public class TestWritableECContainerProvider {
       @Override
       public Pipeline createPipeline(ReplicationConfig repConf,
           List<DatanodeDetails> excludedNodes,
-          List<DatanodeDetails> favoredNodes,
-          StorageTier storageTier)
+          List<DatanodeDetails> favoredNodes)
           throws IOException {
         if (throwError) {
           throw new RocksDatabaseException("Cannot create pipelines");
         }
         throwError = true;
-        return super.createPipeline(repConfig, storageTier);
+        return super.createPipeline(repConfig);
       }
     };
     provider = createSubject(policy);
 
     IOException ioException = assertThrows(IOException.class,
-        () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier()));
+        () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
     assertThat(ioException.getMessage())
         .contains("Cannot create pipelines");
 
     for (int i = 0; i < 5; i++) {
       ioException = assertThrows(IOException.class,
-          () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier()));
+          () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
       assertThat(ioException.getMessage())
           .contains("Cannot create pipelines");
     }
@@ -395,14 +392,13 @@ public class TestWritableECContainerProvider {
     // We ask for a space of 50 MB, and will actually need 50 MB space.
     ContainerInfo newContainer =
         provider.getContainer(50 * 1024 * 1024, repConfig, OWNER,
-            new ExcludeList(), StorageTier.getDefaultTier());
+            new ExcludeList());
     assertNotNull(newContainer);
     assertThat(allocatedContainers).contains(newContainer);
     // Now get a new container where there is not enough space in the existing
     // and ensure a new container gets created.
     newContainer = provider.getContainer(
-        128 * 1024 * 1024, repConfig, OWNER, new ExcludeList(),
-        StorageTier.getDefaultTier());
+        128 * 1024 * 1024, repConfig, OWNER, new ExcludeList());
     assertNotNull(newContainer);
     assertThat(allocatedContainers).doesNotContain(newContainer);
     // The original pipelines should all be closed, triggered by the lack of
@@ -435,7 +431,7 @@ public class TestWritableECContainerProvider {
     // Now attempt to get a container - any attempt to use an existing with
     // throw PNF and then we must allocate a new one
     ContainerInfo newContainer =
-        provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+        provider.getContainer(1, repConfig, OWNER, new ExcludeList());
     assertNotNull(newContainer);
     assertThat(allocatedContainers).doesNotContain(newContainer);
   }
@@ -455,7 +451,7 @@ public class TestWritableECContainerProvider {
     }).when(containerManager).getContainer(any(ContainerID.class));
 
     ContainerInfo newContainer =
-        provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+        provider.getContainer(1, repConfig, OWNER, new ExcludeList());
     assertNotNull(newContainer);
     assertThat(allocatedContainers).doesNotContain(newContainer);
 
@@ -477,7 +473,7 @@ public class TestWritableECContainerProvider {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
       ContainerInfo container = provider.getContainer(
-          1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+          1, repConfig, OWNER, new ExcludeList());
       assertThat(allocatedContainers).doesNotContain(container);
       allocatedContainers.add(container);
       // Remove the container from the pipeline to simulate closing it
@@ -485,7 +481,7 @@ public class TestWritableECContainerProvider {
           container.getPipelineID(), container.containerID());
     }
     ContainerInfo newContainer = provider.getContainer(
-        1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+        1, repConfig, OWNER, new ExcludeList());
     assertThat(allocatedContainers).doesNotContain(newContainer);
     for (ContainerInfo c : allocatedContainers) {
       Pipeline pipeline = pipelineManager.getPipeline(c.getPipelineID());
@@ -522,7 +518,7 @@ public class TestWritableECContainerProvider {
 
     // expecting a new container to be created
     ContainerInfo containerInfo = provider.getContainer(1, repConfig, OWNER,
-        excludeList, StorageTier.getDefaultTier());
+        excludeList);
     assertThat(allocated).doesNotContain(containerInfo);
     for (ContainerInfo c : allocated) {
       Pipeline pipeline = pipelineManager.getPipeline(c.getPipelineID());
@@ -540,12 +536,11 @@ public class TestWritableECContainerProvider {
 
     // EmptyList should be passed if there are no nodes excluded.
     ContainerInfo container = provider.getContainer(
-        1, repConfig, OWNER, excludeList, StorageTier.getDefaultTier());
+        1, repConfig, OWNER, excludeList);
     assertNotNull(container);
 
     verify(pipelineManagerSpy).createPipeline(repConfig,
-        Collections.emptyList(), Collections.emptyList(),
-        StorageTier.getDefaultTier());
+        Collections.emptyList(), Collections.emptyList());
 
     // If nodes are excluded then the excluded nodes should be passed through to
     // the create pipeline call.
@@ -554,10 +549,10 @@ public class TestWritableECContainerProvider {
         new ArrayList<>(excludeList.getDatanodes());
 
     container = provider.getContainer(
-        1, repConfig, OWNER, excludeList, StorageTier.getDefaultTier());
+        1, repConfig, OWNER, excludeList);
     assertNotNull(container);
     verify(pipelineManagerSpy).createPipeline(repConfig, excludedNodes,
-        Collections.emptyList(), StorageTier.getDefaultTier());
+        Collections.emptyList());
   }
 
   private ContainerInfo createContainer(Pipeline pipeline,

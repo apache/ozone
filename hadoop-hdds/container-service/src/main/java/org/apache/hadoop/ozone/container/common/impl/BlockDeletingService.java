@@ -123,7 +123,7 @@ public class BlockDeletingService extends BackgroundService {
     });
   }
 
-  public void updateAndRestart(OzoneConfiguration ozoneConf) {
+  public synchronized void updateAndRestart(OzoneConfiguration ozoneConf) {
     long newInterval = ozoneConf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
     int newCorePoolSize = ozoneConf.getInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
@@ -134,15 +134,11 @@ public class BlockDeletingService extends BackgroundService {
             ", core pool size {} and timeout {} {}",
         newInterval, TimeUnit.SECONDS.name().toLowerCase(), newCorePoolSize, newTimeout,
         TimeUnit.NANOSECONDS.name().toLowerCase());
-    // shutdown() awaits the executor; do not hold this monitor (same object as
-    // BackgroundService.PeriodicalTask) or the pool thread can deadlock.
     shutdown();
-    synchronized (this) {
-      setInterval(newInterval, TimeUnit.SECONDS);
-      setPoolSize(newCorePoolSize);
-      setServiceTimeoutInNanos(newTimeout);
-      start();
-    }
+    setInterval(newInterval, TimeUnit.SECONDS);
+    setPoolSize(newCorePoolSize);
+    setServiceTimeoutInNanos(newTimeout);
+    start();
   }
 
   /**

@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -89,8 +88,7 @@ public class TestReconScmSnapshot {
 
     for (int i = 0; i < 10; i++) {
       containerManager.allocateContainer(RatisReplicationConfig.getInstance(
-          HddsProtos.ReplicationFactor.ONE), "testOwner",
-          StorageTier.getDefaultTier());
+          HddsProtos.ReplicationFactor.ONE), "testOwner");
     }
 
     recon.start(conf);
@@ -103,12 +101,7 @@ public class TestReconScmSnapshot {
     assertTrue(logCapturer.getOutput()
         .contains("Recon Container Count: " + reconContainers.size() +
         ", SCM Container Count: " + containerManager.getContainers().size()));
-    // Recon syncs SCM's containers asynchronously after start; wait for the
-    // snapshot to be applied before asserting the counts match.
-    final ContainerManager scmContainerManager = containerManager;
-    GenericTestUtils.waitFor(() -> reconContainerManager.getContainers().size()
-        == scmContainerManager.getContainers().size(), 1000, 60000);
-    assertEquals(scmContainerManager.getContainers().size(),
+    assertEquals(containerManager.getContainers().size(),
         reconContainerManager.getContainers().size());
 
     //PipelineCount after Recon DB is updated with SCM DB

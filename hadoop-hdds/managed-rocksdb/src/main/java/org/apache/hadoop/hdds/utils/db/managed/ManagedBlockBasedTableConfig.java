@@ -25,14 +25,6 @@ import org.rocksdb.Cache;
  * Managed BlockBasedTableConfig.
  */
 public class ManagedBlockBasedTableConfig extends BlockBasedTableConfig {
-
-  /**
-   * Block-based table format version kept stable across RocksDB upgrades so
-   * SST files stay readable if Ozone is downgraded before finalization.
-   * RocksDB 9+ defaults to format_version 6, which RocksDB &lt; 8.6 cannot read.
-   */
-  public static final int FORMAT_VERSION = 5;
-
   private Cache blockCacheHolder;
   private AtomicBoolean closed = new AtomicBoolean(false);
 

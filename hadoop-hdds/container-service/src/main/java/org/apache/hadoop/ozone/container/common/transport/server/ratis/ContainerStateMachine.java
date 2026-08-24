@@ -110,7 +110,6 @@ import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.TaskQueue;
-import org.apache.ratis.util.function.CheckedConsumer;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -727,17 +726,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               requestProto.getTraceID());
     }
     dispatchCommand(requestProto, context);  // stream init
-    final CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock
-        = requestProto.getCmdType() == Type.StreamInitWithPutBlock ? this::streamPutBlock : null;
-    return dispatcher.getStreamDataChannel(requestProto, putBlock);
-  }
-
-  void streamPutBlock(ContainerCommandRequestProto request) throws IOException {
-    final DispatcherContext context = DispatcherContext.newBuilder(DispatcherContext.Op.STREAM_LINK)
-        .setStage(DispatcherContext.WriteChunkStage.COMBINED)
-        .setContainer2BCSIDMap(container2BCSIDMap)
-        .build();
-    dispatchCommand(request, context);
+    return dispatcher.getStreamDataChannel(requestProto);
   }
 
   @Override
@@ -752,7 +741,7 @@ public class ContainerStateMachine extends BaseStateMachine {
                 .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
                 .setContainer2BCSIDMap(container2BCSIDMap)
                 .build();
-        final DataChannel channel = getStreamDataChannel(requestProto, context);
+        DataChannel channel = getStreamDataChannel(requestProto, context);
         final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
             getChunkExecutor(requestProto.getWriteChunk()) : null;
         return new LocalStream(channel, chunkExecutor);
@@ -784,10 +773,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     final KeyValueStreamDataChannel kvStreamDataChannel =
         (KeyValueStreamDataChannel) dataChannel;
-    if (!kvStreamDataChannel.link()) {
-      return JavaUtils.completeExceptionally(new IllegalStateException(
-          "PutBlock was not committed on stream close: " + kvStreamDataChannel));
-    }
+    kvStreamDataChannel.setLinked();
     return CompletableFuture.completedFuture(null);
   }
 
@@ -804,45 +790,26 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> write(LogEntryProto entry, TransactionContext trx) {
     try {
-      return writeImpl(entry, trx).whenComplete((r, e) -> {
-        if (e != null) {
-          closeServer(e);
-        }
-      });
-    } catch (Throwable e) {
-      closeServer(e);
+      metrics.incNumWriteStateMachineOps();
+      long writeStateMachineStartTime = Time.monotonicNowNanos();
+      final Context context = (Context) trx.getStateMachineContext();
+      Objects.requireNonNull(context, "context == null");
+      final ContainerCommandRequestProto requestProto = context.getRequestProto();
+      final Type cmdType = requestProto.getCmdType();
+
+      // For only writeChunk, there will be writeStateMachineData call.
+      // CreateContainer will happen as a part of writeChunk only.
+      switch (cmdType) {
+      case WriteChunk:
+        return writeStateMachineData(requestProto, entry.getIndex(),
+            entry.getTerm(), writeStateMachineStartTime);
+      default:
+        throw new IllegalStateException("Cmd Type:" + cmdType
+            + " should not have state machine data");
+      }
+    } catch (Exception e) {
+      metrics.incNumWriteStateMachineFails();
       return completeExceptionally(e);
-    }
-  }
-
-  private CompletableFuture<Message> writeImpl(LogEntryProto entry, TransactionContext trx) {
-    metrics.incNumWriteStateMachineOps();
-    long writeStateMachineStartTime = Time.monotonicNowNanos();
-    final Context context = (Context) trx.getStateMachineContext();
-    Objects.requireNonNull(context, "context == null");
-    final ContainerCommandRequestProto requestProto = context.getRequestProto();
-    final Type cmdType = requestProto.getCmdType();
-
-    // For only writeChunk, there will be writeStateMachineData call.
-    // CreateContainer will happen as a part of writeChunk only.
-    switch (cmdType) {
-    case WriteChunk:
-      return writeStateMachineData(requestProto, entry.getIndex(),
-          entry.getTerm(), writeStateMachineStartTime);
-    default:
-      throw new IllegalStateException("Cmd Type:" + cmdType
-          + " should not have state machine data");
-    }
-  }
-
-  private void closeServer(Throwable e) {
-    metrics.incNumWriteStateMachineFails();
-    try {
-      LOG.error("{}: Failed to writeStateMachineData, close server", getId(), e);
-      getServer().get().getDivision(getGroupId()).close();
-    } catch (Throwable t) {
-      e.addSuppressed(t);
-      LOG.error("{}: Failed to close server", getId(), t);
     }
   }
 
@@ -1261,7 +1228,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     stateMachineDataCache.removeIf(k -> k <= index);
   }
 
-  private static <T> CompletableFuture<T> completeExceptionally(Throwable e) {
+  private static <T> CompletableFuture<T> completeExceptionally(Exception e) {
     final CompletableFuture<T> future = new CompletableFuture<>();
     future.completeExceptionally(e);
     return future;

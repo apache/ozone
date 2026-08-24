@@ -235,7 +235,6 @@ message ContainerReplicaProto {
   optional int32 replicaIndex = 14;
   optional bool isEmpty = 15 [default = false];
   optional int64 dataChecksum = 16;
-  optional StorageTypeProto storageType = 17;
 }
 
 message CommandStatusReportsProto {
@@ -421,13 +420,11 @@ enum ReplicationCommandPriority {
 }
 
 /**
-This command asks the datanode to push a container to the specified target.
+This command asks the datanode to replicate a container from specific sources.
 */
 message ReplicateContainerCommandProto {
   required int64 containerID = 1;
-  // Deprecated: pull-based replication has been removed. This field is no
-  // longer populated or interpreted. Use target (field 5) instead.
-  repeated DatanodeDetailsProto sources = 2 [deprecated = true];
+  repeated DatanodeDetailsProto sources = 2;
   required int64 cmdId = 3;
   optional int32 replicaIndex = 4;
   optional DatanodeDetailsProto target = 5;

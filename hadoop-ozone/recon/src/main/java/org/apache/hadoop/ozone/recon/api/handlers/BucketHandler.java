@@ -100,13 +100,15 @@ public abstract class BucketHandler {
    * @return subpath
    */
   public static String buildSubpath(String path, String nextLevel) {
-    String subpath = !path.startsWith(OM_KEY_PREFIX)
-        ? OM_KEY_PREFIX + path
-        : path;
+    String subpath = path;
+    if (!subpath.startsWith(OM_KEY_PREFIX)) {
+      subpath = OM_KEY_PREFIX + subpath;
+    }
     subpath = removeTrailingSlashIfNeeded(subpath);
-    return nextLevel != null
-        ? subpath + OM_KEY_PREFIX + nextLevel
-        : subpath;
+    if (nextLevel != null) {
+      subpath = subpath + OM_KEY_PREFIX + nextLevel;
+    }
+    return subpath;
   }
 
   /**

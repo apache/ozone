@@ -82,7 +82,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -822,7 +821,7 @@ public class TestKeyManagerImpl {
     assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
     // create a pipeline using 3 datanodes
     Pipeline pipeline = scm.getPipelineManager().createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), nodeList, StorageTier.getDefaultTier());
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE), nodeList);
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     List<OmKeyLocationInfo> locationList =
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList();
@@ -1524,11 +1523,13 @@ public class TestKeyManagerImpl {
             .setKeyName(keyName)
             .setMultipartUploadPartNumber(99)
             .build();
-    // Reading a part number beyond the object's part count must fail with
-    // InvalidPart, instead of returning an empty (0-byte) result.
-    OMException ex = assertThrows(OMException.class,
-        () -> keyManager.getKeyInfo(keyArgs, RESOLVED_BUCKET, "test"));
-    assertEquals(OMException.ResultCodes.INVALID_PART, ex.getResult());
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, RESOLVED_BUCKET, "test");
+    assertEquals(keyName, omKeyInfo.getKeyName());
+    assertNotNull(omKeyInfo.getLatestVersionLocations());
+
+    List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations().getLocationList();
+    assertNotNull(locationList);
+    assertEquals(0, locationList.size());
   }
 
   private OmKeyInfo getMockedOmKeyInfo(OmBucketInfo bucketInfo, long parentId, String key, long objectId) {

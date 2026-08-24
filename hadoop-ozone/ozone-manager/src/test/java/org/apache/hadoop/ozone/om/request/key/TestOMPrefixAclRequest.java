@@ -45,7 +45,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests Prefix ACL requests.
  */
-public class TestOMPrefixAclRequest extends OMKeyRequestTests {
+public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testAddAclRequest() throws Exception {

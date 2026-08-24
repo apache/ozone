@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPO
 import static org.apache.hadoop.ozone.om.TestOMRatisSnapshots.checkSnapshot;
 import static org.apache.hadoop.ozone.om.TestOMRatisSnapshots.createOzoneSnapshot;
 import static org.apache.hadoop.ozone.om.TestOMRatisSnapshots.writeKeys;
-import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.List;
@@ -107,8 +106,8 @@ public class TestOMBootstrap {
     client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
     objectStore = client.getObjectStore();
 
-    volumeName = uniqueObjectName("volume");
-    bucketName = uniqueObjectName("bucket");
+    volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner("user" + RandomStringUtils.secure().nextNumeric(5))
         .setAdmin("admin" + RandomStringUtils.secure().nextNumeric(5))

@@ -61,18 +61,18 @@ public class ListKeyHandler extends VolumeBucketHandler {
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
     String snapshotNameWithIndicator = address.getSnapshotNameWithIndicator();
-    StringBuilder keyPrefix = new StringBuilder();
+    String keyPrefix = "";
 
     if (!Strings.isNullOrEmpty(snapshotNameWithIndicator)) {
-      keyPrefix.append(snapshotNameWithIndicator);
+      keyPrefix += snapshotNameWithIndicator;
 
       if (!Strings.isNullOrEmpty(prefixFilter.getPrefix())) {
-        keyPrefix.append('/');
+        keyPrefix += "/";
       }
     }
 
     if (!Strings.isNullOrEmpty(prefixFilter.getPrefix())) {
-      keyPrefix.append(prefixFilter.getPrefix());
+      keyPrefix += prefixFilter.getPrefix();
     }
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
@@ -82,7 +82,7 @@ public class ListKeyHandler extends VolumeBucketHandler {
       bucket.setListCacheSize(maxKeyLimit);
     }
     Iterator<? extends OzoneKey> keyIterator = bucket.listKeys(
-        keyPrefix.toString(), listOptions.getStartItem());
+        keyPrefix, listOptions.getStartItem());
 
     int counter = printAsJsonArray(keyIterator, maxKeyLimit);
 

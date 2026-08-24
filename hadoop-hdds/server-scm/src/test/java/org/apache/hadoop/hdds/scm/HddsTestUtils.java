@@ -35,7 +35,6 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -165,7 +164,7 @@ public final class HddsTestUtils {
   public static NodeReportProto getRandomNodeReport(int numberOfStorageReport,
       int numberOfMetadataStorageReport) {
     DatanodeID nodeId = DatanodeID.randomID();
-    return getRandomNodeReport(nodeId, File.separator + nodeId.getUuid(),
+    return getRandomNodeReport(nodeId, File.separator + nodeId.getID(),
         numberOfStorageReport, numberOfMetadataStorageReport);
   }
 
@@ -526,7 +525,7 @@ public final class HddsTestUtils {
     return containerManager
         .allocateContainer(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
-            "root", StorageTier.getDefaultTier());
+            "root");
 
   }
 
@@ -547,7 +546,8 @@ public final class HddsTestUtils {
    * @throws IOException
    */
   public static void quasiCloseContainer(ContainerManager containerManager,
-       ContainerID id) throws IOException {
+       ContainerID id) throws IOException,
+      InvalidStateTransitionException, TimeoutException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -850,7 +850,7 @@ public final class HddsTestUtils {
           int replicaIndex) {
 
     return ContainerReplicaProto.newBuilder()
-                    .setContainerID(containerId.getIdForTesting())
+                    .setContainerID(containerId.getId())
                     .setState(state)
                     .setOriginNodeId(originNodeId)
                     .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")

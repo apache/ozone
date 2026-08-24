@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -81,10 +80,10 @@ public class PipelineFactory {
 
   public Pipeline create(
       ReplicationConfig replicationConfig, List<DatanodeDetails> excludedNodes,
-      List<DatanodeDetails> favoredNodes, StorageTier storageTier)
+      List<DatanodeDetails> favoredNodes)
       throws IOException {
     Pipeline pipeline = providers.get(replicationConfig.getReplicationType())
-        .create(replicationConfig, excludedNodes, favoredNodes, storageTier);
+        .create(replicationConfig, excludedNodes, favoredNodes);
     checkPipeline(pipeline);
     return pipeline;
   }
@@ -107,9 +106,10 @@ public class PipelineFactory {
   }
 
   public Pipeline create(ReplicationConfig replicationConfig,
-      List<DatanodeDetails> nodes, StorageTier storageTier) throws IOException {
+      List<DatanodeDetails> nodes
+  ) {
     return providers.get(replicationConfig.getReplicationType())
-        .create(replicationConfig, nodes, storageTier);
+        .create(replicationConfig, nodes);
   }
 
   public Pipeline createForRead(ReplicationConfig replicationConfig,

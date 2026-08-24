@@ -86,16 +86,15 @@ public class OzoneClientKeyValidator extends BaseFreonGenerator
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-    try (OzoneClient client =
-        createOzoneClient(omServiceID, ozoneConfiguration)) {
-      rpcClient = client;
+    rpcClient = createOzoneClient(omServiceID, ozoneConfiguration);
 
-      readReference();
+    readReference();
 
-      timer = getMetrics().timer("key-validate");
+    timer = getMetrics().timer("key-validate");
 
-      runTests(this::validateKey);
-    }
+    runTests(this::validateKey);
+
+    rpcClient.close();
 
     return null;
   }

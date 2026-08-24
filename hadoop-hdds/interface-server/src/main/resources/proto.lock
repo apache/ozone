@@ -97,9 +97,6 @@
             "name": "RequestType",
             "enum_fields": [
               {
-                "name": "REQUEST_TYPE_UNSPECIFIED"
-              },
-              {
                 "name": "PIPELINE",
                 "integer": 1
               },
@@ -150,7 +147,7 @@
                 "id": 1,
                 "name": "name",
                 "type": "string",
-                "optional": true
+                "required": true
               },
               {
                 "id": 2,
@@ -167,13 +164,13 @@
                 "id": 1,
                 "name": "type",
                 "type": "string",
-                "optional": true
+                "required": true
               },
               {
                 "id": 2,
                 "name": "value",
                 "type": "bytes",
-                "optional": true
+                "required": true
               }
             ]
           },
@@ -184,7 +181,7 @@
                 "id": 1,
                 "name": "type",
                 "type": "string",
-                "optional": true
+                "required": true
               },
               {
                 "id": 2,
@@ -201,13 +198,13 @@
                 "id": 1,
                 "name": "type",
                 "type": "RequestType",
-                "optional": true
+                "required": true
               },
               {
                 "id": 2,
                 "name": "method",
                 "type": "Method",
-                "optional": true
+                "required": true
               }
             ]
           },
@@ -218,17 +215,14 @@
                 "id": 2,
                 "name": "type",
                 "type": "string",
-                "optional": true
+                "required": true
               },
               {
                 "id": 3,
                 "name": "value",
                 "type": "bytes",
-                "optional": true
+                "required": true
               }
-            ],
-            "reserved_ids": [
-              1
             ]
           }
         ],
@@ -1436,36 +1430,6 @@
                     "value": "0"
                   }
                 ]
-              },
-              {
-                "id": 10,
-                "name": "reserved",
-                "type": "uint64",
-                "optional": true
-              },
-              {
-                "id": 11,
-                "name": "fsCapacity",
-                "type": "uint64",
-                "optional": true,
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "0"
-                  }
-                ]
-              },
-              {
-                "id": 12,
-                "name": "fsAvailable",
-                "type": "uint64",
-                "optional": true,
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "0"
-                  }
-                ]
               }
             ]
           },
@@ -2005,24 +1969,6 @@
                     "value": "true"
                   }
                 ]
-              },
-              {
-                "id": 5,
-                "name": "totalBlockSize",
-                "type": "uint64",
-                "optional": true
-              },
-              {
-                "id": 6,
-                "name": "totalBlockReplicatedSize",
-                "type": "uint64",
-                "optional": true
-              },
-              {
-                "id": 7,
-                "name": "totalSizePerReplica",
-                "type": "uint64",
-                "optional": true
               }
             ]
           },
@@ -2943,24 +2889,6 @@
                 "id": 2,
                 "name": "blocks",
                 "type": "BlockID",
-                "is_repeated": true
-              },
-              {
-                "id": 3,
-                "name": "size",
-                "type": "uint64",
-                "is_repeated": true
-              },
-              {
-                "id": 4,
-                "name": "replicatedSize",
-                "type": "uint64",
-                "is_repeated": true
-              },
-              {
-                "id": 5,
-                "name": "sizePerReplica",
-                "type": "uint64",
                 "is_repeated": true
               }
             ]

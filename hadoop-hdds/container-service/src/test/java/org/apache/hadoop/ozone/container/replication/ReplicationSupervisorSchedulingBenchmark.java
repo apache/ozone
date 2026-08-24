@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
+import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -41,30 +43,59 @@ public class ReplicationSupervisorSchedulingBenchmark {
 
   @Test
   public void test() throws InterruptedException {
-    DatanodeDetails source1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails source2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    List<DatanodeDetails> datanodes = new ArrayList<>();
+    datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
 
-    //locks representing the limited resource of local disks on the source
+    //locks representing the limited resource of remote and local disks
+
+    //datanode -> disk -> lock object (remote resources)
     final Map<DatanodeID, Map<Integer, Object>> volumeLocks = new HashMap<>();
 
-    for (DatanodeDetails dn : new DatanodeDetails[]{source1, source2}) {
-      volumeLocks.put(dn.getID(), new HashMap<>());
+    //disk -> lock (local resources)
+    Map<Integer, Object> destinationLocks = new HashMap<>();
+
+    //init the locks
+    for (DatanodeDetails datanode : datanodes) {
+      volumeLocks.put(datanode.getID(), new HashMap<>());
       for (int i = 0; i < 10; i++) {
-        volumeLocks.get(dn.getID()).put(i, new Object());
+        volumeLocks.get(datanode.getID()).put(i, new Object());
       }
     }
 
-    //simplified executor emulating push upload
+    for (int i = 0; i < 10; i++) {
+      destinationLocks.put(i, new Object());
+    }
+
+    //simplified executor emulating the current sequential download +
+    //import.
     ContainerReplicator replicator = task -> {
-      //upload, limited by the source datanode's volume
+      //download, limited by the number of source datanodes
+      final DatanodeDetails sourceDatanode =
+          task.getSources().get(random.nextInt(task.getSources().size()));
+
       final Map<Integer, Object> volumes =
-          volumeLocks.get(source1.getID());
+          volumeLocks.get(sourceDatanode.getID());
       Object volumeLock = volumes.get(random.nextInt(volumes.size()));
       synchronized (volumeLock) {
-        System.out.println("Uploading " + task.getContainerId() + " to " + task.getTarget());
+        System.out.println("Downloading " + task.getContainerId() + " from " + sourceDatanode);
         try {
           volumeLock.wait(1000);
+        } catch (InterruptedException ex) {
+          throw new IllegalStateException(ex);
+        }
+      }
+
+      //import, limited by the destination datanode
+      final int volumeIndex = random.nextInt(destinationLocks.size());
+      Object destinationLock = destinationLocks.get(volumeIndex);
+      synchronized (destinationLock) {
+        System.out.println(
+            "Importing " + task.getContainerId() + " to disk "
+                + volumeIndex);
+
+        try {
+          destinationLock.wait(1000);
         } catch (InterruptedException ex) {
           throw new IllegalStateException(ex);
         }
@@ -77,7 +108,10 @@ public class ReplicationSupervisorSchedulingBenchmark {
 
     //schedule 100 container replication
     for (int i = 0; i < 100; i++) {
-      rs.addTask(new ReplicationTask(toTarget(i, target), replicator));
+      List<DatanodeDetails> sources = new ArrayList<>();
+      sources.add(datanodes.get(random.nextInt(datanodes.size())));
+
+      rs.addTask(new ReplicationTask(fromSources(i, sources), replicator));
     }
     rs.shutdownAfterFinish();
     final long executionTime = Time.monotonicNow() - start;

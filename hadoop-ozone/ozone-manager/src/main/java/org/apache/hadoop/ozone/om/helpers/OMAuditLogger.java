@@ -95,10 +95,6 @@ public final class OMAuditLogger {
     CMD_AUDIT_ACTION_MAP.put(Type.GetObjectTagging, OMAction.GET_OBJECT_TAGGING);
     CMD_AUDIT_ACTION_MAP.put(Type.PutObjectTagging, OMAction.PUT_OBJECT_TAGGING);
     CMD_AUDIT_ACTION_MAP.put(Type.DeleteObjectTagging, OMAction.DELETE_OBJECT_TAGGING);
-    CMD_AUDIT_ACTION_MAP.put(Type.GetBucketTagging, OMAction.GET_BUCKET_TAGGING);
-    CMD_AUDIT_ACTION_MAP.put(Type.PutBucketTagging, OMAction.PUT_BUCKET_TAGGING);
-    CMD_AUDIT_ACTION_MAP.put(Type.DeleteBucketTagging, OMAction.DELETE_BUCKET_TAGGING);
-    CMD_AUDIT_ACTION_MAP.put(Type.SetLifecycleServiceStatus, OMAction.SET_LIFECYCLE_SERVICE_STATUS);
   }
 
   private static OMAction getAction(OzoneManagerProtocolProtos.OMRequest request) {
