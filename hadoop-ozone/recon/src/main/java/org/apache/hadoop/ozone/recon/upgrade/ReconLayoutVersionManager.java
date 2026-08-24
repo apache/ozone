@@ -145,9 +145,11 @@ public class ReconLayoutVersionManager {
   }
 
   /**
-   * Repairs the task status schema based on its actual column state. This
-   * compatibility repair is independent of the MLV because 7.1.9 and 7.3.2
-   * assigned different features to layout version 1.
+   * Repairs the RECON_TASK_STATUS schema based on the table's actual column
+   * state, independent of the stored layout version. Running this before feature
+   * finalization ensures the required columns exist and completes any partially
+   * applied migration, so a table left in an inconsistent state is recovered
+   * regardless of what the layout version reports.
    */
   private void repairTaskStatusSchemaIfRequired() throws Exception {
     LOG.info("Checking whether the Recon task status schema requires repair.");

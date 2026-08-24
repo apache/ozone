@@ -115,7 +115,11 @@ public class TestReconTaskStatusTableUpgradeAction
   }
 
   private void createLegacyTaskStatusTable() throws SQLException {
-    dslContext.dropTableIfExists(RECON_TASK_STATUS_TABLE_NAME).execute();
+    // Use a plain DROP TABLE rather than dropTableIfExists(): the shared test
+    // DSLContext uses SQLDialect.DEFAULT, which renders "DROP TABLE IF EXISTS",
+    // and Derby does not support the IF EXISTS clause. The base class always
+    // creates RECON_TASK_STATUS before this runs, so it is guaranteed to exist.
+    dslContext.dropTable(RECON_TASK_STATUS_TABLE_NAME).execute();
     dslContext.createTable(RECON_TASK_STATUS_TABLE_NAME)
         .column("task_name", SQLDataType.VARCHAR(766).nullable(false))
         .column("last_updated_timestamp", SQLDataType.BIGINT)
