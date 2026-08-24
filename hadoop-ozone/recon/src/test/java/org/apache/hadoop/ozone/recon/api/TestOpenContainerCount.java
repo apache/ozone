@@ -62,7 +62,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -126,8 +126,8 @@ public class TestOpenContainerCount {
     pipeline2 = getRandomPipeline(datanodeDetails);
     pipelineId2 = pipeline2.getId().getId().toString();
 
-    StorageContainerLocationProtocol mockScmClient = mock(
-            StorageContainerLocationProtocol.class);
+    StorageContainerLocationInternalInterface mockScmClient = mock(
+            StorageContainerLocationInternalInterface.class);
     mockScmServiceProvider = mock(
             StorageContainerServiceProviderImpl.class);
 
@@ -205,7 +205,7 @@ public class TestOpenContainerCount {
                     .addBinding(NodeEndpoint.class)
                     .addBinding(MetricsServiceProviderFactory.class)
                     .addBinding(ReconUtils.class, reconUtilsMock)
-                    .addBinding(StorageContainerLocationProtocol.class,
+                    .addBinding(StorageContainerLocationInternalInterface.class,
                             mockScmClient)
                     .build();
 

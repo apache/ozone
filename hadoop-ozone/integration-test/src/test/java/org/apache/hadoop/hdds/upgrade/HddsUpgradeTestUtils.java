@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -67,7 +67,7 @@ public final class HddsUpgradeTestUtils {
   private HddsUpgradeTestUtils() { }
 
   public static void waitForFinalizationFromClient(
-      StorageContainerLocationProtocol scmClient, String clientID)
+      StorageContainerLocationInternalInterface scmClient, String clientID)
       throws Exception {
     LambdaTestUtils.await(60_000, 1_000, () -> {
       UpgradeFinalization.Status status = scmClient

@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -115,7 +115,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
 
     Set<Pipeline> pipelines;
 
-    try (StorageContainerLocationProtocol scmLocationClient =
+    try (StorageContainerLocationInternalInterface scmLocationClient =
                createStorageContainerLocationClient(ozoneConf);
          XceiverClientFactory xceiverClientManager =
              new XceiverClientCreator(ozoneConf)) {

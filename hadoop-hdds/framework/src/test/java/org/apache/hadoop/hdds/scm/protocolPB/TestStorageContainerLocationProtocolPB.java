@@ -18,9 +18,13 @@
 package org.apache.hadoop.hdds.scm.protocolPB;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Modifier;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.security.KerberosInfo;
@@ -43,5 +47,12 @@ public class TestStorageContainerLocationProtocolPB {
     assertNotNull(kerberosInfo);
     assertEquals(ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
         kerberosInfo.serverPrincipal());
+  }
+
+  @Test
+  public void testProtocolIdentityIsSeparateFromInternalInterface() {
+    assertFalse(StorageContainerLocationProtocol.class.isInterface());
+    assertTrue(Modifier.isFinal(StorageContainerLocationProtocol.class.getModifiers()));
+    assertTrue(StorageContainerLocationInternalInterface.class.isInterface());
   }
 }

@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientCreator;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -88,7 +88,7 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
       );
     }
 
-    try (StorageContainerLocationProtocol scmClient =
+    try (StorageContainerLocationInternalInterface scmClient =
                  createStorageContainerLocationClient(ozoneConf)) {
       Pipeline pipeline = findPipelineForTest(pipelineId, scmClient, LOG);
 
