@@ -27,7 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BooleanSupplier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -48,6 +49,10 @@ import org.slf4j.LoggerFactory;
  * and the operator must re-submit on the new leader. {@link ExportFileManager} owns on-disk layout,
  * locking, part files, and completed archives; this class tracks {@link ExportJob} state and
  * schedules work.
+ *
+ * <p>Job submission and the running-job slot are guarded by a {@link ReadWriteLock}. Per-job
+ * progress is read via {@link ExportJob#toStatus()}, which uses its own read lock for a consistent
+ * snapshot.
  */
 public class ContainerExportManager {
 
@@ -57,8 +62,9 @@ public class ContainerExportManager {
   private static final int DEFAULT_PART_SIZE = 500_000;
   private static final long SHUTDOWN_TIMEOUT_MS = 5_000;
 
+  private final ReadWriteLock lock = new ReentrantReadWriteLock();
   private final Map<ExportJob.Id, ExportJob> jobMap = new ConcurrentHashMap<>();
-  private final AtomicReference<ExportJob.Id> runningJobId = new AtomicReference<>();
+  private ExportJob.Id runningJobId;
   private final ExecutorService workerPool;
   private final ContainerManager containerManager;
   private final ExportFileManager fileManager;
@@ -106,28 +112,34 @@ public class ContainerExportManager {
    */
   public ExportJob.Id submitJob(ContainerID start, LifeCycleState lifeCycleState,
       ContainerHealthState healthState) {
-    final ExportScope scope = ExportScope.of(lifeCycleState, healthState);
-
     if (!isLeaderReady.getAsBoolean()) {
       return null;
     }
 
-    ExportJob.Id jobId = ExportJob.Id.newId();
-    if (!runningJobId.compareAndSet(null, jobId)) {
-      return null;
+    final ExportScope scope = ExportScope.of(lifeCycleState, healthState);
+
+    lock.writeLock().lock();
+    try {
+      if (runningJobId != null) {
+        return null;
+      }
+
+      ExportJob.Id jobId = ExportJob.Id.newId();
+      Instant now = Instant.now();
+      String jobStartTime = ExportFileManager.formatJobStartTime(now);
+      String plannedArchivePath = fileManager.resolveArchiveFile(scope, jobStartTime, jobId).getAbsolutePath();
+
+      ExportJob job = new ExportJob(jobId, scope, jobStartTime, plannedArchivePath, start, batchSize, partSize);
+      runningJobId = jobId;
+      jobMap.put(jobId, job);
+
+      workerPool.submit(() -> executeExport(job));
+      LOG.info("Submitted container ID export job {} (scope={}, start={}, batchSize={}, partSize={})",
+          jobId, scope, start, batchSize, partSize);
+      return jobId;
+    } finally {
+      lock.writeLock().unlock();
     }
-
-    Instant now = Instant.now();
-    String jobStartTime = ExportFileManager.formatJobStartTime(now);
-    String plannedArchivePath = fileManager.resolveArchiveFile(scope, jobStartTime, jobId).getAbsolutePath();
-
-    ExportJob job = new ExportJob(jobId, scope, jobStartTime, plannedArchivePath, start, batchSize, partSize);
-    jobMap.put(jobId, job);
-
-    workerPool.submit(() -> executeExport(job));
-    LOG.info("Submitted container ID export job {} (scope={}, start={}, batchSize={}, partSize={})",
-        jobId, scope, start, batchSize, partSize);
-    return jobId;
   }
 
   public ExportJob.Status getExportStatus(ExportJob.Id jobId) {
@@ -239,7 +251,18 @@ public class ContainerExportManager {
       job.fail(e.getMessage() != null ? e.getMessage() : e.toString());
       LOG.error("Export job {} failed", jobIdValue, e);
     } finally {
-      runningJobId.compareAndSet(job.getId(), null);
+      clearRunningJob(job.getId());
+    }
+  }
+
+  private void clearRunningJob(ExportJob.Id jobId) {
+    lock.writeLock().lock();
+    try {
+      if (runningJobId != null && runningJobId.equals(jobId)) {
+        runningJobId = null;
+      }
+    } finally {
+      lock.writeLock().unlock();
     }
   }
 
