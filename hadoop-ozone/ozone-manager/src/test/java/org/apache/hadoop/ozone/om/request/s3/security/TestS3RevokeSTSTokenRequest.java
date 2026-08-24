@@ -226,7 +226,7 @@ public class TestS3RevokeSTSTokenRequest {
           ozoneManager, originalAccessKeyId, false);
       final OMClientRequest omClientRequest = new S3RevokeSTSTokenRequest(buildRevokeOmRequest(originalAccessKeyId));
       final OMException ex = assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
-      assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+      assertEquals(OMException.ResultCodes.ACCESS_ID_NOT_FOUND, ex.getResult());
       assertTrue(ex.getMessage().contains("does not exist"));
       assertTrue(ex.getMessage().contains(originalAccessKeyId));
       verify(s3SecretManager).hasS3Secret(originalAccessKeyId);
@@ -247,7 +247,7 @@ public class TestS3RevokeSTSTokenRequest {
 
       final OMClientRequest omClientRequest = new S3RevokeSTSTokenRequest(buildRevokeOmRequest(originalAccessKeyId));
       final OMException ex = assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
-      assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+      assertEquals(OMException.ResultCodes.ACCESS_ID_NOT_FOUND, ex.getResult());
       assertTrue(ex.getMessage().contains("does not exist"));
       assertTrue(ex.getMessage().contains(originalAccessKeyId));
       verify(s3SecretManager).hasS3Secret(originalAccessKeyId);

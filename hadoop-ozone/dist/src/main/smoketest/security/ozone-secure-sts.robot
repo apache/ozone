@@ -590,7 +590,7 @@ Revoke STS Token Should Fail For Unknown Original Access Key Id
     # Revoking a bogus originalAccessKeyId must fail before writing to the revocation table.
     Kinit test user               ${TEST_USER_ADMIN}            ${TEST_USER_ADMIN}.keytab
     ${output} =                   Execute And Ignore Error      ozone s3 revokeststoken -o bogus-original-access-key-id -y ${OM_HA_PARAM}
-    Should Contain                ${output}                     INVALID_REQUEST
+    Should Contain                ${output}                     ACCESS_ID_NOT_FOUND
     Should Contain                ${output}                     does not exist
 
 List Objects V1 and V2 IAM Session Policy Matrix for OBS and FSO

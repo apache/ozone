@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESS_ID_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
@@ -84,7 +85,7 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(ozoneManager, ugi, originalAccessKeyId);
 
     if (!ozoneManager.getS3SecretManager().hasS3Secret(originalAccessKeyId)) {
-      throw new OMException("originalAccessKeyId does not exist: " + originalAccessKeyId, INVALID_REQUEST);
+      throw new OMException("originalAccessKeyId does not exist: " + originalAccessKeyId, ACCESS_ID_NOT_FOUND);
     }
 
     final long revocationTimeMillis = CLOCK.millis();
