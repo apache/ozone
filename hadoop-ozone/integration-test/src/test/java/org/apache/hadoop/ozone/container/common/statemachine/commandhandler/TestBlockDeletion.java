@@ -272,7 +272,7 @@ public class TestBlockDeletion {
         .getDatanodeStateMachine().getContainer().getContainerSet();
     GenericTestUtils.waitFor(() -> {
       return !(omKeyLocationInfoGroupList.stream().anyMatch((group) ->
-        group.getLocationList().stream().anyMatch((info) ->
+        group.createLocationList().stream().anyMatch((info) ->
           containerSet.getContainer(info.getContainerID()).getContainerData()
               .getState() != ContainerProtos.ContainerDataProto.State.CLOSED
         )
@@ -496,7 +496,7 @@ public class TestBlockDeletion {
         containerIdList.toArray(new Long[0]));
     // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      List<OmKeyLocationInfo> locationInfo = group.createLocationList();
       locationInfo.forEach(
           (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
               .getContainer().getContainerSet()
@@ -626,7 +626,7 @@ public class TestBlockDeletion {
         containerIdList.toArray(new Long[0]));
     // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      List<OmKeyLocationInfo> locationInfo = group.createLocationList();
       locationInfo.forEach(
           (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
               .getContainer().getContainerSet()
