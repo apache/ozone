@@ -39,8 +39,11 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND_COUNT_UPDATED;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -61,6 +64,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -71,6 +75,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -213,15 +218,16 @@ public class TestSCMNodeManager {
    * safe Mode.
    *
    * @throws IOException
-   * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
   public void testScmHeartbeat()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, AuthenticationException {
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       int registeredNodes = 5;
+      long hbProcessedBefore =
+          getLongCounter("NumHBProcessed", getMetrics(SCMNodeMetrics.SOURCE_NAME));
       // Send some heartbeats from different nodes.
       for (int x = 0; x < registeredNodes; x++) {
         DatanodeDetails datanodeDetails = HddsTestUtils
@@ -229,10 +235,10 @@ public class TestSCMNodeManager {
         nodeManager.processHeartbeat(datanodeDetails);
       }
 
-      //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
-      assertEquals(nodeManager.getAllNodes().size(), registeredNodes,
-          "Heartbeat thread should have picked up the scheduled heartbeats.");
+      // Each heartbeat above is processed synchronously by the node manager.
+      assertEquals(hbProcessedBefore + registeredNodes,
+          getLongCounter("NumHBProcessed", getMetrics(SCMNodeMetrics.SOURCE_NAME)),
+          "All scheduled heartbeats should have been processed.");
     }
   }
 
@@ -339,6 +345,81 @@ public class TestSCMNodeManager {
 
     assertEquals(expectedResult, cmd.getError());
     return cmd.getDatanode();
+  }
+
+  private static DatanodeDetails.Builder datanodeWithoutDatastream(UUID uuid) {
+    return DatanodeDetails.newBuilder()
+        .setUuid(uuid)
+        .setHostName("host-" + uuid)
+        .setIpAddress("127.0.0.1")
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.STANDALONE, 9859))
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.RATIS, 9858));
+  }
+
+  private void registerNode(SCMNodeManager nodeManager, DatanodeDetails dn) {
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
+        dn.getID(), dn.getNetworkFullPath(), Long.MAX_VALUE);
+    MetadataStorageReportProto metadataStorageReport =
+        HddsTestUtils.createMetadataStorageReport(
+            dn.getNetworkFullPath(), Long.MAX_VALUE);
+    RegisteredCommand cmd = nodeManager.register(dn,
+        HddsTestUtils.createNodeReport(Arrays.asList(storageReport),
+            Arrays.asList(metadataStorageReport)),
+        getRandomPipelineReports(), UpgradeUtils.defaultLayoutVersionProto());
+    assertEquals(success, cmd.getError());
+  }
+
+  /**
+   * A datanode that re-registers with the same identity but now exposes the
+   * RATIS_DATASTREAM port (e.g. Ratis DataStream was enabled) must have its
+   * stored record refreshed so the new port is visible (HDDS-15799).
+   */
+  @Test
+  public void testRegisterRefreshesPortsOnPortChange()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      final UUID uuid = UUID.randomUUID();
+
+      // First registration: streaming disabled, no RATIS_DATASTREAM port.
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid).build());
+      DatanodeDetails stored = nodeManager.getNode(
+          datanodeWithoutDatastream(uuid).build().getID());
+      assertFalse(stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+
+      // Re-registration (same id/ip/host/version) now exposing the port.
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid)
+          .addPort(DatanodeDetails.newPort(
+              DatanodeDetails.Port.Name.RATIS_DATASTREAM, 9855))
+          .build());
+      stored = nodeManager.getNode(
+          datanodeWithoutDatastream(uuid).build().getID());
+      assertTrue(stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM),
+          "stored node should be refreshed with the RATIS_DATASTREAM port");
+    }
+  }
+
+  /**
+   * Re-registering a datanode with an unchanged port set must not disturb the
+   * stored record (the port-refresh branch is skipped).
+   */
+  @Test
+  public void testRegisterKeepsPortsWhenUnchanged()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      final UUID uuid = UUID.randomUUID();
+
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid).build());
+      // Re-register with the identical port set.
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid).build());
+
+      final DatanodeDetails stored = nodeManager.getNode(
+          datanodeWithoutDatastream(uuid).build().getID());
+      assertTrue(stored.hasPort(DatanodeDetails.Port.Name.STANDALONE));
+      assertTrue(stored.hasPort(DatanodeDetails.Port.Name.RATIS));
+      assertFalse(stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+    }
   }
 
   private void assertPipelineClosedAfterLayoutHeartbeat(
@@ -464,7 +545,7 @@ public class TestSCMNodeManager {
           ReplicationConfig.fromProtoTypeAndFactor(
               HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
-      scm.getPipelineManager().createPipeline(ratisThree);
+      scm.getPipelineManager().createPipeline(ratisThree, StorageTier.getDefaultTier());
     }, "3 nodes should not have been found for a pipeline.");
     assertThat(ex.getMessage()).contains("Required 3. Found " +
         actualNodeCount);
@@ -477,10 +558,10 @@ public class TestSCMNodeManager {
         HddsProtos.ReplicationFactor.THREE);
     SCMException ex = assertThrows(
         SCMException.class,
-        () -> scm.getPipelineManager().createPipeline(config),
+        () -> scm.getPipelineManager().createPipeline(config, StorageTier.getDefaultTier()),
         "3 nodes should not have been found for a pipeline.");
     assertThat(ex.getMessage())
-        .contains("Cannot create pipeline as it would exceed the limit per datanode: " + limit);
+        .contains("Cannot create pipeline for StorageTier DISK as it would exceed the limit per datanode: " + limit);
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,
@@ -587,7 +668,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmHealthyNodeCount()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     final int count = 10;
 
@@ -597,9 +678,8 @@ public class TestSCMNodeManager {
             .createRandomDatanodeAndRegister(nodeManager);
         nodeManager.processHeartbeat(datanodeDetails);
       }
-      //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
-      assertEquals(count, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == count, 100, 4000);
 
       Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
       assertEquals(count,
@@ -812,13 +892,12 @@ public class TestSCMNodeManager {
       nodeManager.processHeartbeat(node1);
       nodeManager.processHeartbeat(node2);
 
-      // Sleep so that heartbeat processing thread gets to run.
-      Thread.sleep(1000);
+      // Wait for the heartbeat processing thread to mark both nodes healthy.
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 2, 100, 5000);
 
       //Assert all nodes are healthy.
       assertEquals(2, nodeManager.getAllNodes().size());
-      assertEquals(2,
-          nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       /**
        * Simulate a JVM Pause and subsequent handling in following steps:
        * Step 1 : stop heartbeat check process for stale node interval
@@ -1802,7 +1881,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmRegisterNodeWith4LayerNetworkTopology()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1829,9 +1908,9 @@ public class TestSCMNodeManager {
       }
 
       // verify network topology cluster has all the registered nodes
-      Thread.sleep(4 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == nodeCount, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
       final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
@@ -1844,7 +1923,7 @@ public class TestSCMNodeManager {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testScmRegisterNodeWithNetworkTopology(boolean useHostname)
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1872,10 +1951,9 @@ public class TestSCMNodeManager {
       }
 
       // verify network topology cluster has all the registered nodes
-      Thread.sleep(4 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == nodeCount, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(nodeCount,
-          nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(3, clusterMap.getMaxLevel());
       final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();
@@ -2037,7 +2115,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmRegisterNodeWithUpdatedIpAndHostname()
-          throws IOException, InterruptedException, AuthenticationException {
+          throws IOException, InterruptedException, TimeoutException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
             MILLISECONDS);
@@ -2061,10 +2139,9 @@ public class TestSCMNodeManager {
       nodeManager.register(node, null, null);
 
       // verify network topology cluster has all the registered nodes
-      Thread.sleep(2 * 1000);
+      GenericTestUtils.waitFor(
+          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 1, 100, 5000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(1,
-              nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
       final List<DatanodeInfo> nodeList = nodeManager.getAllNodes();

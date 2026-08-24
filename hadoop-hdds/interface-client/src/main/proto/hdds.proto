@@ -143,6 +143,7 @@ message Pipeline {
 
     optional DatanodeIDProto leaderDatanodeID = 101;
     optional DatanodeIDProto suggestedLeaderDatanodeID = 102;
+    repeated StorageTierProto supportedStorageTier = 103;
 }
 
 message KeyValue {
@@ -159,6 +160,7 @@ enum StorageTypeProto {
   ARCHIVE = 3;
   RAM_DISK = 4;
   PROVIDED = 5;
+  NVDIMM = 6;
 }
 
 /**
@@ -267,12 +269,14 @@ message ContainerInfoProto {
     required uint64 numberOfKeys = 5;
     optional int64 stateEnterTime = 6;
     required string owner = 7;
-    optional int64 deleteTransactionId = 8;
+    // Legacy SCM-side delete transaction ID. SCM no longer updates this field.
+    optional int64 deleteTransactionId = 8 [deprecated = true];
     optional int64 sequenceId = 9;
     optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
     optional ECReplicationConfig ecReplicationConfig = 12;
     optional bool suppressed = 13;
+    optional StorageTierProto storageTier = 14;
 }
 
 message ContainerWithPipeline {
@@ -324,6 +328,18 @@ enum ReplicationFactor {
     ONE = 1;
     THREE = 3;
     ZERO = 0; // Invalid Factor
+}
+
+enum StorageTierProto {
+    DISK_TIER = 1;
+    SSD_TIER = 2;
+    ARCHIVE_TIER = 3;
+}
+
+enum StoragePolicyProto {
+    HOT = 1;
+    WARM = 2;
+    COLD = 3;
 }
 
 message ECReplicationConfig {
@@ -591,6 +607,7 @@ message VolumeReportProto {
     optional uint64 committedBytes = 5;
     optional uint64 effectiveUsedSpace = 6;
     optional double utilization = 7;
+    optional uint64 ozoneAvailable = 8;
 }
 
 message DatanodeDiskBalancerInfoProto {

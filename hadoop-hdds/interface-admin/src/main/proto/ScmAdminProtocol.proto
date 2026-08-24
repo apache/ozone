@@ -220,6 +220,7 @@ message ContainerRequestProto {
   required string owner = 4;
   optional string traceID = 5;
   optional ECReplicationConfig ecReplicationConfig = 6;
+  optional StorageTierProto storageTier = 7;
 }
 
 /**
@@ -470,6 +471,7 @@ message GetPipelineResponseProto {
 }
 
 message GetContainerCountRequestProto {
+  optional LifeCycleState state = 1;
 }
 
 message GetContainerCountResponseProto {
@@ -657,6 +659,9 @@ message ContainerBalancerStatusInfoProto {
   optional uint64 startedAt = 1;
   optional ContainerBalancerConfigurationProto configuration = 2;
   repeated ContainerBalancerTaskIterationStatusInfoProto iterationsStatusInfo = 3;
+  optional uint64 stoppedAt = 4;
+  optional string stopReason = 5;
+  optional string stopMessage = 6;
 }
 
 message ContainerBalancerTaskIterationStatusInfoProto {

@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,18 +33,21 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -63,6 +67,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -79,6 +84,8 @@ import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -158,7 +165,7 @@ public class TestKeyValueContainer {
             .map(v -> (StorageVolume) v)
             .collect(Collectors.toList()));
     when(volumeChoosingPolicy
-        .chooseVolume(anyList(), anyLong())).thenAnswer(
+        .chooseVolume(anyList(), anyLong(), eq(StorageType.DISK))).thenAnswer(
             invocation -> {
               List<HddsVolume> volumes = invocation.getArgument(0);
               return volumes.get(0);
@@ -198,6 +205,32 @@ public class TestKeyValueContainer {
         ".Container File does not exist");
     assertTrue(keyValueContainer.getContainerDBFile().exists(), "Container " +
         "DB does not exist");
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testCreateContainerWithStorageType(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+
+    HddsVolume ssdVolume = new HddsVolume.Builder(
+        new File(folder, "ssd-volume").getAbsolutePath())
+        .conf(CONF)
+        .datanodeUuid(datanodeId.toString())
+        .storageType(StorageType.SSD)
+        .build();
+    StorageVolumeUtil.checkVolume(ssdVolume, scmId, scmId, CONF, null, null);
+    hddsVolumes.add(ssdVolume);
+
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(),
+        eq(StorageType.SSD))).thenReturn(ssdVolume);
+
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId,
+        StorageType.SSD);
+
+    assertSame(ssdVolume, keyValueContainerData.getVolume());
+    assertEquals(StorageType.SSD, keyValueContainerData.getStorageType());
+    verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong(),
+        eq(StorageType.SSD));
   }
 
   /**
@@ -429,7 +462,7 @@ public class TestKeyValueContainer {
       KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1, StorageType.DISK);
 
       container.populatePathFields(scmId, containerVolume);
       try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
@@ -475,7 +508,7 @@ public class TestKeyValueContainer {
       container = new KeyValueContainer(containerData, CONF);
 
       containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1, StorageType.DISK);
       container.populatePathFields(scmId, containerVolume);
       KeyValueContainer finalContainer1 = container;
       assertThrows(IOException.class, () -> {
@@ -490,6 +523,68 @@ public class TestKeyValueContainer {
         }
       });
     }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testFailedImportCleanupMovesContainerBeforeDelete(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1, StorageType.DISK);
+
+    KeyValueContainer container = new KeyValueContainer(
+        keyValueContainerData, CONF) {
+      @Override
+      void deleteDirectory(File directory) throws IOException {
+        File deletedContainerDir = KeyValueContainerUtil.getTmpDirectoryPath(
+            getContainerData(), getContainerData().getVolume()).toFile();
+        if (directory.equals(deletedContainerDir)) {
+          throw new IOException("Injected tmp cleanup failure");
+        }
+        super.deleteDirectory(directory);
+      }
+    };
+    container.populatePathFields(scmId, containerVolume);
+
+    ContainerPacker<KeyValueContainerData> failingPacker =
+        new ContainerPacker<KeyValueContainerData>() {
+          @Override
+          public byte[] unpackContainerData(
+              Container<KeyValueContainerData> containerToUnpack,
+              InputStream inputStream, Path tmpDir, Path destContainerDir)
+              throws IOException {
+            Files.createDirectories(new File(containerToUnpack
+                .getContainerData().getChunksPath()).toPath());
+            Files.createDirectories(new File(containerToUnpack
+                .getContainerData().getMetadataPath()).toPath());
+            throw new IOException("Injected import failure");
+          }
+
+          @Override
+          public void pack(Container<KeyValueContainerData> containerToPack,
+              OutputStream destination) {
+          }
+
+          @Override
+          public byte[] unpackContainerDescriptor(InputStream inputStream) {
+            return null;
+          }
+        };
+
+    assertThrows(IOException.class, () -> container.importContainerData(
+        new ByteArrayInputStream(new byte[0]), failingPacker));
+
+    assertThat(new File(container.getContainerData().getContainerPath()))
+        .doesNotExist();
+    File deletedContainerDir = KeyValueContainerUtil.getTmpDirectoryPath(
+        container.getContainerData(), container.getContainerData().getVolume())
+        .toFile();
+    assertThat(deletedContainerDir).exists();
+    assertThat(new File(deletedContainerDir, OzoneConsts.STORAGE_DIR_CHUNKS))
+        .exists();
+    assertThat(new File(deletedContainerDir, OzoneConsts.CONTAINER_META_PATH))
+        .exists();
   }
 
   private void checkContainerFilesPresent(KeyValueContainerData data,
@@ -508,7 +603,7 @@ public class TestKeyValueContainer {
    * Create the container on disk.
    */
   private void createContainer() throws StorageContainerException {
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
     keyValueContainerData = keyValueContainer.getContainerData();
   }
 
@@ -606,9 +701,9 @@ public class TestKeyValueContainer {
   public void testDuplicateContainer(ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
 
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
     StorageContainerException exception = assertThrows(StorageContainerException.class, () ->
-        keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId));
+        keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK));
     assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS, exception.getResult());
     assertThat(exception).hasMessage("Container creation failed because ContainerFile already exists");
   }
@@ -618,13 +713,13 @@ public class TestKeyValueContainer {
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
     reset(volumeChoosingPolicy);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
         .thenThrow(DiskChecker.DiskOutOfSpaceException.class);
 
     StorageContainerException exception = assertThrows(StorageContainerException.class, () ->
-        keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId));
+        keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK));
     assertEquals(ContainerProtos.Result.DISK_OUT_OF_SPACE, exception.getResult());
-    assertThat(exception).hasMessage("Container creation failed, due to disk out of space");
+    assertThat(exception).hasMessage("Container creation failed, due to disk out of space on StorageType: DISK");
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -634,7 +729,7 @@ public class TestKeyValueContainer {
     closeContainer();
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
     KeyValueContainerUtil.removeContainer(
         keyValueContainer.getContainerData(), CONF);
     keyValueContainer.delete();
@@ -661,7 +756,7 @@ public class TestKeyValueContainer {
   public void testCloseContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
     keyValueContainer.close();
 
     keyValueContainerData = keyValueContainer
@@ -683,7 +778,7 @@ public class TestKeyValueContainer {
   public void testReportOfUnhealthyContainer(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
     assertNotNull(keyValueContainer.getContainerReport());
     keyValueContainer.markContainerUnhealthy();
     File containerFile = keyValueContainer.getContainerFile();
@@ -694,11 +789,40 @@ public class TestKeyValueContainer {
     assertNotNull(keyValueContainer.getContainerReport());
   }
 
+  /**
+   * When a container's metadata directory is missing (MISSING_METADATA_DIR detected by the scanner),
+   * markContainerUnhealthy must succeed without throwing. Writing a partial .container file with only
+   * the state field would lose other metadata and is more harmful than writing nothing. The in-memory
+   * UNHEALTHY state is sufficient for SCM to receive it via ICR and schedule deletion.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testMarkUnhealthyWithMissingMetadataDir(ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
+
+    // Simulate MISSING_METADATA_DIR using the same corruption helper used in scanner tests.
+    File metadataDir = new File(keyValueContainerData.getMetadataPath());
+    assertTrue(metadataDir.exists(), "Metadata dir should exist before corruption");
+    MISSING_METADATA_DIR.applyTo(keyValueContainer);
+
+    // markContainerUnhealthy must not throw even though the metadata dir is absent.
+    keyValueContainer.markContainerUnhealthy();
+
+    // In-memory state must be UNHEALTHY.
+    assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+        keyValueContainer.getContainerState());
+
+    // Regression guards: if a future change adds mkdirs/persist logic, these catch it early.
+    assertFalse(metadataDir.exists(), "Metadata dir should not be recreated by markContainerUnhealthy");
+    assertFalse(keyValueContainer.getContainerFile().exists(),
+        "Container file should not be written when metadata dir is missing");
+  }
+
   @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
     Map<String, String> metadata = new HashMap<>();
     metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
     metadata.put(OzoneConsts.OWNER, OzoneConsts.OZONE_SIMPLE_HDFS_USER);
@@ -727,7 +851,7 @@ public class TestKeyValueContainer {
 
     StorageContainerException exception = assertThrows(StorageContainerException.class, () -> {
       keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
       Map<String, String> metadata = new HashMap<>();
       metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
       keyValueContainer.update(metadata, false);
@@ -744,7 +868,7 @@ public class TestKeyValueContainer {
     closeContainer();
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
 
     try (DBHandle db = BlockUtils.getDB(keyValueContainerData, CONF)) {
       RDBStore store = (RDBStore) db.getStore().getStore();
@@ -798,7 +922,7 @@ public class TestKeyValueContainer {
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
     // Create Container 1
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
 
     DatanodeDBProfile outProfile1;
     try (DBHandle db1 =
@@ -819,7 +943,7 @@ public class TestKeyValueContainer {
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
     keyValueContainer = new KeyValueContainer(keyValueContainerData, otherConf);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
 
     DatanodeDBProfile outProfile2;
     try (DBHandle db2 =
@@ -899,7 +1023,7 @@ public class TestKeyValueContainer {
     List<File> exportFiles = new ArrayList<>();
     for (HddsVolume volume: volumeList) {
       reset(volumeChoosingPolicy);
-      when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+      when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
           .thenReturn(volume);
       for (int index = 0; index < count; index++, containerId++) {
         // Create new container
@@ -907,7 +1031,7 @@ public class TestKeyValueContainer {
             (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
             datanodeId.toString());
         container = new KeyValueContainer(containerData, CONF);
-        container.create(volumeSet, volumeChoosingPolicy, scmId);
+        container.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
         containerData = container.getContainerData();
         containerData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
         populate(container, numberOfKeysToWrite);
@@ -1014,7 +1138,7 @@ public class TestKeyValueContainer {
       KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1, StorageType.DISK);
 
       container.populatePathFields(scmId, containerVolume);
       try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
@@ -1062,7 +1186,7 @@ public class TestKeyValueContainer {
       KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1, StorageType.DISK);
 
       container.populatePathFields(scmId, containerVolume);
       try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
@@ -1117,7 +1241,7 @@ public class TestKeyValueContainer {
         ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     KeyValueContainer container = new KeyValueContainer(data, conf);
-    container.create(volumeSet, volumeChoosingPolicy, scmId);
+    container.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
     long pendingDeleteBlockCount = 20;
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       Table<String, Long> metadataTable = meta.getStore().getMetadataTable();
@@ -1179,10 +1303,10 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
     keyValueContainer = spy(keyValueContainer);
 
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
 
     // verify that
-    verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong()); // this would reserve commit space
+    verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong(), eq(StorageType.DISK));
     assertTrue(keyValueContainerData.isCommittedSpace());
   }
 }

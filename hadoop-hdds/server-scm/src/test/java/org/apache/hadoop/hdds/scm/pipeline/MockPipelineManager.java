@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -64,26 +65,32 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public Pipeline createPipeline(ReplicationConfig replicationConfig)
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
+      StorageTier storageTier)
       throws IOException {
     return createPipeline(replicationConfig, Collections.emptyList(),
-        Collections.emptyList());
+        Collections.emptyList(), storageTier);
   }
 
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+      StorageTier storageTier)
       throws IOException {
     Pipeline pipeline;
     if (replicationConfig.getReplicationType()
         == HddsProtos.ReplicationType.EC) {
       pipeline = buildECPipeline(
-          replicationConfig, excludedNodes, favoredNodes);
+          replicationConfig, excludedNodes, favoredNodes)
+          .toBuilder()
+          .setSupportedStorageTier(storageTier)
+          .build();
     } else {
       pipeline = createPipeline(replicationConfig,
           ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
               MockDatanodeDetails.randomDatanodeDetails(),
-              MockDatanodeDetails.randomDatanodeDetails()));
+              MockDatanodeDetails.randomDatanodeDetails()),
+          storageTier);
     }
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
@@ -116,11 +123,12 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public Pipeline createPipeline(final ReplicationConfig replicationConfig,
-      final List<DatanodeDetails> nodes) {
+      final List<DatanodeDetails> nodes, StorageTier storageTier) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
+        .setSupportedStorageTier(storageTier)
         .setState(Pipeline.PipelineState.OPEN)
         .build();
   }
@@ -179,11 +187,17 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+      final Pipeline.PipelineState state, StorageTier storageTier) {
+    return stateManager.getPipelines(replicationConfig, state, storageTier);
+  }
+
+  @Override
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       final Pipeline.PipelineState state,
       final Collection<DatanodeDetails> excludeDns,
-      final Collection<PipelineID> excludePipelines) {
+      final Collection<PipelineID> excludePipelines, StorageTier storageTier) {
     return stateManager.getPipelines(replicationConfig, state,
-        excludeDns, excludePipelines);
+        excludeDns, excludePipelines, storageTier);
   }
 
   @Override
@@ -334,15 +348,13 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public boolean hasEnoughSpace(Pipeline pipeline) {
-    return false;
-  }
-
-  @Override
-  public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
+  public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
+      if (!nodeManager.checkSpaceAndRecordAllocation(nodeManager.getNode(dn.getID()), containerID)) {
+        return false;
+      }
     }
+    return true;
   }
 
   @Override

@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doNothing;
@@ -232,6 +234,19 @@ class TestContainerImporter {
         targetVolume, NO_COMPRESSION);
 
     assertEquals(Optional.empty(), containerData.lastDataScanTime());
+  }
+
+  @Test
+  public void testChooseNextVolumeStorageType() throws Exception {
+    VolumeChoosingPolicy policy = mock(VolumeChoosingPolicy.class);
+    HddsVolume expectedVolume = mock(HddsVolume.class);
+    long spaceToReserve = 100L;
+    when(policy.chooseVolume(anyList(), anyLong(), isNull()))
+        .thenReturn(expectedVolume);
+    ContainerImporter importer = new ContainerImporter(conf, containerSet,
+        controllerMock, volumeSet, policy);
+
+    assertEquals(expectedVolume, importer.chooseNextVolume(spaceToReserve));
   }
 
   private File containerTarFile(long id, ContainerData data) throws IOException {

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -53,6 +55,7 @@ import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -61,7 +64,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -181,13 +184,8 @@ public class PipelineManagerImpl implements PipelineManager {
             .setServiceName("BackgroundPipelineScrubber")
             .setIntervalInMillis(scrubberIntervalInMillis)
             .setWaitTimeInMillis(safeModeWaitMs)
-            .setPeriodicalTask(() -> {
-              try {
-                pipelineManager.scrubPipelines();
-              } catch (IOException e) {
-                LOG.error("Unexpected error during pipeline scrubbing", e);
-              }
-            }).build();
+            .setPeriodicalTask(pipelineManager::scrubAndClosePipelinesMissingDataStreamPort)
+            .build();
 
     pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
     serviceManager.register(backgroundPipelineScrubber);
@@ -213,9 +211,10 @@ public class PipelineManagerImpl implements PipelineManager {
     if (replicationConfig.getReplicationType() != ReplicationType.EC) {
       throw new IllegalArgumentException("Replication type must be EC");
     }
+    // TODO StoragePolicy Support EC
     checkIfPipelineCreationIsAllowed(replicationConfig);
     return pipelineFactory.create(replicationConfig, excludedNodes,
-        favoredNodes);
+        favoredNodes, StorageTier.getDefaultTier());
   }
 
   /**
@@ -237,15 +236,17 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public Pipeline createPipeline(ReplicationConfig replicationConfig)
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
+      StorageTier storageTier)
       throws IOException {
     return createPipeline(replicationConfig, Collections.emptyList(),
-        Collections.emptyList());
+        Collections.emptyList(), storageTier);
   }
 
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+      StorageTier storageTier)
       throws IOException {
     checkIfPipelineCreationIsAllowed(replicationConfig);
 
@@ -254,8 +255,10 @@ public class PipelineManagerImpl implements PipelineManager {
     try {
       try {
         pipeline = pipelineFactory.create(replicationConfig,
-            excludedNodes, favoredNodes);
+            excludedNodes, favoredNodes, storageTier);
       } catch (IOException e) {
+        LOG.debug("Failed to create pipeline with replicationConfig {} " +
+            "storageTier {}.", replicationConfig, storageTier, e);
         metrics.incNumPipelineCreationFailed();
         throw e;
       }
@@ -317,11 +320,12 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public Pipeline createPipeline(
       ReplicationConfig replicationConfig,
-      List<DatanodeDetails> nodes
-  ) {
+      List<DatanodeDetails> nodes,
+      StorageTier storageTier
+  ) throws IOException {
     // This will mostly be used to create dummy pipeline for SimplePipelines.
     // We don't update the metrics for SimplePipelines.
-    return pipelineFactory.create(replicationConfig, nodes);
+    return pipelineFactory.create(replicationConfig, nodes, storageTier);
   }
 
   @Override
@@ -363,12 +367,19 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
+  public List<Pipeline> getPipelines(ReplicationConfig config,
+      Pipeline.PipelineState state, StorageTier storageTier) {
+    return stateManager.getPipelines(config, state, storageTier);
+  }
+
+  @Override
   public List<Pipeline> getPipelines(
       ReplicationConfig replicationConfig,
       Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
-      Collection<PipelineID> excludePipelines) {
+      Collection<PipelineID> excludePipelines, StorageTier storageTier) {
     return stateManager
-        .getPipelines(replicationConfig, state, excludeDns, excludePipelines);
+        .getPipelines(replicationConfig, state, excludeDns, excludePipelines,
+            storageTier);
   }
 
   /**
@@ -476,14 +487,13 @@ public class PipelineManagerImpl implements PipelineManager {
     for (ContainerID containerID : containerIDs) {
       if (containerManager.getContainer(containerID).getState()
             == HddsProtos.LifeCycleState.OPEN) {
-        try {
-          containerManager.updateContainerState(containerID,
-              HddsProtos.LifeCycleEvent.FINALIZE);
-        } catch (InvalidStateTransitionException ex) {
-          throw new IOException(ex);
-        }
+        containerManager.updateContainerState(containerID,
+            HddsProtos.LifeCycleEvent.FINALIZE);
       }
-      eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+      if (containerManager.getContainer(containerID).getState() ==
+          HddsProtos.LifeCycleState.CLOSING) {
+        eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+      }
       LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
     }
   }
@@ -563,6 +573,64 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   /**
+   * Scrub pipelines, then close (and delete) OPEN RATIS pipelines whose
+   * registered nodes now advertise the RATIS_DATASTREAM port their stored node
+   * snapshot lacks.
+   */
+  public void scrubAndClosePipelinesMissingDataStreamPort() {
+    try {
+      scrubPipelines();
+    } catch (IOException e) {
+      LOG.error("Unexpected error during pipeline scrubbing", e);
+    }
+    closePipelinesMissingDataStreamPort();
+  }
+
+  void closePipelinesMissingDataStreamPort() {
+    if (!isDataStreamEnabled()) {
+      return;
+    }
+    for (Pipeline pipeline : getPipelines()) {
+      if (!pipeline.isOpen()
+          || pipeline.getType() != ReplicationType.RATIS
+          || !nodesMissingDataStreamPort(pipeline)) {
+        continue;
+      }
+      try {
+        final PipelineID id = pipeline.getId();
+        LOG.info("Closing RATIS pipeline {}", id);
+        closePipeline(id);
+        deletePipeline(id);
+      } catch (IOException e) {
+        LOG.error("Failed to close RATIS pipeline {} missing the datastream "
+            + "port", pipeline.getId(), e);
+      }
+    }
+  }
+
+  private boolean isDataStreamEnabled() {
+    return conf.getBoolean(
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
+  }
+
+  /**
+   * Whether any registered node of the pipeline now advertises the
+   * RATIS_DATASTREAM port that the pipeline's stored node snapshot lacks.
+   */
+  private boolean nodesMissingDataStreamPort(Pipeline pipeline) {
+    for (DatanodeDetails stored : pipeline.getNodes()) {
+      final DatanodeDetails current = nodeManager.getNode(stored.getID());
+      if (current != null
+          && current.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)
+          && !stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Scrub pipelines.
    */
   @Override
@@ -634,20 +702,30 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public boolean hasEnoughSpace(Pipeline pipeline) {
-    for (DatanodeDetails node : pipeline.getNodes()) {
-      if (!nodeManager.hasSpaceForNewContainerAllocation(node.getID())) {
+  public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
+    final Set<DatanodeDetails> datanodeDetails = pipeline.getNodeSet();
+    final List<DatanodeInfo> datanodeInfos = new ArrayList<>(datanodeDetails.size());
+    for (DatanodeDetails dn : datanodeDetails) {
+      // Refactored to use getNode instead of getDatanodeInfo
+      final DatanodeInfo info = nodeManager.getNode(dn.getID());
+      if (info == null) {
+        LOG.warn("DatanodeInfo not found for {}", dn.getID());
         return false;
       }
+      datanodeInfos.add(info);
+    }
+
+    final List<DatanodeInfo> successfulNodes = new ArrayList<>(datanodeInfos.size());
+    for (DatanodeInfo dn : datanodeInfos) {
+      if (!nodeManager.checkSpaceAndRecordAllocation(dn, containerID)) {
+        for (DatanodeInfo rollbackNode : successfulNodes) {
+          nodeManager.removePendingAllocationForDatanode(rollbackNode, containerID);
+        }
+        return false;
+      }
+      successfulNodes.add(dn);
     }
     return true;
-  }
-
-  @Override
-  public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
-    }
   }
 
   /**

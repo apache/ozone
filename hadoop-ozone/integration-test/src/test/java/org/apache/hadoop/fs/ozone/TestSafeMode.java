@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.SafeMode;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -117,7 +118,8 @@ class TestSafeMode {
           RatisReplicationConfig.getInstance(THREE);
       assertThrows(IOException.class, () -> cluster.getStorageContainerManager()
           .getWritableContainerFactory()
-          .getContainer(MB, replication, OZONE, new ExcludeList()));
+          .getContainer(MB, replication, OZONE, new ExcludeList(),
+              StorageTier.getDefaultTier()));
     } finally {
       IOUtils.closeQuietly(fs);
     }

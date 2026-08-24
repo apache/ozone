@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -39,7 +40,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -238,9 +238,10 @@ public class RatisUnderReplicationHandler
     int numCommandsSent = 0;
     for (ContainerReplica replica : sources) {
       // find a target for each source and send replicate command
+      // TODO StoragePolicy replace this StorageType with container actual StorageType
       final List<DatanodeDetails> target =
           ReplicationManagerUtil.getTargetDatanodes(placementPolicy, 1, excludedAndUsedNodes.getUsedNodes(),
-              excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container);
+              excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container, StorageType.DEFAULT);
       int count = 0;
       try {
         count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()), target);
@@ -460,33 +461,21 @@ public class RatisUnderReplicationHandler
 
     LOG.debug("UsedList: {}, size {}. ExcludeList: {}, size: {}. ",
         used, used.size(), excluded, excluded.size());
-
+    // TODO StoragePolicy replace this StorageType with container actual StorageType
     return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
         replicaCount.additionalReplicaNeeded(), used, excluded,
-        currentContainerSize, replicaCount.getContainer());
+        currentContainerSize, replicaCount.getContainer(), StorageType.DEFAULT);
   }
 
   private int sendReplicationCommands(
       ContainerInfo containerInfo, List<DatanodeDetails> sources,
       List<DatanodeDetails> targets) throws CommandTargetOverloadedException,
       NotLeaderException {
-    final boolean push = replicationManager.getConfig().isPush();
     int commandsSent = 0;
-
-    if (push) {
-      for (DatanodeDetails target : targets) {
-        replicationManager.sendThrottledReplicationCommand(
-            containerInfo, sources, target, 0);
-        commandsSent++;
-      }
-    } else {
-      for (DatanodeDetails target : targets) {
-        ReplicateContainerCommand command =
-            ReplicateContainerCommand.fromSources(
-                containerInfo.getContainerID(), sources);
-        replicationManager.sendDatanodeCommand(command, containerInfo, target);
-        commandsSent++;
-      }
+    for (DatanodeDetails target : targets) {
+      replicationManager.sendThrottledReplicationCommand(
+          containerInfo, sources, target, 0);
+      commandsSent++;
     }
     return commandsSent;
   }

@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -272,7 +273,7 @@ public final class TestSecretKeySnapshot {
       containers.add(scm.getContainerManager()
           .allocateContainer(
               RatisReplicationConfig.getInstance(ReplicationFactor.ONE),
-              this.getClass().getName()));
+              this.getClass().getName(), StorageTier.getDefaultTier()));
       Thread.sleep(100);
       logIndex = stateMachine.getLastAppliedTermIndex().getIndex();
     }

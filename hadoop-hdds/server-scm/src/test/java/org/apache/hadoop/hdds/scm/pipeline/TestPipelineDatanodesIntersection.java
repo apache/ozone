@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -108,7 +109,7 @@ public class TestPipelineDatanodesIntersection {
     while (!end && createdPipelineCount <= healthyNodeCount * nodeHeaviness) {
       try {
         Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE));
+            ReplicationFactor.THREE), StorageTier.getDefaultTier());
         HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
             ClientVersion.CURRENT_VERSION);
         stateManager.addPipeline(pipelineProto);
@@ -122,12 +123,12 @@ public class TestPipelineDatanodesIntersection {
             LOG.info("This pipeline: " + pipeline.getId().toString() +
                 " overlaps with previous pipeline: " + overlapPipeline.getId() +
                 ". They share same set of datanodes as: " +
-                pipeline.getNodesInOrder().get(0).getUuid() + "/" +
-                pipeline.getNodesInOrder().get(1).getUuid() + "/" +
-                pipeline.getNodesInOrder().get(2).getUuid() + " and " +
-                overlapPipeline.getNodesInOrder().get(0).getUuid() + "/" +
-                overlapPipeline.getNodesInOrder().get(1).getUuid() + "/" +
-                overlapPipeline.getNodesInOrder().get(2).getUuid() +
+                pipeline.getNodesInOrder().get(0).getID() + "/" +
+                pipeline.getNodesInOrder().get(1).getID() + "/" +
+                pipeline.getNodesInOrder().get(2).getID() + " and " +
+                overlapPipeline.getNodesInOrder().get(0).getID() + "/" +
+                overlapPipeline.getNodesInOrder().get(1).getID() + "/" +
+                overlapPipeline.getNodesInOrder().get(2).getID() +
                 " is the same.");
           }
         }

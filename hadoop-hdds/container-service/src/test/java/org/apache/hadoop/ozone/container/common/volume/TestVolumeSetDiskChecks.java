@@ -32,7 +32,6 @@ import com.google.common.collect.Iterables;
 import com.google.protobuf.Message;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -42,11 +41,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -301,14 +302,14 @@ public class TestVolumeSetDiskChecks {
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     container.create(volumeSet,
-        new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
+        new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString(), StorageType.DISK);
     conSet.addContainer(container);
 
     KeyValueContainer container1 = new KeyValueContainer(data1, conf);
     StorageVolumeUtil.getHddsVolumesList(volumeSet1.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     container1.create(volumeSet1,
-        new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
+        new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString(), StorageType.DISK);
     conSet.addContainer(container1);
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
@@ -316,7 +317,7 @@ public class TestVolumeSetDiskChecks {
         new OzoneConfiguration(), DatanodeStateMachine
         .DatanodeStates.getInitState(),
         datanodeStateMachineMock, "");
-    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
     stateContext.addEndpoint(scm1);
     when(datanodeStateMachineMock.getContainer()).thenReturn(ozoneContainer);
 

@@ -54,14 +54,13 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeInfoMetrics;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * A mix of helper functions for containers.
@@ -247,11 +246,8 @@ public final class ContainerUtils {
     if (enabled) {
       String storedChecksum = containerData.getContainerFileChecksum();
 
-      Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-          containerData.getContainerType(),
-          containerData instanceof KeyValueContainerData &&
-              ((KeyValueContainerData)containerData).getReplicaIndex() > 0);
-      containerData.computeAndSetContainerFileChecksum(yaml);
+      // Compute checksum (storageTypeis automatically excluded for rollback compatibility)
+      containerData.computeAndSetContainerFileChecksum();
       String computedChecksum = containerData.getContainerFileChecksum();
 
       if (storedChecksum == null || !storedChecksum.equals(computedChecksum)) {
@@ -367,15 +363,28 @@ public final class ContainerUtils {
   public static void assertSpaceAvailability(long containerId, HddsVolume volume, int sizeRequested)
       throws StorageContainerException {
     final SpaceUsageSource currentUsage = volume.getCurrentUsage();
-    final long spared = volume.getFreeSpaceToSpare(currentUsage.getCapacity());
+    final long capacity = currentUsage.getCapacity();
+    final long available = currentUsage.getAvailable();
+    final long hardSpare = volume.getFreeSpaceToSpare(capacity);
 
-    if (currentUsage.getAvailable() - spared < sizeRequested) {
+    if (available - hardSpare < sizeRequested) {
+      VolumeInfoMetrics stats = volume.getVolumeInfoStats();
+      if (stats != null) {
+        stats.incNumWriteRequestsRejectedHardMinFreeSpace();
+      }
       throw new StorageContainerException("Failed to write " + sizeRequested + " bytes to container "
           + containerId + " due to volume " + volume + " out of space "
-          + currentUsage + ", minimum free space spared="  + spared, DISK_OUT_OF_SPACE);
+          + currentUsage + ", minimum free space spared="  + hardSpare, DISK_OUT_OF_SPACE);
+    }
+    final long reportedSpare = volume.getReportedFreeSpaceToSpare(capacity);
+    if (available - reportedSpare < sizeRequested) {
+      VolumeInfoMetrics stats = volume.getVolumeInfoStats();
+      if (stats != null) {
+        stats.incNumWriteRequestsInSoftBandMinFreeSpace();
+      }
     }
   }
-  
+
   public static long getPendingDeletionBytes(ContainerData containerData) {
     if (containerData.getContainerType()
         .equals(ContainerProtos.ContainerType.KeyValueContainer)) {
@@ -388,5 +397,31 @@ public final class ContainerUtils {
               containerData.getContainerType() +
               " not support.");
     }
+  }
+
+  /**
+   * @return true if the DataNode may auto-create a missing container for this request
+   */
+  public static boolean isContainerCreatable(ContainerCommandRequestProto request) {
+    switch (request.getCmdType()) {
+    case PutBlock:
+      return isContainerAutoCreateAllowed(request.getPutBlock());
+    case WriteChunk:
+      return isContainerAutoCreateAllowed(request.getWriteChunk());
+    case PutSmallFile:
+      return isContainerAutoCreateAllowed(request.getPutSmallFile().getBlock());
+    default:
+      return true;
+    }
+  }
+
+  private static boolean isContainerAutoCreateAllowed(
+      ContainerProtos.PutBlockRequestProto putBlock) {
+    return !putBlock.hasContainerAutoCreate() || putBlock.getContainerAutoCreate();
+  }
+
+  private static boolean isContainerAutoCreateAllowed(
+      ContainerProtos.WriteChunkRequestProto writeChunk) {
+    return !writeChunk.hasContainerAutoCreate() || writeChunk.getContainerAutoCreate();
   }
 }

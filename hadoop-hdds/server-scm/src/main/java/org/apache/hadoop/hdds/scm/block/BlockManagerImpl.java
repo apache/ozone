@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.INVALID_BLOCK_SIZE;
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.LOCAL_ID;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -30,6 +29,7 @@ import javax.management.ObjectName;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -160,8 +161,19 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
           INVALID_BLOCK_SIZE);
     }
 
+    // TODO: Implement pass storageTier(StoragePolicy) from API.
+    // For the old version client, it will not have a "default StoragePolicy",
+    // so its StorageTier will be null, we use the "default StorageTier" to
+    // write data for them. The value of the "default StorageTier" can be set
+    // via configuration, and the default is StorageTier.DISK.
+    //
+    // By default, if the Datanode Volume StorageType is not explicitly
+    // configured, it will be of type StorageType.DISK and therefore belong
+    // to a StorageTier.DISK tier, so for old clients the write process is
+    // unchanged if the Datanode Volume configuration is not changed.
+    StorageTier storageTier = StorageTier.getDefaultTier();
     ContainerInfo containerInfo = writableContainerFactory.getContainer(
-        size, replicationConfig, owner, excludeList);
+        size, replicationConfig, owner, excludeList, storageTier);
 
     if (containerInfo != null) {
       return newBlock(containerInfo);
@@ -185,7 +197,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     try {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());
-      long localID = sequenceIdGen.getNextId(LOCAL_ID);
+      long localID = sequenceIdGen.getNextId(SequenceIdType.localId);
       long containerID = containerInfo.getContainerID();
       AllocatedBlock.Builder abb =  new AllocatedBlock.Builder()
           .setContainerBlockID(new ContainerBlockID(containerID, localID))

@@ -41,14 +41,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -113,13 +115,16 @@ public class TestPipelinePlacementPolicy {
 
   private List<DatanodeDetails> nodesWithOutRackAwareness = new ArrayList<>();
   private List<DatanodeDetails> nodesWithRackAwareness = new ArrayList<>();
+  private final StorageTier storageTier = StorageTier.DISK;
+  private StorageType storageType = StorageType.DEFAULT;
 
   @BeforeEach
   public void init() throws Exception {
     cluster = initTopology();
+    storageType = storageTier.getUniformStorageType();
     // start with nodes with rack awareness.
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
-        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT, storageType);
     conf = SCMTestUtils.getConf(testDir);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
@@ -189,7 +194,7 @@ public class TestPipelinePlacementPolicy {
     //    nodeManager.getClusterNetworkTopologyMap(), anchor, excludedNodes);
     assertThat(excludedNodes).doesNotContain(nextNode);
     // next node should not be the same as anchor.
-    assertNotSame(anchor.getUuid(), nextNode.getUuid());
+    assertNotSame(anchor.getID(), nextNode.getID());
     // next node should be on the same rack based on topology.
     assertEquals(anchor.getNetworkLocation(), nextNode.getNetworkLocation());
   }
@@ -204,7 +209,7 @@ public class TestPipelinePlacementPolicy {
       datanodes.add(datanode);
     }
     MockNodeManager localNodeManager = new MockNodeManager(cluster,
-        datanodes, false, datanodes.size());
+        datanodes, false, datanodes.size(), storageType);
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
         .newBuilder().setNodeManager(localNodeManager)
@@ -219,7 +224,7 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> results = localPlacementPolicy.chooseDatanodes(
         new ArrayList<>(datanodes.size()),
         new ArrayList<>(datanodes.size()),
-        nodesRequired, 0, 0);
+        nodesRequired, 0, 0, storageType);
 
     assertEquals(nodesRequired, results.size());
     // 3 nodes should be on different racks.
@@ -241,7 +246,7 @@ public class TestPipelinePlacementPolicy {
       datanodes.add(datanode);
     }
     MockNodeManager localNodeManager = new MockNodeManager(cluster,
-        datanodes, false, datanodes.size());
+        datanodes, false, datanodes.size(), storageType);
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
         .newBuilder().setNodeManager(localNodeManager)
@@ -258,16 +263,17 @@ public class TestPipelinePlacementPolicy {
         "the space requirement";
 
     // A huge container size
+    localNodeManager.setPendingContainerMaxSize(200 * OzoneConsts.TB);
     SCMException ex =
         assertThrows(SCMException.class,
             () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-                new ArrayList<>(datanodes.size()), nodesRequired, 0, 10 * OzoneConsts.TB));
+                new ArrayList<>(datanodes.size()), nodesRequired, 0, 10 * OzoneConsts.TB, storageType));
     assertThat(ex.getMessage()).contains(expectedMessageSubstring);
 
     // a huge free space min configured
     ex = assertThrows(SCMException.class,
         () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-            new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB, 0));
+            new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB, 0, storageType));
     assertThat(ex.getMessage()).contains(expectedMessageSubstring);
   }
 
@@ -281,13 +287,14 @@ public class TestPipelinePlacementPolicy {
     for (int i = 0; i < maxPipelineCount; i++) {
       try {
         List<DatanodeDetails> nodes = placementPolicy.chooseDatanodes(null,
-            null, HddsProtos.ReplicationFactor.THREE.getNumber(), 0, 0);
+            null, HddsProtos.ReplicationFactor.THREE.getNumber(), 0, 0, storageType);
 
         Pipeline pipeline = Pipeline.newBuilder()
             .setId(PipelineID.randomId())
             .setState(Pipeline.PipelineState.ALLOCATED)
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                 ReplicationFactor.THREE))
+            .setSupportedStorageTier(storageTier)
             .setNodes(nodes)
             .build();
         HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
@@ -388,15 +395,14 @@ public class TestPipelinePlacementPolicy {
 
   private DatanodeDetails overwriteLocationInNode(
       DatanodeDetails datanode, Node node) {
-    DatanodeDetails result = DatanodeDetails.newBuilder()
-        .setUuid(datanode.getUuid())
+    return DatanodeDetails.newBuilder()
+        .setID(datanode.getID())
         .setHostName(datanode.getHostName())
         .setIpAddress(datanode.getIpAddress())
         .addPort(datanode.getStandalonePort())
         .addPort(datanode.getRatisPort())
         .addPort(datanode.getRestPort())
         .setNetworkLocation(node.getNetworkLocation()).build();
-    return result;
   }
 
   private List<DatanodeDetails> overWriteLocationInNodes(
@@ -421,13 +427,13 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> pickedNodes1 = placementPolicy.chooseDatanodes(
         new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
         new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
-        nodesRequired, 0, 0);
+        nodesRequired, 0, 0, storageType);
     // modify node to pipeline mapping.
     insertHeavyNodesIntoNodeManager(healthyNodes, minorityHeavy);
     // NODES should be sufficient.
     assertEquals(nodesRequired, pickedNodes1.size());
     // make sure pipeline placement policy won't select duplicated NODES.
-    assertTrue(checkDuplicateNodesUUID(pickedNodes1));
+    assertTrue(checkDuplicateNodesID(pickedNodes1));
 
     // majority of healthy NODES are heavily engaged in pipelines.
     int majorityHeavy = healthyNodes.size() / 2 + 2;
@@ -437,7 +443,7 @@ public class TestPipelinePlacementPolicy {
         placementPolicy.chooseDatanodes(
             new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
             new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
-            nodesRequired, 0, 0));
+            nodesRequired, 0, 0, storageType));
   }
 
   @Test
@@ -454,13 +460,13 @@ public class TestPipelinePlacementPolicy {
         placementPolicy.chooseDatanodes(
             new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
             new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
-            nodesRequired, 0, 0));
+            nodesRequired, 0, 0, storageType));
   }
 
   @Test
   public void testValidatePlacementPolicyOK() {
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
-        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT, storageType);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
 
@@ -514,7 +520,7 @@ public class TestPipelinePlacementPolicy {
     NetworkTopologyImpl localCluster = initTopology();
 
     nodeManager = new MockNodeManager(localCluster, new ArrayList<>(),
-        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT, storageType);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
 
@@ -546,7 +552,7 @@ public class TestPipelinePlacementPolicy {
 
     // As there is only 1 rack alive, the 3 DNs on /rack2 should be returned
     List<DatanodeDetails> pickedDns =  placementPolicy.chooseDatanodes(
-        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0);
+        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0, storageType);
 
     assertEquals(3, pickedDns.size());
     assertThat(pickedDns).contains(dns.get(1));
@@ -567,7 +573,7 @@ public class TestPipelinePlacementPolicy {
 
     Throwable t = assertThrows(SCMException.class, () ->
         placementPolicy.chooseDatanodes(
-            new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0));
+            new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0, storageType));
     assertEquals(PipelinePlacementPolicy.MULTIPLE_RACK_PIPELINE_MSG, t.getMessage());
   }
 
@@ -586,7 +592,7 @@ public class TestPipelinePlacementPolicy {
     excluded.add(dns.get(0));
     Throwable t = assertThrows(SCMException.class, () ->
         placementPolicy.chooseDatanodes(
-            excluded, new ArrayList<>(), nodesRequired, 0, 0));
+            excluded, new ArrayList<>(), nodesRequired, 0, 0, storageType));
     assertEquals(PipelinePlacementPolicy.MULTIPLE_RACK_PIPELINE_MSG, t.getMessage());
   }
 
@@ -602,17 +608,17 @@ public class TestPipelinePlacementPolicy {
         .createDatanodeDetails("host4", "/rack2"));
 
     nodeManager = new MockNodeManager(cluster, dns,
-        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT, storageType);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
     return dns;
   }
 
-  private boolean checkDuplicateNodesUUID(List<DatanodeDetails> nodes) {
-    HashSet<UUID> uuids = nodes.stream().
-        map(DatanodeDetails::getUuid).
+  private boolean checkDuplicateNodesID(List<DatanodeDetails> nodes) {
+    HashSet<DatanodeID> ids = nodes.stream().
+        map(DatanodeDetails::getID).
         collect(Collectors.toCollection(HashSet::new));
-    return uuids.size() == nodes.size();
+    return ids.size() == nodes.size();
   }
 
   private void insertHeavyNodesIntoNodeManager(
@@ -645,6 +651,7 @@ public class TestPipelinePlacementPolicy {
               .setReplicationConfig(ReplicationConfig
                   .fromProtoTypeAndFactor(RATIS, THREE))
               .setNodes(dnList)
+              .setSupportedStorageTier(storageTier)
               .build();
 
           pipelineProto = pipeline.getProtobufMessage(
@@ -672,7 +679,7 @@ public class TestPipelinePlacementPolicy {
 
     pipelineCount
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
-        stateManager, healthyNodes.get(0));
+        stateManager, healthyNodes.get(0), StorageType.DEFAULT);
     assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/ONE pipeline
@@ -682,7 +689,7 @@ public class TestPipelinePlacementPolicy {
 
     pipelineCount
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
-        stateManager, healthyNodes.get(1));
+        stateManager, healthyNodes.get(1), StorageType.DEFAULT);
     assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/THREE pipeline
@@ -694,7 +701,7 @@ public class TestPipelinePlacementPolicy {
 
     pipelineCount
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
-        stateManager, healthyNodes.get(2));
+        stateManager, healthyNodes.get(2), StorageType.DEFAULT);
     assertEquals(pipelineCount, 1);
 
     // Check datanode with one RATIS/ONE and one STANDALONE/ONE pipeline
@@ -704,7 +711,7 @@ public class TestPipelinePlacementPolicy {
 
     pipelineCount
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
-        stateManager, healthyNodes.get(1));
+        stateManager, healthyNodes.get(1), StorageType.DEFAULT);
     assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/ONE and one STANDALONE/ONE pipeline and
@@ -718,8 +725,31 @@ public class TestPipelinePlacementPolicy {
 
     pipelineCount
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
-        stateManager, healthyNodes.get(1));
+        stateManager, healthyNodes.get(1), StorageType.DEFAULT);
     assertEquals(pipelineCount, 2);
+  }
+
+  @Test
+  public void testCurrentRatisThreePipelineCountIgnoresLegacyPipeline()
+      throws IOException {
+    List<DatanodeDetails> healthyNodes = nodeManager
+        .getNodes(NodeStatus.inServiceHealthy());
+    List<DatanodeDetails> pipelineNodes = healthyNodes.subList(0, 3);
+    Pipeline legacyPipeline = Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setState(Pipeline.PipelineState.OPEN)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE))
+        .setNodes(pipelineNodes)
+        .build();
+
+    nodeManager.addPipeline(legacyPipeline);
+    stateManager.addPipeline(legacyPipeline.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION));
+
+    assertEquals(0, PipelinePlacementPolicy.currentRatisThreePipelineCount(
+        nodeManager, stateManager, pipelineNodes.get(0),
+        StorageType.DEFAULT));
   }
 
   @Test
@@ -765,12 +795,12 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(p2Dns, RATIS, THREE);
 
     assertEquals(2, PipelinePlacementPolicy.currentRatisThreePipelineCount(
-        localNodeManager, localStateManager, target));
+        localNodeManager, localStateManager, target, storageType));
 
     // 3) Verifies node is filtered out when choosing nodes for new pipeline
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
     List<DatanodeDetails> chosen = localPolicy.chooseDatanodes(
-        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0);
+        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0, StorageType.DEFAULT);
 
     assertEquals(nodesRequired, chosen.size());
     assertThat(chosen).doesNotContain(target);
@@ -788,6 +818,7 @@ public class TestPipelinePlacementPolicy {
         .setReplicationConfig(ReplicationConfig
             .fromProtoTypeAndFactor(replicationType, replicationFactor))
         .setNodes(dnList)
+        .setSupportedStorageTier(storageTier)
         .build();
 
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(

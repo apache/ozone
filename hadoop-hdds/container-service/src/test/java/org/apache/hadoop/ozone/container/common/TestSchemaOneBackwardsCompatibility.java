@@ -70,7 +70,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * Tests processing of containers written with DB schema version 1,
@@ -136,29 +135,30 @@ public class TestSchemaOneBackwardsCompatibility {
   }
 
   /**
-   * Because all tables in schema version one map back to the default table,
-   * directly iterating any of the table instances should be forbidden.
-   * Otherwise, the iterators for each table would read the entire default
-   * table, return all database contents, and yield unexpected results.
+   * Because datanode schemas may map multiple logical tables to the same
+   * underlying table, directly iterating or clearing any of the table
+   * instances should be forbidden. Otherwise, iteration may read unrelated
+   * data and clearing may delete it.
    *
    * @throws Exception
    */
   @ParameterizedTest
   @MethodSource("schemaVersion")
-  public void testDirectTableIterationDisabled(String schemaVersion)
+  public void testDirectTableOperationsDisabled(String schemaVersion)
       throws Exception {
     setup(schemaVersion);
     try (DBHandle refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
       DatanodeStore store = refCountedDB.getStore();
 
-      assertTableIteratorUnsupported(store.getMetadataTable());
-      assertTableIteratorUnsupported(store.getBlockDataTable());
-      assertTableIteratorUnsupported(store.getDeletedBlocksTable());
+      assertTableOperationsUnsupported(store.getMetadataTable());
+      assertTableOperationsUnsupported(store.getBlockDataTable());
+      assertTableOperationsUnsupported(store.getDeletedBlocksTable());
     }
   }
 
-  private void assertTableIteratorUnsupported(Table<?, ?> table) {
+  private void assertTableOperationsUnsupported(Table<?, ?> table) {
     assertThrows(UnsupportedOperationException.class, table::iterator);
+    assertThrows(UnsupportedOperationException.class, table::clear);
   }
 
   /**
@@ -597,10 +597,10 @@ public class TestSchemaOneBackwardsCompatibility {
 
     // Changing the paths above affects the checksum, so it was also removed
     // from the container file and calculated at run time.
-    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+    ContainerDataYaml.getYamlForContainerType(
             kvData.getContainerType(),
-        kvData.getReplicaIndex() > 0);
-    kvData.computeAndSetContainerFileChecksum(yaml);
+        kvData.getReplicaIndex() > 0, kvData.getStorageType());
+    kvData.computeAndSetContainerFileChecksum();
 
     KeyValueContainerUtil.parseKVContainerData(kvData, conf);
 

@@ -25,15 +25,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.NodeUtils;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,26 +80,34 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   }
 
   @Override
-  public synchronized Pipeline create(ECReplicationConfig replicationConfig)
+  public synchronized Pipeline create(ECReplicationConfig replicationConfig, StorageTier storageTier)
       throws IOException {
     return create(replicationConfig, Collections.emptyList(),
-        Collections.emptyList());
+        Collections.emptyList(), storageTier);
   }
 
   @Override
   protected Pipeline create(ECReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+      StorageTier storageTier)
       throws IOException {
+    StorageType storageType = storageTier.getUniformStorageType();
     List<DatanodeDetails> dns = placementPolicy
         .chooseDatanodes(excludedNodes, favoredNodes,
-            replicationConfig.getRequiredNodes(), 0, this.containerSizeBytes);
-    return create(replicationConfig, dns);
+            replicationConfig.getRequiredNodes(), 0, this.containerSizeBytes, storageType);
+    return create(replicationConfig, dns, storageTier);
   }
 
   @Override
   protected Pipeline create(ECReplicationConfig replicationConfig,
-      List<DatanodeDetails> nodes) {
-
+      List<DatanodeDetails> nodes, StorageTier storageTier) throws IOException {
+    List<StorageTier> storageTiers = NodeUtils.getDatanodesStorageTypes(nodes, getNodeManager());
+    if (!storageTiers.contains(storageTier)) {
+      throw new SCMException(String.format("Cannot create pipeline for "
+              + "StorageTier %s replicationConfig: %s",
+          storageTier, replicationConfig),
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
     Map<DatanodeDetails, Integer> dnIndexes = new HashMap<>();
     int ecIndex = 1;
     for (DatanodeDetails dn : nodes) {
@@ -103,7 +115,11 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
       ecIndex++;
     }
 
-    return createPipelineInternal(replicationConfig, nodes, dnIndexes);
+    return newPipelineBuilder(replicationConfig, nodes)
+        .setId(PipelineID.randomId())
+        .setReplicaIndexes(dnIndexes)
+        .setSupportedStorageTier(storageTier)
+        .build();
   }
 
   @Override
@@ -130,17 +146,13 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
     dns.sort(Comparator.comparing(nodeStatusMap::get, CREATE_FOR_READ_COMPARATOR));
 
-    return createPipelineInternal(replicationConfig, dns, map);
-  }
-
-  private Pipeline createPipelineInternal(ECReplicationConfig repConfig,
-      List<DatanodeDetails> dns, Map<DatanodeDetails, Integer> indexes) {
-    return Pipeline.newBuilder()
-        .setId(PipelineID.randomId())
-        .setState(Pipeline.PipelineState.ALLOCATED)
-        .setReplicationConfig(repConfig)
-        .setNodes(dns)
-        .setReplicaIndexes(indexes)
+    // Use insecureRandomId for throwaway read pipeline IDs to avoid
+    // contention on the shared SecureRandom instance.
+    // Read Pipelines do not require storage tiers, so the calculation of storage tiers can be omitted.
+    return newPipelineBuilder(replicationConfig, dns)
+        .setId(PipelineID.insecureRandomId())
+        .setReplicaIndexes(map)
+        .setSupportedStorageTier(null)
         .build();
   }
 

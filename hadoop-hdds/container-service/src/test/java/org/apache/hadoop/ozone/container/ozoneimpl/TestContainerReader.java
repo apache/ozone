@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +46,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -130,7 +132,7 @@ public class TestContainerReader {
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
         .thenReturn(hddsVolume);
 
     for (int i = 0; i < 2; i++) {
@@ -141,7 +143,7 @@ public class TestContainerReader {
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData,
               conf);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId, StorageType.DISK);
 
 
       List<Long> blkNames;
@@ -299,7 +301,7 @@ public class TestContainerReader {
         new KeyValueContainer(recoveringContainerData,
             conf);
     recoveringKeyValueContainer.create(
-        volumeSet, volumeChoosingPolicy, clusterId);
+        volumeSet, volumeChoosingPolicy, clusterId, StorageType.DISK);
 
     thread = new Thread(containerReader);
     thread.start();
@@ -359,7 +361,7 @@ public class TestContainerReader {
     StorageVolumeUtil.checkVolume(hddsVolume1, clusterId, clusterId, conf,
         null, null);
     volumeChoosingPolicy1 = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
         .thenReturn(hddsVolume1);
 
     int containerCount = 3;
@@ -370,7 +372,7 @@ public class TestContainerReader {
           datanodeId.toString());
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData, conf);
-      keyValueContainer.create(volumeSet1, volumeChoosingPolicy1, clusterId);
+      keyValueContainer.create(volumeSet1, volumeChoosingPolicy1, clusterId, StorageType.DISK);
 
       if (i == 0) {
         // rename first container directory name
@@ -417,7 +419,7 @@ public class TestContainerReader {
     StorageVolumeUtil.checkVolume(hddsVolume1, clusterId, clusterId, conf,
         null, null);
     volumeChoosingPolicy1 = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
         .thenReturn(hddsVolume1);
 
     List<File> dbPathList = new ArrayList<>();
@@ -429,7 +431,7 @@ public class TestContainerReader {
           datanodeId.toString());
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData, conf);
-      keyValueContainer.create(volumeSet1, volumeChoosingPolicy1, clusterId);
+      keyValueContainer.create(volumeSet1, volumeChoosingPolicy1, clusterId, StorageType.DISK);
       dbPathList.add(keyValueContainerData.getDbFile());
     }
     ContainerCache.getInstance(conf).shutdownCache();
@@ -642,7 +644,7 @@ public class TestContainerReader {
     KeyValueContainer keyValueContainer =
         new KeyValueContainer(keyValueContainerData,
             conf);
-    keyValueContainer.create(volSet, policy, clusterId);
+    keyValueContainer.create(volSet, policy, clusterId, StorageType.DISK);
 
     List<Long> blkNames;
     if (id % 2 == 0) {
@@ -680,7 +682,7 @@ public class TestContainerReader {
     KeyValueContainer kvContainer =
         new KeyValueContainer(containerData, conf);
     kvContainer.create(
-        volumeSet, volumeChoosingPolicy, clusterId);
+        volumeSet, volumeChoosingPolicy, clusterId, StorageType.DISK);
     long baseCount = 0;
     if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // add db entry for the container ID 101 for V3
@@ -849,7 +851,7 @@ public class TestContainerReader {
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(), datanodeId.toString());
     containerData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
-    container.create(volumeSet, volumeChoosingPolicy, clusterId);
+    container.create(volumeSet, volumeChoosingPolicy, clusterId, StorageType.DISK);
     return container;
   }
 

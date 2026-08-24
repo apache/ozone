@@ -19,9 +19,13 @@ package org.apache.hadoop.ozone;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -119,6 +123,9 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @return {@link StorageContainerManager} instance
    */
   StorageContainerManager getStorageContainerManager();
+
+  /** @return all SCMs */
+  List<StorageContainerManager> getStorageContainerManagers();
 
   /**
    * Returns {@link OzoneManager} associated with this
@@ -260,7 +267,11 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected CertificateClient certClient;
     protected SecretKeyClient secretKeyClient;
     protected DatanodeFactory dnFactory = UniformDatanodesFactory.newBuilder().build();
+    protected String[] racks;
+    protected String[] hosts;
     private final List<Service> services = new ArrayList<>();
+    protected int numDataVolumes = 1;
+    protected List<List<StorageType>> datanodeStorageType = Collections.emptyList();
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
@@ -285,6 +296,15 @@ public interface MiniOzoneCluster extends AutoCloseable {
       conf.unset(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
       conf.unset(OMConfigKeys.OZONE_OM_DB_DIRS);
       conf.unset(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR);
+
+      // dn rack configs
+      if (racks != null) {
+        conf.unset(CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY);
+        conf.unset(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME);
+        conf.unset("hadoop.configured.node.mapping");
+        racks = null;
+        hosts = null;
+      }
 
       setClusterId();
     }
@@ -364,6 +384,74 @@ public interface MiniOzoneCluster extends AutoCloseable {
     public Builder setDatanodeFactory(DatanodeFactory factory) {
       this.dnFactory = factory;
       return this;
+    }
+
+    /**
+     * Sets the rack location for each datanode.  Each entry is a rack path
+     * such as {@code "/rack0"}.  The length of the array must match the
+     * number of datanodes.
+     *
+     * @param racks rack path per datanode
+     * @return this Builder
+     */
+    public Builder setRacks(String[] racks) {
+      this.racks = Arrays.copyOf(racks, racks.length);
+      return this;
+    }
+
+    /**
+     * Sets the number of data volumes per datanode. Rebuilds the default
+     * {@link UniformDatanodesFactory} to honor the new count. If a custom
+     * {@link DatanodeFactory} was set via {@link #setDatanodeFactory(DatanodeFactory)},
+     * this method has no effect on it.
+     */
+    public Builder setNumDataVolumes(int val) {
+      this.numDataVolumes = val;
+      rebuildDefaultDatanodeFactory();
+      return this;
+    }
+
+    /**
+     * Sets the hostname for each datanode.  When used together with
+     * {@link #setRacks}, the hostnames are used as keys in the
+     * {@code StaticMapping} instead of the default synthetic names
+     * ({@code "dn-0"}, {@code "dn-1"}, …).  The length of the array must
+     * match the number of datanodes.
+     *
+     * @param hosts hostname per datanode
+     * @return this Builder
+     */
+    public Builder setHosts(String[] hosts) {
+      this.hosts = Arrays.copyOf(hosts, hosts.length);
+      return this;
+    }
+
+    /**
+     * Per-datanode storage type list. Outer list size must equal number of datanodes;
+     * each inner list, when non-empty, must equal {@link #numDataVolumes}. When set,
+     * each data dir is advertised with the requested {@link StorageType}.
+     */
+    public Builder setDatanodeStorageType(List<List<StorageType>> datanodeStorageType) {
+      this.datanodeStorageType = datanodeStorageType == null
+          ? Collections.emptyList() : datanodeStorageType;
+      rebuildDefaultDatanodeFactory();
+      return this;
+    }
+
+    private void rebuildDefaultDatanodeFactory() {
+      this.dnFactory = UniformDatanodesFactory.newBuilder()
+          .setNumDataVolumes(numDataVolumes)
+          .setDatanodeStorageType(datanodeStorageType)
+          .build();
+    }
+
+    protected void validateDatanodeConfiguration() {
+      if (racks != null && racks.length != numOfDatanodes) {
+        throw new IllegalArgumentException("Number of racks must match the number of datanodes");
+      }
+      if (hosts != null && hosts.length != numOfDatanodes) {
+        throw new IllegalArgumentException("Number of hosts must match the number of datanodes");
+      }
     }
 
     public Builder addService(Service service) {

@@ -149,9 +149,11 @@ public class ContainerImporter {
   HddsVolume chooseNextVolume(long spaceToReserve) throws IOException {
     // Choose volume that can hold both container in tmp and dest directory
     LOG.debug("Choosing volume to reserve space : {}", spaceToReserve);
+    // TODO: Use the target container storage type once replication/import
+    // requests carry it. Null preserves the existing any-volume behavior.
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        spaceToReserve);
+        spaceToReserve, null);
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)

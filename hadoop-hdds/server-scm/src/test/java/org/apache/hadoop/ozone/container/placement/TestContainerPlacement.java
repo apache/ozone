@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
@@ -91,12 +92,12 @@ public class TestContainerPlacement {
       long metadataSize = random.nextInt(10) * OzoneConsts.GB;
       List<DatanodeDetails> nodesCapacity =
           capacityPlacer.chooseDatanodes(new ArrayList<>(), null, nodesRequired,
-              metadataSize, containerSize);
+              metadataSize, containerSize, StorageType.DEFAULT);
       assertEquals(nodesRequired, nodesCapacity.size());
 
       List<DatanodeDetails> nodesRandom =
           randomPlacer.chooseDatanodes(nodesCapacity, null, nodesRequired,
-              metadataSize, containerSize);
+              metadataSize, containerSize, StorageType.DEFAULT);
 
       // One fifth of all calls are delete
       if (x % 5 == 0) {

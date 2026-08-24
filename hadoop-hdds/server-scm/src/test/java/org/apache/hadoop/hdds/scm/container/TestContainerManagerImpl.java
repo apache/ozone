@@ -38,8 +38,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -58,7 +60,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -95,17 +96,19 @@ public class TestContainerManagerImpl {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    NodeManager nodeManager = new MockNodeManager(true, 10);
+    NodeManager nodeManager = new MockNodeManager(true, 10, StorageType.DISK);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     PipelineManager base = new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     pipelineManager = spy(base);
 
     // Default: allow allocation in tests unless a test overrides it.
-    doReturn(true).when(pipelineManager).hasEnoughSpace(any(Pipeline.class));
+    // Allocation uses checkSpaceAndRecordAllocation
+    doReturn(true).when(pipelineManager)
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-        ReplicationFactor.THREE));
+        ReplicationFactor.THREE), StorageTier.getDefaultTier());
 
     pendingOpsMock = mock(ContainerReplicaPendingOps.class);
     containerManager = new ContainerManagerImpl(conf,
@@ -126,7 +129,7 @@ public class TestContainerManagerImpl {
         containerManager.getContainers().isEmpty());
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "admin");
+            ReplicationFactor.THREE), "admin", StorageTier.getDefaultTier());
 
     assertNotNull(container);
     assertEquals(1, containerManager.getContainers().size());
@@ -140,21 +143,23 @@ public class TestContainerManagerImpl {
    */
   @Test
   public void testGetMatchingContainerReturnsNullWhenNotEnoughSpaceInDatanodes() throws IOException {
-    doReturn(false).when(pipelineManager).hasEnoughSpace(any());
+    doReturn(false).when(pipelineManager)
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
     Pipeline pipeline = pipelineManager.getPipelines().iterator().next();
-    // MockPipelineManager#hasEnoughSpace always returns false
+    // MockPipelineManager#checkSpaceAndRecordAllocation always returns false
     // the pipeline has no existing containers, so a new container gets allocated in getMatchingContainer
     ContainerInfo container = containerManager
-        .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+        .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet(), StorageTier.getDefaultTier());
     assertNull(container);
 
     // create an EC pipeline to test for EC containers
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
-    pipelineManager.createPipeline(ecReplicationConfig);
+    pipelineManager.createPipeline(ecReplicationConfig, StorageTier.getDefaultTier());
     pipeline = pipelineManager.getPipelines(ecReplicationConfig).iterator().next();
-    container = containerManager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+    container = containerManager.getMatchingContainer(sizeRequired, "test",
+        pipeline, Collections.emptySet(), StorageTier.getDefaultTier());
     assertNull(container);
   }
 
@@ -162,10 +167,10 @@ public class TestContainerManagerImpl {
   public void testGetMatchingContainerReturnsContainerWhenEnoughSpaceInDatanodes() throws IOException {
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
 
-    // create a spy to mock hasEnoughSpace to always return true
+    // create a spy to mock checkSpaceAndRecordAllocation to always return true
     PipelineManager spyPipelineManager = spy(pipelineManager);
     doReturn(true).when(spyPipelineManager)
-        .hasEnoughSpace(any(Pipeline.class));
+        .checkSpaceAndRecordAllocation(any(Pipeline.class), any(ContainerID.class));
 
     // create a new ContainerManager using the spy
     File tempDir = new File(testDir, "tempDir");
@@ -177,14 +182,15 @@ public class TestContainerManagerImpl {
     Pipeline pipeline = spyPipelineManager.getPipelines().iterator().next();
     // the pipeline has no existing containers, so a new container gets allocated in getMatchingContainer
     ContainerInfo container = manager
-        .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+        .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet(), StorageTier.getDefaultTier());
     assertNotNull(container);
 
     // create an EC pipeline to test for EC containers
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
-    spyPipelineManager.createPipeline(ecReplicationConfig);
+    spyPipelineManager.createPipeline(ecReplicationConfig, StorageTier.getDefaultTier());
     pipeline = spyPipelineManager.getPipelines(ecReplicationConfig).iterator().next();
-    container = manager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+    container = manager.getMatchingContainer(sizeRequired, "test", pipeline,
+        Collections.emptySet(), StorageTier.getDefaultTier());
     assertNotNull(container);
   }
 
@@ -192,7 +198,7 @@ public class TestContainerManagerImpl {
   void testUpdateContainerState() throws Exception {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "admin");
+            ReplicationFactor.THREE), "admin", StorageTier.getDefaultTier());
     final ContainerID cid = container.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(cid).getState());
     containerManager.updateContainerState(cid,
@@ -210,12 +216,14 @@ public class TestContainerManagerImpl {
   @EnumSource(value = HddsProtos.LifeCycleState.class,
       names = {"DELETING", "DELETED"})
   void testTransitionDeletingOrDeletedToTargetState(HddsProtos.LifeCycleState desiredState)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     // Allocate OPEN Ratis and Ec containers, and do a series of state changes to transition them to DELETING / DELETED
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "admin");
-    ContainerInfo ecContainer = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
+            ReplicationFactor.THREE), "admin", StorageTier.getDefaultTier());
+    ContainerInfo ecContainer = containerManager.allocateContainer(
+        new ECReplicationConfig(3, 2), "admin",
+        StorageTier.getDefaultTier());
     final ContainerID cid = container.containerID();
     final ContainerID ecCid = ecContainer.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(cid).getState());
@@ -263,14 +271,16 @@ public class TestContainerManagerImpl {
     // test for RATIS container
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "admin");
+            ReplicationFactor.THREE), "admin", StorageTier.getDefaultTier());
     final ContainerID cid = container.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(cid).getState());
     assertThrows(IOException.class, () ->
             containerManager.transitionDeletingOrDeletedToTargetState(cid, LifeCycleState.CLOSED));
 
     // test for EC container
-    final ContainerInfo ecContainer = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
+    final ContainerInfo ecContainer = containerManager.allocateContainer(
+        new ECReplicationConfig(3, 2), "admin",
+        StorageTier.getDefaultTier());
     final ContainerID ecCid = ecContainer.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(ecCid).getState());
     assertThrows(IOException.class, () ->
@@ -284,7 +294,7 @@ public class TestContainerManagerImpl {
     List<ContainerID> ids = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       ContainerInfo container = containerManager.allocateContainer(
-          RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "admin");
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "admin", StorageTier.getDefaultTier());
       ids.add(container.containerID());
     }
 
@@ -342,7 +352,7 @@ public class TestContainerManagerImpl {
   @Test
   void testAllocateContainersWithECReplicationConfig() throws Exception {
     final ContainerInfo admin = containerManager
-        .allocateContainer(new ECReplicationConfig(3, 2), "admin");
+        .allocateContainer(new ECReplicationConfig(3, 2), "admin", StorageTier.getDefaultTier());
     assertEquals(1, containerManager.getContainers().size());
     assertNotNull(
         containerManager.getContainer(admin.containerID()));
@@ -353,7 +363,7 @@ public class TestContainerManagerImpl {
       throws IOException, TimeoutException {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "admin");
+            ReplicationFactor.THREE), "admin", StorageTier.getDefaultTier());
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     containerManager.updateContainerReplica(container.containerID(),
         ContainerReplica.newBuilder()
@@ -373,7 +383,7 @@ public class TestContainerManagerImpl {
       throws IOException, TimeoutException {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "admin");
+            ReplicationFactor.THREE), "admin", StorageTier.getDefaultTier());
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     containerManager.removeContainerReplica(container.containerID(),
         ContainerReplica.newBuilder()

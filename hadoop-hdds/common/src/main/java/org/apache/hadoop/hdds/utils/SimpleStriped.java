@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.util.concurrent.Striped;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -45,8 +44,7 @@ public final class SimpleStriped {
    * @param fair whether to use a fair ordering policy
    * @return a new {@code Striped<ReadWriteLock>}
    */
-  public static Striped<ReadWriteLock> readWriteLock(int stripes,
-      boolean fair) {
+  public static Striped<ReentrantReadWriteLock> readWriteLock(int stripes, boolean fair) {
     return Striped.custom(stripes, () -> new ReentrantReadWriteLock(fair));
   }
 

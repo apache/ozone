@@ -27,6 +27,7 @@ import java.io.IOException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -35,9 +36,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
@@ -78,7 +79,8 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
 
     ContainerInfo containerInfo = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
-            HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
+            HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE,
+        StorageTier.getDefaultTier());
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     assertEquals(getLongCounter("NumSuccessfulCreateContainers",
@@ -86,7 +88,8 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
 
     assertThrows(IOException.class, () ->
         containerManager.allocateContainer(
-            new ECReplicationConfig(8, 5), OzoneConsts.OZONE));
+            new ECReplicationConfig(8, 5), OzoneConsts.OZONE,
+            StorageTier.getDefaultTier()));
     // allocateContainer should fail, so it should have the old metric value.
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     assertEquals(getLongCounter("NumSuccessfulCreateContainers",
@@ -137,7 +140,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
     // Create key should create container on DN.
-    TestDataUtil.createKeys(cluster(), 1);
+    DataTestUtil.createKeys(cluster(), 1);
 
     GenericTestUtils.waitFor(() -> {
       final MetricsRecordBuilder scmMetrics =

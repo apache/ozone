@@ -37,21 +37,26 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -82,7 +87,7 @@ public class TestECPipelineProvider {
     // Placement policy will always return EC number of random nodes.
     when(placementPolicy.chooseDatanodes(anyList(),
         anyList(), anyInt(), anyLong(),
-        anyLong()))
+        anyLong(), any(StorageType.class)))
         .thenAnswer(invocation -> {
           List<DatanodeDetails> dns = new ArrayList<>();
           for (int i = 0; i < (int) invocation.getArguments()[2]; i++) {
@@ -93,12 +98,14 @@ public class TestECPipelineProvider {
 
     when(nodeManager.getNodeStatus(any()))
         .thenReturn(NodeStatus.inServiceHealthy());
+    when(nodeManager.getNode(any()))
+        .thenAnswer(invocation -> createDatanodeInfo(invocation.getArgument(0)));
   }
 
   @Test
   public void testSimplePipelineCanBeCreatedWithIndexes() throws IOException {
     ECReplicationConfig ecConf = new ECReplicationConfig(3, 2);
-    Pipeline pipeline = provider.create(ecConf);
+    Pipeline pipeline = provider.create(ecConf, StorageTier.getDefaultTier());
     assertEquals(EC, pipeline.getType());
     assertEquals(ecConf.getData() + ecConf.getParity(), pipeline.getNodes().size());
     assertEquals(ALLOCATED, pipeline.getPipelineState());
@@ -195,12 +202,11 @@ public class TestECPipelineProvider {
     List<DatanodeDetails> favoredNodes = new ArrayList<>();
     favoredNodes.add(MockDatanodeDetails.randomDatanodeDetails());
 
-    Pipeline pipeline = provider.create(ecConf, excludedNodes, favoredNodes);
+    Pipeline pipeline = provider.create(ecConf, excludedNodes, favoredNodes, StorageTier.getDefaultTier());
     assertEquals(EC, pipeline.getType());
     assertEquals(ecConf.getData() + ecConf.getParity(), pipeline.getNodes().size());
-
     verify(placementPolicy).chooseDatanodes(excludedNodes, favoredNodes,
-        ecConf.getRequiredNodes(), 0, containerSizeBytes);
+        ecConf.getRequiredNodes(), 0, containerSizeBytes, StorageType.DEFAULT);
   }
 
   private Set<ContainerReplica> createContainerReplicas(int number) {
@@ -220,6 +226,17 @@ public class TestECPipelineProvider {
       replicas.add(r);
     }
     return replicas;
+  }
+
+  private DatanodeInfo createDatanodeInfo(DatanodeID id) {
+    DatanodeDetails dn = MockDatanodeDetails.createDatanodeDetails(id);
+    DatanodeInfo datanodeInfo = new DatanodeInfo(dn,
+        NodeStatus.inServiceHealthy(), null,
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+    datanodeInfo.updateStorageReports(Collections.singletonList(
+        HddsTestUtils.createStorageReport(id,
+            "/data-" + dn.getUuidString(), 100)));
+    return datanodeInfo;
   }
 
 }

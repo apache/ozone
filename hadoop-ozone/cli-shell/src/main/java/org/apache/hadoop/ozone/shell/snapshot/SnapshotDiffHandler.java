@@ -67,7 +67,7 @@ public class SnapshotDiffHandler extends Handler {
           "Note the effective page size will also be bound by " +
           "the server-side page size limit, see config:%n" +
           "  ozone.om.snapshot.diff.max.page.size",
-      defaultValue = "1000",
+      defaultValue = "5000",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS
   )
   private int pageSize;

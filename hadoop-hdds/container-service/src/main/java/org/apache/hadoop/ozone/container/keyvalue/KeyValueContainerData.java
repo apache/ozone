@@ -48,6 +48,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -275,7 +276,7 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   ContainerReplicaProto buildContainerReplicaProto() throws StorageContainerException {
-    return getStatistics().setContainerReplicaProto(ContainerReplicaProto.newBuilder())
+    ContainerReplicaProto.Builder builder = getStatistics().setContainerReplicaProto(ContainerReplicaProto.newBuilder())
         .setContainerID(getContainerID())
         .setState(getContainerReplicaProtoState(getState()))
         .setIsEmpty(isEmpty())
@@ -283,8 +284,11 @@ public class KeyValueContainerData extends ContainerData {
         .setReplicaIndex(getReplicaIndex())
         .setBlockCommitSequenceId(getBlockCommitSequenceId())
         .setDeleteTransactionId(getDeleteTransactionId())
-        .setDataChecksum(getDataChecksum())
-        .build();
+        .setDataChecksum(getDataChecksum());
+    if (getStorageType() != null) {
+      builder.setStorageType(StorageTypeUtils.getStorageTypeProto(getStorageType()));
+    }
+    return builder.build();
   }
 
   // TODO remove one of the State from proto

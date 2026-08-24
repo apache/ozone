@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -69,12 +70,14 @@ public class TestSCMRestart {
     ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
             RatisReplicationConfig.getInstance(
-                ReplicationFactor.THREE), "Owner1").getPipelineID());
+                ReplicationFactor.THREE), "Owner1",
+            StorageTier.getDefaultTier()).getPipelineID());
     pipelineManager.openPipeline(ratisPipeline1.getId());
     ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
             RatisReplicationConfig.getInstance(
-                ReplicationFactor.ONE), "Owner2").getPipelineID());
+                ReplicationFactor.ONE), "Owner2",
+            StorageTier.getDefaultTier()).getPipelineID());
     pipelineManager.openPipeline(ratisPipeline2.getId());
     // At this stage, there should be 2 pipeline one with 1 open container
     // each. Try restarting the SCM and then discover that pipeline are in
@@ -104,12 +107,16 @@ public class TestSCMRestart {
     assertNotSame(ratisPipeline2AfterRestart, ratisPipeline2);
     assertEquals(ratisPipeline1AfterRestart, ratisPipeline1);
     assertEquals(ratisPipeline2AfterRestart, ratisPipeline2);
+    assertEquals(ratisPipeline1AfterRestart.getSupportedStorageTier(),
+        ratisPipeline1.getSupportedStorageTier());
+    assertEquals(ratisPipeline2AfterRestart.getSupportedStorageTier(),
+        ratisPipeline2.getSupportedStorageTier());
 
     // Try creating a new container, it should be from the same pipeline
     // as was before restart
     ContainerInfo containerInfo = newContainerManager
         .allocateContainer(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), "Owner1");
+            ReplicationFactor.THREE), "Owner1", StorageTier.getDefaultTier());
     assertEquals(ratisPipeline1.getId(), containerInfo.getPipelineID());
   }
 }

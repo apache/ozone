@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -42,6 +44,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -87,6 +90,10 @@ public final class Pipeline {
   // suggested leader id with high priority
   private final DatanodeID suggestedLeaderId;
 
+  private final StorageTier supportedStorageTier;
+
+  private final ReadWriteLock lock;
+
   private final Instant stateEnterTime;
 
   /**
@@ -114,6 +121,8 @@ public final class Pipeline {
     replicaIndexes = b.replicaIndexes;
     creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
     stateEnterTime = Instant.now();
+    supportedStorageTier = b.supportedStorageTier;
+    lock = new ReentrantReadWriteLock();
   }
 
   public static Codec<Pipeline> getCodec() {
@@ -168,6 +177,20 @@ public final class Pipeline {
    */
   public DatanodeID getSuggestedLeaderId() {
     return suggestedLeaderId;
+  }
+
+  /**
+   * Return the Pipeline supported StorageTier.
+   *
+   * @return Supported StorageTier
+   */
+  public StorageTier getSupportedStorageTier() {
+    lock.readLock().lock();
+    try {
+      return supportedStorageTier;
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   /**
@@ -399,6 +422,12 @@ public final class Pipeline {
       builder.setSuggestedLeaderDatanodeID(suggestedLeaderId.toProto());
     }
 
+    // To simplify Pipeline management, we currently only support Pipelines with a single StorageTier.
+    // However, to facilitate future expansion, StorageTier is still defined using `repeat` in the proto file.
+    if (supportedStorageTier != null) {
+      builder.addSupportedStorageTier(supportedStorageTier.toProto());
+    }
+
     // To save the message size on wire, only transfer the node order based on
     // network topology
     if (!nodesInOrder.isEmpty()) {
@@ -488,6 +517,12 @@ public final class Pipeline {
       HddsProtos.UUID uuid = pipeline.getSuggestedLeaderID();
       suggestedLeaderId = DatanodeID.of(uuid);
     }
+    StorageTier supportedStorageTier = null;
+    // To simplify Pipeline management, we currently only support Pipelines with a single StorageTier.
+    // However, to facilitate future expansion, StorageTier is still defined using `repeat` in the proto file.
+    for (HddsProtos.StorageTierProto storageTierProto : pipeline.getSupportedStorageTierList()) {
+      supportedStorageTier = StorageTier.fromProto(storageTierProto);
+    }
 
     final ReplicationConfig config = ReplicationConfig
         .fromProto(pipeline.getType(), pipeline.getFactor(),
@@ -501,6 +536,7 @@ public final class Pipeline {
         .setLeaderId(leaderId)
         .setSuggestedLeaderId(suggestedLeaderId)
         .setNodeOrder(pipeline.getMemberOrdersList())
+        .setSupportedStorageTier(supportedStorageTier)
         .setCreateTimestamp(pipeline.getCreationTimeStamp());
   }
 
@@ -545,9 +581,11 @@ public final class Pipeline {
       b.append(" {").append(datanodeDetails)
           .append(", ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails)).append("},");
     }
+
     b.append(']')
         .append(", ReplicationConfig: ").append(replicationConfig)
         .append(", State:").append(getPipelineState())
+        .append(", SupportStorageTier:").append(getSupportedStorageTier())
         .append(", leaderId:").append(leaderId != null ? leaderId.toString() : "")
         .append(", CreationTimestamp").append(getCreationTimestamp().atZone(ZoneId.systemDefault()))
         .append('}');
@@ -572,6 +610,7 @@ public final class Pipeline {
     private Instant creationTimestamp = null;
     private DatanodeID suggestedLeaderId = null;
     private Map<DatanodeDetails, Integer> replicaIndexes = ImmutableMap.of();
+    private StorageTier supportedStorageTier;
 
     private Builder() { }
 
@@ -594,6 +633,7 @@ public final class Pipeline {
         }
         replicaIndexes = b.build();
       }
+      this.supportedStorageTier = pipeline.getSupportedStorageTier();
     }
 
     public Builder setId(DatanodeID datanodeID) {
@@ -673,6 +713,11 @@ public final class Pipeline {
 
     public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> indexes) {
       this.replicaIndexes = indexes == null ? ImmutableMap.of() : ImmutableMap.copyOf(indexes);
+      return this;
+    }
+
+    public Builder setSupportedStorageTier(StorageTier supportedStorageTier) {
+      this.supportedStorageTier = supportedStorageTier;
       return this;
     }
 

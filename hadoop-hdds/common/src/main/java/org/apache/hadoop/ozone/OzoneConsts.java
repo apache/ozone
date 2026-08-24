@@ -130,6 +130,14 @@ public final class OzoneConsts {
   public static final String OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST =
       "toExcludeSST";
 
+  /**
+   * Response header set by OM leader on full checkpoint responses with the
+   * estimated total uncompressed SST bytes (see OMDBCheckpointUtils); used by
+   * followers to pre-check disk space before streaming the tarball body.
+   */
+  public static final String OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER =
+      "X-Ozone-Om-Checkpoint-Estimated-Sst-Bytes";
+
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";
 
@@ -243,6 +251,7 @@ public final class OzoneConsts {
   public static final String ORIGIN_NODE_ID = "originNodeId";
   public static final String SCHEMA_VERSION = "schemaVersion";
   public static final String REPLICA_INDEX = "replicaIndex";
+  public static final String CONTAINER_STORAGE_TYPE = "storageType";
 
   // Supported .container datanode schema versions.
   // Since containers in older schema versions are currently not reformatted to
@@ -318,8 +327,9 @@ public final class OzoneConsts {
   public static final String TENANT = "tenant";
   public static final String USER_PREFIX = "userPrefix";
   public static final String REWRITE_GENERATION = "rewriteGeneration";
+  public static final String DELETED_KEY_SOURCE_TYPE = "deletedKeySourceType";
   /** Sentinel generation used to request atomic create-if-not-exists(put if absent) semantics. */
-  public static final long EXPECTED_GEN_CREATE_IF_NOT_EXISTS = -1L;
+  public static final long EXPECTED_GEN_CREATE_IF_ABSENT = 0L;
   public static final String FROM_SNAPSHOT = "fromSnapshot";
   public static final String TO_SNAPSHOT = "toSnapshot";
   public static final String TOKEN = "token";
