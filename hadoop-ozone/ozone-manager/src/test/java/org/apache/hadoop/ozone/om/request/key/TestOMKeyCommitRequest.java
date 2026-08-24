@@ -142,7 +142,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     // Check block location.
     assertEquals(allocatedLocationList,
-        omKeyInfo.getLatestVersionLocations().getLocationList());
+        omKeyInfo.getLatestVersionLocations().createLocationList());
 
   }
 
@@ -215,9 +215,9 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
         .collect(Collectors.toList());
 
     assertEquals(locationInfoListFromCommitKeyRequest,
-        omKeyInfo.getLatestVersionLocations().getLocationList());
+        omKeyInfo.getLatestVersionLocations().createLocationList());
     assertEquals(allocatedLocationList,
-        omKeyInfo.getLatestVersionLocations().getLocationList());
+        omKeyInfo.getLatestVersionLocations().createLocationList());
   }
 
   @Test
@@ -402,7 +402,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     assertEquals(allocatedKeyLocationList.size() - committedKeyLocationList.size(),
         toDeleteKeyList.values().stream()
         .findFirst().get().cloneOmKeyInfoList().get(0).getKeyLocationVersions()
-        .get(0).getLocationList().size());
+        .get(0).createLocationList().size());
 
     // Entry should be deleted from openKey Table.
     omKeyInfo =
@@ -437,7 +437,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     // Key table should have three blocks.
     assertEquals(intersection,
-        omKeyInfo.getLatestVersionLocations().getLocationList());
+        omKeyInfo.getLatestVersionLocations().createLocationList());
     assertEquals(3, intersection.size());
 
   }
@@ -760,8 +760,8 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
         commitKeyRequest.getKeyArgs().getKeyLocationsList().stream().map(OmKeyLocationInfo::getFromProtobuf)
             .collect(Collectors.toList());
 
-    assertEquals(locationInfoListFromCommitKeyRequest, omKeyInfo.getLatestVersionLocations().getLocationList());
-    assertEquals(allocatedLocationList, omKeyInfo.getLatestVersionLocations().getLocationList());
+    assertEquals(locationInfoListFromCommitKeyRequest, omKeyInfo.getLatestVersionLocations().createLocationList());
+    assertEquals(allocatedLocationList, omKeyInfo.getLatestVersionLocations().createLocationList());
     assertEquals(1, omKeyInfo.getKeyLocationVersions().size());
 
     // flush response content to db
@@ -847,8 +847,8 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
         commitKeyRequest.getKeyArgs().getKeyLocationsList().stream().map(OmKeyLocationInfo::getFromProtobuf)
             .collect(Collectors.toList());
 
-    assertEquals(locationInfoListFromCommitKeyRequest, omKeyInfo.getLatestVersionLocations().getLocationList());
-    assertEquals(committedBlockList, omKeyInfo.getLatestVersionLocations().getLocationList());
+    assertEquals(locationInfoListFromCommitKeyRequest, omKeyInfo.getLatestVersionLocations().createLocationList());
+    assertEquals(committedBlockList, omKeyInfo.getLatestVersionLocations().createLocationList());
     assertEquals(1, omKeyInfo.getKeyLocationVersions().size());
 
     Map<String, RepeatedOmKeyInfo> toDeleteKeyList
@@ -862,9 +862,9 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     assertEquals(2, keysToDelete.size());
     OmKeyInfo overwrittenKey = keysToDelete.get(0);
     OmKeyInfo uncommittedPseudoKey = keysToDelete.get(1);
-    assertEquals(DEFAULT_COMMIT_BLOCK_SIZE, overwrittenKey.getLatestVersionLocations().getLocationList().size());
+    assertEquals(DEFAULT_COMMIT_BLOCK_SIZE, overwrittenKey.getLatestVersionLocations().createLocationList().size());
     assertEquals(allocatedKeyLocationList.size() - committedKeyLocationList.size(),
-        uncommittedPseudoKey.getLatestVersionLocations().getLocationList().size());
+        uncommittedPseudoKey.getLatestVersionLocations().createLocationList().size());
 
     // flush response content to db
     BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
