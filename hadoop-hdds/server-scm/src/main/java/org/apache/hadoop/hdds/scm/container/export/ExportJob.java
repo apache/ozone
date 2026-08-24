@@ -21,15 +21,32 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 /**
- * Metadata for a container ID export job.
+ * In-memory state for a container ID export job.
+ * <p>Mutable fields are guarded by a {@link ReadWriteLock} so {@link #toStatus()} returns a
+ * consistent snapshot while the worker updates progress.
  */
 public final class ExportJob {
+
+  private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
   private final Id id;
   private final ExportScope scope;
   private final String jobStartTime;
+  private final ContainerID startContainerId;
+  private final int batchSize;
+  private final int partSize;
+  // Planned .tar.gz output path, fixed at job creation; used by the worker to write the archive.
+  private final String plannedArchivePath;
+  private ExecutionState executionState = ExecutionState.RUNNING;
+  private long totalRows;
+  private String errorMessage;
 
   /**
    * Unique job identifier.
@@ -75,10 +92,158 @@ public final class ExportJob {
     }
   }
 
-  ExportJob(Id id, ExportScope scope, String jobStartTime) {
+  /**
+   * Immutable snapshot of export progress.
+   */
+  public static final class Status {
+    private final Id id;
+    private final ExecutionState executionState;
+    private final long totalRows;
+    // plannedArchivePath when the job SUCCEEDED with rows; null while running, on failure, or zero matches.
+    private final String completedArchivePath;
+    private final String errorMessage;
+
+    private Status(Id id, ExecutionState executionState, long totalRows, String completedArchivePath,
+        String errorMessage) {
+      this.id = id;
+      this.executionState = executionState;
+      this.totalRows = totalRows;
+      this.completedArchivePath = completedArchivePath;
+      this.errorMessage = errorMessage;
+    }
+
+    public Id getId() {
+      return id;
+    }
+
+    public ExecutionState getExecutionState() {
+      return executionState;
+    }
+
+    public long getTotalRows() {
+      return totalRows;
+    }
+
+    public String getCompletedArchivePath() {
+      return completedArchivePath;
+    }
+
+    public String getErrorMessage() {
+      return errorMessage;
+    }
+  }
+
+  /**
+   * Job execution state.
+   */
+  public enum ExecutionState {
+    RUNNING(false),
+    SUCCEEDED(true),
+    FAILED(true);
+
+    private final boolean terminal;
+
+    ExecutionState(boolean terminal) {
+      this.terminal = terminal;
+    }
+
+    public boolean isTerminal() {
+      return terminal;
+    }
+  }
+
+  ExportJob(Id id, ExportScope scope, String jobStartTime, String plannedArchivePath, ContainerID startContainerId,
+      int batchSize, int partSize) {
     this.id = id;
     this.scope = scope;
     this.jobStartTime = jobStartTime;
+    this.plannedArchivePath = plannedArchivePath;
+    this.startContainerId = startContainerId != null ? startContainerId : ContainerID.valueOf(0);
+    this.batchSize = batchSize;
+    this.partSize = partSize;
+  }
+
+  Id getId() {
+    return id;
+  }
+
+  LifeCycleState getLifeCycleState() {
+    return scope.getLifeCycleState();
+  }
+
+  ContainerHealthState getHealthState() {
+    return scope.getHealthState();
+  }
+
+  String getPlannedArchivePath() {
+    return plannedArchivePath;
+  }
+
+  ContainerID getStartContainerId() {
+    return startContainerId;
+  }
+
+  int getBatchSize() {
+    return batchSize;
+  }
+
+  int getPartSize() {
+    return partSize;
+  }
+
+  void updateTotalRows(long rows) {
+    lock.writeLock().lock();
+    try {
+      totalRows = rows;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  void completeWithNoMatches() {
+    lock.writeLock().lock();
+    try {
+      transitionToTerminal(ExecutionState.SUCCEEDED);
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  void completeSucceeded() {
+    lock.writeLock().lock();
+    try {
+      transitionToTerminal(ExecutionState.SUCCEEDED);
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  void fail(String message) {
+    lock.writeLock().lock();
+    try {
+      errorMessage = message;
+      transitionToTerminal(ExecutionState.FAILED);
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  Status toStatus() {
+    lock.readLock().lock();
+    try {
+      String completedArchivePath =
+          executionState == ExecutionState.SUCCEEDED && totalRows > 0 ? plannedArchivePath : null;
+      return new Status(id, executionState, totalRows, completedArchivePath, errorMessage);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  private void transitionToTerminal(ExecutionState terminalState) {
+    if (executionState.isTerminal()) {
+      throw new IllegalStateException("Export job " + id + " is already terminal: " + executionState);
+    }
+    executionState = terminalState;
   }
 
   String partFileName(int partIndex) {

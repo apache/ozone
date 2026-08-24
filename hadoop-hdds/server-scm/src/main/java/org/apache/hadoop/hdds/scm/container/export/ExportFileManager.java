@@ -27,6 +27,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,6 +40,8 @@ import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.ozone.util.UUIDUtil;
 import org.apache.ratis.util.AtomicFileOutputStream;
@@ -77,18 +82,30 @@ final class ExportFileManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ExportFileManager.class);
 
+  static final String EXPORT_SUBDIR = "exports";
   static final String EXPORT_JOB_DIR_PREFIX = "export_";
   static final String EXPORT_ARCHIVE_JOB_INFIX = "_job";
   static final String EXPORT_ARCHIVE_SUFFIX = ".tar.gz";
   static final String EXPORT_ARCHIVE_TMP_SUFFIX = EXPORT_ARCHIVE_SUFFIX + AtomicFileOutputStream.TMP_EXTENSION;
   static final String EXPORT_LOCK_NAME = "in_use.lock";
   private static final int EXPORT_JOB_START_TIME_LENGTH = 19;
+  private static final DateTimeFormatter EXPORT_JOB_START_TIME_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss").withZone(ZoneOffset.UTC);
 
   private final String exportDirectory;
   private FileLock exportDirectoryLock;
 
   ExportFileManager(String exportDirectory) {
     this.exportDirectory = Objects.requireNonNull(exportDirectory, "exportDirectory == null");
+  }
+
+  static String resolveExportDirectory(OzoneConfiguration conf) {
+    File scmDbDir = ServerUtils.getScmDbDir(conf);
+    return new File(scmDbDir, EXPORT_SUBDIR).getAbsolutePath();
+  }
+
+  String getExportDirectory() {
+    return exportDirectory;
   }
 
   void start() throws IOException {
@@ -115,6 +132,15 @@ final class ExportFileManager {
       lockAccessFile.close();
       throw new IOException("Failed to lock container export directory " + exportDirectory, e);
     }
+  }
+
+  void unlock() throws IOException {
+    if (exportDirectoryLock == null) {
+      return;
+    }
+    exportDirectoryLock.release();
+    exportDirectoryLock.channel().close();
+    exportDirectoryLock = null;
   }
 
   File resolveArchiveFile(ExportScope scope, String jobStartTime, ExportJob.Id jobId) {
@@ -175,6 +201,10 @@ final class ExportFileManager {
       archivePaths.add(archive.getAbsolutePath());
     }
     return archivePaths;
+  }
+
+  static String formatJobStartTime(Instant jobStartTime) {
+    return EXPORT_JOB_START_TIME_FORMAT.format(jobStartTime);
   }
 
   static String jobStartTimeFromArchiveFileName(String fileName) {

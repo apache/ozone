@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.export;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedWriter;
@@ -26,6 +27,7 @@ import java.nio.file.Files;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -34,7 +36,10 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestExportJob {
 
+  private static final int TEST_BATCH_SIZE = 100;
+  private static final int TEST_PART_SIZE = 500;
   private static final String TEST_JOB_START_TIME = "2026-01-01-12-00-00";
+  private static final ExportJob.Id TEST_JOB_ID = ExportJob.Id.of("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
   @TempDir
   private File tempDir;
@@ -60,8 +65,28 @@ public class TestExportJob {
     assertTrue(lines.contains("# part=2"));
   }
 
+  @Test
+  public void testStatusCompletedArchivePathDerivedFromOutcome() {
+    ExportJob job = newJob(ContainerHealthState.MISSING, null);
+    job.completeWithNoMatches();
+    assertNull(job.toStatus().getCompletedArchivePath());
+
+    ExportJob succeededJob = newJob(ContainerHealthState.MISSING, null);
+    succeededJob.updateTotalRows(10);
+    succeededJob.completeSucceeded();
+    assertEquals(testPlannedArchivePath(ExportScope.of(null, ContainerHealthState.MISSING)),
+        succeededJob.toStatus().getCompletedArchivePath());
+  }
+
   private static ExportJob newJob(ContainerHealthState healthState, LifeCycleState lifeCycleState) {
     ExportScope scope = ExportScope.of(lifeCycleState, healthState);
-    return new ExportJob(ExportJob.Id.newId(), scope, TEST_JOB_START_TIME);
+    return new ExportJob(TEST_JOB_ID, scope, TEST_JOB_START_TIME, testPlannedArchivePath(scope),
+        ContainerID.valueOf(0), TEST_BATCH_SIZE, TEST_PART_SIZE);
+  }
+
+  private static String testPlannedArchivePath(ExportScope scope) {
+    return "/" + ExportFileManager.EXPORT_SUBDIR + "/container-ids_" + scope.getValue() + "_"
+        + TEST_JOB_START_TIME + ExportFileManager.EXPORT_ARCHIVE_JOB_INFIX + TEST_JOB_ID.getValue()
+        + ExportFileManager.EXPORT_ARCHIVE_SUFFIX;
   }
 }

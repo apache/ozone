@@ -38,6 +38,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.utils.Archiver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -134,8 +135,9 @@ public class TestExportFileManager {
   public void testWriteArchiveFromPartFiles() throws Exception {
     ExportJob.Id jobId = ExportJob.Id.newId();
     ExportScope scope = ExportScope.of(null, ContainerHealthState.MISSING);
-    ExportJob job = new ExportJob(jobId, scope, TEST_JOB_START_TIME);
     File archive = fileManager.resolveArchiveFile(scope, TEST_JOB_START_TIME, jobId);
+    ExportJob job = new ExportJob(jobId, scope, TEST_JOB_START_TIME, archive.getAbsolutePath(),
+        ContainerID.valueOf(0), 100, 500);
 
     fileManager.createJobDirectory(jobId);
     try (BufferedWriter writer = fileManager.newPartWriter(jobId, job.partFileName(1))) {
