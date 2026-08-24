@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.s3;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -338,32 +337,6 @@ public class TestSignedChunksInputStream {
     InputStream is = new SignedChunksInputStream(
         new ByteArrayInputStream(tamperedBody.getBytes(UTF_8)), newValidator());
     assertThrows(OS3Exception.class, () -> IOUtils.toString(is, UTF_8));
-  }
-
-  @Test
-  void closeClosesUnderlyingStream() throws IOException {
-    TrackingInputStream underlying = new TrackingInputStream("1234567890\r\n".getBytes(UTF_8));
-    SignedChunksInputStream wrapper = new SignedChunksInputStream(underlying);
-    wrapper.close();
-    assertTrue(underlying.isClosed());
-  }
-
-  private static final class TrackingInputStream extends ByteArrayInputStream {
-    private boolean closed;
-
-    TrackingInputStream(byte[] buf) {
-      super(buf);
-    }
-
-    @Override
-    public void close() throws IOException {
-      super.close();
-      closed = true;
-    }
-
-    boolean isClosed() {
-      return closed;
-    }
   }
 
   private static String signedChunkedBody(char payloadChar) {

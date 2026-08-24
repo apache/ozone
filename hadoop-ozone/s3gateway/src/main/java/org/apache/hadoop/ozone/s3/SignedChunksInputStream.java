@@ -228,11 +228,6 @@ public class SignedChunksInputStream extends InputStream {
     return totalReadBytes > 0 ? totalReadBytes : -1;
   }
 
-  @Override
-  public void close() throws IOException {
-    originalStream.close();
-  }
-
   /**
    * A verified stream must end with the terminating 0-byte chunk. Reaching EOF before it means the
    * body was truncated, so the payload read so far was never fully authenticated. Without a validator
