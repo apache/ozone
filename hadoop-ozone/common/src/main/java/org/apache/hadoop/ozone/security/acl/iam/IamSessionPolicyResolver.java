@@ -29,13 +29,17 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -77,6 +81,9 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
  * The only supported Effect is Allow - all others will throw OMException with NOT_SUPPORTED_OPERATION.  This
  * value is case-sensitive per the
  * <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_effect.html">AWS spec</a>.
+ * <p>
+ * The only supported Statement elements are Sid, Effect, Action, Resource, and Condition.  Duplicate JSON object keys
+ * and unsupported Statement elements will throw OMException with MALFORMED_POLICY_DOCUMENT.
  * <p>
  * If a (currently) unsupported S3 action is requested, such as s3:GetAccelerateConfiguration,
  * it will be silently ignored.  Similarly, if an invalid S3 action is requested, it will be silently ignored.
@@ -141,13 +148,19 @@ public final class IamSessionPolicyResolver {
     final Set<JsonNode> statements = parseJsonAndRetrieveStatements(policyJson);
 
     for (JsonNode stmt : statements) {
+      validateSupportedStatementFields(stmt);
       validateEffectInJsonStatement(stmt);
 
-      final Set<String> actions = readStringOrArray(stmt.get("Action"));
-      final Set<String> resources = readStringOrArray(stmt.get("Resource"));
+      final Set<String> actions = readRequiredStringOrArray(stmt.get("Action"), "Action");
+      final Set<String> resources = readRequiredStringOrArray(stmt.get("Resource"), "Resource");
 
       // Parse prefixes from conditions, if any
       final Condition condition = parsePrefixesFromConditions(stmt);
+
+      // An empty s3:prefix array matches no prefixes and therefore grants no access (AWS behavior).
+      if (condition != null && condition.prefixes.isEmpty()) {
+        continue;
+      }
 
       // Map actions to S3Action enum if possible
       final Set<S3Action> mappedS3Actions = mapPolicyActionsToS3Actions(actions);
@@ -203,6 +216,10 @@ public final class IamSessionPolicyResolver {
    * Parses IAM session policy and retrieve the statement(s).
    */
   private static Set<JsonNode> parseJsonAndRetrieveStatements(String policyJson) throws OMException {
+    // Jackson's tree model silently collapses duplicate keys (last value wins), which could let a caller smuggle
+    // broader permissions than intended.  Detect them up front so we can reject them with the exact field name.
+    checkForDuplicateFields(policyJson);
+
     final JsonNode root;
     try {
       root = MAPPER.readTree(policyJson);
@@ -223,7 +240,82 @@ public final class IamSessionPolicyResolver {
     } else {
       statements.add(statementsNode);
     }
+    if (statements.isEmpty()) {
+      throw new OMException(ERROR_PREFIX + "No Statement(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+    }
     return statements;
+  }
+
+  /**
+   * Detects duplicate JSON object keys at any nesting level in a single streaming pass, reporting the offending
+   * field name directly.  Structural JSON problems are ignored here and surfaced by the subsequent tree parse.
+   */
+  private static void checkForDuplicateFields(String policyJson) throws OMException {
+    try (JsonParser parser = MAPPER.getFactory().createParser(policyJson)) {
+      checkForDuplicateFields(parser);
+    } catch (OMException e) {
+      throw e;
+    } catch (IOException e) {
+      // Structural JSON problems are surfaced by the subsequent tree parse with a clearer message.
+    }
+  }
+
+  private static void checkForDuplicateFields(JsonParser parser) throws IOException {
+    JsonToken token = parser.currentToken();
+    if (token == null) {
+      token = parser.nextToken();
+    }
+
+    if (token == JsonToken.START_OBJECT) {
+      final Set<String> fieldNames = new HashSet<>();
+      while (parser.nextToken() == JsonToken.FIELD_NAME) {
+        final String fieldName = parser.currentName();
+        if (!fieldNames.add(fieldName)) {
+          throw new OMException(
+              ERROR_PREFIX + "Duplicate field '" + fieldName + "' in session policy", MALFORMED_POLICY_DOCUMENT);
+        }
+        parser.nextToken();
+        checkForDuplicateFields(parser);
+      }
+    } else if (token == JsonToken.START_ARRAY) {
+      JsonToken element;
+      while ((element = parser.nextToken()) != null && element != JsonToken.END_ARRAY) {
+        checkForDuplicateFields(parser);
+      }
+    }
+  }
+
+  /**
+   * Ensures statements contain only the IAM policy elements supported by the STS session policy subset.
+   */
+  private static void validateSupportedStatementFields(JsonNode statement) throws OMException {
+    if (!statement.isObject()) {
+      throw new OMException(
+          ERROR_PREFIX + "Invalid Statement in JSON policy (must be an Object) - " + statement,
+          MALFORMED_POLICY_DOCUMENT);
+    }
+
+    final Iterator<String> fieldNames = statement.fieldNames();
+    while (fieldNames.hasNext()) {
+      final String fieldName = fieldNames.next();
+      if (!isSupportedStatementField(fieldName)) {
+        throw new OMException(
+            ERROR_PREFIX + "Unsupported statement element - " + fieldName, MALFORMED_POLICY_DOCUMENT);
+      }
+    }
+  }
+
+  private static boolean isSupportedStatementField(String fieldName) {
+    switch (fieldName) {
+    case "Sid":
+    case "Effect":
+    case "Action":
+    case "Resource":
+    case "Condition":
+      return true;
+    default:
+      return false;
+    }
   }
 
   /**
@@ -248,28 +340,87 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
-   * Reads a JsonNode and converts to a Set of String, if the node represents
-   * a textual value or an array of textual values.  Otherwise, returns
-   * an empty List.
+   * Reads a required String or String array JSON policy element.
    */
-  private static Set<String> readStringOrArray(JsonNode node) {
+  private static Set<String> readRequiredStringOrArray(JsonNode node, String fieldName) throws OMException {
     if (node == null || node.isMissingNode() || node.isNull()) {
-      return Collections.emptySet();
+      throw new OMException(ERROR_PREFIX + "No " + fieldName + "(s) found in policy", MALFORMED_POLICY_DOCUMENT);
     }
     if (node.isTextual()) {
       return Collections.singleton(node.asText());
     }
     if (node.isArray()) {
       final Set<String> set = new HashSet<>();
-      node.forEach(n -> {
-        if (n.isTextual()) {
-          set.add(n.asText());
+      for (JsonNode n : node) {
+        if (!n.isTextual()) {
+          throw invalidStringOrArray(fieldName, node);
         }
-      });
+        set.add(n.asText());
+      }
+      if (set.isEmpty()) {
+        throw new OMException(ERROR_PREFIX + "No " + fieldName + "(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+      }
       return set;
     }
 
-    return Collections.emptySet();
+    throw invalidStringOrArray(fieldName, node);
+  }
+
+  private static OMException invalidStringOrArray(String fieldName, JsonNode node) {
+    return new OMException(
+        ERROR_PREFIX + "Invalid " + fieldName + " in JSON policy (must be a String or Array of Strings) - " + node,
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  /**
+   * Reads and validates an s3:prefix condition value per AWS IAM session policy behavior.
+   * <p>
+   * Rejects {@code null}, objects (such as {@code {}}), and arrays whose elements are not all
+   * strings or not all numbers/booleans.  Scalar numbers and booleans are coerced to strings
+   * (for example {@code 123} becomes {@code "123"}).  An empty array matches no prefixes and
+   * causes the statement to grant no access.
+   */
+  private static Set<String> readConditionPrefixValue(JsonNode node) throws OMException {
+    if (node == null || node.isMissingNode() || node.isNull()) {
+      throw invalidConditionPrefixValue(node);
+    }
+    if (node.isTextual() || node.isNumber() || node.isBoolean()) {
+      return Collections.singleton(node.asText());
+    }
+    if (node.isArray()) {
+      if (node.isEmpty()) {
+        return Collections.emptySet();
+      }
+      boolean allTextual = true;
+      boolean allNumber = true;
+      boolean allBoolean = true;
+      for (final JsonNode element : node) {
+        if (!element.isTextual()) {
+          allTextual = false;
+        }
+        if (!element.isNumber()) {
+          allNumber = false;
+        }
+        if (!element.isBoolean()) {
+          allBoolean = false;
+        }
+      }
+      if (!allTextual && !allNumber && !allBoolean) {
+        throw invalidConditionPrefixValue(node);
+      }
+      final Set<String> prefixes = new HashSet<>();
+      node.forEach(n -> prefixes.add(n.asText()));
+      return prefixes;
+    }
+
+    throw invalidConditionPrefixValue(node);
+  }
+
+  private static OMException invalidConditionPrefixValue(JsonNode node) {
+    return new OMException(
+        ERROR_PREFIX + "Invalid s3:prefix in Condition (must be a String, Number, Boolean, or homogeneous " +
+        "Array of Strings, Numbers, or Booleans) - " + node,
+        MALFORMED_POLICY_DOCUMENT);
   }
 
   /**
@@ -319,7 +470,7 @@ public final class IamSessionPolicyResolver {
         throw new OMException(ERROR_PREFIX + "Unsupported Condition key name - " + keyName, NOT_SUPPORTED_OPERATION);
       }
 
-      final Set<String> prefixes = readStringOrArray(operatorValue.get(keyName));
+      final Set<String> prefixes = readConditionPrefixValue(operatorValue.get(keyName));
       condition = new Condition(operator, prefixes);
     }
 
@@ -596,23 +747,23 @@ public final class IamSessionPolicyResolver {
       addAclsForObj(objToAclsMap, volumeObj, action.volumePerms);
       addAclsForObj(objToAclsMap, bucketObj, action.bucketPerms);
 
-      if (condition != null && condition.prefixes != null && !condition.prefixes.isEmpty() &&
-          action == S3Action.LIST_BUCKET) {
-
+      if (condition != null && action == S3Action.LIST_BUCKET) {
         // Ensure the volume and bucket get the action
         addActionForKind(objToActionsMap, action, volumeObj, bucketObj, null);
 
-        for (String prefix : condition.prefixes) {
-          // If operator is StringEquals, ignore wildcard prefixes - this is AWS behavior
-          if (STRING_EQUALS.equals(condition.operator) && hasWildcard(prefix)) {
-            continue;
-          }
+        if (condition.prefixes != null && !condition.prefixes.isEmpty()) {
+          for (String prefix : condition.prefixes) {
+            // If operator is StringEquals, ignore wildcard prefixes - this is AWS behavior
+            if (STRING_EQUALS.equals(condition.operator) && hasWildcard(prefix)) {
+              continue;
+            }
 
-          final IOzoneObj listObj = createObjectResourcesFromConditionPrefix(
-              volumeName, authorizerType, ResourceSpec.any(), prefix, objToAclsMap, EnumSet.of(READ));
-          addActionForKind(objToActionsMap, action, null, null, listObj);
+            final IOzoneObj listObj = createObjectResourcesFromConditionPrefix(
+                volumeName, authorizerType, ResourceSpec.any(), prefix, objToAclsMap, EnumSet.of(READ));
+            addActionForKind(objToActionsMap, action, null, null, listObj);
+          }
         }
-      } else {
+      } else if (condition == null) {
         addAclsForObj(objToAclsMap, keyObj, action.objectPerms);
         addActionForKind(objToActionsMap, action, volumeObj, bucketObj, keyObj);
       }
