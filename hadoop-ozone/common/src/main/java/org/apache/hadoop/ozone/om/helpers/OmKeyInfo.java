@@ -353,7 +353,7 @@ public final class OmKeyInfo extends WithParentObjectId
     Map<ContainerBlockID, OmKeyLocationInfo> allocatedBlockLocations =
         new HashMap<>();
     for (OmKeyLocationInfo existingLocationInfo : keyLocationInfoGroup.
-        getLocationList()) {
+        createLocationList()) {
       ContainerBlockID existingBlockID = existingLocationInfo.getBlockID().
           getContainerBlockID();
       // The case of overwriting value should never happen
@@ -537,7 +537,7 @@ public final class OmKeyInfo extends WithParentObjectId
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
               new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
-                  keyLocationVersion.getLocationList(),
+                  keyLocationVersion.createLocationList(),
                   keyLocationVersion.isMultipartKey())));
     }
 

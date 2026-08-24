@@ -251,7 +251,7 @@ public class TestFailureHandlingByClient {
 
     // Get information about the first and second block (in different pipelines)
     List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations()
-        .getLocationList();
+        .createLocationList();
     long containerId1 = locationList.get(0).getContainerID();
     List<DatanodeDetails> block1DNs = locationList.get(0).getPipeline()
         .getNodes();
