@@ -21,10 +21,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -47,6 +50,7 @@ import org.slf4j.LoggerFactory;
 public class ContainerBalancerSelectionCriteria {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerSelectionCriteria.class);
+  private static final int MAX_EXCLUDED_CONTAINERS_TO_LOG = 50;
 
   private ContainerBalancerConfiguration balancerConfiguration;
   private NodeManager nodeManager;
@@ -56,6 +60,7 @@ public class ContainerBalancerSelectionCriteria {
   private Set<ContainerID> excludeContainers;
   private Set<ContainerID> includeContainers;
   private Set<ContainerID> excludeContainersDueToFailure;
+  private Map<ContainerID, ContainerHealthResult.HealthState> excludeContainersDueToHealth;
   private FindSourceStrategy findSourceStrategy;
   private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
 
@@ -72,6 +77,7 @@ public class ContainerBalancerSelectionCriteria {
     this.containerManager = containerManager;
     this.containerToSourceMap = containerToSourceMap;
     excludeContainersDueToFailure = new HashSet<>();
+    excludeContainersDueToHealth = new LinkedHashMap<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
     includeContainers = balancerConfiguration.getIncludeContainers();
     this.findSourceStrategy = findSourceStrategy;
@@ -247,6 +253,7 @@ public class ContainerBalancerSelectionCriteria {
     ContainerHealthResult.HealthState state =
         replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
     if (state != ContainerHealthResult.HealthState.HEALTHY) {
+      excludeContainersDueToHealth.put(container.containerID(), state);
       LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
       return false;
     }
@@ -339,8 +346,22 @@ public class ContainerBalancerSelectionCriteria {
       return true;
     }
 
+    excludeContainersDueToHealth.put(container.containerID(), state);
     LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
     return false;
+  }
+
+  void logExcludedContainersDueToHealth() {
+    if (excludeContainersDueToHealth.isEmpty()) {
+      return;
+    }
+
+    List<Map.Entry<ContainerID, ContainerHealthResult.HealthState>> containersToLog =
+        excludeContainersDueToHealth.entrySet().stream()
+            .limit(MAX_EXCLUDED_CONTAINERS_TO_LOG)
+            .collect(Collectors.toList());
+    LOG.info("Excluded {} containers because of their health state. Logging the first {}: {}.",
+        excludeContainersDueToHealth.size(), containersToLog.size(), containersToLog);
   }
 
   private boolean breaksMaxSizeToMoveLimit(ContainerID containerID,
