@@ -752,8 +752,6 @@ public final class OzoneManagerRatisServer {
 
     setRaftRpcProperties(properties, conf);
 
-    setRaftRetryCacheProperties(properties, conf);
-
     setRaftSnapshotProperties(properties, conf);
 
     setRaftCloseThreshold(properties, conf);
@@ -844,16 +842,6 @@ public final class OzoneManagerRatisServer {
         nodeFailureTimeoutUnit);
     RaftServerConfigKeys.Notification.setNoLeaderTimeout(properties, nodeFailureTimeout);
     RaftServerConfigKeys.Rpc.setSlownessTimeout(properties, nodeFailureTimeout);
-  }
-
-  private static void setRaftRetryCacheProperties(RaftProperties properties, ConfigurationSource conf) {
-    // Set timeout for server retry cache entry
-    TimeUnit retryCacheTimeoutUnit = OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT.getUnit();
-    final TimeDuration retryCacheTimeout = TimeDuration.valueOf(conf.getTimeDuration(
-        OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT.getDuration(), retryCacheTimeoutUnit),
-        retryCacheTimeoutUnit);
-    RaftServerConfigKeys.RetryCache.setExpiryTime(properties, retryCacheTimeout);
   }
 
   private static void setRaftSnapshotProperties(RaftProperties properties, ConfigurationSource conf) {

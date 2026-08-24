@@ -2347,13 +2347,6 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.server.retry.cache.timeout</name>
-    <value>600000ms</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>Retry Cache entry timeout for OM's ratis server.</description>
-  </property>
-
-  <property>
     <name>ozone.om.ratis.minimum.timeout</name>
     <value>5s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>

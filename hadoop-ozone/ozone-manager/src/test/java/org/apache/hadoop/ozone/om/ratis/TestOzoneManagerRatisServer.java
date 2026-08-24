@@ -49,7 +49,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.util.ExitUtils;
@@ -274,5 +276,24 @@ public class TestOzoneManagerRatisServer {
     assertEquals(uuid, raftGroupId.getUuid());
     assertEquals(raftGroupId.toByteString().size(), 16);
     newOmRatisServer.stop();
+  }
+
+  @Test
+  public void testRetryCacheExpiryTime(@TempDir Path ratisDir) {
+    assertEquals(300_000, retryCacheExpiryMillis(new OzoneConfiguration(), ratisDir));
+
+    OzoneConfiguration currentKeyConf = new OzoneConfiguration();
+    currentKeyConf.set(OMConfigKeys.OZONE_OM_HA_PREFIX + ".raft.server.retrycache.expirytime", "42s");
+    assertEquals(42_000, retryCacheExpiryMillis(currentKeyConf, ratisDir));
+
+    // The deprecated key must reach Ratis instead of being silently overwritten.
+    OzoneConfiguration deprecatedKeyConf = new OzoneConfiguration();
+    deprecatedKeyConf.set("ozone.om.ratis.server.retry.cache.timeout", "17s");
+    assertEquals(17_000, retryCacheExpiryMillis(deprecatedKeyConf, ratisDir));
+  }
+
+  private static long retryCacheExpiryMillis(OzoneConfiguration conf, Path ratisDir) {
+    RaftProperties properties = OzoneManagerRatisServer.newRaftProperties(conf, 9872, ratisDir.toString());
+    return RaftServerConfigKeys.RetryCache.expiryTime(properties).toLong(TimeUnit.MILLISECONDS);
   }
 }
