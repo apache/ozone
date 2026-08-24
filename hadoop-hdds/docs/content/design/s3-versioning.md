@@ -107,10 +107,15 @@ shape `InfoBucket` and `ListBuckets` return, not because a create needs it.
 
 A `BucketVersioningStatusProto` enum (`UNVERSIONED` / `VERSIONING_ENABLED` /
 `VERSIONING_SUSPENDED`) is added as an optional field on `BucketInfo` and
-`BucketArgs`. The legacy `isVersionEnabled` boolean is kept and maintained in
-two-way sync (`ENABLED → true`, otherwise `false`; records without the enum are
-interpreted via the boolean), so old and new clients/OMs coexist during rolling
-upgrades.
+`BucketArgs`. The legacy `isVersionEnabled` boolean is kept, and a status
+derives it (`ENABLED → true`, otherwise `false`). The reverse does not hold: a
+record without the enum reads as `UNVERSIONED` whatever the boolean says, and a
+legacy client setting the boolean on such a bucket leaves it without a status,
+so it keeps using the in-record block version list rather than being opted into
+S3 versioning semantics behind its owner's back. A legacy client's boolean is
+mapped onto the state machine only on a bucket that already carries a status,
+where the two have to stay consistent. Old and new clients/OMs coexist during
+rolling upgrades either way.
 
 ## Metadata layout: keyTable (current) + versionedKeyTable (noncurrent)
 
