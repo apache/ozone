@@ -37,7 +37,9 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
  * The input stream for Ozone file system.
  *
  * TODO: Make inputStream generic for both rest and rpc clients
- * This class is not thread safe.
+ * Sequential reads are not thread safe. Positioned reads may be made safe for
+ * concurrent pread when
+ * {@code ozone.fs.synchronize.positioned.reads.enabled=true}.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -46,10 +48,18 @@ public class OzoneFSInputStream extends FSInputStream
 
   private final InputStream inputStream;
   private final Statistics statistics;
+  private final boolean synchronizePositionedReads;
+  private final Object positionedReadLock = new Object();
 
   public OzoneFSInputStream(InputStream inputStream, Statistics statistics) {
+    this(inputStream, statistics, false);
+  }
+
+  public OzoneFSInputStream(InputStream inputStream, Statistics statistics,
+      boolean synchronizePositionedReads) {
     this.inputStream = inputStream;
     this.statistics = statistics;
+    this.synchronizePositionedReads = synchronizePositionedReads;
   }
 
   @Override
@@ -169,6 +179,15 @@ public class OzoneFSInputStream extends FSInputStream
     if (!buf.hasRemaining()) {
       return 0;
     }
+    if (synchronizePositionedReads) {
+      synchronized (positionedReadLock) {
+        return readPositioned(position, buf);
+      }
+    }
+    return readPositioned(position, buf);
+  }
+
+  private int readPositioned(long position, ByteBuffer buf) throws IOException {
     if (inputStream instanceof ExtendedInputStream) {
       final int remainingBeforeRead = buf.remaining();
       try {
@@ -179,7 +198,11 @@ public class OzoneFSInputStream extends FSInputStream
         return -1;
       }
     }
+    return readAtPositionSeekRestore(position, buf);
+  }
 
+  private int readAtPositionSeekRestore(long position, ByteBuffer buf)
+      throws IOException {
     long oldPos = this.getPos();
     int bytesRead;
     try {

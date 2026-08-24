@@ -132,6 +132,15 @@ public final class OzoneConfigKeys {
       = false;
 
   /**
+   * When true, synchronize seek-read-restore in OzoneFSInputStream positioned
+   * reads for thread-safe pread on a shared input stream.
+   */
+  public static final String OZONE_FS_SYNCHRONIZE_POSITIONED_READS_ENABLED =
+      "ozone.fs.synchronize.positioned.reads.enabled";
+  public static final boolean OZONE_FS_SYNCHRONIZE_POSITIONED_READS_ENABLED_DEFAULT =
+      false;
+
+  /**
    * hsync lease soft limit.
    */
   public static final String OZONE_OM_LEASE_SOFT_LIMIT
