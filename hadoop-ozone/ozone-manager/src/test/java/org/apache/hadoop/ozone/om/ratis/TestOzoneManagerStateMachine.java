@@ -841,13 +841,24 @@ public class TestOzoneManagerStateMachine {
   }
 
   @Test
-  public void testNotifyInstallSnapshotFromLeaderFailure() {
+  public void testNotifyInstallSnapshotFromLeaderNullResult() throws Exception {
+    CompletableFuture<TermIndex> future = sm.notifyInstallSnapshotFromLeader(
+        roleInfoWithLeader("leader-om"), TermIndex.valueOf(1, 11));
+
+    assertNull(future.get());
+  }
+
+  @Test
+  public void testNotifyInstallSnapshotFromLeaderFailure() throws Exception {
+    IOException failure = new IOException("Failed to install checkpoint");
+    doThrow(failure).when(om).installSnapshotFromLeader("leader-om");
+
     CompletableFuture<TermIndex> future = sm.notifyInstallSnapshotFromLeader(
         roleInfoWithLeader("leader-om"), TermIndex.valueOf(1, 11));
 
     ExecutionException exception = assertThrows(ExecutionException.class, future::get);
 
-    assertInstanceOf(IOException.class, exception.getCause());
+    assertSame(failure, exception.getCause());
   }
 
   @Test

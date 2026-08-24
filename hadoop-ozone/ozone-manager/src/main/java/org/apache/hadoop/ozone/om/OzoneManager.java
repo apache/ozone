@@ -4260,7 +4260,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       termIndex = installCheckpoint(leaderId, checkpointLocation);
     } catch (Exception ex) {
-      LOG.error("Failed to install snapshot from Leader OM.", ex);
+      throw new IOException("Failed to install snapshot from Leader " + leaderId, ex);
     } finally {
       cleanupCheckpoint(omDBCheckpoint);
     }
@@ -4317,6 +4317,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     long startTime = Time.monotonicNow();
     File oldDBLocation = metadataManager.getStore().getDbLocation();
     Path omDbPath = Paths.get(checkpointLocation.toString(), OM_DB_NAME);
+    IOException installFailure = null;
     try {
       // Stop Background services
       keyManager.stop();
@@ -4328,20 +4329,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // pending transactions in the buffer, they are discarded.
       omRatisServer.getOmStateMachine().pause();
     } catch (Exception e) {
-      LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
-          "installing the new checkpoint.");
       // Stop the checkpoint install process and restart the services.
       keyManager.start(configuration);
       startSecretManagerIfNecessary();
       startTrashEmptier(configuration);
-      throw e;
+      throw newInstallCheckpointException(checkpointTrxnInfo, "stop/pause services", e);
     }
-
     File dbBackup = null;
     TermIndex termIndex = omRatisServer.getLastAppliedTermIndex();
     long term = termIndex.getTerm();
     long lastAppliedIndex = termIndex.getIndex();
-
     // Check if current applied log index is smaller than the downloaded
     // checkpoint transaction index. If yes, proceed by stopping the ratis
     // server so that the OM state can be re-initialized. If no then do not
@@ -4383,6 +4380,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         LOG.error("Failed to install Snapshot from {} as OM failed to replace" +
             " DB with downloaded checkpoint. Reloading old OM state.",
             leaderId, e);
+        installFailure = newInstallCheckpointException(checkpointTrxnInfo, "replace DB", e);
       }
     } else {
       LOG.warn("Cannot proceed with InstallSnapshot as OM is at TermIndex {} " +
@@ -4449,6 +4447,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           dbBackup, e);
     }
 
+    throwIfInstallCheckpointFailed(installFailure);
+
     if (lastAppliedIndex != checkpointTrxnInfo.getTransactionIndex()) {
       // Install Snapshot failed and old state was reloaded. Return null to
       // Ratis to indicate that installation failed.
@@ -4462,6 +4462,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         "Spend {} ms.", newTermIndex.getTerm(), newTermIndex.getIndex(),
         (Time.monotonicNow() - startTime));
     return newTermIndex;
+  }
+
+  private static IOException newInstallCheckpointException(TransactionInfo checkpointTrxnInfo,
+      String operation, Exception cause) {
+    return new IOException("Failed to install checkpoint " + checkpointTrxnInfo
+        + ": Cannot " + operation + '.', cause);
+  }
+
+  private static void throwIfInstallCheckpointFailed(IOException installFailure) throws IOException {
+    if (installFailure != null) {
+      throw installFailure;
+    }
   }
 
   private void buildDBCheckpointInstallAuditLog(String leaderId, long term, long lastAppliedIndex) {
