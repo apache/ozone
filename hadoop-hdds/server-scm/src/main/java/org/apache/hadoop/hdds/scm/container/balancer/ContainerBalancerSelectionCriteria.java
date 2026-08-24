@@ -63,6 +63,9 @@ public class ContainerBalancerSelectionCriteria {
   private FindSourceStrategy findSourceStrategy;
   private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
 
+  // Capped to avoid unbounded growth in long-running or unlimited-iteration runs.
+  private static final int MAX_NOT_FOUND_CONTAINERS = 10_000;
+
   public ContainerBalancerSelectionCriteria(
       ContainerBalancerConfiguration balancerConfiguration,
       NodeManager nodeManager,
@@ -192,7 +195,7 @@ public class ContainerBalancerSelectionCriteria {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not find Container {} to check if it should be a " +
           "candidate container. Excluding it.", containerID);
-      excludeContainersNotFound.add(containerID);
+       addToExcludeNotFoundContainers(containerID);
       return true;
     }
 
@@ -212,7 +215,7 @@ public class ContainerBalancerSelectionCriteria {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
           "this container.", container.getContainerID(), e);
-      excludeContainersNotFound.add(containerID);
+       addToExcludeNotFoundContainers(containerID);
       return true;
     }
 
@@ -390,7 +393,13 @@ public class ContainerBalancerSelectionCriteria {
   }
 
   public void addToExcludeNotFoundContainers(ContainerID container) {
-    this.excludeContainersNotFound.add(container);
+    if (excludeContainersNotFound.size() < MAX_NOT_FOUND_CONTAINERS) {
+      excludeContainersNotFound.add(container);
+    } else {
+      LOG.warn("ContainerBalancer not found exclude set has reached the cap of {}. " +
+              "Container {} will not be added, it may be retried in subsequent iterations.",
+          MAX_NOT_FOUND_CONTAINERS, container);
+    }
   }
 
   Set<ContainerID> getExcludeNotFoundContainers() {

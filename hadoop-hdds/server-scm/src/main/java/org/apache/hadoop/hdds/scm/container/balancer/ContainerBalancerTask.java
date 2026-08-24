@@ -267,6 +267,12 @@ public class ContainerBalancerTask implements Runnable {
         return;
       }
 
+      if (!excludeContainersNotFound.isEmpty()) {
+        LOG.info("ContainerBalancer iteration {}: {} containers permanently " +
+                "excluded (ContainerNotFoundException across prior iterations).",
+            i + 1, excludeContainersNotFound.size());
+      }
+
       // initialize this iteration. stop balancing on initialization failure
       if (!initializeIteration()) {
         // just return if the reason for initialization failure is that
