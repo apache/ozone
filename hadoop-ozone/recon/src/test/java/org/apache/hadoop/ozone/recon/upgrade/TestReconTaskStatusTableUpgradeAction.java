@@ -35,6 +35,7 @@ import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.jooq.DSLContext;
+import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +59,11 @@ public class TestReconTaskStatusTableUpgradeAction
   @BeforeEach
   public void setUp() throws SQLException {
     dataSource = getDataSource();
-    dslContext = getDslContext();
+    // Use the Derby dialect explicitly. The shared DSLContext from the base
+    // class uses SQLDialect.DEFAULT, which renders Derby-incompatible DDL
+    // (e.g. "DROP TABLE IF EXISTS" and "bigint null"); a Derby-dialect context
+    // generates SQL that the embedded Derby database accepts.
+    dslContext = DSL.using(dataSource, SQLDialect.DERBY);
     upgradeAction = new ReconTaskStatusTableUpgradeAction();
     createLegacyTaskStatusTable();
   }
@@ -115,10 +120,8 @@ public class TestReconTaskStatusTableUpgradeAction
   }
 
   private void createLegacyTaskStatusTable() throws SQLException {
-    // Use a plain DROP TABLE rather than dropTableIfExists(): the shared test
-    // DSLContext uses SQLDialect.DEFAULT, which renders "DROP TABLE IF EXISTS",
-    // and Derby does not support the IF EXISTS clause. The base class always
-    // creates RECON_TASK_STATUS before this runs, so it is guaranteed to exist.
+    // The base class always creates RECON_TASK_STATUS before this runs, so a
+    // plain DROP TABLE is safe (no IF EXISTS needed).
     dslContext.dropTable(RECON_TASK_STATUS_TABLE_NAME).execute();
     dslContext.createTable(RECON_TASK_STATUS_TABLE_NAME)
         .column("task_name", SQLDataType.VARCHAR(766).nullable(false))
