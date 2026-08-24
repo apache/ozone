@@ -179,15 +179,11 @@ public class OzoneFSInputStream extends FSInputStream
     if (!buf.hasRemaining()) {
       return 0;
     }
-    if (synchronizePositionedReads) {
-      synchronized (positionedReadLock) {
-        return readPositioned(position, buf);
-      }
-    }
-    return readPositioned(position, buf);
-  }
-
-  private int readPositioned(long position, ByteBuffer buf) throws IOException {
+    // Prefer the native positioned read. For the replicated (Ratis) path this
+    // is stateless and thread-safe by construction, so it runs without any
+    // lock and lets concurrent positioned reads proceed in parallel. The
+    // StreamBlock path serializes internally. Streams that do not support a
+    // native positioned read (e.g. erasure coded) return false here.
     if (inputStream instanceof ExtendedInputStream) {
       final int remainingBeforeRead = buf.remaining();
       try {
@@ -196,6 +192,15 @@ public class OzoneFSInputStream extends FSInputStream
         }
       } catch (EOFException e) {
         return -1;
+      }
+    }
+
+    // Fallback: stateful seek-read-restore on the shared cursor. This is only
+    // thread-safe when enabled. When enabled, the lock covers the entire
+    // seek-read-restore sequence.
+    if (synchronizePositionedReads) {
+      synchronized (positionedReadLock) {
+        return readAtPositionSeekRestore(position, buf);
       }
     }
     return readAtPositionSeekRestore(position, buf);

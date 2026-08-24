@@ -430,6 +430,108 @@ public class ChunkInputStream extends InputStream
   }
 
   /**
+   * Whether this chunk stream can serve positioned reads without holding a
+   * lock. A plain chunk read is a self-contained RPC, so concurrent callers
+   * reading different ranges do not interfere. Overridden by
+   * {@link LocalChunkInputStream}, which reads from a shared {@link
+   * java.nio.channels.FileChannel} and therefore must serialize.
+   */
+  boolean supportsConcurrentPositionedRead() {
+    return true;
+  }
+
+  /**
+   * Stateless positioned read of up to {@code dst.remaining()} bytes starting
+   * at {@code chunkRelativePosition} within this chunk. Unlike the buffered
+   * {@link #read} path, this does not read or mutate any of the instance's
+   * buffer/position state ({@code buffers}, {@code chunkPosition},
+   * {@code bufferOffsetWrtChunkData}, ...), so it is safe to call concurrently
+   * from multiple threads sharing the same stream.
+   *
+   * @param chunkRelativePosition start offset within this chunk
+   * @param dst destination buffer
+   * @return number of bytes copied into {@code dst}, or {@link #EOF} at EOF
+   */
+  int readPositioned(long chunkRelativePosition, ByteBuffer dst)
+      throws IOException {
+    if (supportsConcurrentPositionedRead()) {
+      return doPositionedRead(chunkRelativePosition, dst);
+    }
+    // Local (short-circuit) reads share a FileChannel cursor; serialize them.
+    synchronized (this) {
+      return doPositionedRead(chunkRelativePosition, dst);
+    }
+  }
+
+  private int doPositionedRead(long chunkRelativePosition, ByteBuffer dst)
+      throws IOException {
+    if (chunkRelativePosition < 0 || chunkRelativePosition >= length) {
+      return EOF;
+    }
+    final int toRead =
+        (int) Math.min(dst.remaining(), length - chunkRelativePosition);
+    if (toRead == 0) {
+      return 0;
+    }
+
+    acquireClient();
+
+    final long adjustedOffset;
+    final long adjustedLen;
+    if (verifyChecksum) {
+      Pair<Long, Long> boundaries =
+          computeChecksumBoundaries(chunkRelativePosition, toRead);
+      adjustedOffset = boundaries.getLeft();
+      adjustedLen = boundaries.getRight();
+    } else {
+      adjustedOffset = chunkRelativePosition;
+      adjustedLen = toRead;
+    }
+
+    final ChunkInfo readChunkInfo = ChunkInfo.newBuilder(chunkInfo)
+        .setOffset(chunkInfo.getOffset() + adjustedOffset)
+        .setLen(adjustedLen)
+        .build();
+
+    final ByteBuffer[] readBuffers = readChunk(readChunkInfo);
+    return copyRange(readBuffers, chunkRelativePosition - adjustedOffset,
+        toRead, dst);
+  }
+
+  /**
+   * Copy {@code toCopy} bytes from {@code src} buffers, skipping the first
+   * {@code skip} bytes, into {@code dst}. Operates on duplicates so the source
+   * buffers' positions are left untouched.
+   */
+  private static int copyRange(ByteBuffer[] src, long skip, int toCopy,
+      ByteBuffer dst) {
+    long remainingSkip = skip;
+    int copied = 0;
+    for (ByteBuffer buffer : src) {
+      if (copied >= toCopy) {
+        break;
+      }
+      ByteBuffer dup = buffer.duplicate();
+      if (remainingSkip > 0) {
+        int skipHere = (int) Math.min(remainingSkip, dup.remaining());
+        dup.position(dup.position() + skipHere);
+        remainingSkip -= skipHere;
+        if (!dup.hasRemaining()) {
+          continue;
+        }
+      }
+      int n = Math.min(dup.remaining(), toCopy - copied);
+      if (n <= 0) {
+        continue;
+      }
+      dup.limit(dup.position() + n);
+      dst.put(dup);
+      copied += n;
+    }
+    return copied;
+  }
+
+  /**
    * Send RPC call to get the chunk from the container.
    */
   @VisibleForTesting
