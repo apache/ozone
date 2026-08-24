@@ -688,6 +688,7 @@ message ContainerMoveFailureDetailProto {
 message NodeFailureCountProto {
   optional string datanodeUuid = 1;
   optional int64 count = 2;
+  optional string hostname = 3;
 }
 
 message NodeTransferInfoProto {

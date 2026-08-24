@@ -732,16 +732,16 @@ class TestContainerBalancerSubCommand {
                     .setCount(2)
                     .addSourceFailureCounts(
                         StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
-                            .setDatanodeUuid("source-uuid-1").setCount(1).build())
+                            .setDatanodeUuid("source-uuid-1").setHostname("datanode1.example.com").setCount(1).build())
                     .addSourceFailureCounts(
                         StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
-                            .setDatanodeUuid("source-uuid-2").setCount(1).build())
+                            .setDatanodeUuid("source-uuid-2").setHostname("datanode2.example.com").setCount(1).build())
                     .addTargetFailureCounts(
                         StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
-                            .setDatanodeUuid("target-uuid-1").setCount(1).build())
+                            .setDatanodeUuid("target-uuid-1").setHostname("datanode3.example.com").setCount(1).build())
                     .addTargetFailureCounts(
                         StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
-                            .setDatanodeUuid("target-uuid-2").setCount(1).build())
+                            .setDatanodeUuid("target-uuid-2").setHostname("datanode4.example.com").setCount(1).build())
                     .build())
             .addContainerMoveFailures(
                 StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
@@ -749,10 +749,10 @@ class TestContainerBalancerSubCommand {
                     .setCount(1)
                     .addSourceFailureCounts(
                         StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
-                            .setDatanodeUuid("source-uuid-3").setCount(1).build())
+                            .setDatanodeUuid("source-uuid-3").setHostname("datanode5.example.com").setCount(1).build())
                     .addTargetFailureCounts(
                         StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
-                            .setDatanodeUuid("target-uuid-3").setCount(1).build())
+                            .setDatanodeUuid("target-uuid-3").setHostname("datanode6.example.com").setCount(1).build())
                     .build())
             .build();
 
@@ -779,11 +779,46 @@ class TestContainerBalancerSubCommand {
         .contains("Failed container moves")
         .contains("REPLICATION_FAIL_TIME_OUT")
         .contains("PRE_MOVE_CONTAINER_NOT_FOUND")
-        .contains("source-uuid-1")
-        .contains("target-uuid-1")
-        .contains("source-uuid-3")
-        .contains("target-uuid-3")
+        .contains("datanode1.example.com (source-uuid-1)")
+        .contains("datanode3.example.com (target-uuid-1)")
+        .contains("datanode5.example.com (source-uuid-3)")
+        .contains("datanode6.example.com (target-uuid-3)")
         .doesNotContain("Failure breakdown")
         .doesNotContain("Failed move details");
+  }
+
+  @Test
+  void testContainerBalancerStatusVerboseShowsNoBreakdownWhenFailuresMissing() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
+            .setIterationNumber(1)
+            .setIterationResult("ITERATION_COMPLETED")
+            .setIterationDuration(120L)
+            .setContainerMovesFailed(3)
+            .build();
+
+    long stoppedAt = OffsetDateTime.now().toEpochSecond();
+    ContainerBalancerStatusInfoProto statusInfo = ContainerBalancerStatusInfoProto.newBuilder()
+        .setStartedAt(stoppedAt - 600)
+        .setStoppedAt(stoppedAt)
+        .setStopReason("USER_REQUESTED")
+        .setConfiguration(config.toProtobufBuilder().setShouldRun(false))
+        .addIterationsStatusInfo(iteration)
+        .build();
+
+    when(scmClient.getContainerBalancerStatusInfo())
+        .thenReturn(ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setIsRunning(false)
+            .setContainerBalancerStatusInfo(statusInfo)
+            .build());
+
+    verbose.set(true);
+    statusCmd.execute(scmClient);
+
+    assertThat(out.get())
+        .contains("Failed to move containers                          3")
+        .contains("Failed container moves                             (no breakdown available)");
   }
 }

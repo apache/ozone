@@ -28,13 +28,16 @@ public final class ContainerMoveFailureDetail {
   private final long count;
   private final Map<String, Long> sourceFailureCounts;
   private final Map<String, Long> targetFailureCounts;
+  private final Map<String, String> datanodeHostnames;
 
   public ContainerMoveFailureDetail(String reason, long count,
-      Map<String, Long> sourceFailureCounts, Map<String, Long> targetFailureCounts) {
+      Map<String, Long> sourceFailureCounts, Map<String, Long> targetFailureCounts,
+      Map<String, String> datanodeHostnames) {
     this.reason = reason;
     this.count = count;
     this.sourceFailureCounts = Collections.unmodifiableMap(sourceFailureCounts);
     this.targetFailureCounts = Collections.unmodifiableMap(targetFailureCounts);
+    this.datanodeHostnames = Collections.unmodifiableMap(datanodeHostnames);
   }
 
   public String getReason() {
@@ -51,5 +54,9 @@ public final class ContainerMoveFailureDetail {
 
   public Map<String, Long> getTargetFailureCounts() {
     return targetFailureCounts;
+  }
+
+  public Map<String, String> getDatanodeHostnames() {
+    return datanodeHostnames;
   }
 }

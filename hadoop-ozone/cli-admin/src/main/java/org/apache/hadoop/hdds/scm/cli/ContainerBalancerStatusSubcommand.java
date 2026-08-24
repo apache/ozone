@@ -235,7 +235,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     if (leavingDataNodeList.isEmpty()) {
       leavingDataNodeList = " -" + System.lineSeparator();
     }
-    String failures = formatFailures(iterationStatusInfo.getContainerMoveFailuresList());
+    String failures = formatFailures(containerMovesFailed, iterationStatusInfo.getContainerMoveFailuresList());
     return String.format(
             "%-50s %s%n" +
                     "%-50s %s%n" +
@@ -266,7 +266,10 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             "Exited data from nodes", leavingDataNodeList);
   }
 
-  private String formatFailures(List<ContainerMoveFailureDetailProto> failures) {
+  private String formatFailures(long containerMovesFailed, List<ContainerMoveFailureDetailProto> failures) {
+    if (containerMovesFailed > 0 && failures.isEmpty()) {
+      return String.format("%-50s %s%n", "Failed container moves", "(no breakdown available)");
+    }
     if (failures.isEmpty()) {
       return "";
     }
@@ -281,17 +284,23 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
       if (!failure.getSourceFailureCountsList().isEmpty()) {
         builder.append(String.format("    %-46s %n", "Source datanodes"));
         for (NodeFailureCountProto src : failure.getSourceFailureCountsList()) {
-          builder.append(String.format("      %-44s %d%n", src.getDatanodeUuid(), src.getCount()));
+          builder.append(String.format("      %-44s %d%n", formatDatanodeLabel(src), src.getCount()));
         }
       }
       if (!failure.getTargetFailureCountsList().isEmpty()) {
         builder.append(String.format("    %-46s %n", "Target datanodes"));
         for (NodeFailureCountProto tgt : failure.getTargetFailureCountsList()) {
-          builder.append(String.format("      %-44s %d%n", tgt.getDatanodeUuid(), tgt.getCount()));
+          builder.append(String.format("      %-44s %d%n", formatDatanodeLabel(tgt), tgt.getCount()));
         }
       }
     }
     return builder.toString();
+  }
+
+  private static String formatDatanodeLabel(NodeFailureCountProto node) {
+    return node.hasHostname()
+        ? node.getHostname() + " (" + node.getDatanodeUuid() + ")"
+        : node.getDatanodeUuid();
   }
 
 }

@@ -2391,6 +2391,12 @@
                 "name": "count",
                 "type": "int64",
                 "optional": true
+              },
+              {
+                "id": 3,
+                "name": "hostname",
+                "type": "string",
+                "optional": true
               }
             ]
           },

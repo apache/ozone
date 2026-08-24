@@ -167,25 +167,33 @@ public class ContainerBalancerTaskIterationStatusInfo {
       List<ContainerMoveFailureDetail> failures) {
     return failures.stream()
         .map(failure -> {
+          Map<String, String> datanodeHostnames = failure.getDatanodeHostnames();
           StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.Builder builder =
               StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
                   .setReason(failure.getReason())
                   .setCount(failure.getCount());
           failure.getSourceFailureCounts().forEach((uuid, count) ->
               builder.addSourceFailureCounts(
-                  StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
-                      .setDatanodeUuid(uuid)
-                      .setCount(count)
-                      .build()));
+                  toNodeFailureCountProto(uuid, count, datanodeHostnames)));
           failure.getTargetFailureCounts().forEach((uuid, count) ->
               builder.addTargetFailureCounts(
-                  StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
-                      .setDatanodeUuid(uuid)
-                      .setCount(count)
-                      .build()));
+                  toNodeFailureCountProto(uuid, count, datanodeHostnames)));
           return builder.build();
         })
         .collect(Collectors.toList());
+  }
+
+  private StorageContainerLocationProtocolProtos.NodeFailureCountProto toNodeFailureCountProto(
+      String uuid, long count, Map<String, String> datanodeHostnames) {
+    StorageContainerLocationProtocolProtos.NodeFailureCountProto.Builder builder =
+        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+            .setDatanodeUuid(uuid)
+            .setCount(count);
+    String hostname = datanodeHostnames.get(uuid);
+    if (hostname != null && !hostname.isEmpty()) {
+      builder.setHostname(hostname);
+    }
+    return builder.build();
   }
 
   /**
