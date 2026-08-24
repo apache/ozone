@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.unwrapExecutionException;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -34,14 +36,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -52,6 +49,9 @@ import org.apache.hadoop.crypto.Decryptor;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.fs.StreamCapabilities;
+import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
+import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -62,6 +62,8 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Tests for {@link OzoneFSInputStream}.
  */
 public class TestOzoneFSInputStream {
+
+  private static final byte CORRUPT_BYTE = (byte) 0x5A;
 
   private static final List<IntFunction<ByteBuffer>> BUFFER_CONSTRUCTORS =
       ImmutableList.of(ByteBuffer::allocate, ByteBuffer::allocateDirect);
@@ -204,91 +206,72 @@ public class TestOzoneFSInputStream {
   @Timeout(value = 30)
   public void testConcurrentPositionedRead(boolean synchronizePositionedReads)
       throws Exception {
-    final byte[] source = RandomUtils.secure().randomBytes(512 * 1024);
+    final byte[] source = RandomUtils.secure().randomBytes(SOURCE_SIZE);
     final InterleavingSeekableInputStream underlying =
         new InterleavingSeekableInputStream(source);
-    final OzoneFSInputStream subject = new OzoneFSInputStream(underlying,
-        new FileSystem.Statistics("test"), synchronizePositionedReads);
+    try (OzoneFSInputStream subject = new OzoneFSInputStream(underlying,
+        new FileSystem.Statistics("test"), synchronizePositionedReads)) {
 
-    if (synchronizePositionedReads) {
-      runConcurrentPositionedReads(subject, source);
-    } else {
-      ExecutionException executionException = assertThrows(
-          ExecutionException.class,
-          () -> runConcurrentPositionedReads(subject, source));
-      assertInstanceOf(AssertionError.class,
-          unwrapExecutionException(executionException));
+      if (synchronizePositionedReads) {
+        PositionedReadTestHelper.runConcurrentPositionedReads(source,
+            (offset, buf) -> subject.readFully(offset, buf));
+      } else {
+        ExecutionException executionException = assertThrows(
+            ExecutionException.class,
+            () -> PositionedReadTestHelper.runConcurrentPositionedReads(source,
+                (offset, buf) -> subject.readFully(offset, buf)));
+        assertInstanceOf(AssertionError.class,
+            unwrapExecutionException(executionException));
+      }
     }
   }
 
-  private static void runConcurrentPositionedReads(OzoneFSInputStream subject,
-      byte[] source) throws Exception {
-    ExecutorService pool = Executors.newFixedThreadPool(8);
-    try {
-      List<Future<?>> futures = new ArrayList<>();
-      for (int t = 0; t < 8; t++) {
-        final int threadId = t;
-        futures.add(pool.submit(() -> {
-          try {
-            for (int i = 0; i < 100; i++) {
-              int offset = (threadId * 1000 + i * 17) % (source.length - 4096);
-              ByteBuffer buf = ByteBuffer.allocate(4096);
-              subject.readFully(offset, buf);
-              buf.flip();
-              byte[] expected = Arrays.copyOfRange(source, offset, offset + 4096);
-              byte[] actual = new byte[4096];
-              buf.get(actual);
-              assertArrayEquals(expected, actual,
-                  "thread " + threadId + " offset " + offset);
-            }
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        }));
-      }
-      for (Future<?> future : futures) {
-        future.get(1, TimeUnit.MINUTES);
-      }
-    } finally {
-      pool.shutdownNow();
-    }
-  }
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @Timeout(value = 30)
+  public void testConcurrentPositionedReadEcFallback(boolean synchronizePositionedReads)
+      throws Exception {
+    final byte[] source = RandomUtils.secure().randomBytes(SOURCE_SIZE);
+    final EcInterleavingInputStream underlying =
+        new EcInterleavingInputStream(source);
+    try (OzoneFSInputStream subject = new OzoneFSInputStream(underlying,
+        new FileSystem.Statistics("test"), synchronizePositionedReads)) {
 
-  private static Throwable unwrapExecutionException(
-      ExecutionException executionException) {
-    Throwable cause = executionException.getCause();
-    while (cause instanceof RuntimeException && cause.getCause() != null) {
-      cause = cause.getCause();
+      if (synchronizePositionedReads) {
+        PositionedReadTestHelper.runConcurrentPositionedReads(source,
+            (offset, buf) -> subject.readFully(offset, buf));
+      } else {
+        ExecutionException executionException = assertThrows(
+            ExecutionException.class,
+            () -> PositionedReadTestHelper.runConcurrentPositionedReads(source,
+                (offset, buf) -> subject.readFully(offset, buf)));
+        assertInstanceOf(AssertionError.class,
+            unwrapExecutionException(executionException));
+      }
     }
-    return cause;
   }
 
   /**
-   * Mimics KeyInputStream synchronized per-operation seek/read where multi-step
+   * Mimics KeyInputStream synchronized per-operation seek/read where multi-steps
    * positioned reads must still be serialized at the FS layer.
    */
   private static final class InterleavingSeekableInputStream extends InputStream
       implements Seekable, org.apache.hadoop.fs.ByteBufferReadable {
 
-    private static final byte CORRUPT_BYTE = (byte) 0x5A;
-
-    private final byte[] data;
-    private long pos;
-    private final ThreadLocal<Long> expectedReadPos = new ThreadLocal<>();
+    private final InterleavingReadState readState;
 
     private InterleavingSeekableInputStream(byte[] data) {
-      this.data = data;
+      this.readState = new InterleavingReadState(data);
     }
 
     @Override
     public synchronized void seek(long p) {
-      pos = p;
-      expectedReadPos.set(p);
+      readState.seek(p);
     }
 
     @Override
     public synchronized long getPos() {
-      return pos;
+      return readState.getPos();
     }
 
     @Override
@@ -303,6 +286,78 @@ public class TestOzoneFSInputStream {
 
     @Override
     public synchronized int read(ByteBuffer buf) {
+      return readState.read(buf);
+    }
+  }
+
+  /**
+   * Mimics an erasure-coded key stream: {@link ExtendedInputStream#readFully}
+   * returns {@code false}, so {@link OzoneFSInputStream} falls back to
+   * seek-read-restore on the shared cursor.
+   */
+  private static final class EcInterleavingInputStream extends ExtendedInputStream {
+
+    private final InterleavingReadState readState;
+
+    private EcInterleavingInputStream(byte[] data) {
+      this.readState = new InterleavingReadState(data);
+    }
+
+    @Override
+    public boolean readFully(long position, ByteBuffer buffer) {
+      return false;
+    }
+
+    @Override
+    protected int readWithStrategy(ByteReaderStrategy strategy) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public synchronized void seek(long p) {
+      readState.seek(p);
+    }
+
+    @Override
+    public synchronized long getPos() {
+      return readState.getPos();
+    }
+
+    @Override
+    public synchronized boolean seekToNewSource(long targetPos) {
+      return false;
+    }
+
+    @Override
+    public synchronized int read(ByteBuffer buf) {
+      return readState.read(buf);
+    }
+
+    @Override
+    public void unbuffer() {
+      return;
+    }
+  }
+
+  private static final class InterleavingReadState {
+    private final byte[] data;
+    private long pos;
+    private final ThreadLocal<Long> expectedReadPos = new ThreadLocal<>();
+
+    private InterleavingReadState(byte[] data) {
+      this.data = data;
+    }
+
+    private void seek(long p) {
+      pos = p;
+      expectedReadPos.set(p);
+    }
+
+    private long getPos() {
+      return pos;
+    }
+
+    private int read(ByteBuffer buf) {
       Long expected = expectedReadPos.get();
       if (expected != null && pos != expected) {
         int len = buf.remaining();

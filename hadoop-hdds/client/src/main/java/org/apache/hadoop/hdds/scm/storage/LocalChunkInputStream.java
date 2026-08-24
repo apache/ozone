@@ -72,6 +72,13 @@ public class LocalChunkInputStream extends ChunkInputStream
     }
   }
 
+  @Override
+  boolean supportsConcurrentPositionedRead() {
+    // Reads share a single FileChannel cursor, so positioned reads must be
+    // serialized rather than run concurrently.
+    return false;
+  }
+
   /**
    * Get the chunk from the local block replica.
    */

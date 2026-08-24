@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.BUFFER_SIZE;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -468,5 +470,46 @@ public class TestBlockInputStream {
         Arguments.of(new IOException(new ExecutionException(
             new StatusException(Status.UNAVAILABLE))))
     );
+  }
+
+  @Test
+  public void testConcurrentPositionedRead() throws Exception {
+    try (BlockInputStream largeBlockStream = createLargeBlockStream()) {
+      largeBlockStream.initialize();
+      PositionedReadTestHelper.runConcurrentPositionedReads(blockData,
+          (offset, buf) -> {
+            int read = largeBlockStream.readPositioned(offset, buf);
+            if (read != BUFFER_SIZE) {
+              throw new AssertionError("expected " + BUFFER_SIZE + " bytes at " + offset
+                  + " but read " + read);
+            }
+          });
+    }
+  }
+
+  private BlockInputStream createLargeBlockStream() throws Exception {
+    refreshFunction = mock(Function.class);
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 2));
+    checksum = new Checksum(ChecksumType.NONE, 1024);
+    chunks = new ArrayList<>(1);
+    chunkDataMap = new HashMap<>();
+    blockData = generateRandomData(SOURCE_SIZE);
+    blockSize = SOURCE_SIZE;
+    String chunkName = "large-chunk";
+    ChunkInfo chunkInfo = ChunkInfo.newBuilder()
+        .setChunkName(chunkName)
+        .setOffset(0)
+        .setLen(SOURCE_SIZE)
+        .setChecksumData(checksum.computeChecksum(
+            blockData, 0, SOURCE_SIZE).getProtoBufMessage())
+        .build();
+    chunkDataMap.put(chunkName, blockData);
+    chunks.add(chunkInfo);
+
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    return new DummyBlockInputStream(blockID, blockSize, pipeline, null,
+        null, refreshFunction, chunks, chunkDataMap, clientConfig);
   }
 }
