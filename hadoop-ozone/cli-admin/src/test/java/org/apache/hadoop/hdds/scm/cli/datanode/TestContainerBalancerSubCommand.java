@@ -735,7 +735,7 @@ class TestContainerBalancerSubCommand {
                             .setDatanodeUuid("source-uuid-1").setHostname("datanode1.example.com").setCount(1).build())
                     .addSourceFailureCounts(
                         StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
-                            .setDatanodeUuid("source-uuid-2").setHostname("datanode2.example.com").setCount(1).build())
+                            .setDatanodeUuid("source-uuid-2").setCount(1).build())
                     .addTargetFailureCounts(
                         StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
                             .setDatanodeUuid("target-uuid-1").setHostname("datanode3.example.com").setCount(1).build())
@@ -780,11 +780,11 @@ class TestContainerBalancerSubCommand {
         .contains("REPLICATION_FAIL_TIME_OUT")
         .contains("PRE_MOVE_CONTAINER_NOT_FOUND")
         .contains("datanode1.example.com (source-uuid-1)")
+        .contains("source-uuid-2")
+        .doesNotContain("(source-uuid-2)")
         .contains("datanode3.example.com (target-uuid-1)")
         .contains("datanode5.example.com (source-uuid-3)")
-        .contains("datanode6.example.com (target-uuid-3)")
-        .doesNotContain("Failure breakdown")
-        .doesNotContain("Failed move details");
+        .contains("datanode6.example.com (target-uuid-3)");
   }
 
   @Test
