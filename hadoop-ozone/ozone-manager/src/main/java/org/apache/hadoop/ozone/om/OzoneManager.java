@@ -1296,7 +1296,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public UUID refetchSecretKey() {
+  public UUID refetchSecretKey() throws IOException {
+    checkAdminUserPrivilege("refetch secret key.");
     secretKeyClient.refetchSecretKey();
     return secretKeyClient.getCurrentSecretKey().getId();
   }
@@ -5407,6 +5408,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void startQuotaRepair(List<String> buckets) throws IOException {
     checkAdminUserPrivilege("start quota repair");
     new QuotaRepairTask(this).repair(buckets);
+  }
+
+  public byte[] getS3DerivedKey(String accessId, String signingKey) throws IOException {
+    String awsSecretKey = s3SecretManager.getSecretString(accessId);
+    return AWSV4AuthValidator.getSigningKey(awsSecretKey, signingKey);
   }
 
   @Override

@@ -2549,7 +2549,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .bucket(bucketName)
             .lifecycleConfiguration(configuration)));
     assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, exception.statusCode());
-    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), exception.awsErrorDetails().errorCode());
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), exception.awsErrorDetails().errorCode());
 
     // Test 2: Non-existent bucket
     final String nonExistentBucket = getBucketName("nonexistent");
