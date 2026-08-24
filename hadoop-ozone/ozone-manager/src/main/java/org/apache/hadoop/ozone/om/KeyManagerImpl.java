@@ -887,7 +887,8 @@ public class KeyManagerImpl implements KeyManager {
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
               List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
-                  .flatMap(versionLocations -> versionLocations.createLocationList().stream()
+                  .flatMap(versionLocations -> versionLocations.getLocationLists().stream()
+                      .flatMap(List::stream)
                       .map(b -> new DeletedBlock(
                           new BlockID(b.getContainerID(), b.getLocalID()),
                           b.getLength(),
