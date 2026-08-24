@@ -98,12 +98,12 @@ class TestDatanodeCurrentVersionEndToEnd {
   private OzoneClient client;
   private StorageContainerManager scm;
   private OzoneBucket bucket;
-  private final String volumeName = "vol1";
-  private final String bucketName = "bucket1";
-  private final String ratisClosedKey = "closed-key";
-  private final String ratisOpenKey = "open-key";
-  private final String ecClosedKey = "ec-closed-key";
-  private final String ecOpenKey = "ec-open-key";
+  private static final String VOLUME_NAME = "vol1";
+  private static final String BUCKET_NAME = "bucket1";
+  private static final String RATIS_CLOSED_KEY = "closed-key";
+  private static final String RATIS_OPEN_KEY = "open-key";
+  private static final String EC_CLOSED_KEY = "ec-closed-key";
+  private static final String EC_OPEN_KEY = "ec-open-key";
 
   @BeforeAll
   void init() throws Exception {
@@ -118,9 +118,9 @@ class TestDatanodeCurrentVersionEndToEnd {
     scm = cluster.getStorageContainerManager();
     client = cluster.newClient();
     ObjectStore store = client.getObjectStore();
-    store.createVolume(volumeName);
-    store.getVolume(volumeName).createBucket(bucketName);
-    bucket = store.getVolume(volumeName).getBucket(bucketName);
+    store.createVolume(VOLUME_NAME);
+    store.getVolume(VOLUME_NAME).createBucket(BUCKET_NAME);
+    bucket = store.getVolume(VOLUME_NAME).getBucket(BUCKET_NAME);
 
     // Pre-create keys whose containers are closed so that read-path lookups
     // resolve the per-datanode read pipeline (built over the closed replicas),
@@ -129,10 +129,10 @@ class TestDatanodeCurrentVersionEndToEnd {
     // pipeline, which must reflect current datanode versions too. Cover both
     // RATIS and EC replication.
     byte[] data = "current-version".getBytes(UTF_8);
-    createClosedContainerKey(ratisClosedKey, RATIS_THREE, data);
-    createClosedContainerKey(ecClosedKey, EC_3_2, data);
-    createOpenContainerKey(ratisOpenKey, RATIS_THREE, data);
-    createOpenContainerKey(ecOpenKey, EC_3_2, data);
+    createClosedContainerKey(RATIS_CLOSED_KEY, RATIS_THREE, data);
+    createClosedContainerKey(EC_CLOSED_KEY, EC_3_2, data);
+    createOpenContainerKey(RATIS_OPEN_KEY, RATIS_THREE, data);
+    createOpenContainerKey(EC_OPEN_KEY, EC_3_2, data);
   }
 
   /** Create a key and wait for all of its containers to close. */
@@ -184,10 +184,10 @@ class TestDatanodeCurrentVersionEndToEnd {
 
     assertNodesAt(version, writePathPipeline("write-probe", RATIS_THREE), "RATIS write");
     assertNodesAt(version, writePathPipeline("ec-write-probe", EC_3_2), "EC write");
-    assertNodesAt(version, readPathPipeline(ratisClosedKey), "RATIS closed-container read");
-    assertNodesAt(version, readPathPipeline(ecClosedKey), "EC closed-container read");
-    assertNodesAt(version, readPathPipeline(ratisOpenKey), "RATIS open-container read");
-    assertNodesAt(version, readPathPipeline(ecOpenKey), "EC open-container read");
+    assertNodesAt(version, readPathPipeline(RATIS_CLOSED_KEY), "RATIS closed-container read");
+    assertNodesAt(version, readPathPipeline(EC_CLOSED_KEY), "EC closed-container read");
+    assertNodesAt(version, readPathPipeline(RATIS_OPEN_KEY), "RATIS open-container read");
+    assertNodesAt(version, readPathPipeline(EC_OPEN_KEY), "EC open-container read");
   }
 
   /**
@@ -227,8 +227,8 @@ class TestDatanodeCurrentVersionEndToEnd {
   /** Client read: the pipeline OM resolves from SCM for the given key. */
   private Pipeline readPathPipeline(String keyName) throws IOException {
     OmKeyArgs args = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
         .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(args);

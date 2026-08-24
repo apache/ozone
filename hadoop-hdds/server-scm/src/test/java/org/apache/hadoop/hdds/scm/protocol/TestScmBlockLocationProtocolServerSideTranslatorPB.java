@@ -243,13 +243,18 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
    */
   @Test
   public void testDatanodeDetailsVersionOverride() throws Exception {
-    // Pipeline members carry the DEFAULT_VERSION baked in at pipeline creation,
-    // but the live registry reports a higher version for every node. The
-    // forwarded version must come from the registry, not the stale copy.
+    // `nodes` represents the persisted versions in the pipeline manager, which are configured to be returned on
+    // block allocation.
     DatanodeDetails oldNode = nodes.get(0);
+    // `registry` contains the latest versions of all datanodes, representing their heartbeat information.
     setLiveVersion(oldNode, HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC);
 
+    // The pipeline nodes should all have their default version.
     for (DatanodeDetails member : nodes) {
+      assertEquals(HDDSVersion.SOFTWARE_VERSION, member.getCurrentVersion());
+    }
+    // The node manager registry should have one node in an older version after the test setup.
+    for (DatanodeDetails member : registry.values()) {
       if (member.equals(oldNode)) {
         assertEquals(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC, member.getCurrentVersion());
       } else {
@@ -257,18 +262,23 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
       }
     }
 
+    // Since there is one old node, the whole pipeline should report that as the version to use.
     assertAllMembersHaveVersion(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize(),
         allocate(1).getBlocks(0));
 
-    // Serialization overrides only the outgoing proto; the source pipeline copies and the
+    // Serialization overrides only the outgoing pipeline proto; the source pipeline copies and the
     // registered node info keep their own versions.
     for (DatanodeDetails member : nodes) {
+      assertEquals(HDDSVersion.SOFTWARE_VERSION, member.getCurrentVersion());
+    }
+    for (DatanodeDetails member : registry.values()) {
       if (member.equals(oldNode)) {
         assertEquals(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC, member.getCurrentVersion());
       } else {
         assertEquals(HDDSVersion.SOFTWARE_VERSION, member.getCurrentVersion());
       }
     }
+
   }
 
   @Test
