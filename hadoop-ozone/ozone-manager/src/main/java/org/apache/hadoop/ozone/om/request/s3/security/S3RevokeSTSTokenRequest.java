@@ -141,9 +141,6 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     if (StringUtils.isEmpty(originalAccessKeyId)) {
       throw new OMException("originalAccessKeyId is required for STS token revocation", INVALID_REQUEST);
     }
-    if (originalAccessKeyId.length() >= OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH) {
-      throw new OMException("originalAccessKeyId length is invalid: " + originalAccessKeyId.length(), INVALID_REQUEST);
-    }
     if (revokeReq.hasRevocationTimeMillis()) {
       throw new OMException("revocationTimeMillis must not be set by client", INVALID_REQUEST);
     }

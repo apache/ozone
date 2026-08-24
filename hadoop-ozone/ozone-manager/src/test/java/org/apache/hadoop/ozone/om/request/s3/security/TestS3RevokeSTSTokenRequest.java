@@ -349,23 +349,6 @@ public class TestS3RevokeSTSTokenRequest {
     }
   }
 
-  @Test
-  public void testPreExecuteRejectsOverlongOriginalAccessKeyId() throws Exception {
-    final StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH; i++) {
-      sb.append('a');
-    }
-    final UserGroupInformation callerUgi = UserGroupInformation.createRemoteUser("caller");
-    Server.getCurCall().set(new StubCall(callerUgi));
-
-    try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
-      configureOzoneManagerForPreExecute(ozoneManager, sb.toString(), false);
-      final OMClientRequest omClientRequest = new S3RevokeSTSTokenRequest(buildRevokeOmRequest(sb.toString()));
-      final OMException ex = assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
-      assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
-    }
-  }
-
   private static OMRequest buildRevokeOmRequest(String originalAccessKeyId) {
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
         OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
