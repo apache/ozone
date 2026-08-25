@@ -229,13 +229,12 @@ class TestKeyDataStreamOutput {
 
   @Test
   void hsyncWithBlockErrorDoesNotCallOmHsync() throws Exception {
-    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    MockDatanodePipeline pipeline1 = new MockDatanodePipeline(new BlockID(1, 1));
+    MockDatanodePipeline pipeline2 = new MockDatanodePipeline(new BlockID(2, 2));
     // First putBlock will fail
-    pipeline.failPutBlockAfter(0, () -> new IOException("putBlock failed"));
-
-    OzoneManagerProtocol omClient = createOmClient(pipeline);
-
-    KeyDataStreamOutput stream = createKeyStream(omClient, pipeline);
+    pipeline1.failPutBlockAfter(0, () -> new IOException("putBlock failed"));
+    OzoneManagerProtocol omClient = createOmClient(pipeline1, pipeline2);
+    KeyDataStreamOutput stream = createKeyStream(omClient, pipeline1, pipeline2);
     writeRandom(stream, 200);
 
     // hsync should throw because the block-level flush failed

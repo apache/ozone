@@ -171,7 +171,7 @@ class TestBlockDataStreamOutput {
 
     // hsync should propagate the IOException from the failed putBlock
     assertThrows(IOException.class, stream::hsync, "hsync() must propagate IOException from failed putBlock");
-    stream.close();
+    stream.cleanup(false);
   }
 
   @Test
@@ -187,7 +187,7 @@ class TestBlockDataStreamOutput {
 
     // hsync should propagate the watch failure
     assertThrows(IOException.class, stream::hsync, "hsync() must propagate IOException from failed watchForCommit");
-    stream.close();
+    stream.cleanup(false);
   }
 
   @Test

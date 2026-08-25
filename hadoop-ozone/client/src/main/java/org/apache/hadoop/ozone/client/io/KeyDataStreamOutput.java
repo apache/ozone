@@ -389,6 +389,9 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
             try {
               handleStreamAction(entry, op);
             } catch (IOException ioe) {
+              if (op == StreamAction.HSYNC) {
+                throw ioe;
+              }
               handleException(entry, ioe);
               continue;
             }
