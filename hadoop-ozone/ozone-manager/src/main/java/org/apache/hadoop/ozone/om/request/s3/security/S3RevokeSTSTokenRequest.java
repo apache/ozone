@@ -146,6 +146,9 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
       throw new OMException("revokeSTSTokenRequest is required for STS token revocation", INTERNAL_ERROR);
     }
     final RevokeSTSTokenRequest revokeReq = omRequest.getRevokeSTSTokenRequest();
+    if (StringUtils.isEmpty(revokeReq.getOriginalAccessKeyId())) {
+      throw new OMException("originalAccessKeyId is required for STS token revocation", INTERNAL_ERROR);
+    }
     if (!revokeReq.hasRevocationTimeMillis()) {
       throw new OMException("revocationTimeMillis is required for STS token revocation", INTERNAL_ERROR);
     }
