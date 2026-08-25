@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -151,7 +149,10 @@ public abstract class OMFinalizeUpgradeRequestBase extends OMClientRequest {
       String peerId = peerDetails.getNodeId();
       OMAdminProtocolClientSideImpl client = null;
       try {
-        client = OMAdminProtocolClientSideImpl.createProxyForSingleOM(configuration, getRemoteUser(), peerDetails);
+        // Use the OM service login (Kerberos keytab) identity, not the remote client's identity: this runs inside the
+        // client's RPC handler thread, whose UGI has no credentials to open a fresh outbound RPC to the peer OM.
+        client = OMAdminProtocolClientSideImpl.createProxyForSingleOM(
+            configuration, UserGroupInformation.getLoginUser(), peerDetails);
         OzoneManagerVersion peerVersion = client.getPeerUpgradeStatus();
         if (!peerVersion.equals(leaderVersion)) {
           LOG.warn("OM peer {} is running software version {} but leader is running version {}. "
