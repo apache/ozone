@@ -206,7 +206,7 @@ public final class ContainerBalancerConfiguration {
    * Gets the maximum percentage of healthy, in-service datanodes that will be
    * involved in balancing in one iteration.
    *
-   * @return percentage as an integer from 0 up to and including 100
+   * @return percentage as an integer greater than 0 up to and including 100
    */
   public int getMaxDatanodesPercentageToInvolvePerIteration() {
     return maxDatanodesPercentageToInvolvePerIteration;
@@ -254,6 +254,17 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
+   * Computes the maximum number of datanodes that may be involved in an
+   * iteration for the given eligible datanode count.
+   *
+   * @param eligibleDatanodeCount number of healthy, in-service datanodes.
+   * @return maximum datanodes that may be involved in one iteration
+   */
+  public int computeMaxDatanodesToInvolvePerIteration(int eligibleDatanodeCount) {
+    return (int) (getMaxDatanodesRatioToInvolvePerIteration() * eligibleDatanodeCount);
+  }
+
+  /**
    * Sets the maximum percentage of healthy, in-service datanodes that will be
    * involved in balancing in one iteration.
    *
@@ -266,10 +277,10 @@ public final class ContainerBalancerConfiguration {
    */
   public void setMaxDatanodesPercentageToInvolvePerIteration(
       int maxDatanodesPercentageToInvolvePerIteration) {
-    if (maxDatanodesPercentageToInvolvePerIteration < 0 ||
+    if (maxDatanodesPercentageToInvolvePerIteration <= 0 ||
         maxDatanodesPercentageToInvolvePerIteration > 100) {
       throw new IllegalArgumentException(String.format("Argument %d is " +
-              "illegal. Percentage must be from 0 up to and including 100.",
+              "illegal. Percentage must be greater than 0 up to and including 100.",
           maxDatanodesPercentageToInvolvePerIteration));
     }
     this.maxDatanodesPercentageToInvolvePerIteration =

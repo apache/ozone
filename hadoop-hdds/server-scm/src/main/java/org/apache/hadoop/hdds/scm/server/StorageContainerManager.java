@@ -55,7 +55,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -67,6 +66,7 @@ import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -181,7 +181,6 @@ import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.ScriptBasedMapping;
@@ -755,15 +754,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .build();
     }
 
-    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
-        conf.getClass(
-            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            ScriptBasedMapping.class, DNSToSwitchMapping.class);
-    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
-        dnsToSwitchMappingClass, conf);
-    dnsToSwitchMapping =
-        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
-            : new CachedDNSToSwitchMapping(newInstance));
+    dnsToSwitchMapping = createDNSToSwitchMapping(conf);
 
     if (configurator.getScmNodeManager() != null) {
       scmNodeManager = configurator.getScmNodeManager();
@@ -1585,8 +1576,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     getBlockProtocolServer().start();
 
-    // start datanode protocol server
-    getDatanodeProtocolServer().start();
+    // In HA mode, defer starting the datanode protocol server until the SCM
+    // state machine has caught up with the leader's committed log entries
+    // (see SCMStateMachine#tryStartDNServerAndRefreshSafeMode). In non-HA mode
+    // there is no Ratis state machine, so start it here as before.
+    if (!scmStorageConfig.isSCMHAEnabled()) {
+      getDatanodeProtocolServer().start();
+    }
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
       persistSCMCertificates();
@@ -2090,20 +2086,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Get the safe mode status of all rules.
    *
-   * @return map of rule statuses.
+   * @return list of rule statuses.
    */
-  public Map<String, Pair<Boolean, String>> getRuleStatus() {
+  public List<SafeModeRuleStatusProto> getRuleStatus() {
     return scmSafeModeManager.getRuleStatus();
   }
 
   @Override
   public Map<String, String[]> getSafeModeRuleStatus() {
     Map<String, String[]> map = new HashMap<>();
-    for (Map.Entry<String, Pair<Boolean, String>> entry :
-        scmSafeModeManager.getRuleStatus().entrySet()) {
-      String[] status =
-          {entry.getValue().getRight(), entry.getValue().getLeft().toString()};
-      map.put(entry.getKey(), status);
+    for (SafeModeRuleStatusProto entry : scmSafeModeManager.getRuleStatus()) {
+      String[] status = {entry.getStatusText(), Boolean.toString(entry.getValidate())};
+      map.put(entry.getRuleName(), status);
     }
     return map;
   }
@@ -2185,7 +2179,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       List<String> ratisRoles = server.getRatisRoles();
       List<List<String>> result = new ArrayList<>();
       for (String role : ratisRoles) {
-        String[] roleArr = role.split(":");
+        String[] roleArr = HddsUtils.parseRatisRoleString(role);
         List<String> scmInfo = new ArrayList<>();
         // Host Name
         scmInfo.add(roleArr[0]);
@@ -2241,6 +2235,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public String getHostname() {
     return scmHostName;
+  }
+
+  @Override
+  public String getRatisEvents() {
+    return metrics != null ? metrics.getRatisEvents() : "";
   }
 
   public Collection<String> getScmAdminUsernames() {
@@ -2363,6 +2362,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.debug("Node resolution did not yield any result for {}", hostname);
       return null;
     }
+  }
+
+  static DNSToSwitchMapping createDNSToSwitchMapping(OzoneConfiguration conf) {
+    Class<? extends DNSToSwitchMapping> mappingClass =
+        conf.getClass(
+            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScriptBasedMapping.class, DNSToSwitchMapping.class);
+    return ReflectionUtils.newInstance(mappingClass, conf);
   }
 
 }

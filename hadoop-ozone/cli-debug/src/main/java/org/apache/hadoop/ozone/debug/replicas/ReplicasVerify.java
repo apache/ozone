@@ -17,12 +17,15 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -35,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -78,6 +82,11 @@ public class ReplicasVerify extends Handler {
       description = "Print results for all passing and failing keys")
   private boolean allResults;
 
+  @CommandLine.Option(names = {"--refresh-from-scm"},
+      description = "Force OM to refresh container locations from SCM before returning key info. " +
+          "This can slow down verification but may avoid stale location results from OM cache.")
+  private boolean refreshContainerLocationsFromScm;
+
   @CommandLine.ArgGroup(exclusive = false, multiplicity = "1")
   private Verification verification;
 
@@ -88,6 +97,21 @@ public class ReplicasVerify extends Handler {
           "Note: This option is ignored if '--container-state' option is not used.",
       defaultValue = "1000000")
   private long containerCacheSize;
+
+  @CommandLine.Option(names = {"--out", "-o"},
+      description = "Output directory to dump verification output.The directory is created if it does not exist, " +
+          "and files are named using the directory's name as the base, e.g. <dirName>.0, <dirName>.1, " +
+          "when splitting with --max-records-per-file (otherwise a single <dirName> file is written).")
+  private String outputDir;
+
+  @CommandLine.Option(names = {"--max-records-per-file"},
+      description = "Maximum number of keys to write per output file. When greater than zero, output is split " +
+          "into multiple valid JSON files named <dirName>.0, <dirName>.1, ... Requires --out. " +
+          "Split output files do not include a top-level 'pass' field, check each key's 'pass'. " +
+          "The single-file output keeps the top-level 'pass' for the whole run. JSON format example: " +
+          "single file: { 'pass': true/false, 'keys': [ ... ] }, split files: { 'keys': [ ... ] }.",
+      defaultValue = "0")
+  private long recordsPerFile;
 
   private List<ReplicaVerifier> replicaVerifiers;
 
@@ -117,6 +141,11 @@ public class ReplicasVerify extends Handler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
     startTime = System.nanoTime();
+
+    if (recordsPerFile > 0 && outputDir == null) {
+      throw new CommandLine.ParameterException(spec().commandLine(),
+          "--max-records-per-file requires --out / -o option to be set.");
+    }
 
     if (!address.getKeyName().isEmpty()) {
       verificationScope = "Key";
@@ -197,8 +226,92 @@ public class ReplicasVerify extends Handler {
         checkVolume(ozoneClient, it.next(), keysArray, allKeysPassed);
       }
     }
-    root.put("pass", allKeysPassed.get());
-    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(root));
+    if (outputDir == null) {
+      root.put("pass", allKeysPassed.get());
+      System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(root));
+    } else {
+      writeOutputToFiles(root, keysArray, allKeysPassed.get());
+    }
+  }
+
+  /**
+   * Writes verification output to file(s) instead of stdout.
+   * When recordsPerFile is greater than zero, the keys are split into multiple valid JSON files.
+   * Split files contain only a "keys" array (no top-level "pass"); the per-key "pass" field reflects each
+   * key's result. The single-file output keeps the top-level "pass".
+   */
+  private void writeOutputToFiles(ObjectNode root, ArrayNode keysArray, boolean allKeysPassed) throws IOException {
+    String outputPrefix = resolveOutputPrefix();
+    // Remove output files from any previous run.
+    deleteExistingOutputFiles(outputPrefix);
+
+    if (recordsPerFile <= 0) {
+      root.put("pass", allKeysPassed);
+      writeJsonToFile(root, outputPrefix);
+      return;
+    }
+
+    int suffix = 0;
+    ObjectNode chunkNode = null;
+    ArrayNode chunkKeys = null;
+    for (int i = 0; i < keysArray.size(); i++) {
+      if (chunkNode == null) {
+        chunkNode = JsonUtils.createObjectNode(null);
+        chunkKeys = chunkNode.putArray("keys");
+      }
+      chunkKeys.add(keysArray.get(i));
+      if (chunkKeys.size() >= recordsPerFile) {
+        writeJsonToFile(chunkNode, outputPrefix + "." + suffix++);
+        chunkNode = null;
+      }
+    }
+    if (chunkNode != null) {
+      writeJsonToFile(chunkNode, outputPrefix + "." + suffix++);
+    }
+  }
+
+  /**
+   * Deletes output files written by a previous run in the output directory. Matches the single-file
+   * output <dirName> and split files <dirName>.<number> so a re-run does not leave
+   * stale higher-numbered files behind.
+   */
+  private void deleteExistingOutputFiles(String outputPrefix) throws IOException {
+    File prefixFile = new File(outputPrefix);
+    File dir = prefixFile.getParentFile();
+    String baseName = prefixFile.getName();
+    Pattern outputFilePattern = Pattern.compile(Pattern.quote(baseName) + "(\\.\\d+)?");
+    File[] existing = dir.listFiles((d, name) -> outputFilePattern.matcher(name).matches());
+    if (existing != null) {
+      for (File file : existing) {
+        if (!file.delete()) {
+          throw new IOException("Failed to delete stale output file: " + file.getAbsolutePath());
+        }
+      }
+    }
+  }
+
+  /**
+   * Resolves the file name prefix used for output files from --out. The value of --out is always treated as a directory
+   * it is created when missing, and files are written inside it using the directory's own name as the base.
+   */
+  private String resolveOutputPrefix() throws IOException {
+    File outputDirectory = new File(outputDir);
+    if (outputDirectory.exists()) {
+      if (!outputDirectory.isDirectory()) {
+        throw new IOException("Output path already exists and is not a directory: " +
+            outputDirectory.getAbsolutePath());
+      }
+    } else if (!outputDirectory.mkdirs()) {
+      throw new IOException("An exception occurred while creating the directory. Directory: " +
+          outputDirectory.getAbsolutePath());
+    }
+    return new File(outputDirectory, outputDirectory.getName()).getPath();
+  }
+
+  private void writeJsonToFile(ObjectNode node, String targetFileName) throws IOException {
+    try (PrintWriter writer = new PrintWriter(targetFileName, UTF_8.name())) {
+      writer.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(node));
+    }
   }
 
   void checkVolume(OzoneClient ozoneClient, OzoneVolume volume, ArrayNode keysArray, AtomicBoolean allKeysPassed)
@@ -226,7 +339,7 @@ public class ReplicasVerify extends Handler {
       ArrayNode keysArray, AtomicBoolean allKeysPassed) throws IOException {
     keysProcessed.incrementAndGet();
     OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
-        volumeName, bucketName, keyName, false);
+        volumeName, bucketName, keyName, refreshContainerLocationsFromScm);
 
     // Check if key should be processed based on replication config
     if (!shouldProcessKeyByReplicationType(keyInfo)) {

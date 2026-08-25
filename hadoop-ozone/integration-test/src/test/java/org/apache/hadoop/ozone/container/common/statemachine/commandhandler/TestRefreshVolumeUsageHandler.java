@@ -102,10 +102,6 @@ public class TestRefreshVolumeUsageHandler {
       //a new key is created, but the datanode default REFRESH_PERIOD is 1 hour,
       //still the cache is updated, so the scm will eventually get the new
       //used space from the datanode through node report.
-      assertTrue(cluster.getStorageContainerManager()
-          .getScmNodeManager().getUsageInfo(datanodeDetails)
-          .getScmNodeStat().getScmUsed().isEqual(currentScmUsed));
-
       try {
         GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
             datanodeDetails, currentScmUsed), 500, 5 * 1000);

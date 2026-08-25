@@ -21,16 +21,22 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.IOException;
 import java.net.ConnectException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
+import java.util.ArrayList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,13 +47,15 @@ import org.junit.jupiter.api.Test;
  * Complements {@code TestConnectionFailureUtils} (helper-in-isolation)
  * and {@code TestSCMFailoverProxyProviderRefresh} (per-instance refresh)
  * by exercising the actual retry policy whose return value drives the
- * RetryInvocationHandler in production.
+ * RetryInvocationHandler in production. It also verifies wired
+ * suggested-leader failover target selection.
  */
 public class TestSCMFailoverProxyProviderRefreshWired {
 
   private static final String SCM_SERVICE_ID = "scmservice";
   private static final String SCM_NODE_1 = "scm1";
   private static final String SCM_NODE_2 = "scm2";
+  private static final String SCM_NODE_3 = "scm3";
 
   private OzoneConfiguration conf;
 
@@ -119,6 +127,163 @@ public class TestSCMFailoverProxyProviderRefreshWired {
         0, 0, false);
     assertEquals(0, provider.refreshCalls,
         "ServerNotLeaderException is application-level; refresh must NOT fire");
+  }
+
+  @Test
+  public void testFailoverToIpv6SuggestedLeader() {
+    SCMBlockLocationFailoverProxyProvider provider = newThreeNodeProvider();
+    SCMProxyInfo leaderProxy = proxyInfoOf(provider, SCM_NODE_3);
+    int port = leaderProxy.getAddress().getPort();
+    provider.replaceProxyInfoForTest(SCM_NODE_3,
+        new SCMProxyInfo(leaderProxy.getServiceId(), SCM_NODE_3,
+            new InetSocketAddress("2001:db8::1", port)));
+
+    // The cached address expands to 2001:db8:0:0:0:0:0:1, so the compressed hint only
+    // matches through the canonical comparison.
+    failoverWith(provider, notLeader("[2001:db8::1]:" + port));
+
+    assertEquals(SCM_NODE_3, provider.getCurrentProxySCMNodeId(),
+        "suggested leader must override the next round-robin SCM");
+  }
+
+  @Test
+  public void testFailoverToIpv4SuggestedLeader() {
+    SCMBlockLocationFailoverProxyProvider provider = newThreeNodeProvider();
+    SCMProxyInfo leaderProxy = proxyInfoOf(provider, SCM_NODE_3);
+    // Give scm3 a distinct IPv4 address so its authority is unambiguous among the
+    // localhost nodes.
+    int port = leaderProxy.getAddress().getPort();
+    provider.replaceProxyInfoForTest(SCM_NODE_3,
+        new SCMProxyInfo(leaderProxy.getServiceId(), SCM_NODE_3,
+            new InetSocketAddress("127.0.0.2", port)));
+
+    failoverWith(provider, notLeader("127.0.0.2:" + port));
+
+    assertEquals(SCM_NODE_3, provider.getCurrentProxySCMNodeId(),
+        "an IPv4 suggested leader must keep matching");
+  }
+
+  @Test
+  public void testFailoverToSuggestedLeaderMatchesWithoutResolution() {
+    SCMBlockLocationFailoverProxyProvider provider = newThreeNodeProvider();
+    SCMProxyInfo leaderProxy = proxyInfoOf(provider, SCM_NODE_3);
+    // An address that was never resolved: matching it can only be done on the host text,
+    // and getAddress() is null.
+    int port = leaderProxy.getAddress().getPort();
+    provider.replaceProxyInfoForTest(SCM_NODE_3,
+        new SCMProxyInfo(leaderProxy.getServiceId(), SCM_NODE_3,
+            InetSocketAddress.createUnresolved("scm3.example.com", port)));
+
+    failoverWith(provider, notLeader("scm3.example.com:" + port));
+
+    assertEquals(SCM_NODE_3, provider.getCurrentProxySCMNodeId(),
+        "suggested leader must match by authority without DNS resolution");
+  }
+
+  @Test
+  public void testSuggestedLeaderDistinguishesIpv6ScopeIds() {
+    SCMBlockLocationFailoverProxyProvider provider = newThreeNodeProvider();
+    // Every node gets the same IPv6 address and port; only the scope tells scm3 apart, so a
+    // scope-blind comparison matches one of the other two whatever the iteration order.
+    int port = proxyInfoOf(provider, SCM_NODE_3).getAddress().getPort();
+    for (SCMProxyInfo proxyInfo : new ArrayList<>(provider.getSCMProxyInfoList())) {
+      String host = SCM_NODE_3.equals(proxyInfo.getNodeId()) ? "fe80::1%2" : "fe80::1%1";
+      provider.replaceProxyInfoForTest(proxyInfo.getNodeId(),
+          new SCMProxyInfo(proxyInfo.getServiceId(), proxyInfo.getNodeId(),
+              new InetSocketAddress(host, port)));
+    }
+
+    failoverWith(provider, notLeader("[fe80::1%2]:" + port));
+
+    assertEquals(SCM_NODE_3, provider.getCurrentProxySCMNodeId(),
+        "a differing IPv6 scope must not be treated as the same SCM");
+  }
+
+  @Test
+  public void testSuggestedLeaderDistinguishesIpv6ZoneNameCase() {
+    SCMBlockLocationFailoverProxyProvider provider = newThreeNodeProvider();
+    // As above, but the scope is an interface name. Interface names are case-sensitive, so a
+    // case-insensitive host comparison matches one of the ETH0 nodes instead of scm3.
+    int port = proxyInfoOf(provider, SCM_NODE_3).getAddress().getPort();
+    for (SCMProxyInfo proxyInfo : new ArrayList<>(provider.getSCMProxyInfoList())) {
+      String host = SCM_NODE_3.equals(proxyInfo.getNodeId()) ? "fe80::1%eth0" : "fe80::1%ETH0";
+      provider.replaceProxyInfoForTest(proxyInfo.getNodeId(),
+          new SCMProxyInfo(proxyInfo.getServiceId(), proxyInfo.getNodeId(),
+              InetSocketAddress.createUnresolved(host, port)));
+    }
+
+    failoverWith(provider, notLeader("[fe80::1%eth0]:" + port));
+
+    assertEquals(SCM_NODE_3, provider.getCurrentProxySCMNodeId(),
+        "a differing IPv6 zone name must not be treated as the same SCM");
+  }
+
+  @Test
+  public void testSuggestedLeaderMatchesResolvedAddressOfHostname() throws Exception {
+    SCMBlockLocationFailoverProxyProvider provider = newThreeNodeProvider();
+    SCMProxyInfo leaderProxy = proxyInfoOf(provider, SCM_NODE_3);
+    int port = leaderProxy.getAddress().getPort();
+    // scm3 is configured by hostname but already resolved to an IPv6 address, which is what
+    // Ratis reports in the hint. getByAddress attaches the hostname without any lookup.
+    InetAddress resolved = InetAddress.getByAddress("scm3.example.com",
+        InetAddress.getByName("2001:db8::1").getAddress());
+    provider.replaceProxyInfoForTest(SCM_NODE_3,
+        new SCMProxyInfo(leaderProxy.getServiceId(), SCM_NODE_3,
+            new InetSocketAddress(resolved, port)));
+
+    failoverWith(provider, notLeader("[2001:db8::1]:" + port));
+
+    assertEquals(SCM_NODE_3, provider.getCurrentProxySCMNodeId(),
+        "a hint carrying the resolved IP must match a hostname-configured SCM");
+  }
+
+  @Test
+  public void testUnparseableSuggestedLeaderKeepsRoundRobin() {
+    SCMBlockLocationFailoverProxyProvider provider = newThreeNodeProvider();
+    int port = proxyInfoOf(provider, SCM_NODE_3).getAddress().getPort();
+    // The message parser's non-bracketed alternative accepts a malformed authority such as
+    // [a]b:9863, which no longer parses as host and port on the client side.
+    String malformed = "[a]b:" + port;
+    ServerNotLeaderException parsed =
+        new ServerNotLeaderException(notLeader(malformed).getMessage());
+    assertEquals(malformed, parsed.getSuggestedLeader());
+
+    LogCapturer log = LogCapturer.captureLogs(SCMBlockLocationFailoverProxyProvider.class);
+    try {
+      failoverWith(provider, parsed);
+    } finally {
+      log.stopCapturing();
+    }
+
+    assertThat(log.getOutput()).contains("Ignoring unparseable suggested leader " + malformed);
+    assertEquals(SCM_NODE_2, provider.getCurrentProxySCMNodeId(),
+        "an unparseable suggested leader must fall back to round-robin failover");
+  }
+
+  private SCMBlockLocationFailoverProxyProvider newThreeNodeProvider() {
+    conf.set(OZONE_SCM_NODES_KEY + "." + SCM_SERVICE_ID,
+        SCM_NODE_1 + "," + SCM_NODE_2 + "," + SCM_NODE_3);
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        SCM_SERVICE_ID, SCM_NODE_3), "localhost");
+    return new SCMBlockLocationFailoverProxyProvider(conf);
+  }
+
+  private static SCMProxyInfo proxyInfoOf(
+      SCMBlockLocationFailoverProxyProvider provider, String nodeId) {
+    return provider.getSCMProxyInfoList().stream()
+        .filter(proxyInfo -> nodeId.equals(proxyInfo.getNodeId()))
+        .findFirst().get();
+  }
+
+  private static ServerNotLeaderException notLeader(String suggestedLeader) {
+    return new ServerNotLeaderException(RaftPeerId.valueOf(SCM_NODE_1),
+        suggestedLeader, "localhost", "SCM");
+  }
+
+  private static void failoverWith(SCMBlockLocationFailoverProxyProvider provider,
+      ServerNotLeaderException e) {
+    provider.performFailoverToAssignedLeader(null, e);
+    provider.performFailover(null);
   }
 
   @Test

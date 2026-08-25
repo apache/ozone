@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -470,23 +469,11 @@ public class RatisUnderReplicationHandler
       ContainerInfo containerInfo, List<DatanodeDetails> sources,
       List<DatanodeDetails> targets) throws CommandTargetOverloadedException,
       NotLeaderException {
-    final boolean push = replicationManager.getConfig().isPush();
     int commandsSent = 0;
-
-    if (push) {
-      for (DatanodeDetails target : targets) {
-        replicationManager.sendThrottledReplicationCommand(
-            containerInfo, sources, target, 0);
-        commandsSent++;
-      }
-    } else {
-      for (DatanodeDetails target : targets) {
-        ReplicateContainerCommand command =
-            ReplicateContainerCommand.fromSources(
-                containerInfo.getContainerID(), sources);
-        replicationManager.sendDatanodeCommand(command, containerInfo, target);
-        commandsSent++;
-      }
+    for (DatanodeDetails target : targets) {
+      replicationManager.sendThrottledReplicationCommand(
+          containerInfo, sources, target, 0);
+      commandsSent++;
     }
     return commandsSent;
   }

@@ -78,7 +78,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
 
   private static final int RATIS_RPC_TIMEOUT = 1000; // 1 second
-  public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
+  private static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   public MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
@@ -464,6 +464,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     @Override
     public MiniOzoneHAClusterImpl build() throws IOException {
+      validateDatanodeConfiguration();
       if (numOfActiveOMs > numOfOMs) {
         throw new IllegalArgumentException("Number of active OMs cannot be " +
             "more than the total number of OMs");
@@ -512,10 +513,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       }
       prepareForNextBuild();
       return cluster;
-    }
-
-    protected int numberOfOzoneManagers() {
-      return numOfOMs;
     }
 
     protected void initOMRatisConf() {
@@ -884,10 +881,24 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   /**
    * Update the configurations of the given list of OMs.
+   * Merges {@code newConf} with each OM's existing node-local storage paths so
+   * bootstrap peer updates do not clobber per-node {@code ozone.metadata.dirs}.
    */
   private void updateOMConfigs(OzoneConfiguration newConf) {
     for (OzoneManager om : omhaService.getActiveServices()) {
-      om.setConfiguration(newConf);
+      OzoneConfiguration merged = new OzoneConfiguration(newConf);
+      OzoneConfiguration current = om.getConfiguration();
+      copyConfigIfSet(current, merged, OZONE_METADATA_DIRS);
+      copyConfigIfSet(current, merged, OMConfigKeys.OZONE_OM_DB_DIRS);
+      om.setConfiguration(merged);
+    }
+  }
+
+  private static void copyConfigIfSet(OzoneConfiguration from,
+      OzoneConfiguration to, String key) {
+    String value = from.get(key);
+    if (StringUtils.isNotEmpty(value)) {
+      to.set(key, value);
     }
   }
 

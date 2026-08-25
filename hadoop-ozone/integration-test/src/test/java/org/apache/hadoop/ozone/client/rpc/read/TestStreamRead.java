@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.om.TestBucket;
+import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
@@ -74,6 +74,7 @@ public class TestStreamRead {
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("ExpiredContainerReplicaOpScrubber"), Level.ERROR);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("SCMHATransactionMonitor"), Level.ERROR);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger(CodecBuffer.class), Level.ERROR);
+//    GenericTestUtils.setLogLevel(StreamBlockInputStream.class, Level.DEBUG);
   }
 
   static final int CHUNK_SIZE = 1 << 20;          // 1MB
@@ -155,7 +156,7 @@ public class TestStreamRead {
 
       try (OzoneClient streamReadClient = OzoneClientFactory.getRpcClient(steamReadConf);
            OzoneClient nonStreamReadClient = OzoneClientFactory.getRpcClient(nonSteamReadConf)) {
-        final TestBucket testBucket = TestBucket.newBuilder(streamReadClient).build();
+        final BucketForTesting testBucket = BucketForTesting.newBuilder(streamReadClient).build();
         final String volume = testBucket.delegate().getVolumeName();
         final String bucket = testBucket.delegate().getName();
         final String keyName = "key0";
@@ -170,7 +171,7 @@ public class TestStreamRead {
 
           // get block file and generate md5
           final OmKeyInfo info = nonStreamReadClient.getProxy().getKeyInfo(volume, bucket, keyName, false);
-          final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().getLocationList();
+          final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
           assertEquals(1, locations.size());
           final BlockID blockId = locations.get(0).getBlockID();
           final ContainerData containerData = datanode.getDatanodeStateMachine().getContainer().getContainerSet()
@@ -207,7 +208,7 @@ public class TestStreamRead {
   }
 
   static void streamRead(SizeInBytes keySize, SizeInBytes bufferSize, String expectedMD5,
-      TestBucket bucket, String keyName) throws Exception {
+      BucketForTesting bucket, String keyName) throws Exception {
     try (KeyInputStream in = bucket.getKeyInputStream(keyName)) {
       assertTrue(in.isStreamBlockInputStream());
       runTestReadKey(keySize, bufferSize, expectedMD5, in);

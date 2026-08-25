@@ -39,7 +39,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
-import org.apache.hadoop.hdds.utils.TestUtils;
+import org.apache.hadoop.hdds.utils.RocksTestUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
@@ -121,7 +121,7 @@ class TestManagedRawSSTFileIterator {
     try (ManagedOptions options = new ManagedOptions();
          ManagedRawSSTFileReader reader = new ManagedRawSSTFileReader(
              options, file.getAbsolutePath(), 2 * 1024 * 1024)) {
-      List<Optional<String>> testBounds = TestUtils.getTestingBounds(keys.keySet().stream()
+      List<Optional<String>> testBounds = RocksTestUtils.getTestingBounds(keys.keySet().stream()
           .collect(Collectors.toMap(Pair::getKey, Pair::getValue, (v1, v2) -> v1, TreeMap::new)));
       for (Optional<String> keyStart : testBounds) {
         for (Optional<String> keyEnd : testBounds) {

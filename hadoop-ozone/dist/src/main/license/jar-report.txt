@@ -45,7 +45,6 @@ share/ozone/lib/disruptor.jar
 share/ozone/lib/dnsjava.jar
 share/ozone/lib/error_prone_annotations.jar
 share/ozone/lib/failureaccess.jar
-share/ozone/lib/gethostname4j.jar
 share/ozone/lib/grpc-api.jar
 share/ozone/lib/grpc-context.jar
 share/ozone/lib/grpc-core.jar
@@ -153,8 +152,6 @@ share/ozone/lib/jgraphx.jar
 share/ozone/lib/jheaps.jar
 share/ozone/lib/jline.jar
 share/ozone/lib/jmespath-java.jar
-share/ozone/lib/jna-platform.jar
-share/ozone/lib/jna.jar
 share/ozone/lib/jnr-a64asm.jar
 share/ozone/lib/jnr-constants.jar
 share/ozone/lib/jnr-ffi.jar
@@ -165,11 +162,11 @@ share/ozone/lib/jooq-codegen.jar
 share/ozone/lib/jooq-meta.jar
 share/ozone/lib/jooq.jar
 share/ozone/lib/jsch.jar
-share/ozone/lib/json-simple.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jspecify.jar
 share/ozone/lib/jsr311-api.jar
 share/ozone/lib/jts-core.jar
+share/ozone/lib/jul-to-slf4j.jar
 share/ozone/lib/jtokkit.jar
 share/ozone/lib/kerb-core.jar
 share/ozone/lib/kerb-crypto.jar
@@ -206,7 +203,6 @@ share/ozone/lib/netty-tcnative-boringssl-static.Final-windows-x86_64.jar
 share/ozone/lib/netty-tcnative-boringssl-static.Final.jar
 share/ozone/lib/netty-tcnative-classes.Final.jar
 share/ozone/lib/netty-transport-classes-epoll.Final.jar
-share/ozone/lib/netty-transport-native-epoll.Final-linux-x86_64.jar
 share/ozone/lib/netty-transport-native-epoll.Final.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
 share/ozone/lib/netty-transport.Final.jar
@@ -239,7 +235,6 @@ share/ozone/lib/ozone-cli-repair.jar
 share/ozone/lib/ozone-cli-shell.jar
 share/ozone/lib/ozone-client.jar
 share/ozone/lib/ozone-common.jar
-share/ozone/lib/ozone-csi.jar
 share/ozone/lib/ozone-datanode.jar
 share/ozone/lib/ozone-filesystem-common.jar
 share/ozone/lib/ozone-filesystem-hadoop2.jar
@@ -275,6 +270,7 @@ share/ozone/lib/protobuf-java.jar
 share/ozone/lib/protobuf-java.jar
 share/ozone/lib/ranger-audit-core.jar
 share/ozone/lib/ranger-authz-api.jar
+share/ozone/lib/ranger-common-utils.jar
 share/ozone/lib/ranger-intg.jar
 share/ozone/lib/ranger-plugin-classloader.jar
 share/ozone/lib/ranger-plugins-common.jar
