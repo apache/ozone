@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -87,7 +88,7 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
     when(nodeManager.getNode(any(DatanodeID.class))).thenAnswer(inv -> registry.get(inv.getArgument(0)));
     when(scm.getScmNodeManager()).thenReturn(nodeManager);
 
-    // Pipeline copies stay at DEFAULT_VERSION; the registry holds a distinct live version per node.
+    // Pipeline copies stay at SOFTWARE_VERSION; the registry holds a distinct live version per node.
     nodes = new ArrayList<>();
     nodes.add(registerNode(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE));
     nodes.add(registerNode(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC));
@@ -98,11 +99,13 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
   }
 
   /**
-   * Creates a pipeline member (left at {@link HDDSVersion#DEFAULT_VERSION}) and registers it in the mocked node
+   * Creates a pipeline member (left at {@link HDDSVersion#SOFTWARE_VERSION}) and registers it in the mocked node
    * manager with the given live {@code currentVersion}, mirroring what a heartbeat records on SCM.
    */
   private DatanodeDetails registerNode(HDDSVersion liveVersion) {
     DatanodeDetails dn = randomDatanodeDetails();
+    // Test setup expects nodes to be created with the latest software version by default.
+    assertEquals(HDDSVersion.SOFTWARE_VERSION, dn.getCurrentVersion());
     setLiveVersion(dn, liveVersion);
     return dn;
   }
@@ -190,12 +193,15 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
   @Test
   public void testDatanodeDetailsVersionOverride() throws Exception {
     for (DatanodeDetails member : nodes) {
-      assertEquals(HDDSVersion.DEFAULT_VERSION, member.getCurrentVersion());
+      assertEquals(HDDSVersion.SOFTWARE_VERSION, member.getCurrentVersion());
     }
     when(impl.getContainerWithPipeline(anyLong())).thenReturn(containerWithPipeline());
 
-    assertCurrentVersionsMatch(service.getContainerWithPipeline(
-        GetContainerWithPipelineRequestProto.newBuilder().setContainerID(1L).build(), ClientVersion.CURRENT)
+    GetContainerWithPipelineRequestProto requestProto = GetContainerWithPipelineRequestProto
+        .newBuilder()
+        .setContainerID(1L)
+        .build();
+    assertCurrentVersionsMatch(service.getContainerWithPipeline(requestProto, ClientVersion.CURRENT)
         .getContainerWithPipeline().getPipeline().getMembersList());
 
     // Serialization overrides only the outgoing proto; the source pipeline copies keep their own version.

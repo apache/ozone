@@ -72,8 +72,8 @@ import org.junit.jupiter.api.Test;
  * Pipeline members are frozen copies (rebuilt from the replicated pipeline
  * proto), so the translator must source each member's current version from the
  * live node registry, which the heartbeat handler keeps up to date. These tests
- * pin the pipeline copies at {@link HDDSVersion#DEFAULT_VERSION} and register a
- * different, higher version per node so a translator that read the stale
+ * pin the pipeline copies at {@link HDDSVersion#SOFTWARE_VERSION} and register a
+ * different version per node so a translator that read the stale
  * pipeline copy would compute the wrong minimum.
  */
 class TestScmBlockLocationProtocolServerSideTranslatorPB {
@@ -94,7 +94,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     when(nodeManager.getNode(any(DatanodeID.class))).thenAnswer(inv -> registry.get(inv.getArgument(0)));
     when(scm.getScmNodeManager()).thenReturn(nodeManager);
 
-    // Pipeline copies stay at DEFAULT_VERSION; the live version lives in the registry.
+    // Pipeline copies stay at SOFTWARE_VERSION; the live version lives in the registry.
     nodes = registerNodes(3, HDDSVersion.SOFTWARE_VERSION);
 
     Pipeline pipeline = buildPipeline(nodes);
@@ -107,13 +107,15 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
   }
 
   /**
-   * Creates {@code count} pipeline members (left at {@link HDDSVersion#DEFAULT_VERSION}) and registers each one in the
+   * Creates {@code count} pipeline members (left at {@link HDDSVersion#SOFTWARE_VERSION}) and registers each one in the
    * mocked node manager with the given live {@code currentVersion}.
    */
   private List<DatanodeDetails> registerNodes(int count, HDDSVersion liveVersion) {
     List<DatanodeDetails> created = new ArrayList<>();
     for (int i = 0; i < count; i++) {
       DatanodeDetails dn = randomDatanodeDetails();
+      // Test setup expects nodes to be created with the latest software version by default.
+      assertEquals(HDDSVersion.SOFTWARE_VERSION, dn.getCurrentVersion());
       created.add(dn);
       setLiveVersion(dn, liveVersion);
     }
