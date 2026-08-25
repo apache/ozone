@@ -88,17 +88,6 @@ jobs:
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: mvn $BUILD_ARGS $MAVEN_ARGS --no-transfer-progress --show-version -Pgo-offline clean verify
 
-      - name: Setup Java 8
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
-        with:
-          distribution: 'temurin'
-          java-version: 8
-
-      - name: Fetch dependencies for Java 8
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: mvn $MAVEN_ARGS --no-transfer-progress --show-version -Pgo-offline -DskipRecon -DskipShade test-compile
-
       - name: Delete Ozone jars from repo
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: rm -fr ~/.m2/repository/org/apache/ozone
