@@ -154,9 +154,7 @@ A storage policy attribute is added to buckets and keys on OM.
 
 ### SCM Container, Pipeline
 
-A storage tier attribute is added to containers and pipelines on SCM. A pipeline can support multiple storage tiers.
-For example, if all Datanodes in a pipeline have both SSD and DISK type volumes, the pipeline's supported storage tier
-attributes will include both SSD and DISK.
+A storage tier attribute is added to containers and pipelines on SCM. A pipeline can support only one storage tiers.
 
 ## Datanode Volume Storage Type
 
@@ -284,8 +282,7 @@ Refer to
 - SCM does not mix storage types within a storage tier. An SSD storage tier pipeline will only consist of Datanodes
   with SSD type volumes, and will not include Datanodes with only DISK type volumes.
 - The storage tier is an attribute of the pipeline, indicating the storage tiers supported by that pipeline. A pipeline
-  can support multiple storage tiers. For example, if Datanodes all have both SSD and DISK type volumes, the pipeline
-  created on these Datanodes will have supported storage tier attributes of both SSD and DISK.
+  can support one storage tiers.
 - When allocating a container through an existing pipeline, SCM filters matching pipelines based on their supported
   storage tiers.
 
@@ -381,6 +378,8 @@ Check whether a key's storage policy is satisfied:
   Datanode, it will try to use the fallback storage types defined by the SCM container's storage tier. If the storage
   tier has no defined fallback storage types, or no Datanodes matching the fallback storage types can be found, the
   operation fails.
+- For `OVER_REPLICATED` containers, the ReplicationManager deletes DN Container replicas whose storage type does not match the
+  storage tier of the SCM container, while preserving the container placement policy.
 
 ## DiskBalancerService
 
@@ -566,16 +565,14 @@ not supported at this time, but the implementation would not be difficult to add
 ## How does the storage tier affect pipeline creation?
 
 Introducing a storage tier does not alter the pipeline's behavioral logic; it only affects which Datanodes compose the
-pipeline. A pipeline will have a supported storage tier attribute. For example, a pipeline with an SSD storage tier
-attribute will be composed of Datanodes that have SSD type volumes. The primary logic change occurs during pipeline
+pipeline. A pipeline will have a supported storage tier attribute. The primary logic change occurs during pipeline
 creation, where Datanodes with suitable volumes are selected to form the pipeline. Read and write behavior after
 pipeline creation remains unchanged.
 
 ## How does the storage tier affect the number of pipelines?
 
-The pipeline count limit is calculated independently for each storage tier. However, since a pipeline can support
-multiple storage tiers simultaneously, when Datanodes have both SSD and DISK type volumes, pipelines created on these
-Datanodes will support both tiers. In this case, the actual number of pipelines will not increase significantly.
+The pipeline count limit is calculated independently for each storage tier. If there are multiple storage types in the
+cluster, the final number of pipelines will increase—potentially by a factor equal to the number of storage types.
 
 ## Can different keys in the same bucket have different storage policies?
 
@@ -605,3 +602,13 @@ to a volume with the matching storage type.
 
 Use `ozone admin storagepolicy usageinfo` to view cluster-wide storage type usage, or
 `ozone admin storagepolicy usageinfo --with-datanode` for per-Datanode details.
+
+## When does ReplicationManager report MIS_STORAGE_TYPE_WITH_CONTAINER?
+
+- An old client creates a container replica on the datanode without carrying the `storageType`,
+  leaving the replica's storage type null. The old client does not have a `storageType` field;
+  even if SCM has assigned a storage tier to it, the `storageType` in requests written to the DataNode will be null.
+- ReplicationManager repairs or migrates a replica using a fallback
+  storage type when the preferred storage type is unavailable.
+- The container storage tier is set or changed with `ozone admin container setstoragetier`,
+  but existing replicas still have a different or null storage type.
