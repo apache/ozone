@@ -22,32 +22,37 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/errorprone"}
-mkdir -p "$REPORT_DIR"
-
 REPORT_FILE="$REPORT_DIR/summary.txt"
+OUTPUT_LOG=$(mktemp)
 
 MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipDocs -DskipRecon -DskipShade'
+MAVEN_DIAGNOSTIC_PATTERN='^\[(ERROR|WARNING)\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
+JAVAC_DIAGNOSTIC_PATTERN='^.*:[0-9]+: (error|warning): \[[^]]+\]'
+MAVEN_ERROR_PATTERN='^\[ERROR\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
+JAVAC_ERROR_PATTERN='^.*:[0-9]+: error: \[[^]]+\]'
+ERROR_PATTERN="${MAVEN_ERROR_PATTERN}|${JAVAC_ERROR_PATTERN}"
 
 declare -i rc
 
+trap 'rm -f "$OUTPUT_LOG"' EXIT
+
 #shellcheck disable=SC2086
-mvn $MAVEN_OPTIONS clean test-compile "$@" | tee "${REPORT_DIR}/output.log"
+mvn $MAVEN_OPTIONS clean test-compile "$@" 2>&1 | tee "$OUTPUT_LOG"
 rc=$?
 
-grep -E "^\[(ERROR|WARNING)\] .*:\[[0-9]+,[0-9]+\] \[[A-Za-z][A-Za-z0-9]+\]" \
-  "${REPORT_DIR}/output.log" | awk '!seen[$0]++' > "$REPORT_FILE"
+mkdir -p "$REPORT_DIR"
+mv "$OUTPUT_LOG" "${REPORT_DIR}/output.log"
+trap - EXIT
 
-grep -c '^\[ERROR\]' "$REPORT_FILE" > "$REPORT_DIR/failures" || true
+grep -E "${MAVEN_DIAGNOSTIC_PATTERN}|${JAVAC_DIAGNOSTIC_PATTERN}" "${REPORT_DIR}/output.log" \
+  | awk '!seen[$0]++' > "$REPORT_FILE"
 
-if [[ ${rc} -ne 0 ]] && ! grep -q '^\[ERROR\]' "$REPORT_FILE"; then
-  grep -m25 '^\[ERROR\]' "${REPORT_DIR}/output.log" >> "$REPORT_FILE"
-  grep -c '^\[ERROR\]' "$REPORT_FILE" > "$REPORT_DIR/failures" || true
-fi
+grep -E -c "$ERROR_PATTERN" "$REPORT_FILE" > "$REPORT_DIR/failures" || true
 
-if grep -q '^\[ERROR\]' "$REPORT_FILE"; then
+if grep -q -E "$ERROR_PATTERN" "$REPORT_FILE"; then
   {
     printf '### Error Prone errors\n\n```text\n'
-    grep '^\[ERROR\]' "$REPORT_FILE"
+    grep -E "$ERROR_PATTERN" "$REPORT_FILE"
     printf '```\n'
   } > "$REPORT_DIR/summary.md"
 else

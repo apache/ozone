@@ -21,16 +21,18 @@ setup() {
   mkdir -p "${TEST_TMPDIR}/bin" "${OUTPUT_DIR}"
   echo 9 > "${OUTPUT_DIR}/failures"
   export MAVEN_EXIT_CODE=1
-  export INCLUDE_ERROR=true
   cat > "${TEST_TMPDIR}/bin/mvn" <<'EOF'
 #!/usr/bin/env bash
+rm -rf "${OUTPUT_DIR}"
 printf '%s\n' \
   "[WARNING] The following options were not recognized by any processor: '[artifactId]'" \
-  "[WARNING] /src/Legacy.java:[1,1] [JdkObsolete] legacy finding"
-if [[ "${INCLUDE_ERROR}" == "true" ]]; then
-  echo "[ERROR] /src/Format.java:[2,1] [FormatString] error finding"
-  echo "[ERROR] /src/Format.java:[2,1] [FormatString] error finding"
-fi
+  "[WARNING] /src/Legacy.java:[1,1] [JdkObsolete] legacy finding" \
+  "[WARNING] /src/Custom.java:[3,1] [Custom-Rule_1] custom finding" \
+  "[ERROR] /src/Format.java:[2,1] [FormatString] error finding" \
+  "[ERROR] /src/Format.java:[2,1] [FormatString] error finding" \
+  "/src/Raw.java:4: warning: [RawWarning] raw warning" \
+  "[ERROR] Failed to execute goal example:example: failed"
+printf '%s\n' "/src/Raw.java:5: error: [RawError] raw error" >&2
 exit "${MAVEN_EXIT_CODE}"
 EOF
   chmod +x "${TEST_TMPDIR}/bin/mvn"
@@ -41,27 +43,40 @@ teardown() {
   rm -rf "${TEST_TMPDIR}"
 }
 
-@test "Error Prone reports all findings and fails for errors" {
+@test "Error Prone reports Maven and javac findings and fails for errors" {
   run hadoop-ozone/dev-support/checks/errorprone.sh
 
   [ "$status" -eq 1 ]
-  [ "$(wc -l < "${OUTPUT_DIR}/summary.txt")" -eq 2 ]
+  [ "$(wc -l < "${OUTPUT_DIR}/summary.txt")" -eq 5 ]
   grep -q '^\[WARNING\].*\[JdkObsolete\]' "${OUTPUT_DIR}/summary.txt"
   grep -q '^\[ERROR\].*\[FormatString\]' "${OUTPUT_DIR}/summary.txt"
+  grep -q '^\[WARNING\].*\[Custom-Rule_1\]' "${OUTPUT_DIR}/summary.txt"
+  grep -q '^/src/Raw.java:4: warning: \[RawWarning\]' "${OUTPUT_DIR}/summary.txt"
+  grep -q '^/src/Raw.java:5: error: \[RawError\]' "${OUTPUT_DIR}/summary.txt"
+  ! grep -q 'Failed to execute goal' "${OUTPUT_DIR}/summary.txt"
   grep -q '^### Error Prone errors$' "${OUTPUT_DIR}/summary.md"
   [ "$(grep -c '^\[ERROR\].*\[FormatString\]' "${OUTPUT_DIR}/summary.md")" -eq 1 ]
+  grep -q '^/src/Raw.java:5: error: \[RawError\]' "${OUTPUT_DIR}/summary.md"
   ! grep -q '^\[WARNING\]' "${OUTPUT_DIR}/summary.md"
-  [ "$(< "${OUTPUT_DIR}/failures")" -eq 1 ]
+  [ "$(< "${OUTPUT_DIR}/failures")" -eq 2 ]
 }
 
 @test "Error Prone warnings do not fail the check" {
   export MAVEN_EXIT_CODE=0
-  export INCLUDE_ERROR=false
+  cat > "${TEST_TMPDIR}/bin/mvn" <<'EOF'
+#!/usr/bin/env bash
+rm -rf "${OUTPUT_DIR}"
+printf '%s\n' \
+  "[WARNING] /src/Legacy.java:[1,1] [JdkObsolete] legacy finding" \
+  "/src/Raw.java:4: warning: [RawWarning] raw warning"
+exit "${MAVEN_EXIT_CODE}"
+EOF
+  chmod +x "${TEST_TMPDIR}/bin/mvn"
 
   run hadoop-ozone/dev-support/checks/errorprone.sh
 
   [ "$status" -eq 0 ]
-  [ "$(wc -l < "${OUTPUT_DIR}/summary.txt")" -eq 1 ]
+  [ "$(wc -l < "${OUTPUT_DIR}/summary.txt")" -eq 2 ]
   [ "$(< "${OUTPUT_DIR}/failures")" -eq 0 ]
   [ ! -e "${OUTPUT_DIR}/summary.md" ]
 }
