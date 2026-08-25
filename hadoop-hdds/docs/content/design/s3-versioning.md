@@ -610,7 +610,10 @@ effect without an OM restart, and the operational procedure for keys already
 written under the previous generator; `PutBucketVersioning(Suspended)` on a
 never-versioned bucket (align via s3-tests); whether `ListObjectVersions` against a
 snapshot is worth adding once the feature has landed; interaction with hsync/append
-writes (appends apply to the current version and create no new one).
+writes (appends apply to the current version and create no new one); whether the
+per-block refund should be reconciled with the per-key commit charge, which
+disagree under EC (HDDS-16176), since versioning turns a one-off rounding error
+per key into one that accrues per version.
 
 A multipart upload creates its version at `CompleteMultipartUpload` and its parts
 stay invisible until then, so the version it supersedes has to be demoted on that
