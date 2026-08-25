@@ -65,7 +65,7 @@ abstract class InputStreamTests {
   @TempDir
   private File dir;
 
-  protected MiniOzoneCluster newCluster() throws Exception {
+  private MiniOzoneCluster newCluster() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
