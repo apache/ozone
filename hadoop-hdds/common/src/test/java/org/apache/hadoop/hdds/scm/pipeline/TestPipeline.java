@@ -27,11 +27,14 @@ import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Map;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -146,5 +149,28 @@ public class TestPipeline {
   void testCopyForReadFromNodeRejectsUnknownNode() {
     Pipeline subject = MockPipeline.createRatisPipeline();
     assertThrows(IllegalStateException.class, () -> subject.copyForReadFromNode(randomDatanodeDetails()));
+  }
+
+  @Test
+  void getReplicaIndexesIsMemoizedAndInvalidatedOnReport() throws IOException {
+    Pipeline pipeline = MockPipeline.createEcPipeline();
+
+    Map<DatanodeDetails, Integer> indexes = pipeline.getReplicaIndexes();
+    // The derived view covers every node with its replica index.
+    assertEquals(pipeline.getNodes().size(), indexes.size());
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      assertEquals(pipeline.getReplicaIndex(dn), indexes.get(dn).intValue());
+    }
+
+    // It is an unmodifiable view, memoized across calls.
+    DatanodeDetails node = pipeline.getNodes().get(0);
+    assertThrows(UnsupportedOperationException.class, () -> indexes.put(node, 99));
+    assertSame(indexes, pipeline.getReplicaIndexes());
+
+    // reportDatanode may change the node set, so the cached view is dropped and rebuilt.
+    pipeline.reportDatanode(node);
+    Map<DatanodeDetails, Integer> rebuilt = pipeline.getReplicaIndexes();
+    assertNotSame(indexes, rebuilt);
+    assertEquals(indexes, rebuilt);
   }
 }

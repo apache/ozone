@@ -78,6 +78,8 @@ public final class Pipeline {
   private final PipelineState state;
   private final Map<DatanodeDetails, Long> nodeStatus;
   private final Map<DatanodeDetails, Integer> replicaIndexes;
+  // Lazily-derived {node -> replicaIndex} view; dropped in reportDatanode when the node set changes.
+  private volatile Map<DatanodeDetails, Integer> replicaIndexesView;
   // nodes with ordered distance to client
   private final ImmutableList<DatanodeDetails> nodesInOrder;
   // Current reported Leader for the pipeline
@@ -245,7 +247,13 @@ public final class Pipeline {
    * Get the replicaIndex Map.
    */
   public Map<DatanodeDetails, Integer> getReplicaIndexes() {
-    return this.getNodes().stream().collect(Collectors.toMap(Function.identity(), this::getReplicaIndex));
+    Map<DatanodeDetails, Integer> view = replicaIndexesView;
+    if (view == null) {
+      view = Collections.unmodifiableMap(getNodes().stream()
+          .collect(Collectors.toMap(Function.identity(), this::getReplicaIndex)));
+      replicaIndexesView = view;
+    }
+    return view;
   }
 
   /**
@@ -338,6 +346,8 @@ public final class Pipeline {
           String.format("Datanode=%s not part of pipeline=%s", dn, id));
     }
     nodeStatus.put(dn, System.currentTimeMillis());
+    // Node set may have changed; drop the derived replica-index view so it is rebuilt.
+    replicaIndexesView = null;
   }
 
   public boolean isHealthy() {
