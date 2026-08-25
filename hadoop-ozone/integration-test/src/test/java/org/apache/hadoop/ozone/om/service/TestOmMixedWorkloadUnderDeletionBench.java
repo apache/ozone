@@ -182,18 +182,25 @@ public class TestOmMixedWorkloadUnderDeletionBench {
     final int opsPerThread = Integer.getInteger("bench.opsPerThread", 400);
     final int pathDeletingLimit = Integer.getInteger("bench.pathDeletingLimitPerTask", 2000);
     final int keyDeletingLimit = Integer.getInteger("bench.keyDeletingLimitPerTask", 40000);
+    // Phase-1 (DirectoryDeletingService) cadence. The interval is read in MILLISECONDS (KeyManagerImpl), so 1000
+    // gives a genuine 1s gate between purge rounds: each round moves up to pathDeletingLimit paths under one bucket
+    // write lock — the apply path this change optimizes — and gating spreads phase 1 into a long, sampled window.
+    final int dirDeletingIntervalMs = Integer.getInteger("bench.dirDeletingIntervalMs", 1000);
+    // Phase-2 (KeyDeletingService) is unchanged by this optimization; push its interval past the phase-1 window so it
+    // does not run during measurement and only phase-1 contention is sampled.
+    final int blockDeletingIntervalSec = Integer.getInteger("bench.blockDeletingIntervalSec", 600);
     final String ratisAppenderByteLimit = System.getProperty("bench.ratisAppenderByteLimit",
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT);
     final int perBucketBacklogDirs = Math.max(1, backlogDirs / numBuckets);
     final int backlogFiles = numBuckets * perBucketBacklogDirs * backlogFilesPerDir;
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    // Drive deletion continuously and gather a large amount of work per round so each submitted purge transaction
-    // moves many entries under a single apply-thread bucket write-lock hold while the client workload runs. Both
-    // FSO deletion phases run on 1s intervals (default block-deleting is 60s) so the deletedTable purge phase keeps
-    // the apply thread busy through the full drain rather than polling idly between rounds.
-    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1);
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    // Gate phase 1 (DirectoryDeletingService) at a genuine 1s interval so it moves pathDeletingLimit paths per round
+    // under one apply-thread bucket write-lock hold — the path this change optimizes — spreading phase 1 into a long,
+    // sampled window while the client workload runs. Phase 2 (KeyDeletingService) is unchanged by the optimization,
+    // so its interval is pushed past the window to keep it out of measurement.
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, dirDeletingIntervalMs);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, blockDeletingIntervalSec, TimeUnit.SECONDS);
     conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, pathDeletingLimit);
     conf.setInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK, keyDeletingLimit);
     conf.set(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, ratisAppenderByteLimit);
@@ -241,12 +248,13 @@ public class TestOmMixedWorkloadUnderDeletionBench {
             profiler.start(profileEvent, profileOut);
           }
 
-          // Run the interactive workload continuously in background threads, sampling throughout the drain, and stop it
-          // the moment the backlog is fully drained so the under-load percentiles reflect only the contended window.
-          // Draining spans two apply-thread phases that both take the bucket write lock (DirectoryDeletingService then
-          // KeyDeletingService); every bucket's backlog is deleted here so purge rounds span buckets.
+          // Run the interactive workload continuously in background threads, sampling throughout phase 1, and stop it
+          // the moment phase 1 completes so the under-load percentiles reflect only the optimized, contended window.
+          // Phase 1 (DirectoryDeletingService moving sub-files/sub-dirs into the deletedTable) takes the bucket write
+          // lock on the apply thread — the path this change optimizes; every bucket's backlog is deleted here so purge
+          // rounds span buckets. Phase 2 (KeyDeletingService draining the deletedTable) is unchanged by the change and
+          // is kept out of the window by a long block-deleting interval, so it is neither sampled nor waited on.
           Table<String, ?> deletedDirTable = mm.getDeletedDirTable();
-          Table<String, ?> deletedTable = mm.getDeletedTable();
           long movedFilesBefore = dds.getMovedFilesCount();
           long start = System.nanoTime();
           long drainDeadline = start + TimeUnit.SECONDS.toNanos(900);
@@ -257,28 +265,24 @@ public class TestOmMixedWorkloadUnderDeletionBench {
           }
           LOG.info("delete(recursive) issued on {} buckets; backlog draining in background", numBuckets);
 
-          // Phase 1 (DirectoryDeletingService moving sub-files into the deletedTable) is the apply path this change
-          // optimizes; capture it separately from the full drain. countRowsInTable scans the table, so only probe it
-          // once the cheap moved-files counter shows phase 1 is done.
+          // Phase 1 is complete when every backlog sub-file has been moved (cheap counter) and the deletedDirTable has
+          // been fully drained of sub-dirs. countRowsInTable scans the table, so only probe it once the moved-files
+          // counter shows the sub-files are all moved. Stop here — phase 2 (deletedTable purge) is out of scope.
           long phase1DrainNanos = -1;
           try {
             while (true) {
               long moved = dds.getMovedFilesCount() - movedFilesBefore;
-              if (phase1DrainNanos < 0 && moved >= backlogFiles) {
+              if (moved >= backlogFiles && mm.countRowsInTable(deletedDirTable) == 0) {
                 phase1DrainNanos = System.nanoTime() - start;
-              }
-              if (moved >= backlogFiles && mm.countRowsInTable(deletedDirTable) == 0
-                  && mm.countRowsInTable(deletedTable) == 0) {
                 break;
               }
               if (underLoadWl.failed()) {
                 break;
               }
               if (System.nanoTime() > drainDeadline) {
-                throw new IllegalStateException("backlog did not drain within 900s: moved=" + moved
+                throw new IllegalStateException("phase 1 did not drain within 900s: moved=" + moved
                     + " expected=" + backlogFiles
-                    + " deletedDirTableRows=" + mm.countRowsInTable(deletedDirTable)
-                    + " deletedTableRows=" + mm.countRowsInTable(deletedTable));
+                    + " deletedDirTableRows=" + mm.countRowsInTable(deletedDirTable));
               }
               Thread.sleep(200);
             }
@@ -288,16 +292,15 @@ public class TestOmMixedWorkloadUnderDeletionBench {
               profiler.stop();
             }
           }
-          double drainMs = (System.nanoTime() - start) / 1_000_000.0;
           double phase1DrainMs = phase1DrainNanos / 1_000_000.0;
           List<List<Long>> underLoadSamples = underLoadWl.await();
           Percentiles[] underLoad = toPercentiles(underLoadSamples, "under-load");
           long underLoadOps = totalOps(underLoadSamples);
           String header = String.format(Locale.ROOT,
               "BENCH mixed numBuckets=%d backlogFiles=%d threads=%d opsPerThread=%d ratisByteLimit=%s underLoadOps=%d "
-                  + "phase1DrainMs=%.1f drainMs=%.1f",
+                  + "phase1DrainMs=%.1f",
               numBuckets, backlogFiles, clientThreads, opsPerThread, ratisAppenderByteLimit, underLoadOps,
-              phase1DrainMs, drainMs);
+              phase1DrainMs);
           printBenchLine(control, underLoad, header);
           if (profileOut != null) {
             System.out.printf(Locale.ROOT, "BENCH profile event=%s out=%s%n", profileEvent, profileOut);
@@ -316,7 +319,10 @@ public class TestOmMixedWorkloadUnderDeletionBench {
   private void buildDenseTree(FileSystem fs, Path root, int dirs, int filesPerDir, int nonEmptyEvery,
       byte[] blockContent) throws Exception {
     long buildStart = System.nanoTime();
-    ExecutorService pool = Executors.newFixedThreadPool(8);
+    // Staging is client/RPC-round-trip bound, not apply-thread bound, so more concurrent creators speed it up
+    // nearly linearly; a large backlog is otherwise the long pole of the run. Setup-only — does not affect the
+    // measured control/under-load workload.
+    ExecutorService pool = Executors.newFixedThreadPool(Integer.getInteger("bench.stagingThreads", 48));
     List<Future<?>> futures = new ArrayList<>(dirs);
     for (int d = 0; d < dirs; d++) {
       final Path dir = new Path(root, "dir" + d);
