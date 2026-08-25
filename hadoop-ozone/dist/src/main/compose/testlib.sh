@@ -303,7 +303,7 @@ reorder_om_nodes() {
 ## @description Create stack dump of each java process in each container
 create_stack_dumps() {
   local c pid procname
-  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm | grep -v -e prometheus); do
+  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm | grep -v -e prometheus -e s3g-haproxy); do
     while read -r pid procname; do
       echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
       docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
