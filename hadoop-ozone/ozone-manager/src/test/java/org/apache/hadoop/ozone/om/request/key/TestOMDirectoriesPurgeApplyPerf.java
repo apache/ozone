@@ -145,7 +145,8 @@ public class TestOMDirectoriesPurgeApplyPerf extends OMKeyRequestTests {
     // Only validateAndUpdateCache runs on the apply thread; the RocksDB batch flush happens off-thread later, so it is
     // intentionally excluded here.
     ExecutionContext context = ExecutionContext.of(100L, TermIndex.valueOf(1L, 100L));
-    return request.validateAndUpdateCache(ozoneManager, context) == null ? 0 : 1;
+    // Consume the (always non-null) response as a blackhole so the JIT cannot elide the apply call.
+    return System.identityHashCode(request.validateAndUpdateCache(ozoneManager, context));
   }
 
   private long replicatedBytesPerFile() {
