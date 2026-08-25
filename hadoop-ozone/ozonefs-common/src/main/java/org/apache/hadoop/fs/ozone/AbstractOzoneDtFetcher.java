@@ -46,8 +46,9 @@ abstract class AbstractOzoneDtFetcher implements DtFetcher {
   @Override
   public Token<?> addDelegationTokens(Configuration conf, Credentials creds,
       String renewer, String url) throws Exception {
-    if (!url.startsWith(getServiceName().toString())) {
-      url = getServiceName().toString() + "://" + url;
+    String serviceName = getServiceName().toString();
+    if (!url.startsWith(serviceName + "://")) {
+      url = serviceName + "://" + url;
     }
     return addDelegationTokens(conf, creds, renewer, URI.create(url));
   }

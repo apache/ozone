@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.IOException;
 import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
@@ -34,19 +35,14 @@ public class O3DtFetcher extends AbstractOzoneDtFetcher {
   }
 
   @Override
-  public Token<?> addDelegationTokens(Configuration conf, Credentials creds,
-      String renewer, String url) throws Exception {
-    String serviceName = getServiceName().toString();
-    if (!url.startsWith(serviceName + "://")) {
-      url = serviceName + "://" + url;
-    }
-    URI uri = URI.create(url);
+  protected Token<?> addDelegationTokens(Configuration conf, Credentials creds,
+      String renewer, URI uri) throws IOException {
     if (uri.getAuthority() == null) {
       throw new IllegalArgumentException(
-          "OM authority is required in Ozone RPC URL: " + url);
+          "OM authority is required in Ozone RPC URL: " + uri);
     }
-    URI ofsUri = new URI(OzoneConsts.OZONE_OFS_URI_SCHEME,
-        uri.getAuthority(), "/", null, null);
-    return addDelegationTokens(conf, creds, renewer, ofsUri);
+    URI ofsUri = URI.create(OzoneConsts.OZONE_OFS_URI_SCHEME + "://"
+        + uri.getRawAuthority() + "/");
+    return super.addDelegationTokens(conf, creds, renewer, ofsUri);
   }
 }

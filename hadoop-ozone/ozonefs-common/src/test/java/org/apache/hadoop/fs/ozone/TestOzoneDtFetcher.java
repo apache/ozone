@@ -80,8 +80,31 @@ public class TestOzoneDtFetcher {
             "o3://om-service/volume/bucket/key",
             URI.create("ofs://om-service/")),
         Arguments.of(new O3DtFetcher(),
+            "om-service/volume/bucket/key",
+            URI.create("ofs://om-service/")),
+        Arguments.of(new O3DtFetcher(),
             "o3://om:9862/volume/bucket/key?query#fragment",
             URI.create("ofs://om:9862/")));
+  }
+
+  @Test
+  public void checksFullServiceNamePrefix() throws Exception {
+    AbstractOzoneDtFetcher fetcher = new AbstractOzoneDtFetcher() {
+      @Override
+      public Text getServiceName() {
+        return new Text("o3");
+      }
+
+      @Override
+      protected Token<?> addDelegationTokens(Configuration conf,
+          Credentials creds, String renewer, URI uri) {
+        assertEquals(URI.create("o3://o3fs://bucket.volume.om/key"), uri);
+        return null;
+      }
+    };
+
+    fetcher.addDelegationTokens(new OzoneConfiguration(), new Credentials(),
+        RENEWER, "o3fs://bucket.volume.om/key");
   }
 
   @Test
