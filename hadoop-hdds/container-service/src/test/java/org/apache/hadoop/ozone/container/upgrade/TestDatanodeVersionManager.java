@@ -239,7 +239,7 @@ class TestDatanodeVersionManager extends AbstractComponentVersionManagerTest {
   public void testGetVersionForClientWhenPreZdu() throws Exception {
     // A pre-ZDU apparent version clamps to the last pre-ZDU wire version.
     try (DatanodeVersionManager versionManager = createManager(INITIAL_VERSION.serialize())) {
-      assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT, versionManager.getVersionForClient());
+      assertEquals(HDDSVersion.SHORT_CIRCUIT_READS, versionManager.getVersionForClient());
     }
   }
 

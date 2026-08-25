@@ -38,7 +38,6 @@ import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import * as CONSTANTS from '@/v2/constants/capacity.constants';
 import { UtilizationResponse, SCMPendingDeletion, OMPendingDeletion, DNPendingDeletion, DataNodeUsage } from '@/v2/types/capacity.types';
 import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
-import { AUTO_RELOAD_INTERVAL_DEFAULT } from '@/constants/autoReload.constants';
 
 type CapacityState = {
   lastUpdated: number;
@@ -101,11 +100,20 @@ const Capacity: React.FC<object> = () => {
     return storageDistribution.data.dataNodeUsage.filter(dn => pendingHostNames.has(dn.hostName));
   }, [storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
-  // Seed selected datanode once data loads so dependent calculations work
+  // Seed selected datanode once data loads so dependent calculations work.
+  // Prefer the first available DN so the user does not land on the error card
+  // while a healthy DN exists; fall back to the first DN (surfacing the error
+  // card) only when every DN is unavailable.
   React.useEffect(() => {
     const hostNames = filteredDNs.map(dn => dn.hostName);
     if (!hostNames.includes(selectedDatanode)) {
-      setSelectedDatanode(hostNames[0] ?? "");
+      const unavailableHosts = new Set(
+        (dnPendingDeletes.data.pendingDeletionPerDataNode ?? [])
+          .filter(dn => dn.pendingBlockSize === -1)
+          .map(dn => dn.hostName)
+      );
+      const firstAvailable = hostNames.find(hostName => !unavailableHosts.has(hostName));
+      setSelectedDatanode(firstAvailable ?? hostNames[0] ?? "");
     }
   }, [filteredDNs]);
 
@@ -133,7 +141,10 @@ const Capacity: React.FC<object> = () => {
 
   const autoReload = useAutoReload(loadDataIfIdle);
 
-  const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
+  const selectedDNDetails: DataNodeUsage & {
+    pendingBlockSize: number;
+    unavailable: boolean;
+  } = React.useMemo(() => {
     const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
       ?? storageDistribution.data.dataNodeUsage[0];
     const dnPendingEntry = dnPendingDeletes.data.pendingDeletionPerDataNode?.find(
@@ -151,7 +162,10 @@ const Capacity: React.FC<object> = () => {
         reserved: 0
       }),
       ...dnPendingEntry,
-      pendingBlockSize: Math.max(0, dnPendingEntry.pendingBlockSize)
+      pendingBlockSize: Math.max(0, dnPendingEntry.pendingBlockSize),
+      // -1 is the sentinel for a DN whose pending deletion query failed (offline/unreachable).
+      // Its capacity data from the storage report may be outdated, so surface an error instead.
+      unavailable: dnPendingEntry.pendingBlockSize === -1
     }
   }, [selectedDatanode, storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
@@ -202,19 +216,58 @@ const Capacity: React.FC<object> = () => {
     }
   };
 
-  // Adjust the polling interval based on DN scan status:
-  // fast (5s) while a scan is running, normal (60s) once finished.
-  // Honors the auto-reload toggle: if polling is OFF, do nothing.
-  React.useEffect(() => {
-    if (!autoReload.isPolling) {
-      return;
+  // --- DN pending-deletion scan polling --------------------------------------
+  // The periodic full refresh (all four endpoints) is driven by useAutoReload
+  // when Auto Refresh is enabled, and by the manual reload button otherwise.
+  // On top of that, whenever a DN scan is reported IN_PROGRESS we poll ONLY the
+  // DN endpoint at a fast cadence until it finishes, then refetch the other
+  // endpoints once so the aggregate pending-deletion numbers reflect the final
+  // DN data. This runs regardless of the Auto Refresh toggle, because a running
+  // scan must be driven to completion either way.
+
+  // Refetch only the DN endpoint. Kept in a ref so the interval below always
+  // reads the current `loading` value instead of a stale closure (the effect
+  // does not re-run while the status stays IN_PROGRESS).
+  const pollDnScanRef = React.useRef<() => void>(() => {});
+  pollDnScanRef.current = () => {
+    if (!dnPendingDeletes.loading) {
+      dnPendingDeletes.refetch();
     }
-    autoReload.startPolling(
-      dnPendingDeletes.data.status === "FINISHED"
-        ? AUTO_RELOAD_INTERVAL_DEFAULT
-        : PENDING_POLL_INTERVAL
-    );
-  }, [dnPendingDeletes.data.status, autoReload.isPolling]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
+
+  // Refetch everything except the DN endpoint, to re-sync the OM / SCM / storage
+  // numbers with the DN data once the scan has finished.
+  const syncNonDnDataRef = React.useRef<() => void>(() => {});
+  syncNonDnDataRef.current = () => {
+    storageDistribution.refetch();
+    scmPendingDeletes.refetch();
+    omPendingDeletes.refetch();
+    setState({ lastUpdated: Number(moment()) });
+  };
+
+  // True while we are actively driving a DN scan, so that we sync the other
+  // endpoints exactly once when it transitions to FINISHED — and not on the
+  // initial load, where all four endpoints were already fetched together.
+  const isDrivingDnScanRef = React.useRef(false);
+
+  React.useEffect(() => {
+    const scanInProgress = dnPendingDeletes.data.status === "IN_PROGRESS";
+
+    if (scanInProgress) {
+      isDrivingDnScanRef.current = true;
+      const timer = window.setInterval(() => pollDnScanRef.current(), PENDING_POLL_INTERVAL);
+      return () => clearInterval(timer);
+    }
+
+    // Reached a terminal state (FINISHED / FAILED). If we were driving a scan,
+    // sync the other endpoints once (only on success) and stop tracking it.
+    if (isDrivingDnScanRef.current) {
+      isDrivingDnScanRef.current = false;
+      if (dnPendingDeletes.data.status === "FINISHED") {
+        syncNonDnDataRef.current();
+      }
+    }
+  }, [dnPendingDeletes.data.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dnReportStatus = (
     (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0) > 0
@@ -453,6 +506,7 @@ const Capacity: React.FC<object> = () => {
             downloadUrl={DN_CSV_DOWNLOAD_URL}
             onDownloadClick={() => downloadCsv(DN_CSV_DOWNLOAD_URL)}
             handleSelect={setSelectedDatanode}
+            selectedValue={selectedDatanode}
             dropdownItems={filteredDNs.map(datanode => ({
               label: (
                 <>
@@ -472,6 +526,9 @@ const Capacity: React.FC<object> = () => {
             dataDetails={[{
               title: 'USED SPACE',
               size: (selectedDNDetails.used ?? 0) + (selectedDNDetails.pendingBlockSize ?? 0),
+              hasError: selectedDNDetails.unavailable,
+              errorMessage: 'Datanode is unavailable; capacity data may be outdated.',
+              errorTestId: 'dn-used-space-error',
               breakdown: [{
                 label: 'PENDING DELETION',
                 value: selectedDNDetails.pendingBlockSize ?? 0,
@@ -484,6 +541,9 @@ const Capacity: React.FC<object> = () => {
             }, {
               title: 'FREE SPACE',
               size: (selectedDNDetails.remaining ?? 0) + (selectedDNDetails.committed ?? 0),
+              hasError: selectedDNDetails.unavailable,
+              errorMessage: 'Datanode is unavailable; capacity data may be outdated.',
+              errorTestId: 'dn-free-space-error',
               breakdown: [{
                 label: unusedSpaceBreakdown,
                 value: selectedDNDetails.remaining ?? 0,

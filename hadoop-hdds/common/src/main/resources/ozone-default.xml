@@ -953,6 +953,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.placement.rack.scatter.capacity.aware.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SCM, MANAGEMENT</tag>
+    <description>
+      Enables capacity-aware datanode selection within a rack when SCMContainerPlacementRackScatter is used.
+      When enabled, SCM chooses the less utilized of two randomly selected datanodes.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.pipeline.owner.container.count</name>
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
@@ -1591,6 +1600,16 @@
       If this is empty, no column families are compacted.
     </description>
   </property>
+  <property>
+    <name>ozone.om.compaction.service.bottommost-level-compaction</name>
+    <value>kSkip</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Bottommost level compaction type for compaction.
+      Invalid values will default to kSkip.
+      Valid values: kSkip, kIfHaveCompactionFilter, kForce, kForceOptimized.
+    </description>
+  </property>
 
   <property>
     <name>ozone.om.snapshot.compact.non.snapshot.diff.tables</name>
@@ -2164,7 +2183,16 @@
     <value>30s</value>
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
-      Timeout for ozone grpc client during read.
+      Timeout for ozone grpc and short-circuit client during read.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.write.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone short-circuit client during write.
     </description>
   </property>
 
@@ -3988,6 +4016,16 @@
   </property>
 
   <property>
+    <name>hdds.heartbeat.address.refresh.missed-count-threshold</name>
+    <value>3</value>
+    <tag>OZONE, DATANODE, HA</tag>
+    <description>Consecutive heartbeat failures the DataNode tolerates
+      against one SCM endpoint before re-resolving its hostname. Only
+      consulted when ozone.client.failover.resolve-needed is true.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
@@ -5136,6 +5174,7 @@
       warm up edek cache if none of key successful on OM start up.
     </description>
   </property>
+
   <property>
     <name>ozone.om.hierarchical.resource.locks.soft.limit</name>
     <value>1024</value>
@@ -5151,6 +5190,7 @@
     <value>5m</value>
     <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
   </property>
+
   <property>
     <name>ozone.scm.ratis.events.max.limit</name>
     <value>100</value>
@@ -5168,5 +5208,77 @@
     <value>1m</value>
     <tag>OM</tag>
     <description>If OM is unfinalized, how frequently it should poll SCM to trigger finalization</description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.enabled</name>
+    <value>false</value>
+    <tag>OZONE</tag>
+    <description>It specifies whether to enable lifecycle management service.</description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.move.to.trash.enabled</name>
+    <value>true</value>
+    <tag>OZONE</tag>
+    <description>When enabled KeyLifecycleService will move expired keys/dirs to trash if trash is available.
+      When disabled, it will delete them directly.
+    </description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.delete.batch-size</name>
+    <value>1000</value>
+    <tag>OZONE</tag>
+    <description>Max numbers of objects allowed for deletion in a batch for a lifecycle evaluating task.</description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.interval</name>
+    <value>24h</value>
+    <tag>OZONE</tag>
+    <description>Interval at which key lifecycle management service will run.</description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.timeout</name>
+    <value>2h</value>
+    <tag>OZONE</tag>
+    <description>Timeout for task of key lifecycle management service.</description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.workers</name>
+    <value>5</value>
+    <tag>OZONE</tag>
+    <description>Number of workers executed of key lifecycle management service. This
+      configuration should be set to greater than 0.</description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.delete.cached.directory.max-count</name>
+    <value>1000000</value>
+    <tag>OZONE</tag>
+    <description>Max numbers of directory objects held in memory stack for recursive FSO bucket evaluating for
+      a lifecycle evaluating task. Once the cached directory objects exceeds this limit, the evaluation of the involved
+      directories will abort.
+    </description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.mpu.abort.limit.per.task</name>
+    <value>1000</value>
+    <tag>OZONE</tag>
+    <description>Maximum number of multipart upload parts (rounded up to complete uploads)
+      to abort in a single task when processing AbortIncompleteMultipartUpload
+      lifecycle rules.
+    </description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.state.save.interval.ms</name>
+    <value>300000</value>
+    <tag>OZONE</tag>
+    <description>The interval of bucket scan task saves its pointer to DB. Default is 5 mins.</description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.state.save.keys.processed</name>
+    <value>100000</value>
+    <tag>OZONE</tag>
+    <description>Bucket scan task will save its pointer to DB by default every 100000 keys are scanned. Bucket scan
+      pointer save will happen when either ozone.lifecycle.service.state.save.interval.ms or
+      ozone.lifecycle.service.state.save.keys.processed is satisfied.
+    </description>
   </property>
 </configuration>

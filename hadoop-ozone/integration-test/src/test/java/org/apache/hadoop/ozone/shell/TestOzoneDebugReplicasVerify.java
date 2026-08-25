@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import static org.apache.hadoop.ozone.TestDataUtil.createKeys;
+import static org.apache.hadoop.ozone.DataTestUtil.createKeys;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.corruptFile;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.truncateFile;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;

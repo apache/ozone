@@ -165,7 +165,7 @@ public final class HddsUtils {
       }
 
       return Collections.singletonList(
-          NetUtils.createSocketAddr(getHostName(address).get() + ":" + port));
+          NetUtils.createSocketAddr(getHostPortString(getHostName(address).get(), port)));
     }
   }
 
@@ -203,7 +203,7 @@ public final class HddsUtils {
     if ((value == null) || value.isEmpty()) {
       return Optional.empty();
     }
-    String hostname = value.replaceAll("\\:[0-9]+$", "");
+    String hostname = HostAndPort.fromString(value).getHost();
     if (hostname.isEmpty()) {
       return Optional.empty();
     } else {
@@ -241,6 +241,69 @@ public final class HddsUtils {
    */
   public static String getHostPortString(String host, int port) {
     return HostAndPort.fromParts(host, port).toString();
+  }
+
+  /**
+   * Parse a Ratis role string produced by
+   * {@code SCMRatisServerImpl.getRatisRoles()} into its constituent fields.
+   * The format is {@code [host]:port:ROLE:id:hostIP} where host and hostIP
+   * may be bracketed IPv6 literals.
+   *
+   * @param roleString the encoded role string
+   * @return a 5-element array: {host, port, role, id, hostIP}
+   */
+  public static String[] parseRatisRoleString(String roleString) {
+    Preconditions.checkArgument(roleString != null && !roleString.isEmpty(),
+        "Role string must not be null or empty");
+
+    // Parse from the right: the last field is hostIP (possibly bracketed),
+    // then id (uuid, no colons), then role (LEADER/FOLLOWER, no colons),
+    // and the remainder is host:port (which may be bracketed IPv6).
+    int idx = roleString.length();
+
+    // Field 5: hostIP — may be bracketed IPv6 like [2001:db8::1]
+    String hostIp;
+    if (roleString.charAt(idx - 1) == ']') {
+      int bracket = roleString.lastIndexOf('[');
+      Preconditions.checkArgument(bracket > 0,
+          "Malformed role string (unmatched bracket): %s", roleString);
+      hostIp = roleString.substring(bracket + 1, idx - 1);
+      Preconditions.checkArgument(roleString.charAt(bracket - 1) == ':',
+          "Malformed role string (expected ':' before '['): %s", roleString);
+      idx = bracket - 1;
+    } else {
+      int sep = roleString.lastIndexOf(':');
+      Preconditions.checkArgument(sep > 0,
+          "Malformed role string (expected host:port:role:id:hostIP): %s", roleString);
+      hostIp = roleString.substring(sep + 1);
+      idx = sep;
+    }
+
+    // Field 4: id (uuid or peer id, no colons)
+    int sep3 = roleString.lastIndexOf(':', idx - 1);
+    Preconditions.checkArgument(sep3 > 0,
+        "Malformed role string (cannot find id field): %s", roleString);
+    String id = roleString.substring(sep3 + 1, idx);
+    idx = sep3;
+
+    // Field 3: role (LEADER/FOLLOWER, no colons)
+    int sep2 = roleString.lastIndexOf(':', idx - 1);
+    Preconditions.checkArgument(sep2 > 0,
+        "Malformed role string (cannot find role field): %s", roleString);
+    String role = roleString.substring(sep2 + 1, idx);
+    idx = sep2;
+
+    // Remainder is host:port — use HostAndPort to parse safely
+    String hostPort = roleString.substring(0, idx);
+    Preconditions.checkArgument(!hostPort.isEmpty(),
+        "Malformed role string (empty host:port): %s", roleString);
+    HostAndPort hp = HostAndPort.fromString(hostPort);
+    Preconditions.checkArgument(hp.hasPort(),
+        "Malformed role string (missing port): %s", roleString);
+    String host = hp.getHost();
+    String port = String.valueOf(hp.getPort());
+
+    return new String[]{host, port, role, id, hostIp};
   }
 
   /**
@@ -373,6 +436,7 @@ public final class HddsUtils {
     case PutBlock:
     case PutSmallFile:
     case StreamInit:
+    case StreamInitWithPutBlock:
     case StreamWrite:
     case FinalizeBlock:
       return false;
@@ -583,23 +647,6 @@ public final class HddsUtils {
       throw new IllegalArgumentException("Unable to create path: " + dirFile);
     }
     return dirFile;
-  }
-
-  /**
-   * Utility string formatter method to display SCM roles.
-   *
-   * @param nodes
-   * @return String
-   */
-  public static String format(List<String> nodes) {
-    StringBuilder sb = new StringBuilder();
-    for (String node : nodes) {
-      String[] x = node.split(":");
-      sb.append(String
-          .format("{ HostName : %s, Ratis Port : %s, Role : %s } ", x[0], x[1],
-              x[2]));
-    }
-    return sb.toString();
   }
 
   /**

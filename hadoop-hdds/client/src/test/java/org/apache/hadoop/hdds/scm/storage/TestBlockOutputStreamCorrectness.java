@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -132,6 +134,46 @@ class TestBlockOutputStreamCorrectness {
     }
   }
 
+  @Test
+  public void testEcReconstructionStreamDisablesContainerAutoCreate() throws IOException {
+    OzoneClientConfig config = new OzoneClientConfig();
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    BlockID blockID = new BlockID(1, 1);
+    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(datanodeDetails.getID())
+        .setReplicationConfig(replicationConfig)
+        .setNodes(ImmutableList.of(datanodeDetails))
+        .setState(Pipeline.PipelineState.CLOSED)
+        .setReplicaIndexes(ImmutableMap.of(datanodeDetails, 2))
+        .build();
+
+    try (ECBlockOutputStream ecBlockOutputStream = createECBlockOutputStream(config, replicationConfig,
+        blockID, pipeline, false)) {
+      assertFalse(ecBlockOutputStream.isContainerAutoCreate());
+    }
+  }
+
+  @Test
+  public void testEcClientStreamAllowsContainerAutoCreate() throws IOException {
+    OzoneClientConfig config = new OzoneClientConfig();
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    BlockID blockID = new BlockID(1, 1);
+    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(datanodeDetails.getID())
+        .setReplicationConfig(replicationConfig)
+        .setNodes(ImmutableList.of(datanodeDetails))
+        .setState(Pipeline.PipelineState.CLOSED)
+        .setReplicaIndexes(ImmutableMap.of(datanodeDetails, 2))
+        .build();
+
+    try (ECBlockOutputStream ecBlockOutputStream = createECBlockOutputStream(config, replicationConfig,
+        blockID, pipeline)) {
+      assertTrue(ecBlockOutputStream.isContainerAutoCreate());
+    }
+  }
+
   /**
    * Creates a BlockData array with {@link ECReplicationConfig#getRequiredNodes()} number of elements.
    */
@@ -183,7 +225,8 @@ class TestBlockOutputStreamCorrectness {
   }
 
   private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
-      ECReplicationConfig repConfig, BlockID blockID, Pipeline pipeline) throws IOException {
+      ECReplicationConfig repConfig, BlockID blockID, Pipeline pipeline,
+      boolean containerAutoCreate) throws IOException {
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
     when(xcm.acquireClient(any()))
         .thenReturn(new MockXceiverClientSpi(pipeline));
@@ -193,7 +236,12 @@ class TestBlockOutputStreamCorrectness {
         StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, clientConfig);
 
     return new ECBlockOutputStream(blockID, xcm, pipeline, BufferPool.empty(), clientConfig, null,
-        clientMetrics, streamBufferArgs, () -> newFixedThreadPool(2));
+        clientMetrics, streamBufferArgs, () -> newFixedThreadPool(2), containerAutoCreate);
+  }
+
+  private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
+      ECReplicationConfig repConfig, BlockID blockID, Pipeline pipeline) throws IOException {
+    return createECBlockOutputStream(clientConfig, repConfig, blockID, pipeline, true);
   }
 
   /**

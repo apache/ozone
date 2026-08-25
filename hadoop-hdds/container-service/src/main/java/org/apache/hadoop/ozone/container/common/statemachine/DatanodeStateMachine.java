@@ -198,8 +198,15 @@ public class DatanodeStateMachine implements Closeable {
         .stateContext(context)
         .datanodeConfig(dnConf)
         .replicationConfig(replicationConfig)
+        .containerSet(container.getContainerSet())
+        .volumeSet(container.getVolumeSet())
         .clock(clock)
         .build();
+
+    container.getVolumeSet().setFailedVolumeListener(() -> {
+      container.handleVolumeFailures();
+      supervisor.shutdownFailedVolumePools(container.getVolumeSet());
+    });
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
