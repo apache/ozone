@@ -109,8 +109,9 @@ import org.slf4j.LoggerFactory;
  * regime where the apply-thread per-entry cost dominates interactive latency.
  *
  * <p>Adding {@code -Dbench.profile.event=<cpu|lock|wall|alloc>} profiles only the under-load window with
- * async-profiler (loaded reflectively from {@code -Dbench.profiler.jar} / {@code -Dbench.profiler.lib}, JFR written
- * under {@code -Dbench.profile.out}, default {@code /tmp}). For accurate leaf frames also pass
+ * async-profiler, loaded reflectively from a local install whose paths must be supplied via
+ * {@code -Dbench.profiler.jar} (the async-profiler jar) and {@code -Dbench.profiler.lib} (its native library); the
+ * JFR is written under {@code -Dbench.profile.out}, default {@code /tmp}. For accurate leaf frames also pass
  * {@code -DargLine="-XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints"}.
  */
 @Tag("benchmark")
@@ -265,27 +266,10 @@ public class TestOmMixedWorkloadUnderDeletionBench {
           }
           LOG.info("delete(recursive) issued on {} buckets; backlog draining in background", numBuckets);
 
-          // Phase 1 is complete when every backlog sub-file has been moved (cheap counter) and the deletedDirTable has
-          // been fully drained of sub-dirs. countRowsInTable scans the table, so only probe it once the moved-files
-          // counter shows the sub-files are all moved. Stop here — phase 2 (deletedTable purge) is out of scope.
-          long phase1DrainNanos = -1;
+          long phase1DrainNanos;
           try {
-            while (true) {
-              long moved = dds.getMovedFilesCount() - movedFilesBefore;
-              if (moved >= backlogFiles && mm.countRowsInTable(deletedDirTable) == 0) {
-                phase1DrainNanos = System.nanoTime() - start;
-                break;
-              }
-              if (underLoadWl.failed()) {
-                break;
-              }
-              if (System.nanoTime() > drainDeadline) {
-                throw new IllegalStateException("phase 1 did not drain within 900s: moved=" + moved
-                    + " expected=" + backlogFiles
-                    + " deletedDirTableRows=" + mm.countRowsInTable(deletedDirTable));
-              }
-              Thread.sleep(200);
-            }
+            phase1DrainNanos = awaitPhase1Drain(dds, mm, deletedDirTable, movedFilesBefore, backlogFiles,
+                underLoadWl, start, drainDeadline);
           } finally {
             underLoadWl.stop();
             if (profiler != null) {
@@ -313,6 +297,33 @@ public class TestOmMixedWorkloadUnderDeletionBench {
       }
     } finally {
       cluster.shutdown();
+    }
+  }
+
+  /**
+   * Blocks until phase 1 (DirectoryDeletingService) finishes: every backlog sub-file has been moved (cheap counter)
+   * and the deletedDirTable has been fully drained of sub-dirs. countRowsInTable scans the table, so it is only probed
+   * once the moved-files counter shows the sub-files are all moved. Phase 2 (deletedTable purge) is out of scope.
+   * Returns the drain duration in nanos, or -1 if the workload failed before the drain completed.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private static long awaitPhase1Drain(DirectoryDeletingService dds, OMMetadataManager mm,
+      Table<String, ?> deletedDirTable, long movedFilesBefore, long backlogFiles, RunningWorkload underLoadWl,
+      long start, long drainDeadline) throws Exception {
+    while (true) {
+      long moved = dds.getMovedFilesCount() - movedFilesBefore;
+      if (moved >= backlogFiles && mm.countRowsInTable(deletedDirTable) == 0) {
+        return System.nanoTime() - start;
+      }
+      if (underLoadWl.failed()) {
+        return -1;
+      }
+      if (System.nanoTime() > drainDeadline) {
+        throw new IllegalStateException("phase 1 did not drain within 900s: moved=" + moved
+            + " expected=" + backlogFiles
+            + " deletedDirTableRows=" + mm.countRowsInTable(deletedDirTable));
+      }
+      Thread.sleep(200);
     }
   }
 
@@ -614,15 +625,22 @@ public class TestOmMixedWorkloadUnderDeletionBench {
     }
 
     static Profiler load() throws Exception {
-      String jar = System.getProperty("bench.profiler.jar",
-          "/opt/homebrew/opt/async-profiler/libexec/async-profiler.jar");
-      String lib = System.getProperty("bench.profiler.lib",
-          "/opt/homebrew/opt/async-profiler/lib/libasyncProfiler.dylib");
+      String jar = requireProfilerPath("bench.profiler.jar");
+      String lib = requireProfilerPath("bench.profiler.lib");
       URLClassLoader loader = new URLClassLoader(new URL[] {new File(jar).toURI().toURL()},
           Profiler.class.getClassLoader());
       Class<?> clazz = Class.forName("one.profiler.AsyncProfiler", true, loader);
       Object instance = clazz.getMethod("getInstance", String.class).invoke(null, lib);
       return new Profiler(instance, clazz.getMethod("execute", String.class));
+    }
+
+    private static String requireProfilerPath(String property) {
+      String value = System.getProperty(property);
+      if (value == null || value.isEmpty()) {
+        throw new IllegalStateException("bench.profile.event is set but " + property + " is not; point it at your "
+            + "local async-profiler install (jar and native library) to enable profiling");
+      }
+      return value;
     }
 
     void start(String event, String jfrFile) throws Exception {
