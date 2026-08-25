@@ -3305,7 +3305,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ServiceInfo.Builder omServiceInfoBuilder = ServiceInfo.newBuilder()
         .setNodeType(HddsProtos.NodeType.OM)
         .setHostname(omRpcAddress.getHostName())
-        .setOmVersion(OzoneManagerVersion.SOFTWARE_VERSION)
+        .setOmVersion(versionManager.getVersionForClient())
         .addServicePort(ServicePort.newBuilder()
             .setType(ServicePort.Type.RPC)
             .setValue(omRpcAddress.getPort())
@@ -3366,10 +3366,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       ServiceInfo.Builder peerOmServiceInfoBuilder = ServiceInfo.newBuilder()
           .setNodeType(HddsProtos.NodeType.OM)
           .setHostname(peerNode.getHostName())
-          // For now assume peer is at the same version.
-          // This field needs to be fetched from peer when rolling upgrades
-          // are implemented.
-          .setOmVersion(OzoneManagerVersion.SOFTWARE_VERSION)
+          // OM version is set through Ratis on finalization, so we can assume peers have the same version.
+          .setOmVersion(versionManager.getVersionForClient())
           .addServicePort(ServicePort.newBuilder()
               .setType(ServicePort.Type.RPC)
               .setValue(peerNode.getRpcPort())
