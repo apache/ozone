@@ -508,6 +508,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
+  private final VolumeUtilizationMetrics volumeUtilizationMetrics;
   private final BucketUtilizationMetrics bucketUtilizationMetrics;
 
   private boolean fsSnapshotEnabled;
@@ -774,6 +775,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omState = State.INITIALIZED;
     }
 
+    volumeUtilizationMetrics = VolumeUtilizationMetrics.create(metadataManager);
     bucketUtilizationMetrics = BucketUtilizationMetrics.create(metadataManager);
     omHostName = HddsUtils.getHostName(conf);
   }
@@ -2503,6 +2505,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMHAMetrics.unRegister();
       }
       omRatisServer = null;
+
+      if (volumeUtilizationMetrics != null) {
+        volumeUtilizationMetrics.unRegister();
+      }
 
       if (bucketUtilizationMetrics != null) {
         bucketUtilizationMetrics.unRegister();
