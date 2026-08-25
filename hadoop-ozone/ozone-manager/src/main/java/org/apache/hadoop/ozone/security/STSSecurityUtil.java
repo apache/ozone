@@ -154,6 +154,10 @@ public final class STSSecurityUtil {
   private static Token<STSTokenIdentifier> decodeTokenFromString(String encodedToken)
       throws SecretManager.InvalidToken {
     final Token<STSTokenIdentifier> token = new Token<>();
+    // token.decodeFromUrlString() only declares IOException, but deserialization can throw
+    // unchecked exceptions (e.g. NegativeArraySizeException) when malformed input decodes to a
+    // negative byte-array length. Map those to InvalidToken (via catching RuntimeException)
+    // instead of failing the OM request.
     try {
       token.decodeFromUrlString(encodedToken);
       return token;

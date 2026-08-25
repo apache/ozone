@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.ozone.security;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Objects;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
@@ -65,6 +67,15 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
   public Token<STSTokenIdentifier> generateToken(STSTokenIdentifier tokenIdentifier) {
     final ManagedSecretKey secretKey = secretKeyClient.getCurrentSecretKey();
     tokenIdentifier.setSecretKeyId(secretKey.getId());
+    return generateToken(tokenIdentifier, secretKey);
+  }
+
+  private Token<STSTokenIdentifier> generateToken(STSTokenIdentifier tokenIdentifier, ManagedSecretKey secretKey) {
+    Objects.requireNonNull(
+        tokenIdentifier.getSecretKeyId(), "secretKeyId must be set on the token identifier before signing");
+    Preconditions.checkArgument(
+        secretKey.getId().equals(tokenIdentifier.getSecretKeyId()), "secretKeyId on the token identifier " +
+            "must match the signing secret key");
     final byte[] identifierBytes = tokenIdentifier.getBytes();
     final byte[] password = secretKey.sign(identifierBytes);
     return new Token<>(identifierBytes, password, tokenIdentifier.getKind(), new Text(tokenIdentifier.getService()));
@@ -88,9 +99,9 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
     final Instant creationTime = clock.instant();
     final Instant expiration = creationTime.plusSeconds(durationSeconds);
 
-    // Get the current secret key for encryption
-    final ManagedSecretKey currentSecretKey = secretKeyClient.getCurrentSecretKey();
-    final byte[] encryptionKey = currentSecretKey.getSecretKey().getEncoded();
+    // Get the current secret key once for encryption, secretKeyId, and signing.
+    final ManagedSecretKey secretKey = secretKeyClient.getCurrentSecretKey();
+    final byte[] encryptionKey = secretKey.getSecretKey().getEncoded();
 
     // Note - the encryptionKey will NOT be encoded in the token.  When generateToken() is called, it eventually calls
     // the write() method in STSTokenIdentifier which calls toProtoBuf(), and the encryptionKey is not
@@ -105,8 +116,9 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
         .setSessionPolicy(sessionPolicy)
         .setEncryptionKey(encryptionKey)
         .build());
+    identifier.setSecretKeyId(secretKey.getId());
 
-    final Token<STSTokenIdentifier> token = generateToken(identifier);
+    final Token<STSTokenIdentifier> token = generateToken(identifier, secretKey);
     return token.encodeToUrlString();
   }
 }
