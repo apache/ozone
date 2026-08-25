@@ -27,7 +27,6 @@ import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -152,7 +151,7 @@ public class TestPipeline {
   }
 
   @Test
-  void getReplicaIndexesIsMemoizedAndInvalidatedOnReport() throws IOException {
+  void getReplicaIndexesIsMemoizedUnmodifiableView() throws IOException {
     Pipeline pipeline = MockPipeline.createEcPipeline();
 
     Map<DatanodeDetails, Integer> indexes = pipeline.getReplicaIndexes();
@@ -167,10 +166,8 @@ public class TestPipeline {
     assertThrows(UnsupportedOperationException.class, () -> indexes.put(node, 99));
     assertSame(indexes, pipeline.getReplicaIndexes());
 
-    // reportDatanode may change the node set, so the cached view is dropped and rebuilt.
+    // Re-reporting a present node keeps the node count, so the memoized view stays valid.
     pipeline.reportDatanode(node);
-    Map<DatanodeDetails, Integer> rebuilt = pipeline.getReplicaIndexes();
-    assertNotSame(indexes, rebuilt);
-    assertEquals(indexes, rebuilt);
+    assertSame(indexes, pipeline.getReplicaIndexes());
   }
 }
