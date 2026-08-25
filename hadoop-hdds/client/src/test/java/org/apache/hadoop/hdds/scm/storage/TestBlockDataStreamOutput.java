@@ -159,7 +159,7 @@ class TestBlockDataStreamOutput {
     }
   }
 
-  //@Test - skipped as it fails now.
+  @Test
   void hsyncPropagatesIOException() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     // Fail the first putBlock
@@ -174,7 +174,7 @@ class TestBlockDataStreamOutput {
     stream.close();
   }
 
-  //@Test - skipped as it fails now
+  @Test
   void hsyncPropagatesWatchFailure() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     // Fail the first watchForCommit

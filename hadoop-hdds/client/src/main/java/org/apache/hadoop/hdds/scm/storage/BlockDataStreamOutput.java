@@ -541,8 +541,13 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       if (!isClosed()) {
         handleFlush(false);
       }
-    } catch (Exception e) {
-
+    } catch (IOException e) {
+      throw e;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      handleInterruptedException(e, false);
+    } catch (ExecutionException e) {
+      handleExecutionException(e);
     }
   }
 
