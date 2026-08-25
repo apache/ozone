@@ -605,15 +605,6 @@ public abstract class EndpointBase {
     Map<String, String> auditMap = getAuditParameters();
     auditMap.put("x-amz-request-id", requestIdentifier.getRequestId());
     auditMap.put("x-amz-id-2", requestIdentifier.getAmzId());
-    if (s3Auth != null) {
-      // For STS temporary credentials, record the originalAccessKeyId (the permanent principal that
-      // created the token) so the audit trail is not limited to the opaque tempAccessKeyId.
-      // This value is decoded from the client-presented session token only - OM validates it separately.
-      final String originalAccessKeyId = AuditUtils.getStsOriginalAccessKeyId(s3Auth.getSessionToken());
-      if (originalAccessKeyId != null) {
-        auditMap.put(OzoneConsts.S3_STS_ORIGINAL_ACCESS_KEY_ID, originalAccessKeyId + " (unverified)");
-      }
-    }
 
     AuditMessage.Builder builder = new AuditMessage.Builder()
         .forOperation(op)

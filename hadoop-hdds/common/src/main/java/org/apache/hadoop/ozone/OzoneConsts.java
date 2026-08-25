@@ -314,7 +314,6 @@ public final class OzoneConsts {
   public static final String S3_SETSECRET_USER = "S3SetSecretUser";
   public static final String S3_REVOKESECRET_USER = "S3RevokeSecretUser";
   public static final String S3_REVOKESTSTOKEN_USER = "S3RevokeSTSTokenUser";
-  public static final String S3_STS_ORIGINAL_ACCESS_KEY_ID = "originalAccessKeyId";
   public static final String S3_STS_TEMP_ACCESS_KEY_ID = "tempAccessKeyId";
   public static final String RENAMED_KEYS_MAP = "renamedKeysMap";
   public static final String UNRENAMED_KEYS_MAP = "unRenamedKeysMap";
