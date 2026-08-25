@@ -243,7 +243,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       omKeyInfo.setExpectedDataGeneration(null);
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
-      // if keyToDelete isn't null, usedNamespace shouldn't check and increase.
+      // Same-client hsync re-commit does not consume namespace.
       if (keyToDelete != null && isSameHsyncKey) {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
@@ -289,12 +289,13 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         omBucketInfo.decrUsedNamespace(totalNamespace, true);
         omBucketInfo.decrUsedNamespace(filteredUsedBlockCnt.getRight(), false);
         omBucketInfo.decrUsedBytes(totalSize, true);
+        omBucketInfo.incrUsedNamespace(1L);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
+        omBucketInfo.incrUsedNamespace(1L);
       }
-      omBucketInfo.incrUsedNamespace(1L);
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
