@@ -73,6 +73,9 @@ public class TestOzoneManagerRatisServer {
   private OzoneManagerRatisServer omRatisServer;
   private String clientId = UUID.randomUUID().toString();
   private static final long RATIS_RPC_TIMEOUT = 500L;
+  private static final String CURRENT_RETRY_CACHE_KEY =
+      OMConfigKeys.OZONE_OM_HA_PREFIX + "." + RaftServerConfigKeys.RetryCache.EXPIRY_TIME_KEY;
+  private static final String DEPRECATED_RETRY_CACHE_KEY = "ozone.om.ratis.server.retry.cache.timeout";
   private OMMetadataManager omMetadataManager;
   private OzoneManager ozoneManager;
   private OMNodeDetails omNodeDetails;
@@ -283,13 +286,27 @@ public class TestOzoneManagerRatisServer {
     assertEquals(300_000, retryCacheExpiryMillis(new OzoneConfiguration(), ratisDir));
 
     OzoneConfiguration currentKeyConf = new OzoneConfiguration();
-    currentKeyConf.set(OMConfigKeys.OZONE_OM_HA_PREFIX + ".raft.server.retrycache.expirytime", "42s");
+    currentKeyConf.set(CURRENT_RETRY_CACHE_KEY, "42s");
     assertEquals(42_000, retryCacheExpiryMillis(currentKeyConf, ratisDir));
 
-    // The deprecated key must reach Ratis instead of being silently overwritten.
+    // The deprecated key must reach Ratis instead of being silently overwritten, and must warn.
+    LogCapturer logCapturer = LogCapturer.captureLogs(OzoneManagerRatisServer.class);
     OzoneConfiguration deprecatedKeyConf = new OzoneConfiguration();
-    deprecatedKeyConf.set("ozone.om.ratis.server.retry.cache.timeout", "17s");
+    deprecatedKeyConf.set(DEPRECATED_RETRY_CACHE_KEY, "17s");
     assertEquals(17_000, retryCacheExpiryMillis(deprecatedKeyConf, ratisDir));
+    assertThat(logCapturer.getOutput()).contains(DEPRECATED_RETRY_CACHE_KEY + " is deprecated");
+
+    // A value without a unit suffix keeps the milliseconds the deprecated key was always read with,
+    // instead of falling back to the seconds Ratis would assume.
+    OzoneConfiguration bareValueConf = new OzoneConfiguration();
+    bareValueConf.set(DEPRECATED_RETRY_CACHE_KEY, "600000");
+    assertEquals(600_000, retryCacheExpiryMillis(bareValueConf, ratisDir));
+
+    // The deprecated key is applied last, so it wins when both are set.
+    OzoneConfiguration bothKeysConf = new OzoneConfiguration();
+    bothKeysConf.set(CURRENT_RETRY_CACHE_KEY, "42s");
+    bothKeysConf.set(DEPRECATED_RETRY_CACHE_KEY, "17s");
+    assertEquals(17_000, retryCacheExpiryMillis(bothKeysConf, ratisDir));
   }
 
   private static long retryCacheExpiryMillis(OzoneConfiguration conf, Path ratisDir) {

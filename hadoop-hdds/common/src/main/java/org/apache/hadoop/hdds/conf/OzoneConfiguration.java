@@ -318,8 +318,6 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
            + RaftServerConfigKeys.PREFIX + "." + "rpcslowness.timeout",
            HDDS_DATANODE_RATIS_PREFIX_KEY + "."
            + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout"),
-        new DeprecationDelta("ozone.om.ratis.server.retry.cache.timeout",
-            "ozone.om.ha.raft.server.retrycache.expirytime"),
         new DeprecationDelta("dfs.datanode.keytab.file",
             HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
         new DeprecationDelta("ozone.scm.chunk.layout",
