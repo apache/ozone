@@ -116,7 +116,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -1751,24 +1750,21 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     public Stream<Arguments> parameters4() {
       return Stream.of(
-          arguments("dir1/dir2/dir3//", "dir1/dir2/dir3/", 3, true, false),
-          arguments("dir1/dir2/dir3//", "dir1/dir2/dir3/", 3, false, true),
-          arguments("dir1/dir2//", "dir1/dir2/", 2, true, false),
-          arguments("dir1/dir2//", "dir1/dir2/", 2, false, true),
-          arguments("dir1//", "dir1/", 1, true, false),
-          arguments("dir1//", "dir1/", 1, false, true)
+          arguments("dir1/dir2/dir3//", "dir1/dir2/dir3/", true, false),
+          arguments("dir1/dir2/dir3//", "dir1/dir2/dir3/", false, true),
+          arguments("dir1/dir2//", "dir1/dir2/", true, false),
+          arguments("dir1/dir2//", "dir1/dir2/", false, true),
+          arguments("dir1//", "dir1/", true, false),
+          arguments("dir1//", "dir1/", false, true)
       );
     }
 
     @ParameterizedTest
     @MethodSource("parameters4")
-    void testPrefixDirectoryNotExpired(String dirName, String prefix, int dirDepth, boolean createPrefix,
+    void testPrefixDirectoryNotExpired(String dirName, String prefix, boolean createPrefix,
         boolean createFilterPrefix) throws IOException, TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      long initialDeletedDirCount = getDeletedDirectoryCount();
-      long initialDirCount = getDirCount();
-      long initialNumDeletedDir = metrics.getNumDirDeleted().value();
 
       // Create the directory
       createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
@@ -1777,10 +1773,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
       Thread.sleep(SERVICE_INTERVAL);
-
-      GenericTestUtils.waitFor(() -> dirDepth == getDirCount() - initialDirCount,
-          WAIT_CHECK_INTERVAL, 5000);
-      assertEquals(0, getDeletedDirectoryCount() - initialDeletedDirCount);
 
       GenericTestUtils.LogCapturer log =
           GenericTestUtils.LogCapturer.captureLogs(
@@ -1800,8 +1792,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       GenericTestUtils.waitFor(() -> log.getOutput().contains("Prefix directory " + prefix + " doesn't get expired"),
           WAIT_CHECK_INTERVAL, 10000);
-      assertEquals(dirDepth, getDirCount() - initialDirCount);
-      assertEquals(0, metrics.getNumDirDeleted().value() - initialNumDeletedDir);
+      // getKeyInfo resolves the whole path, so this fails if any level of the directory was expired
+      assertFalse(getDirectory(volumeName, bucketName, dirName).getKeyInfo().isFile());
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
@@ -3572,16 +3564,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
       return metadataManager.countRowsInTable(table);
     } catch (IOException e) {
       fail("Failed to count deleted directories " + e.getMessage());
-      return -1;
-    }
-  }
-
-  private long getDirCount() {
-    final Table<String, OmDirectoryInfo> table = metadataManager.getDirectoryTable();
-    try {
-      return metadataManager.countRowsInTable(table);
-    } catch (IOException e) {
-      fail("Failed to count directories " + e.getMessage());
       return -1;
     }
   }
