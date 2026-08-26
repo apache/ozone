@@ -165,8 +165,13 @@ public final class HAUtils {
 
   public static StorageContainerLocationProtocol getScmContainerClientForNode(
       ConfigurationSource conf, ScmNodeTarget targetScmNode) {
+    return getScmContainerClientForNode(conf, targetScmNode, null);
+  }
+
+  public static StorageContainerLocationProtocol getScmContainerClientForNode(
+      ConfigurationSource conf, ScmNodeTarget targetScmNode, UserGroupInformation ugi) {
     SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(conf, null);
+        new SCMContainerLocationFailoverProxyProvider(conf, ugi);
     StorageContainerLocationProtocol scmContainerClient =
         TracingUtil.createProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
