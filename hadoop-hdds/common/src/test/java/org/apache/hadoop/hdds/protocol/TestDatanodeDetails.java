@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;
@@ -59,34 +61,66 @@ public class TestDatanodeDetails {
     Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
         .collect(Collectors.toSet());
     HddsProtos.DatanodeDetailsProto proto =
-        subject.toProto(ClientVersion.deserialize(subject.getCurrentVersion()), requiredPorts);
+        subject.toProto(ClientVersion.CURRENT, requiredPorts);
     assertPorts(proto, ImmutableSet.copyOf(requiredPorts));
 
     HddsProtos.DatanodeDetailsProto ioPortProto =
-        subject.toProto(ClientVersion.deserialize(subject.getCurrentVersion()), Name.IO_PORTS);
+        subject.toProto(ClientVersion.CURRENT, Name.IO_PORTS);
     assertPorts(ioPortProto, ImmutableSet.copyOf(Name.IO_PORTS));
   }
 
   @Test
   public void testNewBuilderCurrentVersion() {
-    // test that if the current version is not set (Ozone 1.4.0 and earlier),
-    // it falls back to SEPARATE_RATIS_PORTS_AVAILABLE
+    // When the current version proto field is absent, the builder default (DEFAULT_VERSION) applies.
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
         .collect(Collectors.toSet());
-    HddsProtos.DatanodeDetailsProto.Builder protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION, requiredPorts);
+    HddsProtos.DatanodeDetailsProto.Builder protoBuilder = dn.toProtoBuilder(ClientVersion.CURRENT, requiredPorts);
     protoBuilder.clearCurrentVersion();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE,
-        HDDSVersion.deserialize(dn2.getCurrentVersion()));
+    assertEquals(HDDSVersion.DEFAULT_VERSION, dn2.getCurrentVersion());
 
-    // test that if the current version is set, it is used
-    protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION, requiredPorts);
-    DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.SOFTWARE_VERSION,
-        HDDSVersion.deserialize(dn3.getCurrentVersion()));
+    // When the proto field is present, it round-trips correctly.
+    protoBuilder = dn.toProtoBuilder(ClientVersion.CURRENT, requiredPorts);
+    DatanodeDetails dn3 = DatanodeDetails.newBuilder(
+        protoBuilder.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION.serialize()).build())
+        .build();
+    assertEquals(HDDSVersion.SOFTWARE_VERSION, dn3.getCurrentVersion());
+  }
+
+  @Test
+  void portsChangedComparesNameAndValue() {
+    DatanodeID id = DatanodeID.randomID();
+    DatanodeDetails base = DatanodeDetails.newBuilder()
+        .setID(id)
+        .addPort(DatanodeDetails.newStandalonePort(9858))
+        .addPort(DatanodeDetails.newRatisPort(9859))
+        .build();
+
+    // Identical name/value set: no change.
+    DatanodeDetails same = DatanodeDetails.newBuilder()
+        .setID(id)
+        .addPort(DatanodeDetails.newStandalonePort(9858))
+        .addPort(DatanodeDetails.newRatisPort(9859))
+        .build();
+    assertFalse(base.portsChanged(same));
+
+    // Same names, one different value: detected (Port.equals ignores value).
+    DatanodeDetails changedValue = DatanodeDetails.newBuilder()
+        .setID(id)
+        .addPort(DatanodeDetails.newStandalonePort(9858))
+        .addPort(DatanodeDetails.newRatisPort(1234))
+        .build();
+    assertTrue(base.portsChanged(changedValue));
+
+    // Extra port: detected (key set differs).
+    DatanodeDetails extraPort = DatanodeDetails.newBuilder()
+        .setID(id)
+        .addPort(DatanodeDetails.newStandalonePort(9858))
+        .addPort(DatanodeDetails.newRatisPort(9859))
+        .addPort(DatanodeDetails.newPort(Name.RATIS_DATASTREAM, 9860))
+        .build();
+    assertTrue(base.portsChanged(extraPort));
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,

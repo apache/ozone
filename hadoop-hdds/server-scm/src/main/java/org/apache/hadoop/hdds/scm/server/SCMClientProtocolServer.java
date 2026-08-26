@@ -1386,9 +1386,9 @@ public class SCMClientProtocolServer implements
         int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
         auditMap.put("maxDatanodesPercentageToInvolvePerIteration",
             String.valueOf(mdti));
-        if (mdti < 0 || mdti > 100) {
+        if (mdti <= 0 || mdti > 100) {
           throw new IOException("Max Datanodes Percentage To Involve Per Iteration" +
-                  "should be specified in the range [0, 100]");
+                  "should be specified in the range (0, 100]");
         }
         cbc.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
       }

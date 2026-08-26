@@ -126,41 +126,42 @@ The DiskBalancer is managed through the `ozone admin datanode diskbalancer` comm
 
 **Start DiskBalancer:**
 ```bash
-ozone admin datanode diskbalancer start [<datanode-address> ...] [OPTIONS] [--in-service-datanodes]
+ozone admin datanode diskbalancer start [<datanode-address or -id> ...] [OPTIONS] [--in-service-datanodes]
 ```
 
 **Stop DiskBalancer:**
 ```bash
-ozone admin datanode diskbalancer stop [<datanode-address> ...] [--in-service-datanodes]
+ozone admin datanode diskbalancer stop [<datanode-address or -id> ...] [--in-service-datanodes]
 ```
 
 **Update Configuration:**
 ```bash
-ozone admin datanode diskbalancer update [<datanode-address> ...] [OPTIONS] [--in-service-datanodes]
+ozone admin datanode diskbalancer update [<datanode-address or -id> ...] [OPTIONS] [--in-service-datanodes]
 ```
 
 **Get Status:**
 ```bash
-ozone admin datanode diskbalancer status [<datanode-address> ...] [--in-service-datanodes] [--json]
+ozone admin datanode diskbalancer status [<datanode-address or -id> ...] [--in-service-datanodes] [--json]
 ```
 
 **Get Report:**
 ```bash
-ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-datanodes] [--json]
+ozone admin datanode diskbalancer report [<datanode-address or -id> ...] [--in-service-datanodes] [--json]
 ```
 
 ### Command Options
 
-| Option                              | Description                                                                                                                                                                                                                                                                                                                                                           | Example                                        |
-|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
-| `<datanode-address>`                | One or more datanode addresses as positional arguments. Addresses can be:<br>- Hostname (e.g., `DN-1`) - uses default CLIENT_RPC port (19864)<br>- Hostname with port (e.g., `DN-1:19864`)<br>- IP address (e.g., `192.168.1.10`)<br>- IP address with port (e.g., `192.168.1.10:19864`)<br>- Stdin (`-`) - reads datanode addresses from standard input, one per line | `DN-1`<br>`DN-1:19864`<br>`192.168.1.10`<br>`-` |
-| `--in-service-datanodes`            | It queries SCM for all IN_SERVICE and HEALTHY datanodes and executes the command on all of them.                                                                                                                                                                                                                                                                     | `--in-service-datanodes`                       |
-| `--json`                            | Format output as JSON.                                                                                                                                                                                                                                                                                                                                                | `--json`                                       |
-| `-t/--threshold-percentage`        | Volume density threshold percentage (default: 10.0). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                         | `-t 5`<br>`--threshold-percentage 5.0`         |
-| `-b/--bandwidth-in-mb`              | Maximum disk bandwidth in MB/s (default: 10). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                                | `-b 20`<br>`--bandwidth-in-mb 50`              |
-| `-p/--parallel-thread`              | Number of parallel threads (default: 5). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                                     | `-p 5`<br>`--parallel-thread 10`               |
-| `-s/--stop-after-disk-even`         | Stop automatically after disks are balanced (default: true). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                 | `-s false`<br>`--stop-after-disk-even true`    |
-| `-c/--container-states`             | Comma-separated container lifecycle state names that may be moved between disks. Used with `start` and `update` commands.                                                                                                         | `-c CLOSED,QUASI_CLOSED`<br>`--container-states CLOSED` |
+| Option                      | Description                                                                                                                                                                                                                                                                                                                                                           | Example                                        |
+|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
+| `<datanode-address>`        | One or more datanode addresses as positional arguments. Each can be:<br>- Hostname (e.g., `DN-1`) - uses default CLIENT_RPC port (19864)<br>- Hostname with port (e.g., `DN-1:19864`)<br>- IP address (e.g., `192.168.1.10`)<br>- IP address with port (e.g., `192.168.1.10:19864`)<br>- Stdin (`-`) - reads addresses from standard input, one per line | `DN-1`<br>`DN-1:19864`<br>`192.168.1.10`<br>`-` |
+| `--node-id`                 | Datanode UUID to target. Requires SCM to resolve the UUID to a CLIENT_RPC address.                                                                                                                                                                                                                                                                    | `--node-id a3b63511-bdf8-4fa1-8ab6-d19c0e806f84` |
+| `--in-service-datanodes`    | It queries SCM for all IN_SERVICE and HEALTHY datanodes and executes the command on all of them.                                                                                                                                                                                                                                                                     | `--in-service-datanodes`                       |
+| `--json`                    | Format output as JSON.                                                                                                                                                                                                                                                                                                                                                | `--json`                                       |
+| `-t/--threshold-percentage` | Volume density threshold percentage (default: 10.0). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                         | `-t 5`<br>`--threshold-percentage 5.0`         |
+| `-b/--bandwidth-in-mb`      | Maximum disk bandwidth in MB/s (default: 10). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                                | `-b 20`<br>`--bandwidth-in-mb 50`              |
+| `-p/--parallel-thread`      | Number of parallel threads (default: 5). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                                     | `-p 5`<br>`--parallel-thread 10`               |
+| `-s/--stop-after-disk-even` | Stop automatically after disks are balanced (default: true). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                 | `-s false`<br>`--stop-after-disk-even true`    |
+| `-c/--container-states`     | Comma-separated container lifecycle state names that may be moved between disks. Used with `start` and `update` commands.                                                                                                         | `-c CLOSED,QUASI_CLOSED`<br>`--container-states CLOSED` |
 
 ### Examples
 
@@ -168,6 +169,9 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 ```bash
 # Start DiskBalancer on multiple datanodes
 ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
+
+# Start DiskBalancer using a datanode UUID
+ozone admin datanode diskbalancer start --node-id a3b63511-bdf8-4fa1-8ab6-d19c0e806f84
 
 # Start DiskBalancer on all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer start --in-service-datanodes
@@ -215,6 +219,9 @@ ozone admin datanode diskbalancer update DN-1 -b 50 --json
 ```bash
 # Get status from multiple datanodes
 ozone admin datanode diskbalancer status DN-1 DN-2 DN-3
+
+# Get status using a datanode UUID
+ozone admin datanode diskbalancer status --node-id a3b63511-bdf8-4fa1-8ab6-d19c0e806f84
 
 # Get status from all IN_SERVICE and HEALTHY datanodes
 ozone admin datanode diskbalancer status --in-service-datanodes

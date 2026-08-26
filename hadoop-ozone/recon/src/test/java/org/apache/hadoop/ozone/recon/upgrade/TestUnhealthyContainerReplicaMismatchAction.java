@@ -20,15 +20,20 @@ package org.apache.hadoop.ozone.recon.upgrade;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.apache.ozone.recon.schema.SqlDbUtils.constraintExists;
+import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.jooq.DSLContext;
+import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,6 +71,30 @@ public class TestUnhealthyContainerReplicaMismatchAction extends AbstractReconSq
   public void testNoOpWhenTableMissing() throws SQLException {
     dropTableIfPresent();
     assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
+  }
+
+  @Test
+  public void testConstraintAdmitsAllStatesAndRejectsInvalid() throws Exception {
+    upgradeAction.execute(dataSource);
+
+    UnHealthyContainerStates[] states = UnHealthyContainerStates.values();
+    for (int i = 0; i < states.length; i++) {
+      insertContainerState(i, states[i].name());
+    }
+    assertEquals(states.length,
+        dslContext.fetchCount(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME)),
+        "Expected one record for each valid state");
+
+    assertThrows(DataAccessException.class,
+        () -> insertContainerState(states.length, "INVALID_STATE"),
+        "Inserting an invalid container_state should fail due to the check constraint");
+  }
+
+  private void insertContainerState(long containerId, String containerState) {
+    dslContext.insertInto(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME))
+        .columns(field(name("container_id")), field(name("container_state")))
+        .values(containerId, containerState)
+        .execute();
   }
 
   private void createTableWithoutCheckConstraint() throws SQLException {

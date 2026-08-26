@@ -143,10 +143,8 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
       System.out.println("Container Balancer started successfully.");
     } else {
       String reason = "";
-      System.err.println("Failed to start Container Balancer.");
       if (response.hasMessage()) {
         reason = response.getMessage();
-        System.err.printf("Failure reason: %s%n", reason);
       }
       throw new IOException("Failed to start Container Balancer. " + reason);
     }

@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
@@ -167,7 +167,7 @@ public abstract class ContainerScannerIntegrationTests {
     cluster.getStorageContainerLocationClient().closeContainer(containerID);
 
     GenericTestUtils.waitFor(
-        () -> TestHelper.isContainerClosed(cluster, containerID,
+        () -> OzoneTestHelper.isContainerClosed(cluster, containerID,
             cluster.getHddsDatanodes().get(0).getDatanodeDetails()),
         1000, 5000);
 
@@ -217,7 +217,7 @@ public abstract class ContainerScannerIntegrationTests {
   }
 
   private OzoneOutputStream createKey(String keyName) throws Exception {
-    return TestHelper.createKey(
+    return OzoneTestHelper.createKey(
         keyName, RATIS, ONE, 0, store, volumeName, bucketName);
   }
 

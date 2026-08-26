@@ -79,7 +79,7 @@ class TestUpgradeFinalizationWithOldClients {
     try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
+            .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION)
             .build())
         .build()) {
       cluster.waitForClusterToBeReady();

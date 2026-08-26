@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -109,8 +110,7 @@ public final class DatanodeIdYaml {
         }
       }
 
-      builder.setInitialVersion(datanodeDetailsYaml.getInitialVersion())
-          .setCurrentVersion(datanodeDetailsYaml.getCurrentVersion());
+      builder.setInitialVersion(HDDSVersion.deserialize(datanodeDetailsYaml.getInitialVersion()));
 
       datanodeDetails = builder.build();
     }
@@ -130,7 +130,6 @@ public final class DatanodeIdYaml {
     private long persistedOpStateExpiryEpochSec = 0;
     private Map<String, Integer> portDetails;
     private int initialVersion;
-    private int currentVersion;
 
     public DatanodeDetailsYaml() {
       // Needed for snake-yaml introspection.
@@ -141,7 +140,7 @@ public final class DatanodeIdYaml {
         String hostName, String certSerialId,
         String persistedOpState, long persistedOpStateExpiryEpochSec,
         Map<String, Integer> portDetails,
-        int initialVersion, int currentVersion) {
+        int initialVersion) {
       this.uuid = uuid;
       this.ipAddress = ipAddress;
       this.hostName = hostName;
@@ -150,7 +149,6 @@ public final class DatanodeIdYaml {
       this.persistedOpStateExpiryEpochSec = persistedOpStateExpiryEpochSec;
       this.portDetails = portDetails;
       this.initialVersion = initialVersion;
-      this.currentVersion = currentVersion;
     }
 
     public String getUuid() {
@@ -217,12 +215,9 @@ public final class DatanodeIdYaml {
       this.initialVersion = version;
     }
 
-    public int getCurrentVersion() {
-      return currentVersion;
-    }
-
     public void setCurrentVersion(int version) {
-      this.currentVersion = version;
+      // Setter retained so SnakeYAML can bind existing datanode.id files
+      // that contain this key without throwing on unknown properties.
     }
 
     @Override
@@ -248,7 +243,6 @@ public final class DatanodeIdYaml {
         persistedOpString,
         datanodeDetails.getPersistedOpStateExpiryEpochSec(),
         VersionedDatanodeFeatures.DatanodePorts.getPortsToPersist(datanodeDetails, conf),
-        datanodeDetails.getInitialVersion(),
-        datanodeDetails.getCurrentVersion());
+        datanodeDetails.getInitialVersion().serialize());
   }
 }

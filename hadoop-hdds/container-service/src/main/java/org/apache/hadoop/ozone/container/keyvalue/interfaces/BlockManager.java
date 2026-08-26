@@ -65,6 +65,16 @@ public interface BlockManager {
           throws IOException;
 
   /**
+   * Persists the container-wide block commit sequence ID and updates it in memory. Used by container
+   * reconciliation to advance the container BCSID once per peer round, after every repaired block in the round
+   * ended fully covered; per-block writes leave the container BCSID untouched.
+   *
+   * @param container - Container whose BCSID is advanced.
+   * @param bcsId     - The new container BCSID; caller ensures it is greater than the current value.
+   */
+  void updateContainerBcsId(Container container, long bcsId) throws IOException;
+
+  /**
    * Gets an existing block.
    *
    * @param container - Container from which block needs to be fetched.

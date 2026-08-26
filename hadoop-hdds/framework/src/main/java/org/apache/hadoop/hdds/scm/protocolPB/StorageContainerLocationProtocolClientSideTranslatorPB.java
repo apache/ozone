@@ -1007,9 +1007,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     }
     if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
       int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
-      Preconditions.checkState(mdti >= 0,
+      Preconditions.checkState(mdti > 0,
           "Max Datanodes Percentage To Involve Per Iteration must be " +
-              "greater than equal to zero.");
+              "greater than zero.");
       Preconditions.checkState(mdti <= 100,
           "Max Datanodes Percentage To Involve Per Iteration must be " +
               "lesser than equal to hundred.");

@@ -65,6 +65,16 @@ public class DatanodeVersionManager extends ComponentVersionManager {
     return storage.getApparentVersion();
   }
 
+  @Override
+  public HDDSVersion getVersionForClient() {
+    ComponentVersion apparentVersion = getApparentVersion();
+    // Once ZDU is finalized, the apparent version should always belong to the HDDSVersion enum.
+    if (isAllowed(HDDSVersion.ZDU) && apparentVersion instanceof HDDSVersion) {
+      return (HDDSVersion) apparentVersion;
+    }
+    return HDDSVersion.values()[HDDSVersion.ZDU.ordinal() - 1];
+  }
+
   @VisibleForTesting
   public Map<ComponentVersion, DatanodeUpgradeAction> getUpgradeActionsForTesting() {
     return upgradeActions;
