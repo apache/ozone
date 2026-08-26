@@ -117,7 +117,10 @@ public abstract class OMFinalizeUpgradeRequestBase extends OMClientRequest {
       response = new OMStartFinalizeUpgradeResponse(createErrorOMResponse(responseBuilder, e));
     }
 
-    markForAudit(auditLogger, buildAuditMessage(OMAction.UPGRADE_FINALIZE, buildAuditMap(), exception, userInfo));
+
+    Map<String, String> auditMap = new HashMap<>();
+    auditMap.put("force", String.valueOf(isForce()));
+    markForAudit(auditLogger, buildAuditMessage(OMAction.UPGRADE_FINALIZE, auditMap, exception, userInfo));
     return response;
   }
 
@@ -131,15 +134,8 @@ public abstract class OMFinalizeUpgradeRequestBase extends OMClientRequest {
    */
   protected abstract void setResponseBody(OMResponse.Builder builder, OzoneManager ozoneManager);
 
-  /**
-   * Command-type-specific audit map entries. Defaults to empty.
-   */
-  protected Map<String, String> buildAuditMap() {
-    return new HashMap<>();
-  }
-
-  static void validatePeerOmVersionsBeforeFinalize(List<OMNodeDetails> peerNodes,
-      OzoneConfiguration configuration) throws OMException {
+  static void validatePeerOmVersionsBeforeFinalize(List<OMNodeDetails> peerNodes, OzoneConfiguration configuration)
+      throws OMException {
     if (peerNodes.isEmpty()) {
       return;
     }

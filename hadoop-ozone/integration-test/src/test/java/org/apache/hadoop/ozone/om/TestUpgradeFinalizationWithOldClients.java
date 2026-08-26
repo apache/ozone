@@ -145,17 +145,8 @@ class TestUpgradeFinalizationWithOldClients {
         assertTrue(UpgradeFinalization.isDone(
             scmClient.queryUpgradeFinalizationProgress(upgradeClientID, false, false).status()));
 
-        // SCM drives datanode finalization asynchronously over heartbeats, so the datanode may lag
-        // behind SCM. Wait for it to catch up, reading its state directly off the running instance,
-        // then confirm it reached the software version.
-        waitFor(() -> {
-          for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
-            if (dn.getDatanodeStateMachine().getVersionManager().needsFinalization()) {
-              return false;
-            }
-          }
-          return true;
-        }, 2000, 60000);
+        // Server side enforces finalization order of SCM->DNs->OM. Since we already waited for OM to finalize,
+        // Datanodes should now be finalized.
         for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
           DatanodeVersionManager dnVersionManager = dn.getDatanodeStateMachine().getVersionManager();
           assertFalse(dnVersionManager.needsFinalization());

@@ -30,10 +30,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Tests for OMStartFinalizeUpgradeRequestLegacy, the old CLI ({@code ozone admin om finalizeupgrade}) initiate
- * request. Shared initiate behavior is covered by {@link TestOMFinalizeUpgradeRequestBase}; the case here
+ * request. Shared initiate behavior is covered by {@link TestOMStartFinalizeUpgradeRequestBase}; the case here
  * asserts the {@code STARTING_FINALIZATION} response the old CLI requires before it polls progress.
  */
-public class TestOMStartFinalizeUpgradeRequestLegacy extends TestOMFinalizeUpgradeRequestBase {
+public class TestOMStartFinalizeUpgradeRequestLegacy extends TestOMStartFinalizeUpgradeRequestBase {
 
   @Override
   protected OMFinalizeUpgradeRequestBase newRequest() {

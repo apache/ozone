@@ -3644,22 +3644,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public StatusAndMessages finalizeUpgrade(String unusedUpgradeClientId)
-      throws IOException {
-    if (!versionManager.needsFinalization()) {
-      return FINALIZED_MSG;
-    }
-    versionManager.finalizeUpgrade();
-    // Old OM clients currently require STARTING_MSG to be returned when this method succeeds.
-
+  public StatusAndMessages finalizeUpgrade(String unusedUpgradeClientId) {
+    // Server-side stub; the real implementation is handled via the Ratis request path through
+    // OMStartFinalizeUpgradeRequestLegacy
     return STARTING_MSG;
   }
 
   @Override
   public void finalizeUpgrade() throws IOException {
-    // Server-side stub; the real implementation is handled via the Ratis request path through
-    // OMStartFinalizeUpgradeRequest
-    throw new UnsupportedOperationException();
+    versionManager.finalizeUpgrade();
   }
 
   @Override

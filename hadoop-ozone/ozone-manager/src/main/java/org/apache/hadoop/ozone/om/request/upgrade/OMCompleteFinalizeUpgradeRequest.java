@@ -65,8 +65,7 @@ public class OMCompleteFinalizeUpgradeRequest extends OMClientRequest {
     Exception exception = null;
 
     try {
-      // The upgrade client id is unused; finalization is driven by the background service.
-      ozoneManager.finalizeUpgrade("");
+      ozoneManager.finalizeUpgrade();
 
       OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
       int apparentVersion = ozoneManager.getVersionManager().getApparentVersion().serialize();

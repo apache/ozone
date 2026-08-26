@@ -46,11 +46,4 @@ public class OMStartFinalizeUpgradeRequest extends OMFinalizeUpgradeRequestBase 
     builder.setStartFinalizeUpgradeResponse(
         OzoneManagerProtocolProtos.StartFinalizeUpgradeResponse.newBuilder().build());
   }
-
-  @Override
-  protected Map<String, String> buildAuditMap() {
-    Map<String, String> auditMap = new HashMap<>();
-    auditMap.put("force", String.valueOf(getOmRequest().getStartFinalizeUpgradeRequest().getForce()));
-    return auditMap;
-  }
 }

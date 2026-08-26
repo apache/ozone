@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -58,7 +59,7 @@ import org.mockito.MockedStatic;
  * the finalization-in-progress marker. Subclasses supply the concrete request via
  * {@link #newRequest()} and add tests for behavior unique to their command type.
  */
-public abstract class TestOMFinalizeUpgradeRequestBase extends OMKeyRequestTests {
+public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequestTests {
 
   /**
    * A fresh, non-forced initiate request for the command type under test.
@@ -121,7 +122,6 @@ public abstract class TestOMFinalizeUpgradeRequestBase extends OMKeyRequestTests
     verify(scmContainerLocationProtocol).finalizeUpgrade();
   }
 
-  // TODO check if this is desired behavior
   @Test
   public void testOtherScmExceptionPropagatesUnchanged() throws IOException {
     SCMException scmFailure = new SCMException("SCM is in safe mode", SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
@@ -160,7 +160,7 @@ public abstract class TestOMFinalizeUpgradeRequestBase extends OMKeyRequestTests
 
   @Test
   public void testPeerVersionCheckPassesWhenNoPeers() throws IOException {
-    // @BeforeEach already stubs getPeerNodes() to return an empty list.
+    assertTrue(ozoneManager.getPeerNodes().isEmpty());
     // preExecute must complete normally and call SCM finalize.
     doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
 

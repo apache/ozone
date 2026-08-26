@@ -39,10 +39,10 @@ import org.mockito.MockedStatic;
 
 /**
  * Tests for OMStartFinalizeUpgradeRequest, the current ({@code ozone admin upgrade finalize}) initiated
- * request. Shared initiate behavior is covered by {@link TestOMFinalizeUpgradeRequestBase}; the cases
+ * request. Shared initiate behavior is covered by {@link TestOMStartFinalizeUpgradeRequestBase}; the cases
  * here exercise the {@code force} flag that is unique to this request.
  */
-public class TestOMStartFinalizeUpgradeRequest extends TestOMFinalizeUpgradeRequestBase {
+public class TestOMStartFinalizeUpgradeRequest extends TestOMStartFinalizeUpgradeRequestBase {
 
   @Override
   protected OMFinalizeUpgradeRequestBase newRequest() {
