@@ -62,7 +62,8 @@ public enum S3GAction implements AuditAction {
   GET_BUCKET_TAGGING,
   PUT_BUCKET_TAGGING,
   DELETE_BUCKET_TAGGING,
-  PUT_OBJECT_ACL;
+  PUT_OBJECT_ACL,
+  GET_OBJECT_ATTRIBUTES;
 
   @Override
   public String getAction() {
