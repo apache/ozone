@@ -133,8 +133,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     OzoneBucket ozoneBucket = context.getVolume().getBucket(bucketName);
     OmLifecycleConfiguration lcc;
     try {
-      s3LifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(null,
-          null, null, null, null, body);
+      s3LifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(body);
       lcc = s3LifecycleConfiguration.toOmLifecycleConfiguration(ozoneBucket);
     } catch (WebApplicationException ex) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName);

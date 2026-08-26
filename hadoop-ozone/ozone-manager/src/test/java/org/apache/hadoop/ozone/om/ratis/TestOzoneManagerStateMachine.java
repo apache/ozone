@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -41,9 +42,13 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -65,6 +70,7 @@ import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
+import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
@@ -918,6 +924,74 @@ public class TestOzoneManagerStateMachine {
     verify(doubleBuffer, times(2)).stop();
   }
 
+  /**
+   * Reproduces the checkpoint-pause deadlock by holding the double-buffer
+   * flush callback immediately before it updates the last-applied index, then
+   * pausing the state machine while it waits for the flush thread to exit.
+   * Releasing the callback must allow both the index update and pause to finish.
+   */
+  @Test
+  public void testPauseWhileDoubleBufferUpdatesLastAppliedIndex(@TempDir Path tmpDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, tmpDir.toAbsolutePath().toString());
+    OzoneManager testOm = mock(OzoneManager.class);
+    when(testOm.getConfiguration()).thenReturn(conf);
+    when(testOm.getConfig()).thenReturn(conf.getObject(OmConfig.class));
+    OmMetadataManagerImpl metadataManager = new OmMetadataManagerImpl(conf, testOm);
+    when(testOm.getMetadataManager()).thenReturn(metadataManager);
+
+    CountDownLatch flushCallbackReached = new CountDownLatch(1);
+    CountDownLatch releaseFlushCallback = new CountDownLatch(1);
+    AtomicReference<OzoneManagerStateMachine> stateMachineRef = new AtomicReference<>();
+    OzoneManagerDoubleBuffer testDoubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
+        .setOmMetadataManager(metadataManager)
+        .setUpdateLastAppliedIndex(termIndex -> {
+          flushCallbackReached.countDown();
+          awaitUninterruptibly(releaseFlushCallback);
+          stateMachineRef.get().updateLastAppliedTermIndex(termIndex);
+        })
+        .setMaxUnFlushedTransactionCount(10)
+        .build()
+        .start();
+    ExecutorService stateMachineExecutor = Executors.newSingleThreadExecutor();
+    OzoneManagerStateMachine testStateMachine = new OzoneManagerStateMachine(
+        testOm, testDoubleBuffer, mock(RequestHandler.class), stateMachineExecutor, null);
+    stateMachineRef.set(testStateMachine);
+
+    AtomicReference<Thread> pauseThread = new AtomicReference<>();
+    ExecutorService pauseExecutor = Executors.newSingleThreadExecutor(runnable -> {
+      Thread thread = new Thread(runnable, "test-state-machine-pause");
+      pauseThread.set(thread);
+      return thread;
+    });
+    Future<?> pauseFuture = null;
+    try {
+      OMResponse response = OMResponse.newBuilder()
+          .setCmdType(Type.CreateKey)
+          .setStatus(Status.OK)
+          .setSuccess(true)
+          .build();
+      testDoubleBuffer.add(new DummyOMClientResponse(response), TermIndex.valueOf(1, 1));
+      assertTrue(flushCallbackReached.await(5, TimeUnit.SECONDS));
+
+      pauseFuture = pauseExecutor.submit(testStateMachine::pause);
+      waitFor(() -> pauseThread.get() != null && pauseThread.get().getState() == Thread.State.WAITING, 10, 5000);
+
+      releaseFlushCallback.countDown();
+      pauseFuture.get(5, TimeUnit.SECONDS);
+      assertEquals(1, testStateMachine.getLastAppliedTermIndex().getIndex());
+    } finally {
+      releaseFlushCallback.countDown();
+      if (pauseFuture != null && !pauseFuture.isDone() && pauseThread.get() != null) {
+        pauseThread.get().interrupt();
+      }
+      pauseExecutor.shutdownNow();
+      pauseExecutor.awaitTermination(5, TimeUnit.SECONDS);
+      testStateMachine.stop();
+      metadataManager.stop();
+    }
+  }
+
   @Test
   public void testStopShutdownsResources() {
     sm.stop();
@@ -974,6 +1048,21 @@ public class TestOzoneManagerStateMachine {
   private static void assertTermIndex(long expectedTerm, long expectedIndex, TermIndex computed) {
     assertEquals(expectedTerm, computed.getTerm());
     assertEquals(expectedIndex, computed.getIndex());
+  }
+
+  private static void awaitUninterruptibly(CountDownLatch latch) {
+    boolean interrupted = false;
+    while (true) {
+      try {
+        latch.await();
+        break;
+      } catch (InterruptedException ex) {
+        interrupted = true;
+      }
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private OMRequest sampleWriteRequest() {
