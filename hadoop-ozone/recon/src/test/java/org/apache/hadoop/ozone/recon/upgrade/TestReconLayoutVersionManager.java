@@ -32,8 +32,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
@@ -87,8 +85,10 @@ public class TestReconLayoutVersionManager {
     // Define the custom features to be returned
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
 
+    // Inject a no-op task-status schema repair action so these tests exercise
+    // only the layout finalization flow, independent of the real action's SQL.
     layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class),
-        mockDataSource);
+        mockDataSource, mock(ReconUpgradeAction.class));
 
     when(scmFacadeMock.getDataSource()).thenReturn(mockDataSource);
     when(mockDataSource.getConnection()).thenReturn(mockConnection);
@@ -96,11 +96,6 @@ public class TestReconLayoutVersionManager {
     doNothing().when(mockConnection).setAutoCommit(false);
     doNothing().when(mockConnection).commit();
     doNothing().when(mockConnection).rollback();
-    DatabaseMetaData metadata = mock(DatabaseMetaData.class);
-    ResultSet tables = mock(ResultSet.class);
-    when(mockConnection.getMetaData()).thenReturn(metadata);
-    when(metadata.getTables(any(), any(), any(), any())).thenReturn(tables);
-    when(tables.next()).thenReturn(false);
   }
 
   @AfterEach
