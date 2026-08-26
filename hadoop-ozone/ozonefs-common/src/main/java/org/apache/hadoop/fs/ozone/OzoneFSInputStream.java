@@ -37,9 +37,9 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
  * The input stream for Ozone file system.
  *
  * TODO: Make inputStream generic for both rest and rpc clients
- * Sequential reads are not thread safe. Positioned reads may be made safe for
- * concurrent pread when
- * {@code ozone.fs.synchronize.positioned.reads.enabled=true}.
+ * Sequential reads are not thread safe. Positioned reads use a native
+ * stateless path when the underlying {@link ExtendedInputStream} supports it;
+ * otherwise they fall back to a synchronized seek-read-restore sequence.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -48,18 +48,11 @@ public class OzoneFSInputStream extends FSInputStream
 
   private final InputStream inputStream;
   private final Statistics statistics;
-  private final boolean synchronizePositionedReads;
   private final Object positionedReadLock = new Object();
 
   public OzoneFSInputStream(InputStream inputStream, Statistics statistics) {
-    this(inputStream, statistics, false);
-  }
-
-  public OzoneFSInputStream(InputStream inputStream, Statistics statistics,
-      boolean synchronizePositionedReads) {
     this.inputStream = inputStream;
     this.statistics = statistics;
-    this.synchronizePositionedReads = synchronizePositionedReads;
   }
 
   @Override
@@ -195,15 +188,12 @@ public class OzoneFSInputStream extends FSInputStream
       }
     }
 
-    // Fallback: stateful seek-read-restore on the shared cursor. This is only
-    // thread-safe when enabled. When enabled, the lock covers the entire
-    // seek-read-restore sequence.
-    if (synchronizePositionedReads) {
-      synchronized (positionedReadLock) {
-        return readAtPositionSeekRestore(position, buf);
-      }
+    // Fallback: stateful seek-read-restore on the shared cursor. Synchronize the
+    // full sequence so concurrent positioned reads remain thread-safe when the
+    // native stateless path is unavailable (e.g. erasure coded keys).
+    synchronized (positionedReadLock) {
+      return readAtPositionSeekRestore(position, buf);
     }
-    return readAtPositionSeekRestore(position, buf);
   }
 
   private int readAtPositionSeekRestore(long position, ByteBuffer buf)

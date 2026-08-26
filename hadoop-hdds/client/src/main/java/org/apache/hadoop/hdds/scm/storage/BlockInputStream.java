@@ -518,7 +518,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       int idx = chunkIndexForPosition(pos, offsets);
       ChunkInputStream chunk = streams.get(idx);
       long chunkPos = pos - offsets[idx];
-      int n = chunk.readPositioned(chunkPos, dst);
+      int n = readChunkPositionedWithRetry(chunk, chunkPos, dst);
       if (n <= 0) {
         break;
       }
@@ -526,6 +526,39 @@ public class BlockInputStream extends BlockExtendedInputStream {
       pos += n;
     }
     return total == 0 ? EOF : total;
+  }
+
+  /**
+   * Positioned read for one chunk with the same retry and pipeline/token
+   * refresh handling as {@link #readWithStrategy(ByteReaderStrategy)}.
+   */
+  private int readChunkPositionedWithRetry(ChunkInputStream chunk, long chunkPos,
+      ByteBuffer dst) throws IOException {
+    while (true) {
+      try {
+        int n = chunk.readPositioned(chunkPos, dst);
+        retries = 0;
+        return n;
+      } catch (SCMSecurityException ex) {
+        throw ex;
+      } catch (StorageContainerException e) {
+        if (shouldRetryRead(e, retryPolicy, ++retries)) {
+          handleReadError(e);
+          continue;
+        }
+        throw e;
+      } catch (IOException ex) {
+        if (shouldRetryRead(ex, retryPolicy, ++retries)) {
+          if (isConnectivityIssue(ex)) {
+            handleReadError(ex);
+          } else {
+            chunk.releaseClient();
+          }
+          continue;
+        }
+        throw ex;
+      }
+    }
   }
 
   private static int chunkIndexForPosition(long pos, long[] offsets) {
@@ -690,7 +723,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     blockPosition = getPos();
   }
 
-  private void handleReadError(IOException cause) throws IOException {
+  private synchronized void handleReadError(IOException cause) throws IOException {
     releaseClient();
     final List<ChunkInputStream> inputStreams = this.chunkStreams;
     if (inputStreams != null) {

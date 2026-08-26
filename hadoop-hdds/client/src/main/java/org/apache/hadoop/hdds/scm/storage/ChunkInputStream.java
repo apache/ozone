@@ -433,8 +433,9 @@ public class ChunkInputStream extends InputStream
    * Whether this chunk stream can serve positioned reads without holding a
    * lock. A plain chunk read is a self-contained RPC, so concurrent callers
    * reading different ranges do not interfere. Overridden by
-   * {@link LocalChunkInputStream}, which reads from a shared {@link
-   * java.nio.channels.FileChannel} and therefore must serialize.
+   * {@link LocalChunkInputStream} uses positional {@link FileChannel} reads on
+   * the shared block channel, so concurrent callers on different chunks do not
+   * interfere.
    */
   boolean supportsConcurrentPositionedRead() {
     return true;

@@ -18,11 +18,8 @@
 package org.apache.hadoop.fs.ozone;
 
 import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
-import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.unwrapExecutionException;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
@@ -38,7 +35,6 @@ import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.function.IntFunction;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -55,8 +51,6 @@ import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for {@link OzoneFSInputStream}.
@@ -201,53 +195,29 @@ public class TestOzoneFSInputStream {
     };
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
+  @Test
   @Timeout(value = 30)
-  public void testConcurrentPositionedRead(boolean synchronizePositionedReads)
-      throws Exception {
+  public void testConcurrentPositionedRead() throws Exception {
     final byte[] source = RandomUtils.secure().randomBytes(SOURCE_SIZE);
     final InterleavingSeekableInputStream underlying =
         new InterleavingSeekableInputStream(source);
     try (OzoneFSInputStream subject = new OzoneFSInputStream(underlying,
-        new FileSystem.Statistics("test"), synchronizePositionedReads)) {
-
-      if (synchronizePositionedReads) {
-        PositionedReadTestHelper.runConcurrentPositionedReads(source,
-            (offset, buf) -> subject.readFully(offset, buf));
-      } else {
-        ExecutionException executionException = assertThrows(
-            ExecutionException.class,
-            () -> PositionedReadTestHelper.runConcurrentPositionedReads(source,
-                (offset, buf) -> subject.readFully(offset, buf)));
-        assertInstanceOf(AssertionError.class,
-            unwrapExecutionException(executionException));
-      }
+        new FileSystem.Statistics("test"))) {
+      PositionedReadTestHelper.runConcurrentPositionedReads(source,
+          (offset, buf) -> subject.readFully(offset, buf));
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
+  @Test
   @Timeout(value = 30)
-  public void testConcurrentPositionedReadEcFallback(boolean synchronizePositionedReads)
-      throws Exception {
+  public void testConcurrentPositionedReadEcFallback() throws Exception {
     final byte[] source = RandomUtils.secure().randomBytes(SOURCE_SIZE);
     final EcInterleavingInputStream underlying =
         new EcInterleavingInputStream(source);
     try (OzoneFSInputStream subject = new OzoneFSInputStream(underlying,
-        new FileSystem.Statistics("test"), synchronizePositionedReads)) {
-
-      if (synchronizePositionedReads) {
-        PositionedReadTestHelper.runConcurrentPositionedReads(source,
-            (offset, buf) -> subject.readFully(offset, buf));
-      } else {
-        ExecutionException executionException = assertThrows(
-            ExecutionException.class,
-            () -> PositionedReadTestHelper.runConcurrentPositionedReads(source,
-                (offset, buf) -> subject.readFully(offset, buf)));
-        assertInstanceOf(AssertionError.class,
-            unwrapExecutionException(executionException));
-      }
+        new FileSystem.Statistics("test"))) {
+      PositionedReadTestHelper.runConcurrentPositionedReads(source,
+          (offset, buf) -> subject.readFully(offset, buf));
     }
   }
 
