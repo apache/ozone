@@ -78,6 +78,10 @@ To get a more detailed status, including the history of iterations:
 ozone admin containerbalancer status -v --history
 ```
 
+With `-v`/`--verbose`, when failures occur, a **Failed container moves** section lists each failure reason
+(e.g. `REPLICATION_FAIL_TIME_OUT`, `ITERATION_MOVE_TIMEOUT`, `PRE_MOVE_CONTAINER_NOT_FOUND` and more)
+with the total count and a per-datanode breakdown of which source and target nodes were involved.
+
 ### Stop
 
 To stop the Container Balancer:
