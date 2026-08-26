@@ -48,7 +48,8 @@ public class BucketCrudHandler extends BucketOperationHandler {
     return queryParams().get(QueryParams.ACL) == null
         && queryParams().get(QueryParams.UPLOADS) == null
         && queryParams().get(QueryParams.DELETE) == null
-        && queryParams().get(QueryParams.TAGGING) == null;
+        && queryParams().get(QueryParams.TAGGING) == null
+        && queryParams().get(QueryParams.LIFECYCLE) == null;
   }
 
   /**

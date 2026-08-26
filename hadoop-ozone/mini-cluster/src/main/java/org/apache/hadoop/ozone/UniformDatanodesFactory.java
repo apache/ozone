@@ -107,6 +107,12 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
       DatanodeStorage layoutStorage = new DatanodeStorage(
           dnConf, UUID.randomUUID().toString(), apparentVersion.serialize());
       layoutStorage.initialize();
+    } else {
+      // TODO HDDS-16206 workaround. Once that is resolved MiniOzoneCluster Datanodes should start with
+      //  SOFTWARE_VERSION by default.
+      DatanodeStorage layoutStorage = new DatanodeStorage(
+          dnConf, UUID.randomUUID().toString(), HDDSVersion.SOFTWARE_VERSION.serialize());
+      layoutStorage.initialize();
     }
 
     if (currentVersion != null) {

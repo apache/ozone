@@ -24,7 +24,6 @@ import static org.jooq.impl.DSL.field;
 import com.google.inject.Injector;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Arrays;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.ReconGuiceServletContextListener;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
@@ -67,19 +66,14 @@ public interface ReconUpgradeAction extends UpgradeAction<DataSource> {
       } catch (DataAccessException e) {
         log.debug("Constraint {} was not present: {}", constraintName, e.getMessage());
       }
-
-      String[] enumStates = Arrays
-          .stream(ContainerSchemaDefinition.UnHealthyContainerStates.values())
-          .map(Enum::name)
-          .toArray(String[]::new);
-
       dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
           .add(DSL.constraint(constraintName)
-              .check(field(DSL.name("container_state")).in(enumStates)))
+          .check(field(DSL.name("container_state"))
+          .in(ContainerSchemaDefinition.UnHealthyContainerStates.NAMES)))
           .execute();
 
       log.info("Added the updated constraint to the UNHEALTHY_CONTAINERS table for enum state values: {}",
-          Arrays.toString(enumStates));
+          ContainerSchemaDefinition.UnHealthyContainerStates.NAMES);
     }
   }
 

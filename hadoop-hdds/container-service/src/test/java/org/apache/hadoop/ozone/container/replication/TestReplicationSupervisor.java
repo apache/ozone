@@ -26,10 +26,17 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getReplicateContainerCommand;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.PER_VOLUME_ENABLED_KEY;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.PER_VOLUME_STREAMS_LIMIT_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
@@ -58,27 +65,36 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.checksum.ReconcileContainerTask;
-import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCommandInfo;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
@@ -91,6 +107,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -107,6 +124,8 @@ public class TestReplicationSupervisor {
   private File tempDir;
 
   private final ContainerReplicator noopReplicator = task -> { };
+  private final ContainerReplicator doneReplicator =
+      task -> task.setStatus(DONE);
   private final ContainerReplicator throwingReplicator = task -> {
     throw new RuntimeException("testing replication failure");
   };
@@ -800,7 +819,7 @@ public class TestReplicationSupervisor {
   }
 
   private ReplicateContainerCommand createCommand(long containerId) {
-    ReplicateContainerCommand cmd = ContainerTestUtils.getReplicateContainerCommand(containerId, datanode);
+    ReplicateContainerCommand cmd = getReplicateContainerCommand(containerId, datanode);
     cmd.setTerm(CURRENT_TERM);
     return cmd;
   }
@@ -1048,7 +1067,455 @@ public class TestReplicationSupervisor {
       List<DatanodeDetails> datanodes, ReplicationSupervisor rs) {
     for (int i = 0; i < 10; i++) {
       DatanodeDetails target = datanodes.get(i % datanodes.size());
-      rs.addTask(new ReplicationTask(ContainerTestUtils.getReplicateContainerCommand(i, target), noopReplicator));
+      rs.addTask(new ReplicationTask(getReplicateContainerCommand(i, target), noopReplicator));
     }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void perVolumeDisabledUsesGlobalPool(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
+    ReplicationServer.ReplicationConfig repConf =
+        new ReplicationServer.ReplicationConfig();
+    repConf.setPerVolumeEnabled(false);
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .executor(newDirectExecutorService())
+        .clock(clock)
+        .build();
+
+    try {
+      assertNull(supervisor.getVolumeReplicationThreadPools());
+      replicatorRef.set(doneReplicator);
+      supervisor.addTask(createTask(1L));
+      assertEquals(1, supervisor.getReplicationSuccessCount());
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void perVolumeInitLogging(ContainerLayoutVersion layout,
+      @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+
+    LogCapturer supervisorLogs =
+        LogCapturer.captureLogs(ReplicationSupervisor.class);
+    LogCapturer poolLogs =
+        LogCapturer.captureLogs(VolumeReplicationThreadPools.class);
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .executor(newDirectExecutorService())
+        .clock(clock)
+        .build();
+
+    try {
+      assertNotNull(supervisor.getVolumeReplicationThreadPools());
+      assertThat(supervisorLogs.getOutput())
+          .contains("Per-volume container replication thread pools enabled");
+      assertThat(poolLogs.getOutput())
+          .contains("Initialized 2 per-volume replication thread pools");
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        assertThat(poolLogs.getOutput())
+            .contains(volume.getStorageDir().getPath());
+      }
+    } finally {
+      supervisorLogs.stopCapturing();
+      poolLogs.stopCapturing();
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void perVolumePoolSizeRespected(ContainerLayoutVersion layout,
+      @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 3);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .executor(newDirectExecutorService())
+        .clock(clock)
+        .build();
+
+    try {
+      VolumeReplicationThreadPools pools =
+          supervisor.getVolumeReplicationThreadPools();
+      assertNotNull(pools);
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        assertEquals(3, pools.getPoolSize(volume.getStorageDir().getPath()));
+      }
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void perVolumePoolResize(ContainerLayoutVersion layout,
+      @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .executor(newDirectExecutorService())
+        .clock(clock)
+        .build();
+
+    try {
+      supervisor.setPerVolumePoolSize(3);
+      VolumeReplicationThreadPools pools =
+          supervisor.getVolumeReplicationThreadPools();
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        assertEquals(3, pools.getPoolSize(volume.getStorageDir().getPath()));
+      }
+      assertEquals(3, repConf.getPerVolumeStreamsLimit());
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void perVolumePoolResizeOnNodeStateChange(ContainerLayoutVersion layout,
+      @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 2);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .clock(clock)
+        .build();
+
+    try {
+      datanode.setPersistedOpState(IN_SERVICE);
+      supervisor.nodeStateUpdated(
+          HddsProtos.NodeOperationalState.DECOMMISSIONING);
+      VolumeReplicationThreadPools pools =
+          supervisor.getVolumeReplicationThreadPools();
+      int expected = repConf.scaleOutOfServiceLimit(2);
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        assertEquals(expected,
+            pools.getPoolSize(volume.getStorageDir().getPath()));
+      }
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void perVolumePoolResizeDuringDecommission(ContainerLayoutVersion layout,
+      @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 2);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .clock(clock)
+        .build();
+
+    try {
+      datanode.setPersistedOpState(IN_SERVICE);
+      supervisor.nodeStateUpdated(DECOMMISSIONING);
+      supervisor.setPerVolumePoolSize(2);
+      VolumeReplicationThreadPools pools =
+          supervisor.getVolumeReplicationThreadPools();
+      int expected = repConf.scaleOutOfServiceLimit(2);
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        assertEquals(expected,
+            pools.getPoolSize(volume.getStorageDir().getPath()));
+      }
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void nonPushReplicationUsesGlobalPoolWhenPerVolumeEnabled(
+      ContainerLayoutVersion layout, @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+    AtomicInteger globalExecutions = new AtomicInteger();
+
+    ExecutorService trackingGlobal = new AbstractExecutorService() {
+      @Override
+      public void shutdown() {
+      }
+
+      @Override
+      public List<Runnable> shutdownNow() {
+        return emptyList();
+      }
+
+      @Override
+      public boolean isShutdown() {
+        return false;
+      }
+
+      @Override
+      public boolean isTerminated() {
+        return false;
+      }
+
+      @Override
+      public boolean awaitTermination(long timeout, TimeUnit unit) {
+        return true;
+      }
+
+      @Override
+      public void execute(Runnable command) {
+        globalExecutions.incrementAndGet();
+        command.run();
+      }
+    };
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .executor(trackingGlobal)
+        .clock(clock)
+        .build();
+
+    try {
+      supervisor.addTask(createReconciliationTask(1L));
+      assertEquals(1, globalExecutions.get());
+      assertEquals(1, supervisor.getReplicationSuccessCount());
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void perVolumePushIsolation(ContainerLayoutVersion layout,
+      @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
+    HddsVolume vol2 = (HddsVolume) volumeSet.getVolumesList().get(1);
+
+    addContainerOnVolume(1L, vol1, conf);
+    addContainerOnVolume(2L, vol2, conf);
+
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+
+    CountDownLatch vol1Started = new CountDownLatch(1);
+    CountDownLatch vol1Release = new CountDownLatch(1);
+    ContainerReplicator volumeAwareReplicator = task -> {
+      Container<?> container = set.getContainer(task.getContainerId());
+      HddsVolume volume = container.getContainerData().getVolume();
+      if (volume == vol1) {
+        vol1Started.countDown();
+        try {
+          assertTrue(vol1Release.await(10, TimeUnit.SECONDS));
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(ie);
+        }
+      }
+      task.setStatus(DONE);
+    };
+    replicatorRef.set(volumeAwareReplicator);
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .clock(clock)
+        .build();
+
+    try {
+      supervisor.addTask(createPushTask(1L));
+      assertTrue(vol1Started.await(10, TimeUnit.SECONDS));
+
+      supervisor.addTask(createPushTask(2L));
+      GenericTestUtils.waitFor((BooleanSupplier) () ->
+          supervisor.getReplicationSuccessCount() >= 1, 100, 10000);
+
+      assertEquals(1, supervisor.getReplicationSuccessCount());
+      vol1Release.countDown();
+      GenericTestUtils.waitFor((BooleanSupplier) () ->
+          supervisor.getReplicationSuccessCount() == 2, 100, 10000);
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void volumeFailureCleansUpQueuedTasks(ContainerLayoutVersion layout,
+      @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
+    addContainerOnVolume(1L, vol1, conf);
+    addContainerOnVolume(2L, vol1, conf);
+
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+
+    CountDownLatch task1Started = new CountDownLatch(1);
+    CountDownLatch task1Block = new CountDownLatch(1);
+    AtomicBoolean task1Interrupted = new AtomicBoolean();
+    replicatorRef.set(task -> {
+      if (task.getContainerId() == 1L) {
+        task1Started.countDown();
+        try {
+          task1Block.await();
+        } catch (InterruptedException ie) {
+          task1Interrupted.set(true);
+          Thread.currentThread().interrupt();
+          return;
+        }
+      }
+      task.setStatus(DONE);
+    });
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .clock(clock)
+        .build();
+
+    String volumeRoot = vol1.getStorageDir().getPath();
+    try {
+      supervisor.addTask(createPushTask(1L));
+      assertTrue(task1Started.await(10, TimeUnit.SECONDS));
+
+      supervisor.addTask(createPushTask(2L));
+      GenericTestUtils.waitFor((BooleanSupplier) () ->
+          supervisor.getTotalInFlightReplications() == 2, 100, 5000);
+
+      volumeSet.failVolume(volumeRoot);
+      supervisor.shutdownFailedVolumePools(volumeSet);
+
+      GenericTestUtils.waitFor((BooleanSupplier) () ->
+          supervisor.getTotalInFlightReplications() == 0, 100, 5000);
+      assertTrue(task1Interrupted.get());
+      task1Block.countDown();
+
+      supervisor.addTask(createPushTask(2L));
+      GenericTestUtils.waitFor((BooleanSupplier) () ->
+          supervisor.getReplicationSuccessCount() >= 1, 100, 5000);
+    } finally {
+      task1Block.countDown();
+      supervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void volumeFailureShutsDownPool(ContainerLayoutVersion layout,
+      @TempDir File perVolumeTempDir) throws Exception {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = perVolumeConf(perVolumeTempDir, 1);
+    MutableVolumeSet volumeSet = newVolumeSet(conf);
+    HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
+    addContainerOnVolume(1L, vol1, conf);
+
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .containerSet(set)
+        .volumeSet(volumeSet)
+        .executor(newDirectExecutorService())
+        .clock(clock)
+        .build();
+    replicatorRef.set(doneReplicator);
+
+    String volumeRoot = vol1.getStorageDir().getPath();
+    try {
+      VolumeReplicationThreadPools pools =
+          supervisor.getVolumeReplicationThreadPools();
+      assertTrue(pools.hasPool(volumeRoot));
+
+      volumeSet.failVolume(volumeRoot);
+      supervisor.shutdownFailedVolumePools(volumeSet);
+      assertFalse(pools.hasPool(volumeRoot));
+
+      supervisor.addTask(createPushTask(1L));
+      assertEquals(1, supervisor.getReplicationSuccessCount());
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  private OzoneConfiguration perVolumeConf(File baseDir, int perVolumeStreams) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, baseDir.getAbsolutePath());
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        baseDir.getAbsolutePath() + "/vol1,"
+            + baseDir.getAbsolutePath() + "/vol2");
+    conf.setBoolean(PER_VOLUME_ENABLED_KEY, true);
+    conf.setInt(PER_VOLUME_STREAMS_LIMIT_KEY, perVolumeStreams);
+    conf.setClass(SpaceUsageCheckFactory.Conf.configKeyForClassName(),
+        MockSpaceUsageCheckFactory.HalfTera.class,
+        SpaceUsageCheckFactory.class);
+    return conf;
+  }
+
+  private MutableVolumeSet newVolumeSet(OzoneConfiguration conf)
+      throws IOException {
+    return new MutableVolumeSet(datanode.getUuidString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+  }
+
+  private void addContainerOnVolume(long containerId, HddsVolume volume,
+      OzoneConfiguration conf) {
+    KeyValueContainerData containerData = new KeyValueContainerData(containerId,
+        layoutVersion, 100L,
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    containerData.setVolume(volume);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    assertDoesNotThrow(() -> set.addContainer(container));
+  }
+
+  private ReplicationTask createPushTask(long containerId) {
+    ReplicateContainerCommand cmd =
+        getReplicateContainerCommand(containerId, MockDatanodeDetails.randomDatanodeDetails());
+    cmd.setTerm(CURRENT_TERM);
+    return new ReplicationTask(cmd, replicatorRef.get());
   }
 }

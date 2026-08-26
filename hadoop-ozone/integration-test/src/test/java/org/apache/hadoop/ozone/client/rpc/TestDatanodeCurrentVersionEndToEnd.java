@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
@@ -145,7 +145,7 @@ class TestDatanodeCurrentVersionEndToEnd {
           .distinct()
           .collect(Collectors.toList());
     }
-    TestHelper.waitForContainerClose(cluster, containerIds.toArray(new Long[0]));
+    OzoneTestHelper.waitForContainerClose(cluster, containerIds.toArray(new Long[0]));
   }
 
   /** Create a key whose container stays open. */

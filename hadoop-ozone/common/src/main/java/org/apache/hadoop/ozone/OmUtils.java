@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.DOUBLE_SLASH_OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -267,6 +268,8 @@ public final class OmUtils {
     case Prepare:
     case CancelPrepare:
     case QueryUpgradeStatus:
+    case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -329,6 +332,10 @@ public final class OmUtils {
     case DeleteObjectTagging:
     case PutBucketTagging:
     case DeleteBucketTagging:
+    case SetLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
+    case SaveLifecycleScanState:
       return false;
     case UnknownCommand:
       return false;
@@ -384,6 +391,8 @@ public final class OmUtils {
     case GetKeyInfo:
     case GetSnapshotInfo:
     case GetObjectTagging:
+    case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
       return true;
     case GetBucketTagging:
       return true;
@@ -465,6 +474,10 @@ public final class OmUtils {
     case GetQuotaRepairStatus:
       // Quota repair lifecycle request should be initiated by the leader
     case DBUpdates: // We are currently only interested on the leader DB info
+    case SetLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
+    case SaveLifecycleScanState:
     case UnknownCommand:
     case QueryUpgradeStatus:
       return false;
@@ -1136,7 +1149,10 @@ public final class OmUtils {
    */
   public static void resolveOmHost(String omHost, int omPort)
       throws IOException {
-    InetSocketAddress omHostAddress = NetUtils.createSocketAddr(omHost, omPort);
+    // Combine via getHostPortString so an IPv6 literal is bracketed; passing a
+    // bare ::1 to createSocketAddr fails with "not a valid host:port authority".
+    InetSocketAddress omHostAddress =
+        NetUtils.createSocketAddr(getHostPortString(omHost, omPort));
     if (omHostAddress.isUnresolved()) {
       throw new IOException(
           "Cannot resolve OM host " + omHost + " in the URI",

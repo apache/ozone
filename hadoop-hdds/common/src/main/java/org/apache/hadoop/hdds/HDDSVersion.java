@@ -38,6 +38,7 @@ public enum HDDSVersion implements ComponentVersion {
           "a PutBlock request"),
   STREAM_BLOCK_SUPPORT(3,
       "This version has support for reading a block by streaming chunks."),
+  SHORT_CIRCUIT_READS(4, "Version with short-circuit read support."),
 
   ZDU(100, "Version that supports zero downtime upgrade"),
 

@@ -596,8 +596,8 @@ class TestContainerBalancerSubCommand {
             .setStart(false)
             .setMessage("")
             .build());
-    assertThrows(IOException.class, () -> startCmd.execute(scmClient));
-    assertThat(err.get()).containsPattern(FAILED_TO_START);
+    IOException ex = assertThrows(IOException.class, () -> startCmd.execute(scmClient));
+    assertThat(ex.getMessage()).containsPattern(FAILED_TO_START);
   }
 
   @Test

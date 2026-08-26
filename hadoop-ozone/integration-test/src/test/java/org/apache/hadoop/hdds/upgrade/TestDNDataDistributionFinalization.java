@@ -160,6 +160,7 @@ public class TestDNDataDistributionFinalization {
 
     // Verify finalization completed
     assertFalse(cluster.getStorageContainerManager().getVersionManager().needsFinalization());
+    assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
 
     // Create more data and deletions to test post-finalization behavior
     String keyName3 = "testKey3";
@@ -192,8 +193,8 @@ public class TestDNDataDistributionFinalization {
     bucket.deleteKey(keyName);
     scmClient.finalizeUpgrade();
     HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
-
     assertFalse(cluster.getStorageContainerManager().getVersionManager().needsFinalization());
+    assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
 
     // Verify the system can handle scenarios where pendingDeleteBlockCount
     // might be missing and needs recalculation

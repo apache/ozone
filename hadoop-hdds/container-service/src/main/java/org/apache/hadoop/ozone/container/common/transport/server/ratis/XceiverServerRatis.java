@@ -31,6 +31,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
@@ -603,6 +604,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   @Override
+  public boolean isStarted() {
+    return isStarted;
+  }
+
+  @Override
   public int getIPCPort() {
     return clientPort;
   }
@@ -657,7 +663,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
-            request.getTraceID());
+            request.getTraceID(),
+            SpanKind.SERVER);
     try (Scope ignored = span.makeCurrent()) {
       RaftClientRequest raftClientRequest =
           createRaftClientRequest(request, pipelineID,
