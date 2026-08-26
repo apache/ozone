@@ -107,7 +107,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServicePro
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_DONE_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_REQUIRED_MSG;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZED_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.STARTING_MSG;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;

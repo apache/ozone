@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.om.request.upgrade;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.StartFinalizeUpgrade;
 
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
