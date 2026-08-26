@@ -66,6 +66,21 @@ public class TestOMStartFinalizeUpgradeResponse {
         "key should be persisted to the meta table after the response is committed");
   }
 
+  @Test
+  public void testAddToDBBatchSkipsPersistWhenFinalizationNotNeeded() throws IOException {
+    assertNull(omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY),
+        "key should not exist before the response is applied");
+
+    // finalizationNeeded=false models initiating finalize on an already-finalized cluster: the key must not be
+    // persisted, otherwise it would be orphaned since OMUpgradeFinalizeService never clears it.
+    OMStartFinalizeUpgradeResponse response = new OMStartFinalizeUpgradeResponse(buildOkResponse(), false);
+    response.addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    assertNull(omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY),
+        "key must not be persisted when finalization is not needed");
+  }
+
   private OzoneManagerProtocolProtos.OMResponse buildOkResponse() {
     return OzoneManagerProtocolProtos.OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.StartFinalizeUpgrade)

@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -45,6 +46,8 @@ import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -67,8 +70,12 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
   protected abstract OMFinalizeUpgradeRequestBase newRequest();
 
   @BeforeEach
-  public void stubPeerNodes() {
+  public void mockPreFinalizedOM() {
     when(ozoneManager.getPeerNodes()).thenReturn(Collections.emptyList());
+    // A finalize request models a cluster that still needs finalization; the parent test harness defaults to a
+    // finalized version manager, which is the special already-finalized case exercised separately below.
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
   }
 
   @Test
@@ -249,12 +256,59 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
     assertEquals(0, omMetrics.getFinalizationInProgress(),
         "metric should be 0 before the request");
 
-    submitRequest();
+    OMClientResponse response = submitRequest();
 
     assertNotNull(omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY),
         "key should be present in the cache after validateAndUpdateCache");
     assertEquals(1, omMetrics.getFinalizationInProgress(),
         "metric should be 1 after the request");
+
+    // Applying the response as the double buffer would must also persist the marker to the DB.
+    flushResponseToDb(response);
+    assertEquals("ignored", omMetadataManager.getMetaTable().getSkipCache(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY),
+        "key should be persisted to the DB after the response is flushed");
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheSkipsMarkerWhenAlreadyFinalized() throws IOException {
+    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    // Simulate an admin initiating finalize on a cluster that is already finalized.
+    OMVersionManager finalizedVersionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(finalizedVersionManager);
+
+    assertNull(omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY),
+        "key should not exist before the request");
+    assertEquals(0, omMetrics.getFinalizationInProgress(),
+        "metric should be 0 before the request");
+
+    OMClientResponse response = submitRequest();
+
+    // The marker and metric must NOT be set: OMUpgradeFinalizeService would shut down because needsFinalization()
+    // is false and would never clear a marker written here, leaving it and the metric stuck.
+    assertNull(omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY),
+        "key must not be written when the cluster is already finalized");
+    assertEquals(0, omMetrics.getFinalizationInProgress(),
+        "metric must remain 0 when the cluster is already finalized");
+    // Finalizing an already-finalized cluster is a successful no-op.
+    assertTrue(response.getOMResponse().getSuccess(),
+        "response should still report success for an already-finalized cluster");
+
+    // Even the success response must not persist the marker when the double buffer flushes; otherwise it would be
+    // orphaned in the DB.
+    flushResponseToDb(response);
+    assertNull(omMetadataManager.getMetaTable().getSkipCache(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY),
+        "key must not be persisted to the DB when the cluster is already finalized");
+  }
+
+  /**
+   * Applies the response to the DB the way the OM double buffer does on flush: status-gated addToDBBatch followed by
+   * a batch commit.
+   */
+  private void flushResponseToDb(OMClientResponse response) throws IOException {
+    try (BatchOperation batch = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batch);
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
   }
 
   /**

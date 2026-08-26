@@ -111,7 +111,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServicePro
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_DONE_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_REQUIRED_MSG;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.STARTING_MSG;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -3762,7 +3761,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public StatusAndMessages finalizeUpgrade(String unusedUpgradeClientId) {
     // Server-side stub; the real implementation is handled via the Ratis request path through
     // OMStartFinalizeUpgradeRequestLegacy
-    return STARTING_MSG;
+    throw new UnsupportedOperationException();
   }
 
   @Override

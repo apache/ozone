@@ -104,19 +104,27 @@ public abstract class OMFinalizeUpgradeRequestBase extends OMClientRequest {
     Exception exception = null;
 
     try {
-      OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-      omMetadataManager.getMetaTable().addCacheEntry(
-          new CacheKey<>(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY), CacheValue.get(context.getIndex(), "ignored"));
-      ozoneManager.getMetrics().setFinalizationInProgress(true);
+      // Only mark finalization in progress when OM actually needs to finalize. If an admin initiates finalize on an
+      // already-finalized cluster, the marker would be orphaned: the async OMUpgradeFinalizeService shuts down because
+      // needsFinalization() is false and would never clear it. The response mirrors this so the marker is not
+      // persisted to the DB when the double buffer flushes either.
+      boolean finalizationNeeded = ozoneManager.getVersionManager().needsFinalization();
+      if (finalizationNeeded) {
+        OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+        omMetadataManager.getMetaTable().addCacheEntry(
+            new CacheKey<>(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY), CacheValue.get(context.getIndex(), "ignored"));
+        ozoneManager.getMetrics().setFinalizationInProgress(true);
+      } else {
+        LOG.info("OM does not need finalization; skipping finalization-in-progress marker.");
+      }
 
       setResponseBody(responseBuilder, ozoneManager);
-      response = new OMStartFinalizeUpgradeResponse(responseBuilder.build());
+      response = new OMStartFinalizeUpgradeResponse(responseBuilder.build(), finalizationNeeded);
       LOG.trace("Returning response: {}", response);
     } catch (Exception e) {
       exception = e;
       response = new OMStartFinalizeUpgradeResponse(createErrorOMResponse(responseBuilder, e));
     }
-
 
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put("force", String.valueOf(isForce()));
