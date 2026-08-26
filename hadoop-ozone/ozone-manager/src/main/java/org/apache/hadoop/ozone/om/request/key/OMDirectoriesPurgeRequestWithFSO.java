@@ -98,17 +98,12 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    PurgeApplyState state = new PurgeApplyState(omMetadataManager, omMetrics, context.getIndex());
     final SnapshotInfo fromSnapshotInfo;
 
     try {
       fromSnapshotInfo = resolveFromSnapshotInfo(ozoneManager, omMetadataManager, purgeDirsRequest, fromSnapshot);
     } catch (IOException e) {
-      LOG.error("Error occurred while performing OMDirectoriesPurge. ", e);
-      if (LOG.isDebugEnabled()) {
-        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, e));
-      }
-      return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
+      return directoryPurgeFailure(ozoneManager, omResponse, e);
     }
     // Phase 1 (no lock): parse every purge entry and precompute its delete key, path key, replicated size and any
     // hsync open-key name. None of this depends on the bucket write lock, so doing it up front keeps the string and
@@ -117,13 +112,16 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         .collect(Collectors.toMap(bucketNameInfo ->
                 new VolumeBucketId(bucketNameInfo.getVolumeId(), bucketNameInfo.getBucketId()),
             Function.identity()));
+    List<PreparedEntry> preparedSubDirs = new ArrayList<>();
+    List<PreparedEntry> preparedSubFiles = new ArrayList<>();
+    List<PreparedDirPurge> preparedDirPurges = new ArrayList<>();
     for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
-      prepareMarkDeletedSubDirs(path, state);
-      prepareMoveDeletedSubFiles(path, state);
+      preparedSubDirs.addAll(prepareMarkDeletedSubDirs(path, omMetadataManager));
+      preparedSubFiles.addAll(prepareMoveDeletedSubFiles(path, omMetadataManager));
       if (path.hasDeletedDir()) {
         BucketNameInfo bucketNameInfo = volumeBucketIdMap.get(new VolumeBucketId(path.getVolumeId(),
             path.getBucketId()));
-        prepareDeletedDir(path, bucketNameInfo, state);
+        preparedDirPurges.add(prepareDeletedDir(path, bucketNameInfo));
       }
     }
 
@@ -137,12 +135,17 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, oe));
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, oe));
     }
+    PurgeApplyResult result = new PurgeApplyResult();
     try {
       // Phase 2 (under the bucket write lock): apply the prepared cache tombstones, hsync open-key cleanup and
       // aggregated per-bucket quota changes.
-      applyPreparedEntries(state);
+      applyPreparedEntries(preparedSubDirs, preparedSubFiles, preparedDirPurges, omMetadataManager,
+          context.getIndex(), result);
 
-      int numSubDirMoved = recordDeletionMetrics(deletingServiceMetrics, state);
+      // The per-entry global OM metric mutations were unconditional, so the count is the total number of prepared
+      // sub-directories and sub-files.
+      long numKeysProcessed = (long) preparedSubDirs.size() + preparedSubFiles.size();
+      int numSubDirMoved = recordDeletionMetrics(deletingServiceMetrics, omMetrics, numKeysProcessed, result);
 
       TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
       if (fromSnapshotInfo != null) {
@@ -156,7 +159,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       }
 
       if (LOG.isDebugEnabled()) {
-        logDirectoryDeletionAuditSuccess(ozoneManager, fromSnapshotInfo, numSubDirMoved, state);
+        logDirectoryDeletionAuditSuccess(ozoneManager, fromSnapshotInfo, numSubDirMoved, result);
       }
     } catch (IOException ex) {
       // Case of IOException for fromProtobuf will not happen
@@ -173,33 +176,32 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       // Snapshot the mutated bucket infos for the response after releasing the lock. The single apply thread is the
       // only writer, so no other transaction can mutate them between release and copy.
       for (Map.Entry<Pair<String, String>, OmBucketInfo> entry :
-          state.volBucketInfoMap.entrySet()) {
+          result.volBucketInfoMap.entrySet()) {
         entry.setValue(entry.getValue().copyObject());
       }
     }
 
     return new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests,
-        getBucketLayout(), state.volBucketInfoMap, fromSnapshotInfo, state.openKeyInfoMap);
+        getBucketLayout(), result.volBucketInfoMap, fromSnapshotInfo, result.openKeyInfoMap);
   }
 
   /**
    * De-duplicates purged directories from the moved sub-directory set and updates the deletion service metrics for
    * this transaction, returning the resulting number of sub-directories moved (used for the success audit).
    */
-  private int recordDeletionMetrics(DeletingServiceMetrics deletingServiceMetrics, PurgeApplyState state) {
+  private int recordDeletionMetrics(DeletingServiceMetrics deletingServiceMetrics, OMMetrics omMetrics,
+      long numKeysProcessed, PurgeApplyResult result) {
     // Apply the per-entry global OM metric mutations in bulk (one increment each instead of once per entry) to
-    // minimize work done while holding the bucket write lock. The per-entry calls were unconditional, so the count
-    // is the total number of prepared sub-directories and sub-files.
-    long numKeysProcessed = (long) state.preparedSubDirs.size() + state.preparedSubFiles.size();
-    state.omMetrics.decNumKeys(numKeysProcessed);
-    state.omMetrics.incNumKeyDeletesInternal(numKeysProcessed);
+    // minimize work done while holding the bucket write lock.
+    omMetrics.decNumKeys(numKeysProcessed);
+    omMetrics.incNumKeyDeletesInternal(numKeysProcessed);
     // Remove deletedDirNames from subDirNames to avoid duplication
-    state.subDirNames.removeAll(state.deletedDirNames);
-    int numSubDirMoved = state.subDirNames.size();
+    result.subDirNames.removeAll(result.deletedDirNames);
+    int numSubDirMoved = result.subDirNames.size();
     deletingServiceMetrics.incrNumSubDirectoriesMoved(numSubDirMoved);
-    deletingServiceMetrics.incrNumSubFilesMoved(state.numSubFilesMoved);
-    deletingServiceMetrics.incrNumDirPurged(state.numDirsDeleted);
+    deletingServiceMetrics.incrNumSubFilesMoved(result.numSubFilesMoved);
+    deletingServiceMetrics.incrNumDirPurged(result.numDirsDeleted);
     return numSubDirMoved;
   }
 
@@ -208,18 +210,31 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * only assembled when debug audit logging is enabled.
    */
   private void logDirectoryDeletionAuditSuccess(OzoneManager ozoneManager, SnapshotInfo fromSnapshotInfo,
-      int numSubDirMoved, PurgeApplyState state) {
+      int numSubDirMoved, PurgeApplyResult result) {
     Map<String, String> auditParams = new LinkedHashMap<>();
     if (fromSnapshotInfo != null) {
       auditParams.put(AUDIT_PARAM_SNAPSHOT_ID, fromSnapshotInfo.getSnapshotId().toString());
     }
-    auditParams.put(AUDIT_PARAM_DIRS_DELETED, String.valueOf(state.numDirsDeleted));
+    auditParams.put(AUDIT_PARAM_DIRS_DELETED, String.valueOf(result.numDirsDeleted));
     auditParams.put(AUDIT_PARAM_SUBDIRS_MOVED, String.valueOf(numSubDirMoved));
-    auditParams.put(AUDIT_PARAM_SUBFILES_MOVED, String.valueOf(state.numSubFilesMoved));
-    auditParams.put(AUDIT_PARAM_DIRS_DELETED_LIST, String.join(",", state.deletedDirNames));
-    auditParams.put(AUDIT_PARAM_SUBDIRS_MOVED_LIST, String.join(",", state.subDirNames));
-    auditParams.put(AUDIT_PARAM_SUBFILES_MOVED_LIST, String.join(",", state.subFileNames));
+    auditParams.put(AUDIT_PARAM_SUBFILES_MOVED, String.valueOf(result.numSubFilesMoved));
+    auditParams.put(AUDIT_PARAM_DIRS_DELETED_LIST, String.join(",", result.deletedDirNames));
+    auditParams.put(AUDIT_PARAM_SUBDIRS_MOVED_LIST, String.join(",", result.subDirNames));
+    auditParams.put(AUDIT_PARAM_SUBFILES_MOVED_LIST, String.join(",", result.subFileNames));
     AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.DIRECTORY_DELETION, auditParams));
+  }
+
+  /**
+   * Logs, audits and builds the error response for a failure while resolving the {@code fromSnapshot}. Extracted so
+   * the {@link #validateAndUpdateCache} catch block reads as a single call.
+   */
+  private OMClientResponse directoryPurgeFailure(OzoneManager ozoneManager, OMResponse.Builder omResponse,
+      IOException e) {
+    LOG.error("Error occurred while performing OMDirectoriesPurge. ", e);
+    if (LOG.isDebugEnabled()) {
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, e));
+    }
+    return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
   }
 
   /**
@@ -251,12 +266,14 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * directory-table tombstones and bucket namespace decrements are applied later under the lock in
    * {@link #applyPreparedEntries}.
    */
-  private void prepareMarkDeletedSubDirs(OzoneManagerProtocolProtos.PurgePathRequest path, PurgeApplyState state) {
-    OmMetadataManagerImpl omMetadataManager = state.omMetadataManager;
+  private List<PreparedEntry> prepareMarkDeletedSubDirs(OzoneManagerProtocolProtos.PurgePathRequest path,
+      OmMetadataManagerImpl omMetadataManager) {
+    List<PreparedEntry> preparedSubDirs = new ArrayList<>();
     for (OzoneManagerProtocolProtos.KeyInfo key : path.getMarkDeletedSubDirsList()) {
       ProcessedKeyInfo processed = processDeleteKey(key, path, omMetadataManager);
-      state.preparedSubDirs.add(new PreparedEntry(processed, path.getBucketId(), 0L, null));
+      preparedSubDirs.add(new PreparedEntry(processed, path.getBucketId(), 0L, null));
     }
+    return preparedSubDirs;
   }
 
   /**
@@ -264,28 +281,30 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * replicated size and, for hsync files, the open-key name to clean up. The file-table tombstones, hsync open-key
    * cleanup and bucket quota decrements are applied later under the lock in {@link #applyPreparedEntries}.
    */
-  private void prepareMoveDeletedSubFiles(OzoneManagerProtocolProtos.PurgePathRequest path, PurgeApplyState state) {
-    OmMetadataManagerImpl omMetadataManager = state.omMetadataManager;
+  private List<PreparedEntry> prepareMoveDeletedSubFiles(OzoneManagerProtocolProtos.PurgePathRequest path,
+      OmMetadataManagerImpl omMetadataManager) {
+    List<PreparedEntry> preparedSubFiles = new ArrayList<>();
     for (OzoneManagerProtocolProtos.KeyInfo key : path.getDeletedSubFilesList()) {
       ProcessedKeyInfo processed = processDeleteKey(key, path, omMetadataManager);
-      long replicatedSize = sumBlockLengths(processed.keyInfo);
+      long replicatedSize = sumBlockLengths(key);
       // If omKeyInfo has hsync metadata, its corresponding open key is cleaned up under the lock.
-      String hsyncClientId = getHsyncClientId(processed.keyInfo);
+      String hsyncClientId = getHsyncClientId(key);
       String dbOpenKey = hsyncClientId == null ? null
           : omMetadataManager.getOpenFileName(path.getVolumeId(), path.getBucketId(),
           processed.parentObjectID, processed.fileName, hsyncClientId);
-      state.preparedSubFiles.add(new PreparedEntry(processed, path.getBucketId(), replicatedSize, dbOpenKey));
+      preparedSubFiles.add(new PreparedEntry(processed, path.getBucketId(), replicatedSize, dbOpenKey));
     }
+    return preparedSubFiles;
   }
 
   /**
    * Phase 1 (no lock): records a path's deleted directory for later purge under the lock in
    * {@link #applyPreparedEntries}.
    */
-  private void prepareDeletedDir(OzoneManagerProtocolProtos.PurgePathRequest path, BucketNameInfo bucketNameInfo,
-      PurgeApplyState state) {
-    state.preparedDirPurges.add(new PreparedDirPurge(bucketNameInfo.getVolumeName(), bucketNameInfo.getBucketName(),
-        path.getBucketId(), path.getDeletedDir()));
+  private PreparedDirPurge prepareDeletedDir(OzoneManagerProtocolProtos.PurgePathRequest path,
+      BucketNameInfo bucketNameInfo) {
+    return new PreparedDirPurge(bucketNameInfo.getVolumeName(), bucketNameInfo.getBucketName(),
+        path.getBucketId(), path.getDeletedDir());
   }
 
   /**
@@ -293,28 +312,55 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * per-bucket quota changes. Quota deltas are accumulated per bucket and applied once, instead of once per entry, to
    * minimize the mutations done while holding the write lock.
    */
-  private void applyPreparedEntries(PurgeApplyState state) throws IOException {
-    OmMetadataManagerImpl omMetadataManager = state.omMetadataManager;
+  private void applyPreparedEntries(List<PreparedEntry> preparedSubDirs, List<PreparedEntry> preparedSubFiles,
+      List<PreparedDirPurge> preparedDirPurges, OmMetadataManagerImpl omMetadataManager, long trxnLogIndex,
+      PurgeApplyResult result) throws IOException {
+    // Memoizes getBucketInfo lookups within this apply so that a purge transaction touching many keys of the same
+    // bucket resolves the bucket cache entry once instead of per key.
+    Map<Pair<String, String>, OmBucketInfo> bucketInfoCache = new HashMap<>();
+    // Quota deltas are accumulated per bucket across all three entry loops and applied once at the end.
     Map<Pair<String, String>, QuotaDelta> quotaDeltas = new HashMap<>();
 
-    for (PreparedEntry entry : state.preparedSubDirs) {
+    applyMarkedSubDirs(preparedSubDirs, omMetadataManager, trxnLogIndex, result, bucketInfoCache, quotaDeltas);
+    applyMovedSubFiles(preparedSubFiles, omMetadataManager, trxnLogIndex, result, bucketInfoCache, quotaDeltas);
+    applyDirPurges(preparedDirPurges, omMetadataManager, result, bucketInfoCache, quotaDeltas);
+    applyQuotaDeltas(quotaDeltas);
+  }
+
+  /**
+   * Phase 2 (under the bucket write lock): tombstones each prepared sub-directory in the directory table and
+   * accumulates its namespace quota decrement, when its bucket still matches the prepared bucket id.
+   */
+  private void applyMarkedSubDirs(List<PreparedEntry> preparedSubDirs, OmMetadataManagerImpl omMetadataManager,
+      long trxnLogIndex, PurgeApplyResult result, Map<Pair<String, String>, OmBucketInfo> bucketInfoCache,
+      Map<Pair<String, String>, QuotaDelta> quotaDeltas) {
+    for (PreparedEntry entry : preparedSubDirs) {
       ProcessedKeyInfo processed = entry.processed;
-      state.subDirNames.add(processed.deleteKey);
+      result.subDirNames.add(processed.deleteKey);
       OmBucketInfo omBucketInfo = getBucketInfoCached(omMetadataManager,
-          state.bucketInfoCache, processed.volumeName, processed.bucketName);
+          bucketInfoCache, processed.volumeName, processed.bucketName);
       // bucketInfo can be null in case of delete volume or bucket
       // or key does not belong to bucket as bucket is recreated
       if (null != omBucketInfo && omBucketInfo.getObjectID() == entry.bucketId) {
         omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(processed.pathKey),
-            CacheValue.get(state.trxnLogIndex));
-        state.volBucketInfoMap.putIfAbsent(processed.volBucketPair, omBucketInfo);
+            CacheValue.get(trxnLogIndex));
+        result.volBucketInfoMap.putIfAbsent(processed.volBucketPair, omBucketInfo);
         quotaDeltas.computeIfAbsent(processed.volBucketPair, k -> new QuotaDelta(omBucketInfo)).usedNamespace += 1L;
       }
     }
+  }
 
-    for (PreparedEntry entry : state.preparedSubFiles) {
+  /**
+   * Phase 2 (under the bucket write lock): tombstones each prepared sub-file in the file table, cleans up its hsync
+   * open key when present, and accumulates its byte and namespace quota decrements, when its bucket still matches the
+   * prepared bucket id.
+   */
+  private void applyMovedSubFiles(List<PreparedEntry> preparedSubFiles, OmMetadataManagerImpl omMetadataManager,
+      long trxnLogIndex, PurgeApplyResult result, Map<Pair<String, String>, OmBucketInfo> bucketInfoCache,
+      Map<Pair<String, String>, QuotaDelta> quotaDeltas) throws IOException {
+    for (PreparedEntry entry : preparedSubFiles) {
       ProcessedKeyInfo processed = entry.processed;
-      state.subFileNames.add(processed.deleteKey);
+      result.subFileNames.add(processed.deleteKey);
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       if (entry.dbOpenKey != null) {
@@ -322,37 +368,51 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         if (openKeyInfo != null) {
           openKeyInfo = openKeyInfo.withMetadataMutations(
               metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
-          state.openKeyInfoMap.put(entry.dbOpenKey, openKeyInfo);
+          result.openKeyInfoMap.put(entry.dbOpenKey, openKeyInfo);
         }
       }
 
-      state.numSubFilesMoved++;
+      result.numSubFilesMoved++;
       OmBucketInfo omBucketInfo = getBucketInfoCached(omMetadataManager,
-          state.bucketInfoCache, processed.volumeName, processed.bucketName);
+          bucketInfoCache, processed.volumeName, processed.bucketName);
       // bucketInfo can be null in case of delete volume or bucket
       // or key does not belong to bucket as bucket is recreated
       if (null != omBucketInfo && omBucketInfo.getObjectID() == entry.bucketId) {
         omMetadataManager.getFileTable().addCacheEntry(new CacheKey<>(processed.pathKey),
-            CacheValue.get(state.trxnLogIndex));
-        state.volBucketInfoMap.putIfAbsent(processed.volBucketPair, omBucketInfo);
+            CacheValue.get(trxnLogIndex));
+        result.volBucketInfoMap.putIfAbsent(processed.volBucketPair, omBucketInfo);
         QuotaDelta quotaDelta = quotaDeltas.computeIfAbsent(processed.volBucketPair, k -> new QuotaDelta(omBucketInfo));
         quotaDelta.usedBytes += entry.replicatedSize;
         quotaDelta.usedNamespace += 1L;
       }
     }
+  }
 
-    for (PreparedDirPurge dirPurge : state.preparedDirPurges) {
-      state.deletedDirNames.add(dirPurge.deletedDir);
+  /**
+   * Phase 2 (under the bucket write lock): records each purged directory and accumulates its snapshot-namespace purge,
+   * when its bucket still matches the prepared bucket id.
+   */
+  private void applyDirPurges(List<PreparedDirPurge> preparedDirPurges, OmMetadataManagerImpl omMetadataManager,
+      PurgeApplyResult result, Map<Pair<String, String>, OmBucketInfo> bucketInfoCache,
+      Map<Pair<String, String>, QuotaDelta> quotaDeltas) {
+    for (PreparedDirPurge dirPurge : preparedDirPurges) {
+      result.deletedDirNames.add(dirPurge.deletedDir);
       OmBucketInfo omBucketInfo = getBucketInfoCached(omMetadataManager,
-          state.bucketInfoCache, dirPurge.volumeName, dirPurge.bucketName);
+          bucketInfoCache, dirPurge.volumeName, dirPurge.bucketName);
       if (omBucketInfo != null && omBucketInfo.getObjectID() == dirPurge.bucketId) {
         Pair<String, String> volBucketPair = Pair.of(omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
-        state.volBucketInfoMap.put(volBucketPair, omBucketInfo);
+        result.volBucketInfoMap.put(volBucketPair, omBucketInfo);
         quotaDeltas.computeIfAbsent(volBucketPair, k -> new QuotaDelta(omBucketInfo)).snapshotNamespacePurge += 1L;
       }
-      state.numDirsDeleted++;
+      result.numDirsDeleted++;
     }
+  }
 
+  /**
+   * Phase 2 (under the bucket write lock): applies the per-bucket accumulated quota changes once each, instead of once
+   * per entry, to minimize the mutations done while holding the bucket write lock.
+   */
+  private void applyQuotaDeltas(Map<Pair<String, String>, QuotaDelta> quotaDeltas) {
     for (QuotaDelta quotaDelta : quotaDeltas.values()) {
       if (quotaDelta.usedBytes != 0L) {
         quotaDelta.bucketInfo.decrUsedBytes(quotaDelta.usedBytes, true);
@@ -367,41 +427,24 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   }
 
   /**
-   * Mutable state accumulated while applying a directory purge, shared across the phase 1 prepare steps
-   * ({@link #prepareMarkDeletedSubDirs}, {@link #prepareMoveDeletedSubFiles}, {@link #prepareDeletedDir}) and the
-   * phase 2 apply step ({@link #applyPreparedEntries}).
+   * Phase 2 output accumulated by {@link #applyPreparedEntries} under the bucket write lock: the mutated bucket infos
+   * and hsync open keys used to build the response, plus the moved sub-dir/sub-file/deleted-dir names and counts used
+   * for the deletion metrics and the success audit.
    */
-  private static final class PurgeApplyState {
-    private final OmMetadataManagerImpl omMetadataManager;
-    private final OMMetrics omMetrics;
-    private final long trxnLogIndex;
+  private static final class PurgeApplyResult {
     private final Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
-    // Memoizes getBucketInfo lookups within this apply so that a purge transaction touching many keys of the same
-    // bucket resolves the bucket cache entry once instead of per key.
-    private final Map<Pair<String, String>, OmBucketInfo> bucketInfoCache = new HashMap<>();
     private final Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
-    // Prepared (lock-free) work built in phase 1 and applied under the bucket write lock in phase 2.
-    private final List<PreparedEntry> preparedSubDirs = new ArrayList<>();
-    private final List<PreparedEntry> preparedSubFiles = new ArrayList<>();
-    private final List<PreparedDirPurge> preparedDirPurges = new ArrayList<>();
     private final Set<String> subDirNames = new HashSet<>();
     private final Set<String> subFileNames = new HashSet<>();
     private final Set<String> deletedDirNames = new HashSet<>();
     private int numSubFilesMoved;
     private int numDirsDeleted;
-
-    PurgeApplyState(OmMetadataManagerImpl omMetadataManager, OMMetrics omMetrics, long trxnLogIndex) {
-      this.omMetadataManager = omMetadataManager;
-      this.omMetrics = omMetrics;
-      this.trxnLogIndex = trxnLogIndex;
-    }
   }
 
   /**
    * Helper class to hold processed key information.
    */
   private static class ProcessedKeyInfo {
-    private final OzoneManagerProtocolProtos.KeyInfo keyInfo;
     private final String deleteKey;
     private final String pathKey;
     private final String volumeName;
@@ -410,9 +453,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     private final String fileName;
     private final Pair<String, String> volBucketPair;
 
-    ProcessedKeyInfo(OzoneManagerProtocolProtos.KeyInfo keyInfo, String deleteKey, String pathKey, String volumeName,
+    ProcessedKeyInfo(String deleteKey, String pathKey, String volumeName,
                      String bucketName, long parentObjectID, String fileName) {
-      this.keyInfo = keyInfo;
       this.deleteKey = deleteKey;
       this.pathKey = pathKey;
       this.volumeName = volumeName;
@@ -492,7 +534,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         path.getBucketId(), parentObjectID, fileName);
     String deleteKey = omMetadataManager.getOzoneDeletePathKey(objectID, pathKey);
 
-    return new ProcessedKeyInfo(key, deleteKey, pathKey, key.getVolumeName(), key.getBucketName(),
+    return new ProcessedKeyInfo(deleteKey, pathKey, key.getVolumeName(), key.getBucketName(),
         parentObjectID, fileName);
   }
 
