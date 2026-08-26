@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -92,20 +93,6 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
     return COLUMN_MISSING;
   }
 
-  private boolean tableExists(Connection connection) throws SQLException {
-    DatabaseMetaData metaData = connection.getMetaData();
-    try (ResultSet tables =
-             metaData.getTables(null, null, null, new String[]{"TABLE"})) {
-      while (tables.next()) {
-        if (RECON_TASK_STATUS_TABLE_NAME.equalsIgnoreCase(
-            tables.getString("TABLE_NAME"))) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
   /**
    * Adds a missing column and completes any partially applied migration.
    */
@@ -135,7 +122,7 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
   @Override
   public void execute(DataSource dataSource) throws SQLException {
     try (Connection conn = dataSource.getConnection()) {
-      if (!tableExists(conn)) {
+      if (!TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
         LOG.info("{} table does not exist; task status schema repair is not "
             + "required.", RECON_TASK_STATUS_TABLE_NAME);
         return;
