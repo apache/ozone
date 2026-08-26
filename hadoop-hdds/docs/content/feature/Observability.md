@@ -256,6 +256,6 @@ status: VOLUME_ALREADY_EXISTS
 
 <div class="alert alert-info" role="alert">
 
-Under the hood `ozone insight` uses HTTP endpoints to retrieve the required information (`/conf`, `/prom` and `/logLevel` endpoints). In a secure (Kerberos) cluster these endpoints are protected by SPNEGO: run `kinit` first, and the requesting user must be an Ozone administrator (`ozone.administrators`). `ozone insight` negotiates SPNEGO automatically.
+Under the hood `ozone insight` uses HTTP endpoints to retrieve the required information (`/conf`, `/prom` and `/logLevel` endpoints). In a secure (Kerberos) cluster these endpoints are protected by SPNEGO, so run `kinit` first; `ozone insight` negotiates SPNEGO automatically. Authorization differs per endpoint: `/logLevel` requires the requesting user to be an Ozone administrator (`ozone.administrators`); `/conf` requires an administrator only when `hadoop.security.instrumentation.requires.admin` is set to `true`, and otherwise allows any authenticated user; `/prom` allows any authenticated user.
 
 </div>

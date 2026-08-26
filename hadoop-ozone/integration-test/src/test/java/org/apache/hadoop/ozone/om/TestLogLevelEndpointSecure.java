@@ -45,6 +45,7 @@ import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.assertSetLogLe
 import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.enableSpnegoOnHttpClient;
 import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.getDnHttpAddress;
 import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.getKerberosHttpAddress;
+import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.getLogLevelResponseCodeWithSpnego;
 import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.getLogLevelWithSpnego;
 import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.getScmHttpAddress;
 import static org.apache.hadoop.ozone.om.LogLevelEndpointTestUtil.openUnauthenticatedConnection;
@@ -56,6 +57,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -96,10 +98,12 @@ public class TestLogLevelEndpointSecure {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration secureConf;
   private static UserGroupInformation adminUgi;
+  private static UserGroupInformation nonAdminUgi;
   private static String omHttpAddress;
   private static String scmHttpAddress;
   private static String dnHttpAddress;
   private static String adminPrincipal;
+  private static String nonAdminPrincipal;
   private static String host;
 
   @BeforeAll
@@ -116,6 +120,8 @@ public class TestLogLevelEndpointSecure {
     UserGroupInformation.setConfiguration(secureConf);
     adminUgi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
         adminPrincipal, secureConf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY));
+    nonAdminUgi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+        nonAdminPrincipal, new File(workDir, "user.keytab").getAbsolutePath());
     secureConf.set(OZONE_ADMINISTRATORS, adminUgi.getShortUserName());
     UserGroupInformation.setLoginUser(adminUgi);
 
@@ -190,13 +196,17 @@ public class TestLogLevelEndpointSecure {
 
       HttpURLConnection connection =
           openUnauthenticatedConnection(httpAddress, logger);
-      int responseCode = connection.getResponseCode();
-      assertNotEquals(HttpURLConnection.HTTP_OK, responseCode,
-          serviceName + " must not allow unauthenticated /logLevel access");
-      assertTrue(responseCode == HttpURLConnection.HTTP_UNAUTHORIZED
-              || responseCode == HttpURLConnection.HTTP_FORBIDDEN,
-          serviceName + " must reject unauthenticated /logLevel, got "
-              + responseCode);
+      try {
+        int responseCode = connection.getResponseCode();
+        assertNotEquals(HttpURLConnection.HTTP_OK, responseCode,
+            serviceName + " must not allow unauthenticated /logLevel access");
+        assertTrue(responseCode == HttpURLConnection.HTTP_UNAUTHORIZED
+                || responseCode == HttpURLConnection.HTTP_FORBIDDEN,
+            serviceName + " must reject unauthenticated /logLevel, got "
+                + responseCode);
+      } finally {
+        connection.disconnect();
+      }
     } finally {
       UserGroupInformation.setLoginUser(previousLoginUser);
       restoreSystemProperty("jdk.http.auth.tunneling.disabledSchemes",
@@ -204,6 +214,16 @@ public class TestLogLevelEndpointSecure {
       restoreSystemProperty("jdk.http.auth.proxying.disabledSchemes",
           previousDisabledProxySchemes);
     }
+  }
+
+  @ParameterizedTest(name = "reject authenticated non-admin GET /logLevel on {0}")
+  @MethodSource("secureHttpEndpoints")
+  void testLogLevelRejectsAuthenticatedNonAdmin(
+      String serviceName, String httpAddress, String logger) throws Exception {
+    int responseCode = runAs(nonAdminUgi,
+        () -> getLogLevelResponseCodeWithSpnego(httpAddress, logger));
+    assertEquals(HttpURLConnection.HTTP_FORBIDDEN, responseCode,
+        serviceName + " must reject authenticated non-admin /logLevel access");
   }
 
   static Stream<Arguments> secureHttpEndpoints() {
@@ -215,6 +235,11 @@ public class TestLogLevelEndpointSecure {
 
   private static String runAsAdmin(PrivilegedExceptionAction<String> action)
       throws Exception {
+    return runAs(adminUgi, action);
+  }
+
+  private static <T> T runAs(UserGroupInformation ugi,
+      PrivilegedExceptionAction<T> action) throws Exception {
     UserGroupInformation.setConfiguration(secureConf);
     UserGroupInformation previousLoginUser = UserGroupInformation.getLoginUser();
     String previousDisabledSchemes =
@@ -222,10 +247,10 @@ public class TestLogLevelEndpointSecure {
     String previousDisabledProxySchemes =
         System.getProperty("jdk.http.auth.proxying.disabledSchemes");
     try {
-      UserGroupInformation.setLoginUser(adminUgi);
-      adminUgi.setAuthenticationMethod(KERBEROS);
+      UserGroupInformation.setLoginUser(ugi);
+      ugi.setAuthenticationMethod(KERBEROS);
       enableSpnegoOnHttpClient();
-      return adminUgi.doAs(action);
+      return ugi.doAs(action);
     } finally {
       UserGroupInformation.setLoginUser(previousLoginUser);
       restoreSystemProperty("jdk.http.auth.tunneling.disabledSchemes",
@@ -264,6 +289,7 @@ public class TestLogLevelEndpointSecure {
     String hostAndRealm = host + "@" + realm;
     String httpSpnegoPrincipal = "HTTP/_HOST@" + realm;
     adminPrincipal = "om/" + hostAndRealm;
+    nonAdminPrincipal = "user/" + hostAndRealm;
 
     String scmPrincipal = "scm/" + hostAndRealm;
     secureConf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, scmPrincipal);
@@ -298,7 +324,9 @@ public class TestLogLevelEndpointSecure {
     File omKeytab = new File(secureConf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY));
     File spnegoKeytab =
         new File(secureConf.get(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE));
+    File userKeytab = new File(workDir, "user.keytab");
     miniKdc.createPrincipal(omKeytab, adminPrincipal, scmPrincipal);
     miniKdc.createPrincipal(spnegoKeytab, httpPrincipal);
+    miniKdc.createPrincipal(userKeytab, nonAdminPrincipal);
   }
 }

@@ -131,16 +131,24 @@ final class LogLevelEndpointTestUtil {
   static String getLogLevel(String address, String logger) throws Exception {
     HttpURLConnection connection =
         openUnauthenticatedConnection(address, logger);
-    assertEquals(HttpURLConnection.HTTP_OK, connection.getResponseCode());
-    return readResponse(connection);
+    try {
+      assertEquals(HttpURLConnection.HTTP_OK, connection.getResponseCode());
+      return readResponse(connection);
+    } finally {
+      connection.disconnect();
+    }
   }
 
   static String setLogLevel(String address, String logger, String level)
       throws Exception {
     HttpURLConnection connection =
         openUnauthenticatedConnection(address, logger, level);
-    assertEquals(HttpURLConnection.HTTP_OK, connection.getResponseCode());
-    return readResponse(connection);
+    try {
+      assertEquals(HttpURLConnection.HTTP_OK, connection.getResponseCode());
+      return readResponse(connection);
+    } finally {
+      connection.disconnect();
+    }
   }
 
   static String getLogLevelWithSpnego(String address, String logger)
@@ -166,10 +174,36 @@ final class LogLevelEndpointTestUtil {
     AuthenticatedURL.Token token = new AuthenticatedURL.Token();
     HttpURLConnection connection = (HttpURLConnection) authenticatedUrl
         .openConnection(url, token);
-    connection.connect();
-    assertEquals(HttpURLConnection.HTTP_OK, connection.getResponseCode(),
-        "Authenticated admin must receive /logLevel content");
-    return readResponse(connection);
+    try {
+      connection.connect();
+      assertEquals(HttpURLConnection.HTTP_OK, connection.getResponseCode(),
+          "Authenticated admin must receive /logLevel content");
+      return readResponse(connection);
+    } finally {
+      connection.disconnect();
+    }
+  }
+
+  /**
+   * SPNEGO-authenticate as the current login user and return the /logLevel
+   * response code without asserting it. The SPNEGO handshake completes on the
+   * servlet's default OPTIONS handling, so the admin-ACL check on the GET is
+   * what an authenticated non-admin user is rejected by.
+   */
+  static int getLogLevelResponseCodeWithSpnego(String address, String logger)
+      throws Exception {
+    URL url = new URL(buildLogLevelUrl(address, logger, null));
+    AuthenticatedURL authenticatedUrl =
+        new AuthenticatedURL(new KerberosAuthenticator());
+    AuthenticatedURL.Token token = new AuthenticatedURL.Token();
+    HttpURLConnection connection = (HttpURLConnection) authenticatedUrl
+        .openConnection(url, token);
+    try {
+      connection.connect();
+      return connection.getResponseCode();
+    } finally {
+      connection.disconnect();
+    }
   }
 
   static void assertGetLogLevelResponse(String response, String serviceName) {

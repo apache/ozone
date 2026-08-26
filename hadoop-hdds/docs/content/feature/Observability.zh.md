@@ -210,6 +210,6 @@ status: VOLUME_ALREADY_EXISTS
 
 <div class="alert alert-info" role="alert">
 
-实际上 `ozone insight` 是通过 HTTP 端点来检索所需的信息（`/conf`、`/prom` 和 `/logLevel` 端点）。在启用安全（Kerberos）的集群中，这些端点通过 SPNEGO 进行保护：请先执行 `kinit`，并且请求用户必须是 Ozone 管理员（`ozone.administrators`）。`ozone insight` 会自动完成 SPNEGO 协商。
+实际上 `ozone insight` 是通过 HTTP 端点来检索所需的信息（`/conf`、`/prom` 和 `/logLevel` 端点）。在启用安全（Kerberos）的集群中，这些端点通过 SPNEGO 进行保护，请先执行 `kinit`；`ozone insight` 会自动完成 SPNEGO 协商。不同端点的鉴权要求不同：`/logLevel` 要求请求用户必须是 Ozone 管理员（`ozone.administrators`）；`/conf` 仅当 `hadoop.security.instrumentation.requires.admin` 设置为 `true` 时才要求管理员权限，否则允许任意已认证用户访问；`/prom` 允许任意已认证用户访问。
 
 </div>
