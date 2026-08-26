@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.net.InetAddresses;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -156,10 +157,6 @@ public class BasicOzoneFileSystem extends FileSystem {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
-    if (authority.indexOf(':') != authority.lastIndexOf(':')) {
-      throw new IllegalArgumentException(IPV6_EXCEPTION_TEXT);
-    }
-
     Matcher matcher = URL_SCHEMA_PATTERN.matcher(authority);
 
     if (!matcher.matches()) {
@@ -168,6 +165,10 @@ public class BasicOzoneFileSystem extends FileSystem {
     String bucketStr = matcher.group(1);
     String volumeStr = matcher.group(2);
     String remaining = matcher.groupCount() == 3 ? matcher.group(3) : null;
+
+    if (!isEmpty(remaining) && remaining.contains(":") && InetAddresses.isInetAddress(remaining)) {
+      throw new IllegalArgumentException(IPV6_EXCEPTION_TEXT);
+    }
 
     String omHost = null;
     int omPort = -1;

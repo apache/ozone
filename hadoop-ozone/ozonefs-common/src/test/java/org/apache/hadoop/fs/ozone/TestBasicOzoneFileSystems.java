@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -30,8 +29,11 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.nullable;
+import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,10 +46,8 @@ import java.util.Collection;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -236,24 +236,14 @@ public class TestBasicOzoneFileSystems {
   @Test
   public void testO3fsConfiguredIpv6Endpoint() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
-        "[2001:db8::10]:9862");
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "[2001:db8::10]:9862");
     BasicOzoneFileSystem o3fs = spy(new BasicOzoneFileSystem());
-    BasicOzoneClientAdapterImpl adapter =
-        mock(BasicOzoneClientAdapterImpl.class);
-    doReturn(adapter).when(o3fs).createAdapter(any(), anyString(), anyString(),
-        nullable(String.class), anyInt());
+    BasicOzoneClientAdapterImpl adapter = mock(BasicOzoneClientAdapterImpl.class);
+    doReturn(adapter).when(o3fs).createAdapter(any(), anyString(), anyString(), nullable(String.class), anyInt());
 
     o3fs.initialize(new URI("o3fs://bucket.volume/"), conf);
 
-    ArgumentCaptor<ConfigurationSource> confCaptor =
-        ArgumentCaptor.forClass(ConfigurationSource.class);
-    ArgumentCaptor<String> hostCaptor = ArgumentCaptor.forClass(String.class);
-    verify(o3fs).createAdapter(confCaptor.capture(), anyString(), anyString(),
-        hostCaptor.capture(), anyInt());
-    assertNull(hostCaptor.getValue());
-    assertEquals("[2001:db8::10]:9862",
-        OmUtils.getOmRpcAddress(confCaptor.getValue()));
+    verify(o3fs).createAdapter(same(conf), eq("bucket"), eq("volume"), isNull(), eq(-1));
   }
 
   @Test
@@ -264,8 +254,6 @@ public class TestBasicOzoneFileSystems {
 
   @ParameterizedTest
   @CsvSource({
-      "o3fs://[2001:db8::10]/",
-      "o3fs://[2001:db8::10]:9862/",
       "o3fs://bucket.volume.2001:db8::10/",
       "o3fs://bucket.volume.2001:db8::10:9862/"
   })
@@ -274,6 +262,19 @@ public class TestBasicOzoneFileSystems {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> o3fs.initialize(new URI(uri), new OzoneConfiguration()));
     assertTrue(exception.getMessage().contains("use an OM service ID or DNS name instead"));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "o3fs://[2001:db8::10]/",
+      "o3fs://[2001:db8::10]:9862/",
+      "o3fs://bucket.volume.host:123:456/"
+  })
+  public void testO3fsMalformedAuthoritiesUseGeneralError(String uri) throws Exception {
+    BasicOzoneFileSystem o3fs = new BasicOzoneFileSystem();
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> o3fs.initialize(new URI(uri), new OzoneConfiguration()));
+    assertTrue(exception.getMessage().contains("Ozone file system URL should be one of the following formats"));
   }
 
   @Test

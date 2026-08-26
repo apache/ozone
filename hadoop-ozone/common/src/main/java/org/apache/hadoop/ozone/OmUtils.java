@@ -617,7 +617,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" + addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT));
   }
 
   /**
@@ -643,8 +644,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" +
-        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT));
   }
 
   public static File createOMDir(String dirPath) {

@@ -44,6 +44,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -249,6 +250,22 @@ public class TestOmUtils {
 
     assertEquals("[2001:db8::10]:100",
         OmUtils.getOmRpcAddress(conf, addressKey));
+  }
+
+  @Test
+  void getOmPeerHttpAddressesIpv6() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String serviceId = "service";
+    String nodeId = "node";
+    conf.set(ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, serviceId, nodeId),
+        "[2001:db8::10]:100");
+    conf.set(ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, serviceId, nodeId),
+        "[2001:db8::10]:200");
+
+    assertEquals("[2001:db8::10]:100",
+        OmUtils.getHttpAddressForOMPeerNode(conf, serviceId, nodeId, "fallback"));
+    assertEquals("[2001:db8::10]:200",
+        OmUtils.getHttpsAddressForOMPeerNode(conf, serviceId, nodeId, "fallback"));
   }
 
   @Test
