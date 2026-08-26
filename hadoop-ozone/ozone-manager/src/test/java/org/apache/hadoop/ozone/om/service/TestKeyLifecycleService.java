@@ -191,6 +191,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
   private static final AtomicInteger OBJECT_ID_COUNTER = new AtomicInteger();
   private static final int KEY_COUNT = 2;
   private static final int EXPIRE_SECONDS = 2;
+  // Date-based expiration compares the key's modificationTime against the date, so tests that rename or
+  // update a key after it was scanned need a date that stays in the future for the whole test.
+  private static final int LONG_EXPIRE_SECONDS = 600;
   private static final int SERVICE_INTERVAL = 300;
   private static final int WAIT_CHECK_INTERVAL = 50;
 
@@ -2092,7 +2095,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now.plusSeconds(LONG_EXPIRE_SECONDS);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       Thread.sleep(SERVICE_INTERVAL);
       KeyLifecycleService.getInjector(0).resume();
@@ -3235,7 +3238,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now.plusSeconds(LONG_EXPIRE_SECONDS);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       Thread.sleep(SERVICE_INTERVAL);
       KeyLifecycleService.getInjector(0).resume();
