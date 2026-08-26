@@ -179,12 +179,12 @@ public class TestOmKeyInfo {
       assertEquals(orig.isMultipartKey(), clone.isMultipartKey());
       assertEquals(orig.getVersion(), clone.getVersion());
 
-      assertEquals(orig.getLocationList().size(),
-          clone.getLocationList().size());
+      assertEquals(orig.createLocationList().size(),
+          clone.createLocationList().size());
 
-      for (int j = 0; j < orig.getLocationList().size(); j++) {
-        OmKeyLocationInfo origLocationInfo = orig.getLocationList().get(j);
-        OmKeyLocationInfo cloneLocationInfo = clone.getLocationList().get(j);
+      for (int j = 0; j < orig.createLocationList().size(); j++) {
+        OmKeyLocationInfo origLocationInfo = orig.createLocationList().get(j);
+        OmKeyLocationInfo cloneLocationInfo = clone.createLocationList().get(j);
         assertEquals(origLocationInfo, cloneLocationInfo);
       }
     }

@@ -94,7 +94,7 @@ public class ContainerMapper {
             for (OmKeyLocationInfoGroup keyLocationInfoGroup : keyInfo
                 .getKeyLocationVersions()) {
               List<OmKeyLocationInfo> keyLocationInfo = keyLocationInfoGroup
-                  .getLocationList();
+                  .createLocationList();
               for (OmKeyLocationInfo keyLocation : keyLocationInfo) {
                 BlockIdDetails blockIdDetails = new BlockIdDetails();
                 Map<Long, BlockIdDetails> innerMap = new HashMap<>();

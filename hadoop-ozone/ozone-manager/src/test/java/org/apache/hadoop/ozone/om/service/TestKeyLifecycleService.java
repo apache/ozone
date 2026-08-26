@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS;
@@ -87,6 +88,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -275,6 +277,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       keyLifecycleService.setOzoneTrash(null);
       keyLifecycleService.setMoveToTrashEnabled(true);
       KeyLifecycleService.setInjectors(null);
+      keyLifecycleService.setListMaxSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
+          OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
     }
 
     @AfterAll
@@ -567,6 +571,52 @@ class TestKeyLifecycleService extends OzoneTestBase {
         keyLifecycleService.resume();
         deleteLifecyclePolicy(volumeName, bucketName);
       }
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters1")
+    void testAbortedScanDoesNotMarkScanComplete(BucketLayout bucketLayout, boolean createPrefix)
+        throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
+      int testKeyCount = 3;
+
+      keyLifecycleService.setListMaxSize(1);
+      KeyLifecycleService.setInjectors(Arrays.asList(new FaultInjectorImpl()));
+
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, bucketLayout, testKeyCount, 1, keyPrefix, null);
+      assertEquals(testKeyCount, keyList.size());
+
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      if (createPrefix) {
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
+      } else {
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
+      }
+
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().contains(bucketKey),
+          WAIT_CHECK_INTERVAL, 10000);
+
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+          LoggerFactory.getLogger(KeyLifecycleService.class));
+      keyLifecycleService.suspend();
+      KeyLifecycleService.getInjector(0).resume();
+      GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+          WAIT_CHECK_INTERVAL, 10000);
+
+      OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+      assertNotNull(scanState);
+      assertNull(scanState.getScanEndTime(),
+          "Aborted scan must not persist scanEndTime so a new leader can resume");
+      assertTrue(logCapturer.getOutput().contains("KeyLifecycleService is suspended, disabled, or leader not ready"));
+      keyLifecycleService.resume();
+      deleteLifecyclePolicy(volumeName, bucketName);
     }
 
     @ParameterizedTest
@@ -1727,7 +1777,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
       Thread.sleep(SERVICE_INTERVAL);
-      assertEquals(dirDepth, getDirCount() - initialDirCount);
+
+      GenericTestUtils.waitFor(() -> dirDepth == getDirCount() - initialDirCount,
+          WAIT_CHECK_INTERVAL, 5000);
       assertEquals(0, getDeletedDirectoryCount() - initialDeletedDirCount);
 
       GenericTestUtils.LogCapturer log =
@@ -2631,6 +2683,74 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
 
     @Test
+    void testMoveToTrashAbortTaskWhenTrashRootPrepareFails() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String keyPrefix = "key";
+      String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
+      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+
+      List<OmKeyArgs> createdKeys =
+          createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, 1, 1, keyPrefix, null);
+      assertEquals(1, createdKeys.size());
+      Thread.sleep(SERVICE_INTERVAL);
+      GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == 1,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      keyLifecycleService.setMoveToTrashEnabled(true);
+      final float trashInterval = 0.5f;
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>)
+              () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+
+      OmLifecycleConfiguration policy = new OmLifecycleConfiguration.Builder()
+          .setVolume(volumeName)
+          .setBucket(bucketName)
+          .setBucketLayout(FILE_SYSTEM_OPTIMIZED)
+          .setBucketObjectID(bucketObjectID)
+          .setRules(Collections.singletonList(new OmLCRule.Builder()
+              .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
+              .setEnabled(true)
+              .setPrefix("")
+              .setAction(new OmLCExpiration.Builder()
+                  .setDate(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS).toString())
+                  .build())
+              .build()))
+          .build();
+
+      String expectedTrashRoot = new Path(TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner, CURRENT).toString();
+      OzoneManager omSpy = spy(om);
+      doThrow(new IOException("Injected trash root prepare failure"))
+          .when(omSpy).getFileStatus(argThat(key ->
+              key != null
+                  && volumeName.equals(key.getVolumeName())
+                  && bucketName.equals(key.getBucketName())
+                  && expectedTrashRoot.equals(key.getKeyName())));
+
+      Field ozoneManagerField = KeyLifecycleService.class.getDeclaredField("ozoneManager");
+      ozoneManagerField.setAccessible(true);
+      ozoneManagerField.set(keyLifecycleService, omSpy);
+
+      GenericTestUtils.LogCapturer log =
+          GenericTestUtils.LogCapturer.captureLogs(LoggerFactory.getLogger(KeyLifecycleService.class));
+      try {
+        KeyLifecycleService.LifecycleActionTask task = keyLifecycleService.new LifecycleActionTask(policy);
+        task.call();
+
+        assertTrue(log.getOutput().contains("Failed to prepare trash root"));
+        assertTrue(log.getOutput().contains("Failed to evaluate lifecycle configuration for bucket"));
+        // Verify local bucket state instead of global lifecycle metrics, which are shared across parameterized runs.
+        assertNotNull(writeClient.getKeyInfo(createdKeys.get(0), false));
+        assertEquals(1, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+      } finally {
+        ozoneManagerField.set(keyLifecycleService, om);
+        log.stopCapturing();
+      }
+    }
+
+    @Test
     void testAbortIncompleteMultipartUploadWithFilters() throws Exception {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
@@ -3435,9 +3555,14 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
   }
 
-  private long getDirCount() throws IOException {
+  private long getDirCount() {
     final Table<String, OmDirectoryInfo> table = metadataManager.getDirectoryTable();
-    return metadataManager.countRowsInTable(table);
+    try {
+      return metadataManager.countRowsInTable(table);
+    } catch (IOException e) {
+      fail("Failed to count directories " + e.getMessage());
+      return -1;
+    }
   }
 
   private long getKeyCount(BucketLayout layout) {

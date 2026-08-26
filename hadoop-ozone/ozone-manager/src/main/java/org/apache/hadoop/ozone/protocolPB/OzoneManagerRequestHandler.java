@@ -1121,7 +1121,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
   }
 
-  private RefetchSecretKeyResponse refetchSecretKey() {
+  private RefetchSecretKeyResponse refetchSecretKey() throws IOException {
     UUID uuid = impl.refetchSecretKey();
     RefetchSecretKeyResponse response =
         RefetchSecretKeyResponse.newBuilder()
