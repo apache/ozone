@@ -527,8 +527,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
                   activeDbDeletedKeyInfo.getKeyName());
           OmKeyInfo snap1keyInfo = snap1KeyTable.get(keyForSnap);
           assertEquals(activeDbDeletedKeyInfo.getLatestVersionLocations()
-              .getLocationList(), snap1keyInfo.getLatestVersionLocations()
-              .getLocationList());
+              .createLocationList(), snap1keyInfo.getLatestVersionLocations()
+              .createLocationList());
         }
       }
     }
