@@ -128,6 +128,9 @@ public final class S3Consts {
   // tag limit for bucket
   public static final int TAG_BUCKET_NUM_LIMIT = 50;
 
+  /** Request header carrying the list of object attributes to return. */
+  public static final String OBJECT_ATTRIBUTES_HEADER = "x-amz-object-attributes";
+
   //Never Constructed
   private S3Consts() {
 
@@ -170,6 +173,7 @@ public final class S3Consts {
     public static final String UPLOAD_ID_MARKER = "upload-id-marker";
     public static final String UPLOADS = "uploads";
     public static final String LIFECYCLE = "lifecycle";
+    public static final String ATTRIBUTES = "attributes";
 
     private QueryParams() {
       // no instances

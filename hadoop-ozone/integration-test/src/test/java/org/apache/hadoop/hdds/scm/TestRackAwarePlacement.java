@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -287,7 +288,9 @@ public class TestRackAwarePlacement {
     for (ContainerInfo c : scm.getContainerManager().getContainers()) {
       Set<ContainerReplica> r =
           scm.getContainerManager().getContainerReplicas(c.containerID());
-      if (r.size() >= 3) {
+      // Start with a normally replicated container so stopping one datanode
+      // must trigger creation of a replacement replica.
+      if (r.size() == 3) {
         targetContainer = c;
         replicas = r;
         break;
@@ -311,29 +314,52 @@ public class TestRackAwarePlacement {
       }
     }, 500, 30_000);
 
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return scm.getContainerManager()
-            .getContainerReplicas(containerID)
-            .size() >= 3;
-      } catch (Exception e) {
-        return false;
-      }
-    }, 1_000, 60_000);
+    waitForRackAwareReplication(scm, containerID, stoppedDn);
 
-    Set<String> racks = scm.getContainerManager()
-        .getContainerReplicas(containerID)
-        .stream()
-        .map(r -> r.getDatanodeDetails().getNetworkLocation())
-        .collect(Collectors.toSet());
+    Set<String> racks = getReplicaRacks(scm.getContainerManager()
+        .getContainerReplicas(containerID));
 
     assertTrue(racks.size() >= 2,
         "Container replicas after re-replication should span at least "
             + "2 racks, but were on: " + racks);
   }
 
-  private static void assertRackAssignments(MiniOzoneCluster cluster,
-                                            String[] expectedRacks) {
+  private static void waitForRackAwareReplication(
+      StorageContainerManager scm, ContainerID containerID,
+      DatanodeDetails stoppedDn)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Set<ContainerReplica> current = scm.getContainerManager()
+            .getContainerReplicas(containerID);
+
+        // Starting with exactly 3 replicas ensures that removing the dead
+        // replica requires a replacement. Use >= here to allow temporary
+        // over-replication while placement repair converges.
+        boolean deadReplicaRemoved = current.stream()
+            .noneMatch(replica -> stoppedDn.equals(
+                replica.getDatanodeDetails()));
+        boolean replicaCountRestored = current.size() >= 3;
+        boolean rackAware = getReplicaRacks(current).size() >= 2;
+
+        // Replica reports and placement repair are asynchronous. Wait for the
+        // replacement and the resulting rack-aware placement to be visible.
+        return deadReplicaRemoved && replicaCountRestored && rackAware;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1_000, 60_000);
+  }
+
+  private static Set<String> getReplicaRacks(
+      Set<ContainerReplica> replicas) {
+    return replicas.stream()
+        .map(replica -> replica.getDatanodeDetails().getNetworkLocation())
+        .collect(Collectors.toSet());
+  }
+
+  private void assertRackAssignments(MiniOzoneCluster cluster,
+                                     String[] expectedRacks) {
     NodeManager nodeManager =
         cluster.getStorageContainerManager().getScmNodeManager();
     List<? extends DatanodeDetails> allNodes = nodeManager.getAllNodes();
@@ -368,8 +394,8 @@ public class TestRackAwarePlacement {
     }
   }
 
-  private static void assertHostnameAssignments(MiniOzoneCluster cluster,
-                                                String[] expectedHosts) {
+  private void assertHostnameAssignments(MiniOzoneCluster cluster,
+                                         String[] expectedHosts) {
     NodeManager nodeManager =
         cluster.getStorageContainerManager().getScmNodeManager();
     List<? extends DatanodeDetails> allNodes = nodeManager.getAllNodes();

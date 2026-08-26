@@ -31,8 +31,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -49,7 +51,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -222,9 +223,8 @@ public class TestContainerStateManagerIntegration {
   }
 
   @Test
-  @Flaky("HDDS-1159")
   public void testGetMatchingContainerMultipleThreads()
-      throws IOException, InterruptedException {
+      throws IOException, InterruptedException, ExecutionException, TimeoutException {
     ContainerWithPipeline container1 = scm.getClientProtocolServer().
         allocateContainer(SCMTestUtils.getReplicationType(conf),
             SCMTestUtils.getReplicationFactor(conf), OzoneConsts.OZONE);
@@ -234,8 +234,9 @@ public class TestContainerStateManagerIntegration {
 
     // allocate blocks using multiple threads
     int numBlockAllocates = 100000;
+    CompletableFuture<?>[] futures = new CompletableFuture[numBlockAllocates];
     for (int i = 0; i < numBlockAllocates; i++) {
-      CompletableFuture.supplyAsync(() -> {
+      futures[i] = CompletableFuture.supplyAsync(() -> {
         ContainerInfo info = containerManager
             .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
                 container1.getPipeline());
@@ -244,12 +245,12 @@ public class TestContainerStateManagerIntegration {
         return null;
       }, executor);
     }
+    CompletableFuture.allOf(futures).get(60, TimeUnit.SECONDS);
 
     // make sure pipeline has has numContainerPerOwnerInPipeline number of
     // containers.
     assertEquals(numContainerPerOwnerInPipeline, scm.getPipelineManager()
             .getNumberOfContainers(container1.getPipeline().getId()));
-    Thread.sleep(5000);
     long threshold = 2000;
     // check the way the block allocations are distributed in the different
     // containers.
