@@ -1367,6 +1367,38 @@ STS Role On Chained Linked Bucket Grants GetObject On Source Bucket
     Head Bucket Should Succeed    ${STS_LINK_BUCKET_CHAIN_FINAL}
     Get Object Should Succeed     ${STS_LINK_BUCKET_CHAIN_FINAL}            ${STS_LINK_BUCKET_CHAIN_TESTFILE}
 
+Get Caller Identity With Permanent Credentials Should Succeed
+    Configure AWS Profile         permanent  ${PERMANENT_ACCESS_KEY_ID}  ${PERMANENT_SECRET_KEY}
+    ${json}  ${account}  ${arn}  ${userId} =                    Get Caller Identity    permanent
+    Should Be Equal               ${account}                    123456789012
+    ${principal} =                Execute                       klist | awk '/Default principal/ {print $3}'
+    Should Be Equal               ${userId}                     ${principal}
+    Should Be Equal               ${arn}                        arn:aws:iam::123456789012:user/${ICEBERG_SVC_CATALOG_USER}
+
+Get Caller Identity With STS Credentials Should Succeed
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${json}  ${account}  ${arn}  ${userId} =                    Get Caller Identity    sts
+    Should Be Equal               ${account}                    123456789012
+    Should Be Equal               ${userId}                     ${STS_ASSUMED_ROLE_ID}
+    Should Be Equal               ${arn}                        ${STS_ASSUMED_ROLE_USER_ARN}
+
+Get Caller Identity Ignores Extra Parameters
+    # curl 7.76.1 produces an invalid SigV4 signature for STS GET requests with --get --data-urlencode.
+    ${extra_curl_params} =        Set Variable                  --data-urlencode "RoleArn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}" --data-urlencode "RoleSessionName=${ROLE_SESSION_NAME}" --data-urlencode "DurationSeconds=3600"
+    ${output} =                   Get Caller Identity Using Curl  ${PERMANENT_ACCESS_KEY_ID}  ${PERMANENT_SECRET_KEY}  extra_curl_params=${extra_curl_params}
+    Should Contain                ${output}                     123456789012
+    @{http_codes} =               Get Regexp Matches            ${output}    (?m)^HTTP/[0-9.]+ ([0-9]{3})    1
+    ${code_count} =               Get Length                    ${http_codes}
+    Should Be True                ${code_count} > 0             Expected to find an HTTP status code in curl output, but none was found.
+    ${http_code} =                Get From List                 ${http_codes}    -1
+    Should Be Equal As Strings    ${http_code}                  200
+
+Get Caller Identity Rejects Missing Version
+    Get Caller Identity Should Fail                             InvalidAction
+
+Get Caller Identity Rejects Invalid Version
+    Get Caller Identity Should Fail                             InvalidAction    api_version=2020-01-01
+
 Expired STS temporary credentials must return ExpiredToken on S3 APIs
     # Increase timeout to account for 15 minute STS token expiration plus the time to execute the api calls
     [Timeout]                     25 minutes

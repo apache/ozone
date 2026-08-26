@@ -111,10 +111,14 @@ Assume Role And Get Temporary Credentials
     ${stsAccessKeyId} =           Execute                       echo '${json}' | jq -r '.Credentials.AccessKeyId'
     ${stsSecretKey} =             Execute                       echo '${json}' | jq -r '.Credentials.SecretAccessKey'
     ${stsSessionToken} =          Execute                       echo '${json}' | jq -r '.Credentials.SessionToken'
+    ${assumedRoleId} =            Execute                       echo '${json}' | jq -r '.AssumedRoleUser.AssumedRoleId'
+    ${assumedRoleUserArn} =       Execute                       echo '${json}' | jq -r '.AssumedRoleUser.Arn'
     Should Start With             ${stsAccessKeyId}             ASIA
     Set Global Variable           ${STS_ACCESS_KEY_ID}          ${stsAccessKeyId}
     Set Global Variable           ${STS_SECRET_KEY}             ${stsSecretKey}
     Set Global Variable           ${STS_SESSION_TOKEN}          ${stsSessionToken}
+    Set Global Variable           ${STS_ASSUMED_ROLE_ID}        ${assumedRoleId}
+    Set Global Variable           ${STS_ASSUMED_ROLE_USER_ARN}  ${assumedRoleUserArn}
 
     ${expected_duration} =        Set Variable                  ${duration_seconds}
     # Ensure the expected duration defaults to 3600 seconds (1 hour) if not specified
@@ -336,3 +340,36 @@ Assert Listed Keys Should Equal
     Sort List                     ${expected_sorted}
     ${actual_list} =              Evaluate                      json.loads($actual_keys_json)    modules=json
     Lists Should Be Equal         ${actual_list}                ${expected_sorted}
+
+Get Caller Identity
+    [Arguments]                   ${profile}
+    ${json} =                     Execute                       aws sts get-caller-identity --endpoint-url ${STS_ENDPOINT_URL} --output json --profile ${profile}
+    ${account} =                  Execute                       echo '${json}' | jq -r '.Account'
+    ${arn} =                      Execute                       echo '${json}' | jq -r '.Arn'
+    ${userId} =                   Execute                       echo '${json}' | jq -r '.UserId'
+    [Return]                      ${json}                       ${account}    ${arn}    ${userId}
+
+Get Caller Identity Using Curl
+    # AWS CLI always sends Version=2011-06-15 and rejects unknown flags, so use curl to test version validation.
+    # curl 7.76.1's --aws-sigv4 omits the port from the signed canonical "host" header (it signs "host:s3g"
+    # while sending "Host: s3g:9880"), so Ozone's SigV4 validation for the non-default STS port rejects it.
+    # Send an explicit Host header without the port so the sent and signed host values match.
+    # This should also work for newer versions of curl as well
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${api_version}=2011-06-15  ${extra_curl_params}=${EMPTY}
+    ${sts_host} =                 Evaluate                      urllib.parse.urlparse("${STS_ENDPOINT_URL}").hostname    modules=urllib.parse
+    ${cmd} =                      Set Variable                  curl --silent --show-error --include --request POST --aws-sigv4 "aws:amz:us-east-1:sts" --user '${perm_access_key_id}:${perm_secret_key}' --header "Host: ${sts_host}" --header "Content-Type: application/x-www-form-urlencoded" --data-urlencode "Action=GetCallerIdentity"
+    ${cmd} =                      Set Variable If               '${api_version}' != '${EMPTY}'    ${cmd} --data-urlencode "Version=${api_version}"    ${cmd}
+    ${cmd} =                      Set Variable If               '${extra_curl_params}' != '${EMPTY}'    ${cmd} ${extra_curl_params}    ${cmd}
+    ${cmd} =                      Set Variable                  ${cmd} ${STS_ENDPOINT_URL}
+    ${output} =                   Execute And Ignore Error      ${cmd}
+    [Return]                      ${output}
+
+Get Caller Identity Should Fail
+    [Arguments]                   ${expected_error_contains}    ${api_version}=${EMPTY}
+    ${output} =                   Get Caller Identity Using Curl  ${PERMANENT_ACCESS_KEY_ID}  ${PERMANENT_SECRET_KEY}  api_version=${api_version}
+    Should Contain                ${output}                     ${expected_error_contains}
+    @{http_codes} =               Get Regexp Matches            ${output}    (?m)^HTTP/[0-9.]+ ([0-9]{3})    1
+    ${code_count} =               Get Length                    ${http_codes}
+    Should Be True                ${code_count} > 0             Expected to find an HTTP status code in curl output, but none was found.
+    ${http_code} =                Get From List                 ${http_codes}    -1
+    Should Be Equal As Strings    ${http_code}                  400
