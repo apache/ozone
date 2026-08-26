@@ -208,7 +208,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
 
           long expected = nodeManager.getContainers(dn).size();
           long actual = usageInfoList.get(0).getContainerCount();
-          LOG.info("Container count expected: {}, actual: {}", expected, actual);
+          LOG.info("Container count expected: {}, actual: {}, dn: {}", expected, actual, dn.getUuidString());
 
           return expected == actual;
         } catch (Exception e) {
