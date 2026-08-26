@@ -222,10 +222,19 @@ public class TestVirtualHostStyleFilter {
    * IPv6 Host header whether it is configured with or without brackets. Before
    * normalization a bracketed config ({@code [::1]}) failed to match
    * {@code Host: [::1]:9878}, which {@code getHost()} reduces to {@code ::1}.
+   * The client does not have to spell the address the way the operator did
+   * either, since both name the same gateway.
    */
   @ParameterizedTest
-  @CsvSource(value = {"[::1]", "::1"})
-  public void testPathStyleWithIPv6Domain(String configuredDomain)
+  @CsvSource(value = {
+      "[::1],[::1]:9878",
+      "[::1],[::1]",
+      "::1,[::1]:9878",
+      "::1,[::1]",
+      "[::1],[0:0:0:0:0:0:0:1]:9878",
+      "2001:db8::1,[2001:DB8::1]:9878",
+  })
+  public void testPathStyleWithIPv6Domain(String configuredDomain, String host)
       throws Exception {
     conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, configuredDomain);
     VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
@@ -233,8 +242,27 @@ public class TestVirtualHostStyleFilter {
 
     // Path-style request whose Host matches the IPv6 domain is left unchanged.
     ContainerRequestContext requestContext = mock(ContainerRequestContext.class);
-    when(requestContext.getHeaderString(HttpHeaders.HOST)).thenReturn("[::1]:9878");
+    when(requestContext.getHeaderString(HttpHeaders.HOST)).thenReturn(host);
     virtualHostStyleFilter.filter(requestContext);
     verify(requestContext, never()).setRequestUri(any(URI.class), any(URI.class));
+  }
+
+  /**
+   * An IPv6 literal cannot carry a bucket prefix, so an address that merely
+   * ends with the configured domain is a different host, not a virtual host
+   * style request for a bucket named after the leading segments.
+   */
+  @ParameterizedTest
+  @CsvSource(value = {"[2001:db8::1]:9878", "[2001:db8::1]", "2001:db8::1"})
+  public void testIPv6HostOutsideConfiguredDomain(String host) {
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, "[::1]");
+    VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
+    virtualHostStyleFilter.setConfiguration(conf);
+
+    ContainerRequestContext requestContext =
+        createRequestContext(host, "/mybucket/myfile");
+    InvalidRequestException exception = assertThrows(InvalidRequestException.class,
+        () -> virtualHostStyleFilter.filter(requestContext));
+    assertThat(exception).hasMessageContaining("No matching domain");
   }
 }

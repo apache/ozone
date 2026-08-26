@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NA
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
+import com.google.common.net.InetAddresses;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
@@ -127,12 +128,29 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
   }
 
   /**
-   * This method finds the longest match with the domain name.
+   * This method finds the longest match with the domain name, except for a host
+   * that still holds a colon once its port is stripped, which has to be one of
+   * the configured domains itself, compared as an address rather than as text.
    * @param host
    * @return domain name matched with the host. if none of them are matching,
    * return null.
    */
   private String getDomainName(String host) {
+    // A colon at this point means an IPv6 literal (or a Host header malformed
+    // enough that checkHostWithoutPort returned it as it came), and neither can
+    // carry a bucket prefix. Matched by suffix, 2001:db8::1 would match the
+    // domain ::1 and be read as a request for a bucket named "2001:db8".
+    if (host.indexOf(':') >= 0) {
+      for (String domainVal : domains) {
+        if (isSameAddress(host, domainVal)) {
+          // The host itself, so that the caller sees nothing left in front of
+          // the domain to read as a bucket, however the two spell the address.
+          return host;
+        }
+      }
+      return null;
+    }
+
     String match = null;
     int length = 0;
     for (String domainVal : domains) {
@@ -164,6 +182,20 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
       // than failing with an internal error.
       return host;
     }
+  }
+
+  /**
+   * Compares a host with a configured domain by address rather than by
+   * spelling, so that a client writing the gateway's address in a form other
+   * than the configured one still reaches it: ::1 and 0:0:0:0:0:0:0:1 are the
+   * same address, and hexadecimal digits may be in either case.
+   */
+  private static boolean isSameAddress(String host, String domain) {
+    if (host.equals(domain)) {
+      return true;
+    }
+    return InetAddresses.isInetAddress(host) && InetAddresses.isInetAddress(domain)
+        && InetAddresses.forString(host).equals(InetAddresses.forString(domain));
   }
 
   /**
