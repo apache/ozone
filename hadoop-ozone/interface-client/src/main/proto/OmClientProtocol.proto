@@ -169,6 +169,7 @@ enum Type {
   AssumeRole = 153;
   RevokeSTSToken = 154;
   DeleteRevokedSTSTokens = 155;
+  GetCallerIdentity = 156;
 }
 
 enum SafeMode {
@@ -333,6 +334,7 @@ message OMRequest {
   optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 155;
   optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 156;
   optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 157;
+  optional GetCallerIdentityRequest         getCallerIdentityRequest       = 158;
 }
 
 message OMResponse {
@@ -481,6 +483,7 @@ message OMResponse {
   optional AssumeRoleResponse                assumeRoleResponse             = 153;
   optional RevokeSTSTokenResponse            revokeSTSTokenResponse         = 154;
   optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 155;
+  optional GetCallerIdentityResponse         getCallerIdentityResponse      = 156;
 }
 
 enum Status {
@@ -1600,6 +1603,8 @@ message OMTokenProto {
     optional string originalAccessKeyId = 18;
     optional string secretAccessKey     = 19;
     optional string sessionPolicy       = 20;
+    optional string assumedRoleId       = 21;
+    optional string assumedRoleUserArn  = 22;
 }
 
 message SecretKeyProto {
@@ -2553,6 +2558,15 @@ message DeleteRevokedSTSTokensRequest {
 }
 
 message DeleteRevokedSTSTokensResponse {
+}
+
+message GetCallerIdentityRequest {
+}
+
+message GetCallerIdentityResponse {
+  optional string account = 1;
+  optional string arn     = 2;
+  optional string userId  = 3;
 }
 
 enum ReadConsistencyProto {

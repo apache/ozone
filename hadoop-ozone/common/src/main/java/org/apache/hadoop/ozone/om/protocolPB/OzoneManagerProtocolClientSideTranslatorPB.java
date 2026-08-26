@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -2978,6 +2979,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     return AssumeRoleResponseInfo.fromProtobuf(
         handleError(submitRequest(omRequest)).getAssumeRoleResponse());
+  }
+
+  @Override
+  public CallerIdentityInfo getCallerIdentity() throws IOException {
+    final OMRequest omRequest = createOMRequest(Type.GetCallerIdentity)
+        .setGetCallerIdentityRequest(OzoneManagerProtocolProtos.GetCallerIdentityRequest.newBuilder().build())
+        .build();
+
+    return CallerIdentityInfo.fromProtobuf(handleError(submitRequest(omRequest)).getGetCallerIdentityResponse());
   }
 
   @Override

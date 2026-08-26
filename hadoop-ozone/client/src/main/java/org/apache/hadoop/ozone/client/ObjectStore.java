@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -810,6 +811,15 @@ public class ObjectStore {
   public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
       String awsIamSessionPolicy, String requestId) throws IOException {
     return proxy.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy, requestId);
+  }
+
+  /**
+   * Returns the caller identity for the current S3-authenticated request.
+   * @return CallerIdentityInfo containing account, arn, and userId
+   * @throws IOException if an error occurs during the GetCallerIdentity operation
+   */
+  public CallerIdentityInfo getCallerIdentity() throws IOException {
+    return proxy.getCallerIdentity();
   }
 
   /**

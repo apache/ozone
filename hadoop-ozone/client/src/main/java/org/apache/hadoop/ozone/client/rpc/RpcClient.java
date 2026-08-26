@@ -130,6 +130,7 @@ import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -3019,6 +3020,11 @@ public class RpcClient implements ClientProtocol {
   public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
       String awsIamSessionPolicy, String requestId) throws IOException {
     return ozoneManagerClient.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy, requestId);
+  }
+
+  @Override
+  public CallerIdentityInfo getCallerIdentity() throws IOException {
+    return ozoneManagerClient.getCallerIdentity();
   }
 
   @Override
