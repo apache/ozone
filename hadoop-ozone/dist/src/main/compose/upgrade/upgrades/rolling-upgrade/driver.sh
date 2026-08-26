@@ -34,6 +34,13 @@ echo "--- RUNNING ROLLING UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRAD
 
 source "$TEST_DIR"/testlib.sh
 
+# The first upgrade (old -> new) is always exercised as a rolling (zero-downtime) upgrade,
+# since that is the path this suite exists to prove. The downgrade and the subsequent
+# re-upgrade are run NON-ROLLING (all servers restarts at once) to save CI time. The
+# rolling versions of those two phases are switched off here. Set this to "true" to run all
+# three phases as rolling (e.g. when debugging the full zero-downtime downgrade path).
+DOWNGRADE_AND_REUPGRADE_ROLLING=false
+
 ## @description Restart one service with the target image.
 ## @param name of the service
 ## @param stage prefix, used for the data prefix
@@ -104,6 +111,29 @@ rolling_restart_all_services() {
   fi
 }
 
+## @description Restart all server services at once (non-rolling) with the target image.
+## @param stage prefix, used for OUTPUT_NAME
+## @param target image
+non_rolling_restart_all_services() {
+  local stage_prefix="$1"
+  local target_image="$2"
+  local services=(scm1 scm2 scm3 recon dn1 dn2 dn3 dn4 dn5 om1 om2 om3 s3g1 s3g2 s3g3)
+
+  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}"
+
+  prepare_for_image "${target_image}"
+  echo "--- PREPARED ${target_image} IMAGE ---"
+
+  echo "--- STOPPING ALL SERVER SERVICES ---"
+  stop_containers "${services[@]}"
+
+  echo "--- STARTING ALL SERVER SERVICES WITH IMAGE ${target_image} ---"
+  create_containers "${services[@]}"
+
+  wait_for_safemode_exit
+  wait_for_om_leader
+}
+
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-1-original"
 prepare_for_image "$OZONE_UPGRADE_FROM"
@@ -119,14 +149,22 @@ rolling_restart_all_services "2-upgrade" "$OZONE_UPGRADE_TO"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-pre-finalized"
 callback with_this_version_pre_finalized
 
-echo "--- ROLLING DOWNGRADE TO $OZONE_UPGRADE_FROM ---"
-rolling_restart_all_services "3-downgrade" "$OZONE_UPGRADE_FROM" "reverse"
+echo "--- DOWNGRADE TO $OZONE_UPGRADE_FROM ---"
+if [[ "$DOWNGRADE_AND_REUPGRADE_ROLLING" == "true" ]]; then
+  rolling_restart_all_services "3-downgrade" "$OZONE_UPGRADE_FROM" "reverse"
+else
+  non_rolling_restart_all_services "3-downgrade" "$OZONE_UPGRADE_FROM"
+fi
 
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-3-downgraded"
 callback with_old_version_downgraded
 
-echo "--- ROLLING UPGRADE TO $OZONE_UPGRADE_TO ---"
-rolling_restart_all_services "4-upgrade" "$OZONE_UPGRADE_TO"
+echo "--- UPGRADE TO $OZONE_UPGRADE_TO ---"
+if [[ "$DOWNGRADE_AND_REUPGRADE_ROLLING" == "true" ]]; then
+  rolling_restart_all_services "4-upgrade" "$OZONE_UPGRADE_TO"
+else
+  non_rolling_restart_all_services "4-upgrade" "$OZONE_UPGRADE_TO"
+fi
 
 # Upgrade client after all server components are upgraded but before finalization,
 # so new client APIs can be exercised against pre-finalized servers.
