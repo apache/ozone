@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.Config;
@@ -79,6 +80,7 @@ import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealt
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -530,8 +532,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         1, sourceWithCmds);
 
     ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(
-        containerID, target,
-        ScmVersionManager.computeCommonVersion(Arrays.asList(source, target)));
+        containerID, target, computeVersionForReplication(source, target));
     cmd.setReplicaIndex(replicaIndex);
     sendDatanodeCommand(cmd, containerInfo, source);
   }
@@ -550,6 +551,20 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     DatanodeDetails target = selectAndOptionallyExcludeDatanode(
         rmConf.getReconstructionCommandWeight(), targetWithCmds);
     sendDatanodeCommand(command, containerInfo, target);
+  }
+
+  private ComponentVersion computeVersionForReplication(DatanodeDetails source, DatanodeDetails target) {
+    return ScmVersionManager.computeVersionForReplication(
+        Arrays.asList(getDatanodeInfo(source), getDatanodeInfo(target)));
+  }
+
+  private DatanodeInfo getDatanodeInfo(DatanodeDetails dnDetails) {
+    DatanodeInfo datanodeInfo = nodeManager.getNode(dnDetails.getID());
+    if (datanodeInfo == null) {
+      throw new IllegalArgumentException("Datanode " + dnDetails + " not " +
+          "found in NodeManager. Should not happen");
+    }
+    return datanodeInfo;
   }
 
   private DatanodeDetails selectAndOptionallyExcludeDatanode(
@@ -631,8 +646,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       DatanodeDetails target, long scmDeadlineEpochMs)
       throws NotLeaderException {
     final ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
-        container.getContainerID(), target,
-        ScmVersionManager.computeCommonVersion(Arrays.asList(source, target)));
+        container.getContainerID(), target, computeVersionForReplication(source, target));
     command.setReplicaIndex(replicaIndex);
     command.setPriority(ReplicationCommandPriority.LOW);
     sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);

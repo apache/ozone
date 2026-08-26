@@ -21,9 +21,13 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
@@ -58,14 +62,26 @@ public class ScmVersionManager extends RatisBasedVersionManager {
     upgradeActions = upgradeActionProvider.load();
   }
 
-  public static HDDSVersion computeCommonVersion(List<DatanodeDetails> datanodes) {
-    if (datanodes.isEmpty()) {
+  public static ComponentVersion computeVersionForReplication(List<DatanodeInfo> datanodes) {
+    return computeCommonVersion(datanodes.stream()
+        .map(DatanodeInfo::getLastKnownApparentVersion)
+        .collect(Collectors.toList()));
+  }
+
+  public static HDDSVersion computeVersionForClientWrite(List<DatanodeDetails> datanodes) {
+    return computeCommonVersion(datanodes.stream()
+        .map(DatanodeDetails::getCurrentVersion)
+        .collect(Collectors.toList()));
+  }
+
+  private static <T extends ComponentVersion> T computeCommonVersion(List<T> dnVersions) {
+    if (dnVersions.isEmpty()) {
       throw new IllegalArgumentException("No nodes provided");
     }
 
-    HDDSVersion minVersion = datanodes.get(0).getCurrentVersion();
-    for (int i = 1; i < datanodes.size(); i++) {
-      minVersion = ComponentVersion.min(datanodes.get(i).getCurrentVersion(), minVersion);
+    T minVersion = dnVersions.get(0);
+    for (int i = 1; i < dnVersions.size(); i++) {
+      minVersion = ComponentVersion.min(dnVersions.get(i), minVersion);
     }
     return minVersion;
   }

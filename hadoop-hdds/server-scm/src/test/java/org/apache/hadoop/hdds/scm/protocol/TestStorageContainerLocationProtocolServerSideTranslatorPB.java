@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.protocol;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -100,21 +100,19 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
 
   /**
    * Creates a pipeline member (left at {@link HDDSVersion#SOFTWARE_VERSION}) and registers it in the mocked node
-   * manager with the given live {@code currentVersion}, mirroring what a heartbeat records on SCM.
+   * manager registry with the given live {@code currentVersion}, mirroring what a heartbeat records on SCM.
    */
   private DatanodeDetails registerNode(HDDSVersion liveVersion) {
     DatanodeDetails dn = randomDatanodeDetails();
     // Test setup expects nodes to be created with the latest software version by default.
     assertEquals(HDDSVersion.SOFTWARE_VERSION, dn.getCurrentVersion());
-    setLiveVersion(dn, liveVersion);
-    return dn;
-  }
 
-  private void setLiveVersion(DatanodeDetails member, HDDSVersion version) {
-    DatanodeInfo info = new DatanodeInfo(member, NodeStatus.inServiceHealthy(),
+    // Add the node to the registry with a live version representing what it is reporting on heartbeat.
+    DatanodeInfo info = new DatanodeInfo(dn, NodeStatus.inServiceHealthy(),
         UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
-    info.setCurrentVersion(version);
-    registry.put(member.getID(), info);
+    info.setCurrentVersion(liveVersion);
+    registry.put(dn.getID(), info);
+    return dn;
   }
 
   private ContainerWithPipeline containerWithPipeline() {
@@ -128,11 +126,14 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
   }
 
   /** Asserts each serialized member carries its own live (registry) version. */
-  private void assertCurrentVersionsMatch(List<DatanodeDetailsProto> members) {
+  private void assertCurrentVersionsOverriddenAndMatch(List<DatanodeDetailsProto> members) {
     assertEquals(nodes.size(), members.size());
     for (DatanodeDetailsProto member : members) {
       DatanodeID id = DatanodeDetails.getFromProtoBuf(member).getID();
       assertEquals(registry.get(id).getCurrentVersion().serialize(), member.getCurrentVersion());
+      // All datanodes in the `nodes` list are in SOFTWARE_VERSION, but their live overrides have different versions
+      // meaning that no pipeline should be using SOFTWARE_VERSION as its overall version.
+      assertNotEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), member.getCurrentVersion());
     }
   }
 
@@ -144,7 +145,7 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
         GetContainerWithPipelineRequestProto.newBuilder().setContainerID(1L).build(), ClientVersion.CURRENT)
         .getContainerWithPipeline().getPipeline().getMembersList();
 
-    assertCurrentVersionsMatch(members);
+    assertCurrentVersionsOverriddenAndMatch(members);
   }
 
   @Test
@@ -155,7 +156,7 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
         GetContainerWithPipelineBatchRequestProto.newBuilder().addContainerIDs(1L).build(), ClientVersion.CURRENT)
         .getContainerWithPipelines(0).getPipeline().getMembersList();
 
-    assertCurrentVersionsMatch(members);
+    assertCurrentVersionsOverriddenAndMatch(members);
   }
 
   @Test
@@ -168,7 +169,7 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
         ClientVersion.CURRENT)
         .getContainerWithPipelines(0).getPipeline().getMembersList();
 
-    assertCurrentVersionsMatch(members);
+    assertCurrentVersionsOverriddenAndMatch(members);
   }
 
   @Test
@@ -183,7 +184,7 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
             .build(), ClientVersion.CURRENT)
         .getContainerWithPipeline().getPipeline().getMembersList();
 
-    assertCurrentVersionsMatch(members);
+    assertCurrentVersionsOverriddenAndMatch(members);
   }
 
   /**
@@ -201,12 +202,12 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
         .newBuilder()
         .setContainerID(1L)
         .build();
-    assertCurrentVersionsMatch(service.getContainerWithPipeline(requestProto, ClientVersion.CURRENT)
+    assertCurrentVersionsOverriddenAndMatch(service.getContainerWithPipeline(requestProto, ClientVersion.CURRENT)
         .getContainerWithPipeline().getPipeline().getMembersList());
 
     // Serialization overrides only the outgoing proto; the source pipeline copies keep their own version.
     for (DatanodeDetails member : nodes) {
-      assertEquals(HDDSVersion.DEFAULT_VERSION, member.getCurrentVersion());
+      assertEquals(HDDSVersion.SOFTWARE_VERSION, member.getCurrentVersion());
     }
   }
 

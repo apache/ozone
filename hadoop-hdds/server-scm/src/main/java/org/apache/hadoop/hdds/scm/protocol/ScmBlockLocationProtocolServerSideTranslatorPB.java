@@ -233,7 +233,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       if (pipelineProto == null) {
         // Pipeline members are frozen copies rebuilt from the replicated pipeline proto, so their currentVersion can
         // be stale; resolve the authoritative value from the live node registry before computing the minimum.
-        ComponentVersion pipelineVersion = ScmVersionManager.computeCommonVersion(currentNodes(pipeline.getNodes()));
+        ComponentVersion pipelineVersion =
+            ScmVersionManager.computeVersionForClientWrite(currentNodes(pipeline.getNodes()));
         pipelineProto = pipeline.getProtobufMessage(clientVersion, Name.IO_PORTS, pipelineVersion);
         pipelineProtoCache.put(pipeline.getId(), pipelineProto);
       }
