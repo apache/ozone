@@ -92,10 +92,13 @@ abstract class InputStreamTests {
         .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
-    enableShortCircuitRead(dir, conf);
+    int datanodeCount = getDatanodeCount();
+    if (datanodeCount == 1) {
+      enableShortCircuitRead(dir, conf);
+    }
 
     return MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(getDatanodeCount())
+        .setNumDatanodes(datanodeCount)
         .build();
   }
 
