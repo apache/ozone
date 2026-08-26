@@ -854,14 +854,19 @@ class TestKeyLifecycleService extends OzoneTestBase {
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
 
       // Inject to cause resume case for FSO with nested directory
+      FaultInjectorImpl firstTaskStart = new FaultInjectorImpl();
+      FaultInjectorImpl firstDelete = new FaultInjectorImpl();
       FaultInjectorImpl lastFaultInjector = new FaultInjectorImpl();
       lastFaultInjector.setException(new IOException("Injected exception for testing"));
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl(), lastFaultInjector));
+      KeyLifecycleService.setInjectors(Arrays.asList(firstTaskStart, firstDelete, lastFaultInjector));
       // Resume the service
       keyLifecycleService.resume();
-      KeyLifecycleService.getInjector(0).resume();
-      KeyLifecycleService.getInjector(1).resume();
+      // Returns once the aborted task is past its start, so it keeps using the injectors below
+      firstTaskStart.resume();
+      // Hold the follow-up task at its start, otherwise it overwrites the scan state asserted below
+      FaultInjectorImpl nextTaskStart = new FaultInjectorImpl();
+      KeyLifecycleService.setInjectors(Arrays.asList(nextTaskStart, firstDelete, lastFaultInjector));
+      firstDelete.resume();
 
       // wait for scanState to be updated
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
@@ -903,6 +908,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
           }
         }
       }
+
+      // Let the follow-up task resume from the saved state and finish the scan
+      nextTaskStart.resume();
 
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == testKeyCount, WAIT_CHECK_INTERVAL, 10000);
