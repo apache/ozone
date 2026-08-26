@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -139,6 +140,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Finaliz
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetDelegationTokenResponseProto;
@@ -2003,6 +2006,28 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         resp.hasContinuationToken() ? resp.getContinuationToken() : null,
         resp.getClientIDList(),
         resp.getKeyInfoList());
+  }
+
+  @Override
+  public BucketDeletedBytes getBucketDeletedBytes(String bucketPath)
+      throws IOException {
+    GetBucketDeletedBytesRequest request = GetBucketDeletedBytesRequest
+        .newBuilder()
+        .setBucketPath(bucketPath)
+        .build();
+    OMRequest omRequest = createOMRequest(Type.GetBucketDeletedBytes)
+        .setGetBucketDeletedBytesRequest(request)
+        .build();
+
+    GetBucketDeletedBytesResponse response = handleError(submitRequest(omRequest))
+        .getGetBucketDeletedBytesResponse();
+    return new BucketDeletedBytes(
+        response.getSnapshotTrappedBytes(),
+        response.getPurgeableBytes(),
+        response.getSnapshotTrappedKeys(),
+        response.getPurgeableKeys(),
+        response.getSnapshotTrappedDirs(),
+        response.getPurgeableDirs());
   }
 
   @Override
