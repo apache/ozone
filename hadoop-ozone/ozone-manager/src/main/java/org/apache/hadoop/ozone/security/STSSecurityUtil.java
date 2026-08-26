@@ -101,7 +101,7 @@ public final class STSSecurityUtil {
     final ManagedSecretKey secretKey;
     try {
       secretKey = getValidatedSecretKey(secretKeyId, secretKeyClient);
-      tokenId.setEncryptionKey(secretKey.getSecretKey().getEncoded());
+      tokenId.setManagedSecretKey(secretKey);
       tokenId.readFromByteArray(tokenBytes);
     } catch (OMException e) {
       throw e;
@@ -118,7 +118,7 @@ public final class STSSecurityUtil {
     }
 
     // Verify token signature against the original identifier bytes
-    if (!secretKey.isValidSignature(tokenBytes, token.getPassword())) {
+    if (!tokenId.isValidSignature(tokenBytes, token.getPassword())) {
       throw new SecretManager.InvalidToken("Invalid STS token - signature is not correct for token: " + tokenId);
     }
 
@@ -154,10 +154,14 @@ public final class STSSecurityUtil {
   private static Token<STSTokenIdentifier> decodeTokenFromString(String encodedToken)
       throws SecretManager.InvalidToken {
     final Token<STSTokenIdentifier> token = new Token<>();
+    // token.decodeFromUrlString() only declares IOException, but deserialization can throw
+    // unchecked exceptions (e.g. NegativeArraySizeException) when malformed input decodes to a
+    // negative byte-array length. Map those to InvalidToken (via catching RuntimeException)
+    // instead of failing the OM request.
     try {
       token.decodeFromUrlString(encodedToken);
       return token;
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       throw new SecretManager.InvalidToken("Failed to decode STS token string: " + e);
     }
   }
@@ -179,6 +183,9 @@ public final class STSSecurityUtil {
     }
     if (StringUtils.isEmpty(stsTokenIdentifier.getSecretAccessKey())) {
       throw new SecretManager.InvalidToken("Invalid STS token - secretAccessKey is null/empty");
+    }
+    if (stsTokenIdentifier.getCreationTime() == null) {
+      throw new SecretManager.InvalidToken("Invalid STS token - creationTime is null");
     }
   }
 

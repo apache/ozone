@@ -2534,18 +2534,20 @@ message UpdateAssumeRoleRequest {
 }
 
 message RevokeSTSTokenRequest {
-    required string sessionToken = 1;
+  required string originalAccessKeyId = 1;
+  // Leader-generated revocation cutoff, replicated across OMs in HA mode.
+  optional uint64 revocationTimeMillis = 2;
 }
 
 message RevokeSTSTokenResponse {
 }
 
 /**
- This will contain a list of revoked STS session tokens whose entries should be removed from
+ This will contain a list of originalAccessKeyIds whose revocation entries should be removed from
  the s3RevokedStsTokenTable.
 */
 message DeleteRevokedSTSTokensRequest {
-  repeated string sessionToken = 1;
+  repeated string originalAccessKeyId = 1;
 }
 
 message DeleteRevokedSTSTokensResponse {

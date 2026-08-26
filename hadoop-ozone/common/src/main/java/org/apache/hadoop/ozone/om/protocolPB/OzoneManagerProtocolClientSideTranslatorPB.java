@@ -2981,10 +2981,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void revokeSTSToken(String sessionToken) throws IOException {
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException {
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest request =
         OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-            .setSessionToken(sessionToken)
+            .setOriginalAccessKeyId(originalAccessKeyId)
             .build();
 
     final OMRequest omRequest = createOMRequest(Type.RevokeSTSToken)

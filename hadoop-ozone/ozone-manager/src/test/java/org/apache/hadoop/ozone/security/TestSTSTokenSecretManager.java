@@ -26,12 +26,16 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
@@ -70,7 +74,7 @@ public class TestSTSTokenSecretManager {
     final UUID keyId = UUID.fromString("00000000-0000-0000-0000-000000000000");
     when(mockSecretKey.getId()).thenReturn(keyId);
     when(mockSecretKey.getSecretKey()).thenReturn(sharedSecretKey);
-    when(mockSecretKey.sign(any(STSTokenIdentifier.class)))
+    when(mockSecretKey.sign(any(byte[].class)))
         .thenReturn("mock-signature".getBytes(StandardCharsets.UTF_8));
     when(mockSecretKeyClient.getCurrentSecretKey()).thenReturn(mockSecretKey);
 
@@ -89,7 +93,9 @@ public class TestSTSTokenSecretManager {
 
     // Verify the token identifier fields
     final STSTokenIdentifier identifier = new STSTokenIdentifier();
-    identifier.setEncryptionKey(sharedSecretKey.getEncoded());
+    identifier.setManagedSecretKey(createManagedSecretKey(
+        UUID.fromString("00000000-0000-0000-0000-000000000000"),
+        sharedSecretKey.getEncoded(), Instant.now()));
     identifier.readFromByteArray(token.getIdentifier());
     final Instant expiration = identifier.getExpiry();
 
@@ -98,6 +104,7 @@ public class TestSTSTokenSecretManager {
     assertEquals(ROLE_ARN, identifier.getRoleArn());
     assertEquals(SECRET_ACCESS_KEY, identifier.getSecretAccessKey());
     assertEquals(SESSION_POLICY, identifier.getSessionPolicy());
+    assertEquals(clock.instant(), identifier.getCreationTime());
     assertNotNull(identifier.getSecretKeyId());
     assertEquals(new Text("STSToken"), identifier.getKind());
     assertEquals("STS", identifier.getService());
@@ -114,8 +121,78 @@ public class TestSTSTokenSecretManager {
     token.decodeFromUrlString(tokenString);
 
     final STSTokenIdentifier identifier = new STSTokenIdentifier();
-    identifier.setEncryptionKey(sharedSecretKey.getEncoded());
+    identifier.setManagedSecretKey(createManagedSecretKey(
+        UUID.fromString("00000000-0000-0000-0000-000000000000"),
+        sharedSecretKey.getEncoded(), Instant.now()));
     identifier.readFromByteArray(token.getIdentifier());
     assertTrue(identifier.getSessionPolicy().isEmpty());
+  }
+
+  /**
+   * createSTSTokenString() must use a single getCurrentSecretKey() for encryption, secretKeyId, and signing. If a
+   * second fetch happened during signing, a key rotation between calls would encrypt with the old key but stamp the
+   * token with the new key id.
+   */
+  @Test
+  public void testCreateSTSTokenStringValidatesWhenSecretKeyRotatesDuringCreation() throws Exception {
+    // ManagedSecretKey.isExpired() uses Instant.now(), not the test clock.
+    final Instant keyCreationTime = Instant.now();
+    final ManagedSecretKey encryptionKey = createManagedSecretKey(
+        UUID.fromString("11111111-1111-1111-1111-111111111111"),
+        "encryption-key-material-012345678901".getBytes(StandardCharsets.US_ASCII),
+        keyCreationTime);
+    final ManagedSecretKey signingKey = createManagedSecretKey(
+        UUID.fromString("22222222-2222-2222-2222-222222222222"),
+        "signing-key-material-01234567890123".getBytes(StandardCharsets.US_ASCII),
+        keyCreationTime);
+
+    final RotatingSecretKeyTestClient rotatingSecretKeyClient = new RotatingSecretKeyTestClient(
+        encryptionKey, signingKey);
+    final STSTokenSecretManager rotatingSecretManager = new STSTokenSecretManager(rotatingSecretKeyClient);
+
+    final String tokenString = rotatingSecretManager.createSTSTokenString(
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
+
+    final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+        tokenString, rotatingSecretKeyClient, clock);
+    assertEquals(SECRET_ACCESS_KEY, result.getSecretAccessKey());
+    assertEquals(encryptionKey.getId(), result.getSecretKeyId());
+    assertEquals(1, rotatingSecretKeyClient.getCurrentSecretKeyCallCount());
+  }
+
+  private static ManagedSecretKey createManagedSecretKey(UUID id, byte[] keyBytes, Instant creationTime) {
+    final SecretKey secretKey = new SecretKeySpec(keyBytes, "HmacSHA256");
+    return new ManagedSecretKey(id, creationTime, creationTime.plus(Duration.ofHours(1)), secretKey);
+  }
+
+  /**
+   * Returns different current keys on consecutive getCurrentSecretKey() calls to simulate rotation.
+   */
+  private static final class RotatingSecretKeyTestClient implements SecretKeyClient {
+    private final ManagedSecretKey firstKey;
+    private final ManagedSecretKey secondKey;
+    private final Map<UUID, ManagedSecretKey> keysById = new HashMap<>();
+    private int getCurrentSecretKeyCallCount;
+
+    private RotatingSecretKeyTestClient(ManagedSecretKey firstKey, ManagedSecretKey secondKey) {
+      this.firstKey = firstKey;
+      this.secondKey = secondKey;
+      keysById.put(firstKey.getId(), firstKey);
+      keysById.put(secondKey.getId(), secondKey);
+    }
+
+    @Override
+    public synchronized ManagedSecretKey getCurrentSecretKey() {
+      return getCurrentSecretKeyCallCount++ == 0 ? firstKey : secondKey;
+    }
+
+    @Override
+    public ManagedSecretKey getSecretKey(UUID id) {
+      return keysById.get(id);
+    }
+
+    private int getCurrentSecretKeyCallCount() {
+      return getCurrentSecretKeyCallCount;
+    }
   }
 }

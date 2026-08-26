@@ -23,12 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.STSTokenEncryption.STSTokenEncryptionException;
 import org.junit.jupiter.api.BeforeAll;
@@ -43,11 +45,17 @@ public class TestSTSTokenEncryption {
   private static final int HKDF_SALT_LENGTH = 16; // 128 bits
 
   private static SecretKey sharedSecretKey;
+  private static ManagedSecretKey managedSecretKey;
 
   @BeforeAll
   public static void setUpClass() {
     final byte[] keyBytes = "01234567890123456789012345678901".getBytes(StandardCharsets.US_ASCII);
     sharedSecretKey = new SecretKeySpec(keyBytes, "HmacSHA256");
+    managedSecretKey = new ManagedSecretKey(
+        UUID.randomUUID(),
+        Instant.EPOCH,
+        Instant.EPOCH.plus(Duration.ofDays(1)),
+        sharedSecretKey);
   }
 
   @Test
@@ -69,20 +77,26 @@ public class TestSTSTokenEncryption {
   
   @Test
   public void testSTSTokenIdentifierEncryption() throws Exception {
-    final byte[] keyBytes = sharedSecretKey.getEncoded();
-
     final String tempAccessKeyId = "ASIA123TEMPKEY";
     final String originalAccessKeyId = "AKIA123ORIGINAL";
     final String roleArn = "arn:aws:iam::123456789012:role/TestRole";
     final String secretAccessKey = "mySecretAccessKey123456";
     // Use millisecond precision to match serialization format
-    final Instant expiry = Instant.ofEpochMilli(Instant.now().plusSeconds(3600).toEpochMilli());
+    final Instant creationTime = Instant.ofEpochMilli(1_700_000_000_000L);
+    final Instant expiry = creationTime.plusSeconds(3600);
     final String sessionPolicy = "test-session-policy";
-    
+
     // Create token identifier with encryption
-    final STSTokenIdentifier tokenId = new STSTokenIdentifier(
-        tempAccessKeyId, originalAccessKeyId, roleArn, expiry, secretAccessKey, sessionPolicy, keyBytes);
-    tokenId.setSecretKeyId(UUID.randomUUID());
+    final STSTokenIdentifier tokenId = new STSTokenIdentifier(STSTokenIdentifier.Params.newBuilder()
+        .setTempAccessKeyId(tempAccessKeyId)
+        .setOriginalAccessKeyId(originalAccessKeyId)
+        .setRoleArn(roleArn)
+        .setCreationTime(creationTime)
+        .setExpiry(expiry)
+        .setSecretAccessKey(secretAccessKey)
+        .setSessionPolicy(sessionPolicy)
+        .setManagedSecretKey(managedSecretKey)
+        .build());
     
     // Convert to protobuf
     final OzoneManagerProtocolProtos.OMTokenProto omTokenProto = tokenId.toProtoBuf();
@@ -91,7 +105,7 @@ public class TestSTSTokenEncryption {
     
     // Create new token identifier from protobuf with decryption key
     final STSTokenIdentifier decodedTokenId = new STSTokenIdentifier();
-    decodedTokenId.setEncryptionKey(keyBytes);
+    decodedTokenId.setManagedSecretKey(managedSecretKey);
     decodedTokenId.readFromByteArray(protobufBytes);
     
     // Verify all fields are correctly decrypted
@@ -100,6 +114,7 @@ public class TestSTSTokenEncryption {
     assertEquals(roleArn, decodedTokenId.getRoleArn());
     assertEquals(secretAccessKey, decodedTokenId.getSecretAccessKey());
     assertEquals(expiry, decodedTokenId.getExpiry());
+    assertEquals(creationTime, decodedTokenId.getCreationTime());
   }
   
   @Test

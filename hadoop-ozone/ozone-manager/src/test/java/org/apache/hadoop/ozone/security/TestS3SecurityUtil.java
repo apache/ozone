@@ -36,8 +36,11 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
+import javax.crypto.spec.SecretKeySpec;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -57,21 +60,15 @@ import org.mockito.MockedStatic;
  * Tests for STS revocation handling in {@link S3SecurityUtil}.
  */
 public class TestS3SecurityUtil {
-  private static final byte[] ENCRYPTION_KEY = new byte[5];
+  private static final ManagedSecretKey MANAGED_SECRET_KEY = createManagedSecretKey();
   private static final MockClock CLOCK = MockClock.newInstance();
   private static final String TEMP_ACCESS_KEY_ID = "temp-access-key-id";
 
-  {
-    ThreadLocalRandom.current().nextBytes(ENCRYPTION_KEY);
-  }
-
   @Test
-  public void testValidateS3CredentialFailsWhenTokenRevoked() throws Exception {
-    // If the revoked STS token table contains an entry for the session token, the request should be rejected with
-    // REVOKED_TOKEN
+  public void testValidateS3CredentialFailsWhenTokenCreatedBeforeRevocationCutoff() throws Exception {
     validateS3CredentialHelper(
         new TestConfig()
-            .setTokenRevoked(true)
+            .setRevocationCutoffOffsetMs(1)
             .setExpectedResult(REVOKED_TOKEN)
             .setExpectedMessage("STS token has been revoked"));
   }
@@ -162,6 +159,22 @@ public class TestS3SecurityUtil {
             .setExpectedMessage("STS token validation failed - accessKeyId is invalid for session token"));
   }
 
+  @Test
+  public void testValidateS3CredentialSuccessWhenTokenCreatedAfterRevocationCutoff() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRevocationCutoffOffsetMs(-1)
+            .setExpectedResult(null));
+  }
+
+  @Test
+  public void testValidateS3CredentialSuccessWhenTokenCreatedAtRevocationCutoff() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRevocationCutoffOffsetMs(0)
+            .setExpectedResult(null));
+  }
+
   private void validateS3CredentialHelper(TestConfig config) throws Exception {
     try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
       when(ozoneManager.isSecurityEnabled()).thenReturn(true);
@@ -188,12 +201,13 @@ public class TestS3SecurityUtil {
       }
 
       final String sessionToken = "session-token";
-      if (config.isTokenRevoked && config.revokedSTSTokenTable != null) {
-        final long insertionTimeMillis = CLOCK.millis();
-        config.revokedSTSTokenTable.put(sessionToken, insertionTimeMillis);
-      }
-
       final STSTokenIdentifier stsTokenIdentifier = createSTSTokenIdentifier();
+      final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
+      if (config.revocationCutoffOffsetMs != null && config.revokedSTSTokenTable != null) {
+        final long revocationTimeMillis = stsTokenIdentifier.getCreationTime().toEpochMilli() +
+            config.revocationCutoffOffsetMs;
+        config.revokedSTSTokenTable.put(originalAccessKeyId, revocationTimeMillis);
+      }
 
       try (MockedStatic<STSSecurityUtil> stsSecurityUtilMock = mockStatic(STSSecurityUtil.class, CALLS_REAL_METHODS);
            MockedStatic<AWSV4AuthValidator> awsV4AuthValidatorMock = mockStatic(
@@ -229,10 +243,28 @@ public class TestS3SecurityUtil {
   }
 
   private STSTokenIdentifier createSTSTokenIdentifier() {
-    return new STSTokenIdentifier(
-        TEMP_ACCESS_KEY_ID, "original-access-key-id", "arn:aws:iam::123456789012:role/test-role",
-        CLOCK.instant().plusSeconds(3600), "secret-access-key", "session-policy",
-        ENCRYPTION_KEY);
+    return new STSTokenIdentifier(STSTokenIdentifier.Params.newBuilder()
+        .setTempAccessKeyId(TEMP_ACCESS_KEY_ID)
+        .setOriginalAccessKeyId("original-access-key-id")
+        .setRoleArn("arn:aws:iam::123456789012:role/test-role")
+        .setCreationTime(CLOCK.instant())
+        .setExpiry(CLOCK.instant().plusSeconds(3600))
+        .setSecretAccessKey("secret-access-key")
+        .setSessionPolicy("session-policy")
+        .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .build());
+  }
+
+  private static ManagedSecretKey createManagedSecretKey() {
+    final byte[] keyBytes = new byte[32];
+    for (int i = 0; i < keyBytes.length; i++) {
+      keyBytes[i] = (byte) i;
+    }
+    return new ManagedSecretKey(
+        UUID.randomUUID(),
+        Instant.EPOCH,
+        Instant.EPOCH.plus(Duration.ofDays(1)),
+        new SecretKeySpec(keyBytes, "HmacSHA256"));
   }
 
   private static OMRequest createRequestWithSessionToken(String accessId, boolean includeAccessId) {
@@ -258,7 +290,7 @@ public class TestS3SecurityUtil {
   private static final class TestConfig {
     private OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     private Table<String, Long> revokedSTSTokenTable = new InMemoryTestTable<>();
-    private boolean isTokenRevoked = false;
+    private Long revocationCutoffOffsetMs = null;
     private boolean isOriginalAccessKeyIdRevoked = false;
     private boolean shouldOriginalAccessKeyIdCheckThrowError = false;
     private String requestAccessId = TEMP_ACCESS_KEY_ID;
@@ -277,9 +309,8 @@ public class TestS3SecurityUtil {
       return this;
     }
 
-    @SuppressWarnings("SameParameterValue")
-    TestConfig setTokenRevoked(boolean isRevoked) {
-      this.isTokenRevoked = isRevoked;
+    TestConfig setRevocationCutoffOffsetMs(long offsetMs) {
+      this.revocationCutoffOffsetMs = offsetMs;
       return this;
     }
 

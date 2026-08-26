@@ -5254,9 +5254,10 @@
     <value>3h</value>
     <tag>OZONE, OM, PERFORMANCE, SECURITY</tag>
     <description>
-      A background job that periodically checks revoked STS token entries and
-      deletes ones that have existed for 12 hours. This entry controls the interval of this
-      cleanup check. Unit could be defined with postfix (ns,ms,s,m,h,d).
+      A background service that periodically scans the s3RevokedStsTokenTable and deletes
+      revocation entries whose cutoff is older than the maximum STS token lifetime (12 hours).
+      This property controls how often the cleanup service runs. Unit could be defined with
+      postfix (ns,ms,s,m,h,d).
     </description>
   </property>
   <property>

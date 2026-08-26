@@ -46,10 +46,10 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.s3.security.S3AssumeRoleRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -226,7 +226,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     // falling back to accessId if session token not present.
     if (omRequest.hasS3Authentication()) {
       final String accessKeyId = omRequest.getS3Authentication().getAccessId();
-      if (accessKeyId.startsWith(S3AssumeRoleRequest.STS_TOKEN_PREFIX) &&
+      if (accessKeyId.startsWith(S3STSUtils.STS_TOKEN_PREFIX) &&
           !omRequest.getS3Authentication().hasSessionToken()) {
         throw new IOException("Error with STS token", new AuthenticationException(
             "Missing session token for accessKeyId: " + accessKeyId));

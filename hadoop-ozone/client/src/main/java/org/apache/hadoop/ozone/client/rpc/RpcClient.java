@@ -3022,8 +3022,8 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void revokeSTSToken(String sessionToken) throws IOException {
-    ozoneManagerClient.revokeSTSToken(sessionToken);
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException {
+    ozoneManagerClient.revokeSTSToken(originalAccessKeyId);
   }
 
   @Override

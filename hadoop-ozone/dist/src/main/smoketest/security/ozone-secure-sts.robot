@@ -66,6 +66,7 @@ ${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE_ARN}  arn:aws:iam::123456789012:rol
 ${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE_ARN}  arn:aws:iam::123456789012:role/${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}
 ${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE_ARN}  arn:aws:iam::123456789012:role/${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}
 ${ACTION_MATCHES_GET_STAR_READ_ROLE_ARN}        arn:aws:iam::123456789012:role/${ACTION_MATCHES_GET_STAR_READ_ROLE}
+${TEST_USER_ADMIN}                      testuser
 ${TEST_USER_NON_ADMIN}                  testuser2
 @{ICEBERG_OBJECT_KEYS}                  file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt
 @{ICEBERG_LISTABLE_OBJECT_KEYS_OBS}     file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt    zeroByteFile    zeroByteFolder/
@@ -253,6 +254,17 @@ Configure STS Profile With Bogus Credential Part
     ELSE IF                       '${bogus_part}' == 'sessionToken'
         Configure STS Profile     ${STS_ACCESS_KEY_ID}  ${STS_SECRET_KEY}  bogusSessionToken
     END
+
+Verify STS Token Revocation And Post Revocation Assume Role
+    [Arguments]                   ${bucket}  ${role_arn}  ${revoker_user}  ${revoker_keytab}
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
+    Get Object Should Succeed     ${bucket}  ${ICEBERG_BUCKET_TESTFILE}
+    Kinit test user               ${revoker_user}               ${revoker_keytab}
+    ${output} =                   Execute                       ozone s3 revokeststoken -o ${PERMANENT_ACCESS_KEY_ID} -y ${OM_HA_PARAM}
+    Should Contain                ${output}                     STS tokens revoked for originalAccessKeyId
+    Get Object Should Fail        ${bucket}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
+    Get Object Should Succeed     ${bucket}  ${ICEBERG_BUCKET_TESTFILE}
 
 *** Test Cases ***
 Create User in Ranger
@@ -558,26 +570,31 @@ Verify Token Revocation via CLI
     FOR    ${bucket}    ${role_arn}    IN
     ...    ${ICEBERG_BUCKET_OBS}    ${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
     ...    ${ICEBERG_BUCKET_FSO}    ${ICEBERG_ALL_ACCESS_ROLE_FSO_ARN}
-        Assume Role And Configure STS Profile                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
-        ${output} =               Execute                       ozone s3 revokeststoken -t ${STS_SESSION_TOKEN} -y ${OM_HA_PARAM}
-        Should Contain            ${output}                     STS token revoked for sessionToken
-        # Trying to use the token for even get-object should now fail.
-        Get Object Should Fail    ${bucket}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+        # Owner of the original access key can revoke the STS token.
+        Verify STS Token Revocation And Post Revocation Assume Role  ${bucket}  ${role_arn}  ${ICEBERG_SVC_CATALOG_USER}  ${ICEBERG_SVC_CATALOG_USER}.keytab
+        # S3 admin can also revoke an STS token owned by another user.
+        Verify STS Token Revocation And Post Revocation Assume Role  ${bucket}  ${role_arn}  ${TEST_USER_ADMIN}  ${TEST_USER_ADMIN}.keytab
     END
 
 Non-Admin Cannot Revoke STS Token
     FOR    ${role_arn}    IN    ${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}    ${ICEBERG_ALL_ACCESS_ROLE_FSO_ARN}
         # Create a token first.
         Assume Role And Get Temporary Credentials               perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${role_arn}
-        ${token_to_revoke} =      Set Variable                  ${STS_SESSION_TOKEN}
 
         # Kinit as non-admin user.
         Kinit test user           ${TEST_USER_NON_ADMIN}        ${TEST_USER_NON_ADMIN}.keytab
 
         # Try to revoke - should give USER_MISMATCH error.
-        ${output} =               Execute And Ignore Error      ozone s3 revokeststoken -t ${token_to_revoke} -y ${OM_HA_PARAM}
+        ${output} =               Execute And Ignore Error      ozone s3 revokeststoken -o ${PERMANENT_ACCESS_KEY_ID} -y ${OM_HA_PARAM}
         Should Contain            ${output}                     USER_MISMATCH
     END
+
+Revoke STS Token Should Fail For Unknown Original Access Key Id
+    # Revoking a bogus originalAccessKeyId must fail before writing to the revocation table.
+    Kinit test user               ${TEST_USER_ADMIN}            ${TEST_USER_ADMIN}.keytab
+    ${output} =                   Execute And Ignore Error      ozone s3 revokeststoken -o bogus-original-access-key-id -y ${OM_HA_PARAM}
+    Should Contain                ${output}                     ACCESS_ID_NOT_FOUND
+    Should Contain                ${output}                     does not exist
 
 List Objects V1 and V2 IAM Session Policy Matrix for OBS and FSO
     Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
@@ -610,6 +627,13 @@ Tampered STS Token Service, Policy, or Signature Must Fail
 
     ${token_with_signature_tamper} =  Mutate STS Session Token  ${STS_SESSION_TOKEN}  signature
     Configure STS Profile                                       ${STS_ACCESS_KEY_ID}  ${STS_SECRET_KEY}  ${token_with_signature_tamper}
+    Get Object Should Fail      ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+    Put Object Should Fail      ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
+    # Exercise malformed token decoding with incorrect token structure. Unlike the earlier
+    # bogusSessionToken credential-part check, this literal decodes to a negative Writable
+    # length and covers unchecked decoder failures such as NegativeArraySizeException.
+    Configure STS Profile                                       ${STS_ACCESS_KEY_ID}  ${STS_SECRET_KEY}  not-a-valid-token
     Get Object Should Fail      ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
     Put Object Should Fail      ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
 

@@ -24,11 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import javax.crypto.spec.SecretKeySpec;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.junit.jupiter.api.Test;
 
@@ -37,17 +39,25 @@ import org.junit.jupiter.api.Test;
  */
 public class TestSTSTokenIdentifier {
 
-  private static final byte[] ENCRYPTION_KEY = new byte[5];
+  private static final byte[] SECRET_KEY_BYTES = new byte[5];
+  private static final ManagedSecretKey MANAGED_SECRET_KEY;
+  private static final Instant CREATION_TIME = Instant.ofEpochMilli(1_700_000_000_000L);
 
-  {
-    ThreadLocalRandom.current().nextBytes(ENCRYPTION_KEY);
+  static {
+    ThreadLocalRandom.current().nextBytes(SECRET_KEY_BYTES);
+    MANAGED_SECRET_KEY = createManagedSecretKey(SECRET_KEY_BYTES);
   }
 
   @Test
   public void testKindAndService() {
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn",
-        Instant.now().plusSeconds(3600), "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(Instant.now().plusSeconds(3600))
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
     assertEquals("STSToken", stsTokenIdentifier.getKind().toString());
     assertEquals("STS", stsTokenIdentifier.getService());
@@ -59,16 +69,22 @@ public class TestSTSTokenIdentifier {
     // so use a millisecond-precision Instant to avoid nanos-only differences across
     // platforms/JDKs during round-trips.
     final Instant expiry = Instant.now().plusSeconds(7200).truncatedTo(ChronoUnit.MILLIS);
-    final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(
-        "tempAccess", "origAccess", "arn:aws:iam::123456789012:role/RoleY",
-        expiry, "secretKey", "sessionPolicy", ENCRYPTION_KEY);
-    final UUID secretKeyId = UUID.randomUUID();
-    originalTokenIdentifier.setSecretKeyId(secretKeyId);
+    final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccess")
+        .setOriginalAccessKeyId("origAccess")
+        .setRoleArn("arn:aws:iam::123456789012:role/RoleY")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretKey")
+        .setSessionPolicy("sessionPolicy")
+        .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .build());
+    final UUID secretKeyId = MANAGED_SECRET_KEY.getId();
 
     final OMTokenProto proto = originalTokenIdentifier.toProtoBuf();
     assertThat(proto.getType()).isEqualTo(OMTokenProto.Type.S3_STS_TOKEN);
     assertThat(proto.getOwner()).isEqualTo("tempAccess");
     assertThat(proto.getMaxDate()).isEqualTo(expiry.toEpochMilli());
+    assertThat(proto.getIssueDate()).isEqualTo(CREATION_TIME.toEpochMilli());
     assertThat(proto.getOriginalAccessKeyId()).isEqualTo("origAccess");
     assertThat(proto.getRoleArn()).isEqualTo("arn:aws:iam::123456789012:role/RoleY");
     assertThat(proto.getSecretAccessKey()).isNotEqualTo("secretKey");   // must be encrypted
@@ -76,11 +92,12 @@ public class TestSTSTokenIdentifier {
     assertThat(proto.getSecretKeyId()).isEqualTo(secretKeyId.toString());
 
     final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
-    parsedTokenIdentifier.setEncryptionKey(ENCRYPTION_KEY);
+    parsedTokenIdentifier.setManagedSecretKey(MANAGED_SECRET_KEY);
     parsedTokenIdentifier.fromProtoBuf(proto);
 
     assertThat(parsedTokenIdentifier.getOwnerId()).isEqualTo("tempAccess");
     assertThat(parsedTokenIdentifier.getExpiry()).isEqualTo(expiry);
+    assertThat(parsedTokenIdentifier.getCreationTime()).isEqualTo(CREATION_TIME);
     assertThat(parsedTokenIdentifier.getOriginalAccessKeyId()).isEqualTo("origAccess");
     assertThat(parsedTokenIdentifier.getRoleArn()).isEqualTo("arn:aws:iam::123456789012:role/RoleY");
     assertThat(parsedTokenIdentifier.getSecretAccessKey()).isEqualTo("secretKey");
@@ -99,9 +116,14 @@ public class TestSTSTokenIdentifier {
         .setSecretKeyId("not-a-uuid")
         .build();
 
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", Instant.now(),
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(Instant.now())
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
     final IOException ex = assertThrows(IOException.class, () -> stsTokenIdentifier.fromProtoBuf(invalid));
     assertThat(ex.getMessage()).isEqualTo("Invalid secretKeyId format in STS token: not-a-uuid");
@@ -110,17 +132,20 @@ public class TestSTSTokenIdentifier {
   @Test
   public void testProtobufRoundTripWithNullSessionPolicy() throws IOException {
     final Instant expiry = Instant.now().plusSeconds(7200);
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccess", "origAccess", "arn:aws:iam::123456789012:role/RoleX",
-        expiry, "secretKey", null, ENCRYPTION_KEY);
-    final UUID secretKeyId = UUID.randomUUID();
-    stsTokenIdentifier.setSecretKeyId(secretKeyId);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccess")
+        .setOriginalAccessKeyId("origAccess")
+        .setRoleArn("arn:aws:iam::123456789012:role/RoleX")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretKey")
+        .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .build());
 
     final OMTokenProto proto = stsTokenIdentifier.toProtoBuf();
     assertThat(proto.getSessionPolicy()).isEmpty();
 
     final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
-    parsedTokenIdentifier.setEncryptionKey(ENCRYPTION_KEY);
+    parsedTokenIdentifier.setManagedSecretKey(MANAGED_SECRET_KEY);
     parsedTokenIdentifier.fromProtoBuf(proto);
 
     assertThat(parsedTokenIdentifier.getSessionPolicy()).isEmpty();
@@ -129,17 +154,21 @@ public class TestSTSTokenIdentifier {
   @Test
   public void testProtobufRoundTripWithEmptySessionPolicy() throws IOException {
     final Instant expiry = Instant.now().plusSeconds(4000);
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccess", "origAccess", "arn:aws:iam::123456789012:role/RoleZ",
-        expiry, "secretKey", "", ENCRYPTION_KEY);
-    final UUID secretKeyId = UUID.randomUUID();
-    stsTokenIdentifier.setSecretKeyId(secretKeyId);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccess")
+        .setOriginalAccessKeyId("origAccess")
+        .setRoleArn("arn:aws:iam::123456789012:role/RoleZ")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretKey")
+        .setSessionPolicy("")
+        .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .build());
 
     final OMTokenProto proto = stsTokenIdentifier.toProtoBuf();
     assertThat(proto.getSessionPolicy()).isEmpty();
 
     final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
-    parsedTokenIdentifier.setEncryptionKey(ENCRYPTION_KEY);
+    parsedTokenIdentifier.setManagedSecretKey(MANAGED_SECRET_KEY);
     parsedTokenIdentifier.fromProtoBuf(proto);
 
     assertThat(parsedTokenIdentifier.getSessionPolicy()).isEmpty();
@@ -153,9 +182,14 @@ public class TestSTSTokenIdentifier {
         .setMaxDate(Instant.now().toEpochMilli())
         .build();
 
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "origAccessKeyId", "roleArn", Instant.now(),
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("origAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(Instant.now())
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
     final IllegalArgumentException ex = assertThrows(
         IllegalArgumentException.class, () -> stsTokenIdentifier.fromProtoBuf(invalidType));
@@ -169,10 +203,15 @@ public class TestSTSTokenIdentifier {
     // compared to the original object, which is compared using equals().
     final Instant expiry =
         Instant.now().plusSeconds(1000).truncatedTo(ChronoUnit.MILLIS);
-    final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
-    originalTokenIdentifier.setSecretKeyId(UUID.randomUUID());
+    final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .build());
 
     final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     try (DataOutputStream out = new DataOutputStream(baos)) {
@@ -181,35 +220,41 @@ public class TestSTSTokenIdentifier {
 
     final byte[] bytes = baos.toByteArray();
     final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
-    parsedTokenIdentifier.setEncryptionKey(ENCRYPTION_KEY);
+    parsedTokenIdentifier.setManagedSecretKey(MANAGED_SECRET_KEY);
     parsedTokenIdentifier.readFromByteArray(bytes);
 
     assertThat(parsedTokenIdentifier).isEqualTo(originalTokenIdentifier);
   }
 
   @Test
-  public void testWriteToAndReadFromByteArrayWithDifferentSecretKeyIds() throws Exception {
-    final UUID uuid1 = UUID.randomUUID();
-    UUID uuid2 = UUID.randomUUID();
-    if (uuid2.equals(uuid1)) {
-      uuid2 = UUID.randomUUID();
-    }
-
+  public void testWriteToAndReadFromByteArrayWithDifferentSecretKeys() throws Exception {
     final Instant expiry = Instant.now().plusSeconds(1500);
-    final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
-    originalTokenIdentifier.setSecretKeyId(uuid1);
+    final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .build());
 
     final ByteArrayOutputStream baos1 = new ByteArrayOutputStream();
     try (DataOutputStream out = new DataOutputStream(baos1)) {
       originalTokenIdentifier.write(out);
     }
 
-    final STSTokenIdentifier anotherTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
-    anotherTokenIdentifier.setSecretKeyId(uuid2);
+    byte[] rawBytes = new byte[5];
+    ManagedSecretKey managedSecretKey2 = createManagedSecretKey(rawBytes);
+    final STSTokenIdentifier anotherTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .setManagedSecretKey(managedSecretKey2)
+        .build());
 
     final ByteArrayOutputStream baos2 = new ByteArrayOutputStream();
     try (DataOutputStream out = new DataOutputStream(baos2)) {
@@ -223,33 +268,42 @@ public class TestSTSTokenIdentifier {
     final byte[] byteArr2 = baos2.toByteArray();
     assertThat(byteArr1).isNotEqualTo(byteArr2);
     final STSTokenIdentifier tokenFromByteArr1 = new STSTokenIdentifier();
-    tokenFromByteArr1.setEncryptionKey(ENCRYPTION_KEY);
+    tokenFromByteArr1.setManagedSecretKey(MANAGED_SECRET_KEY);
     tokenFromByteArr1.readFromByteArray(byteArr1);
     final STSTokenIdentifier tokenFromByteArr2 = new STSTokenIdentifier();
-    tokenFromByteArr2.setEncryptionKey(ENCRYPTION_KEY);
+    tokenFromByteArr2.setManagedSecretKey(managedSecretKey2);
     tokenFromByteArr2.readFromByteArray(byteArr2);
     assertThat(tokenFromByteArr1).isNotEqualTo(tokenFromByteArr2);
   }
 
   @Test
   public void testWriteToAndReadFromByteArrayWithSameSecretKeyIds() throws Exception {
-    final UUID uuid = UUID.randomUUID();
     final Instant expiry = Instant.now().plusSeconds(1700);
 
-    final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
-    originalTokenIdentifier.setSecretKeyId(uuid);
+    final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .build());
 
     final ByteArrayOutputStream baos1 = new ByteArrayOutputStream();
     try (DataOutputStream out = new DataOutputStream(baos1)) {
       originalTokenIdentifier.write(out);
     }
 
-    final STSTokenIdentifier anotherTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
-    anotherTokenIdentifier.setSecretKeyId(uuid);
+    final STSTokenIdentifier anotherTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .build());
 
     final ByteArrayOutputStream baos2 = new ByteArrayOutputStream();
     try (DataOutputStream out = new DataOutputStream(baos2)) {
@@ -262,10 +316,10 @@ public class TestSTSTokenIdentifier {
     final byte[] byteArr2 = baos2.toByteArray();
     assertThat(byteArr1).isNotEqualTo(byteArr2);
     final STSTokenIdentifier tokenFromByteArr1 = new STSTokenIdentifier();
-    tokenFromByteArr1.setEncryptionKey(ENCRYPTION_KEY);
+    tokenFromByteArr1.setManagedSecretKey(MANAGED_SECRET_KEY);
     tokenFromByteArr1.readFromByteArray(byteArr1);
     final STSTokenIdentifier tokenFromByteArr2 = new STSTokenIdentifier();
-    tokenFromByteArr2.setEncryptionKey(ENCRYPTION_KEY);
+    tokenFromByteArr2.setManagedSecretKey(MANAGED_SECRET_KEY);
     tokenFromByteArr2.readFromByteArray(byteArr2);
     assertThat(tokenFromByteArr1).isEqualTo(tokenFromByteArr2);
   }
@@ -279,13 +333,20 @@ public class TestSTSTokenIdentifier {
     final String secretAccessKey = "mySecretKey";
     final String sessionPolicy = "myPolicy";
 
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        tempAccessKeyId, originalAccessKeyId, roleArn, expiry, secretAccessKey, sessionPolicy, ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId(tempAccessKeyId)
+        .setOriginalAccessKeyId(originalAccessKeyId)
+        .setRoleArn(roleArn)
+        .setExpiry(expiry)
+        .setSecretAccessKey(secretAccessKey)
+        .setSessionPolicy(sessionPolicy)
+        .build());
 
     assertThat(stsTokenIdentifier.getOwnerId()).isEqualTo(tempAccessKeyId);
     assertThat(stsTokenIdentifier.getTempAccessKeyId()).isEqualTo(tempAccessKeyId);
     assertThat(stsTokenIdentifier.getOriginalAccessKeyId()).isEqualTo(originalAccessKeyId);
     assertThat(stsTokenIdentifier.getRoleArn()).isEqualTo(roleArn);
+    assertThat(stsTokenIdentifier.getCreationTime()).isEqualTo(CREATION_TIME);
     assertThat(stsTokenIdentifier.getExpiry()).isEqualTo(expiry);
     assertThat(stsTokenIdentifier.getSecretAccessKey()).isEqualTo(secretAccessKey);
     assertThat(stsTokenIdentifier.getSessionPolicy()).isEqualTo(sessionPolicy);
@@ -296,14 +357,24 @@ public class TestSTSTokenIdentifier {
     final Instant expiry = Instant.now().plusSeconds(3600);
     final UUID uuid = UUID.randomUUID();
 
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
     stsTokenIdentifier.setSecretKeyId(uuid);
 
-    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
     stsTokenIdentifier2.setSecretKeyId(uuid);
 
     assertThat(stsTokenIdentifier).isEqualTo(stsTokenIdentifier2);
@@ -314,13 +385,23 @@ public class TestSTSTokenIdentifier {
   public void testNotEqualsWhenTempAccessKeyIdDiffers() {
     final Instant expiry = Instant.now().plusSeconds(3600);
 
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId1", "originalAccessKeyId", "roleArn",
-        expiry, "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId1")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
-    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(
-        "tempAccessKeyId2", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId2")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
     assertThat(stsTokenIdentifier).isNotEqualTo(stsTokenIdentifier2);
   }
@@ -329,13 +410,23 @@ public class TestSTSTokenIdentifier {
   public void testNotEqualsWhenOriginalAccessKeyIdDiffers() {
     final Instant expiry = Instant.now().plusSeconds(3600);
 
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId1", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId1")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
-    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId2", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId2")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
     assertThat(stsTokenIdentifier).isNotEqualTo(stsTokenIdentifier2);
   }
@@ -344,26 +435,46 @@ public class TestSTSTokenIdentifier {
   public void testNotEqualsWhenRoleArnDiffers() {
     final Instant expiry = Instant.now().plusSeconds(3600);
 
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn1", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn1")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
-    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn2", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn2")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
     assertThat(stsTokenIdentifier).isNotEqualTo(stsTokenIdentifier2);
   }
 
   @Test
   public void testNotEqualsWhenExpirationDiffers() {
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn",
-        Instant.now().plusSeconds(3600), "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(Instant.now().plusSeconds(3600))
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
-    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn",
-        Instant.now().plusSeconds(7600), "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(Instant.now().plusSeconds(7600))
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
     assertThat(stsTokenIdentifier).isNotEqualTo(stsTokenIdentifier2);
   }
@@ -372,13 +483,23 @@ public class TestSTSTokenIdentifier {
   public void testNotEqualsWhenSecretAccessKeyDiffers() {
     final Instant expiry = Instant.now().plusSeconds(3600);
 
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey1", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey1")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
-    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey2", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey2")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
     assertThat(stsTokenIdentifier).isNotEqualTo(stsTokenIdentifier2);
   }
@@ -387,13 +508,23 @@ public class TestSTSTokenIdentifier {
   public void testNotEqualsWhenSessionPolicyDiffers() {
     final Instant expiry = Instant.now().plusSeconds(3600);
 
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy1", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy1")
+        .build());
 
-    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy2", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy2")
+        .build());
 
     assertThat(stsTokenIdentifier).isNotEqualTo(stsTokenIdentifier2);
   }
@@ -403,14 +534,20 @@ public class TestSTSTokenIdentifier {
     final Instant expiry = Instant.now().plusSeconds(3600);
     final UUID uuid = UUID.randomUUID();
 
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
     stsTokenIdentifier.setSecretKeyId(uuid);
 
     final String stsTokenIdentifierStr = stsTokenIdentifier.toString();
     final String expectedString = "STSTokenIdentifier{" + "tempAccessKeyId='tempAccessKeyId'" +
-        ", originalAccessKeyId='originalAccessKeyId'" + ", roleArn='roleArn'" + ", expiry='" + expiry +
+        ", originalAccessKeyId='originalAccessKeyId'" + ", roleArn='roleArn'" +
+        ", creationTime='" + CREATION_TIME + "', expiry='" + expiry +
         "', secretKeyId='" + uuid + "', sessionPolicy='sessionPolicy'" + '}';
 
     assertEquals(expectedString, stsTokenIdentifierStr);
@@ -418,37 +555,65 @@ public class TestSTSTokenIdentifier {
 
   @Test
   public void testNotEqualsWithNull() {
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", Instant.now(),
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(Instant.now())
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
 
     assertThat(stsTokenIdentifier).isNotEqualTo(null);
   }
 
   @Test
-  public void testEqualsWithDifferentEncryptionKeys() {
+  public void testEqualsWithDifferentManagedSecretKeys() {
     final Instant expiry = Instant.now().plusSeconds(3600).truncatedTo(ChronoUnit.MILLIS);
     final UUID uuid = UUID.randomUUID();
 
     // Create first identifier with the default key
-    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", ENCRYPTION_KEY);
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .build());
     stsTokenIdentifier.setSecretKeyId(uuid);
 
-    // Create second identifier with a different encryption key but otherwise same parameters
-    byte[] differentKey = new byte[5];
-    new SecureRandom().nextBytes(differentKey);
+    // Create second identifier with a different ManagedSecretKey but otherwise same parameters
+    byte[] differentKeyBytes = new byte[5];
+    ThreadLocalRandom.current().nextBytes(differentKeyBytes);
 
-    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
-        "secretAccessKey", "sessionPolicy", differentKey);
+    final STSTokenIdentifier stsTokenIdentifier2 = new STSTokenIdentifier(paramsBuilder()
+        .setTempAccessKeyId("tempAccessKeyId")
+        .setOriginalAccessKeyId("originalAccessKeyId")
+        .setRoleArn("roleArn")
+        .setExpiry(expiry)
+        .setSecretAccessKey("secretAccessKey")
+        .setSessionPolicy("sessionPolicy")
+        .setManagedSecretKey(createManagedSecretKey(differentKeyBytes))
+        .build());
     stsTokenIdentifier2.setSecretKeyId(uuid);
 
-    // They should still be equal because encryptionKey is transient/ignored for identity
+    // They should still be equal because managedSecretKey is transient/ignored for identity
     assertThat(stsTokenIdentifier).isEqualTo(stsTokenIdentifier2);
     assertThat(stsTokenIdentifier.hashCode()).isEqualTo(stsTokenIdentifier2.hashCode());
   }
+
+  private static ManagedSecretKey createManagedSecretKey(byte[] keyBytes) {
+    return new ManagedSecretKey(
+        UUID.randomUUID(),
+        CREATION_TIME,
+        CREATION_TIME.plus(Duration.ofDays(1)),
+        new SecretKeySpec(keyBytes, "HmacSHA256"));
+  }
+
+  private static STSTokenIdentifier.Params.Builder paramsBuilder() {
+    return STSTokenIdentifier.Params.newBuilder()
+        .setCreationTime(CREATION_TIME)
+        .setManagedSecretKey(MANAGED_SECRET_KEY);
+  }
 }
-
-
