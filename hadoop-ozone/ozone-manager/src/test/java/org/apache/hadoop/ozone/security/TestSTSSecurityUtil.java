@@ -53,6 +53,9 @@ public class TestSTSSecurityUtil {
   private static final String ROLE_ARN = "arn:aws:iam::123456789012:role/test-role";
   private static final String SECRET_ACCESS_KEY = "test-secret-access-key";
   private static final String SESSION_POLICY = "test-session-policy";
+  private static final String ASSUMED_ROLE_ID = "AROATEST123456789:testsess";
+  private static final String ASSUMED_ROLE_USER_ARN =
+      "arn:aws:sts::123456789012:assumed-role/test-role/testsess";
   private static final int DURATION_SECONDS = 3600;
   private static final ManagedSecretKey MANAGED_SECRET_KEY = new SecretKeyTestClient().getCurrentSecretKey();
   private final SecretKeyTestClient secretKeyClient = new SecretKeyTestClient();
@@ -80,8 +83,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptSTSTokenSuccess() throws IOException {
     // Create a valid token
-    final String tokenString = tokenSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String tokenString = createStsTokenString();
 
     // Validate and decrypt the token
     final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(
@@ -102,8 +104,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptSTSTokenSuccessWithNullSessionPolicy() throws Exception {
     // Create a valid token with null session policy
-    final String tokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, null, clock.instant());
+    final String tokenString = createStsTokenString(DURATION_SECONDS, null);
 
     // Validate and decrypt the token
     final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(
@@ -135,8 +136,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptSTSTokenInvalidKind() throws Exception {
     // Create a valid identifier to use as base
-    final String validTokenString = tokenSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String validTokenString = createStsTokenString();
 
     final Token<STSTokenIdentifier> validToken = new Token<>();
     validToken.decodeFromUrlString(validTokenString);
@@ -158,8 +158,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptSTSTokenInvalidService() throws Exception {
     // Create a token with incorrect service
-    final String validTokenString = tokenSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String validTokenString = createStsTokenString();
 
     final Token<STSTokenIdentifier> validToken = new Token<>();
     validToken.decodeFromUrlString(validTokenString);
@@ -179,8 +178,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptSTSTokenExpired() throws Exception {
     // Create a token that expires immediately (durationSeconds of 0)
-    final String tokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, 0, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String tokenString = createStsTokenString(0, SESSION_POLICY);
 
     // Fast-forward time to ensure token is expired
     clock.fastForward(100);
@@ -196,8 +194,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptSTSTokenSecretKeyNotFound() throws Exception {
     // Create a valid token string
-    final String validTokenString = tokenSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String validTokenString = createStsTokenString();
 
     // Create a mock secret key client that returns null for the key
     final SecretKeyClient mockKeyClient = mock(SecretKeyClient.class);
@@ -215,8 +212,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptSTSTokenInvalidSecretKeyId() throws Exception {
     // Create a valid identifier to use as base
-    final String validTokenString = tokenSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String validTokenString = createStsTokenString();
 
     final Token<STSTokenIdentifier> validToken = new Token<>();
     validToken.decodeFromUrlString(validTokenString);
@@ -241,8 +237,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptSTSTokenExpiredSecretKey() throws Exception {
     // Create a valid token string
-    final String validTokenString = tokenSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String validTokenString = createStsTokenString();
 
     // Create a mock secret key that is expired
     final ManagedSecretKey expiredSecretKey = mock(ManagedSecretKey.class);
@@ -264,8 +259,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptSTSTokenSecretKeyRetrievalException() throws Exception {
     // Create a valid token string
-    final String validTokenString = tokenSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String validTokenString = createStsTokenString();
 
     // Create a mock secret key client that throws an exception
     final SecretKeyClient mockKeyClient = mock(SecretKeyClient.class);
@@ -283,8 +277,7 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptSTSTokenInvalidSignature() throws Exception {
     // Create a valid token string
-    final String validTokenString = tokenSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String validTokenString = createStsTokenString();
 
     final Token<STSTokenIdentifier> validToken = new Token<>();
     validToken.decodeFromUrlString(validTokenString);
@@ -342,13 +335,11 @@ public class TestSTSSecurityUtil {
   @Test
   public void testConstructValidateAndDecryptMultipleTokens() throws Exception {
     // Create multiple tokens and validate them all
-    final String token1 = tokenSecretManager.createSTSTokenString(
-        "temp-key-1", "orig-key-1", "role-arn-1", DURATION_SECONDS,
-        "secret-key-1", "policy-1", clock.instant());
+    final String token1 = createStsTokenString(DURATION_SECONDS, "secret-key-1", "policy-1",
+        "temp-key-1", "orig-key-1", "role-arn-1");
 
-    final String token2 = tokenSecretManager.createSTSTokenString(
-        "temp-key-2", "orig-key-2", "role-arn-2", DURATION_SECONDS,
-        "secret-key-2", "policy-2", clock.instant());
+    final String token2 = createStsTokenString(DURATION_SECONDS, "secret-key-2", "policy-2",
+        "temp-key-2", "orig-key-2", "role-arn-2");
 
     final STSTokenIdentifier result1 = STSSecurityUtil.constructValidateAndDecryptSTSToken(
         token1, secretKeyClient, clock);
@@ -418,8 +409,7 @@ public class TestSTSSecurityUtil {
 
   @Test
   public void testEnsureResolvedStsFieldsInvariantsSuccess() throws Exception {
-    final String tokenString = tokenSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String tokenString = createStsTokenString();
 
     final S3Authentication s3Auth = S3Authentication.newBuilder()
         .setSessionToken(tokenString)
@@ -458,9 +448,7 @@ public class TestSTSSecurityUtil {
 
   @Test
   public void testEnsureResolvedStsFieldsInvariantsMissingResolvedFields() throws Exception {
-    final String tokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS,
-        SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String tokenString = createStsTokenString();
 
     final S3Authentication s3Auth = S3Authentication.newBuilder()
         .setSessionToken(tokenString)
@@ -486,6 +474,32 @@ public class TestSTSSecurityUtil {
 
     // Should not throw
     STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+  }
+
+  private String createStsTokenString() throws IOException {
+    return createStsTokenString(DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY,
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN);
+  }
+
+  private String createStsTokenString(int durationSeconds, String sessionPolicy)
+      throws IOException {
+    return createStsTokenString(durationSeconds, TestSTSSecurityUtil.SECRET_ACCESS_KEY, sessionPolicy,
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN);
+  }
+
+  private String createStsTokenString(int durationSeconds, String secretAccessKey, String sessionPolicy,
+      String tempAccessKey, String originalAccessKey, String roleArn) throws IOException {
+    return tokenSecretManager.createSTSTokenString(STSTokenSecretManager.CreateSTSTokenParams.newBuilder()
+        .setTempAccessKeyId(tempAccessKey)
+        .setOriginalAccessKeyId(originalAccessKey)
+        .setRoleArn(roleArn)
+        .setDurationSeconds(durationSeconds)
+        .setSecretAccessKey(secretAccessKey)
+        .setSessionPolicy(sessionPolicy)
+        .setAssumedRoleId(ASSUMED_ROLE_ID)
+        .setAssumedRoleUserArn(ASSUMED_ROLE_USER_ARN)
+        .setCreationTime(clock.instant())
+        .build());
   }
 
   private STSTokenIdentifier.Params.Builder paramsBuilder() {

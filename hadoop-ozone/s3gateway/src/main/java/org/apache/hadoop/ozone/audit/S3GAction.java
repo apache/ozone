@@ -66,6 +66,7 @@ public enum S3GAction implements AuditAction {
 
   // STS endpoint
   ASSUME_ROLE,
+  GET_CALLER_IDENTITY,
 
   GET_OBJECT_ATTRIBUTES;
   

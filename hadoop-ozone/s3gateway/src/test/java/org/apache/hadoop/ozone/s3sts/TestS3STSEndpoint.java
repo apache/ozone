@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OSTSException;
@@ -103,6 +104,11 @@ public class TestS3STSEndpoint {
             "session-token",
             Instant.now().plusSeconds(3600).getEpochSecond(),
             "AROA1234567890123456:test-session"));
+    when(objectStore.getCallerIdentity())
+        .thenReturn(new CallerIdentityInfo(
+                "123456789012",
+                "arn:aws:iam::123456789012:user/test-user",
+                "test-user"));
     when(clientStub.getObjectStore()).thenReturn(objectStore);
 
     endpoint = new S3STSEndpoint();
@@ -558,6 +564,79 @@ public class TestS3STSEndpoint {
     ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
         "Operation GetSessionToken is not supported yet.");
+  }
+
+  @Test
+  public void testStsGetCallerIdentitySuccessForGetMethod() throws Exception {
+    final Response response = endpoint.get("GetCallerIdentity", null, null, null, "2011-06-15", null);
+
+    assertEquals(200, response.getStatus());
+    verify(objectStore).getCallerIdentity();
+    verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteFailure(any(AuditMessage.class));
+
+    final Document doc = parseXml((String) response.getEntity());
+    assertEquals("GetCallerIdentityResponse", doc.getDocumentElement().getLocalName());
+    assertEquals(STS_NS, doc.getDocumentElement().getNamespaceURI());
+    assertEquals(
+        "123456789012", doc.getElementsByTagNameNS(STS_NS, "Account").item(0).getTextContent());
+    assertEquals(
+        "arn:aws:iam::123456789012:user/test-user", doc.getElementsByTagNameNS(STS_NS, "Arn").item(0).getTextContent());
+    assertEquals(
+        "test-user", doc.getElementsByTagNameNS(STS_NS, "UserId").item(0).getTextContent());
+  }
+
+  @Test
+  public void testStsGetCallerIdentityIgnoresExtraParameters() throws Exception {
+    final Response response = endpoint.get("GetCallerIdentity", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+
+    assertEquals(200, response.getStatus());
+    verify(objectStore).getCallerIdentity();
+  }
+
+  @Test
+  public void testStsGetCallerIdentityIgnoresExtraParametersForPostMethod() throws Exception {
+    formParameters = new Form();
+    formParameters.param("Action", "GetCallerIdentity");
+    formParameters.param("Version", "2011-06-15");
+    formParameters.param("RoleArn", ROLE_ARN);
+    formParameters.param("RoleSessionName", ROLE_SESSION_NAME);
+    formParameters.param("DurationSeconds", "3600");
+
+    final Response response = endpoint.post(formParameters);
+
+    assertEquals(200, response.getStatus());
+    verify(objectStore).getCallerIdentity();
+  }
+
+  @Test
+  public void testStsGetCallerIdentityRejectsMissingVersion() throws Exception {
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get("GetCallerIdentity", null, null, null, null, null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(objectStore, never()).getCallerIdentity();
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
+        "Could not find operation GetCallerIdentity for version NO_VERSION_SPECIFIED");
+  }
+
+  @Test
+  public void testStsGetCallerIdentityRejectsInvalidVersion() throws Exception {
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get("GetCallerIdentity", null, null, null, "2020-01-01", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(objectStore, never()).getCallerIdentity();
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
+        "Could not find operation GetCallerIdentity for version 2020-01-01");
   }
 
   @Test

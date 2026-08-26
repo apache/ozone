@@ -56,6 +56,8 @@ public class TestSTSTokenSecretManager {
   private static final String ROLE_ARN = "arn:aws:iam::123456789012:role/test-role";
   private static final String SECRET_ACCESS_KEY = "test-secret-access-key";
   private static final String SESSION_POLICY = "test-session-policy";
+  private static final String ASSUMED_ROLE_ID = "AROATEST123456789:testsess";
+  private static final String ASSUMED_ROLE_USER_ARN = "arn:aws:sts::123456789012:assumed-role/test-role/testsess";
   private static final int DURATION_SECONDS = 3600;
 
   private static SecretKey sharedSecretKey;
@@ -84,8 +86,7 @@ public class TestSTSTokenSecretManager {
 
   @Test
   public void testCreateSTSTokenStringContainsCorrectFields() throws IOException {
-    final String tokenString = secretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String tokenString = secretManager.createSTSTokenString(createStsTokenParamsBuilder().build());
 
     // Decode the token
     final Token<STSTokenIdentifier> token = new Token<>();
@@ -104,6 +105,8 @@ public class TestSTSTokenSecretManager {
     assertEquals(ROLE_ARN, identifier.getRoleArn());
     assertEquals(SECRET_ACCESS_KEY, identifier.getSecretAccessKey());
     assertEquals(SESSION_POLICY, identifier.getSessionPolicy());
+    assertEquals(ASSUMED_ROLE_ID, identifier.getAssumedRoleId());
+    assertEquals(ASSUMED_ROLE_USER_ARN, identifier.getAssumedRoleUserArn());
     assertEquals(clock.instant(), identifier.getCreationTime());
     assertNotNull(identifier.getSecretKeyId());
     assertEquals(new Text("STSToken"), identifier.getKind());
@@ -114,7 +117,7 @@ public class TestSTSTokenSecretManager {
   @Test
   public void testCreateSTSTokenStringWithNullSessionPolicy() throws IOException {
     final String tokenString = secretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, null, clock.instant());
+        createStsTokenParamsBuilder().setSessionPolicy(null).build());
 
     // Decode the token
     final Token<STSTokenIdentifier> token = new Token<>();
@@ -150,14 +153,26 @@ public class TestSTSTokenSecretManager {
         encryptionKey, signingKey);
     final STSTokenSecretManager rotatingSecretManager = new STSTokenSecretManager(rotatingSecretKeyClient);
 
-    final String tokenString = rotatingSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
-        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
+    final String tokenString = rotatingSecretManager.createSTSTokenString(createStsTokenParamsBuilder().build());
 
     final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(
         tokenString, rotatingSecretKeyClient, clock);
     assertEquals(SECRET_ACCESS_KEY, result.getSecretAccessKey());
     assertEquals(encryptionKey.getId(), result.getSecretKeyId());
     assertEquals(1, rotatingSecretKeyClient.getCurrentSecretKeyCallCount());
+  }
+
+  private STSTokenSecretManager.CreateSTSTokenParams.Builder createStsTokenParamsBuilder() {
+    return STSTokenSecretManager.CreateSTSTokenParams.newBuilder()
+        .setTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setRoleArn(ROLE_ARN)
+        .setDurationSeconds(DURATION_SECONDS)
+        .setSecretAccessKey(SECRET_ACCESS_KEY)
+        .setSessionPolicy(SESSION_POLICY)
+        .setAssumedRoleId(ASSUMED_ROLE_ID)
+        .setAssumedRoleUserArn(ASSUMED_ROLE_USER_ARN)
+        .setClock(clock);
   }
 
   private static ManagedSecretKey createManagedSecretKey(UUID id, byte[] keyBytes, Instant creationTime) {

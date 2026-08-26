@@ -75,33 +75,159 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
   /**
    * Create an STS token and return it as an encoded string.
    *
-   * @param tempAccessKeyId     the temporary access key ID
-   * @param originalAccessKeyId the original long-lived access key ID
-   * @param roleArn             the ARN of the assumed role
-   * @param durationSeconds     how long the token should be valid for
-   * @param secretAccessKey     the secret access key associated with the temporary access key ID
-   * @param sessionPolicy       an optional opaque identifier that further limits the scope of
-   *                            the permissions granted by the role
-   * @param creationTime        token creation time
+   * @param params  the STS token creation parameters
    * @return base64 encoded token string
    */
-  public String createSTSTokenString(String tempAccessKeyId, String originalAccessKeyId, String roleArn,
-      int durationSeconds, String secretAccessKey, String sessionPolicy, Instant creationTime) throws IOException {
-    final Instant expiration = creationTime.plusSeconds(durationSeconds);
+  public String createSTSTokenString(CreateSTSTokenParams params) throws IOException {
+    final Instant creationTime = params.getCreationTime();
+    final Instant expiration = creationTime.plusSeconds(params.getDurationSeconds());
 
     final STSTokenIdentifier identifier = new STSTokenIdentifier(STSTokenIdentifier.Params.newBuilder()
-        .setTempAccessKeyId(tempAccessKeyId)
-        .setOriginalAccessKeyId(originalAccessKeyId)
-        .setRoleArn(roleArn)
+        .setTempAccessKeyId(params.getTempAccessKeyId())
+        .setOriginalAccessKeyId(params.getOriginalAccessKeyId())
+        .setRoleArn(params.getRoleArn())
         .setCreationTime(creationTime)
         .setExpiry(expiration)
-        .setSecretAccessKey(secretAccessKey)
-        .setSessionPolicy(sessionPolicy)
+        .setSecretAccessKey(params.getSecretAccessKey())
+        .setSessionPolicy(params.getSessionPolicy())
         .setManagedSecretKey(secretKeyClient.getCurrentSecretKey())
+        .setAssumedRoleId(params.getAssumedRoleId())
+        .setAssumedRoleUserArn(params.getAssumedRoleUserArn())
         .build());
 
     final Token<STSTokenIdentifier> token = generateToken(identifier);
     return token.encodeToUrlString();
+  }
+
+  /**
+   * Parameters for {@link #createSTSTokenString(CreateSTSTokenParams)}.
+   */
+  public static final class CreateSTSTokenParams {
+    private final String tempAccessKeyId;
+    private final String originalAccessKeyId;
+    private final String roleArn;
+    private final int durationSeconds;
+    private final String secretAccessKey;
+    private final String sessionPolicy;
+    private final String assumedRoleId;
+    private final String assumedRoleUserArn;
+    private final Instant creationTime;
+
+    private CreateSTSTokenParams(Builder builder) {
+      this.tempAccessKeyId = builder.tempAccessKeyId;
+      this.originalAccessKeyId = builder.originalAccessKeyId;
+      this.roleArn = builder.roleArn;
+      this.durationSeconds = builder.durationSeconds;
+      this.secretAccessKey = builder.secretAccessKey;
+      this.sessionPolicy = builder.sessionPolicy;
+      this.assumedRoleId = builder.assumedRoleId;
+      this.assumedRoleUserArn = builder.assumedRoleUserArn;
+      this.creationTime = builder.creationTime;
+    }
+
+    public static Builder newBuilder() {
+      return new Builder();
+    }
+
+    public String getTempAccessKeyId() {
+      return tempAccessKeyId;
+    }
+
+    public String getOriginalAccessKeyId() {
+      return originalAccessKeyId;
+    }
+
+    public String getRoleArn() {
+      return roleArn;
+    }
+
+    public int getDurationSeconds() {
+      return durationSeconds;
+    }
+
+    public String getSecretAccessKey() {
+      return secretAccessKey;
+    }
+
+    public String getSessionPolicy() {
+      return sessionPolicy;
+    }
+
+    public String getAssumedRoleId() {
+      return assumedRoleId;
+    }
+
+    public String getAssumedRoleUserArn() {
+      return assumedRoleUserArn;
+    }
+
+    public Instant getCreationTime() {
+      return creationTime;
+    }
+
+    /**
+     * Builder for {@link CreateSTSTokenParams}.
+     */
+    public static final class Builder {
+      private String tempAccessKeyId;
+      private String originalAccessKeyId;
+      private String roleArn;
+      private int durationSeconds;
+      private String secretAccessKey;
+      private String sessionPolicy;
+      private String assumedRoleId;
+      private String assumedRoleUserArn;
+      private Instant creationTime;
+
+      public Builder setTempAccessKeyId(String value) {
+        this.tempAccessKeyId = value;
+        return this;
+      }
+
+      public Builder setOriginalAccessKeyId(String value) {
+        this.originalAccessKeyId = value;
+        return this;
+      }
+
+      public Builder setRoleArn(String value) {
+        this.roleArn = value;
+        return this;
+      }
+
+      public Builder setDurationSeconds(int value) {
+        this.durationSeconds = value;
+        return this;
+      }
+
+      public Builder setSecretAccessKey(String value) {
+        this.secretAccessKey = value;
+        return this;
+      }
+
+      public Builder setSessionPolicy(String value) {
+        this.sessionPolicy = value;
+        return this;
+      }
+
+      public Builder setAssumedRoleId(String value) {
+        this.assumedRoleId = value;
+        return this;
+      }
+
+      public Builder setAssumedRoleUserArn(String value) {
+        this.assumedRoleUserArn = value;
+        return this;
+      }
+
+      public Builder setCreationTime(Instant creationTime) {
+        this.creationTime = creationTime;
+        return this;
+      }
+
+      public CreateSTSTokenParams build() {
+        return new CreateSTSTokenParams(this);
+      }
+    }
   }
 }
 
