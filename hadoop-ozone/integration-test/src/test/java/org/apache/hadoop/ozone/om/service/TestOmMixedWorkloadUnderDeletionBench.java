@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -165,7 +166,7 @@ public class TestOmMixedWorkloadUnderDeletionBench {
   }
 
   @Test
-  @Timeout(value = 120, unit = TimeUnit.MINUTES)
+  @Timeout(value = 20, unit = TimeUnit.MINUTES)
   public void benchmarkMixedWorkloadUnderDeletionLoad() throws Exception {
     final String profileEvent = System.getProperty("bench.profile.event", "");
 
@@ -210,10 +211,12 @@ public class TestOmMixedWorkloadUnderDeletionBench {
     conf.set(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, ratisAppenderByteLimit);
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 1000);
 
-    stripTestOnlyOverhead();
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
+    // Strip after build: MiniOzoneClusterImpl's static initializer enables CodecBuffer leak detection when the class
+    // is first loaded here, so disabling it earlier would be undone before any measurement.
+    stripTestOnlyOverhead();
     try {
       cluster.waitForClusterToBeReady();
       DirectoryDeletingService dds = cluster.getOzoneManager().getKeyManager().getDirDeletingService();
@@ -355,11 +358,13 @@ public class TestOmMixedWorkloadUnderDeletionBench {
         return null;
       }));
     }
-    for (Future<?> future : futures) {
-      future.get();
+    try {
+      for (Future<?> future : futures) {
+        future.get();
+      }
+    } finally {
+      HadoopExecutors.shutdown(pool, LOG, 120, TimeUnit.SECONDS);
     }
-    pool.shutdown();
-    pool.awaitTermination(120, TimeUnit.SECONDS);
     LOG.info("Built dense backlog: {} files in {} dirs, every {}-th with a block ({} ms)",
         dirs * filesPerDir, dirs, nonEmptyEvery, (System.nanoTime() - buildStart) / 1_000_000);
   }
@@ -532,13 +537,15 @@ public class TestOmMixedWorkloadUnderDeletionBench {
       for (String ignored : OPS) {
         byOp.add(new ArrayList<>());
       }
-      for (Future<List<long[]>> future : futures) {
-        for (long[] sample : future.get()) {
-          byOp.get((int) sample[0]).add(sample[1]);
+      try {
+        for (Future<List<long[]>> future : futures) {
+          for (long[] sample : future.get()) {
+            byOp.get((int) sample[0]).add(sample[1]);
+          }
         }
+      } finally {
+        HadoopExecutors.shutdown(pool, LOG, 180, TimeUnit.SECONDS);
       }
-      pool.shutdown();
-      pool.awaitTermination(180, TimeUnit.SECONDS);
       if (failed.get()) {
         throw new IllegalStateException("client thread failed during " + label);
       }
