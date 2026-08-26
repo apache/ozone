@@ -524,18 +524,16 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertNotNull(state);
 
       // resume the service
-      keyLifecycleService.resume();
+      runSingleLifecycleScan(volumeName, bucketName);
 
-      // wait for it to process
       // it should skip the first 3 keys (index 0, 1, 2) since we set lastScannedDbKey as index 2.
       // So it deletes only the last 2 keys (index 3 and 4).
       int expectedDeleted = 2;
       GenericTestUtils.waitFor(() ->
-          (getDeletedKeyCount() - initialDeletedKeyCount) >= expectedDeleted, WAIT_CHECK_INTERVAL, 10000);
+          (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeleted, WAIT_CHECK_INTERVAL, 10000);
       
       // confirm it hasn't deleted all keys
       assertEquals(testKeyCount - expectedDeleted, getKeyCount(bucketLayout) - initialKeyCount);
-      deleteLifecyclePolicy(volumeName, bucketName);
     }
 
     @Test
@@ -1028,9 +1026,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
           LoggerFactory.getLogger(KeyLifecycleService.class));
       // Resume the service
-      keyLifecycleService.resume();
+      runSingleLifecycleScan(volumeName, bucketName);
 
-      // Wait for it to process
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeleted, WAIT_CHECK_INTERVAL, 10000);
       
@@ -1041,8 +1038,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
             d -> assertTrue(logCapturer.getOutput().contains("Skip " + d)));
         logCapturer.clearOutput();
       }
-
-      deleteLifecyclePolicy(volumeName, bucketName);
     }
 
     @ParameterizedTest
@@ -1113,22 +1108,24 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
           LoggerFactory.getLogger(KeyLifecycleService.class));
-      keyLifecycleService.resume();
+      runSingleLifecycleScan(volumeName, bucketName);
 
-      // dir1 can be fully evaluated depending on whether lastScannedKey belong to it (no seek) or not
-      // dir2 should be skipped dir2 > dir1
-      int expectedDeleted = 2;
+      // dir2 is skipped since dir2 > dir1. dir1 is fully evaluated only when lastScannedKey does not
+      // belong to it, otherwise the scan seeks past its last key and nothing is left to expire.
+      int expectedDeleted = keyBelongToDir ? 0 : 2;
       GenericTestUtils.waitFor(() ->
-          (getDeletedKeyCount() - initialDeletedKeyCount) >= expectedDeleted, WAIT_CHECK_INTERVAL, 5000);
+          (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeleted, WAIT_CHECK_INTERVAL, 5000);
       assertEquals(keyList.size() - expectedDeleted, getKeyCount(BucketLayout.FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+      // The task drops the bucket from the in-flight list before it updates the metrics
       GenericTestUtils.waitFor(() ->
           expectedDeleted == metrics.getNumKeyIterated().value() - keyIterated, WAIT_CHECK_INTERVAL, 5000);
+      // dir2 sorts after the resumed dir1, so it is skipped in both cases
+      assertTrue(logCapturer.getOutput().contains("Skip dir2"));
       if (keyBelongToDir) {
         assertTrue(logCapturer.getOutput().contains("Seek to key"));
       } else {
         assertFalse(logCapturer.getOutput().contains("Seek to key"));
       }
-      deleteLifecyclePolicy(volumeName, bucketName);
     }
 
     @ParameterizedTest
@@ -3425,6 +3422,29 @@ class TestKeyLifecycleService extends OzoneTestBase {
     metadataManager.getLifecycleConfigurationTable().delete(key);
     metadataManager.getLifecycleConfigurationTable().addCacheEntry(
         new CacheKey<>(key), CacheValue.get(1L));
+  }
+
+  /**
+   * Resume the service and let exactly one lifecycle scan run for the bucket: the task is held at
+   * its start, the policy is dropped so the periodic service does not schedule a follow-up scan,
+   * then the task is released and waited for. Without this the next scan starts SERVICE_INTERVAL
+   * after the first one finished and deletes the objects the caller expects to remain.
+   */
+  private void runSingleLifecycleScan(String volume, String bucket)
+      throws IOException, TimeoutException, InterruptedException {
+    String bucketKey = metadataManager.getBucketKey(volume, bucket);
+    // injector 0 holds the task at its start, injector 1 holds the first delete request,
+    // injector 2 is only read for an injected exception but must exist
+    KeyLifecycleService.setInjectors(
+        Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl(), new FaultInjectorImpl()));
+    keyLifecycleService.resume();
+    GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().contains(bucketKey),
+        WAIT_CHECK_INTERVAL, 10000);
+    deleteLifecyclePolicy(volume, bucket);
+    KeyLifecycleService.getInjector(0).resume();
+    KeyLifecycleService.getInjector(1).resume();
+    GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+        WAIT_CHECK_INTERVAL, 10000);
   }
 
   private void createVolumeAndBucket(String volumeName,
