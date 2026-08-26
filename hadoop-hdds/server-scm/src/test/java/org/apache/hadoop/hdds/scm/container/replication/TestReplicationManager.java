@@ -1765,12 +1765,11 @@ public class TestReplicationManager {
     return (ReplicateContainerCommand) command.getValue();
   }
 
-  private DatanodeInfo mockDatanodeWithApparentVersion(
+  private void mockDatanodeWithApparentVersion(
       DatanodeDetails dn, ComponentVersion version) {
     DatanodeInfo info = mock(DatanodeInfo.class);
     when(info.getLastKnownApparentVersion()).thenReturn(version);
     when(nodeManager.getNode(dn.getID())).thenReturn(info);
-    return info;
   }
 
   /**
