@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -265,8 +264,7 @@ public class TestDirectoryDeletingService {
     final int ratisLimitBytes = 2304;
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    File testDir = Files.createTempDirectory("TestDDS-SubmitSpy").toFile();
-    ServerUtils.setOzoneMetaDirPath(conf, testDir.toString());
+    ServerUtils.setOzoneMetaDirPath(conf, folder.toFile().toString());
     conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, ratisLimitBytes, StorageUnit.BYTES);
     conf.setQuietMode(false);
@@ -327,16 +325,13 @@ public class TestDirectoryDeletingService {
 
       assertThat(payloadBytes).as("Batch size should respect Ratis byte limit").isLessThanOrEqualTo(ratisLimitBytes);
     }
-
-    org.apache.commons.io.FileUtils.deleteDirectory(testDir);
   }
 
   @Test
   @DisplayName("DirectoryDeletingService submits one bucket per PurgeDirectories transaction")
   void testPurgeDirectoriesGroupedByBucketPerTransaction() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    File testDir = Files.createTempDirectory("TestDDS-BucketGroup").toFile();
-    ServerUtils.setOzoneMetaDirPath(conf, testDir.toString());
+    ServerUtils.setOzoneMetaDirPath(conf, folder.toFile().toString());
     conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setQuietMode(false);
 
@@ -386,8 +381,6 @@ public class TestDirectoryDeletingService {
     }
     assertThat(bucketsSeen).as("Both buckets should be purged across transactions").containsExactlyInAnyOrder(
         bucketIdA, bucketIdB);
-
-    org.apache.commons.io.FileUtils.deleteDirectory(testDir);
   }
 
 }

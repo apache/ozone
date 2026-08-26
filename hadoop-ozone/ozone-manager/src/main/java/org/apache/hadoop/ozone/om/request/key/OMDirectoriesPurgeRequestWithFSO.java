@@ -560,13 +560,12 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    * {@code KeyValueUtil.getFromProtobuf(...).get(HSYNC_CLIENT_ID)} without building the full metadata map.
    */
   private static String getHsyncClientId(OzoneManagerProtocolProtos.KeyInfo key) {
-    String hsyncClientId = null;
     for (HddsProtos.KeyValue kv : key.getMetadataList()) {
       if (OzoneConsts.HSYNC_CLIENT_ID.equals(kv.getKey())) {
-        hsyncClientId = kv.getValue();
+        return kv.getValue();
       }
     }
-    return hsyncClientId;
+    return null;
   }
 
   /**
