@@ -177,7 +177,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     Assertions.assertThrows(IOException.class, () -> keyValueHandler.writeChunkForClosedContainer(
         getChunkInfo(), getBlockID(), ChunkBuffer.wrap(getData()), keyValueContainer));
     Assertions.assertThrows(IOException.class, () -> keyValueHandler.putBlockForClosedContainer(keyValueContainer,
-            new BlockData(getBlockID()), 0L, true));
+            new BlockData(getBlockID()), 0L, true, true));
   }
 
   @Test
@@ -301,7 +301,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
     ChunkBuffer chunkData = ContainerTestHelper.getData(20);
     keyValueHandler.writeChunkForClosedContainer(info, getBlockID(), chunkData, kvContainer);
-    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true, true);
     keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
     assertEquals(1L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
@@ -323,7 +323,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
     chunkData = ContainerTestHelper.getData(20);
     keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
-    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true, true);
     long previousDataChecksum = containerData.getDataChecksum();
     keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
     assertEquals(2L, containerData.getBlockCommitSequenceId());
@@ -349,7 +349,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
     chunkData = ContainerTestHelper.getData(30);
     keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
-    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true, true);
     assertEquals(2L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
     // Old chunk size 20, new chunk size 30, difference 10. So bytesUsed should be 40 + 10 = 50
@@ -363,7 +363,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
       assertEquals(50L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
 
-    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true, true);
     assertEquals(2L, containerData.getBlockCommitSequenceId());
   }
 

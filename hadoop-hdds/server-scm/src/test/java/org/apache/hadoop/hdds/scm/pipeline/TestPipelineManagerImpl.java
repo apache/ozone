@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.apache.ratis.util.Preconditions.assertInstanceOf;
@@ -50,7 +50,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -67,12 +66,10 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -94,6 +91,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
@@ -106,10 +104,11 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.assertj.core.util.Lists;
@@ -118,7 +117,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 /**
  * Tests for PipelineManagerImpl.
@@ -131,11 +129,11 @@ public class TestPipelineManagerImpl {
   private SCMContext scmContext;
   private SCMServiceManager serviceManager;
   private StorageContainerManager scm;
-  private TestClock testClock;
+  private MockClock testClock;
 
   @BeforeEach
   void init(@TempDir File testDir, @TempDir File dbDir) throws Exception {
-    testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
+    testClock = new MockClock(Instant.now(), ZoneOffset.UTC);
     conf = SCMTestUtils.getConf(dbDir);
     scm = HddsTestUtils.getScm(SCMTestUtils.getConf(testDir));
 
@@ -198,7 +196,7 @@ public class TestPipelineManagerImpl {
         new EventQueue(),
         SCMContext.emptyContext(),
         serviceManager,
-        new TestClock(Instant.now(), ZoneOffset.UTC));
+        new MockClock(Instant.now(), ZoneOffset.UTC));
   }
 
   @Test
@@ -1010,48 +1008,6 @@ public class TestPipelineManagerImpl {
     }
   }
 
-  /**
-   * {@link PipelineManager#hasEnoughSpace(Pipeline)} should return false if all the
-   * volumes on any Datanode in the pipeline have space less than or equal to the configured container size.
-   */
-  @Test
-  public void testHasEnoughSpace() throws IOException {
-    NodeManager mockedNodeManager = Mockito.mock(NodeManager.class);
-    PipelineManagerImpl pipelineManager = PipelineManagerImpl.newPipelineManager(conf,
-        SCMHAManagerStub.getInstance(true),
-        mockedNodeManager,
-        SCMDBDefinition.PIPELINES.getTable(dbStore),
-        new EventQueue(),
-        scmContext,
-        serviceManager,
-        testClock);
-
-    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
-    Pipeline pipeline = Pipeline.newBuilder()
-        .setId(PipelineID.randomId())
-        .setNodes(ImmutableList.of(dn1, dn2, dn3))
-        .setState(OPEN)
-        .setReplicationConfig(ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, THREE))
-        .build();
-
-    // Case 1: All nodes have enough space.
-    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn1.getID());
-    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn2.getID());
-    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn3.getID());
-    assertTrue(pipelineManager.hasEnoughSpace(pipeline));
-
-    // Case 2: One node does not have enough space — pipeline should be rejected.
-    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn1.getID());
-    assertFalse(pipelineManager.hasEnoughSpace(pipeline));
-
-    // Case 3: All nodes do not have enough space.
-    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn2.getID());
-    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn3.getID());
-    assertFalse(pipelineManager.hasEnoughSpace(pipeline));
-  }
-
   private Set<ContainerReplica> createContainerReplicasList(
       List <DatanodeDetails> dns) {
     Set<ContainerReplica> replicas = new HashSet<>();
@@ -1102,5 +1058,188 @@ public class TestPipelineManagerImpl {
     SCMException e = assertThrows(SCMException.class, block::run);
     assertEquals(ResultCodes.SCM_NOT_LEADER, e.getResult());
     assertInstanceOf(NotLeaderException.class, e.getCause());
+  }
+
+  private static DatanodeDetails portlessDatanode(DatanodeID id) {
+    return DatanodeDetails.newBuilder()
+        .setID(id)
+        .setHostName("host-" + id)
+        .setIpAddress("127.0.0.1")
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.STANDALONE, 9859))
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.RATIS, 9858))
+        .build();
+  }
+
+  private Pipeline addPipeline(PipelineManagerImpl pipelineManager,
+      Pipeline.PipelineState state, List<DatanodeDetails> nodes)
+      throws IOException {
+    final Pipeline pipeline = Pipeline.newBuilder()
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes)
+        .setState(state)
+        .setId(PipelineID.randomId())
+        .build();
+    pipelineManager.getStateManager().addPipeline(
+        pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+    return pipeline;
+  }
+
+  private static boolean exists(PipelineManagerImpl pipelineManager,
+      PipelineID id) {
+    try {
+      pipelineManager.getPipeline(id);
+      return true;
+    } catch (PipelineNotFoundException e) {
+      return false;
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPorts() throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      // Registered datanodes (MockNodeManager) expose all ports incl datastream.
+      final List<DatanodeInfo> registered = nodeManager.getAllNodes();
+      final List<DatanodeDetails> idsA = new ArrayList<>();
+      final List<DatanodeDetails> idsB = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        idsA.add(portlessDatanode(registered.get(i).getID()));
+        idsB.add(portlessDatanode(registered.get(i + 3).getID()));
+      }
+
+      // OPEN, registered nodes, portless -> legacy pipeline, must be closed.
+      final Pipeline stale = addPipeline(pipelineManager, OPEN, idsA);
+      // OPEN, registered nodes carrying all ports -> not stale, kept.
+      final Pipeline portful = addPipeline(pipelineManager, OPEN,
+          new ArrayList<>(registered.subList(6, 9)));
+      // OPEN, but nodes are NOT registered -> cannot heal, left alone.
+      final List<DatanodeDetails> unregistered = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        unregistered.add(portlessDatanode(DatanodeID.randomID()));
+      }
+      final Pipeline unreg = addPipeline(pipelineManager, OPEN, unregistered);
+      // ALLOCATED (non-open) portless -> skipped.
+      final Pipeline allocated = addPipeline(pipelineManager, ALLOCATED, idsB);
+
+      pipelineManager.closePipelinesMissingDataStreamPort();
+
+      assertFalse(exists(pipelineManager, stale.getId()),
+          "OPEN pipeline whose nodes expose new ports should be closed and deleted");
+      assertTrue(exists(pipelineManager, portful.getId()));
+      assertTrue(exists(pipelineManager, unreg.getId()));
+      assertTrue(exists(pipelineManager, allocated.getId()));
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPortsSkippedWhenDataStreamDisabled()
+      throws Exception {
+    // Datastream disabled (default): even a portless RATIS pipeline is kept.
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      final List<DatanodeInfo> registered = nodeManager.getAllNodes();
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        nodes.add(portlessDatanode(registered.get(i).getID()));
+      }
+      final Pipeline portless = addPipeline(pipelineManager, OPEN, nodes);
+
+      pipelineManager.closePipelinesMissingDataStreamPort();
+
+      assertTrue(exists(pipelineManager, portless.getId()),
+          "portless pipeline must be kept while datastream is disabled");
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPortsSkipsEcPipeline()
+      throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      final List<DatanodeInfo> registered = nodeManager.getAllNodes();
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 5; i++) {
+        nodes.add(portlessDatanode(registered.get(i).getID()));
+      }
+      final Pipeline ec = Pipeline.newBuilder()
+          .setReplicationConfig(new ECReplicationConfig(3, 2))
+          .setNodes(nodes)
+          .setState(OPEN)
+          .setId(PipelineID.randomId())
+          .build();
+      pipelineManager.getStateManager().addPipeline(
+          ec.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+
+      pipelineManager.closePipelinesMissingDataStreamPort();
+
+      assertTrue(exists(pipelineManager, ec.getId()),
+          "EC pipeline must not be closed by datastream port scrubbing");
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPortsKeepsNotYetRestartedNodes()
+      throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      // Nodes are registered and healthy but still lack the datastream port
+      // (they have not restarted yet during a rolling enablement).
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        final DatanodeDetails portless = portlessDatanode(DatanodeID.randomID());
+        nodeManager.register(new DatanodeInfo(portless,
+            NodeStatus.inServiceHealthy(), null,
+            HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT), null, null);
+        nodes.add(portless);
+      }
+      final Pipeline pending = addPipeline(pipelineManager, OPEN, nodes);
+
+      pipelineManager.closePipelinesMissingDataStreamPort();
+
+      assertTrue(exists(pipelineManager, pending.getId()),
+          "pipeline whose registered nodes have not yet advertised the "
+              + "datastream port must be kept");
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPortsSwallowsError() throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      final List<DatanodeInfo> registered = nodeManager.getAllNodes();
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        nodes.add(portlessDatanode(registered.get(i).getID()));
+      }
+      final Pipeline stale = addPipeline(pipelineManager, OPEN, nodes);
+
+      final PipelineManagerImpl spy = spy(pipelineManager);
+      doThrow(new IOException("boom")).when(spy).closePipeline(stale.getId());
+      // The close failure is logged and swallowed; the loop does not throw.
+      spy.closePipelinesMissingDataStreamPort();
+      assertTrue(exists(pipelineManager, stale.getId()));
+    }
+  }
+
+  @Test
+  public void testScrubAndCloseWiring() throws Exception {
+    // The background task scrubs then closes pipelines exposing new ports; on
+    // an empty manager both are no-ops and must not throw.
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      pipelineManager.scrubAndClosePipelinesMissingDataStreamPort();
+    }
+  }
+
+  @Test
+  public void testScrubAndCloseSwallowsScrubError() throws Exception {
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      final PipelineManagerImpl spy = spy(pipelineManager);
+      doThrow(new IOException("boom")).when(spy).scrubPipelines();
+      // Scrub failure is logged and swallowed; the close pass still runs.
+      spy.scrubAndClosePipelinesMissingDataStreamPort();
+      verify(spy).closePipelinesMissingDataStreamPort();
+    }
   }
 }

@@ -464,8 +464,12 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 8 * 1024;
 
   public static final String OZONE_CLIENT_READ_TIMEOUT
-          = "ozone.client.read.timeout";
+      = "ozone.client.read.timeout";
   public static final String OZONE_CLIENT_READ_TIMEOUT_DEFAULT = "30s";
+  public static final String OZONE_CLIENT_WRITE_TIMEOUT
+      = "ozone.client.write.timeout";
+  public static final String OZONE_CLIENT_WRITE_TIMEOUT_DEFAULT = "30s";
+
   public static final String OZONE_ACL_AUTHORIZER_CLASS =
       "ozone.acl.authorizer.class";
   public static final String OZONE_ACL_AUTHORIZER_CLASS_DEFAULT =
@@ -492,6 +496,18 @@ public final class OzoneConfigKeys {
       "ozone.client.failover.max.attempts";
   public static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT =
       500;
+  /**
+   * When true, RPC clients (DN heartbeat, OM client, SCM client) re-resolve
+   * cached hostnames on connection failure and rebuild the proxy if the
+   * resolved IP has changed. Set to true in environments where server pod
+   * IPs may change while DNS names remain stable, such as Kubernetes.
+   * Default false preserves pre-fix behavior. Mirrors the design intent of
+   * HADOOP-17068 / HDFS-14118.
+   */
+  public static final String OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY =
+          "ozone.client.failover.resolve-needed";
+  public static final boolean OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT =
+          false;
   public static final String OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY =
       "ozone.client.wait.between.retries.millis";
   public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =

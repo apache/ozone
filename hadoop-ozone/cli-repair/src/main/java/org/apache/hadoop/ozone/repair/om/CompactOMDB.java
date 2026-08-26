@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.repair.om;
 import java.io.IOException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.ozone.repair.RepairTool;
@@ -39,7 +41,7 @@ import picocli.CommandLine;
 )
 public class CompactOMDB extends RepairTool {
 
-  @CommandLine.Option(names = {"--column-family", "--column_family", "--cf"},
+  @CommandLine.Option(names = {"--column-family", "--cf"},
       required = true,
       description = "Column family name")
   private String columnFamilyName;
@@ -53,24 +55,49 @@ public class CompactOMDB extends RepairTool {
 
   @CommandLine.Option(
       names = {"--node-id"},
-      description = "NodeID of the OM for which db needs to be compacted.",
+      description = "NodeID of the OM for which db needs to be compacted. "
+          + "Required when OM HA is configured.",
       required = false
   )
   private String nodeId;
+
+  @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
+      description = "BottommostLevelCompaction option for RocksDB compaction." +
+          "  Valid values: ${COMPLETION-CANDIDATES}",
+      defaultValue = "kSkip",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction;
 
   @Override
   public void execute() throws Exception {
 
     OzoneConfiguration conf = getOzoneConf();
+
+    if (nodeId == null && OmUtils.isServiceIdsDefined(conf)) {
+      error("This is an HA OM cluster; specify --node-id to select which OM's"
+          + " db to compact.");
+      return;
+    }
+
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
         conf, omServiceId, nodeId);
+
+    if (omNodeDetails == null) {
+      error("Couldn't determine OM node from the given service-id: %s and node-id: %s.",
+          omServiceId, nodeId);
+      return;
+    }
+
+    String omDisplay = nodeId != null ? nodeId : omNodeDetails.getRpcAddressString();
     if (!isDryRun()) {
       try (OMAdminProtocolClientSideImpl omAdminProtocolClient =
                OMAdminProtocolClientSideImpl.createProxyForSingleOM(conf,
                    UserGroupInformation.getCurrentUser(), omNodeDetails)) {
-        omAdminProtocolClient.compactOMDB(columnFamilyName);
-        info("Compaction request issued for om.db of om node: %s, column-family: %s.", nodeId, columnFamilyName);
-        info("Please check role logs of %s for completion status.", nodeId);
+        omAdminProtocolClient.compactOMDB(columnFamilyName, bottommostLevelCompaction.getValue());
+        info("Compaction request issued for om.db of om node: %s, column-family: %s" +
+            " with bottommost level compaction: %s.",
+            omDisplay, columnFamilyName, bottommostLevelCompaction.name());
+        info("Please check role logs of %s for completion status.", omDisplay);
       } catch (IOException ex) {
         error("Couldn't compact column %s. \nException: %s", columnFamilyName, ex);
       }

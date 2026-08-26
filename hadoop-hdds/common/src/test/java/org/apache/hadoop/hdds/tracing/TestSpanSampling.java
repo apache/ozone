@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.TraceFlags;
 import io.opentelemetry.api.trace.TraceState;
@@ -140,5 +142,85 @@ public class TestSpanSampling {
         SpanKind.INTERNAL, Attributes.empty(), Collections.emptyList());
 
     assertEquals(SamplingDecision.DROP, result.getDecision());
+  }
+
+  @Test
+  public void testParseSpanSamplingConfigNullOrEmpty() {
+    assertThat(TracingUtil.parseSpanSamplingConfig(null)).isEmpty();
+    assertThat(TracingUtil.parseSpanSamplingConfig("")).isEmpty();
+  }
+
+  @Test
+  public void testParseSpanSamplingConfigSkipsMalformedEntries() {
+    String config = "badnocolon, :0.5, nameonly:, :1.0, good:0.5";
+    Map<String, LoopSampler> result = TracingUtil.parseSpanSamplingConfig(config);
+    assertThat(result).containsOnlyKeys("good");
+  }
+
+  @Test
+  public void testParseSpanSamplingConfigCapsRateAboveOne() {
+    Map<String, LoopSampler> result =
+        TracingUtil.parseSpanSamplingConfig("heavy:2.0");
+    assertThat(result).hasSize(1).containsKey("heavy");
+    assertThat(result.get("heavy").shouldSample()).isTrue();
+  }
+
+  @Test
+  public void testSpanSamplerGetDescription() {
+    Map<String, LoopSampler> spanMap = new HashMap<>();
+    spanMap.put("a", new LoopSampler(1.0));
+    SpanSampler sampler = new SpanSampler(Sampler.alwaysOn(), spanMap);
+    assertThat(sampler.getDescription()).contains("SpanSampler").contains("a");
+  }
+
+  /**
+   * Test to check Child span has entry in map with ratio as 0.
+   * It must not be sampled even if parent flag is set to sampled.
+   */
+  @Test
+  public void testChildWithConfiguredSpanAndZeroLoopSamplerDrops() {
+    Map<String, LoopSampler> spanMap = new HashMap<>();
+    spanMap.put("rpc", new LoopSampler(0.0));
+    SpanSampler customSampler = new SpanSampler(Sampler.alwaysOn(), spanMap);
+
+    Span parentSpan = Span.wrap(
+        SpanContext.create(
+            "ff000000000000000000000000000041",
+            "ff00000000000042",
+            TraceFlags.getSampled(),
+            TraceState.getDefault()));
+
+    Context parentContext = Context.root().with(parentSpan);
+
+    SamplingResult result = customSampler.shouldSample(
+        parentContext, "ff000000000000000000000000000041", "rpc",
+        SpanKind.INTERNAL, Attributes.empty(), Collections.emptyList());
+
+    assertThat(result.getDecision()).isEqualTo(SamplingDecision.DROP);
+  }
+
+  /**
+   * Test to check a child span with no entry in map will be sampled if parent is sampled.
+   */
+  @Test
+  public void testChildSampledParentNotInSpanMapIsRecorded() {
+    Map<String, LoopSampler> spanMap = new HashMap<>();
+    spanMap.put("other", new LoopSampler(1.0));
+    SpanSampler customSampler = new SpanSampler(Sampler.alwaysOn(), spanMap);
+
+    Span parentSpan = Span.wrap(
+        SpanContext.create(
+            "ff000000000000000000000000000041",
+            "ff00000000000042",
+            TraceFlags.getSampled(),
+            TraceState.getDefault()));
+
+    Context parentContext = Context.root().with(parentSpan);
+
+    SamplingResult result = customSampler.shouldSample(
+        parentContext, "ff000000000000000000000000000041", "unlistedSpan",
+        SpanKind.INTERNAL, Attributes.empty(), Collections.emptyList());
+
+    assertThat(result.getDecision()).isEqualTo(SamplingDecision.RECORD_AND_SAMPLE);
   }
 }

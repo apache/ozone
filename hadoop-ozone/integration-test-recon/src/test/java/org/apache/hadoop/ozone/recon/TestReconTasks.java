@@ -158,8 +158,8 @@ public class TestReconTasks {
   }
 
   /**
-   * Verifies that {@code syncWithSCMContainerInfo()} pulls CLOSED containers
-   * from SCM into Recon when they are not yet known to Recon.
+   * Verifies that {@code triggerTargetedSCMContainerSync()} pulls CLOSED
+   * containers from SCM into Recon when they are not yet known to Recon.
    */
   @Test
   public void testSyncSCMContainerInfo() throws Exception {
@@ -186,7 +186,7 @@ public class TestReconTasks {
     int scmContainersCount = scmContainerManager.getContainers().size();
     int reconContainersCount = reconCm.getContainers().size();
     assertNotEquals(scmContainersCount, reconContainersCount);
-    reconScm.syncWithSCMContainerInfo();
+    reconScm.triggerSCMContainerSync();
     reconContainersCount = reconCm.getContainers().size();
     assertEquals(scmContainersCount, reconContainersCount);
   }
@@ -265,8 +265,8 @@ public class TestReconTasks {
     //   RatisReplicationCheckHandler → only reached for CLOSED/QUASI_CLOSED containers;
     //                                  this is the ONLY handler that records UNDER_REPLICATED
     //
-    // syncWithSCMContainerInfo() only discovers *new* CLOSED containers, not state
-    // changes to already-known ones, so we apply the transition to both managers directly.
+    // Apply the transition to both managers directly so this test can focus on
+    // the health-check handler chain rather than targeted sync state correction.
     scmContainerManager.updateContainerState(containerInfo.containerID(),
         HddsProtos.LifeCycleEvent.FINALIZE);
     scmContainerManager.updateContainerState(containerInfo.containerID(),
@@ -341,9 +341,8 @@ public class TestReconTasks {
    * <p>Classification logic: When a CLOSING container has zero replicas,
    * {@code ClosingContainerHandler} samples it as {@code MISSING}. Then
    * {@code handleMissingContainer()} calls {@code isEmptyMissing()} which checks
-   * {@link ContainerInfo#getNumberOfKeys()}. Since the container was created via
-   * XceiverClient bypassing Ozone Manager, SCM's key count is 0, so the container
-   * is classified as {@code EMPTY_MISSING} rather than {@code MISSING}.</p>
+   * {@link ContainerInfo#getNumberOfKeys()}. Since no block is written, container reports keep the key
+   * count at 0, so Recon classifies the container as {@code EMPTY_MISSING} rather than {@code MISSING}.</p>
    *
    * <p>Note: this test relies on the CLOSING-state path (not the CLOSED-state path),
    * so no explicit container close is needed before node shutdown. The dead-node
@@ -366,8 +365,11 @@ public class TestReconTasks {
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
 
+    // Do NOT write a block here: container reports propagate the datanode's block count into
+    // ContainerInfo#numberOfKeys, and a non-zero key count yields MISSING instead of EMPTY_MISSING.
     XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
-    runTestOzoneContainerViaDataNode(containerID, client);
+    client.connect();
+    createContainerForTesting(client, containerID);
 
     // Wait for Recon to receive the container report from the single datanode.
     // This ensures DeadNodeHandler can find and remove the replica when the node dies.
@@ -605,7 +607,7 @@ public class TestReconTasks {
     DatanodeDetails primaryDn = pipeline.getFirstNode();
     DatanodeDetails secondDn = cluster.getHddsDatanodes().stream()
         .map(HddsDatanodeService::getDatanodeDetails)
-        .filter(dd -> !dd.getUuid().equals(primaryDn.getUuid()))
+        .filter(dd -> !dd.getID().equals(primaryDn.getID()))
         .findFirst()
         .orElseThrow(() -> new AssertionError("No second datanode available"));
 

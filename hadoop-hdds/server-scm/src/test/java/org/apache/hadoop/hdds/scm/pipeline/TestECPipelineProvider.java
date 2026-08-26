@@ -38,9 +38,11 @@ import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -84,6 +86,7 @@ public class TestECPipelineProvider {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
+    Map<DatanodeID, DatanodeInfo> datanodeInfos = new HashMap<>();
     // Placement policy will always return EC number of random nodes.
     when(placementPolicy.chooseDatanodes(anyList(),
         anyList(), anyInt(), anyLong(),
@@ -91,15 +94,17 @@ public class TestECPipelineProvider {
         .thenAnswer(invocation -> {
           List<DatanodeDetails> dns = new ArrayList<>();
           for (int i = 0; i < (int) invocation.getArguments()[2]; i++) {
-            dns.add(MockDatanodeDetails.randomDatanodeDetails());
+            DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+            dns.add(dn);
+            datanodeInfos.put(dn.getID(), createDatanodeInfo(dn));
           }
           return dns;
         });
 
     when(nodeManager.getNodeStatus(any()))
         .thenReturn(NodeStatus.inServiceHealthy());
-    when(nodeManager.getDatanodeInfo(any()))
-        .thenAnswer(invocation -> createDatanodeInfo(invocation.getArgument(0)));
+    when(nodeManager.getNode(any()))
+        .thenAnswer(invocation -> datanodeInfos.get(invocation.getArgument(0)));
   }
 
   @Test

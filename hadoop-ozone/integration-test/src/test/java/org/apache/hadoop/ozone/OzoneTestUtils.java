@@ -131,7 +131,7 @@ public final class OzoneTestUtils {
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup :
         omKeyLocationInfoGroups) {
       List<OmKeyLocationInfo> omKeyLocationInfos =
-          omKeyLocationInfoGroup.getLocationList();
+          omKeyLocationInfoGroup.createLocationList();
       for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfos) {
         BlockID blockID = omKeyLocationInfo.getBlockID();
         consumer.accept(blockID);

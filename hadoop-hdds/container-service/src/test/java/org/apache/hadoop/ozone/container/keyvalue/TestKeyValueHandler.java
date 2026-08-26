@@ -35,6 +35,7 @@ import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -60,6 +61,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -120,6 +122,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -145,6 +149,11 @@ public class TestKeyValueHandler {
   private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
+  // The checksum boundary readBlock aligns to when the chunk carries no checksums.
+  private static final long BYTES_PER_CHECKSUM = 1024 * 64;
+  // Deliberately not a multiple of BYTES_PER_CHECKSUM, so an offset past the end of the block can still have its
+  // checksum aligned floor inside the block.
+  private static final int BLOCK_SIZE = 1000;
 
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
@@ -371,18 +380,20 @@ public class TestKeyValueHandler {
   @ContainerLayoutTestInfo.ContainerTest
   public void testCloseInvalidContainer(ContainerLayoutVersion layoutVersion)
       throws IOException {
-    KeyValueHandler keyValueHandler = createKeyValueHandler(tempDir);
     conf = new OzoneConfiguration();
-    KeyValueContainerData kvData = new KeyValueContainerData(DUMMY_CONTAINER_ID,
-        layoutVersion,
-        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
-        UUID.randomUUID().toString());
-    kvData.setMetadataPath(tempDir.toString());
-    kvData.setDbFile(dbFile.toFile());
-    KeyValueContainer container = new KeyValueContainer(kvData, conf);
+    conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, layoutVersion.name());
+    HandlerWithVolumeSet handlerCtx = createKeyValueHandler(tempDir);
+    KeyValueHandler keyValueHandler = handlerCtx.getHandler();
+    ContainerSet containerSet = handlerCtx.getContainerSet();
+
+    long containerId = DUMMY_CONTAINER_ID + layoutVersion.getVersion();
     ContainerCommandRequestProto createContainerRequest =
-        createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID);
-    keyValueHandler.handleCreateContainer(createContainerRequest, container);
+        createContainerRequest(DATANODE_UUID, containerId);
+    keyValueHandler.handleCreateContainer(createContainerRequest, null);
+
+    KeyValueContainer container =
+        (KeyValueContainer) containerSet.getContainer(containerId);
+    KeyValueContainerData kvData = container.getContainerData();
 
     // Make the container state as invalid.
     kvData.setState(ContainerProtos.ContainerDataProto.State.INVALID);
@@ -391,12 +402,11 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto closeContainerRequest =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.CloseContainer)
-            .setContainerID(DUMMY_CONTAINER_ID)
+            .setContainerID(containerId)
             .setDatanodeUuid(DATANODE_UUID)
             .setCloseContainer(ContainerProtos.CloseContainerRequestProto
                 .getDefaultInstance())
             .build();
-    dispatcher.dispatch(closeContainerRequest, null);
 
     // Closing invalid container should return error response.
     ContainerProtos.ContainerCommandResponseProto response =
@@ -703,6 +713,46 @@ public class TestKeyValueHandler {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
+  public void testDeleteUnreferencedFailsWhenChunkDirCannotBeListed(
+      ContainerLayoutVersion layoutVersion) throws Exception {
+    KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
+        DATANODE_UUID, newContainerSet(), mock(MutableVolumeSet.class),
+        mock(ContainerMetrics.class), c -> { },
+        new ContainerChecksumTreeManager(conf));
+    KeyValueContainer container = createContainerWithChunksPath(layoutVersion,
+        Files.createFile(tempDir.resolve("chunks-file")));
+
+    IOException exception = Assertions.assertThrows(IOException.class,
+        () -> keyValueHandler.deleteUnreferenced(container, 1L));
+
+    assertThat(exception)
+        .hasMessageContaining("Failed to list chunks under")
+        .hasMessageContaining("for unreferenced block 1")
+        .hasMessageContaining("in container " + DUMMY_CONTAINER_ID);
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testDeleteUnreferencedFailsWhenFileDeletionFails(
+      ContainerLayoutVersion layoutVersion) throws Exception {
+    FailingUnreferencedDeleteKeyValueHandler keyValueHandler =
+        new FailingUnreferencedDeleteKeyValueHandler(conf);
+    Path chunkDir = Files.createDirectory(tempDir.resolve("chunks"));
+    Path chunkFile = Files.createFile(chunkDir.resolve(
+        getUnreferencedChunkName(layoutVersion, 1L)));
+    KeyValueContainer container =
+        createContainerWithChunksPath(layoutVersion, chunkDir);
+
+    IOException exception = Assertions.assertThrows(IOException.class,
+        () -> keyValueHandler.deleteUnreferenced(container, 1L));
+
+    assertThat(exception)
+        .hasMessageContaining("Failed to delete unreferenced chunk/block")
+        .hasMessageContaining(chunkFile.toString())
+        .hasMessageContaining("in container " + DUMMY_CONTAINER_ID);
+    assertTrue(Files.exists(chunkFile));
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
   public void testUpdateContainerChecksum(ContainerLayoutVersion layoutVersion) throws Exception {
     conf = new OzoneConfiguration();
     KeyValueContainerData data = new KeyValueContainerData(123L, layoutVersion, GB,
@@ -817,7 +867,7 @@ public class TestKeyValueHandler {
 
     final KeyValueHandler kvHandler = new KeyValueHandler(conf,
         datanodeId, containerSet, volumeSet, null, metrics,
-        c -> icrReceived.incrementAndGet(), clock, new ContainerChecksumTreeManager(conf));
+        c -> icrReceived.incrementAndGet(), clock, new ContainerChecksumTreeManager(conf), null);
     kvHandler.setClusterID(clusterId);
 
     final ContainerCommandRequestProto createContainer =
@@ -924,7 +974,7 @@ public class TestKeyValueHandler {
         .build();
   }
 
-  private KeyValueHandler createKeyValueHandler(Path path) throws IOException {
+  private HandlerWithVolumeSet createKeyValueHandler(Path path) throws IOException {
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
@@ -951,7 +1001,7 @@ public class TestKeyValueHandler {
         conf.getObject(ContainerScannerConfiguration.class), controller);
     containerSet.registerOnDemandScanner(onDemandScanner);
 
-    return kvHandler;
+    return new HandlerWithVolumeSet(kvHandler, volumeSet, containerSet);
   }
 
   private static class HandlerWithVolumeSet {
@@ -1085,6 +1135,209 @@ public class TestKeyValueHandler {
       }
       FileUtils.deleteDirectory(testDir.toFile());
       ContainerMetrics.remove();
+    }
+  }
+
+  /**
+   * An offset which is aligned to the checksum boundary but past the end of the block must be rejected before any
+   * data is streamed.
+   */
+  @Test
+  public void testReadBlockOutOfRangeAlignedOffset() throws Exception {
+    // BYTES_PER_CHECKSUM below is used when the chunk has no checksums, so this offset is checksum aligned.
+    ReadBlockResult result = readBlock(BLOCK_SIZE, BYTES_PER_CHECKSUM, 1024);
+    assertOutOfRange(result, BYTES_PER_CHECKSUM);
+  }
+
+  /**
+   * An offset past the end of the block whose checksum aligned floor still falls inside the block must be rejected
+   * as well, even though the aligned read itself would be in range.
+   */
+  @Test
+  public void testReadBlockOutOfRangeMisalignedSliver() throws Exception {
+    final long offset = BLOCK_SIZE + 500;
+    assertThat(offset - offset % BYTES_PER_CHECKSUM).isLessThan((long) BLOCK_SIZE);
+    ReadBlockResult result = readBlock(BLOCK_SIZE, offset, 1024);
+    assertOutOfRange(result, offset);
+  }
+
+  /**
+   * The first offset past the last byte of the block must be rejected.
+   */
+  @Test
+  public void testReadBlockOutOfRangeAtBlockSize() throws Exception {
+    ReadBlockResult result = readBlock(BLOCK_SIZE, BLOCK_SIZE, 1024);
+    assertOutOfRange(result, BLOCK_SIZE);
+  }
+
+  /**
+   * The last byte of the block is still in range, even if the requested length runs past the end of the block.
+   */
+  @Test
+  public void testReadBlockOutOfRangeLastByteInRange() throws Exception {
+    ReadBlockResult result = readBlock(BLOCK_SIZE, BLOCK_SIZE - 1, 1024);
+    assertNull(result.getResponse(), "ReadBlock should return null on success");
+    assertThat(result.getErrors()).isEmpty();
+    assertThat(result.getDataResponses()).isNotEmpty();
+    for (ContainerCommandResponseProto response : result.getDataResponses()) {
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+    }
+  }
+
+  private void assertOutOfRange(ReadBlockResult result, long offset) {
+    assertNull(result.getResponse(),
+        "ReadBlock must return null so the dispatcher does not scan the container");
+    assertThat(result.getDataResponses()).isEmpty();
+    assertEquals(1, result.getErrors().size(), "Exactly one onError is expected");
+    StatusRuntimeException sre = assertInstanceOf(StatusRuntimeException.class, result.getErrors().get(0));
+    assertEquals(Status.Code.OUT_OF_RANGE, sre.getStatus().getCode());
+    assertThat(sre.getStatus().getDescription())
+        .contains(String.valueOf(result.getBlockID().getContainerID()))
+        .contains(String.valueOf(result.getBlockID().getLocalID()))
+        .contains(String.valueOf(offset))
+        .contains(String.valueOf(BLOCK_SIZE));
+  }
+
+  /**
+   * Reads a block of {@code blockSize} bytes from a real container through {@link KeyValueHandler#readBlock},
+   * collecting the streamed responses and errors.
+   */
+  private ReadBlockResult readBlock(int blockSize, long offset, long length) throws Exception {
+    Path testDir = Files.createTempDirectory("testReadBlockOutOfRange");
+    RandomAccessFileChannel blockFile = null;
+    try {
+      conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+      KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+      MutableVolumeSet volumeSet = handlerWithVolume.getVolumeSet();
+      ContainerSet containerSet = handlerWithVolume.getContainerSet();
+
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainerData containerData = new KeyValueContainerData(
+          containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
+          (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+          DATANODE_UUID);
+      KeyValueContainer container = new KeyValueContainer(containerData, conf);
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+          CLUSTER_ID, null);
+      containerSet.addContainer(container);
+
+      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+      BlockData blockData = new BlockData(blockID);
+      ChunkInfo chunkInfo = new ChunkInfo("chunk1", 0, blockSize);
+      blockData.addChunk(chunkInfo.getProtoBufMessage());
+      kvHandler.getBlockManager().putBlock(container, blockData);
+
+      ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.allocate(blockSize));
+      kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, data,
+          DispatcherContext.getHandleWriteChunk());
+
+      ContainerCommandRequestProto readBlockRequest =
+          ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.ReadBlock)
+              .setContainerID(containerID)
+              .setDatanodeUuid(DATANODE_UUID)
+              .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+                  .setBlockID(blockID.getDatanodeBlockIDProtobuf())
+                  .setOffset(offset)
+                  .setLength(length)
+                  .build())
+              .build();
+
+      ReadBlockResult result = new ReadBlockResult(blockID);
+      blockFile = new RandomAccessFileChannel();
+      result.setResponse(kvHandler.readBlock(readBlockRequest, container, blockFile, result));
+      return result;
+    } finally {
+      if (blockFile != null) {
+        blockFile.close();
+      }
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
+  }
+
+  /**
+   * Collects everything a single readBlock call produced: the streamed data responses, the errors and the response
+   * proto returned by the handler.
+   */
+  private static final class ReadBlockResult implements StreamObserver<ContainerCommandResponseProto> {
+    private final BlockID blockID;
+    private final List<ContainerCommandResponseProto> dataResponses = new ArrayList<>();
+    private final List<Throwable> errors = new ArrayList<>();
+    private ContainerCommandResponseProto response;
+
+    ReadBlockResult(BlockID blockID) {
+      this.blockID = blockID;
+    }
+
+    @Override
+    public void onNext(ContainerCommandResponseProto dataResponse) {
+      dataResponses.add(dataResponse);
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      errors.add(t);
+    }
+
+    @Override
+    public void onCompleted() {
+    }
+
+    BlockID getBlockID() {
+      return blockID;
+    }
+
+    List<ContainerCommandResponseProto> getDataResponses() {
+      return dataResponses;
+    }
+
+    List<Throwable> getErrors() {
+      return errors;
+    }
+
+    ContainerCommandResponseProto getResponse() {
+      return response;
+    }
+
+    void setResponse(ContainerCommandResponseProto response) {
+      this.response = response;
+    }
+  }
+
+  private KeyValueContainer createContainerWithChunksPath(
+      ContainerLayoutVersion layoutVersion, Path chunksPath) {
+    KeyValueContainerData data = new KeyValueContainerData(DUMMY_CONTAINER_ID,
+        layoutVersion, GB, PipelineID.randomId().toString(), DATANODE_UUID);
+    data.setChunksPath(chunksPath.toString());
+    return new KeyValueContainer(data, conf);
+  }
+
+  private static String getUnreferencedChunkName(
+      ContainerLayoutVersion layoutVersion, long localID) {
+    switch (layoutVersion) {
+    case FILE_PER_BLOCK:
+      return localID + ".block";
+    case FILE_PER_CHUNK:
+      return localID + "_chunk_0";
+    default:
+      throw new IllegalArgumentException(
+          "Unsupported container layout version " + layoutVersion);
+    }
+  }
+
+  private static final class FailingUnreferencedDeleteKeyValueHandler
+      extends KeyValueHandler {
+    private FailingUnreferencedDeleteKeyValueHandler(OzoneConfiguration conf) {
+      super(conf, DATANODE_UUID, newContainerSet(), mock(MutableVolumeSet.class),
+          mock(ContainerMetrics.class), c -> { },
+          new ContainerChecksumTreeManager(conf));
+    }
+
+    @Override
+    boolean deleteUnreferencedFile(File file) {
+      return false;
     }
   }
 }

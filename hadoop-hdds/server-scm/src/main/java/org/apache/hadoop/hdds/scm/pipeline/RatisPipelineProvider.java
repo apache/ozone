@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_DATASTREAM;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -24,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicyFactory;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
@@ -70,6 +72,7 @@ public class RatisPipelineProvider
   private final SCMContext scmContext;
   private final long containerSizeBytes;
   private final long minRatisVolumeSizeBytes;
+  private final boolean isRatisStreamingEnabled;
 
   @VisibleForTesting
   public RatisPipelineProvider(NodeManager nodeManager,
@@ -96,6 +99,9 @@ public class RatisPipelineProvider
         ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
         StorageUnit.BYTES);
+    this.isRatisStreamingEnabled = conf.getBoolean(
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
     try {
       leaderChoosePolicy = LeaderChoosePolicyFactory
           .getPolicy(conf, nodeManager, stateManager);
@@ -174,19 +180,7 @@ public class RatisPipelineProvider
       dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes, containerSizeBytes, storageTier);
       break;
     case THREE:
-      StorageTierUtil.validateNotEmpty(storageTier);
-      StorageType storageType = storageTier.getUniformStorageType();
-      List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement(storageTier);
-      if (!excludeDueToEngagement.isEmpty()) {
-        if (excludedNodes.isEmpty()) {
-          excludedNodes = excludeDueToEngagement;
-        } else {
-          excludedNodes.addAll(excludeDueToEngagement);
-        }
-      }
-      dns = placementPolicy.chooseDatanodes(excludedNodes,
-          favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
-          containerSizeBytes, storageType);
+      dns = chooseThreeFactorDatanodes(excludedNodes, favoredNodes, factor.getNumber(), storageTier);
       break;
     default:
       throw new IllegalStateException("Unknown factor: " + factor.name());
@@ -200,13 +194,9 @@ public class RatisPipelineProvider
               storageTier, replicationConfig), SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
     Preconditions.checkArgument(storageTiers.contains(storageTier));
-    Pipeline pipeline = Pipeline.newBuilder()
+    Pipeline pipeline = newPipelineBuilder(RatisReplicationConfig.getInstance(factor), dns)
         .setId(PipelineID.randomId())
-        .setState(PipelineState.ALLOCATED)
-        .setReplicationConfig(RatisReplicationConfig.getInstance(factor))
-        .setNodes(dns)
-        .setSuggestedLeaderId(
-            suggestedLeader != null ? suggestedLeader.getID() : null)
+        .setSuggestedLeaderId(suggestedLeader != null ? suggestedLeader.getID() : null)
         .setSupportedStorageTier(storageTier)
         .build();
 
@@ -239,16 +229,8 @@ public class RatisPipelineProvider
           storageTier, replicationConfig),
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
-    return createPipelineInternal(replicationConfig, nodes, storageTier);
-  }
-
-  private Pipeline createPipelineInternal(RatisReplicationConfig replicationConfig,
-      List<DatanodeDetails> nodes, StorageTier storageTier) {
-    return Pipeline.newBuilder()
+    return newPipelineBuilder(replicationConfig, nodes)
         .setId(PipelineID.randomId())
-        .setState(PipelineState.ALLOCATED)
-        .setReplicationConfig(replicationConfig)
-        .setNodes(nodes)
         .setSupportedStorageTier(storageTier)
         .build();
   }
@@ -257,27 +239,56 @@ public class RatisPipelineProvider
   public Pipeline createForRead(
       RatisReplicationConfig replicationConfig,
       Set<ContainerReplica> replicas) {
-    // Read Pipelines do not require storage tiers, so the calculation of storage tiers can be omitted.
-    return createPipelineInternal(replicationConfig, replicas
-        .stream()
-        .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList()), null);
+    // Use insecureRandomId for throwaway read pipeline IDs to avoid
+    // contention on the shared SecureRandom instance.
+    return newPipelineBuilder(replicationConfig, ContainerReplica.toDatanodeDetailsList(replicas))
+        .setId(PipelineID.insecureRandomId())
+        .build();
   }
 
-  private List<DatanodeDetails> filterPipelineEngagement(StorageTier storageTier) {
+  private List<DatanodeDetails> chooseThreeFactorDatanodes(
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, int requiredNode,
+      StorageTier storageTier)
+      throws IOException {
+    StorageTierUtil.validateNotEmpty(storageTier);
+    final StorageType storageType = storageTier.getUniformStorageType();
     final NodeManager nodeManager = getNodeManager();
     final PipelineStateManager stateManager = getPipelineStateManager();
     final List<DatanodeDetails> healthyNodes = nodeManager.getNodes(NodeStatus.inServiceHealthy());
-    final List<DatanodeDetails> excluded = new ArrayList<>();
-    final StorageType storageType = storageTier.getUniformStorageType();
+    excludedNodes = excludedNodes.isEmpty() ? null : excludedNodes;
+    List<DatanodeDetails> additionalExcludedNodes = null;
     for (DatanodeDetails d : healthyNodes) {
       final int count = PipelinePlacementPolicy.currentRatisThreePipelineCount(
           nodeManager, stateManager, d, storageType);
       if (count >= nodeManager.pipelineLimit(d)) {
-        excluded.add(d);
+        if (excludedNodes == null) {
+          excludedNodes = new ArrayList<>();
+        }
+        excludedNodes.add(d);
+      } else if (isRatisStreamingEnabled && !d.hasPort(RATIS_DATASTREAM)) {
+        if (additionalExcludedNodes == null) {
+          additionalExcludedNodes = new ArrayList<>();
+        }
+        additionalExcludedNodes.add(d);
       }
     }
-    return excluded;
+    // If the cluster does not support Ratis streaming, or if all nodes support it, no fallback will occur.
+    if (additionalExcludedNodes != null) {
+      if (excludedNodes != null) {
+        additionalExcludedNodes.addAll(excludedNodes);
+      }
+      try {
+        return placementPolicy.chooseDatanodes(additionalExcludedNodes,
+            favoredNodes, requiredNode, minRatisVolumeSizeBytes,
+            containerSizeBytes, storageType);
+      } catch (SCMException scmException) {
+        LOG.debug("Failed to allocate datanodes with strict exclusion (non-streaming nodes excluded)." +
+            " Falling back.", scmException);
+      }
+    }
+    return placementPolicy.chooseDatanodes(excludedNodes,
+          favoredNodes, requiredNode, minRatisVolumeSizeBytes,
+          containerSizeBytes, storageType);
   }
 
   /**

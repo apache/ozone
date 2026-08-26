@@ -64,13 +64,28 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
     return stateManager;
   }
 
+  protected Pipeline create(REPLICATION_CONFIG replicationConfig) throws IOException {
+    return create(replicationConfig, StorageTier.getDefaultTier());
+  }
+
   protected abstract Pipeline create(REPLICATION_CONFIG replicationConfig,
       StorageTier storageTier) throws IOException;
+
+  protected Pipeline create(REPLICATION_CONFIG replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
+    return create(replicationConfig, excludedNodes, favoredNodes, StorageTier.getDefaultTier());
+  }
 
   protected abstract Pipeline create(REPLICATION_CONFIG replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
       StorageTier storageTier)
       throws IOException;
+
+  protected Pipeline create(REPLICATION_CONFIG replicationConfig,
+      List<DatanodeDetails> nodes) throws IOException {
+    return create(replicationConfig, nodes, StorageTier.getDefaultTier());
+  }
 
   protected abstract Pipeline create(
       REPLICATION_CONFIG replicationConfig,
@@ -94,7 +109,29 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
     List<DatanodeDetails> healthyDNs = pickAllNodesNotUsed(replicationConfig);
     List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
         .filter(dn -> SCMCommonPlacementPolicy.hasEnoughSpace(
-            dn, metadataSizeRequired, dataSizeRequired, storageType))
+            dn, metadataSizeRequired, dataSizeRequired, storageType, nodeManager))
+        .limit(nodesRequired)
+        .collect(Collectors.toList());
+
+    if (healthyDNsWithSpace.size() < nodesRequired) {
+      String msg = String.format("Unable to find enough nodes that meet the " +
+              "space requirement of %d bytes for metadata and %d bytes for " +
+              "data in healthy node set. Nodes required: %d Found: %d",
+          metadataSizeRequired, dataSizeRequired, nodesRequired,
+          healthyDNsWithSpace.size());
+      LOG.warn(msg);
+      throw new SCMException(msg,
+          SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
+    }
+
+    return healthyDNsWithSpace;
+  }
+
+  List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig,
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
+    int nodesRequired = replicationConfig.getRequiredNodes();
+    List<DatanodeDetails> healthyDNsWithSpace = pickAllNodesNotUsed(replicationConfig).stream()
+        .filter(dn -> SCMCommonPlacementPolicy.hasEnoughSpace(dn, metadataSizeRequired, nodeManager))
         .limit(nodesRequired)
         .collect(Collectors.toList());
 
@@ -145,5 +182,12 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
     return dns;
+  }
+
+  protected Pipeline.Builder newPipelineBuilder(ReplicationConfig replicationConfig, List<DatanodeDetails> nodes) {
+    return Pipeline.newBuilder()
+        .setNodes(nodes)
+        .setReplicationConfig(replicationConfig)
+        .setState(Pipeline.PipelineState.ALLOCATED);
   }
 }

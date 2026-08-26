@@ -100,7 +100,6 @@ import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -938,7 +937,7 @@ public class TestContainerCommandsEC {
   }
 
   private void closeContainer(long conID)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     //Close the container first.
     scm.getContainerManager().getContainerStateManager().updateContainerStateWithSequenceId(
         HddsProtos.ContainerID.newBuilder().setId(conID).build(),
@@ -1041,7 +1040,7 @@ public class TestContainerCommandsEC {
                     .map(ContainerInfo::containerID)
                     .collect(Collectors.toList());
     assertEquals(1, containerIDs.size());
-    containerID = containerIDs.get(0).getId();
+    containerID = containerIDs.get(0).getIdForTesting();
     List<Pipeline> pipelines = scm.getPipelineManager().getPipelines(repConfig);
     assertEquals(1, pipelines.size());
     pipeline = pipelines.get(0);

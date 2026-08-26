@@ -75,6 +75,9 @@ public class ContainerLogController extends AbstractSubcommand {
         throw new IllegalArgumentException("The parent directory of the provided database " +
             "path does not exist: " + parentDir);
       }
+      if (!Files.exists(resolvedPath) || !Files.isRegularFile(resolvedPath)) {
+        throw new IllegalArgumentException("Database file does not exist: " + resolvedPath);
+      }
     }
 
     return resolvedPath;

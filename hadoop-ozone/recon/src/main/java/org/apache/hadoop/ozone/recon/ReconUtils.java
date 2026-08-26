@@ -43,9 +43,12 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -721,7 +724,7 @@ public class ReconUtils {
     // If limit = -1, set it to Integer.MAX_VALUE to return all records
     int actualLimit = (limit == -1) ? Integer.MAX_VALUE : limit;
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, T>> keyIter = table.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, T>> keyIter = table.iterator()) {
 
       // Scenario 1 & 4: prevKey is provided (whether startPrefix is empty or not)
       if (!prevKey.isEmpty()) {
@@ -781,27 +784,37 @@ public class ReconUtils {
                               long volumeID, long bucketID,
                               ReconNamespaceSummaryManager reconNamespaceSummaryManager)
       throws IOException {
-    // Fetch the NSSummary object for parentId
-    NSSummary parentSummary =
-        reconNamespaceSummaryManager.getNSSummary(parentId);
-    if (parentSummary == null) {
-      return;
-    }
-
-    Set<Long> childDirIds = parentSummary.getChildDir();
-    for (Long childId : childDirIds) {
-      // Fetch the NSSummary for each child directory
-      NSSummary childSummary =
-          reconNamespaceSummaryManager.getNSSummary(childId);
-      if (childSummary != null) {
-        String subPath =
-            ReconUtils.constructObjectPathWithPrefix(volumeID, bucketID,
-                childId);
-        // Add to subPaths
-        subPaths.add(subPath);
-        // Recurse into this child directory
-        gatherSubPaths(childId, subPaths, volumeID, bucketID,
-            reconNamespaceSummaryManager);
+    // Iterative traversal with a visited-set cycle guard. A corrupted NSSummary
+    // tree (e.g. a directory listing itself or an ancestor as a child) would
+    // otherwise recurse forever and crash Recon with a StackOverflowError.
+    // Each node is fetched once, on pop, and its path recorded (except the
+    // traversal root, which is the caller's starting directory).
+    Set<Long> visited = new HashSet<>();
+    Deque<Long> stack = new ArrayDeque<>();
+    stack.push(parentId);
+    visited.add(parentId);
+    boolean cycleLogged = false;
+    while (!stack.isEmpty()) {
+      long currentId = stack.pop();
+      NSSummary summary = reconNamespaceSummaryManager.getNSSummary(currentId);
+      if (summary == null) {
+        continue;
+      }
+      if (currentId != parentId) {
+        subPaths.add(ReconUtils.constructObjectPathWithPrefix(volumeID,
+            bucketID, currentId));
+      }
+      for (Long childId : summary.getChildDir()) {
+        if (visited.add(childId)) {
+          stack.push(childId);
+        } else if (!cycleLogged) {
+          reconNamespaceSummaryManager.recordNSSummaryInvalidTreeDetection();
+          log.warn("Detected a repeated reference to object {} while walking " +
+              "the NSSummary tree under object {} (volume {}, bucket {}); the " +
+              "NSSummary data may be corrupted.", childId, parentId, volumeID,
+              bucketID);
+          cycleLogged = true;
+        }
       }
     }
   }

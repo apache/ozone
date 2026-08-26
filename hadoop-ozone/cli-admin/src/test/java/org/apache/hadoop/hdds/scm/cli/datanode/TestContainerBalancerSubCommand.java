@@ -85,6 +85,78 @@ class TestContainerBalancerSubCommand {
       "Datanodes Specified to be Balanced                 None\n" +
       "Datanodes Excluded from Balancing                  None";
 
+  private static final String ITERATION_1_COMPLETED_OUTPUT =
+      "Key                                                Value\n" +
+          "Iteration number                                   1\n" +
+          "Iteration duration                                 6m 40s\n" +
+          "Iteration result                                   ITERATION_COMPLETED\n" +
+          "Size scheduled to move                             54 GB\n" +
+          "Moved data size                                    54 GB\n" +
+          "Scheduled to move containers                       11\n" +
+          "Already moved containers                           11\n" +
+          "Failed to move containers                          0\n" +
+          "Failed to move containers by timeout               0\n" +
+          "Entered data to nodes                              \n" +
+          "80f6bc27-e6f3-493e-b1f4-25f810ad960d <- 28 GB\n" +
+          "701ca98e-aa1a-4b36-b817-e28ed634bba6 <- 26 GB\n" +
+          "Exited data from nodes                             \n" +
+          "b8b9c511-c30f-4933-8938-2f272e307070 -> 25 GB\n" +
+          "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 29 GB";
+
+  private static final String ITERATION_2_COMPLETED_OUTPUT =
+      "Key                                                Value\n" +
+          "Iteration number                                   2\n" +
+          "Iteration duration                                 5m 0s\n" +
+          "Iteration result                                   ITERATION_COMPLETED\n" +
+          "Size scheduled to move                             30 GB\n" +
+          "Moved data size                                    30 GB\n" +
+          "Scheduled to move containers                       8\n" +
+          "Already moved containers                           8\n" +
+          "Failed to move containers                          0\n" +
+          "Failed to move containers by timeout               0\n" +
+          "Entered data to nodes                              \n" +
+          "80f6bc27-e6f3-493e-b1f4-25f810ad960d <- 20 GB\n" +
+          "701ca98e-aa1a-4b36-b817-e28ed634bba6 <- 10 GB\n" +
+          "Exited data from nodes                             \n" +
+          "b8b9c511-c30f-4933-8938-2f272e307070 -> 15 GB\n" +
+          "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 15 GB";
+
+  private static final String ITERATION_3_INTERRUPTED_OUTPUT =
+      "Key                                                Value\n" +
+          "Iteration number                                   3\n" +
+          "Iteration duration                                 6m 10s\n" +
+          "Iteration result                                   ITERATION_INTERRUPTED\n" +
+          "Size scheduled to move                             48 GB\n" +
+          "Moved data size                                    48 GB\n" +
+          "Scheduled to move containers                       5\n" +
+          "Already moved containers                           5\n" +
+          "Failed to move containers                          0\n" +
+          "Failed to move containers by timeout               0\n" +
+          "Entered data to nodes                              \n" +
+          "80f6bc27-e6f3-493e-b1f4-25f810ad960d <- 20 GB\n" +
+          "701ca98e-aa1a-4b36-b817-e28ed634bba6 <- 28 GB\n" +
+          "Exited data from nodes                             \n" +
+          "b8b9c511-c30f-4933-8938-2f272e307070 -> 30 GB\n" +
+          "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
+
+  private static final String ITERATION_3_COMPLETED_OUTPUT =
+      "Key                                                Value\n" +
+          "Iteration number                                   3\n" +
+          "Iteration duration                                 6m 10s\n" +
+          "Iteration result                                   ITERATION_COMPLETED\n" +
+          "Size scheduled to move                             48 GB\n" +
+          "Moved data size                                    48 GB\n" +
+          "Scheduled to move containers                       5\n" +
+          "Already moved containers                           5\n" +
+          "Failed to move containers                          0\n" +
+          "Failed to move containers by timeout               0\n" +
+          "Entered data to nodes                              \n" +
+          "80f6bc27-e6f3-493e-b1f4-25f810ad960d <- 20 GB\n" +
+          "701ca98e-aa1a-4b36-b817-e28ed634bba6 <- 28 GB\n" +
+          "Exited data from nodes                             \n" +
+          "b8b9c511-c30f-4933-8938-2f272e307070 -> 30 GB\n" +
+          "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
+
   private ContainerBalancerStopSubcommand stopCmd;
   private ContainerBalancerStartSubcommand startCmd;
   private ContainerBalancerStatusSubcommand statusCmd;
@@ -92,6 +164,17 @@ class TestContainerBalancerSubCommand {
   private GenericTestUtils.PrintStreamCapturer err;
   private AtomicBoolean verbose;
 
+  private static final Pattern STOP_REASON = Pattern.compile(
+      "^Stop reason: USER_REQUESTED$", Pattern.MULTILINE);
+  private static final Pattern STOP_MESSAGE = Pattern.compile(
+      "^Message: Stopped by user request\\.$", Pattern.MULTILINE);
+  private static final Pattern COMPLETED_ALL_ITERATIONS_STOP_REASON = Pattern.compile(
+      "^Stop reason: COMPLETED_ALL_ITERATIONS$", Pattern.MULTILINE);
+  private static final Pattern COMPLETED_ALL_ITERATIONS_STOP_MESSAGE = Pattern.compile(
+      "^Message: Completed all configured number of iterations\\.$", Pattern.MULTILINE);
+  private static final Pattern STOPPED_AT = Pattern.compile(
+      "^Stopped at: (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$", Pattern.MULTILINE);
+  
   private static ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfoResponseProto(
       ContainerBalancerConfiguration config) {
     StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration1StatusInfo =
@@ -234,6 +317,47 @@ class TestContainerBalancerSubCommand {
     return config;
   }
 
+  /**
+   * Builds a stopped-balancer response.
+   *
+   * @param config configuration
+   * @param stopReason stop reason
+   * @param stopMessage stop message
+   * @param lastIterationResult result for iteration 3, e.g. ITERATION_INTERRUPTED or ITERATION_COMPLETED
+   * @param balancingDurationSeconds wall-clock duration between startedAt and stoppedAt
+   */
+  private static ContainerBalancerStatusInfoResponseProto getStoppedStatusInfoResponseProto(
+      ContainerBalancerConfiguration config, String stopReason, String stopMessage,
+      String lastIterationResult, long balancingDurationSeconds) {
+    ContainerBalancerStatusInfoProto runningInfo =
+        getContainerBalancerStatusInfoResponseProto(config).getContainerBalancerStatusInfo();
+
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration3 =
+        runningInfo.getIterationsStatusInfo(2).toBuilder()
+            .setIterationResult(lastIterationResult)
+            .build();
+
+    long stoppedAt = OffsetDateTime.now().toEpochSecond();
+    long startedAt = stoppedAt - balancingDurationSeconds;
+
+    ContainerBalancerStatusInfoProto stoppedInfo = runningInfo.toBuilder()
+        .setStartedAt(startedAt)
+        .setStoppedAt(stoppedAt)
+        .setStopReason(stopReason)
+        .setStopMessage(stopMessage)
+        .setConfiguration(config.toProtobufBuilder().setShouldRun(false))
+        .clearIterationsStatusInfo()
+        .addIterationsStatusInfo(runningInfo.getIterationsStatusInfo(0))
+        .addIterationsStatusInfo(runningInfo.getIterationsStatusInfo(1))
+        .addIterationsStatusInfo(iteration3)
+        .build();
+
+    return ContainerBalancerStatusInfoResponseProto.newBuilder()
+        .setIsRunning(false)
+        .setContainerBalancerStatusInfo(stoppedInfo)
+        .build();
+  }
+
   @BeforeEach
   void setup() {
     verbose = new AtomicBoolean();
@@ -290,7 +414,7 @@ class TestContainerBalancerSubCommand {
     assertThat(out.get()).containsPattern(IS_RUNNING)
         .doesNotContain(BALANCER_CONFIG_OUTPUT)
         .doesNotContain(currentIterationOutput)
-        .doesNotContain("Iteration history list:");
+        .doesNotContain("Completed iteration history:");
   }
 
   @Test
@@ -351,7 +475,7 @@ class TestContainerBalancerSubCommand {
         .containsPattern(STARTED_AT)
         .containsPattern(DURATION)
         .contains(BALANCER_CONFIG_OUTPUT)
-        .contains("Iteration history list:")
+        .contains("Completed iteration history:")
         .contains(firstHistoryIterationOutput)
         .contains(secondHistoryIterationOutput);
   }
@@ -396,7 +520,7 @@ class TestContainerBalancerSubCommand {
         .containsPattern(DURATION)
         .contains(BALANCER_CONFIG_OUTPUT)
         .contains(currentIterationOutput)
-        .doesNotContain("Iteration history list:");
+        .doesNotContain("Completed iteration history:");
   }
 
   @Test
@@ -472,8 +596,229 @@ class TestContainerBalancerSubCommand {
             .setStart(false)
             .setMessage("")
             .build());
-    assertThrows(IOException.class, () -> startCmd.execute(scmClient));
-    assertThat(err.get()).containsPattern(FAILED_TO_START);
+    IOException ex = assertThrows(IOException.class, () -> startCmd.execute(scmClient));
+    assertThat(ex.getMessage()).containsPattern(FAILED_TO_START);
   }
 
+  @Test
+  void testContainerBalancerStatusSubcommandStoppedWithoutFlagsShowsStopReason() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
+    when(scmClient.getContainerBalancerStatusInfo())
+        .thenReturn(getStoppedStatusInfoResponseProto(
+            config, "USER_REQUESTED", "Stopped by user request.",
+            "ITERATION_INTERRUPTED", 1070L));
+    statusCmd.execute(scmClient);
+    assertThat(out.get())
+        .containsPattern(IS_NOT_RUNNING)
+        .containsPattern(STOP_REASON)
+        .containsPattern(STOP_MESSAGE)
+        .doesNotContain(BALANCER_CONFIG_OUTPUT)
+        .doesNotContain("Last iteration info:")
+        .doesNotContain("Stopped at:")
+        .doesNotContain("Completed iteration history:");
+  }
+
+  @Test
+  void testContainerBalancerStatusSubcommandStoppedVerbose() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
+    when(scmClient.getContainerBalancerStatusInfo())
+        .thenReturn(getStoppedStatusInfoResponseProto(
+            config, "USER_REQUESTED", "Stopped by user request.",
+            "ITERATION_INTERRUPTED", 1070L));
+    verbose.set(true);
+    statusCmd.execute(scmClient);
+
+    assertThat(out.get())
+        .containsPattern(IS_NOT_RUNNING)
+        .containsPattern(STOP_REASON)
+        .containsPattern(STOP_MESSAGE)
+        .containsPattern(STARTED_AT)
+        .containsPattern(STOPPED_AT)
+        .contains(BALANCER_CONFIG_OUTPUT)
+        .contains("Last iteration info:")
+        .contains(ITERATION_3_INTERRUPTED_OUTPUT)
+        .doesNotContain("Current iteration info:")
+        .doesNotContain("Completed iteration history:");
+  }
+
+  @Test
+  void testContainerBalancerStatusSubcommandStoppedVerboseWithHistory() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
+    when(scmClient.getContainerBalancerStatusInfo())
+        .thenReturn(getStoppedStatusInfoResponseProto(
+            config, "USER_REQUESTED", "Stopped by user request.",
+            "ITERATION_INTERRUPTED", 1070L));
+    CommandLine cmd = new CommandLine(statusCmd);
+    verbose.set(true);
+    cmd.parseArgs("--history");
+    statusCmd.execute(scmClient);
+
+    String output = out.get();
+    int lastIterationStart = output.indexOf("Last iteration info:");
+    int historyStart = output.indexOf("Completed iteration history:");
+    String lastIterationSection = output.substring(lastIterationStart, historyStart);
+    String historySection = output.substring(historyStart);
+
+    assertThat(output)
+        .containsPattern(IS_NOT_RUNNING)
+        .containsPattern(STOP_REASON)
+        .containsPattern(STOP_MESSAGE)
+        .containsPattern(STARTED_AT)
+        .containsPattern(STOPPED_AT)
+        .contains(BALANCER_CONFIG_OUTPUT)
+        .doesNotContain("Current iteration info:");
+    assertThat(lastIterationSection).contains(ITERATION_3_INTERRUPTED_OUTPUT);
+    assertThat(historySection)
+        .contains(ITERATION_1_COMPLETED_OUTPUT)
+        .contains(ITERATION_2_COMPLETED_OUTPUT)
+        .doesNotContain(ITERATION_3_INTERRUPTED_OUTPUT);
+  }
+
+  @Test
+  void testContainerBalancerStatusSubcommandStoppedAfterAllIterationsCompleteVerboseWithHistory()
+      throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
+    when(scmClient.getContainerBalancerStatusInfo())
+        .thenReturn(getStoppedStatusInfoResponseProto(config, "COMPLETED_ALL_ITERATIONS",
+            "Completed all configured number of iterations.", "ITERATION_COMPLETED",
+            1070L));
+
+    CommandLine cmd = new CommandLine(statusCmd);
+    verbose.set(true);
+    cmd.parseArgs("--history");
+    statusCmd.execute(scmClient);
+
+    String output = out.get();
+    int lastIterationStart = output.indexOf("Last iteration info:");
+    int historyStart = output.indexOf("Completed iteration history:");
+    String lastIterationSection = output.substring(lastIterationStart, historyStart);
+    String historySection = output.substring(historyStart);
+
+    assertThat(output)
+        .containsPattern(IS_NOT_RUNNING)
+        .containsPattern(COMPLETED_ALL_ITERATIONS_STOP_REASON)
+        .containsPattern(COMPLETED_ALL_ITERATIONS_STOP_MESSAGE)
+        .containsPattern(STARTED_AT)
+        .containsPattern(STOPPED_AT)
+        .contains(BALANCER_CONFIG_OUTPUT)
+        .doesNotContain("Current iteration info:");
+    assertThat(lastIterationSection).contains(ITERATION_3_COMPLETED_OUTPUT);
+    assertThat(historySection)
+        .contains(ITERATION_1_COMPLETED_OUTPUT)
+        .contains(ITERATION_2_COMPLETED_OUTPUT)
+        .doesNotContain(ITERATION_3_COMPLETED_OUTPUT);
+  }
+
+  @Test
+  void testContainerBalancerStatusVerboseShowsFailureBreakdown() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
+            .setIterationNumber(1)
+            .setIterationResult("ITERATION_COMPLETED")
+            .setIterationDuration(120L)
+            .setContainerMovesScheduled(5)
+            .setContainerMovesCompleted(3)
+            .setContainerMovesFailed(1)
+            .setContainerMovesTimeout(2)
+            .addContainerMoveFailures(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
+                    .setReason("REPLICATION_FAIL_TIME_OUT")
+                    .setCount(2)
+                    .addSourceFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("source-uuid-1").setHostname("datanode1.example.com").setCount(1).build())
+                    .addSourceFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("source-uuid-2").setCount(1).build())
+                    .addTargetFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("target-uuid-1").setHostname("datanode3.example.com").setCount(1).build())
+                    .addTargetFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("target-uuid-2").setHostname("datanode4.example.com").setCount(1).build())
+                    .build())
+            .addContainerMoveFailures(
+                StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto.newBuilder()
+                    .setReason("PRE_MOVE_CONTAINER_NOT_FOUND")
+                    .setCount(1)
+                    .addSourceFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("source-uuid-3").setHostname("datanode5.example.com").setCount(1).build())
+                    .addTargetFailureCounts(
+                        StorageContainerLocationProtocolProtos.NodeFailureCountProto.newBuilder()
+                            .setDatanodeUuid("target-uuid-3").setHostname("datanode6.example.com").setCount(1).build())
+                    .build())
+            .build();
+
+    long stoppedAt = OffsetDateTime.now().toEpochSecond();
+    ContainerBalancerStatusInfoProto statusInfo = ContainerBalancerStatusInfoProto.newBuilder()
+        .setStartedAt(stoppedAt - 600)
+        .setStoppedAt(stoppedAt)
+        .setStopReason("USER_REQUESTED")
+        .setStopMessage("Stopped by user request.")
+        .setConfiguration(config.toProtobufBuilder().setShouldRun(false))
+        .addIterationsStatusInfo(iteration)
+        .build();
+
+    when(scmClient.getContainerBalancerStatusInfo())
+        .thenReturn(ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setIsRunning(false)
+            .setContainerBalancerStatusInfo(statusInfo)
+            .build());
+
+    verbose.set(true);
+    statusCmd.execute(scmClient);
+
+    assertThat(out.get())
+        .contains("Failed container moves")
+        .contains("REPLICATION_FAIL_TIME_OUT")
+        .contains("PRE_MOVE_CONTAINER_NOT_FOUND")
+        .contains("datanode1.example.com (source-uuid-1)")
+        .contains("source-uuid-2")
+        .doesNotContain("(source-uuid-2)")
+        .contains("datanode3.example.com (target-uuid-1)")
+        .contains("datanode5.example.com (source-uuid-3)")
+        .contains("datanode6.example.com (target-uuid-3)");
+  }
+
+  @Test
+  void testContainerBalancerStatusVerboseShowsNoBreakdownWhenFailuresMissing() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
+            .setIterationNumber(1)
+            .setIterationResult("ITERATION_COMPLETED")
+            .setIterationDuration(120L)
+            .setContainerMovesFailed(3)
+            .build();
+
+    long stoppedAt = OffsetDateTime.now().toEpochSecond();
+    ContainerBalancerStatusInfoProto statusInfo = ContainerBalancerStatusInfoProto.newBuilder()
+        .setStartedAt(stoppedAt - 600)
+        .setStoppedAt(stoppedAt)
+        .setStopReason("USER_REQUESTED")
+        .setConfiguration(config.toProtobufBuilder().setShouldRun(false))
+        .addIterationsStatusInfo(iteration)
+        .build();
+
+    when(scmClient.getContainerBalancerStatusInfo())
+        .thenReturn(ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setIsRunning(false)
+            .setContainerBalancerStatusInfo(statusInfo)
+            .build());
+
+    verbose.set(true);
+    statusCmd.execute(scmClient);
+
+    assertThat(out.get())
+        .contains("Failed to move containers                          3")
+        .contains("Failed container moves                             (no breakdown available)");
+  }
 }

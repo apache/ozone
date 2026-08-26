@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -107,6 +108,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   private final String owner;
 
+  /**
+   * S3-style tags stored on the bucket.
+   */
+  private final ImmutableMap<String, String> tags;
+
   private OmBucketInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -128,6 +134,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.bucketLayout = b.bucketLayout;
     this.owner = b.owner;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
+    this.tags = b.tags.build();
   }
 
   public static Codec<OmBucketInfo> getCodec() {
@@ -260,7 +267,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
   }
 
-  private void incrSnapshotUsedBytes(long bytes) {
+  public void incrSnapshotUsedBytes(long bytes) {
     this.snapshotUsedBytes += bytes;
   }
 
@@ -275,7 +282,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
   }
 
-  private void incrSnapshotUsedNamespace(long namespaceToUse) {
+  public void incrSnapshotUsedNamespace(long namespaceToUse) {
     this.snapshotUsedNamespace += namespaceToUse;
   }
 
@@ -301,6 +308,13 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   public String getOwner() {
     return owner;
+  }
+
+  /**
+   * @return tag map associated with this bucket; never null (may be empty).
+   */
+  public Map<String, String> getTags() {
+    return tags;
   }
 
   /**
@@ -378,7 +392,34 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setSnapshotUsedNamespace(snapshotUsedNamespace)
         .setBucketLayout(bucketLayout)
         .setOwner(owner)
-        .setDefaultReplicationConfig(defaultReplicationConfig);
+        .setDefaultReplicationConfig(defaultReplicationConfig)
+        .setTags(tags);
+  }
+
+  /**
+   * Returns a copy of this bucket with operational properties taken from
+   * {@code source}. Link identity fields (volume, name, owner, source path,
+   * ACLs, timestamps, object/update IDs) are unchanged.
+   *
+   * <p>When adding new operational bucket fields, update this method if they
+   * should be resolved from a link's source bucket.
+   */
+  public OmBucketInfo withOperationalPropertiesFrom(OmBucketInfo source) {
+    return toBuilder()
+        .setStorageType(source.getStorageType())
+        .setIsVersionEnabled(source.getIsVersionEnabled())
+        .setBucketEncryptionKey(source.getEncryptionKeyInfo())
+        .setUsedBytes(source.getUsedBytes())
+        .setUsedNamespace(source.getUsedNamespace())
+        .setQuotaInBytes(source.getQuotaInBytes())
+        .setQuotaInNamespace(source.getQuotaInNamespace())
+        .setSnapshotUsedBytes(source.getSnapshotUsedBytes())
+        .setSnapshotUsedNamespace(source.getSnapshotUsedNamespace())
+        .setBucketLayout(source.getBucketLayout())
+        .setDefaultReplicationConfig(source.getDefaultReplicationConfig())
+        .setTags(source.getTags())
+        .addAllMetadata(source.getMetadata())
+        .build();
   }
 
   /**
@@ -402,16 +443,19 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private BucketLayout bucketLayout = BucketLayout.DEFAULT;
     private String owner;
     private DefaultReplicationConfig defaultReplicationConfig;
+    private final MapBuilder<String, String> tags;
     private long snapshotUsedBytes;
     private long snapshotUsedNamespace;
 
     public Builder() {
       acls = AclListBuilder.empty();
+      tags = MapBuilder.empty();
     }
 
     private Builder(OmBucketInfo obj) {
       super(obj);
       acls = AclListBuilder.of(obj.acls);
+      tags = MapBuilder.of(obj.tags);
     }
 
     public Builder setVolumeName(String volume) {
@@ -550,6 +594,13 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       return this;
     }
 
+    public Builder setTags(Map<String, String> tagMap) {
+      if (tagMap != null) {
+        this.tags.set(tagMap);
+      }
+      return this;
+    }
+
     @Override
     protected void validate() {
       super.validate();
@@ -557,6 +608,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       Objects.requireNonNull(bucketName, "bucketName == null");
       Objects.requireNonNull(acls, "acls == null");
       Objects.requireNonNull(storageType, "storageType == null");
+      Objects.requireNonNull(tags, "tags == null");
     }
 
     @Override
@@ -582,6 +634,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setUsedBytes(usedBytes)
         .setUsedNamespace(usedNamespace)
         .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
+        .addAllTags(KeyValueUtil.toProtobuf(tags))
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace)
         .setSnapshotUsedBytes(snapshotUsedBytes)
@@ -660,6 +713,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (bucketInfo.getMetadataList() != null) {
       obib.addAllMetadata(KeyValueUtil
           .getFromProtobuf(bucketInfo.getMetadataList()));
+    }
+    if (!bucketInfo.getTagsList().isEmpty()) {
+      obib.setTags(KeyValueUtil.getFromProtobuf(bucketInfo.getTagsList()));
     }
     if (bucketInfo.hasBeinfo()) {
       obib.setBucketEncryptionKey(OMPBHelper.convert(bucketInfo.getBeinfo()));
@@ -745,7 +801,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         Objects.equals(getMetadata(), that.getMetadata()) &&
         Objects.equals(bekInfo, that.bekInfo) &&
         Objects.equals(owner, that.owner) &&
-        Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig);
+        Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig) &&
+        Objects.equals(tags, that.tags);
   }
 
   @Override
@@ -777,6 +834,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         ", bucketLayout=" + bucketLayout +
         ", owner=" + owner +
         ", defaultReplicationConfig=" + defaultReplicationConfig +
+        ", tags=" + tags +
         '}';
   }
 }

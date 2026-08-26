@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
@@ -64,9 +65,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -97,7 +101,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     if (keyArgs.hasExpectedDataGeneration()) {
       if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
         ozoneManager.checkFeatureEnabled(
             OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
       } else {
@@ -127,16 +131,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs = null;
     UserInfo userInfo = getUserInfo();
     if (!keyArgs.getIsMultipartKey()) {
-
-      long scmBlockSize = ozoneManager.getScmBlockSize();
-
-      // NOTE size of a key is not a hard limit on anything, it is a value that
-      // client should expect, in terms of current size of key. If client sets
-      // a value, then this value is used, otherwise, we allocate a single
-      // block which is the current size, if read by the client.
-      final long requestedSize = keyArgs.getDataSize() > 0 ?
-          keyArgs.getDataSize() : scmBlockSize;
-
       HddsProtos.ReplicationFactor factor = keyArgs.getFactor();
       HddsProtos.ReplicationType type = keyArgs.getType();
 
@@ -153,7 +147,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  As for a client for the first time this can be executed on any OM,
       //  till leader is identified.
 
-      List<OmKeyLocationInfo> omKeyLocationInfoList;
+      final List<OmKeyLocationInfo> omKeyLocationInfoList;
       final long effectiveDataSize;
       // Skip block allocation if dataSize <= 0. We also consider unspecified dataSize as
       // empty key since the client will not set dataSize if the key is empty (i.e. dataSize <= 0),
@@ -161,17 +155,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         omKeyLocationInfoList = Collections.emptyList();
         effectiveDataSize = 0;
       } else {
+        effectiveDataSize = keyArgs.getDataSize();
         omKeyLocationInfoList = captureLatencyNs(perfMetrics.getCreateKeyAllocateBlockLatencyNs(),
-            () -> allocateBlock(ozoneManager.getScmClient(),
-                ozoneManager.getBlockTokenSecretManager(), repConfig,
-                new ExcludeList(), requestedSize, scmBlockSize,
-                ozoneManager.getPreallocateBlocksMax(),
-                ozoneManager.isGrpcBlockTokenEnabled(),
-                ozoneManager.getOMServiceId(),
-                ozoneManager.getMetrics(),
-                keyArgs.getSortDatanodes(),
-                userInfo));
-        effectiveDataSize = requestedSize;
+            () -> allocateBlock(repConfig, new ExcludeList(), effectiveDataSize,
+                keyArgs.getSortDatanodes(), userInfo, ozoneManager));
       }
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
@@ -212,7 +199,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
-    CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
+    OMRequest omRequest = getOmRequest();
+    CreateKeyRequest createKeyRequest = omRequest.getCreateKeyRequest();
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
@@ -334,6 +322,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       checkBucketQuotaInBytes(omMetadataManager, bucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(bucketInfo, numMissingParents + 1L);
+      CreateKeyResponse.Builder builder =
+          getResponseBuilderWithDerivedKey(getOmRequest(), ozoneManager, createKeyRequest);
       perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       bucketInfo.incrUsedNamespace(numMissingParents);
 
@@ -351,12 +341,12 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           dbOpenKeyName, omKeyInfo, trxnLogIndex);
 
-      // Prepare response
-      omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
+      builder.setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
               keyArgs.getLatestVersionLocation()))
           .setID(clientID)
-          .setOpenVersion(openVersion).build())
+          .setOpenVersion(openVersion);
+      // Prepare response
+      omResponse.setCreateKeyResponse(builder.build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
           omKeyInfo, missingParentInfos, clientID, bucketInfo.copyObject());
@@ -474,5 +464,28 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       }
     }
     return req;
+  }
+
+  protected CreateKeyResponse.Builder getResponseBuilderWithDerivedKey(
+      OMRequest omRequest, OzoneManager ozoneManager,
+      CreateKeyRequest createKeyRequest) throws IOException {
+    CreateKeyResponse.Builder builder = CreateKeyResponse.newBuilder();
+    if (omRequest.hasS3Authentication() && ozoneManager.isSecurityEnabled()
+        && createKeyRequest.hasDerivedKeyPiggyBacking()
+        && createKeyRequest.getDerivedKeyPiggyBacking()
+    ) {
+      OzoneTokenIdentifier s3Token = S3SecurityUtil.constructS3Token(omRequest);
+      if (!s3Token.getTokenType().equals(OMTokenProto.Type.S3AUTHINFO)) {
+        // Piggyback was requested but this token type cannot produce a derived key.
+        // S3 Gateway should only set this flag for S3AUTHINFO tokens.
+        LOG.warn("Derived key piggyback requested but token type is {}, " +
+                "not S3AUTHINFO. Derived key will not be returned.",
+            s3Token.getTokenType());
+        return builder;
+      }
+      byte[] derivedKey = ozoneManager.getS3DerivedKey(s3Token.getAwsAccessId(), s3Token.getStrToSign());
+      builder.setDerivedKey(ByteString.copyFrom(derivedKey));
+    }
+    return builder;
   }
 }
