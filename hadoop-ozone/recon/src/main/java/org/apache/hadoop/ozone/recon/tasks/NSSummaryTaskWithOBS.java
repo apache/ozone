@@ -99,17 +99,23 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
                                             NSSummaryAsyncFlusher asyncFlusher) {
     Table<String, OmKeyInfo> keyTable =
         omMetadataManager.getKeyTable(BUCKET_LAYOUT);
+    Table<String, OmBucketInfo> bucketTable = omMetadataManager.getBucketTable();
 
     // Per-worker maps for lockless updates
-    Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+    Map<Thread, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+    ThreadLocal<Map<Long, NSSummary>> workerMaps = ThreadLocal.withInitial(() -> {
+      Map<Long, NSSummary> workerMap = new HashMap<>();
+      allWorkerMaps.put(Thread.currentThread(), workerMap);
+      return workerMap;
+    });
+    ThreadLocal<Map<String, OmBucketInfo>> bucketCaches = ThreadLocal.withInitial(HashMap::new);
 
     // Divide threshold by worker count
     final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
 
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
       // Get this worker's private map
-      long threadId = Thread.currentThread().getId();
-      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
+      Map<Long, NSSummary> workerMap = workerMaps.get();
 
       try {
         OmKeyInfo keyInfo = kv.getValue();
@@ -121,25 +127,29 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         String bucketName = keyInfo.getBucketName();
         String bucketDBKey = omMetadataManager
             .getBucketKey(volumeName, bucketName);
-        // Get bucket info from bucket table
-        OmBucketInfo omBucketInfo = omMetadataManager
-            .getBucketTable().getSkipCache(bucketDBKey);
+        Map<String, OmBucketInfo> bucketCache = bucketCaches.get();
+        OmBucketInfo omBucketInfo = bucketCache.get(bucketDBKey);
+        if (omBucketInfo == null) {
+          omBucketInfo = bucketTable.getSkipCache(bucketDBKey);
+          if (omBucketInfo != null) {
+            bucketCache.put(bucketDBKey, omBucketInfo);
+          }
+        }
 
         if (omBucketInfo != null && omBucketInfo.getBucketLayout() == BUCKET_LAYOUT) {
           // Check if async flusher has failed - stop immediately if so
           asyncFlusher.checkForFailures();
-          
-          // Look up parent ID for OBS keys (not populated in keyInfo from DB)
-          long parentObjectId = getKeyParentID(keyInfo);
-          
+
           // Use reprocess-specific method (no DB reads)
-          handlePutKeyEventReprocess(keyInfo, workerMap, parentObjectId);
+          handlePutKeyEventReprocess(keyInfo, workerMap, omBucketInfo.getObjectID());
 
           // Submit to async queue when threshold reached
           if (workerMap.size() >= perWorkerThreshold) {
             asyncFlusher.submitForFlush(workerMap);
             // Get fresh map for this worker
-            allWorkerMaps.put(threadId, new HashMap<>());
+            Map<Long, NSSummary> newWorkerMap = new HashMap<>();
+            workerMaps.set(newWorkerMap);
+            allWorkerMaps.put(Thread.currentThread(), newWorkerMap);
           }
         }
       } catch (IOException e) {
@@ -161,6 +171,9 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     } catch (Exception ex) {
       LOG.error("Unable to process keyTable in parallel", ex);
       return false;
+    } finally {
+      workerMaps.remove();
+      bucketCaches.remove();
     }
     
     long keyEndTime = System.currentTimeMillis();
@@ -297,33 +310,6 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
     LOG.debug("Completed a process run of NSSummaryTaskWithOBS");
     return new ImmutablePair<>(seekPos, true);
-  }
-
-  /**
-   * KeyTable entries don't have the parentId set.
-   * In order to reuse the existing methods that rely on
-   * the parentId, we have to set it explicitly.
-   * Note: For an OBS key, the parentId will always correspond to the ID of the
-   * OBS bucket in which it is located.
-   *
-   * @param keyInfo
-   * @throws IOException
-   */
-  private long getKeyParentID(OmKeyInfo keyInfo)
-      throws IOException {
-    String bucketKey = getReconOMMetadataManager()
-        .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
-    OmBucketInfo parentBucketInfo =
-        getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
-
-    if (parentBucketInfo != null) {
-      return parentBucketInfo.getObjectID();
-    } else {
-      LOG.warn("ParentBucketInfo is null for key: %s in volume: %s, bucket: %s",
-          keyInfo.getKeyName(), keyInfo.getVolumeName(), keyInfo.getBucketName());
-      throw new IOException("ParentKeyInfo for " +
-          "NSSummaryTaskWithOBS is null");
-    }
   }
 
 }

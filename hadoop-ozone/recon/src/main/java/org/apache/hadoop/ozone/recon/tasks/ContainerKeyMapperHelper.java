@@ -140,14 +140,17 @@ public abstract class ContainerKeyMapperHelper {
       // Divide threshold by worker count so each worker flushes independently
       final long perWorkerThreshold = Math.max(1, containerKeyFlushToDBMaxThreshold / maxWorkers);
       
-      // Map thread IDs to worker-specific local maps for lockless updates
-      Map<Long, Map<ContainerKeyPrefix, Integer>> allLocalMaps = new ConcurrentHashMap<>();
+      // Registry of worker-specific local maps for the final flush
+      Map<Thread, Map<ContainerKeyPrefix, Integer>> allLocalMaps = new ConcurrentHashMap<>();
+      ThreadLocal<Map<ContainerKeyPrefix, Integer>> workerMaps = ThreadLocal.withInitial(() -> {
+        Map<ContainerKeyPrefix, Integer> workerMap = new ConcurrentHashMap<>();
+        allLocalMaps.put(Thread.currentThread(), workerMap);
+        return workerMap;
+      });
       
       Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
         try {
-          // Get or create this worker's private local map using thread ID
-          Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap = allLocalMaps.computeIfAbsent(
-              Thread.currentThread().getId(), k -> new ConcurrentHashMap<>());
+          Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap = workerMaps.get();
           
           handleKeyReprocess(kv.getKey(), kv.getValue(), containerKeyPrefixMap, SHARED_CONTAINER_KEY_COUNT_MAP,
               reconContainerMetadataManager);
@@ -169,6 +172,8 @@ public abstract class ContainerKeyMapperHelper {
                new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
                    StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, perWorkerThreshold)) {
         keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
+      } finally {
+        workerMaps.remove();
       }
 
       // Final flush: Write remaining entries from all worker local maps to DB

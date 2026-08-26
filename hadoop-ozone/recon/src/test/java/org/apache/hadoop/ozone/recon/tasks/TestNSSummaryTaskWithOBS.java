@@ -20,19 +20,28 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -61,6 +70,20 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
     nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
         getReconOMMetadataManager(), threshold, 5, 20, 2000);
+  }
+
+  @Test
+  void testReprocessCachesBucketInfoPerWorker() throws IOException {
+    ReconOMMetadataManager omMetadataManager = spy(getReconOMMetadataManager());
+    Table<String, OmBucketInfo> bucketTable = spy(getReconOMMetadataManager().getBucketTable());
+    doReturn(bucketTable).when(omMetadataManager).getBucketTable();
+    NSSummaryTaskWithOBS task = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(), omMetadataManager,
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT, 1, 1, 2000);
+
+    getReconNamespaceSummaryManager().clearNSSummaryTable();
+
+    assertThat(task.reprocessWithOBS(omMetadataManager)).isTrue();
+    verify(bucketTable, times(2)).getSkipCache(anyString());
   }
 
   /**
