@@ -25,8 +25,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZ
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_MAX_LISTING_PAGE_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_SYNCHRONIZE_POSITIONED_READS_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_SYNCHRONIZE_POSITIONED_READS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
@@ -260,13 +258,7 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   protected InputStream createFSInputStream(InputStream inputStream) {
-    return new OzoneFSInputStream(inputStream, statistics,
-        isSynchronizePositionedReadsEnabled());
-  }
-
-  protected boolean isSynchronizePositionedReadsEnabled() {
-    return getConf().getBoolean(OZONE_FS_SYNCHRONIZE_POSITIONED_READS_ENABLED,
-        OZONE_FS_SYNCHRONIZE_POSITIONED_READS_ENABLED_DEFAULT);
+    return new OzoneFSInputStream(inputStream, statistics);
   }
 
   protected void incrementCounter(Statistic statistic) {

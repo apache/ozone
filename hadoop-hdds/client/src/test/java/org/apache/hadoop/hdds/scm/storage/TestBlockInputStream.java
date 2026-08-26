@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -312,6 +313,71 @@ public class TestBlockInputStream {
     when(newBlockLocationInfo.getPipeline()).thenReturn(null);
     testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
         id -> newBlockLocationInfo);
+  }
+
+  @ParameterizedTest
+  @MethodSource("exceptionsTriggersRefresh")
+  void refreshesPipelineOnPositionedReadFailure(IOException ex) throws Exception {
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
+    when(blockLocationInfo.getPipeline()).thenReturn(pipeline);
+    Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
+    BlockLocationInfo newBlockLocationInfo = mock(BlockLocationInfo.class);
+
+    testRefreshesPipelineOnPositionedReadFailure(ex, blockLocationInfo,
+        id -> newBlockLocationInfo);
+
+    when(newBlockLocationInfo.getPipeline()).thenReturn(newPipeline);
+    testRefreshesPipelineOnPositionedReadFailure(ex, blockLocationInfo,
+        id -> blockLocationInfo);
+
+    when(newBlockLocationInfo.getPipeline()).thenReturn(null);
+    testRefreshesPipelineOnPositionedReadFailure(ex, blockLocationInfo,
+        id -> newBlockLocationInfo);
+  }
+
+  private void testRefreshesPipelineOnPositionedReadFailure(IOException ex,
+      BlockLocationInfo blockLocationInfo,
+      Function<BlockID, BlockLocationInfo> refreshPipelineFunction)
+      throws Exception {
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    final int len = 200;
+    final ChunkInputStream stream = throwingChunkInputStreamForPositionedRead(ex, len, true);
+
+    when(this.refreshFunction.apply(any()))
+        .thenAnswer(inv -> refreshPipelineFunction.apply(blockID));
+
+    try (BlockInputStream subject = createSubject(blockID,
+        blockLocationInfo.getPipeline(), stream)) {
+      subject.initialize();
+      ByteBuffer buf = ByteBuffer.allocate(len);
+      int bytesRead = subject.readPositioned(0, buf);
+      assertEquals(len, bytesRead);
+      verify(this.refreshFunction).apply(blockID);
+    } finally {
+      reset(this.refreshFunction);
+    }
+  }
+
+  private static ChunkInputStream throwingChunkInputStreamForPositionedRead(
+      IOException ex, int len, boolean succeedOnRetry) throws IOException {
+    final ChunkInputStream stream = mock(ChunkInputStream.class);
+    OngoingStubbing<Integer> stubbing =
+        when(stream.readPositioned(anyLong(), any(ByteBuffer.class)))
+            .thenThrow(ex);
+    if (succeedOnRetry) {
+      stubbing.thenAnswer(invocation -> {
+        ByteBuffer buffer = invocation.getArgument(1);
+        int n = Math.min(len, buffer.remaining());
+        for (int i = 0; i < n; i++) {
+          buffer.put((byte) 0);
+        }
+        return n;
+      });
+    }
+    when(stream.getRemaining()).thenReturn((long) len);
+    when(stream.getLength()).thenReturn((long) len);
+    return stream;
   }
 
   private void testRefreshesPipelineOnReadFailure(IOException ex,

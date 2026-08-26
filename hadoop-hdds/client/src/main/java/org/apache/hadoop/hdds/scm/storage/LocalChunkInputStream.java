@@ -74,9 +74,7 @@ public class LocalChunkInputStream extends ChunkInputStream
 
   @Override
   boolean supportsConcurrentPositionedRead() {
-    // Reads share a single FileChannel cursor, so positioned reads must be
-    // serialized rather than run concurrently.
-    return false;
+    return true;
   }
 
   /**
@@ -89,10 +87,32 @@ public class LocalChunkInputStream extends ChunkInputStream
     int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
     final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(readChunkInfo.getLen(),
         bytesPerChecksum);
-    dataIn.position(readChunkInfo.getOffset()).read(buffers);
+    readAtOffset(buffers, readChunkInfo.getOffset());
     Arrays.stream(buffers).forEach(ByteBuffer::flip);
     validator.accept(Arrays.asList(buffers), readChunkInfo);
     return buffers;
+  }
+
+  /**
+   * Read into {@code buffers} starting at {@code fileOffset} using positional
+   * {@link FileChannel} reads so concurrent callers on different chunks (which
+   * share the same underlying channel) do not stomp each other's cursor.
+   */
+  private void readAtOffset(ByteBuffer[] buffers, long fileOffset) throws IOException {
+    long pos = fileOffset;
+    for (ByteBuffer buffer : buffers) {
+      while (buffer.hasRemaining()) {
+        int n = dataIn.read(buffer, pos);
+        if (n <= 0) {
+          if (buffer.hasRemaining()) {
+            throw new IOException("Failed to read chunk data at offset " + pos
+                + " for block chunk " + chunkInfo.getChunkName());
+          }
+          break;
+        }
+        pos += n;
+      }
+    }
   }
 
   private void validateChunk(List<ByteBuffer> bufferList, ChunkInfo readChunkInfo)
