@@ -36,8 +36,11 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
+import javax.crypto.spec.SecretKeySpec;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -57,13 +60,9 @@ import org.mockito.MockedStatic;
  * Tests for STS revocation handling in {@link S3SecurityUtil}.
  */
 public class TestS3SecurityUtil {
-  private static final byte[] ENCRYPTION_KEY = new byte[5];
+  private static final ManagedSecretKey MANAGED_SECRET_KEY = createManagedSecretKey();
   private static final MockClock CLOCK = MockClock.newInstance();
   private static final String TEMP_ACCESS_KEY_ID = "temp-access-key-id";
-
-  {
-    ThreadLocalRandom.current().nextBytes(ENCRYPTION_KEY);
-  }
 
   @Test
   public void testValidateS3CredentialFailsWhenTokenCreatedBeforeRevocationCutoff() throws Exception {
@@ -252,8 +251,20 @@ public class TestS3SecurityUtil {
         .setExpiry(CLOCK.instant().plusSeconds(3600))
         .setSecretAccessKey("secret-access-key")
         .setSessionPolicy("session-policy")
-        .setEncryptionKey(ENCRYPTION_KEY)
+        .setManagedSecretKey(MANAGED_SECRET_KEY)
         .build());
+  }
+
+  private static ManagedSecretKey createManagedSecretKey() {
+    final byte[] keyBytes = new byte[32];
+    for (int i = 0; i < keyBytes.length; i++) {
+      keyBytes[i] = (byte) i;
+    }
+    return new ManagedSecretKey(
+        UUID.randomUUID(),
+        Instant.EPOCH,
+        Instant.EPOCH.plus(Duration.ofDays(1)),
+        new SecretKeySpec(keyBytes, "HmacSHA256"));
   }
 
   private static OMRequest createRequestWithSessionToken(String accessId, boolean includeAccessId) {

@@ -23,12 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.STSTokenEncryption.STSTokenEncryptionException;
 import org.junit.jupiter.api.BeforeAll;
@@ -43,11 +45,17 @@ public class TestSTSTokenEncryption {
   private static final int HKDF_SALT_LENGTH = 16; // 128 bits
 
   private static SecretKey sharedSecretKey;
+  private static ManagedSecretKey managedSecretKey;
 
   @BeforeAll
   public static void setUpClass() {
     final byte[] keyBytes = "01234567890123456789012345678901".getBytes(StandardCharsets.US_ASCII);
     sharedSecretKey = new SecretKeySpec(keyBytes, "HmacSHA256");
+    managedSecretKey = new ManagedSecretKey(
+        UUID.randomUUID(),
+        Instant.EPOCH,
+        Instant.EPOCH.plus(Duration.ofDays(1)),
+        sharedSecretKey);
   }
 
   @Test
@@ -69,8 +77,6 @@ public class TestSTSTokenEncryption {
   
   @Test
   public void testSTSTokenIdentifierEncryption() throws Exception {
-    final byte[] keyBytes = sharedSecretKey.getEncoded();
-
     final String tempAccessKeyId = "ASIA123TEMPKEY";
     final String originalAccessKeyId = "AKIA123ORIGINAL";
     final String roleArn = "arn:aws:iam::123456789012:role/TestRole";
@@ -89,9 +95,8 @@ public class TestSTSTokenEncryption {
         .setExpiry(expiry)
         .setSecretAccessKey(secretAccessKey)
         .setSessionPolicy(sessionPolicy)
-        .setEncryptionKey(keyBytes)
+        .setManagedSecretKey(managedSecretKey)
         .build());
-    tokenId.setSecretKeyId(UUID.randomUUID());
     
     // Convert to protobuf
     final OzoneManagerProtocolProtos.OMTokenProto omTokenProto = tokenId.toProtoBuf();
@@ -100,7 +105,7 @@ public class TestSTSTokenEncryption {
     
     // Create new token identifier from protobuf with decryption key
     final STSTokenIdentifier decodedTokenId = new STSTokenIdentifier();
-    decodedTokenId.setEncryptionKey(keyBytes);
+    decodedTokenId.setManagedSecretKey(managedSecretKey);
     decodedTokenId.readFromByteArray(protobufBytes);
     
     // Verify all fields are correctly decrypted

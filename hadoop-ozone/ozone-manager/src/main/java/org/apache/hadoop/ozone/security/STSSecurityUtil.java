@@ -101,7 +101,7 @@ public final class STSSecurityUtil {
     final ManagedSecretKey secretKey;
     try {
       secretKey = getValidatedSecretKey(secretKeyId, secretKeyClient);
-      tokenId.setEncryptionKey(secretKey.getSecretKey().getEncoded());
+      tokenId.setManagedSecretKey(secretKey);
       tokenId.readFromByteArray(tokenBytes);
     } catch (OMException e) {
       throw e;
@@ -118,7 +118,7 @@ public final class STSSecurityUtil {
     }
 
     // Verify token signature against the original identifier bytes
-    if (!secretKey.isValidSignature(tokenBytes, token.getPassword())) {
+    if (!tokenId.isValidSignature(tokenBytes, token.getPassword())) {
       throw new SecretManager.InvalidToken("Invalid STS token - signature is not correct for token: " + tokenId);
     }
 

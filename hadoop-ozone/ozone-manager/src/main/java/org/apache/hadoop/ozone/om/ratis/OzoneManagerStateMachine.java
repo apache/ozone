@@ -695,10 +695,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
                   .setRoleArn(s3Auth.hasResolvedStsRoleArn() ? s3Auth.getResolvedStsRoleArn() : "")
                   .setCreationTime(Instant.MAX)
                   .setExpiry(Instant.MAX) // ensure it deterministically is not expired
-                  .setSecretAccessKey("") // no secretAccessKey needed
+                  .setSecretAccessKey(null) // no secretAccessKey needed
                   .setSessionPolicy(
                       s3Auth.hasResolvedStsSessionPolicy() ? s3Auth.getResolvedStsSessionPolicy() : "")
-                  .setEncryptionKey(null) // no encryption key needed
+                  .setManagedSecretKey(null) // no ManagedSecretKey needed
                   .build());
           OzoneManager.setStsTokenIdentifier(rehydratedTokenIdentifier);
           isStsThreadLocalSet = true;

@@ -93,7 +93,9 @@ public class TestSTSTokenSecretManager {
 
     // Verify the token identifier fields
     final STSTokenIdentifier identifier = new STSTokenIdentifier();
-    identifier.setEncryptionKey(sharedSecretKey.getEncoded());
+    identifier.setManagedSecretKey(createManagedSecretKey(
+        UUID.fromString("00000000-0000-0000-0000-000000000000"),
+        sharedSecretKey.getEncoded(), Instant.now()));
     identifier.readFromByteArray(token.getIdentifier());
     final Instant expiration = identifier.getExpiry();
 
@@ -119,7 +121,9 @@ public class TestSTSTokenSecretManager {
     token.decodeFromUrlString(tokenString);
 
     final STSTokenIdentifier identifier = new STSTokenIdentifier();
-    identifier.setEncryptionKey(sharedSecretKey.getEncoded());
+    identifier.setManagedSecretKey(createManagedSecretKey(
+        UUID.fromString("00000000-0000-0000-0000-000000000000"),
+        sharedSecretKey.getEncoded(), Instant.now()));
     identifier.readFromByteArray(token.getIdentifier());
     assertTrue(identifier.getSessionPolicy().isEmpty());
   }

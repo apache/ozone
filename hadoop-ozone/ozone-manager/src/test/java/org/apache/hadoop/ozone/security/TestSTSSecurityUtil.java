@@ -30,7 +30,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -55,16 +54,11 @@ public class TestSTSSecurityUtil {
   private static final String SECRET_ACCESS_KEY = "test-secret-access-key";
   private static final String SESSION_POLICY = "test-session-policy";
   private static final int DURATION_SECONDS = 3600;
-  private static final byte[] ENCRYPTION_KEY = new byte[5];
-
+  private static final ManagedSecretKey MANAGED_SECRET_KEY = new SecretKeyTestClient().getCurrentSecretKey();
   private final SecretKeyTestClient secretKeyClient = new SecretKeyTestClient();
   private final STSTokenSecretManager tokenSecretManager = new STSTokenSecretManager(secretKeyClient);
   private final UUID secretKeyId = secretKeyClient.getCurrentSecretKey().getId();
   private final MockClock clock = new MockClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
-
-  {
-    ThreadLocalRandom.current().nextBytes(ENCRYPTION_KEY);
-  }
 
   @Test
   public void testConstructValidateAndDecryptSTSTokenInvalidProtobuf() throws IOException {
@@ -477,6 +471,6 @@ public class TestSTSSecurityUtil {
         .setExpiry(clock.instant().plusSeconds(DURATION_SECONDS))
         .setSecretAccessKey(SECRET_ACCESS_KEY)
         .setSessionPolicy(SESSION_POLICY)
-        .setEncryptionKey(ENCRYPTION_KEY);
+        .setManagedSecretKey(MANAGED_SECRET_KEY);
   }
 }

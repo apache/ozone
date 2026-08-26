@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.security;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.DataInput;
@@ -29,6 +30,7 @@ import java.util.Objects;
 import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.token.ShortLivedTokenIdentifier;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
@@ -48,8 +50,9 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   private String sessionPolicy;
   private Instant creationTime;
 
-  // Encryption key derived from ManagedSecretKey for this token
-  private transient byte[] encryptionKey;
+  // SCM secret key used for encrypting sensitive fields and signing this token
+  // It will NOT be encoded in the token.
+  private transient ManagedSecretKey managedSecretKey;
 
   // Service name for STS tokens
   public static final String STS_SERVICE = "STS";
@@ -73,7 +76,15 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     this.creationTime = params.getCreationTime();
     this.secretAccessKey = params.getSecretAccessKey();
     this.sessionPolicy = params.getSessionPolicy();
-    this.encryptionKey = params.getEncryptionKey(); // already cloned via Params
+    this.managedSecretKey = params.getManagedSecretKey();
+    // In the OzoneManagerStateMachine case, both secretAccessKey and managedSecretKey are set to null
+    if (this.secretAccessKey != null) {
+      if (this.managedSecretKey != null) {
+        setSecretKeyId(managedSecretKey.getId());
+      } else {
+        throw new IllegalArgumentException("ManagedSecretKey is not set");
+      }
+    }
   }
 
   /**
@@ -87,7 +98,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     private final Instant expiry;
     private final String secretAccessKey;
     private final String sessionPolicy;
-    private final byte[] encryptionKey;
+    private final ManagedSecretKey managedSecretKey;
 
     private Params(Builder builder) {
       this.tempAccessKeyId = builder.tempAccessKeyId;
@@ -97,7 +108,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
       this.expiry = builder.expiry;
       this.secretAccessKey = builder.secretAccessKey;
       this.sessionPolicy = builder.sessionPolicy;
-      this.encryptionKey = builder.encryptionKey;
+      this.managedSecretKey = builder.managedSecretKey;
     }
 
     public static Builder newBuilder() {
@@ -132,8 +143,8 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
       return sessionPolicy;
     }
 
-    public byte[] getEncryptionKey() {
-      return encryptionKey != null ? encryptionKey.clone() : null;
+    public ManagedSecretKey getManagedSecretKey() {
+      return managedSecretKey;
     }
 
     /**
@@ -147,7 +158,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
       private Instant expiry;
       private String secretAccessKey;
       private String sessionPolicy;
-      private byte[] encryptionKey;
+      private ManagedSecretKey managedSecretKey;
 
       public Builder setTempAccessKeyId(String value) {
         this.tempAccessKeyId = value;
@@ -184,8 +195,8 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
         return this;
       }
 
-      public Builder setEncryptionKey(byte[] value) {
-        this.encryptionKey = value != null ? value.clone() : null;
+      public Builder setManagedSecretKey(ManagedSecretKey value) {
+        this.managedSecretKey = value;
         return this;
       }
 
@@ -225,16 +236,10 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   /**
    * Convert this identifier to protobuf format.
    */
-  public OMTokenProto toProtoBuf() {
-    Preconditions.checkArgument(this.encryptionKey != null, "The encryption key must not be null");
+  public OMTokenProto toProtoBuf() throws IOException {
+    Preconditions.checkArgument(this.managedSecretKey != null, "The ManagedSecretKey must not be null");
 
-    final OMTokenProto.Builder builder = OMTokenProto.newBuilder();
-    // Note: secretKeyId must be set before attempting to decrypt secretAccessKey
-    if (getSecretKeyId() != null) {
-      builder.setSecretKeyId(getSecretKeyId().toString());
-    }
-
-    builder
+    final OMTokenProto.Builder builder = OMTokenProto.newBuilder()
         .setType(OMTokenProto.Type.S3_STS_TOKEN)
         .setIssueDate(creationTime.toEpochMilli())
         .setMaxDate(getExpiry().toEpochMilli())
@@ -243,6 +248,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
         .setOriginalAccessKeyId(originalAccessKeyId != null ? originalAccessKeyId : "")
         .setRoleArn(roleArn != null ? roleArn : "")
         .setSecretAccessKey(secretAccessKey != null ? encryptSensitiveField(secretAccessKey) : "")
+        .setSecretKeyId(managedSecretKey.getId().toString())
         .setSessionPolicy(sessionPolicy != null ? sessionPolicy : "");
 
     return builder.build();
@@ -255,7 +261,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     Preconditions.checkArgument(
         token.getType() == OMTokenProto.Type.S3_STS_TOKEN,
         "Invalid token type for STSTokenIdentifier: " + token.getType());
-    Preconditions.checkArgument(this.encryptionKey != null, "The encryption key must not be null");
+    Preconditions.checkArgument(this.managedSecretKey != null, "The ManagedSecretKey must not be null");
 
     setOwnerId(token.getOwner());
     setExpiry(Instant.ofEpochMilli(token.getMaxDate()));
@@ -291,32 +297,24 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   /**
    * Encrypt a sensitive field using the configured encryption key.
    */
-  private String encryptSensitiveField(String value) {
-    if (encryptionKey == null) {
-      throw new IllegalStateException("Encryption key must be set before encrypting sensitive fields");
-    }
-
+  private String encryptSensitiveField(String value) throws IOException {
     try {
       final byte[] aad = computeAadBytes();
-      return STSTokenEncryption.encrypt(value, encryptionKey, aad);
+      return STSTokenEncryption.encrypt(value, getSecretKeyBytes(), aad);
     } catch (STSTokenEncryption.STSTokenEncryptionException e) {
-      throw new RuntimeException("Token encryption failed", e);
+      throw new IOException("Token encryption failed", e);
     }
   }
 
   /**
    * Decrypt a sensitive field using the configured encryption key.
    */
-  private String decryptSensitiveField(String encryptedValue) {
-    if (encryptionKey == null) {
-      throw new IllegalStateException("Encryption key must be set before decrypting sensitive fields");
-    }
-
+  private String decryptSensitiveField(String encryptedValue) throws IOException {
     try {
       final byte[] aad = computeAadBytes();
-      return STSTokenEncryption.decrypt(encryptedValue, encryptionKey, aad);
+      return STSTokenEncryption.decrypt(encryptedValue, getSecretKeyBytes(), aad);
     } catch (STSTokenEncryption.STSTokenEncryptionException e) {
-      throw new RuntimeException("Token decryption failed", e);
+      throw new IOException("Token decryption failed", e);
     }
   }
 
@@ -365,8 +363,39 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     return creationTime;
   }
 
-  public void setEncryptionKey(byte[] encryptionKey) {
-    this.encryptionKey = encryptionKey.clone();
+  // For test only
+  @VisibleForTesting
+  public void setManagedSecretKey(ManagedSecretKey secretKey) {
+    this.managedSecretKey = secretKey;
+  }
+
+  public ManagedSecretKey getManagedSecretKey() {
+    return managedSecretKey;
+  }
+
+  /**
+   * Sign serialized identifier bytes using the configured {@link ManagedSecretKey}.
+   */
+  public byte[] sign(byte[] identifierBytes) {
+    Objects.requireNonNull(managedSecretKey, "ManagedSecretKey must be set before signing");
+    return managedSecretKey.sign(identifierBytes);
+  }
+
+  /**
+   * Verify a signature against serialized identifier bytes using the configured
+   * {@link ManagedSecretKey}.
+   */
+  public boolean isValidSignature(byte[] identifierBytes, byte[] signature) {
+    Objects.requireNonNull(managedSecretKey, "ManagedSecretKey must be set before signature verification");
+    return managedSecretKey.isValidSignature(identifierBytes, signature);
+  }
+
+  private byte[] getSecretKeyBytes() {
+    if (managedSecretKey == null) {
+      throw new IllegalStateException("ManagedSecretKey is not set");
+    }
+
+    return managedSecretKey.getSecretKey().getEncoded();
   }
 
   @Override
