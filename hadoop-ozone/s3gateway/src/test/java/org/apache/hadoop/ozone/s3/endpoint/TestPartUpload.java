@@ -22,6 +22,9 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorR
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signatureInfo;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBody;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signingKey;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
@@ -59,8 +62,6 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
-import org.apache.hadoop.ozone.s3.signature.SignatureTestUtils;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,13 +80,6 @@ import org.mockito.MockedStatic;
 @ParameterizedClass
 @ValueSource(booleans = {false, true})
 public class TestPartUpload {
-
-  private static final String SECRET_KEY = "secret";
-  private static final String DATE = "20260827";
-  private static final String DATE_TIME = DATE + "T010203Z";
-  private static final String SCOPE = DATE + "/us-east-1/s3/aws4_request";
-  private static final String SEED_SIGNATURE =
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
   private ObjectEndpoint rest;
   private OzoneClient client;
@@ -229,24 +223,6 @@ public class TestPartUpload {
         .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
         .thenReturn(String.valueOf(contentLength));
-  }
-
-  private static String signedChunkedBody(String content) {
-    return SignatureTestUtils.signedChunkedBody(
-        signingKey(), DATE_TIME, SCOPE, SEED_SIGNATURE, content);
-  }
-
-  private static byte[] signingKey() {
-    return SignatureTestUtils.signingKey(SECRET_KEY, DATE, "us-east-1", "s3");
-  }
-
-  private static SignatureInfo signatureInfo() {
-    return new SignatureInfo.Builder(SignatureInfo.Version.V4)
-        .setDate(DATE)
-        .setDateTime(DATE_TIME)
-        .setCredentialScope(SCOPE)
-        .setSignature(SEED_SIGNATURE)
-        .build();
   }
 
   @Test

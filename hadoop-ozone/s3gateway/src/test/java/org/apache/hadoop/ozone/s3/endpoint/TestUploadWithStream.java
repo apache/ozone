@@ -24,6 +24,9 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.FailingInput
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signatureInfo;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBody;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signingKey;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -57,8 +60,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
-import org.apache.hadoop.ozone.s3.signature.SignatureTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -72,13 +73,6 @@ public class TestUploadWithStream {
   private static final String S3_COPY_EXISTING_KEY = "test_copy_existing_key";
   private static final String S3_COPY_EXISTING_KEY_CONTENT =
       "test_copy_existing_key_content";
-  private static final String SECRET_KEY = "secret";
-  private static final String DATE = "20260827";
-  private static final String DATE_TIME = DATE + "T010203Z";
-  private static final String SCOPE = DATE + "/us-east-1/s3/aws4_request";
-  private static final String SEED_SIGNATURE =
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
   private ObjectEndpoint rest;
 
   private OzoneClient client;
@@ -203,21 +197,4 @@ public class TestUploadWithStream {
     return bucket;
   }
 
-  private static String signedChunkedBody(String content) {
-    return SignatureTestUtils.signedChunkedBody(
-        signingKey(), DATE_TIME, SCOPE, SEED_SIGNATURE, content);
-  }
-
-  private static byte[] signingKey() {
-    return SignatureTestUtils.signingKey(SECRET_KEY, DATE, "us-east-1", "s3");
-  }
-
-  private static SignatureInfo signatureInfo() {
-    return new SignatureInfo.Builder(SignatureInfo.Version.V4)
-        .setDate(DATE)
-        .setDateTime(DATE_TIME)
-        .setCredentialScope(SCOPE)
-        .setSignature(SEED_SIGNATURE)
-        .build();
-  }
 }

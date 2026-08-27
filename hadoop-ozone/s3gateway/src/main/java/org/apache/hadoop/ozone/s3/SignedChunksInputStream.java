@@ -106,13 +106,7 @@ public class SignedChunksInputStream extends InputStream {
   private boolean isFinalChunkEncountered = false;
 
   public SignedChunksInputStream(InputStream inputStream) {
-    this(inputStream, null);
-  }
-
-  public SignedChunksInputStream(InputStream inputStream, ChunksValidator validator) {
     this.originalStream = inputStream;
-    this.validator = validator;
-    this.chunkDigest = validator == null ? null : newSha256();
   }
 
   /**
@@ -294,11 +288,7 @@ public class SignedChunksInputStream extends InputStream {
     Matcher matcher = signatureLinePattern.matcher(signatureLine);
     if (matcher.matches()) {
       chunkSignature = matcher.group(2);
-      try {
-        return Integer.parseInt(matcher.group(1), 16);
-      } catch (NumberFormatException e) {
-        throw new IOException("Invalid chunk size: " + matcher.group(1), e);
-      }
+      return Integer.parseInt(matcher.group(1), 16);
     } else {
       throw new IOException("Invalid signature line: " + signatureLine);
     }

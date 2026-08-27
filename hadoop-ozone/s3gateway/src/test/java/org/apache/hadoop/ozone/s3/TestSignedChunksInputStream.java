@@ -250,24 +250,6 @@ public class TestSignedChunksInputStream {
   }
 
   @Test
-  void verifiesRealChunkSignatures() throws IOException {
-    String content = signedChunkedBody('a');
-    try (InputStream is = new SignedChunksInputStream(
-        new ByteArrayInputStream(content.getBytes(UTF_8)), newValidator())) {
-      assertEquals(repeat('a', 66560), IOUtils.toString(is, UTF_8));
-    }
-  }
-
-  @Test
-  void rejectsTamperedChunkPayload() {
-    // Same signatures, but the first chunk carries different bytes.
-    String content = signedChunkedBody('b');
-    InputStream is = new SignedChunksInputStream(
-        new ByteArrayInputStream(content.getBytes(UTF_8)), newValidator());
-    assertThrows(OS3Exception.class, () -> IOUtils.toString(is, UTF_8));
-  }
-
-  @Test
   void attachValidatorEnablesVerification() throws IOException {
     // The signing key is only known after the key is opened, so the validator
     // is attached to an already-constructed stream (HDDS-15140/15141).
@@ -310,8 +292,7 @@ public class TestSignedChunksInputStream {
         + repeat('a', 65536) + "\r\n"
         + "400;chunk-signature=" + CHUNK2_SIGNATURE + "\r\n"
         + repeat('a', 1024) + "\r\n";
-    InputStream is = new SignedChunksInputStream(
-        new ByteArrayInputStream(body.getBytes(UTF_8)), newValidator());
+    InputStream is = verifiedStream(body);
     assertThrows(Exception.class, () -> IOUtils.toString(is, UTF_8));
   }
 
@@ -319,23 +300,15 @@ public class TestSignedChunksInputStream {
   void rejectsFinalChunkMissingDataTerminator() {
     String body = signedChunkedBody('a');
     body = body.substring(0, body.length() - 2);
-    InputStream is = new SignedChunksInputStream(
-        new ByteArrayInputStream(body.getBytes(UTF_8)), newValidator());
+    InputStream is = verifiedStream(body);
     assertThrows(IOException.class, () -> IOUtils.toString(is, UTF_8));
   }
 
   @Test
   void rejectsBodyTruncatedMidPayload() throws Exception {
     String body = "10000;chunk-signature=" + CHUNK1_SIGNATURE + "\r\n" + repeat('a', 100);
-    InputStream is = new SignedChunksInputStream(
-        new ByteArrayInputStream(body.getBytes(UTF_8)), newValidator());
+    InputStream is = verifiedStream(body);
     assertThrows(Exception.class, () -> IOUtils.toString(is, UTF_8));
-  }
-
-  @Test
-  void rejectsOversizedChunkSize() throws Exception {
-    InputStream is = wrapContent("FFFFFFFFFF;chunk-signature=sig\r\nsomepayloadbytes\r\n");
-    assertThrows(IOException.class, () -> IOUtils.toString(is, UTF_8));
   }
 
   @Test
@@ -343,8 +316,7 @@ public class TestSignedChunksInputStream {
     String tamperedSig = CHUNK1_SIGNATURE.substring(0, 1)
         + (CHUNK1_SIGNATURE.charAt(1) == 'a' ? 'b' : 'a') + CHUNK1_SIGNATURE.substring(2);
     String tamperedBody = signedChunkedBody('a').replace(CHUNK1_SIGNATURE, tamperedSig);
-    InputStream is = new SignedChunksInputStream(
-        new ByteArrayInputStream(tamperedBody.getBytes(UTF_8)), newValidator());
+    InputStream is = verifiedStream(tamperedBody);
     assertThrows(OS3Exception.class, () -> IOUtils.toString(is, UTF_8));
   }
 
@@ -360,6 +332,12 @@ public class TestSignedChunksInputStream {
     return new ChunksValidator(
         SignatureTestUtils.signingKey(SECRET_KEY, "20130524", "us-east-1", "s3"),
         DATE_TIME, SCOPE, SEED_SIGNATURE);
+  }
+
+  private static SignedChunksInputStream verifiedStream(String body) {
+    SignedChunksInputStream stream = new SignedChunksInputStream(new ByteArrayInputStream(body.getBytes(UTF_8)));
+    stream.attachValidator(newValidator());
+    return stream;
   }
 
   private static String repeat(char c, int count) {

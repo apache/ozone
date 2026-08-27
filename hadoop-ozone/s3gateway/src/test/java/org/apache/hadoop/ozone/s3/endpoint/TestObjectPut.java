@@ -28,6 +28,9 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.SIGNATURE_DOES_NOT_MATCH;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signatureInfo;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBody;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signingKey;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
@@ -94,8 +97,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
-import org.apache.hadoop.ozone.s3.signature.SignatureTestUtils;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -115,13 +116,6 @@ class TestObjectPut {
   private static final String DEST_BUCKET_NAME = "b2";
   private static final String DEST_KEY = "key=value/2";
   private static final String NONEXISTENT_BUCKET = "nonexist";
-  private static final String SECRET_KEY = "secret";
-  private static final String DATE = "20260827";
-  private static final String DATE_TIME = DATE + "T010203Z";
-  private static final String SCOPE = DATE + "/us-east-1/s3/aws4_request";
-  private static final String SEED_SIGNATURE =
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
   private ObjectEndpoint objectEndpoint;
   private HttpHeaders headers;
   private OzoneBucket bucket;
@@ -957,20 +951,6 @@ class TestObjectPut {
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(decodedLength));
   }
 
-  private static SignatureInfo signatureInfo() {
-    return new SignatureInfo.Builder(SignatureInfo.Version.V4)
-        .setDate(DATE)
-        .setDateTime(DATE_TIME)
-        .setCredentialScope(SCOPE)
-        .setSignature(SEED_SIGNATURE)
-        .build();
-  }
-
-  private static String signedChunkedBody(String content) {
-    return SignatureTestUtils.signedChunkedBody(
-        signingKey(), DATE_TIME, SCOPE, SEED_SIGNATURE, content);
-  }
-
   private static String tamperFinalSignature(String body) {
     int signatureOffset = body.lastIndexOf("chunk-signature=") + "chunk-signature=".length();
     char replacement = body.charAt(signatureOffset) == '0' ? '1' : '0';
@@ -979,10 +959,6 @@ class TestObjectPut {
 
   private static String withoutFinalChunk(String body) {
     return body.substring(0, body.lastIndexOf("0;chunk-signature="));
-  }
-
-  private static byte[] signingKey() {
-    return SignatureTestUtils.signingKey(SECRET_KEY, DATE, "us-east-1", "s3");
   }
 
   private void assertKeyWasNotCommitted() {

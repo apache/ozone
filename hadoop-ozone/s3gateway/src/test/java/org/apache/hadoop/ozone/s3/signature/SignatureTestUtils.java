@@ -33,6 +33,12 @@ public final class SignatureTestUtils {
 
   private static final String EMPTY_STRING_SHA256 =
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  private static final String DATE = "20260827";
+  private static final String DATE_TIME = DATE + "T010203Z";
+  private static final String CREDENTIAL_SCOPE = DATE + "/us-east-1/s3/aws4_request";
+  private static final String SEED_SIGNATURE =
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  private static final byte[] SIGNING_KEY = signingKey("secret", DATE, "us-east-1", "s3");
 
   private SignatureTestUtils() {
   }
@@ -47,6 +53,19 @@ public final class SignatureTestUtils {
     key = hmac(key, region);
     key = hmac(key, service);
     return hmac(key, "aws4_request");
+  }
+
+  public static byte[] signingKey() {
+    return SIGNING_KEY.clone();
+  }
+
+  public static SignatureInfo signatureInfo() {
+    return new SignatureInfo.Builder(SignatureInfo.Version.V4)
+        .setDate(DATE)
+        .setDateTime(DATE_TIME)
+        .setCredentialScope(CREDENTIAL_SCOPE)
+        .setSignature(SEED_SIGNATURE)
+        .build();
   }
 
   /** @return {@code HMAC-SHA256(key, msg)}. */
@@ -95,5 +114,9 @@ public final class SignatureTestUtils {
     String finalSignature = chunkSignature(
         signingKey, dateTime, credentialScope, previousSignature, new byte[0]);
     return body.append("0;chunk-signature=").append(finalSignature).append("\r\n\r\n").toString();
+  }
+
+  public static String signedChunkedBody(String content) {
+    return signedChunkedBody(SIGNING_KEY, DATE_TIME, CREDENTIAL_SCOPE, SEED_SIGNATURE, content);
   }
 }
