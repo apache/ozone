@@ -482,7 +482,8 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertThat(output).contains("/[" + tier.getTierName() + "]");
+    assertThat(output).containsPattern(
+        "[^/]+/[^/]+/[^/]+/[^/]+/(Leader|Follower)/\\[" + tier.getTierName() + "\\]");
   }
 
   @Test
@@ -500,7 +501,31 @@ public class TestListInfoSubcommand {
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertThat(output).contains("/[]").doesNotContain("null");
+    assertThat(output).containsPattern(
+        "[^/]+/[^/]+/[^/]+/[^/]+/(Leader|Follower)/\\[\\]").doesNotContain("null");
+  }
+
+  @Test
+  public void testRelatedPipelineShowsLeaderAndFollower() throws Exception {
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    List<HddsProtos.Node> pipelineNodes = nodes.subList(0, 2);
+    DatanodeDetails leader = DatanodeDetails.getFromProtoBuf(pipelineNodes.get(0).getNodeID());
+
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.queryNode(any(), any(), any(), any())).thenReturn(nodes);
+    when(scmClient.listPipelines()).thenReturn(
+        Collections.singletonList(pipelineContaining(pipelineNodes, leader, StorageTier.SSD)));
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs();
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    String tierName = StorageTier.SSD.getTierName();
+    assertThat(output).containsPattern(
+        "[^/]+/[^/]+/[^/]+/[^/]+/Leader/\\[" + tierName + "\\]");
+    assertThat(output).containsPattern(
+        "[^/]+/[^/]+/[^/]+/[^/]+/Follower/\\[" + tierName + "\\]");
   }
 
   private Pipeline pipelineContaining(HddsProtos.Node node, StorageTier tier) {
@@ -510,6 +535,21 @@ public class TestListInfoSubcommand {
         .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setNodes(Collections.singletonList(dn))
+        .setSupportedStorageTier(tier)
+        .build();
+  }
+
+  private Pipeline pipelineContaining(List<HddsProtos.Node> nodes, DatanodeDetails leader, StorageTier tier) {
+    List<DatanodeDetails> dns = new ArrayList<>();
+    for (HddsProtos.Node node : nodes) {
+      dns.add(DatanodeDetails.getFromProtoBuf(node.getNodeID()));
+    }
+    return Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(Pipeline.PipelineState.OPEN)
+        .setNodes(dns)
+        .setLeaderId(leader.getID())
         .setSupportedStorageTier(tier)
         .build();
   }

@@ -205,15 +205,14 @@ public class ListInfoSubcommand extends ScmSubcommand {
             .append(System.lineSeparator());
       } else {
         relatedPipelineNum = relatedPipelines.size();
-        relatedPipelines.forEach(p -> {
-          pipelineListInfo.append(p.getId().getId().toString())
-              .append('/').append(p.getReplicationConfig().toString())
-              .append('/').append(p.getType().toString())
-              .append('/').append(p.getPipelineState().toString())
-              .append('/').append(datanode.getID().equals(p.getLeaderId()) ? "Leader" : "Follower")
-              .append('/').append(formatSupportedStorageTier(p.getSupportedStorageTier()))
-              .append(System.lineSeparator());
-        });
+        relatedPipelines.forEach(
+            p -> pipelineListInfo.append(p.getId().getId().toString())
+                .append('/').append(p.getReplicationConfig().toString())
+                .append('/').append(p.getType().toString())
+                .append('/').append(p.getPipelineState().toString())
+                .append('/').append(datanode.getID().equals(p.getLeaderId()) ? "Leader" : "Follower")
+                .append('/').append(formatSupportedStorageTier(p.getSupportedStorageTier()))
+                .append(System.lineSeparator()));
       }
     } else {
       pipelineListInfo
