@@ -993,6 +993,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+      getVolumeIterator() {
+    return volumeTable.cacheIterator();
+  }
+
+  @Override
   public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
       getBucketIterator() {
     return bucketTable.cacheIterator();
@@ -1504,7 +1510,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .setKeyName(openKeyInfo.getKeyName())
                 .setDataSize(info.getDataSize());
             java.util.Optional.ofNullable(info.getLatestVersionLocations())
-                .map(OmKeyLocationInfoGroup::getLocationList)
+                .map(OmKeyLocationInfoGroup::createLocationList)
                 .map(Collection::stream)
                 .orElseGet(Stream::empty)
                 .map(loc -> loc.getProtobuf(ClientVersion.CURRENT_VERSION))
@@ -1959,7 +1965,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     for (OmKeyInfo info : omKeyInfo.cloneOmKeyInfoList()) {
       for (OmKeyLocationInfoGroup keyLocations :
           info.getKeyLocationVersions()) {
-        List<DeletedBlock> item = keyLocations.getLocationList().stream()
+        List<DeletedBlock> item = keyLocations.getLocationLists().stream()
+            .flatMap(List::stream)
             .map(b -> new DeletedBlock(
                 new BlockID(b.getContainerID(), b.getLocalID()),
                 b.getLength(),

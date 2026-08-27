@@ -49,7 +49,7 @@
     <classpath.skip>true</classpath.skip>
     <com.nimbusds.nimbus-jose-jwt.version>10.9.1</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
-    <commons-codec.version>1.22.0</commons-codec.version>
+    <commons-codec.version>1.22.1</commons-codec.version>
     <commons-collections.version>4.5.0</commons-collections.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <commons-configuration2.version>2.15.1</commons-configuration2.version>
@@ -63,7 +63,7 @@
     <compile-testing.version>0.23.0</compile-testing.version>
     <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
-    <cyclonedx.version>2.9.2</cyclonedx.version>
+    <cyclonedx.version>2.9.3</cyclonedx.version>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
     <derby.version>10.14.2.0</derby.version>
@@ -157,7 +157,7 @@
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
     <native.lib.tmp.dir />
-    <netty.version>4.1.136.Final</netty.version>
+    <netty.version>4.1.137.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>24.17.0</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
@@ -185,10 +185,10 @@
     <protobuf.version>3.25.9</protobuf.version>
     <ranger.version>2.9.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
-    <ratis-thirdparty.grpc.version>1.77.1</ratis-thirdparty.grpc.version>
-    <ratis-thirdparty.netty.version>4.1.130.Final</ratis-thirdparty.netty.version>
-    <ratis-thirdparty.protobuf.version>3.25.8</ratis-thirdparty.protobuf.version>
-    <ratis.thirdparty.version>1.0.11</ratis.thirdparty.version>
+    <ratis-thirdparty.grpc.version>1.82.1</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.netty.version>4.1.136.Final</ratis-thirdparty.netty.version>
+    <ratis-thirdparty.protobuf.version>3.25.9</ratis-thirdparty.protobuf.version>
+    <ratis.thirdparty.version>1.1.0</ratis.thirdparty.version>
     <ratis.version>3.2.1</ratis.version>
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
@@ -222,7 +222,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.6</zookeeper.version>
-    <zstd-jni.version>1.5.7-11</zstd-jni.version>
+    <zstd-jni.version>1.5.7-12</zstd-jni.version>
   </properties>
 
   <dependencyManagement>

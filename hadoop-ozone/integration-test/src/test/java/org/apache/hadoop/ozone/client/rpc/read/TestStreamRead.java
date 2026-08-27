@@ -171,7 +171,7 @@ public class TestStreamRead {
 
           // get block file and generate md5
           final OmKeyInfo info = nonStreamReadClient.getProxy().getKeyInfo(volume, bucket, keyName, false);
-          final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().getLocationList();
+          final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
           assertEquals(1, locations.size());
           final BlockID blockId = locations.get(0).getBlockID();
           final ContainerData containerData = datanode.getDatanodeStateMachine().getContainer().getContainerSet()
