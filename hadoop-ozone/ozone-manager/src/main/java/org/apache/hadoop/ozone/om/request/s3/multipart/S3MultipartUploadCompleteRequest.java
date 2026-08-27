@@ -341,6 +341,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(
               keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
+          // Remove any block from oldKeyVersionsToDelete that shares the same
+          // container ID and local ID with omKeyInfo blocks'.
+          // Otherwise, it causes data loss once those shared blocks are added
+          // to deletedTable and processed by KeyDeletingService for deletion.
+          filterOutBlocksStillInUse(omKeyInfo, oldKeyVersionsToDelete);
           allKeyInfoToRemove.addAll(oldKeyVersionsToDelete.getOmKeyInfoList());
           usedBytesDiff -= keyToDelete.getReplicatedSize();
         } else {
