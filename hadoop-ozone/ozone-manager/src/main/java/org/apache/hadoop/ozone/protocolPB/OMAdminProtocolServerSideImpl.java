@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERM
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
-import org.apache.hadoop.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -39,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.De
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This class is the server-side translator that forwards requests received on
