@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ServiceException;
 import java.io.File;
@@ -49,6 +50,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -82,7 +84,8 @@ import org.slf4j.LoggerFactory;
 public class QuotaRepairTask {
   private static final Logger LOG = LoggerFactory.getLogger(
       QuotaRepairTask.class);
-  private static final int BATCH_SIZE = 5000;
+  @VisibleForTesting
+  static final int BATCH_SIZE = 5000;
   private static final int TASK_THREAD_CNT = 3;
   /**
    * Parallel full-table scans: OBS keys, FSO files, dirs, active deleted keys/dirs,
@@ -363,8 +366,10 @@ public class QuotaRepairTask {
         }
       }));
 
-      for (Future<?> f : tasks) {
-        f.get();
+      // await every scan before propagating a failure, so no scan outlives the checkpoint
+      Exception scanFailure = awaitAll(tasks, null);
+      if (scanFailure != null) {
+        throw scanFailure;
       }
     } catch (UncheckedIOException ex) {
       LOG.error("quota repair failure", ex.getCause());
@@ -576,6 +581,21 @@ public class QuotaRepairTask {
       Table<String, VALUE> table, Map<String, CountPair> prefixUsageMap,
       String strType, boolean haveValue) throws UncheckedIOException,
       UncheckedExecutionException {
+    try (Table.KeyValueIterator<String, VALUE> keyIter
+        = table.iterator(null, haveValue ? KEY_AND_VALUE : KEY_ONLY)) {
+      scanTableInBatches(executor, keyIter, strType,
+          kv -> extractCount(kv, prefixUsageMap, haveValue));
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  @VisibleForTesting
+  static <VALUE> void scanTableInBatches(
+      ExecutorService executor,
+      Table.KeyValueIterator<String, VALUE> keyIter, String strType,
+      Consumer<Table.KeyValue<String, VALUE>> kvConsumer)
+      throws UncheckedIOException, UncheckedExecutionException {
     LOG.info("Starting recalculate {}", strType);
 
     List<Table.KeyValue<String, VALUE>> kvList = new ArrayList<>(BATCH_SIZE);
@@ -584,53 +604,112 @@ public class QuotaRepairTask {
     List<Future<?>> tasks = new ArrayList<>();
     AtomicBoolean isRunning = new AtomicBoolean(true);
     for (int i = 0; i < TASK_THREAD_CNT; ++i) {
-      tasks.add(executor.submit(() -> captureCount(
-          prefixUsageMap, q, isRunning, haveValue)));
+      tasks.add(executor.submit(() -> captureCount(q, isRunning, kvConsumer)));
     }
     int count = 0;
     long startTime = Time.monotonicNow();
-    try (Table.KeyValueIterator<String, VALUE> keyIter
-        = table.iterator(null, haveValue ? KEY_AND_VALUE : KEY_ONLY)) {
+    Exception failure = null;
+    try {
       while (keyIter.hasNext()) {
         count++;
         kvList.add(keyIter.next());
         if (kvList.size() == BATCH_SIZE) {
-          q.put(kvList);
+          putBatch(q, kvList, tasks);
           kvList = new ArrayList<>(BATCH_SIZE);
         }
       }
-      q.put(kvList);
-      isRunning.set(false);
-      for (Future<?> f : tasks) {
-        f.get();
+      if (!kvList.isEmpty()) {
+        putBatch(q, kvList, tasks);
       }
-      LOG.info("Recalculate {} completed, count {} time {}ms", strType,
-          count, (Time.monotonicNow() - startTime));
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
-    } catch (ExecutionException ex) {
-      throw new UncheckedExecutionException(ex);
+      failure = ex;
+      q.clear();
+    } catch (ExecutionException | RuntimeException ex) {
+      failure = ex;
+      q.clear();
+    } finally {
+      isRunning.set(false);
+    }
+    // always await workers so none outlives this scan and touches a closed table
+    failure = awaitAll(tasks, failure);
+    if (failure != null) {
+      throw new UncheckedExecutionException(failure);
+    }
+    LOG.info("Recalculate {} completed, count {} time {}ms", strType,
+        count, (Time.monotonicNow() - startTime));
+  }
+
+  /**
+   * Awaits every task, retrying an interrupted wait so the interrupted future is not
+   * abandoned mid-run; an interrupt seen while waiting is restored before returning.
+   * Returns the passed-in failure or the first failure seen, with later ones suppressed.
+   */
+  private static Exception awaitAll(List<Future<?>> tasks, Exception failure) {
+    boolean interrupted = false;
+    for (Future<?> f : tasks) {
+      boolean done = false;
+      while (!done) {
+        try {
+          f.get();
+          done = true;
+        } catch (InterruptedException ex) {
+          interrupted = true;
+          if (failure == null) {
+            failure = ex;
+          }
+        } catch (ExecutionException ex) {
+          done = true;
+          if (failure == null) {
+            failure = ex;
+          } else {
+            failure.addSuppressed(ex);
+          }
+        }
+      }
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
+    return failure;
+  }
+
+  /**
+   * Blocks until the batch is queued. Fails fast if a worker has already exited,
+   * otherwise a failed worker set could leave the producer blocked forever on a full queue.
+   */
+  private static <VALUE> void putBatch(
+      BlockingQueue<List<Table.KeyValue<String, VALUE>>> q,
+      List<Table.KeyValue<String, VALUE>> kvList,
+      List<Future<?>> tasks) throws InterruptedException, ExecutionException {
+    while (!q.offer(kvList, 100, TimeUnit.MILLISECONDS)) {
+      for (Future<?> f : tasks) {
+        if (f.isDone()) {
+          f.get();
+          throw new IllegalStateException("quota repair scan worker exited prematurely");
+        }
+      }
     }
   }
-  
+
   private static <VALUE> void captureCount(
-      Map<String, CountPair> prefixUsageMap,
       BlockingQueue<List<Table.KeyValue<String, VALUE>>> q,
-      AtomicBoolean isRunning, boolean haveValue) throws UncheckedIOException {
+      AtomicBoolean isRunning,
+      Consumer<Table.KeyValue<String, VALUE>> kvConsumer) throws UncheckedIOException {
     try {
       while (isRunning.get() || !q.isEmpty()) {
         List<Table.KeyValue<String, VALUE>> kvList
             = q.poll(100, TimeUnit.MILLISECONDS);
         if (null != kvList) {
           for (Table.KeyValue<String, VALUE> kv : kvList) {
-            extractCount(kv, prefixUsageMap, haveValue);
+            kvConsumer.accept(kv);
           }
         }
       }
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
+      // fail the scan instead of returning partial counts as success
+      throw new IllegalStateException("quota repair scan worker interrupted", ex);
     }
   }
   
