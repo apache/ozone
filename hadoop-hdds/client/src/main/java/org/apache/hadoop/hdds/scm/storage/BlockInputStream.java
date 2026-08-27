@@ -491,11 +491,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * Stateless positioned read across this block's chunks. Fills up to
    * {@code dst.remaining()} bytes starting from {@code blockRelativePosition}
    * without mutating this stream's cursor ({@code chunkIndex},
-   * {@code blockPosition}) or the chunk streams' buffered state, so it is safe
-   * for concurrent callers. Metadata ({@code chunkOffsets}, {@code
-   * chunkStreams}, {@code length}) is published once by {@link #initialize()};
-   * {@link #initialized} is {@code volatile} so callers observe a consistent
-   * snapshot after initialization completes.
+   * {@code blockPosition}) or the sequential chunk streams' buffered state.
+   * Each covering chunk is read through an ephemeral {@link ChunkInputStream}
+   * closed as soon as its bytes have been copied.
    *
    * @return bytes copied into {@code dst}, or {@link #EOF} at EOF
    */
@@ -504,71 +502,89 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (!initialized) {
       initialize();
     }
-    final List<ChunkInputStream> streams = chunkStreams;
     final long[] offsets = chunkOffsets;
+    final BlockData currentBlockData = blockData;
     final long blockLength = length;
-    if (streams == null || streams.isEmpty()
+    if (offsets == null || currentBlockData == null
         || blockRelativePosition < 0 || blockRelativePosition >= blockLength) {
       return EOF;
     }
 
-    int total = 0;
-    long pos = blockRelativePosition;
-    while (dst.hasRemaining() && pos < blockLength) {
-      int idx = chunkIndexForPosition(pos, offsets);
-      ChunkInputStream chunk = streams.get(idx);
-      long chunkPos = pos - offsets[idx];
-      int n = readChunkPositionedWithRetry(chunk, chunkPos, dst);
-      if (n <= 0) {
-        break;
-      }
-      total += n;
-      pos += n;
+    final List<ChunkInfo> chunkInfos = currentBlockData.getChunksList();
+    int index = Arrays.binarySearch(offsets, blockRelativePosition);
+    if (index < 0) {
+      index = -index - 2;
     }
-    return total == 0 ? EOF : total;
+
+    long pos = blockRelativePosition;
+    int totalReadLen = 0;
+    while (dst.hasRemaining() && pos < blockLength && index < chunkInfos.size()) {
+      final ChunkInfo chunkInfo = chunkInfos.get(index);
+      final long chunkOffset = pos - offsets[index];
+      final long numBytesToRead = Math.min(
+          Math.min(dst.remaining(), chunkInfo.getLen() - chunkOffset), blockLength - pos);
+      if (numBytesToRead <= 0) {
+        index++;
+        continue;
+      }
+      final int numBytesRead =
+          readChunkAt(chunkInfo, chunkOffset, (int) numBytesToRead, dst);
+      totalReadLen += numBytesRead;
+      pos += numBytesRead;
+      index++;
+    }
+    return totalReadLen == 0 ? EOF : totalReadLen;
   }
 
   /**
-   * Positioned read for one chunk with the same retry and pipeline/token
-   * refresh handling as {@link #readWithStrategy(ByteReaderStrategy)}.
+   * Read {@code numBytesToRead} bytes starting at {@code chunkOffset} of the given chunk into {@code dst}
+   * through an ephemeral {@link ChunkInputStream}, retrying like {@link #readWithStrategy(ByteReaderStrategy)}
+   * but with a retry counter local to this call.
    */
-  private int readChunkPositionedWithRetry(ChunkInputStream chunk, long chunkPos,
-      ByteBuffer dst) throws IOException {
+  private int readChunkAt(ChunkInfo chunkInfo, long chunkOffset, int numBytesToRead, ByteBuffer dst)
+      throws IOException {
+    final int startPosition = dst.position();
+    int preadRetries = 0;
     while (true) {
+      final ChunkInputStream chunkStream = createChunkInputStream(chunkInfo);
+      final int numBytesRead;
       try {
-        int n = chunk.readPositioned(chunkPos, dst);
-        retries = 0;
-        return n;
+        final int oldLimit = dst.limit();
+        try {
+          dst.limit(startPosition + numBytesToRead);
+          numBytesRead = chunkStream.readPositioned(chunkOffset, dst);
+        } finally {
+          dst.limit(oldLimit);
+        }
       } catch (SCMSecurityException ex) {
         throw ex;
-      } catch (StorageContainerException e) {
-        if (shouldRetryRead(e, retryPolicy, ++retries)) {
-          handleReadError(e);
-          continue;
+      } catch (StorageContainerException ex) {
+        if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
+          throw ex;
         }
-        throw e;
+        handleReadError(ex);
+        dst.position(startPosition);
+        continue;
       } catch (IOException ex) {
-        if (shouldRetryRead(ex, retryPolicy, ++retries)) {
-          if (isConnectivityIssue(ex)) {
-            handleReadError(ex);
-          } else {
-            chunk.releaseClient();
-          }
-          continue;
+        if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
+          throw ex;
         }
-        throw ex;
+        if (isConnectivityIssue(ex)) {
+          handleReadError(ex);
+        }
+        dst.position(startPosition);
+        continue;
+      } finally {
+        chunkStream.close();
       }
-    }
-  }
 
-  private static int chunkIndexForPosition(long pos, long[] offsets) {
-    int idx = Arrays.binarySearch(offsets, pos);
-    if (idx < 0) {
-      // binarySearch returns -insertionPoint - 1; the containing chunk is
-      // insertionPoint - 1.
-      idx = -idx - 2;
+      if (numBytesRead != numBytesToRead) {
+        throw new IOException(String.format(
+            "Inconsistent read for chunkName=%s length=%d numBytesToRead=%d numBytesRead=%d",
+            chunkInfo.getChunkName(), chunkInfo.getLen(), numBytesToRead, numBytesRead));
+      }
+      return numBytesRead;
     }
-    return idx;
   }
 
   @Override
