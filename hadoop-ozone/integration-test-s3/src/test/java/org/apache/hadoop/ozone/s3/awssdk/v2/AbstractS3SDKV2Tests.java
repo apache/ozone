@@ -294,6 +294,24 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
   }
 
+  @Test
+  public void testPutObjectWithEmptyContentType() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse putObjectResponse = s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .overrideConfiguration(c ->
+                c.putHeader("Content-Type", "")),
+        RequestBody.fromString(content));
+
+    assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"",
+        putObjectResponse.eTag());
+  }
+
   static Stream<Arguments> onlyTagKeyCasesV2() {
     Map<String, String> fooBarEmptyBar = new HashMap<>();
     fooBarEmptyBar.put("foo", "bar");

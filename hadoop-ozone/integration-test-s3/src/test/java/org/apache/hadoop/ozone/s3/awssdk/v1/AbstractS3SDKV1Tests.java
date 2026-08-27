@@ -572,6 +572,24 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testPutObjectWithEmptyContentType() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    ObjectMetadata metadata = new ObjectMetadata();
+    metadata.setContentType("");
+    InputStream inputStream = new ByteArrayInputStream(
+        content.getBytes(StandardCharsets.UTF_8));
+
+    PutObjectResult putObjectResult = s3Client.putObject(
+        bucketName, keyName, inputStream, metadata);
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2",
+        putObjectResult.getETag());
+  }
+
+  @Test
   public void testPutObjectIfNoneMatch() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
