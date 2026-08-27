@@ -267,6 +267,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
         () -> s3Client.createBucket(bucketName));
     assertEquals(409, ase.getStatusCode());
     assertEquals(S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU.getCode(), ase.getErrorCode());
+    assertEquals("application/xml", ase.getHttpHeaders().get("Content-Type"));
   }
 
   @Test
