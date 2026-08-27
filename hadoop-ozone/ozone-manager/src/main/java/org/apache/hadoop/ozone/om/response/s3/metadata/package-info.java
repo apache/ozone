@@ -15,32 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.client;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
-
 /**
- * In-memory OzoneClient for testing.
+ * Package contains classes related to S3 object metadata responses.
  */
-public class OzoneClientStub extends OzoneClient {
-  public OzoneClientStub() {
-    this(new ObjectStoreStub());
-  }
-
-  public OzoneClientStub(ObjectStoreStub objectStoreStub) {
-    this(objectStoreStub, new ClientProtocolStub(objectStoreStub));
-  }
-
-  public OzoneClientStub(ObjectStoreStub objectStoreStub,
-      ClientProtocolStub clientProtocolStub) {
-    super(objectStoreStub, clientProtocolStub);
-    S3GatewayMetrics.create(new OzoneConfiguration());
-  }
-
-  @Override
-  public void close() {
-    //NOOP.
-  }
-
-}
+package org.apache.hadoop.ozone.om.response.s3.metadata;

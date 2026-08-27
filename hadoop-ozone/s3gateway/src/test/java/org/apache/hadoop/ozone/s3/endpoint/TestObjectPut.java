@@ -48,9 +48,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -78,10 +81,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ClientProtocolStub;
+import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -111,6 +118,7 @@ class TestObjectPut {
   private OzoneBucket bucket;
   private OzoneBucket destBucket;
   private OzoneBucket fsoBucket;
+  private ClientProtocolStub clientProtocol;
 
   static Stream<Arguments> argumentsForPutObject() {
     ReplicationConfig ratis3 = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
@@ -126,7 +134,11 @@ class TestObjectPut {
   @BeforeEach
   void setup() throws IOException {
     headers = newMockHttpHeaders();
-    objectEndpoint = spy(EndpointBuilder.newObjectEndpointBuilder().setHeaders(headers).build());
+    ObjectStoreStub objectStoreStub = new ObjectStoreStub();
+    clientProtocol = spy(new ClientProtocolStub(objectStoreStub));
+    objectEndpoint = spy(EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(new OzoneClientStub(objectStoreStub, clientProtocol))
+        .setHeaders(headers).build());
 
     // Create buckets
     OzoneClient clientStub = objectEndpoint.getClient();
@@ -394,6 +406,8 @@ class TestObjectPut {
     when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("COPY");
     assertSucceeds(() -> putObject(CONTENT));
     assertThat(bucket.getKey(KEY_NAME).getMetadata()).containsAllEntriesOf(sourceMetadata);
+    String sourceETag = bucket.getKey(KEY_NAME).getMetadata().get(OzoneConsts.ETAG);
+    clearInvocations(clientProtocol);
 
     // Copy the object onto itself with x-amz-metadata-directive: REPLACE and a
     // new metadata set. AWS allows this as an in-place metadata update.
@@ -409,6 +423,43 @@ class TestObjectPut {
     assertThat(keyDetails.getMetadata())
         .containsEntry("custom-key-3", "custom-value-3")
         .doesNotContainKeys("custom-key-1", "custom-key-2");
+    assertEquals(sourceETag, keyDetails.getMetadata().get(OzoneConsts.ETAG));
+
+    // The self-copy was served as a metadata-only update in OM: the object
+    // data was not rewritten.
+    verify(clientProtocol).setObjectMetadata(any(), any(), any(), any(), any());
+    verify(clientProtocol, never()).createKey(any(), any(), any(), anyLong(), any(ReplicationConfig.class),
+        any(), any());
+  }
+
+  @Test
+  void testCopyObjectToSelfWithMetadataReplaceOldOmFallback() throws Exception {
+    // Seed the source object with some custom metadata.
+    MultivaluedMap<String, String> metadataHeaders = new MultivaluedHashMap<>();
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-1", "custom-value-1");
+    when(headers.getRequestHeaders()).thenReturn(metadataHeaders);
+    assertSucceeds(() -> putObject(CONTENT));
+    clearInvocations(clientProtocol);
+
+    // An OM without SetObjectMetadata support rejects the metadata-only update,
+    // and the copy falls back to the full rewrite path.
+    doThrow(new OMException("OzoneManager does not support SetObjectMetadata API",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION))
+        .when(clientProtocol).setObjectMetadata(any(), any(), any(), any(), any());
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("REPLACE");
+    metadataHeaders.clear();
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-3", "custom-value-3");
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertThat(keyDetails.getMetadata())
+        .containsEntry("custom-key-3", "custom-value-3")
+        .doesNotContainKey("custom-key-1");
+    verify(clientProtocol).createKey(any(), any(), any(), anyLong(), any(ReplicationConfig.class), any(), any());
   }
 
   @Test

@@ -1305,6 +1305,21 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Replaces the custom metadata and tags of an existing key without rewriting
+   * its data. System-managed metadata entries (such as ETag and GDPR info) are
+   * preserved by the OzoneManager. The given tags replace the existing tag set;
+   * pass the current tags to keep them.
+   * @param keyName Key name.
+   * @param metadata Custom metadata to set on the key.
+   * @param tags Tags to set on the key.
+   * @throws IOException
+   */
+  public void setObjectMetadata(String keyName, Map<String, String> metadata, Map<String, String> tags)
+      throws IOException {
+    proxy.setObjectMetadata(volumeName, name, keyName, metadata, tags);
+  }
+
+  /**
    * Gets the lifecycle configuration information.
    * @return OzoneLifecycleConfiguration or exception is thrown.
    * @throws IOException

@@ -2990,6 +2990,27 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void setObjectMetadata(String volumeName, String bucketName, String keyName,
+                                Map<String, String> metadata, Map<String, String> tags) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.SET_OBJECT_METADATA) < 0) {
+      throw new OMException("OzoneManager does not support SetObjectMetadata API",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Objects.requireNonNull(keyName, "keyName == null");
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .addAllMetadata(metadata)
+        .addAllTags(tags)
+        .build();
+    ozoneManagerClient.setObjectMetadata(keyArgs);
+  }
+
+  @Override
   public void deleteObjectTagging(String volumeName, String bucketName,
                                   String keyName) throws IOException {
     if (omVersion.compareTo(OzoneManagerVersion.S3_OBJECT_TAGGING_API) < 0) {

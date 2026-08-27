@@ -772,6 +772,25 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  public void setObjectMetadata(String keyName, Map<String, String> metadata, Map<String, String> tags)
+      throws IOException {
+    OzoneKeyDetails ozoneKeyDetails = keyDetails.get(keyName);
+    if (ozoneKeyDetails == null) {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+    // Mimics the OM: replace the custom metadata but preserve the stored ETag,
+    // and replace the tag set.
+    String eTag = ozoneKeyDetails.getMetadata().get(ETAG);
+    ozoneKeyDetails.getMetadata().clear();
+    ozoneKeyDetails.getMetadata().putAll(metadata);
+    if (eTag != null) {
+      ozoneKeyDetails.getMetadata().put(ETAG, eTag);
+    }
+    ozoneKeyDetails.getTags().clear();
+    ozoneKeyDetails.getTags().putAll(tags);
+  }
+
+  @Override
   public Map<String, String> getBucketTagging() throws IOException {
     return Collections.unmodifiableMap(bucketTags);
   }

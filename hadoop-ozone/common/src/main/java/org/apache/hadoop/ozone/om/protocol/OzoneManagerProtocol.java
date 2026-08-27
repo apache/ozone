@@ -1216,6 +1216,17 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Replaces the custom metadata and tags of an existing key without rewriting
+   * its data. System-managed metadata entries (such as ETag and GDPR info) are
+   * preserved by the OzoneManager.
+   * @param args Key args carrying the replacement metadata and tags
+   */
+  default void setObjectMetadata(OmKeyArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
    * Gets the tags for the specified bucket.
    * @param args Bucket args
    * @return Tags associated with the bucket.
