@@ -33,13 +33,17 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
@@ -47,7 +51,9 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleRequest;
@@ -60,6 +66,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.STSTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.OzoneGrant;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -602,6 +612,218 @@ public class TestS3AssumeRoleRequest {
     assertThat(capturedAssumeRoleRequest.getIp()).isEqualTo(LOOPBACK_IP);
     assertThat(capturedAssumeRoleRequest.getTargetRoleName()).isEqualTo(TARGET_ROLE_NAME);
     assertThat(capturedAssumeRoleRequest.getGrants()).isNull();
+  }
+
+  @Test
+  public void testResolveGrantsAgainstBucketLinksLeavesNonLinkGrantsUnchanged() throws IOException {
+    final Set<OzoneGrant> grants = Collections.singleton(
+        new OzoneGrant(
+            objectsOf(
+                obj(OzoneObj.ResourceType.VOLUME, "s3v", null, null),
+                obj(OzoneObj.ResourceType.BUCKET, "s3v", "mybucket", null),
+                obj(OzoneObj.ResourceType.KEY, "s3v", "mybucket", "*")),
+            EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
+
+    final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
+        grants, (volume, bucket) -> new ResolvedBucket(
+            volume, bucket, volume, bucket, "owner", BucketLayout.OBJECT_STORE));
+
+    assertThat(result).isEqualTo(grants);
+  }
+
+  @Test
+  public void testResolveGrantsAgainstBucketLinksRewritesToSourceForSameVolumeLink() throws IOException {
+    final Set<OzoneGrant> grants = Collections.singleton(
+        new OzoneGrant(
+            objectsOf(
+                obj(OzoneObj.ResourceType.VOLUME, "s3v", null, null),
+                obj(OzoneObj.ResourceType.BUCKET, "s3v", "s3v-iceberg", null),
+                obj(OzoneObj.ResourceType.KEY, "s3v", "s3v-iceberg", "*")),
+            EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
+
+    final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
+        grants, (volume, bucket) -> new ResolvedBucket(
+            volume, bucket, "s3v", "iceberg", "owner", BucketLayout.OBJECT_STORE));
+
+    final IOzoneObj linkBucket = obj(OzoneObj.ResourceType.BUCKET, "s3v", "s3v-iceberg", null);
+    final Set<IOzoneObj> allObjects = allObjectsIn(result);
+    // Key and bucket are anchored to the link's source.
+    assertThat(allObjects).contains(obj(OzoneObj.ResourceType.KEY, "s3v", "iceberg", "*"));
+    assertThat(allObjects).contains(obj(OzoneObj.ResourceType.BUCKET, "s3v", "iceberg", null));
+    // The link key is gone; only a READ on the link bucket remains, for following the link.
+    assertThat(allObjects).doesNotContain(obj(OzoneObj.ResourceType.KEY, "s3v", "s3v-iceberg", "*"));
+    assertThat(allObjects).contains(linkBucket);
+    // Same volume, so no extra source-volume grant is added.
+    assertThat(allObjects).doesNotContain(obj(OzoneObj.ResourceType.VOLUME, "iceberg", null, null));
+
+    final OzoneGrant followGrant = grantContaining(result, linkBucket);
+    assertThat(followGrant.getPermissions()).containsExactly(ACLType.READ);
+    assertThat(followGrant.getS3Actions()).isEmpty();
+  }
+
+  @Test
+  public void testResolveGrantsAgainstBucketLinksRewritesPrefixOnSameVolumeLink() throws IOException {
+    final Set<OzoneGrant> grants = Collections.singleton(
+        new OzoneGrant(
+            objectsOf(
+                prefixObj("s3v", "s3v-iceberg", "folder/")),
+            EnumSet.of(ACLType.READ, ACLType.LIST), Collections.singleton("ListBucket")));
+
+    final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
+        grants, (volume, bucket) -> new ResolvedBucket(
+            volume, bucket, "s3v", "iceberg", "owner", BucketLayout.OBJECT_STORE));
+
+    final IOzoneObj linkBucket = obj(OzoneObj.ResourceType.BUCKET, "s3v", "s3v-iceberg", null);
+    final Set<IOzoneObj> allObjects = allObjectsIn(result);
+    assertThat(allObjects).contains(prefixObj("s3v", "iceberg", "folder/"));
+    assertThat(allObjects).doesNotContain(prefixObj("s3v", "s3v-iceberg", "folder/"));
+    assertThat(allObjects).contains(linkBucket);
+
+    final OzoneGrant followGrant = grantContaining(result, linkBucket);
+    assertThat(followGrant.getPermissions()).containsExactly(ACLType.READ);
+    assertThat(followGrant.getS3Actions()).isEmpty();
+  }
+
+  @Test
+  public void testResolveGrantsAgainstBucketLinksAddsSourceVolumeReadForCrossVolumeLink() throws IOException {
+    final Set<OzoneGrant> grants = Collections.singleton(
+        new OzoneGrant(
+            objectsOf(
+                obj(OzoneObj.ResourceType.VOLUME, "s3v", null, null),
+                obj(OzoneObj.ResourceType.BUCKET, "s3v", "s3v-iceberg", null),
+                obj(OzoneObj.ResourceType.KEY, "s3v", "s3v-iceberg", "*")),
+            EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
+
+    final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
+        grants, (volume, bucket) -> new ResolvedBucket(
+            volume, bucket, "tenantvol", "iceberg", "owner", BucketLayout.OBJECT_STORE));
+
+    final IOzoneObj linkBucket = obj(OzoneObj.ResourceType.BUCKET, "s3v", "s3v-iceberg", null);
+    final IOzoneObj sourceVolume = obj(OzoneObj.ResourceType.VOLUME, "tenantvol", null, null);
+    final Set<IOzoneObj> allObjects = allObjectsIn(result);
+    assertThat(allObjects).contains(obj(OzoneObj.ResourceType.KEY, "tenantvol", "iceberg", "*"));
+    assertThat(allObjects).contains(linkBucket);
+    assertThat(allObjects).contains(sourceVolume);
+
+    final OzoneGrant followGrant = grantContaining(result, sourceVolume);
+    assertThat(followGrant.getPermissions()).containsExactly(ACLType.READ);
+    assertThat(followGrant.getObjects()).contains(linkBucket);
+  }
+
+  @Test
+  public void testResolveGrantsAgainstBucketLinksSkipsWildcardBuckets() throws IOException {
+    final Set<OzoneGrant> grants = Collections.singleton(
+        new OzoneGrant(
+            objectsOf(
+                obj(OzoneObj.ResourceType.VOLUME, "s3v", null, null),
+                obj(OzoneObj.ResourceType.BUCKET, "s3v", "*", null),
+                obj(OzoneObj.ResourceType.KEY, "s3v", "*", "*")),
+            EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
+
+    final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
+        grants, (volume, bucket) -> {
+          throw new AssertionError("link resolver must not be called for wildcard buckets");
+        });
+
+    assertThat(result).isEqualTo(grants);
+  }
+
+  @Test
+  public void testResolveGrantsAgainstBucketLinksLeavesDanglingBucketsUnchanged() throws IOException {
+    final Set<OzoneGrant> grants = Collections.singleton(
+        new OzoneGrant(
+            objectsOf(
+                obj(OzoneObj.ResourceType.KEY, "s3v", "danglingBucket", "*")),
+            EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
+
+    final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
+        grants, (volume, bucket) -> new ResolvedBucket(volume, bucket, null, null, null, null));
+
+    assertThat(result).isEqualTo(grants);
+  }
+
+  @Test
+  public void testGetSessionPolicyRewritesLinkBucketGrantsToSource() throws Exception {
+    when(ozoneManager.isS3MultiTenancyEnabled()).thenReturn(false);
+
+    final Set<OzoneGrant> resolverGrants = Collections.singleton(
+        new OzoneGrant(
+            objectsOf(
+                obj(OzoneObj.ResourceType.VOLUME, "s3v", null, null),
+                obj(OzoneObj.ResourceType.BUCKET, "s3v", "s3v-iceberg", null),
+                obj(OzoneObj.ResourceType.KEY, "s3v", "s3v-iceberg", "*")),
+            EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
+
+    when(ozoneManager.resolveBucketLink(Pair.of("s3v", "s3v-iceberg"), true, false))
+        .thenReturn(new ResolvedBucket("s3v", "s3v-iceberg", "s3v", "iceberg", "owner", BucketLayout.OBJECT_STORE));
+
+    try (MockedStatic<IamSessionPolicyResolver> resolverMock = mockStatic(IamSessionPolicyResolver.class)) {
+      resolverMock.when(() -> IamSessionPolicyResolver.resolve(
+              AWS_IAM_POLICY, "s3v", IamSessionPolicyResolver.AuthorizerType.RANGER))
+          .thenReturn(resolverGrants);
+
+      final String result = new S3AssumeRoleRequest(baseOmRequestBuilder().build(), CLOCK)
+          .getSessionPolicy(
+              ozoneManager, ORIGINAL_ACCESS_KEY_ID, AWS_IAM_POLICY, OM_HOST, LOOPBACK_IP,
+              UserGroupInformation.createRemoteUser("userNameLink"), TARGET_ROLE_NAME);
+      // Ensure no exception was thrown and that the method actually delegated to generateAssumeRoleSessionPolicy
+      // and returned its value (not null, not something else).
+      assertThat(result).isEqualTo(SESSION_POLICY_VALUE);
+    }
+
+    final ArgumentCaptor<org.apache.hadoop.ozone.security.acl.AssumeRoleRequest> captor = ArgumentCaptor.forClass(
+        org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class);
+    verify(accessAuthorizer).generateAssumeRoleSessionPolicy(captor.capture());
+
+    final Set<IOzoneObj> allObjects = allObjectsIn(captor.getValue().getGrants());
+    assertThat(allObjects).contains(obj(OzoneObj.ResourceType.KEY, "s3v", "iceberg", "*"));
+    assertThat(allObjects).contains(obj(OzoneObj.ResourceType.BUCKET, "s3v", "s3v-iceberg", null));
+    assertThat(allObjects).doesNotContain(obj(OzoneObj.ResourceType.KEY, "s3v", "s3v-iceberg", "*"));
+
+    verify(ozoneManager).resolveBucketLink(Pair.of("s3v", "s3v-iceberg"), true, false);
+  }
+
+  private static IOzoneObj obj(OzoneObj.ResourceType type, String volume, String bucket, String key) {
+    final OzoneObjInfo.Builder builder = OzoneObjInfo.Builder.newBuilder()
+        .setResType(type)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volume);
+    if (bucket != null) {
+      builder.setBucketName(bucket);
+    }
+    if (key != null) {
+      builder.setKeyName(key);
+    }
+    return builder.build();
+  }
+
+  private static IOzoneObj prefixObj(String volume, String bucket, String prefix) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.PREFIX)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setPrefixName(prefix)
+        .build();
+  }
+
+  private static Set<IOzoneObj> objectsOf(IOzoneObj... objects) {
+    return new LinkedHashSet<>(Arrays.asList(objects));
+  }
+
+  private static Set<IOzoneObj> allObjectsIn(Set<OzoneGrant> grants) {
+    final Set<IOzoneObj> all = new LinkedHashSet<>();
+    for (OzoneGrant grant : grants) {
+      all.addAll(grant.getObjects());
+    }
+    return all;
+  }
+
+  private static OzoneGrant grantContaining(Set<OzoneGrant> grants, IOzoneObj object) {
+    return grants.stream()
+        .filter(grant -> grant.getObjects().contains(object))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("No grant contains " + object));
   }
 
   private org.apache.hadoop.ozone.security.acl.AssumeRoleRequest captureAssumeRoleRequest(String volumeName,
