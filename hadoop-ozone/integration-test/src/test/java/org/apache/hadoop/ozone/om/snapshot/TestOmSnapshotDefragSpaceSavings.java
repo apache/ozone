@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
@@ -59,9 +61,12 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * HDDS-13218: integration tests that snapshot defrag reduces checkpoint disk footprint.
@@ -75,7 +80,12 @@ import org.junit.jupiter.api.Test;
  * and FSO buckets, full-then-incremental defrag paths, footprint checks after deleting the
  * middle snapshot and running a follow-up defrag on the remaining youngest snapshot, isolated
  * full defrag on a single snapshot, and idempotent repeated defrag on an already-defragged chain.
+ *
+ * <p>Uses one mini-cluster for the whole class (1 datanode, replication factor one) because
+ * assertions inspect OM checkpoint directories only. Shared snapshot-defrag helpers with
+ * {@link TestOmSnapshotCheckpointDbContent} may be consolidated in a follow-up under HDDS-13003.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestOmSnapshotDefragSpaceSavings {
 
   private static final byte[] TEST_KEY_CONTENT = new byte[] {0x61, 0x62, 0x63};
@@ -95,7 +105,7 @@ public class TestOmSnapshotDefragSpaceSavings {
   private OzoneClient client;
   private ObjectStore store;
 
-  @BeforeEach
+  @BeforeAll
   void initCluster() throws Exception {
     startCluster();
   }
@@ -111,17 +121,19 @@ public class TestOmSnapshotDefragSpaceSavings {
     conf.setTimeDuration(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, 2, TimeUnit.HOURS);
     conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 10);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setInt(OZONE_REPLICATION, ONE.getValue());
 
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(ONE, 60_000);
     client = cluster.newClient();
     store = client.getObjectStore();
     resumeBackgroundServices();
   }
 
-  private void restartCluster() throws Exception {
+  @AfterAll
+  void shutdownCluster() {
     IOUtils.closeQuietly(client, cluster);
-    startCluster();
   }
 
   private void resumeBackgroundServices() {
@@ -131,20 +143,15 @@ public class TestOmSnapshotDefragSpaceSavings {
     om.getKeyManager().getSnapshotDeletingService().resume();
   }
 
-  @AfterEach
-  void shutdownCluster() {
-    IOUtils.closeQuietly(client, cluster);
-  }
-
   /**
-   * Three-snapshot chain with churn on OBS then FSO: defrag should reduce aggregate checkpoint
+   * Three-snapshot chain with churn on OBS and FSO: defrag should reduce aggregate checkpoint
    * footprint on both layouts. OBS pass also verifies one full defrag and two incremental defrags.
    */
-  @Test
-  public void testSnapshotDefragReducesCheckpointFootprintWithChurn() throws Exception {
-    runChurnFootprintScenario(BucketLayout.OBJECT_STORE);
-    restartCluster();
-    runChurnFootprintScenario(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  @ParameterizedTest(name = "layout={0}")
+  @EnumSource(value = BucketLayout.class, names = {"OBJECT_STORE", "FILE_SYSTEM_OPTIMIZED"})
+  public void testSnapshotDefragReducesCheckpointFootprintWithChurn(BucketLayout layout)
+      throws Exception {
+    runChurnFootprintScenario(layout);
   }
 
   /**
@@ -230,7 +237,7 @@ public class TestOmSnapshotDefragSpaceSavings {
     int s2Version = readSnapshotVersion(snapshots.get(1));
     int s3Version = readSnapshotVersion(snapshots.get(2));
 
-    triggerDefragUntilDone(snapshots);
+    cluster.getOzoneManager().triggerSnapshotDefrag(false);
 
     CheckpointFootprint footprintAfterSecondDefrag =
         measureActiveAggregateCheckpointFootprint(snapshots);
@@ -260,7 +267,7 @@ public class TestOmSnapshotDefragSpaceSavings {
 
     triggerDefragUntilDone(snapshots);
 
-    assertDefragReducedChainFootprint(snapshots, duplicateInclusiveBefore, dedupedBefore);
+    assertDefragReducedChainFootprint(layout, snapshots, duplicateInclusiveBefore, dedupedBefore);
     if (layout == BucketLayout.OBJECT_STORE) {
       assertTrue(metrics.getNumSnapshotFullDefrag() >= fullDefragBefore + 1,
           "Expected at least one full defrag for the chain head snapshot");
@@ -273,7 +280,7 @@ public class TestOmSnapshotDefragSpaceSavings {
     }
   }
 
-  private void assertDefragReducedChainFootprint(List<SnapshotInfo> snapshots,
+  private void assertDefragReducedChainFootprint(BucketLayout layout, List<SnapshotInfo> snapshots,
       CheckpointFootprint duplicateInclusiveBefore, CheckpointFootprint dedupedBefore)
       throws IOException {
     CheckpointFootprint dedupedAfter = measureActiveAggregateCheckpointFootprint(snapshots);
@@ -281,14 +288,14 @@ public class TestOmSnapshotDefragSpaceSavings {
 
     assertTrue(duplicateInclusiveBefore.getSstFileCount() > dedupedBefore.getSstFileCount(),
         () -> String.format(
-            "Expected pre-defrag chain to carry redundant SST references: duplicate-inclusive=%d, "
-                + "deduped=%d",
-            duplicateInclusiveBefore.getSstFileCount(), dedupedBefore.getSstFileCount()));
+            "[%s] Expected pre-defrag chain to carry redundant SST references: "
+                + "duplicate-inclusive=%d, deduped=%d",
+            layout, duplicateInclusiveBefore.getSstFileCount(), dedupedBefore.getSstFileCount()));
     assertTrue(dedupedAfter.getSstFileCount() < duplicateInclusiveBefore.getSstFileCount(),
         () -> String.format(
-            "Expected defragged chain to drop SST references vs duplicate-inclusive pre-defrag "
+            "[%s] Expected defragged chain to drop SST references vs duplicate-inclusive pre-defrag "
                 + "baseline: before=%d, after=%d",
-            duplicateInclusiveBefore.getSstFileCount(), dedupedAfter.getSstFileCount()));
+            layout, duplicateInclusiveBefore.getSstFileCount(), dedupedAfter.getSstFileCount()));
 
     long sstRedundancyBefore = duplicateInclusiveBefore.getSstFileCount()
         - dedupedBefore.getSstFileCount();
@@ -296,8 +303,8 @@ public class TestOmSnapshotDefragSpaceSavings {
         - dedupedAfter.getSstFileCount();
     assertTrue(sstRedundancyAfter < sstRedundancyBefore,
         () -> String.format(
-            "Expected defrag to reduce cross-snapshot SST redundancy: before=%d, after=%d",
-            sstRedundancyBefore, sstRedundancyAfter));
+            "[%s] Expected defrag to reduce cross-snapshot SST redundancy: before=%d, after=%d",
+            layout, sstRedundancyBefore, sstRedundancyAfter));
   }
 
   /**
@@ -465,37 +472,62 @@ public class TestOmSnapshotDefragSpaceSavings {
     String volumeName = snapshotInfo.getVolumeName();
     String bucketName = snapshotInfo.getBucketName();
     String snapshotName = snapshotInfo.getName();
-    GenericTestUtils.waitFor(() -> {
-      try {
-        SnapshotInfo currentSnapshot = loadSnapshotInfo(volumeName, bucketName, snapshotName);
-        if (readSnapshotVersion(currentSnapshot) > baselineVersion
-            && isSnapshotDefragComplete(currentSnapshot)) {
-          return true;
-        }
-        om.triggerSnapshotDefrag(false);
-        currentSnapshot = loadSnapshotInfo(volumeName, bucketName, snapshotName);
-        return readSnapshotVersion(currentSnapshot) > baselineVersion
-            && isSnapshotDefragComplete(currentSnapshot);
-      } catch (IOException e) {
-        return false;
-      }
-    }, 2000, DEFRAG_WAIT_MS);
+    waitForDefragCondition("snapshot " + snapshotName + " defrag version > " + baselineVersion,
+        () -> {
+          SnapshotInfo currentSnapshot = loadSnapshotInfo(volumeName, bucketName, snapshotName);
+          if (readSnapshotVersion(currentSnapshot) > baselineVersion
+              && isSnapshotDefragComplete(currentSnapshot)) {
+            return true;
+          }
+          om.triggerSnapshotDefrag(false);
+          currentSnapshot = loadSnapshotInfo(volumeName, bucketName, snapshotName);
+          return readSnapshotVersion(currentSnapshot) > baselineVersion
+              && isSnapshotDefragComplete(currentSnapshot);
+        });
   }
 
   private void triggerDefragUntilDone(List<SnapshotInfo> snapshots)
       throws TimeoutException, InterruptedException {
-    OzoneManager om = cluster.getOzoneManager();
-    GenericTestUtils.waitFor(() -> {
+    waitForDefragCondition("all snapshots defrag-complete", () -> {
       if (areAllSnapshotsDefragComplete(snapshots)) {
         return true;
       }
-      try {
-        om.triggerSnapshotDefrag(false);
-      } catch (IOException e) {
-        return false;
-      }
+      cluster.getOzoneManager().triggerSnapshotDefrag(false);
       return areAllSnapshotsDefragComplete(snapshots);
-    }, 2000, DEFRAG_WAIT_MS);
+    });
+  }
+
+  private void waitForDefragCondition(String description, DefragWaitCondition condition)
+      throws TimeoutException, InterruptedException {
+    IOException[] lastFailure = new IOException[1];
+    try {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          if (condition.check()) {
+            lastFailure[0] = null;
+            return true;
+          }
+          return false;
+        } catch (IOException e) {
+          lastFailure[0] = e;
+          return false;
+        }
+      }, 2000, DEFRAG_WAIT_MS);
+    } catch (TimeoutException e) {
+      if (lastFailure[0] != null) {
+        TimeoutException timeout = new TimeoutException(
+            "Timed out waiting for " + description + ". Last triggerSnapshotDefrag failure: "
+                + lastFailure[0].getMessage());
+        timeout.initCause(lastFailure[0]);
+        throw timeout;
+      }
+      throw e;
+    }
+  }
+
+  @FunctionalInterface
+  private interface DefragWaitCondition {
+    boolean check() throws IOException;
   }
 
   private boolean areAllSnapshotsDefragComplete(List<SnapshotInfo> snapshots) {
