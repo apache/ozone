@@ -22,12 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.util.Collections;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -41,23 +40,20 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for the OMFinalizeUpgradeRequest class.
+ * Tests for the OMCompleteFinalizeUpgradeRequest class.
  */
-public class TestOMFinalizeUpgradeRequest extends OMKeyRequestTests {
+public class TestOMCompleteFinalizeUpgradeRequest extends OMKeyRequestTests {
 
   @Test
   public void testFinalizationInProgressKeyRemoved() throws IOException {
     OMVersionManager omVersionManager = mock(OMVersionManager.class);
     when(omVersionManager.getApparentVersion()).thenReturn(OzoneManagerVersion.DEFAULT_VERSION);
     when(ozoneManager.getVersionManager()).thenReturn(omVersionManager);
-    when(ozoneManager.finalizeUpgrade(any())).thenReturn(new UpgradeFinalization.StatusAndMessages(
-         UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS, Collections.singletonList("Finalization in progress")));
 
     omMetadataManager.getMetaTable().put(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignored");
     omMetadataManager.getMetaTable().addCacheEntry(
@@ -89,14 +85,14 @@ public class TestOMFinalizeUpgradeRequest extends OMKeyRequestTests {
     OMVersionManager omVersionManager = mock(OMVersionManager.class);
     when(omVersionManager.getApparentVersion()).thenReturn(OzoneManagerVersion.DEFAULT_VERSION);
     when(ozoneManager.getVersionManager()).thenReturn(omVersionManager);
-    when(ozoneManager.finalizeUpgrade(any())).thenThrow(
-        new UpgradeException(UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED));
+    doThrow(new UpgradeException(UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED))
+        .when(ozoneManager).finalizeUpgrade();
 
     OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
+        .setCmdType(OzoneManagerProtocolProtos.Type.CompleteFinalizeUpgrade)
         .setClientId(ClientId.randomId().toString())
         .build();
-    OMFinalizeUpgradeRequest request = new OMFinalizeUpgradeRequest(omRequest);
+    OMCompleteFinalizeUpgradeRequest request = new OMCompleteFinalizeUpgradeRequest(omRequest);
     ExecutionContext context = ExecutionContext.of(1, TermIndex.INITIAL_VALUE);
     request.preExecute(ozoneManager);
 
@@ -108,11 +104,11 @@ public class TestOMFinalizeUpgradeRequest extends OMKeyRequestTests {
 
   private void submitRequest() throws IOException {
     OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
+        .setCmdType(OzoneManagerProtocolProtos.Type.CompleteFinalizeUpgrade)
         .setClientId(ClientId.randomId().toString())
         .build();
 
-    OMFinalizeUpgradeRequest request = new OMFinalizeUpgradeRequest(omRequest);
+    OMCompleteFinalizeUpgradeRequest request = new OMCompleteFinalizeUpgradeRequest(omRequest);
     ExecutionContext context = ExecutionContext.of(1, TermIndex.INITIAL_VALUE);
 
     OzoneManagerProtocolProtos.OMRequest modifiedOmRequest = request.preExecute(ozoneManager);

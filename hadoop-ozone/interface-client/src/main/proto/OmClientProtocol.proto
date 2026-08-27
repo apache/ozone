@@ -169,6 +169,7 @@ enum Type {
   SaveLifecycleScanState       = 152;
   StartFinalizeUpgrade = 153;
   QueryUpgradeStatus = 154;
+  CompleteFinalizeUpgrade = 155;
 }
 
 enum SafeMode {
@@ -334,6 +335,7 @@ message OMRequest {
   optional SaveLifecycleScanStateRequest saveLifecycleScanStateRequest = 153;
   optional StartFinalizeUpgradeRequest      startFinalizeUpgradeRequest     = 154;
   optional QueryUpgradeStatusRequest        queryUpgradeStatusRequest       = 155;
+  optional CompleteFinalizeUpgradeRequest   completeFinalizeUpgradeRequest  = 156;
 }
 
 message OMResponse {
@@ -482,6 +484,7 @@ message OMResponse {
   optional SaveLifecycleScanStateResponse saveLifecycleScanStateResponse = 152;
   optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 153;
   optional QueryUpgradeStatusResponse        queryUpgradeStatusResponse    = 154;
+  optional CompleteFinalizeUpgradeResponse   completeFinalizeUpgradeResponse = 155;
 }
 
 enum Status {
@@ -1691,6 +1694,14 @@ message StartFinalizeUpgradeRequest {
 }
 
 message StartFinalizeUpgradeResponse {
+}
+
+// Internal request submitted by OMUpgradeFinalizeService to complete OM finalization
+// once SCM reports FINALIZED.
+message CompleteFinalizeUpgradeRequest {
+}
+
+message CompleteFinalizeUpgradeResponse {
 }
 
 message QueryUpgradeStatusRequest {

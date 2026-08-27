@@ -121,7 +121,7 @@ public class OMUpgradeFinalizeService extends BackgroundService {
             LOG.info("The SCM Upgrade has been finalized. OM will now finalize. Run count {}", run);
 
             OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-                .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
+                .setCmdType(OzoneManagerProtocolProtos.Type.CompleteFinalizeUpgrade)
                 .setClientId(clientId.toString())
                 .build();
             OzoneManagerProtocolProtos.OMResponse response = OzoneManagerRatisUtils.submitRequest(

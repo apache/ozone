@@ -111,8 +111,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServicePro
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_DONE_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_REQUIRED_MSG;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZED_MSG;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.STARTING_MSG;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -3760,22 +3758,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public StatusAndMessages finalizeUpgrade(String unusedUpgradeClientId)
-      throws IOException {
-    if (!versionManager.needsFinalization()) {
-      return FINALIZED_MSG;
-    }
-    versionManager.finalizeUpgrade();
-    // Old OM clients currently require STARTING_MSG to be returned when this method succeeds.
-
-    return STARTING_MSG;
+  public StatusAndMessages finalizeUpgrade(String unusedUpgradeClientId) {
+    // Server-side stub; the real implementation is handled via the Ratis request path through
+    // OMStartFinalizeUpgradeRequestLegacy
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public void finalizeUpgrade() throws IOException {
-    // Server-side stub; the real implementation is handled via the Ratis request path through
-    // OMStartFinalizeUpgradeRequest
-    throw new UnsupportedOperationException();
+    versionManager.finalizeUpgrade();
   }
 
   @Override

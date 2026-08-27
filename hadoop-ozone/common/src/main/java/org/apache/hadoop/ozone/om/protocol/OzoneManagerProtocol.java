@@ -494,6 +494,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            when finalization is already in progress.
    */
+  @Deprecated
   UpgradeFinalization.StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
 
   /**
@@ -530,6 +531,9 @@ public interface OzoneManagerProtocol
   OzoneManagerProtocolProtos.QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException;
 
   /**
+   * This command is retained so that new clients can query status of old OM servers. All new finalize requests should
+   * use `void queryUpgradeStatus()`.
+   *
    * Queries the current status of finalization.
    * This method when called, returns the status messages from the finalization
    * progress, if any. The status returned is
@@ -557,6 +561,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            if finalization is needed but not yet started
    */
+  @Deprecated
   UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException;

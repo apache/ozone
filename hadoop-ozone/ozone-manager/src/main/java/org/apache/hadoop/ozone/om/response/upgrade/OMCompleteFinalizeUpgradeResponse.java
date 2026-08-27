@@ -31,15 +31,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Response for finalizeUpgrade request.
+ * Response for completing OM finalization (submitted by OMUpgradeFinalizeService).
  */
 @CleanupTableInfo(cleanupTables = {META_TABLE})
-public class OMFinalizeUpgradeResponse extends OMClientResponse {
+public class OMCompleteFinalizeUpgradeResponse extends OMClientResponse {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMFinalizeUpgradeResponse.class);
+      LoggerFactory.getLogger(OMCompleteFinalizeUpgradeResponse.class);
   private int serializedApparentVersion = -1;
 
-  public OMFinalizeUpgradeResponse(
+  public OMCompleteFinalizeUpgradeResponse(
       OzoneManagerProtocolProtos.OMResponse omResponse,
       int serializedApparentVersion) {
     super(omResponse);

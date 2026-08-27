@@ -17,31 +17,40 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.StartFinalizeUpgrade;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.FinalizeUpgrade;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Starts the cluster upgrade finalization process via {@code ozone admin upgrade finalize}.
+ * Handles the finalizeUpgrade request sent by the old CLI ({@code ozone admin om finalizeupgrade}).
+ * It initiates the same asynchronous finalization flow as {@link OMStartFinalizeUpgradeRequest} and
+ * returns {@code STARTING_FINALIZATION} to be compatible with old clients.
+ * The old CLI then polls finalization progress until done.
  */
-public class OMStartFinalizeUpgradeRequest extends OMFinalizeUpgradeRequestBase {
+public class OMStartFinalizeUpgradeRequestLegacy extends OMFinalizeUpgradeRequestBase {
 
-  public OMStartFinalizeUpgradeRequest(OMRequest omRequest) {
+  public OMStartFinalizeUpgradeRequestLegacy(OMRequest omRequest) {
     super(omRequest);
   }
 
   @Override
   protected boolean isForce() {
-    return getOmRequest().getStartFinalizeUpgradeRequest().getForce();
+    // The old request has no force field.
+    return false;
   }
 
   @Override
   protected void setResponseBody(OMResponse.Builder builder, OzoneManager ozoneManager) {
-    builder.setCmdType(StartFinalizeUpgrade);
-    builder.setStartFinalizeUpgradeResponse(
-        OzoneManagerProtocolProtos.StartFinalizeUpgradeResponse.newBuilder().build());
+    builder.setCmdType(FinalizeUpgrade);
+    UpgradeFinalizationStatus status = UpgradeFinalizationStatus.newBuilder()
+        .setStatus(UpgradeFinalizationStatus.Status.STARTING_FINALIZATION)
+        .build();
+    builder.setFinalizeUpgradeResponse(FinalizeUpgradeResponse.newBuilder()
+        .setStatus(status)
+        .build());
   }
 }
