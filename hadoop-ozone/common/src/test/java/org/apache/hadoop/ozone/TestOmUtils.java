@@ -386,6 +386,24 @@ public class TestOmUtils {
   }
 
   @Test
+  void testOmAddressesBracketIPv6Literals() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::1]:9999");
+
+    assertEquals("[2001:db8::1]:9999", OmUtils.getOmRpcAddress(conf));
+
+    String peerAddressKey = OZONE_OM_ADDRESS_KEY + ".omservice.om1";
+    conf.set(peerAddressKey, "2001:db8::2");
+    assertEquals("[2001:db8::2]:" + OMConfigKeys.OZONE_OM_PORT_DEFAULT,
+        OmUtils.getOmRpcAddress(conf, peerAddressKey));
+
+    assertEquals("[2001:db8::3]:" + OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DEFAULT,
+        OmUtils.getHttpAddressForOMPeerNode(conf, "omservice", "om1", "2001:db8::3"));
+    assertEquals("[2001:db8::3]:" + OMConfigKeys.OZONE_OM_HTTPS_BIND_PORT_DEFAULT,
+        OmUtils.getHttpsAddressForOMPeerNode(conf, "omservice", "om1", "2001:db8::3"));
+  }
+
+  @Test
   public void testResolveOmHostAcceptsIpv6Literal() {
     // A bracketed or bare IPv6 literal must parse into a host:port authority.
     // Before HDDS-15775 the bare form made createSocketAddr throw

@@ -17,12 +17,16 @@
 
 package org.apache.hadoop.hdds;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.HddsUtils.processForLogging;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
@@ -100,6 +104,31 @@ public class TestHddsUtils {
 
     // Already-bracketed IPv6 literals keep a single pair of brackets.
     assertEquals("[2001:db8::1]:9858", HddsUtils.getHostPortString("[2001:db8::1]", 9858));
+  }
+
+  @Test
+  void testGetHostPortStringFromAddress() {
+    assertEquals("1.2.3.4:9858",
+        HddsUtils.getHostPortString(new InetSocketAddress("1.2.3.4", 9858)));
+
+    // Hadoop's NetUtils.getHostPortString joins these with a plain colon, which
+    // is ambiguous; the host must come back bracketed.
+    assertEquals("[2001:db8:0:0:0:0:0:1]:9858",
+        HddsUtils.getHostPortString(new InetSocketAddress("2001:db8::1", 9858)));
+    assertEquals("[0:0:0:0:0:0:0:0]:9858",
+        HddsUtils.getHostPortString(new InetSocketAddress("::", 9858)));
+  }
+
+  @Test
+  void testGetDatanodeRpcAddressWithIPv6BindHost() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_CLIENT_BIND_HOST_KEY, "::");
+    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, "[2001:db8::1]:100");
+
+    InetSocketAddress addr = HddsUtils.getDatanodeRpcAddress(conf);
+
+    assertEquals(InetAddress.getByName("::"), addr.getAddress());
+    assertEquals(100, addr.getPort());
   }
 
   @Test
