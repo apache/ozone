@@ -77,9 +77,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -96,6 +99,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -140,7 +144,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -207,6 +210,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
   private ScmBlockLocationTestingClient scmBlockTestingClient;
   private KeyLifecycleServiceMetrics metrics;
   private long bucketObjectID;
+  private final List<FaultInjectorImpl> installedInjectors = new ArrayList<>();
+  private final Set<String> createdLifecyclePolicies = new HashSet<>();
 
   @Parameter(0)
   private long stateSaveInternal;
@@ -275,12 +280,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
 
     @AfterEach
-    void resume() {
-      keyLifecycleService.setOzoneTrash(null);
-      keyLifecycleService.setMoveToTrashEnabled(true);
-      KeyLifecycleService.setInjectors(null);
-      keyLifecycleService.setListMaxSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
-          OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
+    void resume() throws Exception {
+      cleanUpService();
     }
 
     @AfterAll
@@ -402,6 +403,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(testKeyCount, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == testKeyCount,
           WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(bucketLayout, volumeName, bucketName);
 
       // Inject spy to LifecycleScanStateTable to count put operations
       Field tableField = OmMetadataManagerImpl.class.getDeclaredField("lifecycleScanStateTable");
@@ -471,6 +473,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(testKeyCount, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == testKeyCount,
           WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(bucketLayout, volumeName, bucketName);
 
       // determine db keys
       List<String> dbKeys = new ArrayList<>();
@@ -584,7 +587,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       int testKeyCount = 3;
 
       keyLifecycleService.setListMaxSize(1);
-      KeyLifecycleService.setInjectors(Arrays.asList(new FaultInjectorImpl()));
+      FaultInjectorImpl taskStart = new FaultInjectorImpl();
+      installInjectors(taskStart);
 
       List<OmKeyArgs> keyList =
           createKeys(volumeName, bucketName, bucketLayout, testKeyCount, 1, keyPrefix, null);
@@ -600,13 +604,14 @@ class TestKeyLifecycleService extends OzoneTestBase {
       }
 
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-      GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().contains(bucketKey),
-          WAIT_CHECK_INTERVAL, 10000);
+      // The in-flight list is filled when the task is scheduled, so wait on the injector instead:
+      // suspending before the task actually starts makes it skip its run and never pause here.
+      taskStart.awaitPaused(10000);
 
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
           LoggerFactory.getLogger(KeyLifecycleService.class));
       keyLifecycleService.suspend();
-      KeyLifecycleService.getInjector(0).resume();
+      taskStart.release();
       GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
           WAIT_CHECK_INTERVAL, 10000);
 
@@ -847,6 +852,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(testKeyCount, keyList.size());
       GenericTestUtils.waitFor(
           () -> getKeyCount(bucketLayout) - initialKeyCount == testKeyCount, WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(bucketLayout, volumeName, bucketName);
 
       // Create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -858,59 +864,61 @@ class TestKeyLifecycleService extends OzoneTestBase {
       FaultInjectorImpl firstDelete = new FaultInjectorImpl();
       FaultInjectorImpl lastFaultInjector = new FaultInjectorImpl();
       lastFaultInjector.setException(new IOException("Injected exception for testing"));
-      KeyLifecycleService.setInjectors(Arrays.asList(firstTaskStart, firstDelete, lastFaultInjector));
+      installInjectors(firstTaskStart, firstDelete, lastFaultInjector);
       // Resume the service
       keyLifecycleService.resume();
       // Returns once the aborted task is past its start, so it keeps using the injectors below
       firstTaskStart.resume();
       // Hold the follow-up task at its start, otherwise it overwrites the scan state asserted below
       FaultInjectorImpl nextTaskStart = new FaultInjectorImpl();
-      KeyLifecycleService.setInjectors(Arrays.asList(nextTaskStart, firstDelete, lastFaultInjector));
+      installInjectors(nextTaskStart, firstDelete, lastFaultInjector);
       firstDelete.resume();
 
       // wait for scanState to be updated
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-      GenericTestUtils.waitFor(() -> {
-        try {
-          OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
-          if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
-            return scanState != null && scanState.getLastScannedDir() != null && scanState.getLastScannedKey() != null;
-          } else {
-            return scanState != null && scanState.getLastScannedKey() != null;
+      try {
+        GenericTestUtils.waitFor(() -> {
+          try {
+            OmLifecycleScanState state = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+            if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+              return state != null && state.getLastScannedDir() != null && state.getLastScannedKey() != null;
+            } else {
+              return state != null && state.getLastScannedKey() != null;
+            }
+          } catch (IOException e) {
+            return false;
           }
-        } catch (IOException e) {
-          return false;
-        }
-      }, WAIT_CHECK_INTERVAL, 10000);
+        }, WAIT_CHECK_INTERVAL, 10000);
 
-      OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
-      if (stateSaveInternal != -1) {
-        if (maxSize == 2) {
-          if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
-            assertEquals("dir3/dir6/dir9", scanState.getLastScannedDir());
-            assertTrue(scanState.getLastScannedKey().endsWith("key8"));
+        OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+        if (stateSaveInternal != -1) {
+          if (maxSize == 2) {
+            if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+              assertEquals("dir3/dir6/dir9", scanState.getLastScannedDir());
+              assertTrue(scanState.getLastScannedKey().endsWith("key8"));
+            } else {
+              assertTrue(scanState.getLastScannedKey().endsWith("key1"));
+            }
+          } else if (maxSize == 3) {
+            if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+              assertEquals("dir3/dir6/dir8", scanState.getLastScannedDir());
+              assertTrue(scanState.getLastScannedKey().endsWith("key6"));
+            } else {
+              assertTrue(scanState.getLastScannedKey().endsWith("key2"));
+            }
           } else {
-            assertTrue(scanState.getLastScannedKey().endsWith("key1"));
-          }
-        } else if (maxSize == 3) {
-          if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
-            assertEquals("dir3/dir6/dir8", scanState.getLastScannedDir());
-            assertTrue(scanState.getLastScannedKey().endsWith("key6"));
-          } else {
-            assertTrue(scanState.getLastScannedKey().endsWith("key2"));
-          }
-        } else {
-          if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
-            assertEquals("dir1/dir5", scanState.getLastScannedDir());
-            assertTrue(scanState.getLastScannedKey().endsWith("key3"));
-          } else {
-            assertTrue(scanState.getLastScannedKey().endsWith("key7"));
+            if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+              assertEquals("dir1/dir5", scanState.getLastScannedDir());
+              assertTrue(scanState.getLastScannedKey().endsWith("key3"));
+            } else {
+              assertTrue(scanState.getLastScannedKey().endsWith("key7"));
+            }
           }
         }
+      } finally {
+        // Let the follow-up task resume from the saved state and finish the scan
+        nextTaskStart.release();
       }
-
-      // Let the follow-up task resume from the saved state and finish the scan
-      nextTaskStart.resume();
 
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == testKeyCount, WAIT_CHECK_INTERVAL, 10000);
@@ -1071,6 +1079,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(4, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(BucketLayout.FILE_SYSTEM_OPTIMIZED) - initialKeyCount == 4,
           WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(BucketLayout.FILE_SYSTEM_OPTIMIZED, volumeName, bucketName);
 
       long bucketId =
           metadataManager.getBucketTable().get(metadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
@@ -1158,6 +1167,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(3, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(layout) - initialKeyCount == 3,
           WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(layout, volumeName, bucketName);
 
       long bucketId =
           metadataManager.getBucketTable().get(metadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
@@ -1727,8 +1737,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
 
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -1934,6 +1943,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
             .build());
         keyList.add(createAndCommitKey(volumeName, bucketName, dir4 + "key4", 1, null));
       }
+      awaitKeyCacheDrained(FILE_SYSTEM_OPTIMIZED, volumeName, bucketName);
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, ruleList);
 
       try {
@@ -2087,8 +2097,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       List<OmKeyArgs> keyList =
           createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
 
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -2121,10 +2130,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
           key.getBucketName() + "/" + key.getKeyName() + " whose updateID not match or null";
       GenericTestUtils.waitFor(() -> requestLog.getOutput().contains(expectedString), WAIT_CHECK_INTERVAL, 10000);
 
-      // rename will change object's modificationTime. But since expiration action is an absolute timestamp, so
-      // the renamed key will expire in next evaluation task
-      GenericTestUtils.waitFor(() -> log.getOutput().contains("1 expired keys and 0 expired dirs found"),
-          WAIT_CHECK_INTERVAL, 10000);
+      // The update changes the key's modificationTime, but the expiration action is an absolute timestamp,
+      // so the key still expires and a later task deletes it. How many candidates a single task reports
+      // depends on when it starts relative to the in-flight delete, so assert on the outcome instead.
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == 0, WAIT_CHECK_INTERVAL, 10000);
       assertEquals(KEY_COUNT, getDeletedKeyCount() - initialDeletedKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
@@ -2565,8 +2573,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
 
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -2622,8 +2629,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // Create and inject for test
       createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, KEY_COUNT, 1, prefix, null);
       ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
       Thread.sleep(SERVICE_INTERVAL + 100);
       
@@ -3137,7 +3143,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
 
     @AfterEach
-    void resume() {
+    void resume() throws Exception {
+      cleanUpService();
     }
 
     @AfterAll
@@ -3181,7 +3188,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
 
       FaultInjectorImpl injector = new FaultInjectorImpl();
-      KeyLifecycleService.setInjectors(Arrays.asList(injector));
+      installInjectors(injector);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, "", null, date.toString(), true);
 
       Thread.sleep(1000);
@@ -3230,8 +3237,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       List<OmKeyArgs> keyList =
           createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
 
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -3382,13 +3388,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       }
       throw e;
     }
-    String key = "/" + volume + "/" + bucket;
-    LifecycleConfiguration lcProto = lcc.getProtobuf();
-    OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcProto);
-    canonicalLcc.valid();
-    metadataManager.getLifecycleConfigurationTable().put(key, lcc);
-    metadataManager.getLifecycleConfigurationTable().addCacheEntry(
-        new CacheKey<>(key), CacheValue.get(1L, canonicalLcc));
+    putLifecyclePolicy(volume, bucket, lcc, true);
   }
 
   private void createLifecyclePolicy(String volume, String bucket, BucketLayout layout, List<OmLCRule> ruleList)
@@ -3408,20 +3408,87 @@ class TestKeyLifecycleService extends OzoneTestBase {
       }
       throw e;
     }
-    String key = "/" + volume + "/" + bucket;
-    LifecycleConfiguration lcProto = lcc.getProtobuf();
-    OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcProto);
+    putLifecyclePolicy(volume, bucket, lcc, false);
+  }
+
+  /**
+   * Track policies created by the test helpers so that @AfterEach can drop the ones a test leaves behind.
+   */
+  private void putLifecyclePolicy(String volume, String bucket, OmLifecycleConfiguration lcc, boolean validate)
+      throws IOException {
+    String key = metadataManager.getBucketKey(volume, bucket);
+    OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcc.getProtobuf());
+    if (validate) {
+      canonicalLcc.valid();
+    }
     metadataManager.getLifecycleConfigurationTable().put(key, lcc);
     metadataManager.getLifecycleConfigurationTable().addCacheEntry(
         new CacheKey<>(key), CacheValue.get(1L, canonicalLcc));
+    createdLifecyclePolicies.add(key);
   }
 
   private void deleteLifecyclePolicy(String volume, String bucket)
       throws IOException {
-    String key = "/" + volume + "/" + bucket;
-    metadataManager.getLifecycleConfigurationTable().delete(key);
+    deleteLifecyclePolicy(metadataManager.getBucketKey(volume, bucket));
+  }
+
+  private void deleteLifecyclePolicy(String policyKey) throws IOException {
+    metadataManager.getLifecycleConfigurationTable().delete(policyKey);
     metadataManager.getLifecycleConfigurationTable().addCacheEntry(
-        new CacheKey<>(key), CacheValue.get(1L));
+        new CacheKey<>(policyKey), CacheValue.get(1L));
+    createdLifecyclePolicies.remove(policyKey);
+  }
+
+  /**
+   * Wait until the bucket's keys are only in the DB. A scan reads keys still in the key table cache
+   * from an unordered map, skips them in the sorted table iterator and does not count them, so
+   * lastScannedKey and numKeyIterated are not stable until the cache entries are gone. The cache is
+   * cleaned up asynchronously after the write, so being able to read a key back is not enough.
+   */
+  private void awaitKeyCacheDrained(BucketLayout layout, String volume, String bucket)
+      throws TimeoutException, InterruptedException {
+    Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(layout);
+    GenericTestUtils.waitFor(() -> {
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter = keyTable.cacheIterator();
+      while (cacheIter.hasNext()) {
+        OmKeyInfo key = cacheIter.next().getValue().getCacheValue();
+        if (key != null && volume.equals(key.getVolumeName()) && bucket.equals(key.getBucketName())) {
+          return false;
+        }
+      }
+      return true;
+    }, WAIT_CHECK_INTERVAL, 10000);
+  }
+
+  // Tracks every injector installed, not just the current set, so a replaced one is still released
+  private void installInjectors(FaultInjectorImpl... injectors) {
+    installedInjectors.addAll(Arrays.asList(injectors));
+    KeyLifecycleService.setInjectors(new ArrayList<FaultInjector>(Arrays.asList(injectors)));
+  }
+
+  /**
+   * Leave the service usable for the next test. A task parked in an injector blocks every following
+   * cycle, because BackgroundService waits for the previous batch before scheduling a new one, so
+   * injectors must be released rather than just dropped. Policies left behind keep their bucket
+   * scanned for the rest of the run, which shifts the global counters other tests assert on.
+   */
+  private void cleanUpService() throws Exception {
+    try {
+      for (String policyKey : new ArrayList<>(createdLifecyclePolicies)) {
+        deleteLifecyclePolicy(policyKey);
+      }
+    } finally {
+      installedInjectors.forEach(FaultInjectorImpl::release);
+      installedInjectors.clear();
+      KeyLifecycleService.setInjectors(null);
+      keyLifecycleService.setOzoneTrash(null);
+      keyLifecycleService.setMoveToTrashEnabled(true);
+      keyLifecycleService.setListMaxSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
+          OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
+      keyLifecycleService.resume();
+      GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+          WAIT_CHECK_INTERVAL, 30000);
+    }
   }
 
   /**
@@ -3432,17 +3499,16 @@ class TestKeyLifecycleService extends OzoneTestBase {
    */
   private void runSingleLifecycleScan(String volume, String bucket)
       throws IOException, TimeoutException, InterruptedException {
-    String bucketKey = metadataManager.getBucketKey(volume, bucket);
-    // injector 0 holds the task at its start, injector 1 holds the first delete request,
-    // injector 2 is only read for an injected exception but must exist
-    KeyLifecycleService.setInjectors(
-        Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl(), new FaultInjectorImpl()));
+    FaultInjectorImpl taskStart = new FaultInjectorImpl();
+    FaultInjectorImpl firstDelete = new FaultInjectorImpl();
+    // The third injector is only read for an injected exception, but the scan expects it to exist
+    installInjectors(taskStart, firstDelete, new FaultInjectorImpl());
     keyLifecycleService.resume();
-    GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().contains(bucketKey),
-        WAIT_CHECK_INTERVAL, 10000);
+    // The in-flight list is filled at schedule time, so wait for the task to reach the injector
+    taskStart.awaitPaused(10000);
     deleteLifecyclePolicy(volume, bucket);
-    KeyLifecycleService.getInjector(0).resume();
-    KeyLifecycleService.getInjector(1).resume();
+    taskStart.release();
+    firstDelete.release();
     GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
         WAIT_CHECK_INTERVAL, 10000);
   }
@@ -3759,6 +3825,11 @@ class TestKeyLifecycleService extends OzoneTestBase {
       createSubject();
       keyDeletingService.suspend();
       directoryDeletingService.suspend();
+    }
+
+    @AfterEach
+    void resume() throws Exception {
+      cleanUpService();
     }
 
     @AfterAll
