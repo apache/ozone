@@ -81,6 +81,7 @@ public class TestStreamRead {
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("ExpiredContainerReplicaOpScrubber"), Level.ERROR);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("SCMHATransactionMonitor"), Level.ERROR);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger(CodecBuffer.class), Level.ERROR);
+//    GenericTestUtils.setLogLevel(StreamBlockInputStream.class, Level.DEBUG);
   }
 
   static final int CHUNK_SIZE = 1 << 20;          // 1MB
@@ -188,7 +189,7 @@ public class TestStreamRead {
 
         // get block file and generate md5
         final OmKeyInfo info = nonStreamReadClient.getProxy().getKeyInfo(volume, bucket, keyName, false);
-        final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().getLocationList();
+        final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
         assertEquals(1, locations.size());
         final BlockID blockId = locations.get(0).getBlockID();
         final ContainerData containerData = datanode.getDatanodeStateMachine().getContainer().getContainerSet()
