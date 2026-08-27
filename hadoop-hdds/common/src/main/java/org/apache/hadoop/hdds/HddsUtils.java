@@ -244,6 +244,19 @@ public final class HddsUtils {
   }
 
   /**
+   * Render an address as a "host:port" string, wrapping the host in square
+   * brackets when it is an IPv6 literal. Hadoop's
+   * {@code NetUtils.getHostPortString(InetSocketAddress)} joins the two with a
+   * plain colon, which yields an ambiguous authority for IPv6.
+   *
+   * @param addr the address to render
+   * @return the combined address, bracketed for IPv6 literals
+   */
+  public static String getHostPortString(InetSocketAddress addr) {
+    return getHostPortString(addr.getHostName(), addr.getPort());
+  }
+
+  /**
    * Parse a Ratis role string produced by
    * {@code SCMRatisServerImpl.getRatisRoles()} into its constituent fields.
    * The format is {@code [host]:port:ROLE:id:hostIP} where host and hostIP
@@ -403,7 +416,7 @@ public final class HddsUtils {
         .orElse(conf.getInt(HDDS_DATANODE_CLIENT_PORT_KEY,
             HDDS_DATANODE_CLIENT_PORT_DEFAULT));
 
-    return NetUtils.createSocketAddr(host + ":" + port);
+    return NetUtils.createSocketAddr(getHostPortString(host, port));
   }
 
   /**

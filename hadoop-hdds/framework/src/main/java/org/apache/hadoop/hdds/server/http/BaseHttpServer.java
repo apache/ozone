@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.server.http;
 
 import static org.apache.hadoop.hdds.HddsUtils.createDir;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
@@ -223,7 +224,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
         builder.setFindPort(true);
       }
 
-      URI uri = URI.create("http://" + NetUtils.getHostPortString(httpAddr));
+      URI uri = URI.create("http://" + getHostPortString(httpAddr));
       builder.addEndpoint(uri);
       LOG.info("Starting Web-server for {} at: {}", name, uri);
     }
@@ -236,7 +237,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
         builder.setFindPort(true);
       }
 
-      URI uri = URI.create("https://" + NetUtils.getHostPortString(httpsAddr));
+      URI uri = URI.create("https://" + getHostPortString(httpsAddr));
       builder.addEndpoint(uri);
       LOG.info("Starting Web-server for {} at: {}", name, uri);
     }
@@ -295,7 +296,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
     String hostName = bindHost.orElse(addressHost.orElse(bindHostDefault));
 
     return NetUtils.createSocketAddr(
-        hostName + ":" + addressPort.orElse(bindPortdefault));
+        getHostPortString(hostName, addressPort.orElse(bindPortdefault)));
   }
 
   /**
@@ -358,14 +359,14 @@ public abstract class BaseHttpServer implements AutoCloseable {
     int connIdx = 0;
     if (policy.isHttpEnabled()) {
       httpAddress = httpServer.getConnectorAddress(connIdx++);
-      String realAddress = NetUtils.getHostPortString(NetUtils.getConnectAddress(httpAddress));
+      String realAddress = getHostPortString(NetUtils.getConnectAddress(httpAddress));
       conf.set(getHttpAddressKey(), realAddress);
       LOG.info("HTTP server of {} listening at http://{}", name, realAddress);
     }
 
     if (policy.isHttpsEnabled()) {
       httpsAddress = httpServer.getConnectorAddress(connIdx);
-      String realAddress = NetUtils.getHostPortString(NetUtils.getConnectAddress(httpsAddress));
+      String realAddress = getHostPortString(NetUtils.getConnectAddress(httpsAddress));
       conf.set(getHttpsAddressKey(), realAddress);
       LOG.info("HTTPS server of {} listening at https://{}", name, realAddress);
     }

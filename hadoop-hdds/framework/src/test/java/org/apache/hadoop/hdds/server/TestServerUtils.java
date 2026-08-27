@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -57,6 +58,21 @@ public class TestServerUtils {
    * Test case for {@link ServerUtils#getPermissions}.
    * Verifies the retrieval of permissions for different configs.
    */
+  /**
+   * The address written back after a server binds must stay parseable, so an
+   * IPv6 listen address is bracketed rather than joined with a plain colon.
+   */
+  @Test
+  public void testUpdateListenAddressBracketsIPv6() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    InetSocketAddress bindAddr = new InetSocketAddress("2001:db8::1", 0);
+    InetSocketAddress listenAddr = new InetSocketAddress("2001:db8::1", 9860);
+
+    ServerUtils.updateListenAddress(conf, "test.address.key", bindAddr, listenAddr);
+
+    assertEquals("[2001:db8:0:0:0:0:0:1]:9860", conf.get("test.address.key"));
+  }
+
   @Test
   public void testGetPermissions() {
     // Create an OzoneConfiguration object and set the permissions

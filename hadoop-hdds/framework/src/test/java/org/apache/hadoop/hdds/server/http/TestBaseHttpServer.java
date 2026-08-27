@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -137,6 +138,23 @@ class TestBaseHttpServer {
     assertEquals("/1.2.3.4:1234", baseHttpServer
         .getBindAddress("bindhostkey", "addresskey",
             "default", 65).toString());
+
+    // An IPv6 bind host, wildcard or literal, must survive being combined with
+    // the port. Assert on the address rather than toString(), whose bracketing
+    // of IPv6 literals is a JDK detail.
+    conf.set("bindhostkey", "::");
+
+    InetSocketAddress wildcard = baseHttpServer
+        .getBindAddress("bindhostkey", "addresskey", "default", 65);
+    assertEquals(InetAddress.getByName("::"), wildcard.getAddress());
+    assertEquals(1234, wildcard.getPort());
+
+    conf.set("bindhostkey", "2001:db8::1");
+
+    InetSocketAddress literal = baseHttpServer
+        .getBindAddress("bindhostkey", "addresskey", "default", 65);
+    assertEquals(InetAddress.getByName("2001:db8::1"), literal.getAddress());
+    assertEquals(1234, literal.getPort());
   }
 
   @ParameterizedTest
