@@ -188,14 +188,31 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
    * Compares a host with a configured domain by address rather than by
    * spelling, so that a client writing the gateway's address in a form other
    * than the configured one still reaches it: ::1 and 0:0:0:0:0:0:0:1 are the
-   * same address, and hexadecimal digits may be in either case.
+   * same address, and hexadecimal digits may be in either case. Follows
+   * {@code SCMFailoverProxyProviderBase#sameIpLiteral} in comparing an IPv6
+   * scope as text: {@link java.net.InetAddress#equals} drops it, so fe80::1%eth0
+   * and fe80::1%eth1 would otherwise be the same interface, and resolving a
+   * scope the gateway host does not have would throw.
    */
   private static boolean isSameAddress(String host, String domain) {
     if (host.equals(domain)) {
       return true;
     }
-    return InetAddresses.isInetAddress(host) && InetAddresses.isInetAddress(domain)
-        && InetAddresses.forString(host).equals(InetAddresses.forString(domain));
+    String hostIp = stripScope(host);
+    String domainIp = stripScope(domain);
+    return scopeOf(host).equals(scopeOf(domain))
+        && InetAddresses.isInetAddress(hostIp) && InetAddresses.isInetAddress(domainIp)
+        && InetAddresses.forString(hostIp).equals(InetAddresses.forString(domainIp));
+  }
+
+  private static String stripScope(String host) {
+    int mark = host.indexOf('%');
+    return mark < 0 ? host : host.substring(0, mark);
+  }
+
+  private static String scopeOf(String host) {
+    int mark = host.indexOf('%');
+    return mark < 0 ? "" : host.substring(mark + 1);
   }
 
   /**

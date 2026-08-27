@@ -233,6 +233,7 @@ public class TestVirtualHostStyleFilter {
       "::1,[::1]",
       "[::1],[0:0:0:0:0:0:0:1]:9878",
       "2001:db8::1,[2001:DB8::1]:9878",
+      "fe80::1%eth0,[fe80:0:0:0:0:0:0:1%eth0]:9878",
   })
   public void testPathStyleWithIPv6Domain(String configuredDomain, String host)
       throws Exception {
@@ -250,12 +251,20 @@ public class TestVirtualHostStyleFilter {
   /**
    * An IPv6 literal cannot carry a bucket prefix, so an address that merely
    * ends with the configured domain is a different host, not a virtual host
-   * style request for a bucket named after the leading segments.
+   * style request for a bucket named after the leading segments. A scope names
+   * an interface of the client, not of the gateway, so it is compared as text
+   * and never resolved.
    */
   @ParameterizedTest
-  @CsvSource(value = {"[2001:db8::1]:9878", "[2001:db8::1]", "2001:db8::1"})
-  public void testIPv6HostOutsideConfiguredDomain(String host) {
-    conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, "[::1]");
+  @CsvSource(value = {
+      "[::1],[2001:db8::1]:9878",
+      "[::1],[2001:db8::1]",
+      "[::1],2001:db8::1",
+      "[::1],[fe80::1%25eth0]:9878",
+      "fe80::1%eth0,[fe80::1%eth1]:9878",
+  })
+  public void testIPv6HostOutsideConfiguredDomain(String configuredDomain, String host) {
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, configuredDomain);
     VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
     virtualHostStyleFilter.setConfiguration(conf);
 
