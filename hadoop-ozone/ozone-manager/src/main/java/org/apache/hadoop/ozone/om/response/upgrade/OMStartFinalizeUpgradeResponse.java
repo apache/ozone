@@ -36,13 +36,29 @@ import org.slf4j.LoggerFactory;
 public class OMStartFinalizeUpgradeResponse extends OMClientResponse {
   private static final Logger LOG = LoggerFactory.getLogger(OMStartFinalizeUpgradeResponse.class);
 
+  private final boolean finalizationNeeded;
+
   public OMStartFinalizeUpgradeResponse(OzoneManagerProtocolProtos.OMResponse omResponse) {
+    this(omResponse, true);
+  }
+
+  /**
+   * @param finalizationNeeded whether OM still needs to finalize. When {@code false} the finalization-in-progress
+   *     marker is not persisted, so that initiating finalize on an already-finalized cluster does not orphan the key
+   *     in the DB (the async {@code OMUpgradeFinalizeService} would never clear it since finalization is not needed).
+   */
+  public OMStartFinalizeUpgradeResponse(OzoneManagerProtocolProtos.OMResponse omResponse, boolean finalizationNeeded) {
     super(omResponse);
+    this.finalizationNeeded = finalizationNeeded;
   }
 
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
+    if (!finalizationNeeded) {
+      LOG.info("OM does not need finalization; skipping persistence of the finalization-in-progress key.");
+      return;
+    }
     LOG.info("Persisting Finalization In Progress Key to the Meta DB table");
     omMetadataManager.getMetaTable().putWithBatch(batchOperation, OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignored");
   }

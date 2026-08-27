@@ -50,9 +50,9 @@ public class TestOMLayoutFeature {
   public void testNoNewOMLayoutFeaturesAdded() {
     int numOMLayoutFeatures = OMLayoutFeature.values().length;
     OMLayoutFeature lastFeature = OMLayoutFeature.values()[numOMLayoutFeatures - 1];
-    assertEquals(10, numOMLayoutFeatures);
-    assertEquals(OMLayoutFeature.SNAPSHOT_DEFRAG, lastFeature);
-    assertEquals(9, lastFeature.serialize());
+    assertEquals(12, numOMLayoutFeatures);
+    assertEquals(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT, lastFeature);
+    assertEquals(11, lastFeature.serialize());
   }
 
   @Test

@@ -17,10 +17,13 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.apache.ozone.recon.schema.SqlDbUtils.columnExists;
+import static org.apache.ozone.recon.schema.SqlDbUtils.constraintExists;
 import static org.apache.ozone.recon.schema.SqlDbUtils.isColumnNullable;
+import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -42,6 +45,7 @@ public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTes
 
   private static final String LAST_TASK_RUN_STATUS = "last_task_run_status";
   private static final String IS_CURRENT_TASK_RUNNING = "is_current_task_running";
+  private static final String UNHEALTHY_CONTAINERS_CONSTRAINT = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
 
   private DSLContext dslContext;
   private DataSource dataSource;
@@ -98,6 +102,17 @@ public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTes
     assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
   }
 
+  @Test
+  public void testExecuteAppliesUnhealthyContainersConstraint() throws Exception {
+    createUnhealthyContainersTableWithoutCheckConstraint();
+
+    upgradeAction.execute(dataSource);
+
+    try (Connection conn = dataSource.getConnection()) {
+      assertTrue(constraintExists(conn, UNHEALTHY_CONTAINERS_TABLE_NAME, UNHEALTHY_CONTAINERS_CONSTRAINT));
+    }
+  }
+
   private void createLegacyTaskStatusTable() throws SQLException {
     dropTaskStatusTableIfPresent();
     try (Connection conn = dataSource.getConnection()) {
@@ -123,5 +138,19 @@ public class TestReconTaskStatusTableUpgradeAction extends AbstractReconSqlDBTes
         dslContext.dropTable(RECON_TASK_STATUS_TABLE_NAME).execute();
       }
     }
+  }
+
+  private void createUnhealthyContainersTableWithoutCheckConstraint() throws SQLException {
+    try (Connection conn = dataSource.getConnection()) {
+      if (TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+        dslContext.dropTable(UNHEALTHY_CONTAINERS_TABLE_NAME).execute();
+      }
+    }
+    dslContext.createTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
+        .column("container_id", SQLDataType.BIGINT.nullable(false))
+        .column("container_state", SQLDataType.VARCHAR(16).nullable(false))
+        .constraint(DSL.constraint("pk_container_id")
+            .primaryKey(name("container_id"), name("container_state")))
+        .execute();
   }
 }

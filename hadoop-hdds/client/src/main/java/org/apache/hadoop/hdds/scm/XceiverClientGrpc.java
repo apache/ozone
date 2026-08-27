@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.UncheckedIOException;
@@ -90,7 +91,7 @@ import org.slf4j.LoggerFactory;
  * how it works, and how it is integrated with the Ozone client.
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
-  private static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
+  public static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
   private static final int SHUTDOWN_WAIT_MAX_SECONDS = 5;
   private final Pipeline pipeline;
   private final ConfigurationSource config;
@@ -137,6 +138,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
     this.trustManager = trustManager;
     this.getBlockDNcache = new ConcurrentHashMap<>();
+    LOG.info("{} is created for pipeline {}", XceiverClientGrpc.class.getSimpleName(), pipeline);
   }
 
   /**
@@ -288,6 +290,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   @Override
+  public boolean isClosed() {
+    return isClosed.get();
+  }
+
+  @Override
   public Pipeline getPipeline() {
     return pipeline;
   }
@@ -406,7 +413,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     String spanName = "XceiverClientGrpc." + request.getCmdType().name();
 
-    return TracingUtil.executeInNewSpan(spanName,
+    return TracingUtil.executeInNewSpan(spanName, SpanKind.CLIENT,
         () -> {
           ContainerCommandRequestProto.Builder builder =
               ContainerCommandRequestProto.newBuilder(request)
@@ -674,7 +681,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throws IOException, ExecutionException, InterruptedException {
 
     try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(
-        "XceiverClientGrpc." + request.getCmdType().name())) {
+        "XceiverClientGrpc." + request.getCmdType().name(), SpanKind.CLIENT)) {
 
       ContainerCommandRequestProto.Builder builder =
           ContainerCommandRequestProto.newBuilder(request)

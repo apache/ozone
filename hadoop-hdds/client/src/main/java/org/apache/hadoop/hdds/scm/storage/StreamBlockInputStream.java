@@ -87,7 +87,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientGrpc xceiverClient;
 
-  private ByteBuffer buffer;
+  private ReadBuffer readBuffer;
   private long position = 0;
   private long requestedLength = 0;
   private StreamingReader streamingReader;
@@ -116,6 +116,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     this.responseDataSize = config.getStreamReadResponseDataSize();
     this.readTimeout = config.getStreamReadTimeout();
     this.readTimeoutNanos = readTimeout.toNanos();
+
+    LOG.debug("{}: new StreamBlockInputStream", name);
   }
 
   @Override
@@ -136,11 +138,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized int read() throws IOException {
     checkOpen();
-    if (!dataAvailableToRead(1, true)) {
+    final boolean preRead = true;
+    if (!dataAvailableToRead(1, preRead)) {
       return EOF;
     }
-    int value = buffer.get();
-    advancePosition(1);
+    final int value = readBuffer.getByteBuffer().get();
+    advancePosition(1, preRead);
     return value;
   }
 
@@ -162,12 +165,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       if (!dataAvailableToRead(targetBuf.remaining(), preRead)) {
         break;
       }
+
+      final ByteBuffer buffer = readBuffer.getByteBuffer();
       int toCopy = Math.min(buffer.remaining(), targetBuf.remaining());
       ByteBuffer tmpBuf = buffer.duplicate();
       tmpBuf.limit(tmpBuf.position() + toCopy);
       targetBuf.put(tmpBuf);
       buffer.position(tmpBuf.position());
-      advancePosition(toCopy);
+      advancePosition(toCopy, preRead);
       read += toCopy;
     }
     return read > 0 ? read : EOF;
@@ -177,30 +182,31 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (position >= blockLength) {
       return false;
     }
+
     while (true) {
       try {
         initialize();
-        if (bufferHasRemaining()) {
-          return true;
+        if (!hasRemaining(readBuffer)) {
+          readBuffer = streamingReader.read(length, preRead);
         }
-        buffer = streamingReader.read(length, preRead);
         retries = 0;
-        return bufferHasRemaining();
+        return hasRemaining(readBuffer);
       } catch (IOException ex) {
         handleExceptions(ex);
       }
     }
   }
 
-  private synchronized void advancePosition(long delta) {
+  private synchronized void advancePosition(long delta, boolean preRead) {
+    LOG.trace("{}: advance {} -> {}", getName(streamingReader), position, position + delta);
     position += delta;
-    if (position >= blockLength && streamingReader != null) {
-      closeStream();
+    if (preRead && position >= blockLength) {
+      closeReader("advancePosition");
     }
   }
 
-  private synchronized boolean bufferHasRemaining() {
-    return buffer != null && buffer.hasRemaining();
+  private static boolean hasRemaining(ReadBuffer read) {
+    return read != null && read.getByteBuffer().hasRemaining();
   }
 
   @Override
@@ -220,10 +226,42 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (pos == position) {
       return;
     }
-    LOG.debug("{}: seek {} -> {}", this, position, pos);
-    closeStream();
+    LOG.debug("{}: seek {} -> {}", getName(streamingReader), position, pos);
+    readBuffer = reuseReadBuffer(readBuffer, pos);
     position = pos;
-    requestedLength = pos;
+    if (readBuffer == null) {
+      // Only rewind the request high-watermark when the buffered (already requested/served) data cannot be reused;
+      // otherwise we would re-request data that is still buffered.
+      requestedLength = pos;
+    }
+  }
+
+  static ReadBuffer reuseReadBuffer(ReadBuffer previous, long blockOffset) {
+    if (previous != null) {
+      final ByteBuffer buffer = getByteBuffer(previous.getProto(), blockOffset);
+      if (buffer != null && buffer.hasRemaining()) {
+        previous.getByteBuffer().position(buffer.position());
+        Preconditions.assertSame(buffer.remaining(), previous.getByteBuffer().remaining(), "remaining");
+        return previous;
+      }
+    }
+    return null;
+  }
+
+  static ByteBuffer getByteBuffer(ReadBlockResponseProto proto, long blockOffset) {
+    final ByteBuffer buffer = proto.getData().asReadOnlyByteBuffer();
+    // Adjust buffer position since the server always returns data starting at checksum boundary.
+    final long protoOffset = proto.getOffset();
+    if (blockOffset < protoOffset) {
+      // This can happen after seek, just drop it for now
+      // TODO: consider to cache the proto, which will be useful when seeking back.
+      return null;
+    }
+    final long offset = blockOffset - protoOffset;
+    if (offset > 0) {
+      buffer.position(Math.toIntExact(Math.min(offset, buffer.limit())));
+    }
+    return buffer;
   }
 
   @Override
@@ -238,19 +276,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     releaseClient();
   }
 
-  private synchronized void closeStream() {
+  private synchronized void closeReader(String reason) {
+    readBuffer = null;
     if (streamingReader == null) {
-      buffer = null;
       return;
     }
 
     final StreamingReader reader = streamingReader;
     streamingReader = null;
-    buffer = null;
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Closing {}", reader);
-    }
+    LOG.debug("{} closeReader for {}", getName(reader), reason);
 
     reader.onCompleted();
 
@@ -305,6 +339,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       try {
         acquireClient();
         final StreamingReader reader = new StreamingReader();
+        LOG.debug("{}: new StreamingReader", getName(reader));
         xceiverClient.initStreamRead(blockID, reader, failedStreamingDatanodes);
         streamingReader = reader;
       } catch (IOException ioe) {
@@ -373,7 +408,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   protected synchronized void releaseClient() {
     if (xceiverClientFactory != null && xceiverClient != null) {
-      closeStream();
+      closeReader("releaseClient");
       xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
       xceiverClient = null;
     }
@@ -411,6 +446,35 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   /** Visible for testing: returns the configured streaming read timeout. */
   public Duration getReadTimeout() {
     return readTimeout;
+  }
+
+  private Object getName(StreamingReader reader) {
+    return reader != null ? reader : name;
+  }
+
+  static class ReadBuffer {
+    private final ReadBlockResponseProto proto;
+    private final ByteBuffer buffer;
+
+    ReadBuffer(ReadBlockResponseProto proto, ByteBuffer buffer) {
+      this.proto = proto;
+      this.buffer = buffer;
+    }
+
+    ReadBlockResponseProto getProto() {
+      return proto;
+    }
+
+    ByteBuffer getByteBuffer() {
+      return buffer;
+    }
+
+    @Override
+    public String toString() {
+      return "ReadBuffer: offset=" + proto.getOffset()
+          + ", dataSize=" + proto.getData().size()
+          + ", buffer=" + buffer;
+    }
   }
 
   /**
@@ -462,61 +526,43 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
 
         final long elapsedNanos = System.nanoTime() - startTime;
-        if (elapsedNanos >= readTimeoutNanos) {
-          setFailedAndThrow(new TimeoutIOException(
-              "Timed out waiting for response after " + readTimeout));
+        if (elapsedNanos >= readTimeoutNanos && !future.isDone()) {
+          final TimeoutIOException e = new TimeoutIOException(
+              this + ": Failed to poll a response, timed out " + readTimeout);
+          if (setFailed(e)) {
+            throw e;
+          }
           return null;
         }
       }
     }
 
-    private ByteBuffer read(int length, boolean preRead) throws IOException {
+    private ReadBuffer read(int length, boolean preRead) throws IOException {
       checkError();
       if (future.isDone()) {
         // Don't return null while items remain in the queue. onNext() may have delivered items just before
         // onCompleted() fired.
-        return responseQueue.isEmpty() ? null : readFromQueue();
+        if (responseQueue.isEmpty()) {
+          return null;
+        }
+      } else {
+        // send gRPC onNext(..)
+        readBlock(length, preRead);
       }
 
-      readBlock(length, preRead);
-
+      // poll buffer from queue
       while (true) {
-        final ByteBuffer buf = readFromQueue();
-        if (buf == null) {
-          return null; // Stream ended
+        final ReadBlockResponseProto proto = poll();
+        if (proto == null) {
+          return null;
         }
-        if (buf.hasRemaining()) {
-          return buf;
+        final ByteBuffer buffer = getByteBuffer(proto, getPos());
+        final ReadBuffer read = buffer != null ? new ReadBuffer(proto, buffer) : null;
+        if (hasRemaining(read)) {
+          LOG.debug("{}: read(length={}, preRead={}) returns {}", name, length, preRead, read);
+          return read;
         }
-        // buf is empty: the server aligned its response to a checksum boundary
-        // before our current position and all bytes were skipped. Fetch the next
-        // response, which should start at or after our position.
       }
-    }
-
-    ByteBuffer readFromQueue() throws IOException {
-      final ReadBlockResponseProto readBlock = poll();
-      if (readBlock == null) {
-        return null; // Stream ended
-      }
-      // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
-      // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
-      final ByteString data = readBlock.getData();
-      final ByteBuffer dataBuffer = data.asReadOnlyByteBuffer();
-      final long blockOffset = readBlock.getOffset();
-      final long pos = getPos();
-      if (pos < blockOffset) {
-        // This should not happen, and if it does, we have a bug.
-        setFailedAndThrow(new IllegalStateException(
-            this + ": out of order, position " + pos + " < block offset " + blockOffset));
-      }
-      final long offset = pos - blockOffset;
-      if (offset > 0) {
-        dataBuffer.position(Math.toIntExact(Math.min(offset, dataBuffer.limit())));
-      }
-      LOG.debug("{}: return response positon {}, length {} (block offset {}, length {})",
-          name, pos, dataBuffer.remaining(), blockOffset, data.size());
-      return dataBuffer;
     }
 
     private void releaseResources() {
@@ -575,12 +621,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       return response.get();
     }
 
-    private <T extends Throwable> void setFailedAndThrow(T throwable) throws T {
-      if (setFailed(throwable)) {
-        throw throwable;
-      }
-    }
-
     private boolean setFailed(Throwable throwable) {
       final boolean completed = future.completeExceptionally(throwable);
       if (!completed) {
@@ -608,9 +648,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
 
     private void offerToQueue(ReadBlockResponseProto item) {
-      if (LOG.isDebugEnabled()) {
+      if (LOG.isTraceEnabled()) {
         final ContainerProtos.ChecksumData checksumData = item.getChecksumData();
-        LOG.debug("{}: enqueue response offset {}, length {}, numChecksums {}, bytesPerChecksum={}",
+        LOG.trace("{}: enqueue response offset {}, length {}, numChecksums {}, bytesPerChecksum={}",
             name, item.getOffset(), item.getData().size(),
             checksumData.getChecksumsList().size(), checksumData.getBytesPerChecksum());
       }

@@ -104,7 +104,8 @@ ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port|hostname:por
 | `ozone.block.deleting.service.workers` | `10` | Number of block deletion service workers |
 | `ozone.block.deleting.service.interval` | `60s` | Block deletion service run interval |
 | `ozone.block.deleting.service.timeout` | `300s` | Block deletion service timeout |
-| `hdds.datanode.replication.streams.limit` | `10` | Maximum replication streams per datanode |
+| `hdds.datanode.replication.streams.limit` | `10` | Base size of the global replication handler executor and inbound replication server executor |
+| `hdds.datanode.replication.per.volume.streams.limit` | `2` | Maximum push replication streams per data volume when per-volume replication thread pools are enabled (separate from streams.limit) |
 
 ## Usage Examples
 

@@ -1222,7 +1222,10 @@ public class SCMClientProtocolServer implements
       target.setNodeId(peerId);
       StorageContainerLocationProtocol peerClient = null;
       try {
-        peerClient = HAUtils.getScmContainerClientForNode(conf, target);
+        // Contact the peer SCM as this SCM's service (Kerberos keytab) identity, not the remote client's identity.
+        // This runs inside the finalize RPC handler's doAs context, whose UGI has no credentials to open a fresh
+        // outbound RPC to the peer SCM.
+        peerClient = HAUtils.getScmContainerClientForNode(conf, target, UserGroupInformation.getLoginUser());
         HDDSVersion peerVersion = peerClient.getPeerUpgradeStatus();
         if (!peerVersion.equals(leaderVersion)) {
           LOG.warn("SCM peer {} is running software version {} but leader is running version {}. "
@@ -1386,9 +1389,9 @@ public class SCMClientProtocolServer implements
         int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
         auditMap.put("maxDatanodesPercentageToInvolvePerIteration",
             String.valueOf(mdti));
-        if (mdti < 0 || mdti > 100) {
+        if (mdti <= 0 || mdti > 100) {
           throw new IOException("Max Datanodes Percentage To Involve Per Iteration" +
-                  "should be specified in the range [0, 100]");
+                  "should be specified in the range (0, 100]");
         }
         cbc.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
       }

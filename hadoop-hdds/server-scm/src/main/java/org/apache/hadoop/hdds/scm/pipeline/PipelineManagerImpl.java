@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -170,13 +171,8 @@ public class PipelineManagerImpl implements PipelineManager {
             .setServiceName("BackgroundPipelineScrubber")
             .setIntervalInMillis(scrubberIntervalInMillis)
             .setWaitTimeInMillis(safeModeWaitMs)
-            .setPeriodicalTask(() -> {
-              try {
-                pipelineManager.scrubPipelines();
-              } catch (IOException e) {
-                LOG.error("Unexpected error during pipeline scrubbing", e);
-              }
-            }).build();
+            .setPeriodicalTask(pipelineManager::scrubAndClosePipelinesMissingDataStreamPort)
+            .build();
 
     pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
     serviceManager.register(backgroundPipelineScrubber);
@@ -541,6 +537,64 @@ public class PipelineManagerImpl implements PipelineManager {
     return left.getID().equals(right.getID())
         && (!left.getIpAddress().equals(right.getIpAddress())
         ||  !left.getHostName().equals(right.getHostName()));
+  }
+
+  /**
+   * Scrub pipelines, then close (and delete) OPEN RATIS pipelines whose
+   * registered nodes now advertise the RATIS_DATASTREAM port their stored node
+   * snapshot lacks.
+   */
+  public void scrubAndClosePipelinesMissingDataStreamPort() {
+    try {
+      scrubPipelines();
+    } catch (IOException e) {
+      LOG.error("Unexpected error during pipeline scrubbing", e);
+    }
+    closePipelinesMissingDataStreamPort();
+  }
+
+  void closePipelinesMissingDataStreamPort() {
+    if (!isDataStreamEnabled()) {
+      return;
+    }
+    for (Pipeline pipeline : getPipelines()) {
+      if (!pipeline.isOpen()
+          || pipeline.getType() != ReplicationType.RATIS
+          || !nodesMissingDataStreamPort(pipeline)) {
+        continue;
+      }
+      try {
+        final PipelineID id = pipeline.getId();
+        LOG.info("Closing RATIS pipeline {}", id);
+        closePipeline(id);
+        deletePipeline(id);
+      } catch (IOException e) {
+        LOG.error("Failed to close RATIS pipeline {} missing the datastream "
+            + "port", pipeline.getId(), e);
+      }
+    }
+  }
+
+  private boolean isDataStreamEnabled() {
+    return conf.getBoolean(
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
+  }
+
+  /**
+   * Whether any registered node of the pipeline now advertises the
+   * RATIS_DATASTREAM port that the pipeline's stored node snapshot lacks.
+   */
+  private boolean nodesMissingDataStreamPort(Pipeline pipeline) {
+    for (DatanodeDetails stored : pipeline.getNodes()) {
+      final DatanodeDetails current = nodeManager.getNode(stored.getID());
+      if (current != null
+          && current.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)
+          && !stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

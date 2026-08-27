@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
+import org.apache.hadoop.ozone.recon.metrics.NSSummaryMetrics;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconSafeModeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
@@ -88,6 +89,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   private OzoneConfiguration configuration;
   private ReconStorageConfig reconStorage;
   private CertificateClient certClient;
+  private NSSummaryMetrics nsSummaryMetrics;
   private ReconTaskStatusMetrics reconTaskStatusMetrics;
   private OzoneAdmins reconAdmins;
 
@@ -172,6 +174,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
 
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
+      this.nsSummaryMetrics = injector.getInstance(NSSummaryMetrics.class);
 
       LOG.info("Initializing support of Recon Features...");
       FeatureProvider.initFeatureSupport(configuration);
@@ -188,6 +191,10 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       if (reconTaskStatusMetrics != null) {
         reconTaskStatusMetrics.register();
         LOG.debug("ReconTaskStatusMetrics registered after schema upgrade");
+      }
+      if (nsSummaryMetrics != null) {
+        nsSummaryMetrics.register();
+        LOG.debug("NSSummaryMetrics registered after schema upgrade");
       }
 
       LOG.info("Recon server initialized successfully!");
@@ -349,6 +356,9 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       }
       if (reconTaskStatusMetrics != null) {
         reconTaskStatusMetrics.unregister();
+      }
+      if (nsSummaryMetrics != null) {
+        nsSummaryMetrics.unregister();
       }
       isStarted = false;
       if (reconDBProvider != null) {

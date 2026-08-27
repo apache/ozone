@@ -59,7 +59,6 @@ import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.AbstractComponentVersionManagerTest;
 import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
-import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -102,7 +101,7 @@ class TestDatanodeVersionManager extends AbstractComponentVersionManagerTest {
   }
 
   @Override
-  protected ComponentVersionManager createManager(int serializedApparentVersion) throws IOException {
+  protected DatanodeVersionManager createManager(int serializedApparentVersion) throws IOException {
     return createManager(serializedApparentVersion, HashMap::new);
   }
 
@@ -221,6 +220,26 @@ class TestDatanodeVersionManager extends AbstractComponentVersionManagerTest {
       assertEquals(UpgradeException.ResultCodes.APPARENT_VERSION_UPDATE_FAILED, thrown.getResult());
       assertEquals(INITIAL_VERSION, versionManager.getApparentVersion());
       assertEquals(INITIAL_VERSION.serialize(), versionManager.getPersistedApparentVersion());
+    }
+  }
+
+  @Test
+  public void testGetVersionForClientWhenFinalized() throws Exception {
+    // Apparent version >= ZDU (finalized) reports the apparent version itself.
+    try (DatanodeVersionManager versionManager = createManager(HDDSVersion.ZDU.serialize())) {
+      assertEquals(HDDSVersion.ZDU, versionManager.getVersionForClient());
+    }
+
+    try (DatanodeVersionManager versionManager = createManager(HDDSVersion.SOFTWARE_VERSION.serialize())) {
+      assertEquals(HDDSVersion.SOFTWARE_VERSION, versionManager.getVersionForClient());
+    }
+  }
+
+  @Test
+  public void testGetVersionForClientWhenPreZdu() throws Exception {
+    // A pre-ZDU apparent version clamps to the last pre-ZDU wire version.
+    try (DatanodeVersionManager versionManager = createManager(INITIAL_VERSION.serialize())) {
+      assertEquals(HDDSVersion.SHORT_CIRCUIT_READS, versionManager.getVersionForClient());
     }
   }
 

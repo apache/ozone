@@ -63,6 +63,10 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationDeleteRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationSetRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSaveScanStateRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSetServiceStatusRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
@@ -86,8 +90,9 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotMoveTableKeysReques
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotRenameRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotSetPropertyRequest;
-import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMCompleteFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequestLegacy;
 import org.apache.hadoop.ozone.om.request.util.OMEchoRPCWriteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMQuotaRepairRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
@@ -185,9 +190,11 @@ public final class OzoneManagerRatisUtils {
     case GetS3Secret:
       return new S3GetSecretRequest(omRequest);
     case FinalizeUpgrade:
-      return new OMFinalizeUpgradeRequest(omRequest);
+      return new OMStartFinalizeUpgradeRequestLegacy(omRequest);
     case StartFinalizeUpgrade:
       return new OMStartFinalizeUpgradeRequest(omRequest);
+    case CompleteFinalizeUpgrade:
+      return new OMCompleteFinalizeUpgradeRequest(omRequest);
     case SetS3Secret:
       return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
@@ -341,6 +348,14 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
+    case SetLifecycleConfiguration:
+      return new OMLifecycleConfigurationSetRequest(omRequest);
+    case DeleteLifecycleConfiguration:
+      return new OMLifecycleConfigurationDeleteRequest(omRequest);
+    case SetLifecycleServiceStatus:
+      return new OMLifecycleSetServiceStatusRequest(omRequest);
+    case SaveLifecycleScanState:
+      return new OMLifecycleSaveScanStateRequest(omRequest);
     case PutBucketTagging:
       return new S3PutBucketTaggingRequest(omRequest);
     case DeleteBucketTagging:

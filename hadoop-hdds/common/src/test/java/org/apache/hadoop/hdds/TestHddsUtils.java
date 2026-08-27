@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -57,6 +58,33 @@ public class TestHddsUtils {
 
     assertEquals(Optional.empty(),
         HddsUtils.getHostName(":1234"));
+
+    assertEquals(Optional.of("::1"),
+        HddsUtils.getHostName("[::1]:9862"));
+
+    assertEquals(Optional.of("::1"),
+        HddsUtils.getHostName("::1"));
+
+    assertEquals(Optional.of("2001:db8::1"),
+        HddsUtils.getHostName("2001:db8::1"));
+
+    assertEquals(Optional.of("2001:db8::1"),
+        HddsUtils.getHostName("[2001:db8::1]:9862"));
+
+    assertEquals(Optional.of("2001:db8::1"),
+        HddsUtils.getHostName("[2001:db8::1]"));
+
+    // Malformed host:port input is rejected, matching getHostPort().
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.getHostName("a:b"));
+  }
+
+  @Test
+  void testGetHostPort() {
+    assertEquals(OptionalInt.of(9876), HddsUtils.getHostPort("0.0.0.0:9876"));
+    assertEquals(OptionalInt.of(9862), HddsUtils.getHostPort("localhost:9862"));
+    assertEquals(OptionalInt.of(9862), HddsUtils.getHostPort("[2001:db8::1]:9862"));
+    assertEquals(OptionalInt.empty(), HddsUtils.getHostPort("localhost"));
   }
 
   @Test
@@ -72,6 +100,68 @@ public class TestHddsUtils {
 
     // Already-bracketed IPv6 literals keep a single pair of brackets.
     assertEquals("[2001:db8::1]:9858", HddsUtils.getHostPortString("[2001:db8::1]", 9858));
+  }
+
+  @Test
+  void testParseRatisRoleStringIPv4() {
+    String input = "hostname1:9894:LEADER:peer-uuid-123:192.168.1.1";
+    String[] result = HddsUtils.parseRatisRoleString(input);
+    assertEquals("hostname1", result[0]);
+    assertEquals("9894", result[1]);
+    assertEquals("LEADER", result[2]);
+    assertEquals("peer-uuid-123", result[3]);
+    assertEquals("192.168.1.1", result[4]);
+  }
+
+  @Test
+  void testParseRatisRoleStringIPv6() {
+    String input = "[2001:db8::1]:9894:LEADER:peer1:[2001:db8:0:0:0:0:0:1]";
+    String[] result = HddsUtils.parseRatisRoleString(input);
+    assertEquals("2001:db8::1", result[0]);
+    assertEquals("9894", result[1]);
+    assertEquals("LEADER", result[2]);
+    assertEquals("peer1", result[3]);
+    assertEquals("2001:db8:0:0:0:0:0:1", result[4]);
+  }
+
+  @Test
+  void testParseRatisRoleStringIPv6Follower() {
+    String input = "[::1]:9894:FOLLOWER:abc-def:[0:0:0:0:0:0:0:1]";
+    String[] result = HddsUtils.parseRatisRoleString(input);
+    assertEquals("::1", result[0]);
+    assertEquals("9894", result[1]);
+    assertEquals("FOLLOWER", result[2]);
+    assertEquals("abc-def", result[3]);
+    assertEquals("0:0:0:0:0:0:0:1", result[4]);
+  }
+
+  @Test
+  void testParseRatisRoleStringEmptyHostIp() {
+    String input = "scm-host:9894:LEADER:uuid123:";
+    String[] result = HddsUtils.parseRatisRoleString(input);
+    assertEquals("scm-host", result[0]);
+    assertEquals("9894", result[1]);
+    assertEquals("LEADER", result[2]);
+    assertEquals("uuid123", result[3]);
+    assertEquals("", result[4]);
+  }
+
+  @Test
+  void testParseRatisRoleStringRejectsNull() {
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.parseRatisRoleString(null));
+  }
+
+  @Test
+  void testParseRatisRoleStringRejectsEmpty() {
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.parseRatisRoleString(""));
+  }
+
+  @Test
+  void testParseRatisRoleStringRejectsTooFewFields() {
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.parseRatisRoleString("host:9894"));
   }
 
   static List<Arguments> validPaths() {

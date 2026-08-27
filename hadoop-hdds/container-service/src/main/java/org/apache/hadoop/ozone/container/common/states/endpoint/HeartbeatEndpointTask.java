@@ -19,8 +19,12 @@ package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 
 import com.google.common.base.Preconditions;
@@ -43,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
+import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.helpers.DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -72,11 +77,13 @@ public class HeartbeatEndpointTask
     implements Callable<EndpointStateMachine.EndPointStates> {
   private static final Logger LOG = LoggerFactory.getLogger(HeartbeatEndpointTask.class);
   private final EndpointStateMachine rpcEndpoint;
-  private DatanodeDetailsProto datanodeDetailsProto;
+  private final DatanodeDetails datanodeDetails;
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
   private final DatanodeVersionManager versionManager;
+  private final boolean resolveOnFailureEnabled;
+  private final int refreshThreshold;
 
   /**
    * Constructs a SCM heart beat.
@@ -93,26 +100,12 @@ public class HeartbeatEndpointTask
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
+    this.datanodeDetails = context.getParent().getDatanodeDetails();
     this.versionManager = context.getParent().getVersionManager();
-  }
-
-  /**
-   * Get the container Node ID proto.
-   *
-   * @return ContainerNodeIDProto
-   */
-  public DatanodeDetailsProto getDatanodeDetailsProto() {
-    return datanodeDetailsProto;
-  }
-
-  /**
-   * Set container node ID proto.
-   *
-   * @param datanodeDetailsProto - the node id.
-   */
-  public void setDatanodeDetailsProto(DatanodeDetailsProto
-      datanodeDetailsProto) {
-    this.datanodeDetailsProto = datanodeDetailsProto;
+    this.resolveOnFailureEnabled = conf.getBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
+        OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT);
+    this.refreshThreshold = Math.max(1, conf.getInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD,
+        HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT));
   }
 
   /**
@@ -126,11 +119,12 @@ public class HeartbeatEndpointTask
     rpcEndpoint.lock();
     SCMHeartbeatRequestProto.Builder requestBuilder = null;
     try {
-      Preconditions.checkState(this.datanodeDetailsProto != null);
-
       DatanodeVersionProto versionInfo = toVersionProto(
           versionManager.getApparentVersion(),
           versionManager.getSoftwareVersion());
+
+      datanodeDetails.setCurrentVersion(versionManager.getVersionForClient());
+      DatanodeDetailsProto datanodeDetailsProto = datanodeDetails.getProtoBufMessage();
 
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(datanodeDetailsProto)
@@ -151,10 +145,31 @@ public class HeartbeatEndpointTask
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
       rpcEndpoint.logIfNeeded(ex);
+      maybeRefreshScmAddress(ex);
     } finally {
       rpcEndpoint.unlock();
     }
     return rpcEndpoint.getState();
+  }
+
+  /**
+   * On a connection-class heartbeat failure past the threshold (and when resolve-needed is on),
+   * asks the connection manager to re-resolve this SCM peer and rebuild the endpoint.
+   */
+  private void maybeRefreshScmAddress(IOException heartbeatFailure) {
+    if (!resolveOnFailureEnabled
+        || rpcEndpoint.isPassive()
+        || rpcEndpoint.getMissedCount() < refreshThreshold
+        || !ConnectionFailureUtils.isConnectionFailure(heartbeatFailure)) {
+      return;
+    }
+    try {
+      context.getParent().getConnectionManager()
+          .refreshSCMServer(rpcEndpoint.getAddress(), context.getThreadNamePrefix());
+    } catch (IOException ex) {
+      LOG.warn("Failed to refresh SCM address {} after {} missed heartbeats",
+          rpcEndpoint.getAddress(), rpcEndpoint.getMissedCount(), ex);
+    }
   }
 
   // TODO: Make it generic.
@@ -265,9 +280,9 @@ public class HeartbeatEndpointTask
    * @param response - SCMHeartbeat response.
    */
   private void processResponse(SCMHeartbeatResponseProto response,
-      final DatanodeDetailsProto datanodeDetails) {
+      final DatanodeDetailsProto datanodeDetailsProto) {
     Preconditions.checkState(response.getDatanodeUUID()
-            .equalsIgnoreCase(datanodeDetails.getUuid()),
+            .equalsIgnoreCase(datanodeDetailsProto.getUuid()),
         "Unexpected datanode ID in the response.");
     if (response.hasTerm()) {
       context.updateTermOfLeaderSCM(response.getTerm());
@@ -433,7 +448,6 @@ public class HeartbeatEndpointTask
   public static class Builder {
     private EndpointStateMachine endPointStateMachine;
     private ConfigurationSource conf;
-    private DatanodeDetails datanodeDetails;
     private StateContext context;
 
     /**
@@ -465,17 +479,6 @@ public class HeartbeatEndpointTask
     }
 
     /**
-     * Sets the NodeID.
-     *
-     * @param dnDetails - NodeID proto
-     * @return Builder
-     */
-    public Builder setDatanodeDetails(DatanodeDetails dnDetails) {
-      this.datanodeDetails = dnDetails;
-      return this;
-    }
-
-    /**
      * Sets the context.
      * @param stateContext - State context.
      * @return this.
@@ -498,16 +501,8 @@ public class HeartbeatEndpointTask
             " construct HeartbeatEndpointTask task");
       }
 
-      if (datanodeDetails == null) {
-        LOG.error("No datanode specified.");
-        throw new IllegalArgumentException("A valid Node ID is needed to " +
-            "construct HeartbeatEndpointTask task");
-      }
-
-      HeartbeatEndpointTask task = new HeartbeatEndpointTask(this
+      return new HeartbeatEndpointTask(this
           .endPointStateMachine, this.conf, this.context);
-      task.setDatanodeDetailsProto(datanodeDetails.getProtoBufMessage());
-      return task;
     }
   }
 }

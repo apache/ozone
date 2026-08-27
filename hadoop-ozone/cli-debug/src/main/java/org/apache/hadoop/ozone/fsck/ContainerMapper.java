@@ -81,8 +81,7 @@ public class ContainerMapper {
       Map<Long, List<Map<Long, BlockIdDetails>>> dataMap = new HashMap<>();
 
       if (keyTable != null) {
-        try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-                 keyValueTableIterator = keyTable.iterator()) {
+        try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> keyValueTableIterator = keyTable.iterator()) {
           while (keyValueTableIterator.hasNext()) {
             Table.KeyValue<String, OmKeyInfo> keyValue =
                 keyValueTableIterator.next();

@@ -45,4 +45,19 @@ public final class OMVersionManagerTestUtils {
     when(ovm.isAllowed(any(ComponentVersion.class))).thenReturn(true);
     return ovm;
   }
+
+  /**
+   * Mock with software version {@link OzoneManagerVersion#SOFTWARE_VERSION} and apparent version
+   * {@link OMLayoutFeature#INITIAL_VERSION},
+   * {@link OMVersionManager#needsFinalization()} true, and {@link OMVersionManager#isAllowed(ComponentVersion)}
+   * false for any argument.
+   */
+  public static OMVersionManager mockPreFinalizedOmVersionManager() {
+    OMVersionManager ovm = mock(OMVersionManager.class);
+    when(ovm.getApparentVersion()).thenReturn(OMLayoutFeature.INITIAL_VERSION);
+    when(ovm.getSoftwareVersion()).thenReturn(OzoneManagerVersion.SOFTWARE_VERSION);
+    when(ovm.needsFinalization()).thenReturn(true);
+    when(ovm.isAllowed(any(ComponentVersion.class))).thenReturn(false);
+    return ovm;
+  }
 }

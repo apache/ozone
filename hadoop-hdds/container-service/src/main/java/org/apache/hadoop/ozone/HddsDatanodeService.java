@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.PER_VOLUME_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -96,6 +97,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -122,6 +124,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       HddsDatanodeService.class);
 
   public static final String TESTING_DATANODE_VERSION_INITIAL = "testing.hdds.datanode.version.initial";
+  // TODO(HDDS-16044): TESTING_DATANODE_VERSION_CURRENT is unused until SCM-side version setting lands.
   public static final String TESTING_DATANODE_VERSION_CURRENT = "testing.hdds.datanode.version.current";
 
   private OzoneConfiguration conf;
@@ -318,7 +321,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
               .register(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
                   this::reconfigBlockDeletingServiceTimeout)
               .register(REPLICATION_STREAMS_LIMIT_KEY,
-                  this::reconfigReplicationStreamsLimit);
+                  this::reconfigReplicationStreamsLimit)
+              .register(PER_VOLUME_STREAMS_LIMIT_KEY,
+                  this::reconfigPerVolumeStreamsLimit);
 
       scmServiceId = HddsUtils.getScmServiceId(conf);
 
@@ -478,8 +483,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       details = DatanodeDetails.newBuilder().setID(DatanodeID.randomID()).build();
       details.setInitialVersion(getInitialVersion());
     }
-    // Current version is always overridden to the latest
-    details.setCurrentVersion(getCurrentVersion());
     return details;
   }
 
@@ -719,6 +722,28 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     return value;
   }
 
+  private String reconfigPerVolumeStreamsLimit(String value) {
+    int newSize = Integer.parseInt(value);
+    Preconditions.checkArgument(newSize >= 1,
+        PER_VOLUME_STREAMS_LIMIT_KEY + " must be at least 1 but was %s",
+        value);
+    ReplicationConfig replicationConfig =
+        getDatanodeStateMachine().getSupervisor().getReplicationConfig();
+    if (!replicationConfig.isPerVolumeEnabled()) {
+      LOG.warn("Ignoring reconfiguration of {} to {} because per-volume "
+          + "replication is disabled", PER_VOLUME_STREAMS_LIMIT_KEY, value);
+      return value;
+    }
+    try {
+      getDatanodeStateMachine().getSupervisor().setPerVolumePoolSize(newSize);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to apply per-volume replication thread pool resize to "
+          + "{}: {}", value, e.getMessage(), e);
+      throw e;
+    }
+    return value;
+  }
+
   private String reconfigBlockDeletingServiceInterval(String value) {
     return value;
   }
@@ -836,14 +861,8 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   /**
    * Returns the initial version of the datanode.
    */
-  private int getInitialVersion() {
-    return conf.getInt(TESTING_DATANODE_VERSION_INITIAL, HDDSVersion.SOFTWARE_VERSION.serialize());
-  }
-
-  /**
-   * Returns the current version of the datanode.
-   */
-  private int getCurrentVersion() {
-    return conf.getInt(TESTING_DATANODE_VERSION_CURRENT, HDDSVersion.SOFTWARE_VERSION.serialize());
+  private HDDSVersion getInitialVersion() {
+    return HDDSVersion.deserialize(
+        conf.getInt(TESTING_DATANODE_VERSION_INITIAL, HDDSVersion.SOFTWARE_VERSION.serialize()));
   }
 }

@@ -138,6 +138,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
@@ -146,7 +147,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -156,6 +156,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
+import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -184,6 +185,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -1112,19 +1116,19 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // create a three replica file
     String keyName1 = "key1";
-    TestDataUtil.createKey(bucket, keyName1, ReplicationConfig
+    DataTestUtil.createKey(bucket, keyName1, ReplicationConfig
         .fromTypeAndFactor(RATIS, THREE), value);
 
     // create a EC replica file
     String keyName2 = "key2";
     ReplicationConfig replicationConfig = new ECReplicationConfig("rs-3-2-1024k");
-    TestDataUtil.createKey(bucket, keyName2, replicationConfig, value);
+    DataTestUtil.createKey(bucket, keyName2, replicationConfig, value);
 
     // create a directory and a file
     String dirName = "dir1";
     bucket.createDirectory(dirName);
     String keyName3 = "key3";
-    TestDataUtil.createKey(bucket, keyName3, ReplicationConfig
+    DataTestUtil.createKey(bucket, keyName3, ReplicationConfig
         .fromTypeAndFactor(RATIS, THREE), value);
 
     // delete files and directory
@@ -1135,11 +1139,11 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // create keys for deleteKeys case
     String keyName4 = "key4";
-    TestDataUtil.createKey(bucket, dirName + "/" + keyName4,
+    DataTestUtil.createKey(bucket, dirName + "/" + keyName4,
         ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
 
     String keyName5 = "key5";
-    TestDataUtil.createKey(bucket, dirName + "/" + keyName5, replicationConfig, value);
+    DataTestUtil.createKey(bucket, dirName + "/" + keyName5, replicationConfig, value);
 
     List<String> keysToDelete = new ArrayList<>();
     keysToDelete.add(dirName + "/" + keyName4);
@@ -1260,7 +1264,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     ReplicationConfig replicationConfig =
             new ECReplicationConfig(replicationValue);
     if (isValidReplicationConfig) {
-      TestDataUtil.createKey(bucket, keyName,
+      DataTestUtil.createKey(bucket, keyName,
           replicationConfig, value.getBytes(UTF_8));
       OzoneKey key = bucket.getKey(keyName);
       assertEquals(keyName, key.getName());
@@ -1291,7 +1295,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
 
-      TestDataUtil.createKey(bucket, keyName,
+      DataTestUtil.createKey(bucket, keyName,
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
           value.getBytes(UTF_8));
       OzoneKey key = bucket.getKey(keyName);
@@ -2207,7 +2211,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyName = UUID.randomUUID().toString();
 
     // create the initial key with size 0, write will allocate the first block.
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         value.getBytes(UTF_8));
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
@@ -2241,7 +2245,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
 
-      TestDataUtil.createKey(bucket, keyName,
+      DataTestUtil.createKey(bucket, keyName,
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
           value.getBytes(UTF_8));
       OzoneKey key = bucket.getKey(keyName);
@@ -2274,7 +2278,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
 
-      TestDataUtil.createKey(bucket, keyName,
+      DataTestUtil.createKey(bucket, keyName,
           ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
           value.getBytes(UTF_8));
       OzoneKey key = bucket.getKey(keyName);
@@ -2313,7 +2317,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           String keyName = UUID.randomUUID().toString();
           String data = Arrays.toString(generateData(5 * 1024 * 1024,
               (byte) RandomUtils.secure().randomLong()));
-          TestDataUtil.createKey(bucket, keyName,
+          DataTestUtil.createKey(bucket, keyName,
               ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
               data.getBytes(UTF_8));
           OzoneKey key = bucket.getKey(keyName);
@@ -2387,7 +2391,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     // Write data into a key
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         value.getBytes(UTF_8));
 
@@ -2447,7 +2451,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyValue = RandomStringUtils.secure().next(128);
     //String keyValue = "this is a test value.glx";
     // create the initial key with size 0, write will allocate the first block.
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         keyValue.getBytes(UTF_8));
 
@@ -2540,7 +2544,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyName = UUID.randomUUID().toString();
 
     // Write data into a key
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         value.getBytes(UTF_8));
 
@@ -2589,14 +2593,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyName1 = UUID.randomUUID().toString();
 
     // Write first key
-    TestDataUtil.createKey(bucket, keyName1,
+    DataTestUtil.createKey(bucket, keyName1,
         ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
         value.getBytes(UTF_8));
 
     // Write second key
     String keyName2 = UUID.randomUUID().toString();
     value = "unhealthy container replica";
-    TestDataUtil.createKey(bucket, keyName2,
+    DataTestUtil.createKey(bucket, keyName2,
         ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
         value.getBytes(UTF_8));
 
@@ -2682,7 +2686,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyName = UUID.randomUUID().toString();
 
     // Write data into a key
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
         value.getBytes(UTF_8));
 
@@ -2749,7 +2753,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         value.getBytes(UTF_8));
     OzoneKey key = bucket.getKey(keyName);
@@ -3040,16 +3044,16 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyBaseA = "key-a-";
     for (int i = 0; i < 10; i++) {
       byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
-      TestDataUtil.createKey(volAbucketA,
+      DataTestUtil.createKey(volAbucketA,
           keyBaseA + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
-      TestDataUtil.createKey(volAbucketB,
+      DataTestUtil.createKey(volAbucketB,
           keyBaseA + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
-      TestDataUtil.createKey(volBbucketA,
+      DataTestUtil.createKey(volBbucketA,
           keyBaseA + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
-      TestDataUtil.createKey(volBbucketB,
+      DataTestUtil.createKey(volBbucketB,
           keyBaseA + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
     }
@@ -3061,16 +3065,16 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyBaseB = "key-b-";
     for (int i = 0; i < 10; i++) {
       byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
-      TestDataUtil.createKey(volAbucketA,
+      DataTestUtil.createKey(volAbucketA,
           keyBaseB + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
-      TestDataUtil.createKey(volAbucketB,
+      DataTestUtil.createKey(volAbucketB,
           keyBaseB + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
-      TestDataUtil.createKey(volBbucketA,
+      DataTestUtil.createKey(volBbucketA,
           keyBaseB + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
-      TestDataUtil.createKey(volBbucketB,
+      DataTestUtil.createKey(volBbucketB,
           keyBaseB + i + "-" + RandomStringUtils.secure().nextNumeric(5),
           ReplicationConfig.fromTypeAndFactor(RATIS, ONE), value);
     }
@@ -3551,7 +3555,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneBucket bucket = volume.getBucket(bucketName);
     byte[] data = new byte[10];
     Arrays.fill(data, (byte) 1);
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         data);
     client = null;
@@ -4597,7 +4601,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   private void writeKey(String key1, OzoneBucket bucket) throws IOException {
-    TestDataUtil.createKey(bucket, key1,
+    DataTestUtil.createKey(bucket, key1,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
         RandomStringUtils.secure().next(1024).getBytes(UTF_8));
   }
@@ -5000,7 +5004,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     String keyName = UUID.randomUUID().toString();
 
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         replicationConfig, value.getBytes(UTF_8));
 
     OzoneKey key = bucket.headObject(keyName);
@@ -5039,11 +5043,11 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         .setBucketLayout(VERSIONING_TEST_BUCKET_LAYOUT).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         replicationConfig, value.getBytes(UTF_8));
 
     // Override key
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         replicationConfig, value.getBytes(UTF_8));
   }
 
@@ -5063,7 +5067,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     cluster.getOzoneManager().awaitDoubleBufferFlush();
 
     if (expectedCount == 1) {
-      List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+      List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
           = metadataManager.getDeletedTable().getRangeKVs(null, 100, ozoneKey);
 
       assertThat(rangeKVs).isNotEmpty();
@@ -5262,7 +5266,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyName = UUID.randomUUID().toString();
 
     // Write data into a key
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, THREE),
         value.getBytes(UTF_8));
 
@@ -5546,7 +5550,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     String keyName = UUID.randomUUID().toString();
 
-    TestDataUtil.createKey(bucket, keyName,
+    DataTestUtil.createKey(bucket, keyName,
         anyReplication(), value.getBytes(UTF_8));
 
     OzoneKey key = bucket.getKey(keyName);
@@ -5658,6 +5662,199 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     assertEquals(tags.size(), tagsRetrieved.size());
     assertThat(tagsRetrieved).containsAllEntriesOf(tags);
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testSetLifecycleConfiguration(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    store.getVolume(volumeName).createBucket(bucketName, bucketArgs);
+    ClientProtocol proxy = store.getClientProxy();
+
+    OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
+        bucketName, true, bucketLayout);
+    proxy.setLifecycleConfiguration(lcc1);
+
+    // No such volume
+    OmLifecycleConfiguration lcc2 = createOmLifecycleConfiguration("nonexistentvolume",
+        "nonexistentbucket", true, bucketLayout);
+    OzoneTestUtils.expectOmException(ResultCodes.VOLUME_NOT_FOUND,
+        () -> proxy.setLifecycleConfiguration(lcc2));
+
+    // No such bucket
+    OmLifecycleConfiguration lcc3 = createOmLifecycleConfiguration(volumeName,
+        "nonexistentbucket", true, bucketLayout);
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> proxy.setLifecycleConfiguration(lcc3));
+
+    // Invalid volumeName
+    OmLifecycleConfiguration lcc4 = createOmLifecycleConfiguration("VOLUMENAME",
+        bucketName, true, bucketLayout);
+    OzoneTestUtils.expectOmException(ResultCodes.INVALID_VOLUME_NAME,
+        () -> proxy.setLifecycleConfiguration(lcc4));
+
+    // Invalid bucketName
+    OmLifecycleConfiguration lcc5 = createOmLifecycleConfiguration(volumeName,
+        "BUCKETNAME", true, bucketLayout);
+    OzoneTestUtils.expectOmException(ResultCodes.INVALID_BUCKET_NAME,
+        () -> proxy.setLifecycleConfiguration(lcc5));
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteLifecycleConfiguration(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    store.getVolume(volumeName).createBucket(bucketName, bucketArgs);
+    ClientProtocol proxy = store.getClientProxy();
+
+    // No such lifecycle configuration
+    OzoneTestUtils.expectOmException(
+        ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.deleteLifecycleConfiguration(volumeName, bucketName));
+
+    OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
+        bucketName, true, bucketLayout);
+    proxy.setLifecycleConfiguration(lcc1);
+    proxy.deleteLifecycleConfiguration(volumeName, bucketName);
+  }
+
+  @Test
+  public void testDeleteBucketWithAttachedLifecycleConfiguration()
+      throws Exception {
+    String bucketName = UUID.randomUUID().toString();
+    store.createS3Bucket(bucketName);
+    String volumeName = store.getS3Bucket(bucketName).getVolumeName();
+    ClientProtocol proxy = store.getClientProxy();
+
+    // Create a new lifecycle configuration and make sure verify it.
+    OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
+        bucketName, true, BucketLayout.OBJECT_STORE);
+    proxy.setLifecycleConfiguration(lcc1);
+    OzoneLifecycleConfiguration lcc2 =
+        proxy.getLifecycleConfiguration(volumeName, bucketName);
+    assertEquals(lcc1.getVolume(), lcc2.getVolume());
+    assertEquals(lcc1.getBucket(), lcc2.getBucket());
+    assertEquals(lcc1.getRules().get(0).getId(), lcc2.getRules()
+        .get(0).getId());
+    // CreationTime is added when being created.
+    assertNotEquals(lcc1.getCreationTime(), lcc2.getCreationTime());
+
+    store.deleteS3Bucket(bucketName);
+
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, bucketName));
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testGetLifecycleConfiguration(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    store.getVolume(volumeName).createBucket(bucketName, bucketArgs);
+    ClientProtocol proxy = store.getClientProxy();
+
+    // No such lifecycle configuration
+    OzoneTestUtils.expectOmException(
+        ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, bucketName));
+
+    OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
+        bucketName, true, bucketLayout);
+    proxy.setLifecycleConfiguration(lcc1);
+
+    OzoneLifecycleConfiguration lcc2 =
+        proxy.getLifecycleConfiguration(volumeName, bucketName);
+    assertEquals(lcc1.getVolume(), lcc2.getVolume());
+    assertEquals(lcc1.getBucket(), lcc2.getBucket());
+    assertEquals(lcc1.getRules().get(0).getId(), lcc2.getRules()
+        .get(0).getId());
+    // CreationTime is added when being created.
+    assertNotEquals(lcc1.getCreationTime(), lcc2.getCreationTime());
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testLifecycleConfigurationWithLinkedBucket(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String sourceBucketName = UUID.randomUUID().toString();
+    String linkedBucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    
+    // Create source bucket nand linked bucket
+    BucketArgs bucketArgs = BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(sourceBucketName, bucketArgs);
+    OzoneBucket sourceBucket = volume.getBucket(sourceBucketName);
+    assertNotNull(sourceBucket);
+    volume.createBucket(linkedBucketName,
+        BucketArgs.newBuilder()
+            .setSourceBucket(sourceBucketName)
+            .setSourceVolume(volumeName)
+            .build());
+    OzoneBucket linkedBucket = volume.getBucket(linkedBucketName);
+    assertNotNull(linkedBucket);
+    
+    ClientProtocol proxy = store.getClientProxy();
+    OzoneTestUtils.expectOmException(ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, sourceBucketName));
+    OzoneTestUtils.expectOmException(ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, linkedBucketName));
+
+    OmLifecycleConfiguration lccThroughLinked = createOmLifecycleConfiguration(volumeName,
+        linkedBucketName, true, bucketLayout);
+    proxy.setLifecycleConfiguration(lccThroughLinked);
+
+    OzoneLifecycleConfiguration lccFromSource = 
+        proxy.getLifecycleConfiguration(volumeName, sourceBucketName);
+    // The actual stored configuration should be for the source bucket
+    assertEquals(volumeName, lccFromSource.getVolume());
+    assertEquals(sourceBucketName, lccFromSource.getBucket());
+    
+    // Delete lifecycle configuration through linked bucket
+    proxy.deleteLifecycleConfiguration(volumeName, linkedBucketName);
+    
+    // Verify lifecycle configuration is deleted for both buckets
+    OzoneTestUtils.expectOmException(
+        ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, linkedBucketName));
+    OzoneTestUtils.expectOmException(
+        ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, sourceBucketName));
+    
+    volume.deleteBucket(linkedBucketName);
+    volume.deleteBucket(sourceBucketName);
+    store.deleteVolume(volumeName);
+  }
+
+  private OmLifecycleConfiguration createOmLifecycleConfiguration(String volume,
+      String bucket, boolean hasRules, BucketLayout bucketLayout) throws OMException {
+
+    OmLifecycleConfiguration.Builder builder =
+        new OmLifecycleConfiguration.Builder()
+            .setVolume(volume)
+            .setBucket(bucket)
+            .setBucketLayout(bucketLayout);
+
+    if (hasRules) {
+      builder.setRules(Collections.singletonList(new OmLCRule.Builder()
+          .setEnabled(true)
+          .setPrefix("")
+          .addAction(new OmLCExpiration.Builder().setDays(30).build())
+          .build()));
+    }
+
+    return builder.build();
   }
 
   @Test

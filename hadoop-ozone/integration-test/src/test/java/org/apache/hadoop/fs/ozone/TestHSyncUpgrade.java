@@ -46,9 +46,9 @@ import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -130,7 +130,7 @@ public class TestHSyncUpgrade {
     client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(client, layout);
+    bucket = DataTestUtil.createVolumeAndBucket(client, layout);
 
     // Enable DEBUG level logging for relevant classes
     GenericTestUtils.setLogLevel(BlockManagerImpl.class, Level.DEBUG);
