@@ -20,12 +20,12 @@ package org.apache.hadoop.hdds.scm.protocol;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -51,12 +51,13 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -219,13 +220,22 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
           " blocks. Requested " + request.getNumBlocks() + " blocks",
           SCMException.ResultCodes.FAILED_TO_ALLOCATE_ENOUGH_BLOCKS);
     }
+
+    // Allows skipping version computation for pipelines we have already encountered in this request.
     Map<PipelineID, HddsProtos.Pipeline> pipelineProtoCache = new HashMap<>();
     for (AllocatedBlock block : allocatedBlocks) {
       Pipeline pipeline = block.getPipeline();
+      if (pipeline.getNodes().isEmpty()) {
+        throw new SCMException("Cannot process allocate block request for empty pipeline",
+            SCMException.ResultCodes.FAILED_TO_FIND_ACTIVE_PIPELINE);
+      }
       HddsProtos.Pipeline pipelineProto = pipelineProtoCache.get(pipeline.getId());
       if (pipelineProto == null) {
-        pipelineProto = pipeline.getProtobufMessage(clientVersion, Name.IO_PORTS,
-            computePipelineWriteVersion(pipeline));
+        // Pipeline members are frozen copies rebuilt from the replicated pipeline proto, so their currentVersion can
+        // be stale; resolve the authoritative value from the live node registry before computing the minimum.
+        ComponentVersion pipelineVersion =
+            ScmVersionManager.computeVersionForClientWrite(currentNodes(pipeline.getNodes()));
+        pipelineProto = pipeline.getProtobufMessage(clientVersion, Name.IO_PORTS, pipelineVersion);
         pipelineProtoCache.put(pipeline.getId(), pipelineProto);
       }
       builder.addBlocks(AllocateBlockResponse.newBuilder()
@@ -236,35 +246,17 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     return builder.build();
   }
 
-  /**
-   * Computes the version clients should use for writes to the given pipeline.
-   * Before ZDU is finalized, datanodes report apparent versions from the
-   * {@link HDDSLayoutFeature} enum, which clients cannot compare against the
-   * {@link HDDSVersion} enum they use. In that state we advertise the last
-   * {@link HDDSVersion} before {@code ZDU} so clients keep pre-ZDU write behavior
-   * until the cluster finalizes. Once ZDU is finalized every apparent version is
-   * an {@link HDDSVersion} and safe to share: we return the lowest one across the
-   * pipeline, so during a later rolling upgrade clients do not enable a newer
-   * write-path feature until every datanode in the pipeline has finalized.
-   */
-  private ComponentVersion computePipelineWriteVersion(Pipeline pipeline) throws SCMException {
-    List<DatanodeDetails> nodes = pipeline.getNodes();
-    if (nodes.isEmpty()) {
-      throw new SCMException("Cannot determine the write version for pipeline "
-          + pipeline.getId() + " because it has no datanodes",
-          SCMException.ResultCodes.NO_SUCH_DATANODE);
+  private List<DatanodeDetails> currentNodes(List<DatanodeDetails> nodes) throws SCMException {
+    List<DatanodeDetails> memberVersions = new ArrayList<>();
+    for (DatanodeDetails dn : nodes) {
+      DatanodeInfo live = scm.getScmNodeManager().getNode(dn.getID());
+      if (live == null) {
+        throw new SCMException("Failed to lookup datanode " + dn + " in NodeManager",
+            SCMException.ResultCodes.NO_SUCH_DATANODE);
+      }
+      memberVersions.add(live);
     }
-    if (!scm.getVersionManager().isAllowed(HDDSVersion.ZDU)) {
-      return HDDSVersion.STREAM_BLOCK_SUPPORT; // last HDDSVersion before ZDU
-    }
-    try {
-      return scm.getScmNodeManager()
-          .getLowestApparentVersion(nodes.toArray(new DatanodeDetails[0]));
-    } catch (NodeNotFoundException e) {
-      throw new SCMException("Datanode not found while computing the write version "
-          + "for pipeline " + pipeline.getId() + " during block allocation", e,
-          SCMException.ResultCodes.NO_SUCH_DATANODE);
-    }
+    return memberVersions;
   }
 
   public DeleteScmKeyBlocksResponseProto deleteScmKeyBlocks(

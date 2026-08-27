@@ -87,19 +87,11 @@ public interface ComponentVersion {
    * Comparison is done through {@link #isSupportedBy}, which respects the
    * negative/unknown-future-version convention, rather than comparing the
    * opaque {@link #serialize()} values directly.
-   *
-   * @throws IllegalArgumentException if no versions are provided.
    */
-  static ComponentVersion min(ComponentVersion... versions) {
-    if (versions.length == 0) {
-      throw new IllegalArgumentException("At least one version is required.");
+  static <T extends ComponentVersion> T min(T v1, T v2) {
+    if (v1.isSupportedBy(v2)) {
+      return v1;
     }
-    ComponentVersion lowest = versions[0];
-    for (int i = 1; i < versions.length; i++) {
-      if (versions[i].isSupportedBy(lowest)) {
-        lowest = versions[i];
-      }
-    }
-    return lowest;
+    return v2;
   }
 }

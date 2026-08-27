@@ -654,7 +654,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   }
 
   /**
-   * @return the version this datanode was last started with
+   * @return the version this datanode should report to clients
    */
   public HDDSVersion getCurrentVersion() {
     return currentVersion;

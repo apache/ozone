@@ -220,28 +220,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   }
 
   /**
-   * Returns the lowest apparent version among the given datanodes,
-   * so every node involved in an operation uses the same, mutually-supported
-   * version.
-   *
-   * @throws NodeNotFoundException if SCM has no record of one of the nodes;
-   *     callers must not proceed with an operation involving a node SCM does
-   *     not know about.
-   */
-  default ComponentVersion getLowestApparentVersion(DatanodeDetails... nodes)
-      throws NodeNotFoundException {
-    ComponentVersion[] versions = new ComponentVersion[nodes.length];
-    for (int i = 0; i < nodes.length; i++) {
-      DatanodeInfo info = getNode(nodes[i].getID());
-      if (info == null) {
-        throw new NodeNotFoundException(nodes[i].getID());
-      }
-      versions[i] = info.getLastKnownApparentVersion();
-    }
-    return ComponentVersion.min(versions);
-  }
-
-  /**
    * Returns the aggregated node stats.
    * @return the aggregated node stats.
    */

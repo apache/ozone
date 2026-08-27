@@ -35,6 +35,7 @@ import java.time.ZonedDateTime;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.hdfs.util.EnumCounters;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.helpers.DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
@@ -82,6 +84,8 @@ public class HeartbeatEndpointTask
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
   private final DatanodeVersionManager versionManager;
+  // Test-only override for the version this datanode advertises to clients; null in production.
+  private final HDDSVersion testCurrentVersion;
   private final boolean resolveOnFailureEnabled;
   private final int refreshThreshold;
 
@@ -102,6 +106,15 @@ public class HeartbeatEndpointTask
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
     this.datanodeDetails = context.getParent().getDatanodeDetails();
     this.versionManager = context.getParent().getVersionManager();
+
+    if (conf.isConfigured(HddsDatanodeService.TESTING_DATANODE_VERSION_CURRENT)) {
+      int configuredVersion = conf.getInt(HddsDatanodeService.TESTING_DATANODE_VERSION_CURRENT,
+          HDDSVersion.SOFTWARE_VERSION.serialize());
+      testCurrentVersion = HDDSVersion.deserialize(configuredVersion);
+    } else {
+      testCurrentVersion = null;
+    }
+
     this.resolveOnFailureEnabled = conf.getBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
         OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT);
     this.refreshThreshold = Math.max(1, conf.getInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD,
@@ -123,7 +136,8 @@ public class HeartbeatEndpointTask
           versionManager.getApparentVersion(),
           versionManager.getSoftwareVersion());
 
-      datanodeDetails.setCurrentVersion(versionManager.getVersionForClient());
+      datanodeDetails.setCurrentVersion(
+          testCurrentVersion != null ? testCurrentVersion : versionManager.getVersionForClient());
       DatanodeDetailsProto datanodeDetailsProto = datanodeDetails.getProtoBufMessage();
 
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
