@@ -28,11 +28,14 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -56,6 +59,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -176,6 +180,11 @@ public class TestOzoneClientRetriesOnExceptions {
 
   @Test
   void testMaxRetriesByOzoneClient() throws Exception {
+    GenericTestUtils.waitFor(() -> cluster.getStorageContainerManager()
+        .getPipelineManager().getPipelines(
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+            Pipeline.PipelineState.OPEN, StorageTier.getDefaultTier()).size() >= MAX_RETRIES + 1,
+        100, 30_000);
     String keyName = getKeyName();
     try (OzoneOutputStream key = createKey(
         keyName, ReplicationType.RATIS, (MAX_RETRIES + 1) * BLOCK_SIZE)) {
