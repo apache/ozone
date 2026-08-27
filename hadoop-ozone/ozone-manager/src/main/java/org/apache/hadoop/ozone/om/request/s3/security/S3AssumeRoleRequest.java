@@ -29,10 +29,15 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -40,6 +45,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.AwsRoleArnValidator;
@@ -53,6 +59,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateAssumeRoleRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -274,11 +284,127 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
     final Set<OzoneGrant> grants = Strings.isNullOrEmpty(awsIamPolicy) ?
         null :
-        IamSessionPolicyResolver.resolve(awsIamPolicy, volumeName, IamSessionPolicyResolver.AuthorizerType.RANGER);
+        resolveGrantsAgainstBucketLinks(
+            IamSessionPolicyResolver.resolve(awsIamPolicy, volumeName, IamSessionPolicyResolver.AuthorizerType.RANGER),
+            (linkVolume, linkBucket) -> ozoneManager.resolveBucketLink(Pair.of(linkVolume, linkBucket), true, false));
 
     return ozoneManager.getAccessAuthorizer().generateAssumeRoleSessionPolicy(
         new org.apache.hadoop.ozone.security.acl.AssumeRoleRequest(
             hostName, remoteIp, ugi, targetRoleName, grants));
+  }
+
+  /**
+   * Rewrites the resolved session-policy grants so that any bucket, key, or prefix resource that names a
+   * bucket link is anchored to the link's source volume and bucket - the resource paths the OM authorizes
+   * against once the link is resolved at request time. Only the single READ needed to follow the link (and,
+   * for a cross-volume link, a READ on the source volume for the parent volume check) is retained on the link
+   * bucket, which keeps the generated token as small as possible.
+   * <p>
+   * The link target is resolved when the token is generated, so the token grants access to whatever the link
+   * points to at that moment. If the link is later re-pointed, the token no longer grants access to the new
+   * target.
+   *
+   * @param grants       the grants produced by {@link IamSessionPolicyResolver}, possibly {@code null}
+   * @param linkResolver resolves a (volume, bucket) pair to its link target
+   * @return the link-aware grants, or the input unchanged when there is nothing to resolve
+   */
+  @VisibleForTesting
+  static Set<OzoneGrant> resolveGrantsAgainstBucketLinks(Set<OzoneGrant> grants,
+      BucketLinkResolver linkResolver) throws IOException {
+    if (grants == null || grants.isEmpty()) {
+      return grants;
+    }
+
+    final Map<Pair<String, String>, ResolvedBucket> resolutionCache = new HashMap<>();
+    final Set<IOzoneObj> linkFollowObjects = new LinkedHashSet<>();
+    final Set<OzoneGrant> resolvedGrants = new LinkedHashSet<>();
+
+    for (OzoneGrant grant : grants) {
+      final Set<IOzoneObj> resolvedObjects = new LinkedHashSet<>();
+      for (IOzoneObj object : grant.getObjects()) {
+        resolvedObjects.add(
+            resolveObjectAgainstBucketLink((OzoneObj) object, linkResolver, resolutionCache, linkFollowObjects));
+      }
+      resolvedGrants.add(new OzoneGrant(resolvedObjects, grant.getPermissions(), grant.getS3Actions()));
+    }
+
+    // Retain only the READ required to follow the link(s) at request time.
+    if (!linkFollowObjects.isEmpty()) {
+      resolvedGrants.add(new OzoneGrant(linkFollowObjects, EnumSet.of(ACLType.READ)));
+    }
+
+    return resolvedGrants;
+  }
+
+  /**
+   * Resolves a single grant object against its bucket link. Bucket, key, and prefix objects that name a
+   * link bucket are rewritten to the link's source volume and bucket, and the READ needed to follow the link
+   * is collected in {@code linkFollowObjects}. All other objects (volume resources and wildcard buckets)
+   * are returned unchanged.
+   */
+  private static IOzoneObj resolveObjectAgainstBucketLink(OzoneObj object, BucketLinkResolver linkResolver,
+      Map<Pair<String, String>, ResolvedBucket> resolutionCache, Set<IOzoneObj> linkFollowObjects)
+      throws IOException {
+    final OzoneObj.ResourceType resourceType = object.getResourceType();
+    if (resourceType != OzoneObj.ResourceType.BUCKET
+        && resourceType != OzoneObj.ResourceType.KEY
+        && resourceType != OzoneObj.ResourceType.PREFIX) {
+      return object;
+    }
+
+    final String volumeName = object.getVolumeName();
+    final String bucketName = object.getBucketName();
+    // Wildcard or unspecified names cannot correspond to a concrete link bucket.
+    if (StringUtils.isBlank(volumeName) || StringUtils.isBlank(bucketName) || hasWildcard(volumeName) ||
+        hasWildcard(bucketName)) {
+      return object;
+    }
+
+    final Pair<String, String> requested = Pair.of(volumeName, bucketName);
+    ResolvedBucket resolved = resolutionCache.get(requested);
+    if (resolved == null) {
+      resolved = linkResolver.resolve(volumeName, bucketName);
+      resolutionCache.put(requested, resolved);
+    }
+    if (resolved == null || resolved.isDangling() || !resolved.isLink()) {
+      return object;
+    }
+
+    linkFollowObjects.add(newResourceObj(OzoneObj.ResourceType.BUCKET, volumeName, bucketName));
+    if (!Objects.equals(resolved.realVolume(), volumeName)) {
+      // Cross-volume link: the source volume also needs READ for the parent volume check.
+      linkFollowObjects.add(newResourceObj(OzoneObj.ResourceType.VOLUME, resolved.realVolume(), null));
+    }
+
+    return OzoneObjInfo.Builder.fromOzoneObj(object)
+        .setVolumeName(resolved.realVolume())
+        .setBucketName(resolved.realBucket())
+        .build();
+  }
+
+  private static IOzoneObj newResourceObj(OzoneObj.ResourceType resourceType, String volumeName, String bucketName) {
+    final OzoneObjInfo.Builder builder = OzoneObjInfo.Builder.newBuilder()
+        .setResType(resourceType)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName);
+    if (bucketName != null) {
+      builder.setBucketName(bucketName);
+    }
+    return builder.build();
+  }
+
+  private static boolean hasWildcard(String name) {
+    return name.indexOf('*') >= 0 || name.indexOf('?') >= 0;
+  }
+
+  /**
+   * Resolves a (volume, bucket) pair to its link target, following bucket links. Implementations must not
+   * enforce ACLs, so that session-policy generation stays deterministic across OMs and does not depend on
+   * the external authorizer.
+   */
+  @FunctionalInterface
+  interface BucketLinkResolver {
+    ResolvedBucket resolve(String volumeName, String bucketName) throws IOException;
   }
 
   /**
