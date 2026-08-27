@@ -17,21 +17,32 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.IOException;
+import java.net.URI;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.token.Token;
 
 /**
- * A DT fetcher for OzoneFileSystem.
- * It is only needed for the `hadoop dtutil` command.
+ * A DT fetcher for Ozone RPC URLs.
  */
-public class O3fsDtFetcher extends AbstractOzoneDtFetcher {
-  private static final String SERVICE_NAME = OzoneConsts.OZONE_URI_SCHEME;
-
-  /**
-   * Returns the service name for O3fs, which is also a valid URL prefix.
-   */
+public class O3DtFetcher extends AbstractOzoneDtFetcher {
   @Override
   public Text getServiceName() {
-    return new Text(SERVICE_NAME);
+    return new Text(OzoneConsts.OZONE_RPC_SCHEME);
+  }
+
+  @Override
+  protected Token<?> addDelegationTokens(Configuration conf, Credentials creds,
+      String renewer, URI uri) throws IOException {
+    if (uri.getAuthority() == null) {
+      throw new IllegalArgumentException(
+          "OM authority is required in Ozone RPC URL: " + uri);
+    }
+    URI ofsUri = URI.create(OzoneConsts.OZONE_OFS_URI_SCHEME + "://"
+        + uri.getRawAuthority() + "/");
+    return super.addDelegationTokens(conf, creds, renewer, ofsUri);
   }
 }

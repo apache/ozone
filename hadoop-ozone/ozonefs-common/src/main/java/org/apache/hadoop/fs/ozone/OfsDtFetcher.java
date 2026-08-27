@@ -21,17 +21,11 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
- * A DT fetcher for OzoneFileSystem.
- * It is only needed for the `hadoop dtutil` command.
+ * A DT fetcher for RootedOzoneFileSystem.
  */
-public class O3fsDtFetcher extends AbstractOzoneDtFetcher {
-  private static final String SERVICE_NAME = OzoneConsts.OZONE_URI_SCHEME;
-
-  /**
-   * Returns the service name for O3fs, which is also a valid URL prefix.
-   */
+public class OfsDtFetcher extends AbstractOzoneDtFetcher {
   @Override
   public Text getServiceName() {
-    return new Text(SERVICE_NAME);
+    return new Text(OzoneConsts.OZONE_OFS_URI_SCHEME);
   }
 }

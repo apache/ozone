@@ -17,21 +17,25 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.OzoneConsts;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.HashSet;
+import java.util.ServiceLoader;
+import java.util.Set;
+import org.apache.hadoop.security.token.DtFetcher;
+import org.junit.jupiter.api.Test;
 
 /**
- * A DT fetcher for OzoneFileSystem.
- * It is only needed for the `hadoop dtutil` command.
+ * Tests Ozone delegation token fetcher registrations.
  */
-public class O3fsDtFetcher extends AbstractOzoneDtFetcher {
-  private static final String SERVICE_NAME = OzoneConsts.OZONE_URI_SCHEME;
+public class TestDtFetcherProviders {
+  @Test
+  public void loadsOzoneDtFetchers() {
+    Set<String> serviceNames = new HashSet<>();
+    for (DtFetcher fetcher : ServiceLoader.load(DtFetcher.class)) {
+      serviceNames.add(fetcher.getServiceName().toString());
+    }
 
-  /**
-   * Returns the service name for O3fs, which is also a valid URL prefix.
-   */
-  @Override
-  public Text getServiceName() {
-    return new Text(SERVICE_NAME);
+    assertThat(serviceNames).contains("o3", "ofs", "o3fs");
   }
 }
