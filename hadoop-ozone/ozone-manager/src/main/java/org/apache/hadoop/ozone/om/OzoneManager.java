@@ -2768,6 +2768,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return isAclEnabled;
   }
 
+  /**
+   * Return true if admin authorization checks should be enforced.
+   */
+  public boolean isAdminAuthorizationEnabled() {
+    return secConfig != null && secConfig.isSecurityEnabled();
+  }
+
   public boolean getAllowListAllVolumes() {
     return allowListAllVolumes;
   }
