@@ -868,13 +868,17 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // Resume the service
       keyLifecycleService.resume();
       // Returns once the aborted task is past its start, so it keeps using the injectors below
-      firstTaskStart.resume();
+      firstTaskStart.awaitPaused(10000);
+      firstTaskStart.release();
       // Hold the follow-up task at its start, otherwise it overwrites the scan state asserted below
       FaultInjectorImpl nextTaskStart = new FaultInjectorImpl();
       installInjectors(nextTaskStart, firstDelete, lastFaultInjector);
-      firstDelete.resume();
+      firstDelete.awaitPaused(10000);
+      firstDelete.release();
+      // BackgroundService waits for the previous batch, so the follow-up task reaching its start means
+      // the first task is done
+      nextTaskStart.awaitPaused(10000);
 
-      // wait for scanState to be updated
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
       try {
         GenericTestUtils.waitFor(() -> {
