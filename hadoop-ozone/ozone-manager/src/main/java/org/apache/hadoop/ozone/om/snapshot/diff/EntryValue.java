@@ -42,6 +42,9 @@ import java.util.Objects;
  * <pre>
  *   | parentId (8, big-endian) | isDir (1) | sigLen (4, big-endian) | signature | name (UTF-8, remaining) |
  * </pre>
+ *
+ * <p>In-memory fields use Java types until {@link #toBytes()} produces the {@code byte[]} payload
+ * written to RocksDB by {@link SnapDiffJobStore}.
  */
 public final class EntryValue {
 
@@ -75,7 +78,7 @@ public final class EntryValue {
   }
 
   public byte[] getSignature() {
-    return Arrays.copyOf(signature, signature.length);
+    return signature;
   }
 
   /**

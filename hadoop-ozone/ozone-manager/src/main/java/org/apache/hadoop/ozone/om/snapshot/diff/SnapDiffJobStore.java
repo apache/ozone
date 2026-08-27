@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamily
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -42,6 +41,10 @@ import org.rocksdb.RocksDBException;
  *
  * <p>Diff-candidate {@code objectId}s are held in memory while their count is at
  * most {@code maxInMemoryEntries}; larger sets spill to a temporary column family.
+ *
+ * <p>All RocksDB puts use raw {@code byte[]} keys and values (the JNI boundary). Callers
+ * serialize {@link EntryValue} via {@link EntryValue#toBytes()} before writing to
+ * {@code newList}/{@code oldList}.
  *
  * <p>This initial version supports the full diff sequential reader ({@link FullDiffSequentialReader}).
  * DAG diff support extends this store in HDDS-15393.
@@ -77,6 +80,10 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private final ManagedWriteOptions writeOptions;
   private final int writeBatchSize;
   private int pendingOps;
+
+  /** Reusable big-endian key buffers; safe because RocksDB copies keys on put/get. */
+  private final byte[] objectIdKeyBuffer = new byte[Long.BYTES];
+  private final byte[] edgeKeyBuffer = new byte[2 * Long.BYTES];
 
   /** Full diff: shared new/old lists plus FSO edge column families. */
   public enum Mode {
@@ -148,34 +155,34 @@ public final class SnapDiffJobStore implements AutoCloseable {
 
   /** Writes a present-marker for {@code objectId} in {@code newList}. */
   public void putNewListPresentMarker(long objectId) throws IOException {
-    batchPut(newListCf, objectIdKey(objectId), presentMarker);
+    batchPut(newListCf, objectIdKeyBuffer(objectId), presentMarker);
   }
 
   /** Writes a full diff-candidate {@link EntryValue} for {@code objectId} in {@code newList}. */
   public void putNewList(long objectId, byte[] entryValue) throws IOException {
-    batchPut(newListCf, objectIdKey(objectId), entryValue);
+    batchPut(newListCf, objectIdKeyBuffer(objectId), entryValue);
   }
 
   public void putOldList(long objectId, byte[] entryValue) throws IOException {
-    batchPut(oldListCf, objectIdKey(objectId), entryValue);
+    batchPut(oldListCf, objectIdKeyBuffer(objectId), entryValue);
   }
 
   public void putToEdge(long parentId, long objectId, byte[] name) throws IOException {
     requireFso();
-    batchPut(toEdgesCf, edgeKey(parentId, objectId), name);
+    batchPut(toEdgesCf, edgeKeyBuffer(parentId, objectId), name);
   }
 
   public void putFromEdge(long parentId, long objectId, byte[] name) throws IOException {
     requireFso();
-    batchPut(fromEdgesCf, edgeKey(parentId, objectId), name);
+    batchPut(fromEdgesCf, edgeKeyBuffer(parentId, objectId), name);
   }
 
   public byte[] getNewList(long objectId) throws IOException {
-    return get(newListCf, objectIdKey(objectId));
+    return get(newListCf, objectIdKeyBuffer(objectId));
   }
 
   public byte[] getOldList(long objectId) throws IOException {
-    return get(oldListCf, objectIdKey(objectId));
+    return get(oldListCf, objectIdKeyBuffer(objectId));
   }
 
   public boolean hasNewListEntry(long objectId) throws IOException {
@@ -193,14 +200,14 @@ public final class SnapDiffJobStore implements AutoCloseable {
    */
   public void addDiffCandidate(long objectId) throws IOException {
     if (diffCandidatesSpilled) {
-      batchPut(diffCandidatesCf, objectIdKey(objectId), presentMarker);
+      batchPut(diffCandidatesCf, objectIdKeyBuffer(objectId), presentMarker);
       return;
     }
     if (diffCandidates.size() >= maxInMemoryEntries) {
       spillDiffCandidates();
     }
     if (diffCandidatesSpilled) {
-      batchPut(diffCandidatesCf, objectIdKey(objectId), presentMarker);
+      batchPut(diffCandidatesCf, objectIdKeyBuffer(objectId), presentMarker);
     } else {
       diffCandidates.add(objectId);
     }
@@ -209,7 +216,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /** Returns whether {@code objectId} was gated in as a to-side diff candidate. */
   public boolean isDiffCandidate(long objectId) throws IOException {
     if (diffCandidatesSpilled) {
-      return get(diffCandidatesCf, objectIdKey(objectId)) != null;
+      return get(diffCandidatesCf, objectIdKeyBuffer(objectId)) != null;
     }
     return diffCandidates.contains(objectId);
   }
@@ -234,12 +241,12 @@ public final class SnapDiffJobStore implements AutoCloseable {
 
   public byte[] getToEdgeName(long parentId, long objectId) throws IOException {
     requireFso();
-    return get(toEdgesCf, edgeKey(parentId, objectId));
+    return get(toEdgesCf, edgeKeyBuffer(parentId, objectId));
   }
 
   public byte[] getFromEdgeName(long parentId, long objectId) throws IOException {
     requireFso();
-    return get(fromEdgesCf, edgeKey(parentId, objectId));
+    return get(fromEdgesCf, edgeKeyBuffer(parentId, objectId));
   }
 
   public void flushWrites() throws IOException {
@@ -255,12 +262,21 @@ public final class SnapDiffJobStore implements AutoCloseable {
     pendingOps = 0;
   }
 
-  public static byte[] objectIdKey(long objectId) {
-    return ByteBuffer.allocate(Long.BYTES).putLong(objectId).array();
+  private byte[] objectIdKeyBuffer(long objectId) {
+    encodeLong(objectIdKeyBuffer, 0, objectId);
+    return objectIdKeyBuffer;
   }
 
-  public static byte[] edgeKey(long parentId, long objectId) {
-    return ByteBuffer.allocate(2 * Long.BYTES).putLong(parentId).putLong(objectId).array();
+  private byte[] edgeKeyBuffer(long parentId, long objectId) {
+    encodeLong(edgeKeyBuffer, 0, parentId);
+    encodeLong(edgeKeyBuffer, Long.BYTES, objectId);
+    return edgeKeyBuffer;
+  }
+
+  private static void encodeLong(byte[] buffer, int offset, long value) {
+    for (int shift = Long.SIZE - 8; shift >= 0; shift -= 8) {
+      buffer[offset++] = (byte) (value >>> shift);
+    }
   }
 
   private void initColumnFamilies(ManagedColumnFamilyOptions options, String jobId)
@@ -281,7 +297,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
       throw new IOException("Failed to create diff candidate column family " + diffCandCfName, e);
     }
     for (Long objectId : diffCandidates) {
-      batchPut(diffCandidatesCf, objectIdKey(objectId), presentMarker);
+      batchPut(diffCandidatesCf, objectIdKeyBuffer(objectId), presentMarker);
     }
     diffCandidates.clear();
     flushWrites();

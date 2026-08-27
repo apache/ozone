@@ -232,6 +232,27 @@ class TestFullDiffSequentialReader {
   }
 
   @Test
+  void testBucketKeyPrefixScopesScan() throws Exception {
+    byte[] bucketPrefix = tableKey("/vol/buck/");
+    Table<byte[], byte[]> toTable = InMemoryTestTable.forRawBytes();
+    putKey(toTable, "/vol/buck/in", keyInfo("in-bucket", 1L, 0L, 60L, 100L));
+    putKey(toTable, "/other/out", keyInfo("out-bucket", 2L, 0L, 60L, 100L));
+
+    Table<byte[], byte[]> fromTable = InMemoryTestTable.forRawBytes();
+    putKey(fromTable, "/vol/buck/in", keyInfo("in-bucket", 1L, 0L, 10L, 100L));
+    putKey(fromTable, "/other/out", keyInfo("out-bucket", 2L, 0L, 10L, 100L));
+
+    try (SnapDiffJobStore store = newStore(false)) {
+      new FullDiffSequentialReader(store).scanFileTables(fromTable, toTable, bucketPrefix);
+
+      assertTrue(store.isNewListCandidate(1L));
+      assertFalse(store.hasNewListEntry(2L));
+      assertNotNull(store.getOldList(1L));
+      assertNull(store.getOldList(2L));
+    }
+  }
+
+  @Test
   void testFsoDirectoryEdgesPopulated() throws Exception {
     Table<byte[], byte[]> toTable = InMemoryTestTable.forRawBytes();
     putDir(toTable, "d100", dirInfo("a", 100L, BUCKET_OBJECT_ID, 60L));
