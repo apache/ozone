@@ -3264,11 +3264,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
       String expectedString = "Received a request to delete a Key does not exist /" + key.getVolumeName() + "/" +
           key.getBucketName() + "/" + key.getKeyName();
       GenericTestUtils.waitFor(() -> requestLog.getOutput().contains(expectedString), WAIT_CHECK_INTERVAL, 10000);
-      if (!deleted) {
-        // Since expiration action is an absolute timestamp, so the renamed key will expire in next evaluation task
-        GenericTestUtils.waitFor(() -> log.getOutput().contains("1 expired keys and 0 expired dirs found"),
-            SERVICE_INTERVAL, 10000);
-      }
+      // The expiration action is an absolute timestamp, so a renamed key still expires and a later task
+      // deletes it. How many candidates a single task reports depends on whether the in-flight delete has
+      // landed when it starts, so assert on the outcome instead.
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == 0, WAIT_CHECK_INTERVAL, 10000);
       assertEquals(KEY_COUNT, getDeletedKeyCount() - initialDeletedKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
