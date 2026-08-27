@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -57,7 +58,6 @@ public class ChunksValidator {
   private static final String CHUNK_STRING_TO_SIGN_ALGORITHM =
       "AWS4-HMAC-SHA256-PAYLOAD";
   private static final String HMAC_SHA256 = "HmacSHA256";
-  private static final String SHA_256 = "SHA-256";
   private static final String NEWLINE = "\n";
 
   /** SHA-256 hex of the empty string (the hashed empty headers slot). */
@@ -69,14 +69,6 @@ public class ChunksValidator {
       return Mac.getInstance(HMAC_SHA256);
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException(HMAC_SHA256 + " not available", e);
-    }
-  });
-
-  private static final ThreadLocal<MessageDigest> SHA256 = ThreadLocal.withInitial(() -> {
-    try {
-      return MessageDigest.getInstance(SHA_256);
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException(SHA_256 + " not available", e);
     }
   });
 
@@ -106,21 +98,14 @@ public class ChunksValidator {
         CHUNK_STRING_TO_SIGN_ALGORITHM, dateTime, credentialScope,
         previousSignature, EMPTY_STRING_SHA256, payloadSha256Hex);
     String expected = hex(hmacSha256(signingKey, stringToSign));
+    String normalizedSignature = chunkSignature == null ? null : chunkSignature.toLowerCase(Locale.ROOT);
     // Constant-time comparison to avoid leaking the signature via timing.
-    if (chunkSignature == null || !MessageDigest.isEqual(
+    if (normalizedSignature == null || !MessageDigest.isEqual(
         expected.getBytes(StandardCharsets.UTF_8),
-        chunkSignature.getBytes(StandardCharsets.UTF_8))) {
+        normalizedSignature.getBytes(StandardCharsets.UTF_8))) {
       throw newError(SIGNATURE_DOES_NOT_MATCH, "chunk-signature");
     }
     previousSignature = expected;
-  }
-
-  /** @return hex SHA-256 of {@code data[off, off+len)}. */
-  public static String sha256Hex(byte[] data, int off, int len) {
-    MessageDigest md = SHA256.get();
-    md.reset();
-    md.update(data, off, len);
-    return hex(md.digest());
   }
 
   private static byte[] hmacSha256(byte[] key, String msg) {

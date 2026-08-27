@@ -42,6 +42,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PR
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
@@ -779,7 +780,8 @@ public abstract class EndpointBase {
     }
     MultiDigestInputStream multiDigestInputStream =
         new MultiDigestInputStream(chunkInputStream, digests);
-    return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength);
+    boolean verifyChunkSignature = STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header);
+    return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength, verifyChunkSignature);
   }
 
   /**
@@ -787,7 +789,7 @@ public abstract class EndpointBase {
    * signing key so the chunk signatures can be verified (HDDS-15140/15141).
    */
   protected boolean wantsChunkSignatureVerification(S3ChunkInputStreamInfo info) {
-    return info.getMultiDigestInputStream().getWrappedStream() instanceof SignedChunksInputStream;
+    return info.isChunkSignatureVerificationRequired();
   }
 
   /**
@@ -802,6 +804,9 @@ public abstract class EndpointBase {
    */
   protected void attachChunkValidator(S3ChunkInputStreamInfo info, ByteBuffer derivedKey)
       throws OS3Exception {
+    if (!info.isChunkSignatureVerificationRequired()) {
+      return;
+    }
     InputStream wrapped = info.getMultiDigestInputStream().getWrappedStream();
     if (!(wrapped instanceof SignedChunksInputStream)) {
       return;
@@ -899,10 +904,13 @@ public abstract class EndpointBase {
   protected static final class S3ChunkInputStreamInfo {
     private final MultiDigestInputStream multiDigestInputStream;
     private final long effectiveLength;
+    private final boolean chunkSignatureVerificationRequired;
 
-    S3ChunkInputStreamInfo(MultiDigestInputStream multiDigestInputStream, long effectiveLength) {
+    S3ChunkInputStreamInfo(MultiDigestInputStream multiDigestInputStream, long effectiveLength,
+        boolean chunkSignatureVerificationRequired) {
       this.multiDigestInputStream = multiDigestInputStream;
       this.effectiveLength = effectiveLength;
+      this.chunkSignatureVerificationRequired = chunkSignatureVerificationRequired;
     }
 
     public MultiDigestInputStream getMultiDigestInputStream() {
@@ -911,6 +919,10 @@ public abstract class EndpointBase {
 
     public long getEffectiveLength() {
       return effectiveLength;
+    }
+
+    public boolean isChunkSignatureVerificationRequired() {
+      return chunkSignatureVerificationRequired;
     }
   }
 }

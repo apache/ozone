@@ -255,6 +255,15 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKey(String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createKey(keyName, size, replicationConfig, metadata, tags, derivedKeyPiggyBacking);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
       long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
       Map<String, String> metadata) throws IOException {
@@ -272,6 +281,15 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKeyIfNotExists(String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createKeyIfNotExists(keyName, size, replicationConfig, metadata, tags, derivedKeyPiggyBacking);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKeyIfMatch(String volumeName,
       String bucketName, String keyName, long size, String expectedETag,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
@@ -279,6 +297,15 @@ public class ClientProtocolStub implements ClientProtocol {
     return getBucket(volumeName, bucketName)
         .rewriteKeyIfMatch(keyName, size, expectedETag, replicationConfig,
             metadata, tags);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName, String keyName, long size,
+      String expectedETag, ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName).rewriteKeyIfMatch(keyName, size, expectedETag, replicationConfig,
+        metadata, tags, derivedKeyPiggyBacking);
   }
 
   @Override
@@ -419,6 +446,14 @@ public class ClientProtocolStub implements ClientProtocol {
       throws IOException {
     return getBucket(volumeName, bucketName).createMultipartKey(keyName, size,
         partNumber, uploadID);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createMultipartKey(String volumeName, String bucketName, String keyName, long size,
+      int partNumber, String uploadID, boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createMultipartKey(keyName, size, partNumber, uploadID, derivedKeyPiggyBacking);
   }
 
   @Override

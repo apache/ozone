@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
+import java.util.Locale;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
 
@@ -63,11 +65,19 @@ class TestChunksValidator {
     byte[] finalChunk = new byte[0];
 
     assertDoesNotThrow(() -> validator.validateChunk(CHUNK1_SIGNATURE,
-        ChunksValidator.sha256Hex(chunk1, 0, chunk1.length)));
+        SignatureTestUtils.sha256Hex(chunk1, 0, chunk1.length)));
     assertDoesNotThrow(() -> validator.validateChunk(CHUNK2_SIGNATURE,
-        ChunksValidator.sha256Hex(chunk2, 0, chunk2.length)));
+        SignatureTestUtils.sha256Hex(chunk2, 0, chunk2.length)));
     assertDoesNotThrow(() -> validator.validateChunk(FINAL_CHUNK_SIGNATURE,
-        ChunksValidator.sha256Hex(finalChunk, 0, finalChunk.length)));
+        SignatureTestUtils.sha256Hex(finalChunk, 0, finalChunk.length)));
+  }
+
+  @Test
+  void acceptsUppercaseChunkSignature() {
+    byte[] chunk = repeat('a', 65536);
+
+    assertThatCode(() -> newValidator().validateChunk(CHUNK1_SIGNATURE.toUpperCase(Locale.ROOT),
+        SignatureTestUtils.sha256Hex(chunk, 0, chunk.length))).doesNotThrowAnyException();
   }
 
   @Test
@@ -77,7 +87,7 @@ class TestChunksValidator {
 
     // Wrong signature for the first chunk.
     assertThrows(OS3Exception.class, () -> validator.validateChunk(
-        CHUNK2_SIGNATURE, ChunksValidator.sha256Hex(chunk1, 0, chunk1.length)));
+        CHUNK2_SIGNATURE, SignatureTestUtils.sha256Hex(chunk1, 0, chunk1.length)));
   }
 
   @Test
@@ -88,7 +98,7 @@ class TestChunksValidator {
     // Correct signature but the payload was modified.
     assertThrows(OS3Exception.class, () -> validator.validateChunk(
         CHUNK1_SIGNATURE,
-        ChunksValidator.sha256Hex(tampered, 0, tampered.length)));
+        SignatureTestUtils.sha256Hex(tampered, 0, tampered.length)));
   }
 
   @Test
@@ -99,8 +109,8 @@ class TestChunksValidator {
     ChunksValidator wrongKey = new ChunksValidator(
         SignatureTestUtils.signingKey("wrong-secret", "20130524", "us-east-1", "s3"),
         DATE_TIME, SCOPE, SEED_SIGNATURE);
-    String sha65536 = ChunksValidator.sha256Hex(repeat('a', 65536), 0, 65536);
-    String sha1024 = ChunksValidator.sha256Hex(repeat('a', 1024), 0, 1024);
+    String sha65536 = SignatureTestUtils.sha256Hex(repeat('a', 65536), 0, 65536);
+    String sha1024 = SignatureTestUtils.sha256Hex(repeat('a', 1024), 0, 1024);
 
     assertThrows(OS3Exception.class, () -> wrongKey.validateChunk(CHUNK1_SIGNATURE, sha65536));
     // If the shared Mac were not re-keyed, this would still hold the wrong key and fail.

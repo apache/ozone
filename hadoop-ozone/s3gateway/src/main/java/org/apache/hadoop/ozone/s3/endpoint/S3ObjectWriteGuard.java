@@ -24,7 +24,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.ratis.util.function.CheckedRunnable;
 
 /**
@@ -85,6 +88,15 @@ class S3ObjectWriteGuard implements AutoCloseable {
     preCommits.add(preCommit);
   }
 
+  void onKeyOpened(Consumer<ByteBuffer> action) {
+    try {
+      action.accept(getDerivedKey());
+    } catch (RuntimeException ex) {
+      recordTransferFailure(ex);
+      throw ex;
+    }
+  }
+
   long copyFrom(InputStream body, int bufferSize) throws IOException {
     byte[] buffer = new byte[bufferSize];
     while (writtenLength < expectedLength) {
@@ -108,7 +120,22 @@ class S3ObjectWriteGuard implements AutoCloseable {
       }
       writtenLength += readLength;
     }
+    try {
+      verifySignedChunksComplete(body);
+    } catch (IOException | RuntimeException ex) {
+      recordTransferFailure(ex);
+      throw ex;
+    }
     return writtenLength;
+  }
+
+  private static void verifySignedChunksComplete(InputStream body) throws IOException {
+    if (body instanceof MultiDigestInputStream) {
+      InputStream wrapped = ((MultiDigestInputStream) body).getWrappedStream();
+      if (wrapped instanceof SignedChunksInputStream) {
+        ((SignedChunksInputStream) wrapped).verifyComplete();
+      }
+    }
   }
 
   protected void write(byte[] buffer, int offset, int length)

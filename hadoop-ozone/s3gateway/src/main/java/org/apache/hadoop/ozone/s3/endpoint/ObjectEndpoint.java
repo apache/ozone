@@ -303,7 +303,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
-          attachChunkValidator(chunkInputStreamInfo, output.getDerivedKey());
+          output.onKeyOpened(derivedKey -> attachChunkValidator(chunkInputStreamInfo, derivedKey));
           putLength = output.copyFrom(multiDigestInputStream, getIOBufferSize(expectedLength));
           md5Hash = DatatypeConverter.printHexBinary(
                   multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
@@ -1034,7 +1034,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         try (S3ObjectWriteGuard writeGuard = new S3ObjectWriteGuard(ozoneOutputStream, expectedLength, key)) {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
-          attachChunkValidator(chunkInputStreamInfo, writeGuard.getDerivedKey());
+          writeGuard.onKeyOpened(derivedKey -> attachChunkValidator(chunkInputStreamInfo, derivedKey));
           putLength = writeGuard.copyFrom(multiDigestInputStream, getIOBufferSize(expectedLength));
           byte[] digest = multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest();
           String md5Hash = DatatypeConverter.printHexBinary(digest).toLowerCase();

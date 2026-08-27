@@ -19,13 +19,20 @@ package org.apache.hadoop.ozone.s3.signature;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.apache.kerby.util.Hex;
 
 /**
  * Shared AWS Signature Version 4 helpers for tests.
  */
 public final class SignatureTestUtils {
+
+  private static final String EMPTY_STRING_SHA256 =
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
   private SignatureTestUtils() {
   }
@@ -51,5 +58,42 @@ public final class SignatureTestUtils {
     } catch (Exception e) {
       throw new IllegalStateException(e);
     }
+  }
+
+  /** @return hex SHA-256 of {@code data[off, off+len)}. */
+  public static String sha256Hex(byte[] data, int off, int len) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      digest.update(data, off, len);
+      return Hex.encode(digest.digest()).toLowerCase(Locale.ROOT);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /** Compute one SigV4 streaming chunk signature. */
+  public static String chunkSignature(byte[] signingKey, String dateTime, String credentialScope,
+      String previousSignature, byte[] payload) {
+    String stringToSign = String.join("\n", "AWS4-HMAC-SHA256-PAYLOAD", dateTime, credentialScope,
+        previousSignature, EMPTY_STRING_SHA256, sha256Hex(payload, 0, payload.length));
+    return Hex.encode(hmac(signingKey, stringToSign)).toLowerCase(Locale.ROOT);
+  }
+
+  /** Build a one-data-chunk SigV4 streaming body, including the terminating zero-byte chunk. */
+  public static String signedChunkedBody(byte[] signingKey, String dateTime, String credentialScope,
+      String seedSignature, String content) {
+    byte[] payload = content.getBytes(UTF_8);
+    String previousSignature = seedSignature;
+    StringBuilder body = new StringBuilder();
+    if (payload.length > 0) {
+      previousSignature = chunkSignature(
+          signingKey, dateTime, credentialScope, seedSignature, payload);
+      body.append(Integer.toHexString(payload.length))
+          .append(";chunk-signature=").append(previousSignature).append("\r\n")
+          .append(content).append("\r\n");
+    }
+    String finalSignature = chunkSignature(
+        signingKey, dateTime, credentialScope, previousSignature, new byte[0]);
+    return body.append("0;chunk-signature=").append(finalSignature).append("\r\n\r\n").toString();
   }
 }

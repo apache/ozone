@@ -150,9 +150,7 @@ public class SignedChunksInputStream extends InputStream {
       remainingData--;
       updateDigest((byte) curr);
       if (remainingData == 0) {
-        //read the "\r\n" at the end of the data section
-        originalStream.read();
-        originalStream.read();
+        readChunkTerminator();
         validateChunk();
       }
       return curr;
@@ -160,6 +158,9 @@ public class SignedChunksInputStream extends InputStream {
       remainingData = readContentLengthFromHeader();
       if (remainingData == 0) {
         // final zero-byte chunk: verify it (empty payload) and stop reading
+        if (validator != null) {
+          readChunkTerminator();
+        }
         validateChunk();
         isFinalChunkEncountered = true;
         return -1;
@@ -205,15 +206,16 @@ public class SignedChunksInputStream extends InputStream {
         totalReadBytes += realReadLen;
         remainingData -= realReadLen;
         if (remainingData == 0) {
-          //read the "\r\n" at the end of the data section
-          originalStream.read();
-          originalStream.read();
+          readChunkTerminator();
           validateChunk();
         }
       } else {
         remainingData = readContentLengthFromHeader();
         if (remainingData == 0) {
           // final zero-byte chunk: verify it (empty payload) and stop reading
+          if (validator != null) {
+            readChunkTerminator();
+          }
           validateChunk();
           isFinalChunkEncountered = true;
         } else if (remainingData < 0) {
@@ -229,6 +231,19 @@ public class SignedChunksInputStream extends InputStream {
   }
 
   /**
+   * Complete verification after the caller has consumed the decoded content length. This verifies the terminating
+   * zero-byte chunk and rejects a decoded length that ends in the middle of a chunk. No-op without a validator.
+   */
+  public void verifyComplete() throws IOException {
+    if (validator == null || isFinalChunkEncountered) {
+      return;
+    }
+    if (read() != -1) {
+      throw new IOException("Decoded content length ended before the chunked stream");
+    }
+  }
+
+  /**
    * A verified stream must end with the terminating 0-byte chunk. Reaching EOF before it means the
    * body was truncated, so the payload read so far was never fully authenticated. Without a validator
    * the stream keeps its lenient behavior.
@@ -236,6 +251,14 @@ public class SignedChunksInputStream extends InputStream {
   private void checkNotTruncated() throws IOException {
     if (validator != null) {
       throw new IOException("Chunked stream ended before the terminating 0-byte chunk");
+    }
+  }
+
+  private void readChunkTerminator() throws IOException {
+    int carriageReturn = originalStream.read();
+    int lineFeed = originalStream.read();
+    if (validator != null && (carriageReturn != '\r' || lineFeed != '\n')) {
+      throw new IOException("Invalid chunk data terminator");
     }
   }
 
@@ -252,6 +275,9 @@ public class SignedChunksInputStream extends InputStream {
       }
       prev = curr;
       curr = next;
+    }
+    if (!eol(prev, curr)) {
+      checkNotTruncated();
     }
     // Example of a single chunk data:
     //  10000;chunk-signature=b474d8862b1487a5145d686f57f013e54db672cee1c953b3010fb58501ef5aa2\r\n

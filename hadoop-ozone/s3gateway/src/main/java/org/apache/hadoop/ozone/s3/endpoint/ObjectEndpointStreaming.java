@@ -126,7 +126,7 @@ final class ObjectEndpointStreaming {
             keyPath, length, replicationConfig, keyMetadata, tags,
             writeConditions, derivedKeyPiggyBacking), length, keyPath)) {
       long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
-      onKeyOpened.accept(writeGuard.getDerivedKey());
+      writeGuard.onKeyOpened(onKeyOpened);
       writeLen = writeGuard.copyFrom(body, bufferSize);
       md5Hash = DatatypeConverter.printHexBinary(body.getMessageDigest(OzoneConsts.MD5_HASH).digest())
           .toLowerCase();
@@ -226,7 +226,7 @@ final class ObjectEndpointStreaming {
       try (S3ObjectStreamingWriteGuard writeGuard =
           new S3ObjectStreamingWriteGuard(streamOutput, length, key)) {
         long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
-        onKeyOpened.accept(writeGuard.getDerivedKey());
+        writeGuard.onKeyOpened(onKeyOpened);
         long putLength = writeGuard.copyFrom(body, chunkSize);
         eTag = DatatypeConverter.printHexBinary(
             body.getMessageDigest(OzoneConsts.MD5_HASH).digest()).toLowerCase();

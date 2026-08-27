@@ -24,7 +24,9 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMult
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -51,11 +53,14 @@ import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
+import org.apache.hadoop.ozone.s3.signature.SignatureTestUtils;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +79,13 @@ import org.mockito.MockedStatic;
 @ParameterizedClass
 @ValueSource(booleans = {false, true})
 public class TestPartUpload {
+
+  private static final String SECRET_KEY = "secret";
+  private static final String DATE = "20260827";
+  private static final String DATE_TIME = DATE + "T010203Z";
+  private static final String SCOPE = DATE + "/us-east-1/s3/aws4_request";
+  private static final String SEED_SIGNATURE =
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
   private ObjectEndpoint rest;
   private OzoneClient client;
@@ -101,6 +113,7 @@ public class TestPartUpload {
         .setHeaders(headers)
         .setClient(client)
         .setConfig(conf)
+        .setSignatureInfo(signatureInfo())
         .build());
     assertEquals(enableDataStream, rest.isDatastreamEnabled());
   }
@@ -167,20 +180,73 @@ public class TestPartUpload {
       throws IOException, OS3Exception {
     String keyName = UUID.randomUUID().toString();
 
-    int contentLength = 15;
-    String chunkedContent = "0a;chunk-signature=signature\r\n"
-        + "1234567890\r\n"
-        + "05;chunk-signature=signature\r\n"
-        + "abcde\r\n";
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("STREAMING-AWS4-HMAC-SHA256-PAYLOAD");
-    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
-        .thenReturn(String.valueOf(contentLength));
+    String content = "1234567890abcde";
+    String chunkedContent = signedChunkedBody(content);
+    configureSignedChunks(content.length());
 
     String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
 
     assertSucceeds(() -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, chunkedContent));
-    assertContentLength(uploadID, keyName, contentLength);
+    assertContentLength(uploadID, keyName, content.length());
+  }
+
+  @Test
+  public void testPartUploadRejectsTamperedSignedChunk() throws Exception {
+    String keyName = UUID.randomUUID().toString();
+    String content = "1234567890abcde";
+    String chunkedContent = signedChunkedBody(content).replace(content, "1234567890abXde");
+    configureSignedChunks(content.length());
+
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+
+    assertErrorResponse(S3ErrorTable.SIGNATURE_DOES_NOT_MATCH,
+        () -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, chunkedContent));
+    assertNoParts(uploadID, keyName);
+  }
+
+  @Test
+  public void testPartUploadRejectsMissingDerivedKeyInSecureMode() throws Exception {
+    String keyName = UUID.randomUUID().toString();
+    configureSignedChunkHeaders(0);
+    rest.getOzoneConfiguration().setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
+
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+
+    assertErrorResponse(S3ErrorTable.INTERNAL_ERROR,
+        () -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, signedChunkedBody("")));
+    assertNoParts(uploadID, keyName);
+  }
+
+  private void configureSignedChunks(int contentLength) throws IOException {
+    OzoneBucketStub bucket = (OzoneBucketStub) client.getObjectStore()
+        .getS3Bucket(OzoneConsts.S3_BUCKET);
+    bucket.setDerivedKey(signingKey());
+    configureSignedChunkHeaders(contentLength);
+  }
+
+  private void configureSignedChunkHeaders(int contentLength) {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
+        .thenReturn(String.valueOf(contentLength));
+  }
+
+  private static String signedChunkedBody(String content) {
+    return SignatureTestUtils.signedChunkedBody(
+        signingKey(), DATE_TIME, SCOPE, SEED_SIGNATURE, content);
+  }
+
+  private static byte[] signingKey() {
+    return SignatureTestUtils.signingKey(SECRET_KEY, DATE, "us-east-1", "s3");
+  }
+
+  private static SignatureInfo signatureInfo() {
+    return new SignatureInfo.Builder(SignatureInfo.Version.V4)
+        .setDate(DATE)
+        .setDateTime(DATE_TIME)
+        .setCredentialScope(SCOPE)
+        .setSignature(SEED_SIGNATURE)
+        .build();
   }
 
   @Test
@@ -279,6 +345,13 @@ public class TestPartUpload {
     assertEquals(1, parts.getPartInfoList().size());
     assertEquals(contentLength,
         parts.getPartInfoList().get(0).getSize());
+  }
+
+  private void assertNoParts(String uploadID, String key) throws IOException {
+    OzoneMultipartUploadPartListParts parts = client.getObjectStore()
+        .getS3Bucket(OzoneConsts.S3_BUCKET)
+        .listParts(key, uploadID, 0, 100);
+    assertThat(parts.getPartInfoList()).isEmpty();
   }
 
   private static Response putPart(ObjectEndpoint subject, String bucket,

@@ -316,6 +316,15 @@ public class TestSignedChunksInputStream {
   }
 
   @Test
+  void rejectsFinalChunkMissingDataTerminator() {
+    String body = signedChunkedBody('a');
+    body = body.substring(0, body.length() - 2);
+    InputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(body.getBytes(UTF_8)), newValidator());
+    assertThrows(IOException.class, () -> IOUtils.toString(is, UTF_8));
+  }
+
+  @Test
   void rejectsBodyTruncatedMidPayload() throws Exception {
     String body = "10000;chunk-signature=" + CHUNK1_SIGNATURE + "\r\n" + repeat('a', 100);
     InputStream is = new SignedChunksInputStream(
@@ -344,7 +353,7 @@ public class TestSignedChunksInputStream {
         + repeat(payloadChar, 65536) + "\r\n"
         + "400;chunk-signature=" + CHUNK2_SIGNATURE + "\r\n"
         + repeat(payloadChar, 1024) + "\r\n"
-        + "0;chunk-signature=" + FINAL_CHUNK_SIGNATURE + "\r\n";
+        + "0;chunk-signature=" + FINAL_CHUNK_SIGNATURE + "\r\n\r\n";
   }
 
   private static ChunksValidator newValidator() {
