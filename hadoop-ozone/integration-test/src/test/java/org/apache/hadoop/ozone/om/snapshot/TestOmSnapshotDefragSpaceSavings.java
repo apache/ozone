@@ -121,7 +121,7 @@ public class TestOmSnapshotDefragSpaceSavings {
     conf.setTimeDuration(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, 2, TimeUnit.HOURS);
     conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 10);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
-    conf.setInt(OZONE_REPLICATION, ONE.getValue());
+    conf.setInt(OZONE_REPLICATION, 1);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
