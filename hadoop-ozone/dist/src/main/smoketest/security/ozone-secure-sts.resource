@@ -19,6 +19,7 @@ Library             String
 Library             BuiltIn
 Library             DateTime
 Library             Collections
+Resource            ../admincli/lib.resource
 Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
 
@@ -84,6 +85,13 @@ Update Ranger Policy Items
     ${updated} =                  Execute                       printf '%s' '${policy}' | jq '.policyItems += ${policy_item_json}'
     ${result} =                   Execute                       curl --silent --show-error --include --location --netrc -X PUT -H "Content-Type: application/json" -H "accept: application/json" --data '${updated}' "${RANGER_ENDPOINT_URL}/service/public/v2/api/policy/${policy_id}"
     Should Contain                ${result}                     HTTP/1.1 200
+
+Refresh Ranger Policy Cache
+    [Arguments]                   ${admin_user}=hdfs  ${admin_keytab}=hdfs.keytab
+    Kinit test user               ${admin_user}                 ${admin_keytab}
+    ${om_param} =                 Get OM Service Param
+    ${output} =                   Execute                       ozone admin om updateranger ${om_param}
+    Should Contain                ${output}                     Operation completed successfully
 
 Assume Role And Get Temporary Credentials
     [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900
