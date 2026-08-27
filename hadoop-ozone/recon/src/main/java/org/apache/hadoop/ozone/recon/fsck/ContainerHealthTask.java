@@ -434,9 +434,6 @@ public class ContainerHealthTask extends ReconScmTask {
         }
         return true;
       }
-    } catch (InvalidStateTransitionException e) {
-      LOG.error("Failed to transition Container state while processing " +
-          "container in Container Health task", e);
     } catch (IOException e) {
       LOG.error("Got exception while processing container in" +
           " Container Health task", e);
