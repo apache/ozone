@@ -3,7 +3,7 @@ title: Server Side CopyKey with Shared Block Groups
 summary: Metadata-only S3 CopyObject that shares the source key's blocks, and the reclaim rule that keeps it safe
 date: 2026-08-28
 status: draft
-author: Lixucheng
+author: Peter Lee
 ---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
