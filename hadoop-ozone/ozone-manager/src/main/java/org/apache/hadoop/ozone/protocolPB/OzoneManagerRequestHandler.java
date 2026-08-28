@@ -655,6 +655,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     LookupKeyResponse.Builder resp =
         LookupKeyResponse.newBuilder();
     KeyArgs keyArgs = request.getKeyArgs();
+    OmKeyArgs.validateAddressedVersion(keyArgs);
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
@@ -675,6 +676,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private GetKeyInfoResponse getKeyInfo(GetKeyInfoRequest request,
                                         int clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
+    OmKeyArgs.validateAddressedVersion(keyArgs);
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())

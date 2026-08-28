@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -84,6 +85,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     Objects.requireNonNull(deleteKeyRequest, "deleteKeyRequest == null");
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
+    OmKeyArgs.validateAddressedVersion(keyArgs);
+
     String keyPath = keyArgs.getKeyName();
 
     OmUtils.verifyKeyNameWithSnapshotReservedWordForDeletion(keyPath);
@@ -324,22 +327,28 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         : Long.valueOf(keyArgs.getVersionId()).equals(
             currentVersion.getVersionId()));
 
-    // Everything that can fail runs before the first cache entry is added, so
-    // that a failed request leaves no versionedKeyTable cache entry behind.
-    String versionedKey;
+    String objectKey =
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+
+    // The dbKey the version is deleted from, in the keyTable when it is the
+    // current version and in the versionedKeyTable otherwise. Everything that
+    // can fail runs before the first cache entry is added, so that a failed
+    // request leaves no versionedKeyTable cache entry behind.
+    String deletedVersionKey;
     OmKeyInfo version;
     if (deletingCurrent) {
-      versionedKey = null;
+      deletedVersionKey = objectKey;
       version = currentVersion;
     } else if (nullVersion) {
       Pair<String, OmKeyInfo> nullSlot = getNoncurrentNullVersion(
           omMetadataManager, volumeName, bucketName, keyName);
-      versionedKey = nullSlot == null ? null : nullSlot.getKey();
+      deletedVersionKey = nullSlot == null ? null : nullSlot.getKey();
       version = nullSlot == null ? null : nullSlot.getValue();
     } else {
-      versionedKey = omMetadataManager.getVersionedOzoneKey(
+      deletedVersionKey = omMetadataManager.getVersionedOzoneKey(
           volumeName, bucketName, keyName, keyArgs.getVersionId());
-      version = omMetadataManager.getVersionedKeyTable().get(versionedKey);
+      version =
+          omMetadataManager.getVersionedKeyTable().get(deletedVersionKey);
     }
     if (version == null) {
       throw new OMException("Version not found for key " + keyName,
@@ -363,8 +372,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     version = version.toBuilder().setUpdateID(trxnLogIndex).build();
 
-    String objectKey =
-        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
     if (deletingCurrent) {
       if (promoted != null) {
         omMetadataManager.getKeyTable(getBucketLayout())
@@ -378,7 +385,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       }
     } else {
       omMetadataManager.getVersionedKeyTable().addCacheEntry(
-          new CacheKey<>(versionedKey), CacheValue.get(trxnLogIndex));
+          new CacheKey<>(deletedVersionKey), CacheValue.get(trxnLogIndex));
     }
 
     // A delete marker holds no blocks, so it releases namespace but no space.
@@ -389,7 +396,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     return new OMKeyVersionDeleteResponse(
         omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-        version, deletingCurrent ? objectKey : versionedKey, deletingCurrent,
+        version, deletedVersionKey, deletingCurrent,
         promotedKey, promoted, omBucketInfo.copyObject());
   }
 
