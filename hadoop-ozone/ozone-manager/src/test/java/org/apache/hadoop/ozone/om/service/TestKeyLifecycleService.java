@@ -3462,6 +3462,24 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }, WAIT_CHECK_INTERVAL, 10000);
   }
 
+  /**
+   * Wait until the multipart upload is only in the DB, so a direct write to the table is not undone by
+   * the pending flush of its creation. The cache is cleaned up asynchronously after the write, so being
+   * able to read the upload back is not enough.
+   */
+  private void awaitMultipartCacheDrained(String dbKey) throws TimeoutException, InterruptedException {
+    Table<String, OmMultipartKeyInfo> mpuTable = metadataManager.getMultipartInfoTable();
+    GenericTestUtils.waitFor(() -> {
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>> cacheIter = mpuTable.cacheIterator();
+      while (cacheIter.hasNext()) {
+        if (dbKey.equals(cacheIter.next().getKey().getCacheKey())) {
+          return false;
+        }
+      }
+      return true;
+    }, WAIT_CHECK_INTERVAL, 10000);
+  }
+
   // Tracks every injector installed, not just the current set, so a replaced one is still released
   private void installInjectors(FaultInjectorImpl... injectors) {
     installedInjectors.addAll(Arrays.asList(injectors));
@@ -3676,8 +3694,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
   }
 
   private void updateMultipartUploadCreationTime(String volumeName, String bucketName,
-      String keyName, String uploadId, long newCreationTime) throws IOException {
+      String keyName, String uploadId, long newCreationTime)
+      throws IOException, TimeoutException, InterruptedException {
     String dbKey = metadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadId);
+    // The upload was created through the request pipeline, which flushes to the DB asynchronously.
+    // Writing straight to the table before that flush lands lets the flush overwrite the new creation
+    // time, so the upload never looks expired. Wait for the entry to leave the cache first.
+    awaitMultipartCacheDrained(dbKey);
     OmMultipartKeyInfo existingInfo = metadataManager.getMultipartInfoTable().get(dbKey);
     if (existingInfo == null) {
       fail("Multipart upload not found: " + dbKey);
