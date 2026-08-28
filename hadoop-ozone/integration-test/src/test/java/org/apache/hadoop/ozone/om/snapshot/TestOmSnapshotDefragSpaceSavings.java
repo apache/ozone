@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
@@ -45,6 +47,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -99,6 +103,9 @@ public class TestOmSnapshotDefragSpaceSavings {
   private static final int DEFRAG_WAIT_MS = 600_000;
   private static final int KEY_DELETE_WAIT_MS = 60_000;
   private static final long FOOTPRINT_TOLERANCE_BYTES = 8192;
+  private static final DefaultReplicationConfig REPLICATION_CONFIG_ONE =
+      new DefaultReplicationConfig(
+          ReplicationConfig.fromTypeAndFactor(RATIS, ONE));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -121,11 +128,13 @@ public class TestOmSnapshotDefragSpaceSavings {
     conf.setTimeDuration(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, 2, TimeUnit.HOURS);
     conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 10);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
-    conf.setInt(OZONE_REPLICATION, 1);
+    conf.set(OZONE_REPLICATION, ONE.name());
+    conf.set(OZONE_REPLICATION_TYPE, RATIS.name());
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
-    cluster.waitForPipelineTobeReady(ONE, 60_000);
+    cluster.waitForPipelineTobeReady(
+        org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE, 60_000);
     client = cluster.newClient();
     store = client.getObjectStore();
     resumeBackgroundServices();
@@ -343,7 +352,7 @@ public class TestOmSnapshotDefragSpaceSavings {
 
   private SnapshotChainSetup createSnapshotChainWithChurn(BucketLayout layout)
       throws IOException, InterruptedException, TimeoutException {
-    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, layout);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, layout, REPLICATION_CONFIG_ONE);
     String volumeName = bucket.getVolumeName();
     String bucketName = bucket.getName();
     DBStore activeDbStore = cluster.getOzoneManager().getMetadataManager().getStore();
@@ -379,7 +388,7 @@ public class TestOmSnapshotDefragSpaceSavings {
 
   private SnapshotInfo createSingleSnapshotWithChurn(BucketLayout layout)
       throws IOException, InterruptedException, TimeoutException {
-    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, layout);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, layout, REPLICATION_CONFIG_ONE);
     String volumeName = bucket.getVolumeName();
     String bucketName = bucket.getName();
     DBStore activeDbStore = cluster.getOzoneManager().getMetadataManager().getStore();
