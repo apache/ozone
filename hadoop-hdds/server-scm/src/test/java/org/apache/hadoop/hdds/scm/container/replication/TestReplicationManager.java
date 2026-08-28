@@ -1423,6 +1423,62 @@ public class TestReplicationManager {
         .getEcReconstructionCmdsDeferredTotal());
   }
 
+  /**
+   * The reconstruction command must carry the lowest apparent version among all
+   * the involved nodes (sources plus targets).
+   */
+  @Test
+  public void testReconstructionApparentVersionIsLowestOfInvolvedNodes()
+      throws CommandTargetOverloadedException, NodeNotFoundException, NotLeaderException {
+    Map<DatanodeDetails, Integer> targetNodes = new HashMap<>();
+    DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
+    targetNodes.put(cmdTarget, 0);
+    targetNodes.put(MockDatanodeDetails.randomDatanodeDetails(), 5);
+
+    mockReplicationCommandCounts(targetNodes::get, any -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand command = createReconstructionCommand(
+        container, targetNodes.keySet().toArray(new DatanodeDetails[0]));
+
+    // Every node defaults to SOFTWARE_VERSION; stub one source lower so the
+    // command must fall back to the lower version.
+    ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
+    DatanodeDetails olderSource = command.getSources().get(0).getDnDetails();
+    mockDatanodeWithApparentVersion(olderSource, lower);
+
+    replicationManager.sendThrottledReconstructionCommand(container, command);
+
+    assertEquals(1, commandsSent.size());
+    Pair<DatanodeID, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    ReconstructECContainersCommand sent =
+        (ReconstructECContainersCommand) cmd.getValue();
+    assertEquals(lower, sent.getApparentVersion());
+  }
+
+  @Test
+  public void testReconstructionApparentVersionLookupThrowsWhenNodeNotFound()
+      throws NodeNotFoundException {
+    Map<DatanodeDetails, Integer> targetNodes = new HashMap<>();
+    targetNodes.put(MockDatanodeDetails.randomDatanodeDetails(), 0);
+    targetNodes.put(MockDatanodeDetails.randomDatanodeDetails(), 0);
+
+    mockReplicationCommandCounts(targetNodes::get, any -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand command = createReconstructionCommand(
+        container, targetNodes.keySet().toArray(new DatanodeDetails[0]));
+
+    // SCM has no information for one of the sources.
+    DatanodeDetails unknownSource = command.getSources().get(0).getDnDetails();
+    when(nodeManager.getNode(unknownSource.getID())).thenReturn(null);
+
+    assertThrows(IllegalArgumentException.class, () ->
+        replicationManager.sendThrottledReconstructionCommand(container, command));
+  }
+
   private ReconstructECContainersCommand createReconstructionCommand(
       ContainerInfo containerInfo, DatanodeDetails... targets) {
     List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex> sources

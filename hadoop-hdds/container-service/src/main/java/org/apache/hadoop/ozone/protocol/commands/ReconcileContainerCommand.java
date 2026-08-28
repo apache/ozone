@@ -23,10 +23,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconcileContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Asks datanodes to reconcile the specified container with other container replicas.
@@ -34,11 +39,26 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerCommandProto> {
 
   private final Set<DatanodeDetails> peerDatanodes;
+  private ComponentVersion apparentVersion;
+  private static final Logger LOG = LoggerFactory.getLogger(ReconcileContainerCommand.class);
 
   public ReconcileContainerCommand(long containerID, Set<DatanodeDetails> peerDatanodes) {
     // Container ID serves as command ID, since only one reconciliation should be in progress at a time.
     super(containerID);
     this.peerDatanodes = peerDatanodes;
+  }
+
+  public void setApparentVersion(ComponentVersion apparentVersion) {
+    this.apparentVersion = apparentVersion;
+  }
+
+  /**
+   * @return the apparent version that should be used to carry out this
+   *     reconciliation. SCM computes this as the lowest apparent version among
+   *     the nodes involved.
+   */
+  public ComponentVersion getApparentVersion() {
+    return apparentVersion;
   }
 
   @Override
@@ -53,6 +73,7 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
     for (DatanodeDetails dd : peerDatanodes) {
       builder.addPeers(dd.getProtoBufMessage());
     }
+    builder.setApparentVersion(apparentVersion.serialize());
     return builder.build();
   }
 
@@ -74,14 +95,27 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
         .collect(Collectors.toSet())
         : emptySet();
 
-    return new ReconcileContainerCommand(protoMessage.getContainerID(), peerNodes);
+    ReconcileContainerCommand cmd =
+        new ReconcileContainerCommand(protoMessage.getContainerID(), peerNodes);
+
+    if (protoMessage.hasApparentVersion()) {
+      cmd.apparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+          protoMessage.getApparentVersion());
+    } else {
+      LOG.warn("Received reconcile command for container {} with no apparent version. Falling back to {}",
+          cmd.getContainerID(), HDDSVersion.DEFAULT_VERSION);
+      cmd.apparentVersion = HDDSVersion.DEFAULT_VERSION;
+    }
+
+    return cmd;
   }
 
   @Override
   public String toString() {
     return getType() +
         ": containerId=" + getContainerID() +
-        ", peerNodes=" + peerDatanodes;
+        ", peerNodes=" + peerDatanodes +
+        ", apparentVersion=" + apparentVersion;
   }
 
   @Override

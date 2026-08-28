@@ -550,7 +550,21 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     }
     DatanodeDetails target = selectAndOptionallyExcludeDatanode(
         rmConf.getReconstructionCommandWeight(), targetWithCmds);
+    command.setApparentVersion(computeVersionForReconstruction(command));
     sendDatanodeCommand(command, containerInfo, target);
+  }
+
+  private ComponentVersion computeVersionForReconstruction(ReconstructECContainersCommand command) {
+    List<DatanodeInfo> involved = new ArrayList<>();
+    for (ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex source : command.getSources()) {
+      involved.add(getDatanodeInfo(source.getDnDetails()));
+    }
+    for (ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex target : command.getSources()) {
+      involved.add(getDatanodeInfo(target.getDnDetails()));
+    }
+    // Reconstruction is handled as a specific type of replication command which uses the same generic logic within the
+    // version manager as computing a version for full container replication.
+    return ScmVersionManager.computeVersionForReplication(involved);
   }
 
   private ComponentVersion computeVersionForReplication(DatanodeDetails source, DatanodeDetails target) {

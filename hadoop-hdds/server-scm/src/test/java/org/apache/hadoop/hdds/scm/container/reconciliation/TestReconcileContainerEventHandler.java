@@ -36,9 +36,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -54,8 +57,11 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.Result;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,6 +78,7 @@ public class TestReconcileContainerEventHandler {
   private EventPublisher eventPublisher;
   private ReconcileContainerEventHandler eventHandler;
   private SCMContext scmContext;
+  private NodeManager nodeManager;
 
   private static final ContainerID CONTAINER_ID = ContainerID.valueOf(123L);
   private static final long LEADER_TERM = 3L;
@@ -90,7 +97,14 @@ public class TestReconcileContainerEventHandler {
     when(scmContext.isLeader()).thenReturn(true);
     when(scmContext.getTermOfLeader()).thenReturn(LEADER_TERM);
     eventPublisher = mock(EventPublisher.class);
-    eventHandler = new ReconcileContainerEventHandler(containerManager, scmContext);
+    nodeManager = mock(NodeManager.class);
+    // By default every datanode is known and reports the current version, so
+    // the reconcile path can resolve an apparent version. Individual tests
+    // override this for specific nodes.
+    DatanodeInfo defaultNodeInfo = mock(DatanodeInfo.class);
+    when(defaultNodeInfo.getLastKnownApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(nodeManager.getNode(any(DatanodeID.class))).thenReturn(defaultNodeInfo);
+    eventHandler = new ReconcileContainerEventHandler(containerManager, scmContext, nodeManager);
   }
 
   /**
@@ -247,6 +261,28 @@ public class TestReconcileContainerEventHandler {
     }
 
     assertEquals(allNodeIDs, nodesReceivingCommands);
+  }
+
+  @Test
+  public void testReconcileCommandCarriesLowestApparentVersion() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = addReplicasToContainer(3);
+
+    // Every node defaults to SOFTWARE_VERSION; stub one replica lower so all
+    // dispatched commands must fall back to the lower version.
+    ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
+    DatanodeDetails olderNode = replicas.iterator().next().getDatanodeDetails();
+    DatanodeInfo olderInfo = mock(DatanodeInfo.class);
+    when(olderInfo.getLastKnownApparentVersion()).thenReturn(lower);
+    when(nodeManager.getNode(olderNode.getID())).thenReturn(olderInfo);
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+
+    verify(eventPublisher, times(replicas.size())).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    for (CommandForDatanode<ReconcileContainerCommandProto> dnCommand : commandCaptor.getAllValues()) {
+      ReconcileContainerCommand command = (ReconcileContainerCommand) dnCommand.getCommand();
+      assertEquals(lower, command.getApparentVersion());
+    }
   }
 
   @ParameterizedTest
