@@ -91,27 +91,13 @@ public interface IAccessAuthorizer {
     NONE,
     ASSUME_ROLE;   // ability to create STS tokens
 
-    private static int length = ACLType.values().length;
     static {
+      final int length = values().length;
       if (length > 16) {
         // must update getAclBytes(..) and other code
         throw new AssertionError("BUG: Length = " + length
             + " > 16, check the commit of this change and update the code.");
       }
-    }
-
-    private static ACLType[] vals = ACLType.values();
-
-    public static int getNoOfAcls() {
-      return length;
-    }
-
-    public static ACLType getAclTypeFromOrdinal(int ordinal) {
-      if (ordinal > length - 1 && ordinal > -1) {
-        throw new IllegalArgumentException("Ordinal greater than array length" +
-            ". ordinal:" + ordinal);
-      }
-      return vals[ordinal];
     }
 
     /**

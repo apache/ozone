@@ -64,7 +64,7 @@ import org.junit.jupiter.api.TestMethodOrder;
  * @see TestOzoneManagerHAFollowerReadWithAllRunning
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneManagerHAFollowerRead {
+public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends OzoneManagerHAFollowerReadTests {
 
   /**
    * After restarting OMs we need to wait

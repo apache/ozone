@@ -30,7 +30,10 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 
 /**
- * TODO.
+ * Ratis server that provides SCM HA by hosting the {@link SCMStateMachine}
+ * and replicating SCM metadata operations across the SCM Raft group. Exposes
+ * lifecycle (start/stop/snapshot), membership (add/remove SCM), and
+ * leader/role query operations.
  */
 public interface SCMRatisServer {
 

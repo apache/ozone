@@ -216,7 +216,7 @@ class TestKeyPathLock {
     // Waiting for all the threads to be instantiated/to reach
     // acquireWriteLock.
     countDown.countDown();
-    assertEquals(1, lock.getCurrentLocks().size());
+    assertEquals(1, lock.getCurrentLockSizeForTesting());
 
     lock.releaseWriteLock(resource, sampleResourceName);
     LOG.info("Write Lock Released by " + Thread.currentThread().getName());
@@ -233,12 +233,11 @@ class TestKeyPathLock {
 
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    String[] resourceName = new String[]{volumeName, bucketName, keyName},
-        higherResourceName = new String[]{volumeName, bucketName};
+    String[] resourceName = new String[]{volumeName, bucketName, keyName};
 
     lock.acquireWriteLock(resource, resourceName);
     RuntimeException ex =
-        assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(higherResource, higherResourceName));
+        assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(higherResource, volumeName, bucketName));
     String message = "cannot acquire " + higherResource.getName() + " lock " +
         "while holding [" + resource.getName() + "] lock(s).";
     assertThat(ex).hasMessageContaining(message);
@@ -255,12 +254,11 @@ class TestKeyPathLock {
 
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    String[] resourceName = new String[]{volumeName, bucketName, keyName},
-        higherResourceName = new String[]{volumeName, bucketName};
+    String[] resourceName = new String[]{volumeName, bucketName, keyName};
 
     lock.acquireReadLock(resource, resourceName);
-    RuntimeException ex =
-        assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(higherResource, higherResourceName));
+    RuntimeException ex = assertThrows(RuntimeException.class,
+        () -> lock.acquireWriteLock(higherResource, volumeName, bucketName));
     String message = "cannot acquire " + higherResource.getName() + " lock " +
         "while holding [" + resource.getName() + "] lock(s).";
     assertThat(ex).hasMessageContaining(message);
@@ -277,12 +275,11 @@ class TestKeyPathLock {
 
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    String[] resourceName = new String[]{volumeName, bucketName, keyName},
-        higherResourceName = new String[]{volumeName, bucketName};
+    String[] resourceName = new String[]{volumeName, bucketName, keyName};
 
     lock.acquireReadLock(resource, resourceName);
     RuntimeException ex =
-        assertThrows(RuntimeException.class, () -> lock.acquireReadLock(higherResource, higherResourceName));
+        assertThrows(RuntimeException.class, () -> lock.acquireReadLock(higherResource, volumeName, bucketName));
     String message = "cannot acquire " + higherResource.getName() + " lock " +
         "while holding [" + resource.getName() + "] lock(s).";
     assertThat(ex).hasMessageContaining(message);
@@ -299,12 +296,11 @@ class TestKeyPathLock {
 
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    String[] resourceName = new String[]{volumeName, bucketName, keyName},
-        higherResourceName = new String[]{volumeName, bucketName};
+    String[] resourceName = new String[]{volumeName, bucketName, keyName};
 
     lock.acquireWriteLock(resource, resourceName);
     RuntimeException ex =
-        assertThrows(RuntimeException.class, () -> lock.acquireReadLock(higherResource, higherResourceName));
+        assertThrows(RuntimeException.class, () -> lock.acquireReadLock(higherResource, volumeName, bucketName));
     String message = "cannot acquire " + higherResource.getName() + " lock " +
         "while holding [" + resource.getName() + "] lock(s).";
     assertThat(ex).hasMessageContaining(message);

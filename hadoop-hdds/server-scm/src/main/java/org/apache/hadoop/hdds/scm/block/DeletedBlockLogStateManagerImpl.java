@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceDefinition;
 import org.apache.hadoop.hdds.scm.ha.invoker.DeletedBlockLogStateManagerInvoker;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -52,7 +53,10 @@ public class DeletedBlockLogStateManagerImpl
   private Table<String, ByteString> statefulConfigTable;
   private final SCMHADBTransactionBuffer transactionBuffer;
   private volatile Set<Long> deletingTxIDs;
-  public static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
+  private static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
+
+  public static final StatefulServiceDefinition<DeletedBlocksTransactionSummary> SERVICE_DEFINITION =
+      new StatefulServiceDefinition<>(SERVICE_NAME, DeletedBlocksTransactionSummary.parser());
 
   public DeletedBlockLogStateManagerImpl(Table<Long, DeletedBlocksTransaction> deletedTable,
              Table<String, ByteString> statefulServiceConfigTable,

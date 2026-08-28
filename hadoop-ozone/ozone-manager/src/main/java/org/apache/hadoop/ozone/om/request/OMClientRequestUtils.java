@@ -73,7 +73,7 @@ public final class OMClientRequestUtils {
 
   private static boolean checkInSnapshotDB(OMMetadataManager omMetadataManager,
       String dbSnapshotBucketKey) throws IOException {
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (TableIterator<String, Table.KeyValue<String, SnapshotInfo>>
         iterator = omMetadataManager.getSnapshotInfoTable().iterator()) {
       iterator.seek(dbSnapshotBucketKey);
       return iterator.hasNext() && iterator.next().getKey()

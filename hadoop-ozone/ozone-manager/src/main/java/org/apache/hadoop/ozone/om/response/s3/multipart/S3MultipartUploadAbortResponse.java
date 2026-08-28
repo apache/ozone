@@ -20,15 +20,21 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_PARTS_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartAbortInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -36,7 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * Response for Multipart Abort Request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE,
-    MULTIPART_INFO_TABLE, BUCKET_TABLE})
+    MULTIPART_INFO_TABLE, MULTIPART_PARTS_TABLE, BUCKET_TABLE})
 public class S3MultipartUploadAbortResponse extends
     AbstractS3MultipartAbortResponse {
 
@@ -44,16 +50,23 @@ public class S3MultipartUploadAbortResponse extends
   private String multipartOpenKey;
   private OmMultipartKeyInfo omMultipartKeyInfo;
   private OmBucketInfo omBucketInfo;
+  private List<OmKeyInfo> partsKeyInfoToDelete;
+  private List<OmMultipartPartKey> partsTableKeysToDelete;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadAbortResponse(@Nonnull OMResponse omResponse,
       String multipartKey, String multipartOpenKey,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout,
+      List<OmKeyInfo> partsKeyInfoToDelete,
+      List<OmMultipartPartKey> partsTableKeysToDelete) {
     super(omResponse, bucketLayout);
     this.multipartKey = multipartKey;
     this.multipartOpenKey = multipartOpenKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.omBucketInfo = omBucketInfo;
+    this.partsKeyInfoToDelete = partsKeyInfoToDelete;
+    this.partsTableKeysToDelete = partsTableKeysToDelete;
   }
 
   /**
@@ -69,8 +82,15 @@ public class S3MultipartUploadAbortResponse extends
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    addAbortToBatch(omMetadataManager, batchOperation,
-        multipartKey, multipartOpenKey, omMultipartKeyInfo, omBucketInfo,
-        getBucketLayout());
+    OmMultipartAbortInfo abortInfo = new OmMultipartAbortInfo.Builder()
+        .setMultipartKey(multipartKey)
+        .setMultipartOpenKey(multipartOpenKey)
+        .setMultipartKeyInfo(omMultipartKeyInfo)
+        .setBucketLayout(getBucketLayout())
+        .setPartsKeyInfoToDelete(partsKeyInfoToDelete)
+        .setPartsTableKeysToDelete(partsTableKeysToDelete)
+        .build();
+    addAbortToBatch(omMetadataManager, batchOperation, omBucketInfo,
+        Collections.singletonList(abortInfo));
   }
 }

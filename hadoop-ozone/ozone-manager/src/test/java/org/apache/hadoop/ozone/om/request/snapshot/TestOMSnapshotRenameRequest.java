@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotRequestAndResponseTests;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +62,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests OMSnapshotRenameRequest class, which handles RenameSnapshot request.
  */
-public class TestOMSnapshotRenameRequest extends TestSnapshotRequestAndResponse {
+public class TestOMSnapshotRenameRequest extends SnapshotRequestAndResponseTests {
   private String snapshotName1;
   private String snapshotName2;
 

@@ -420,11 +420,13 @@ enum ReplicationCommandPriority {
 }
 
 /**
-This command asks the datanode to replicate a container from specific sources.
+This command asks the datanode to push a container to the specified target.
 */
 message ReplicateContainerCommandProto {
   required int64 containerID = 1;
-  repeated DatanodeDetailsProto sources = 2;
+  // Deprecated: pull-based replication has been removed. This field is no
+  // longer populated or interpreted. Use target (field 5) instead.
+  repeated DatanodeDetailsProto sources = 2 [deprecated = true];
   required int64 cmdId = 3;
   optional int32 replicaIndex = 4;
   optional DatanodeDetailsProto target = 5;

@@ -42,6 +42,7 @@ OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 OZONE-SITE.XML_ozone.om.volume.listall.allowed=false
 
 OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.block.size=1MB
 OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
@@ -178,3 +179,9 @@ OZONE-SITE.XML_hdds.secret.key.expiry.duration=1h
 OZONE-SITE.XML_ozone.manager.delegation.token.max-lifetime=30m
 OZONE-SITE.XML_ozone.manager.delegation.token.renew-interval=5m
 OZONE-SITE.XML_ozone.manager.delegation.remover.scan.interval=1m
+
+# Enable Ozone lifecycle service
+OZONE-SITE.XML_ozone.lifecycle.service.enabled=true
+OZONE-SITE.XML_ozone.lifecycle.service.interval=30s
+OZONE-SITE.XML_ozone.lifecycle.service.timeout=10s
+

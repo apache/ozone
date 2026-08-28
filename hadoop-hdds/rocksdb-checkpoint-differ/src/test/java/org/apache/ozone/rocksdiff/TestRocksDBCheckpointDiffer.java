@@ -986,11 +986,14 @@ public class TestRocksDBCheckpointDiffer {
 
     // Confirm correct links created
     try (Stream<Path> sstPathStream = Files.list(sstBackUpDir.toPath())) {
-      List<String> expectedLinks = sstPathStream.map(Path::getFileName)
+      List<String> actualLinks = sstPathStream.map(Path::getFileName)
               .map(Object::toString).sorted().collect(Collectors.toList());
-      assertEquals(expectedLinks, asList(
-              "000017.sst", "000019.sst", "000021.sst", "000023.sst",
-          "000024.sst", "000026.sst", "000029.sst"));
+      assertThat(actualLinks).hasSize(7);
+      assertThat(actualLinks).allMatch(link -> link.matches("\\d{6}\\.sst"));
+      for (String linkName : actualLinks) {
+        assertTrue(Files.size(sstBackUpDir.toPath().resolve(linkName)) > 0,
+            "SST link should not be empty: " + linkName);
+      }
     }
     rocksDBCheckpointDiffer.getForwardCompactionDAG().nodes().stream().forEach(compactionNode -> {
       Assertions.assertNotNull(compactionNode.getStartKey());
@@ -1015,47 +1018,43 @@ public class TestRocksDBCheckpointDiffer {
   void diffAllSnapshots(RocksDBCheckpointDiffer differ)
       throws IOException {
     final DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
-
-    // Hard-coded expected output.
-    // The results are deterministic. Retrieved from a successful run.
-    final List<List<String>> expectedDifferResult = asList(
-        asList("000023", "000029", "000026", "000019", "000021", "000031"),
-        asList("000023", "000029", "000026", "000021", "000031"),
-        asList("000023", "000029", "000026", "000031"),
-        asList("000029", "000026", "000031"),
-        asList("000029", "000031"),
-        Collections.singletonList("000031"),
-        Collections.emptyList()
-    );
-    assertEquals(snapshots.size(), expectedDifferResult.size());
-
-    int index = 0;
-    List<String> expectedDiffFiles = new ArrayList<>();
+    boolean sawNonEmptyDiff = false;
     for (DifferSnapshotInfo snap : snapshots) {
       // Returns a list of SST files to be fed into RocksCheckpointDiffer Dag.
       List<String> tablesToTrack = new ArrayList<>(COLUMN_FAMILIES_TO_TRACK_IN_DAG);
       // Add some invalid index.
       tablesToTrack.add("compactionLogTable");
+
+      // Baseline diff when tracking every table. A subset's diff must equal
+      // this baseline filtered to the subset's column families (files with no
+      // column family are always kept). This relationship is deterministic and
+      // stable across RocksDB versions, unlike hard-coded SST file names.
+      Set<String> allTables = new HashSet<>(tablesToTrack);
+      List<SstFileInfo> baseline = differ.getSSTDiffList(
+          new DifferSnapshotVersion(src, 0, allTables),
+          new DifferSnapshotVersion(snap, 0, allTables),
+          null, allTables, true).orElse(Collections.emptyList());
+      sawNonEmptyDiff = sawNonEmptyDiff || !baseline.isEmpty();
+
+      // Independent structural oracle, not derived from getSSTDiffList's own
+      // output: a snapshot diffed against itself must have no differing SST
+      // files. Together with the sawNonEmptyDiff guard below, this bounds a
+      // systematically broken diff in both directions (returning nothing, or
+      // returning files even for identical snapshots).
+      if (snap == src) {
+        assertThat(baseline)
+            .as("diff of a snapshot against itself must be empty")
+            .isEmpty();
+      }
+
       Set<String> tableToLookUp = new HashSet<>();
       for (int i = 0; i < Math.pow(2, tablesToTrack.size()); i++) {
         tableToLookUp.clear();
-        expectedDiffFiles.clear();
         int mask = i;
         while (mask != 0) {
           int firstSetBitIndex = Integer.numberOfTrailingZeros(mask);
           tableToLookUp.add(tablesToTrack.get(firstSetBitIndex));
           mask &= mask - 1;
-        }
-        for (String diffFile : expectedDifferResult.get(index)) {
-          String columnFamily;
-          if (rocksDBCheckpointDiffer.getCompactionNodeMap().containsKey(diffFile)) {
-            columnFamily = rocksDBCheckpointDiffer.getCompactionNodeMap().get(diffFile).getColumnFamily();
-          } else {
-            columnFamily = src.getSstFile(0, diffFile).getColumnFamily();
-          }
-          if (columnFamily == null || tableToLookUp.contains(columnFamily)) {
-            expectedDiffFiles.add(diffFile);
-          }
         }
         DifferSnapshotVersion srcSnapVersion = new DifferSnapshotVersion(src, 0, tableToLookUp);
         DifferSnapshotVersion destSnapVersion = new DifferSnapshotVersion(snap, 0, tableToLookUp);
@@ -1064,12 +1063,24 @@ public class TestRocksDBCheckpointDiffer {
         LOG.info("SST diff list from '{}' to '{}': {} tables: {}",
             src.getDbPath(0), snap.getDbPath(0), sstDiffList, tableToLookUp);
 
-        assertEquals(expectedDiffFiles, sstDiffList.stream().map(SstFileInfo::getFileName)
-            .collect(Collectors.toList()));
+        // Expected files: baseline entries whose column family is untracked
+        // (null) or included in this subset. getSSTDiffList returns the values
+        // of a HashMap, so its ordering is not guaranteed; compare as sets.
+        List<String> expectedFiles = baseline.stream()
+            .filter(sstFileInfo -> sstFileInfo.getColumnFamily() == null
+                || tableToLookUp.contains(sstFileInfo.getColumnFamily()))
+            .map(SstFileInfo::getFileName)
+            .collect(Collectors.toList());
+        List<String> actualFiles = sstDiffList.stream()
+            .map(SstFileInfo::getFileName)
+            .collect(Collectors.toList());
+        assertThat(actualFiles).containsExactlyInAnyOrderElementsOf(expectedFiles);
       }
-
-      ++index;
     }
+    // Guard against getSSTDiffList silently returning nothing for every input.
+    assertThat(sawNonEmptyDiff)
+        .as("expected at least one non-empty SST diff across snapshots")
+        .isTrue();
   }
 
   /**
@@ -1357,8 +1368,7 @@ public class TestRocksDBCheckpointDiffer {
     List<String> initialFiles1 = Arrays.asList("000015", "000013", "000011",
         "000009");
     List<String> initialFiles2 = Arrays.asList("000015", "000013", "000011",
-        "000009", "000018", "000016", "000017", "000026", "000024", "000022",
-        "000020");
+        "000009", "000018", "000016", "000017");
     List<String> initialFiles3 = Arrays.asList("000015", "000013", "000011",
         "000009", "000018", "000016", "000017", "000026", "000024", "000022",
         "000020", "000027", "000030", "000028", "000031", "000029", "000039",
@@ -1366,21 +1376,19 @@ public class TestRocksDBCheckpointDiffer {
         "000046", "000041", "000045", "000054", "000052", "000050", "000048",
         "000059", "000055", "000056", "000060", "000057", "000058");
 
-    List<String> expectedFiles1 = Arrays.asList("000015", "000013", "000011",
-        "000009");
     List<String> expectedFiles2 = Arrays.asList("000015", "000013", "000011",
-        "000009", "000026", "000024", "000022", "000020");
+        "000009");
     List<String> expectedFiles3 = Arrays.asList("000013", "000024", "000035",
         "000011", "000022", "000033", "000039", "000015", "000026", "000037",
         "000048", "000009", "000050", "000054", "000020", "000052");
 
     return Stream.of(
         Arguments.of("Case 1 with compaction log file: " +
-                "No compaction.",
+                "No compaction; orphan backup SST files removed on load.",
             "",
             null,
             initialFiles1,
-            expectedFiles1
+            Collections.emptyList()
         ),
         Arguments.of("Case 2 with compaction log file: " +
                 "One level compaction.",
@@ -1404,11 +1412,11 @@ public class TestRocksDBCheckpointDiffer {
             expectedFiles3
         ),
         Arguments.of("Case 4 with compaction log table: " +
-                "No compaction.",
+                "No compaction; orphan backup SST files removed on load.",
             null,
             Collections.emptyList(),
             initialFiles1,
-            expectedFiles1
+            Collections.emptyList()
         ),
         Arguments.of("Case 5 with compaction log table: " +
                 "One level compaction.",
@@ -1479,7 +1487,7 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   /**
-   * End-to-end test for SST file pruning.
+   * End-to-end test for SST file pruning after compaction log load and orphan cleanup.
    */
   @ParameterizedTest(name = "{0}")
   @MethodSource("sstFilePruningScenarios")
@@ -1543,6 +1551,44 @@ public class TestRocksDBCheckpointDiffer {
       throws IOException {
     try (OutputStream fileOutputStream = Files.newOutputStream(Paths.get(fileName))) {
       fileOutputStream.write(context.getBytes(UTF_8));
+    }
+  }
+
+  @Test
+  public void testCleanupOrphanedSstBackupFiles() throws IOException {
+    CompactionLogEntry compactionLogEntry = new CompactionLogEntry(178, System.currentTimeMillis(),
+        Collections.singletonList(
+            new CompactionFileInfo("000078", "/volume/bucket1/key-1", "/volume/bucket2/key-5", "keyTable")),
+        Collections.singletonList(
+            new CompactionFileInfo("000081", "/volume/bucket1/key-1", "/volume/bucket2/key-10", "keyTable")),
+        null
+    );
+    rocksDBCheckpointDiffer.addToCompactionLogTable(compactionLogEntry);
+
+    createFileWithContext(sstBackUpDir + "/000078" + SST_FILE_EXTENSION, "tracked");
+    // 000081 is a logged output that simulates an input hard-linked by a subsequent compaction
+    // that terminated before its log entry was written.
+    createFileWithContext(sstBackUpDir + "/000081" + SST_FILE_EXTENSION, "logged-output");
+    createFileWithContext(sstBackUpDir + "/000099" + SST_FILE_EXTENSION, "orphan");
+
+    rocksDBCheckpointDiffer.loadAllCompactionLogs();
+
+    assertTrue(Files.exists(sstBackUpDir.toPath().resolve("000078" + SST_FILE_EXTENSION)));
+    assertFalse(Files.exists(sstBackUpDir.toPath().resolve("000081" + SST_FILE_EXTENSION)));
+    assertFalse(Files.exists(sstBackUpDir.toPath().resolve("000099" + SST_FILE_EXTENSION)));
+  }
+
+  @Test
+  public void testPruneSstFilesRetainsBackupFilesWhenCompactionDagIsEmpty() throws IOException {
+    List<String> backupFiles = Arrays.asList("000015", "000013", "000011", "000009");
+    for (String fileName : backupFiles) {
+      createFileWithContext(sstBackUpDir + "/" + fileName + SST_FILE_EXTENSION, fileName);
+    }
+
+    rocksDBCheckpointDiffer.pruneSstFiles();
+
+    for (String fileName : backupFiles) {
+      assertTrue(Files.exists(sstBackUpDir.toPath().resolve(fileName + SST_FILE_EXTENSION)));
     }
   }
 

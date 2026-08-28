@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
+import org.apache.hadoop.ozone.om.response.OMResponseTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -69,7 +69,7 @@ public class TestOMBucketSetPropertyResponse {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
+    OmBucketInfo omBucketInfo = OMResponseTestUtils.createBucket(
         volumeName, bucketName);
     OMBucketSetPropertyResponse omBucketCreateResponse =
         new OMBucketSetPropertyResponse(OMResponse.newBuilder()

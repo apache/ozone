@@ -414,9 +414,16 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public FileStatusAdapter getFileStatus(String key, URI uri,
       Path qualifiedPath, String userName)
       throws IOException {
+    return getFileStatus(key, uri, qualifiedPath, userName, false);
+  }
+
+  @Override
+  public FileStatusAdapter getFileStatus(String key, URI uri,
+      Path qualifiedPath, String userName, boolean headOp)
+      throws IOException {
     try {
       incrementCounter(Statistic.OBJECTS_QUERY, 1);
-      OzoneFileStatus status = bucket.getFileStatus(key);
+      OzoneFileStatus status = bucket.getFileStatus(key, headOp);
       return toFileStatusAdapter(status, userName, uri, qualifiedPath);
 
     } catch (OMException e) {
@@ -537,6 +544,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     OmKeyInfo keyInfo = status.getKeyInfo();
     short replication = (short) keyInfo.getReplicationConfig()
         .getRequiredNodes();
+    boolean isEc = OzoneClientUtils.isKeyErasureCode(keyInfo);
+    String ecPolicy;
+    if (isEc) {
+      ecPolicy = keyInfo.getReplicationConfig().getReplication();
+    } else {
+      ecPolicy = status.isFile() ? "Replicated" : "";
+    }
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
         keyInfo.getReplicatedSize(),
@@ -553,7 +567,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         null,
         getBlockLocations(status),
         OzoneClientUtils.isKeyEncrypted(keyInfo),
-        OzoneClientUtils.isKeyErasureCode(keyInfo)
+        isEc,
+        ecPolicy
     );
   }
 
@@ -562,6 +577,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     BasicOmKeyInfo keyInfo = status.getKeyInfo();
     short replication = (short) keyInfo.getReplicationConfig()
         .getRequiredNodes();
+    boolean isEc = OzoneClientUtils.isKeyErasureCode(keyInfo);
+    String ecPolicy;
+    if (isEc) {
+      ecPolicy = keyInfo.getReplicationConfig().getReplication();
+    } else {
+      ecPolicy = status.isFile() ? "Replicated" : "";
+    }
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
         keyInfo.getReplicatedSize(),
@@ -578,7 +600,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         null,
         getBlockLocations(null),
         keyInfo.isEncrypted(),
-        OzoneClientUtils.isKeyErasureCode(keyInfo)
+        isEc,
+        ecPolicy
     );
   }
 

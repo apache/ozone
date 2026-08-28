@@ -18,10 +18,11 @@
 package org.apache.hadoop.ozone.common;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.ozone.common.Checksum.Algorithm;
+import org.apache.hadoop.ozone.common.Checksum.StreamingChecksum;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,7 +34,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 class TestChecksumCache {
 
   @ParameterizedTest
-  @EnumSource(ChecksumType.class)
+  @EnumSource(value = ChecksumType.class, names = {"CRC32", "CRC32C", "SHA256", "MD5"})
   void testComputeChecksum(ChecksumType checksumType) throws Exception {
     final int bytesPerChecksum = 16;
     ChecksumCache checksumCache = new ChecksumCache(bytesPerChecksum);
@@ -45,7 +46,7 @@ class TestChecksumCache {
       byteArray[i] = (byte) (i % 128);
     }
 
-    final Function<ByteBuffer, ByteString> function = Algorithm.valueOf(checksumType).newChecksumFunction();
+    final StreamingChecksum algo = Algorithm.valueOf(checksumType).newStreamingChecksum();
 
     int iEnd = size / bytesPerChecksum + (size % bytesPerChecksum == 0 ? 0 : 1);
     List<ByteString> lastRes = null;
@@ -54,19 +55,75 @@ class TestChecksumCache {
       ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray, 0, byteBufferLength);
 
       try (ChunkBuffer chunkBuffer = ChunkBuffer.wrap(byteBuffer.asReadOnlyBuffer())) {
-        List<ByteString> res = checksumCache.computeChecksum(chunkBuffer, function);
-        System.out.println(res);
-        // Verify that every entry in the res list except the last one is the same as the one in lastRes list
+        List<ByteString> res = checksumCache.computeChecksum(chunkBuffer, algo, bytesPerChecksum);
+        // Every entry except the last must be unchanged from the prior iteration
+        // (those windows are fully cached and never re-computed).
         if (i > 0) {
           for (int j = 0; j < res.size() - 1; j++) {
             Assertions.assertEquals(lastRes.get(j), res.get(j));
           }
         }
-        lastRes = res;
+        lastRes = new ArrayList<>(res);
       }
     }
 
-    // Sanity check
     checksumCache.clear();
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ChecksumType.class, names = {"CRC32", "CRC32C", "SHA256", "MD5"})
+  void testGrowingMultiBufferMatchesDirectChecksum(ChecksumType checksumType)
+      throws Exception {
+    final int bytesPerChecksum = 16;
+    final byte[] data = new byte[66];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+
+    final Checksum cached = new Checksum(checksumType, bytesPerChecksum, true);
+    final Checksum direct = new Checksum(checksumType, bytesPerChecksum);
+    final int[] lengths = {1, 7, 15, 16, 17, 22, 31, 32, 33, 47, 48, 49, 65, 66};
+    for (int length : lengths) {
+      final ChecksumData expected = direct.computeChecksum(
+          split(data, length, 7));
+      final ChecksumData actual = cached.computeChecksum(
+          split(data, length, 7), true);
+      Assertions.assertEquals(expected.getChecksums(), actual.getChecksums(),
+          "cached checksums must match direct checksums at length " + length);
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ChecksumType.class, names = {"CRC32", "CRC32C", "SHA256", "MD5"})
+  void testPartiallyPositionedMultiBufferMatchesDirectChecksum(
+      ChecksumType checksumType) throws Exception {
+    final int bytesPerChecksum = 4;
+    final byte[] data = new byte[11];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+
+    final Checksum direct = new Checksum(checksumType, bytesPerChecksum);
+    final Checksum cached = new Checksum(checksumType, bytesPerChecksum, true);
+    final ChecksumData expected = direct.computeChecksum(partiallyPositioned(data));
+    final ChecksumData actual = cached.computeChecksum(partiallyPositioned(data), true);
+
+    Assertions.assertEquals(expected.getChecksums(), actual.getChecksums());
+  }
+
+  private static ChunkBuffer split(byte[] data, int length, int bufferSize) {
+    final List<ByteBuffer> buffers = new ArrayList<>();
+    for (int offset = 0; offset < length; offset += bufferSize) {
+      final int size = Math.min(bufferSize, length - offset);
+      buffers.add(ByteBuffer.wrap(data, offset, size).slice());
+    }
+    return ChunkBuffer.wrap(buffers);
+  }
+
+  private static ChunkBuffer partiallyPositioned(byte[] data) {
+    final List<ByteBuffer> buffers = new ArrayList<>();
+    buffers.add(ByteBuffer.wrap(data, 3, 4));
+    buffers.add(ByteBuffer.wrap(data, 7, 4).slice());
+    return ChunkBuffer.wrap(buffers);
   }
 }

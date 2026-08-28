@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -92,7 +93,7 @@ import org.slf4j.LoggerFactory;
  * @see TestOzoneManagerHAWithAllRunning
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
+public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(
       TestOzoneManagerHAWithStoppedNodes.class);
 
@@ -279,8 +280,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     // Do some transactions so that the log index increases
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -585,7 +586,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
     ObjectStore objectStore = getObjectStore();
 
-    String prefix = "vol-" + RandomStringUtils.secure().nextNumeric(10) + "-";
+    String prefix = uniqueObjectName("vol-") + "-";
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
         .setAdmin(userName)
@@ -614,7 +615,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     // Create a volume, a bucket and a key
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
     String bucketName = UUID.randomUUID().toString();
     String keyTo = UUID.randomUUID().toString();
 

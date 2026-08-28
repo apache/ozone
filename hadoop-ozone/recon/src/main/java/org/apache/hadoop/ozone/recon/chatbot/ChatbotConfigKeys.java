@@ -55,12 +55,24 @@ public final class ChatbotConfigKeys {
   public static final String OZONE_RECON_CHATBOT_ANTHROPIC_API_KEY = OZONE_RECON_CHATBOT_PREFIX
       + "anthropic.api.key";
 
+  /**
+   * Gateway API key. Used when provider is set to "gateway" to route all requests
+   * (regardless of underlying model) through an OpenAI-compatible gateway (e.g. LiteLLM).
+   */
+  public static final String OZONE_RECON_CHATBOT_GATEWAY_API_KEY = OZONE_RECON_CHATBOT_PREFIX + "gateway.api.key";
+
   // ── Per-provider base URL overrides (optional) ──────────────
   public static final String OZONE_RECON_CHATBOT_OPENAI_BASE_URL = OZONE_RECON_CHATBOT_PREFIX + "openai.base.url";
   public static final String OZONE_RECON_CHATBOT_OPENAI_BASE_URL_DEFAULT = "https://api.openai.com";
   
   public static final String OZONE_RECON_CHATBOT_GEMINI_BASE_URL = OZONE_RECON_CHATBOT_PREFIX + "gemini.base.url";
   public static final String OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT = "https://generativelanguage.googleapis.com/v1beta/openai/";
+
+  /**
+   * Required base URL when using the "gateway" provider. Points to your internal
+   * OpenAI-compatible endpoint. No default is provided.
+   */
+  public static final String OZONE_RECON_CHATBOT_GATEWAY_BASE_URL = OZONE_RECON_CHATBOT_PREFIX + "gateway.base.url";
 
   // ── Execution policy ────────────────────────────────────────
 
@@ -71,6 +83,21 @@ public final class ChatbotConfigKeys {
   // ── Agent configuration ─────────────────────────────────────
   public static final String OZONE_RECON_CHATBOT_MAX_TOOL_CALLS = OZONE_RECON_CHATBOT_PREFIX + "max.tool.calls";
   public static final int OZONE_RECON_CHATBOT_MAX_TOOL_CALLS_DEFAULT = 5;
+
+  /**
+   * Max reply length (output tokens) sent to the provider per LLM call. Default 8192
+   * is safe across providers (e.g. Claude Sonnet caps output at 8192 without an
+   * output-extending beta header). Raise it for reasoning models that need more room
+   * for internal thinking (e.g. gemini-2.5-pro) — providers bill actual usage.
+   */
+  public static final String OZONE_RECON_CHATBOT_MAX_TOKENS = OZONE_RECON_CHATBOT_PREFIX + "max.tokens";
+  public static final int OZONE_RECON_CHATBOT_MAX_TOKENS_DEFAULT = 8192;
+
+  // ── Conversation memory (V1, client-side) ───────────────────
+  /** Max characters of prior conversation sent as context; 0 disables memory. */
+  public static final String OZONE_RECON_CHATBOT_HISTORY_MAX_CHARS =
+      OZONE_RECON_CHATBOT_PREFIX + "history.max.chars";
+  public static final int OZONE_RECON_CHATBOT_HISTORY_MAX_CHARS_DEFAULT = 8000;
 
   // ── Async execution thread pool ──────────────────────────────
   /**
@@ -140,6 +167,14 @@ public final class ChatbotConfigKeys {
       OZONE_RECON_CHATBOT_PREFIX + "anthropic.models";
   public static final String OZONE_RECON_CHATBOT_ANTHROPIC_MODELS_DEFAULT =
       "claude-opus-4-6,claude-sonnet-4-6";
+
+  /**
+   * Comma-separated list of model aliases exposed by your OpenAI-compatible gateway.
+   * Required when using the "gateway" provider. Include all models (Claude, Gemini, GPT)
+   * that your gateway supports. No default is provided.
+   */
+  public static final String OZONE_RECON_CHATBOT_GATEWAY_MODELS =
+      OZONE_RECON_CHATBOT_PREFIX + "gateway.models";
 
   // ── Anthropic-specific headers ───────────────────────────────
   /**

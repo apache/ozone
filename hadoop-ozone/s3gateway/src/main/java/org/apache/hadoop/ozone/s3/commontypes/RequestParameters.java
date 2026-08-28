@@ -47,6 +47,12 @@ public interface RequestParameters {
     }
   }
 
+  /**
+   * @return true if the query parameter is present, even when its value is
+   * an empty string (eg. {@code delimiter=}).
+   */
+  boolean containsKey(String key);
+
   /** Additional methods for tests. */
   interface Mutable extends RequestParameters {
 
@@ -57,6 +63,20 @@ public interface RequestParameters {
     default void setInt(String key, int value) {
       set(key, String.valueOf(value));
     }
+  }
+
+  default boolean getBoolean(String key, boolean defaultValue) {
+    final String value = get(key);
+    if (value == null) {
+      return defaultValue;
+    }
+    if ("true".equalsIgnoreCase(value)) {
+      return true;
+    }
+    if ("false".equalsIgnoreCase(value)) {
+      return false;
+    }
+    throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, key);
   }
 
   /** Mutable implementation based on {@link MultivaluedMap}. */
@@ -70,6 +90,11 @@ public interface RequestParameters {
     @Override
     public String get(String key) {
       return params.getFirst(key);
+    }
+
+    @Override
+    public boolean containsKey(String key) {
+      return params.containsKey(key);
     }
 
     @Override

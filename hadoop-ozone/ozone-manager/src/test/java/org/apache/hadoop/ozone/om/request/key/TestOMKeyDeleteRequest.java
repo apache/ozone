@@ -42,7 +42,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests OmKeyDelete request.
  */
-public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
+public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
 
   @ParameterizedTest
   @ValueSource(strings = {"keyName", "a/b/keyName", "a/.snapshot/keyName", "a.snapshot/b/keyName"})

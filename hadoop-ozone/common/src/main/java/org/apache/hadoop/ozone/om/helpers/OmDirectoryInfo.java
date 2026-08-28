@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import net.jcip.annotations.Immutable;
@@ -154,7 +154,7 @@ public final class OmDirectoryInfo extends WithParentObjectId {
       return this;
     }
 
-    public Builder setAcls(List<OzoneAcl> listOfAcls) {
+    public Builder setAcls(Collection<OzoneAcl> listOfAcls) {
       this.acls.addAll(listOfAcls);
       return this;
     }

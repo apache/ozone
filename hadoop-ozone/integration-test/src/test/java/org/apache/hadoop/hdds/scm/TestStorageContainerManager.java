@@ -115,12 +115,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -265,7 +265,7 @@ public class TestStorageContainerManager {
         .getScmBlockManager().getDeletedBlockLog();
     assertEquals(0, delLog.getNumOfValidTransactions());
 
-    Map<String, OmKeyInfo> keyLocations = TestDataUtil.createKeys(cluster, KEY_COUNT);
+    Map<String, OmKeyInfo> keyLocations = DataTestUtil.createKeys(cluster, KEY_COUNT);
     // Wait for container report
     Thread.sleep(1000);
     for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -438,7 +438,7 @@ public class TestStorageContainerManager {
           .getScmBlockManager().getSCMBlockDeletingService();
       delService.setBlockDeleteTXNum(limitSize);
 
-      Map<String, OmKeyInfo> keyLocations = TestDataUtil.createKeys(cluster, numKeys);
+      Map<String, OmKeyInfo> keyLocations = DataTestUtil.createKeys(cluster, numKeys);
       // Wait for container report
       Thread.sleep(5000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -481,7 +481,7 @@ public class TestStorageContainerManager {
     // on datanodes.
     Set<Long> containerNames = new HashSet<>();
     for (Map.Entry<String, OmKeyInfo> entry : keyLocations.entrySet()) {
-      entry.getValue().getLatestVersionLocations().getLocationList()
+      entry.getValue().getLatestVersionLocations().createLocationList()
           .forEach(loc -> containerNames.add(loc.getContainerID()));
     }
 
@@ -499,7 +499,7 @@ public class TestStorageContainerManager {
     Map<Long, List<DeletedBlock>> containerBlocks = Maps.newHashMap();
     for (OmKeyInfo info : keyLocations.values()) {
       List<OmKeyLocationInfo> list =
-          info.getLatestVersionLocations().getLocationList();
+          info.getLatestVersionLocations().createLocationList();
       list.forEach(location -> {
         if (containerBlocks.containsKey(location.getContainerID())) {
           containerBlocks.get(location.getContainerID()).add(new DeletedBlock(location.getBlockID(),
@@ -674,7 +674,7 @@ public class TestStorageContainerManager {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
-      TestDataUtil.createKeys(cluster, 10);
+      DataTestUtil.createKeys(cluster, 10);
       GenericTestUtils.waitFor(() ->
           cluster.getStorageContainerManager().getContainerManager()
               .getContainers() != null, 1000, 10000);
@@ -896,7 +896,7 @@ public class TestStorageContainerManager {
     KeyValueContainerData cData = getContainerMetadata(cluster, containerID);
     try (DBHandle db = BlockUtils.getDB(cData, cluster.getConf())) {
 
-      List<? extends Table.KeyValue<String, BlockData>> kvs =
+      List<Table.KeyValue<String, BlockData>> kvs =
           db.getStore().getBlockDataTable()
               .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
                   cData.containerPrefix(), cData.getUnprefixedKeyFilter());
@@ -918,7 +918,7 @@ public class TestStorageContainerManager {
         DatanodeStore ds = db.getStore();
         DatanodeStoreSchemaThreeImpl dnStoreImpl =
             (DatanodeStoreSchemaThreeImpl) ds;
-        List<? extends Table.KeyValue<String, DeletedBlocksTransaction>>
+        List<Table.KeyValue<String, DeletedBlocksTransaction>>
             txnsInTxnTable = dnStoreImpl.getDeleteTransactionTable()
             .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
                 cData.containerPrefix());

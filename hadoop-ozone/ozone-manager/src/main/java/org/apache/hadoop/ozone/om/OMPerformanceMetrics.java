@@ -67,6 +67,9 @@ public class OMPerformanceMetrics {
   @Metric(about = "Sort datanodes latency in getKeyInfo")
   private MutableRate getKeyInfoSortDatanodesLatencyNs;
 
+  @Metric(about = "Sort datanodes latency in allocateBlock (streaming write)")
+  private MutableRate allocateBlockSortDatanodesLatencyNs;
+
   @Metric(about = "resolveBucketLink latency in getKeyInfo")
   private MutableRate getKeyInfoResolveBucketLatencyNs;
 
@@ -244,6 +247,10 @@ public class OMPerformanceMetrics {
 
   MutableRate getGetKeyInfoSortDatanodesLatencyNs() {
     return getKeyInfoSortDatanodesLatencyNs;
+  }
+
+  MutableRate getAllocateBlockSortDatanodesLatencyNs() {
+    return allocateBlockSortDatanodesLatencyNs;
   }
 
   public void setForceContainerCacheRefresh(boolean value) {

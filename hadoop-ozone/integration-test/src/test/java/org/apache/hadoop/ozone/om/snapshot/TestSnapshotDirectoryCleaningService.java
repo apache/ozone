@@ -43,9 +43,9 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -98,7 +98,7 @@ public class TestSnapshotDirectoryCleaningService {
     client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
@@ -305,7 +305,7 @@ public class TestSnapshotDirectoryCleaningService {
     String volume = "vol-" + counter.incrementAndGet();
     String bucket = "buc-" + counter.incrementAndGet();
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket volBucket = TestDataUtil.createVolumeAndBucket(client, volume, bucket,
+    OzoneBucket volBucket = DataTestUtil.createVolumeAndBucket(client, volume, bucket,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volBucket.createDirectory("dir1/dir2/dir3/dir4");
     cluster.getOzoneManager().getKeyManager().getDirDeletingService().suspend();

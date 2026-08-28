@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Test cases for OMSetTimesRequest.
  */
-public class TestOMSetTimesRequest extends TestOMKeyRequest {
+public class TestOMSetTimesRequest extends OMKeyRequestTests {
 
   /**
    * Verify that setTimes() on key works as expected.

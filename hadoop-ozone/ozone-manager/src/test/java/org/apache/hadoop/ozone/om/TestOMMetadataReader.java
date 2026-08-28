@@ -47,7 +47,7 @@ public class TestOMMetadataReader {
       String expectedClientAddressInCaseOfGrpcCall = "172.45.23.4";
       Context.Key<String> clientIpAddressKey = mock(Context.Key.class);
       when(clientIpAddressKey.get())
-          .thenReturn(expectedClientAddressInCaseOfGrpcCall, null);
+          .thenReturn(expectedClientAddressInCaseOfGrpcCall, null, null);
 
       grpcRequestContextStaticMock.when(() -> Context.key("CLIENT_IP_ADDRESS"))
           .thenReturn(clientIpAddressKey);

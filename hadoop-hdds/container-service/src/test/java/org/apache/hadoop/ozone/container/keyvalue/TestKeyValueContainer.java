@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
+import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -757,6 +758,35 @@ public class TestKeyValueContainer {
     assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         keyValueContainerData.getState());
     assertNotNull(keyValueContainer.getContainerReport());
+  }
+
+  /**
+   * When a container's metadata directory is missing (MISSING_METADATA_DIR detected by the scanner),
+   * markContainerUnhealthy must succeed without throwing. Writing a partial .container file with only
+   * the state field would lose other metadata and is more harmful than writing nothing. The in-memory
+   * UNHEALTHY state is sufficient for SCM to receive it via ICR and schedule deletion.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testMarkUnhealthyWithMissingMetadataDir(ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    // Simulate MISSING_METADATA_DIR using the same corruption helper used in scanner tests.
+    File metadataDir = new File(keyValueContainerData.getMetadataPath());
+    assertTrue(metadataDir.exists(), "Metadata dir should exist before corruption");
+    MISSING_METADATA_DIR.applyTo(keyValueContainer);
+
+    // markContainerUnhealthy must not throw even though the metadata dir is absent.
+    keyValueContainer.markContainerUnhealthy();
+
+    // In-memory state must be UNHEALTHY.
+    assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+        keyValueContainer.getContainerState());
+
+    // Regression guards: if a future change adds mkdirs/persist logic, these catch it early.
+    assertFalse(metadataDir.exists(), "Metadata dir should not be recreated by markContainerUnhealthy");
+    assertFalse(keyValueContainer.getContainerFile().exists(),
+        "Container file should not be written when metadata dir is missing");
   }
 
   @ContainerTestVersionInfo.ContainerTest

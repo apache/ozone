@@ -70,6 +70,10 @@ public class TestDnRatisLogParser {
     OzoneConfiguration conf = cluster.getHddsDatanodes().get(0).getConf();
     String path =
         conf.get(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
+    GenericTestUtils.waitFor(
+        () -> !cluster.getStorageContainerManager().getPipelineManager()
+            .getPipelines().isEmpty(),
+        100, 60000);
     UUID pid = cluster.getStorageContainerManager().getPipelineManager()
         .getPipelines().get(0).getId().getId();
     File pipelineDir = new File(path, pid.toString());

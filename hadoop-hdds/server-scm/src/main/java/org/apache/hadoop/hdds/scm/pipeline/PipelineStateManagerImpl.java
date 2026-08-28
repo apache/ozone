@@ -128,7 +128,7 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
       throws PipelineNotFoundException {
     lock.readLock().lock();
     try {
-      return pipelineStateMap.getPipeline(pipelineID);
+      return pipelineStateMap.getPipeline(pipelineID).getPipeline();
     } finally {
       lock.readLock().unlock();
     }

@@ -397,6 +397,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     rawTable.deleteRange(encodeKey(beginKey), encodeKey(endKey));
   }
 
+  /**
+   * Clears the raw table directly: the default implementation would decode and re-encode the boundary keys,
+   * which can miss persisted keys whose bytes do not round-trip through the codec.
+   */
+  @Override
+  public void clear() throws RocksDatabaseException, CodecException {
+    rawTable.clear();
+  }
+
   @Override
   public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, IteratorType type)
       throws RocksDatabaseException, CodecException {

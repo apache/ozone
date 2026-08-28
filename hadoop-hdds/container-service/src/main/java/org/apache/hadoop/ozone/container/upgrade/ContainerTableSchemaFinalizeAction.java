@@ -60,7 +60,7 @@ public class ContainerTableSchemaFinalizeAction
     }
 
     try (BatchOperation batch = metadataStore.getStore().initBatchOperation();
-         TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, ContainerCreateInfo>> iterator =
+         TableIterator<ContainerID, Table.KeyValue<ContainerID, ContainerCreateInfo>> iterator =
              previousTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<ContainerID, ContainerCreateInfo> next = iterator.next();

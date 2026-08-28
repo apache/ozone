@@ -96,6 +96,8 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -426,6 +428,8 @@ public final class OmSnapshotManager implements AutoCloseable {
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         SnapshotDiffReportOzone.getDiffReportEntryCodec());
     registry.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.codec());
+    registry.addCodec(OmKeyInfo.class, OmKeyInfo.getKeyTableCodec());
+    registry.addCodec(OmDirectoryInfo.class, OmDirectoryInfo.getCodec());
     return registry.build();
   }
 

@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -67,6 +68,11 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
       } else {
         return BlockVerificationResult.failCheck("Block does not exist on this replica");
       }
+    } catch (StorageContainerException e) {
+      if (e.getResult() == ContainerProtos.Result.NO_SUCH_BLOCK) {
+        return BlockVerificationResult.failCheckAndRefreshKeyLocation(e.getMessage());
+      }
+      return BlockVerificationResult.failIncomplete(e.getMessage());
     } catch (IOException e) {
       return BlockVerificationResult.failIncomplete(e.getMessage());
     } finally {

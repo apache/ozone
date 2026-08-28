@@ -69,7 +69,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -110,7 +110,7 @@ public class TestReplicationManagerScenarios {
   private EventPublisher eventPublisher;
   private SCMContext scmContext;
   private NodeManager nodeManager;
-  private TestClock clock;
+  private MockClock clock;
 
   private static List<URI> getTestFiles() throws URISyntaxException {
     File[] fileList = (new File(TestReplicationManagerScenarios.class
@@ -183,7 +183,7 @@ public class TestReplicationManagerScenarios {
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
-    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    clock = new MockClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps = new ContainerReplicaPendingOps(clock, null);
 
     when(containerManager.getContainerReplicas(any(ContainerID.class))).thenAnswer(

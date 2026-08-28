@@ -28,6 +28,8 @@ import static org.apache.hadoop.ozone.container.common.statemachine.commandhandl
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -52,6 +54,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -82,6 +85,8 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -167,6 +172,7 @@ public class TestDeleteBlocksCommandHandler {
   public void tearDown() {
     handler.stop();
     BlockDeletingServiceMetrics.unRegister();
+    ExitUtils.clear();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -313,6 +319,108 @@ public class TestDeleteBlocksCommandHandler {
     List<DeleteBlockTransactionResult> deleteBlockTransactionResults =
         handler.executeCmdWithRetry(Collections.emptyList());
     assertEquals(1, deleteBlockTransactionResults.size());
+  }
+
+  @Test
+  public void testDeleteBlocksCommandHandlerErrorShouldInterrupt() throws Exception {
+    setup();
+    Error error = new AssertionError("Simulated Error");
+    CompletableFuture<DeleteBlockTransactionExecutionResult> failed =
+        new CompletableFuture<>();
+    failed.completeExceptionally(error);
+    CompletableFuture<DeleteBlockTransactionExecutionResult> unprocessed =
+        CompletableFuture.completedFuture(
+            new DeleteBlockTransactionExecutionResult(null, false));
+    AtomicInteger processed = new AtomicInteger();
+
+    Error thrown = assertThrows(Error.class, () -> handler.handleTasksResults(
+        Arrays.asList(failed, unprocessed), result -> processed.incrementAndGet()));
+
+    assertSame(error, thrown);
+    assertEquals(0, processed.get());
+  }
+
+  @Test
+  public void testDeleteBlocksCommandHandlerErrorOnRetryShouldInterrupt()
+      throws Exception {
+    setup();
+    DeletedBlocksTransaction transaction =
+        createDeletedBlocksTransaction(1, 1);
+    DeleteBlockTransactionResult retryResult = DeleteBlockTransactionResult
+        .newBuilder()
+        .setTxID(transaction.getTxID())
+        .setContainerID(transaction.getContainerID())
+        .setSuccess(false)
+        .build();
+    CompletableFuture<DeleteBlockTransactionExecutionResult> retry =
+        CompletableFuture.completedFuture(
+            new DeleteBlockTransactionExecutionResult(retryResult, true));
+    Error error = new AssertionError("Simulated retry Error");
+    CompletableFuture<DeleteBlockTransactionExecutionResult> failed =
+        new CompletableFuture<>();
+    failed.completeExceptionally(error);
+    AtomicInteger invocation = new AtomicInteger();
+    doAnswer(ignored -> invocation.getAndIncrement() == 0
+        ? Collections.singletonList(retry)
+        : Collections.singletonList(failed))
+        .when(handler).submitTasks(any());
+
+    Error thrown = assertThrows(Error.class,
+        () -> handler.executeCmdWithRetry(
+            Collections.singletonList(transaction)));
+
+    assertSame(error, thrown);
+    assertEquals(2, invocation.get());
+  }
+
+  @Test
+  public void testDeleteCmdWorkerTerminatesOnError() throws Exception {
+    setup();
+    ExitUtils.disableSystemExit();
+    Container<?> container = containerSet.getContainer(1);
+    String schemaVersionOrDefault = ((KeyValueContainerData)
+        container.getContainerData()).getSupportedSchemaVersionOrDefault();
+    Error error = new AssertionError("Simulated worker Error");
+    SchemaHandler schemaHandler =
+        handler.getSchemaHandlers().get(schemaVersionOrDefault);
+    CountDownLatch processingStarted = new CountDownLatch(1);
+    CountDownLatch failProcessing = new CountDownLatch(1);
+    doAnswer(ignored -> {
+      processingStarted.countDown();
+      assertTrue(failProcessing.await(5, TimeUnit.SECONDS));
+      throw error;
+    }).when(schemaHandler).handle(any(), any());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
+    DatanodeDetails datanodeDetails =
+        MockDatanodeDetails.randomDatanodeDetails();
+    when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
+    StateContext context = new StateContext(conf,
+        DatanodeStateMachine.DatanodeStates.RUNNING, stateMachine, "");
+    DeleteBlocksCommand fatalCommand = new DeleteBlocksCommand(
+        Collections.singletonList(createDeletedBlocksTransaction(1, 1)));
+    DeleteBlocksCommand queuedCommand = new DeleteBlocksCommand(emptyList());
+    context.addCommand(fatalCommand);
+    context.addCommand(queuedCommand);
+
+    handler.handle(fatalCommand, mock(OzoneContainer.class), context,
+        mock(SCMConnectionManager.class));
+    assertTrue(processingStarted.await(5, TimeUnit.SECONDS));
+    try {
+      handler.handle(queuedCommand, mock(OzoneContainer.class), context,
+          mock(SCMConnectionManager.class));
+    } finally {
+      failProcessing.countDown();
+    }
+
+    GenericTestUtils.waitFor(ExitUtils::isTerminated, 10, 5000);
+
+    assertSame(error, ExitUtils.getFirstExitException().getCause());
+    CommandStatus fatalStatus = context.getCmdStatus(fatalCommand.getId());
+    assertEquals(Status.FAILED, fatalStatus.getStatus());
+    assertFalse(fatalStatus.getProtoBufMessage().hasBlockDeletionAck());
+    assertEquals(Status.PENDING, context.getCmdStatus(queuedCommand.getId()).getStatus());
   }
 
   @ContainerTestVersionInfo.ContainerTest

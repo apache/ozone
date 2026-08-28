@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -87,9 +88,8 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
 
   @Test
   void testContainerStateMachineIdempotency() throws Exception {
-    ContainerWithPipeline container = storageClient.createContainer(HddsProtos
-        .ReplicationType.RATIS, HddsProtos.ReplicationFactor
-        .ONE, OzoneConsts.OZONE);
+    ContainerWithPipeline container = storageClient.createContainer(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);
@@ -97,7 +97,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     // call create Container again
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.secure().next(RandomUtils.secure().randomInt(0, 1024)).getBytes(UTF_8);
+        RandomStringUtils.secure().next(RandomUtils.secure().randomInt(1, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,
@@ -126,9 +126,8 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
    */
   @Test
   public void testCreate() throws Exception {
-    ContainerWithPipeline container = storageClient.createContainer(HddsProtos
-        .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
-        .ONE, OzoneConsts.OZONE);
+    ContainerWithPipeline container = storageClient.createContainer(
+        StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
     assertEquals(container.getContainerInfo().getContainerID(), storageClient
         .getContainer(container.getContainerInfo().getContainerID())
         .getContainerID());
@@ -141,9 +140,8 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
   public void testListContainerExceedMaxAllowedCountOperations() throws Exception {
     // create n+1 containers
     for (int i = 0; i < CONTAINER_LIST_LIMIT + 1; i++) {
-      storageClient.createContainer(HddsProtos
-          .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
-          .ONE, OzoneConsts.OZONE);
+      storageClient.createContainer(
+          StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
     }
 
     int count = storageClient.listContainer(0, CONTAINER_LIST_LIMIT + 1)

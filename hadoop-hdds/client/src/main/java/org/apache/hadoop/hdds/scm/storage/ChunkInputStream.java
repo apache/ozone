@@ -412,7 +412,7 @@ public class ChunkInputStream extends InputStream
     adjustBufferPosition(startByteIndex - bufferOffsetWrtChunkData);
   }
 
-  private void readChunkDataIntoBuffers(ChunkInfo readChunkInfo)
+  protected void readChunkDataIntoBuffers(ChunkInfo readChunkInfo)
       throws IOException {
     buffers = readChunk(readChunkInfo);
     buffersSize = readChunkInfo.getLen();

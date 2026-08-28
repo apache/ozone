@@ -76,6 +76,13 @@ public class TestLangChain4jDispatcher {
   }
 
   @Test
+  public void testIsAvailableWithGatewayKey() {
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_API_KEY, "fake-gateway-key");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+    assertTrue(dispatcher.isAvailable());
+  }
+
+  @Test
   public void testGetSupportedModelsEmptyWithoutKeys() {
     List<String> models = dispatcher.getSupportedModels();
     assertNotNull(models);
@@ -89,6 +96,17 @@ public class TestLangChain4jDispatcher {
     List<String> models = dispatcher.getSupportedModels();
     assertFalse(models.isEmpty());
     assertTrue(models.stream().anyMatch(m -> m.startsWith("gemini")));
+  }
+
+  @Test
+  public void testGetSupportedModelsWithGatewayKey() {
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_API_KEY, "fake-gateway-key");
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_MODELS, "claude-sonnet,gpt-4.1");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+    List<String> models = dispatcher.getSupportedModels();
+    assertFalse(models.isEmpty());
+    assertTrue(models.contains("claude-sonnet"));
+    assertTrue(models.contains("gpt-4.1"));
   }
 
   @Test
@@ -165,5 +183,44 @@ public class TestLangChain4jDispatcher {
 
     assertTrue(ex.getMessage().toLowerCase().contains("gemini"),
         "Mismatched pair should fall back to default gemini provider");
+  }
+
+  @Test
+  public void testGatewayProviderRoutesCorrectly() {
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_API_KEY, "fake-gateway-key");
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_BASE_URL, "https://gateway.example.com");
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_MODELS, "claude-sonnet");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+
+    List<LLMClient.ChatMessage> messages = new ArrayList<>();
+    messages.add(new LLMClient.ChatMessage("user", "hello"));
+
+    // Fake URL is not reachable; routing past key/base-url validation means we attempted gateway.
+    Exception ex = assertThrows(Exception.class, () ->
+        dispatcher.chatCompletion(messages, "claude-sonnet", "gateway",
+            new GenParams(0.1, 1000), null));
+    String msg = ex.getMessage() != null ? ex.getMessage() : "";
+    assertFalse(msg.contains("must be set when using the gateway provider"),
+        "Should not fail on missing gateway.base.url");
+    assertFalse(msg.contains("No API key configured"),
+        "Should not fail on missing gateway API key");
+  }
+
+  @Test
+  public void testGatewayProviderThrowsWhenBaseUrlBlank() {
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_API_KEY, "fake-gateway-key");
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GATEWAY_MODELS, "claude-sonnet");
+    // Leave base URL blank
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+
+    List<LLMClient.ChatMessage> messages = new ArrayList<>();
+    messages.add(new LLMClient.ChatMessage("user", "hello"));
+
+    LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
+        dispatcher.chatCompletion(messages, "claude-sonnet", "gateway",
+            new GenParams(0.1, 1000), null));
+
+    assertTrue(ex.getMessage().contains("must be set when using the gateway provider"),
+        "Should throw if gateway.base.url is missing");
   }
 }

@@ -120,6 +120,7 @@ public class TestTriggerDBSyncEndpoint {
     }
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
         .thenReturn(httpURLConnectionMock);
+    when(reconUtilsMock.getReconDbDir(any(), anyString())).thenCallRealMethod();
     when(reconUtilsMock.getReconNodeDetails(
         any(OzoneConfiguration.class))).thenReturn(
         ReconTestUtils.getReconNodeDetails());

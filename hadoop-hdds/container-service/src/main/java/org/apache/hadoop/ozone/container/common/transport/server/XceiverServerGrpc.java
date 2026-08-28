@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.net.BindException;
@@ -76,7 +78,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private final ContainerDispatcher storageContainer;
   private boolean isStarted;
   private DatanodeDetails datanodeDetails;
-  private ThreadPoolExecutor readExecutors;
   private EventLoopGroup eventLoopGroup;
 
   /**
@@ -85,7 +86,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
    * @param conf - Configuration
    */
   public XceiverServerGrpc(DatanodeDetails datanodeDetails,
-      ConfigurationSource conf,
+      ConfigurationSource conf, ThreadPoolExecutor executor,
       ContainerDispatcher dispatcher, CertificateClient caClient) {
     Objects.requireNonNull(conf, "conf == null");
 
@@ -99,21 +100,25 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       this.port = 0;
     }
 
+    ThreadPoolExecutor readExecutors = executor;
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
-    final int threadCountPerDisk = dnConf.getNumReadThreadPerVolume();
-    final int numberOfDisks =
-        HddsServerUtil.getDatanodeStorageDirs(conf).size();
-    final int poolSize = threadCountPerDisk * numberOfDisks;
-    final int soBacklog = dnConf.getGrpcSoBacklog();
-    LOG.info("Datanode gRPC server SO_BACKLOG: {}", soBacklog);
+    if (readExecutors == null) {
+      // this branch is to avoid updating all existing related tests
+      final int threadCountPerDisk = dnConf.getNumReadThreadPerVolume();
+      final int numberOfDisks =
+          HddsServerUtil.getDatanodeStorageDirs(conf).size();
+      final int poolSize = threadCountPerDisk * numberOfDisks;
+      final int soBacklog = dnConf.getGrpcSoBacklog();
+      LOG.info("Datanode gRPC server SO_BACKLOG: {}", soBacklog);
 
-    readExecutors = new ThreadPoolExecutor(poolSize, poolSize,
-        60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(),
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat(datanodeDetails.threadNamePrefix() +
-                "ChunkReader-%d")
-            .build());
+      readExecutors = new ThreadPoolExecutor(poolSize, poolSize,
+          60, TimeUnit.SECONDS,
+          new LinkedBlockingQueue<>(),
+          new ThreadFactoryBuilder().setDaemon(true)
+              .setNameFormat(datanodeDetails.threadNamePrefix() +
+                  "ChunkReader-%d")
+              .build());
+    }
 
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setDaemon(true)
@@ -123,10 +128,10 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
 
     Class<? extends ServerChannel> channelType;
     if (Epoll.isAvailable()) {
-      eventLoopGroup = new EpollEventLoopGroup(poolSize / 10, factory);
+      eventLoopGroup = new EpollEventLoopGroup(readExecutors.getPoolSize() / 10, factory);
       channelType = EpollServerSocketChannel.class;
     } else {
-      eventLoopGroup = new NioEventLoopGroup(poolSize / 10, factory);
+      eventLoopGroup = new NioEventLoopGroup(readExecutors.getPoolSize() / 10, factory);
       channelType = NioServerSocketChannel.class;
     }
 
@@ -137,7 +142,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .bossEventLoopGroup(eventLoopGroup)
         .workerEventLoopGroup(eventLoopGroup)
         .channelType(channelType)
-        .withOption(ChannelOption.SO_BACKLOG, soBacklog)
+        .withOption(ChannelOption.SO_BACKLOG, dnConf.getGrpcSoBacklog())
         .executor(readExecutors)
         // If a client does not send an actual functional business RPC for 15 minutes,
         // the server kicks them off with a GOAWAY frame.
@@ -172,6 +177,12 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     }
     server = nettyServerBuilder.build();
     storageContainer = dispatcher;
+  }
+
+  @VisibleForTesting
+  public XceiverServerGrpc(DatanodeDetails datanodeDetails, ConfigurationSource conf,
+      ContainerDispatcher dispatcher, CertificateClient caClient) {
+    this(datanodeDetails, conf, null, dispatcher, caClient);
   }
 
   @Override
@@ -221,8 +232,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   public void stop() {
     if (isStarted) {
       try {
-        readExecutors.shutdown();
-        readExecutors.awaitTermination(5L, TimeUnit.SECONDS);
         server.shutdown();
         server.awaitTermination(5, TimeUnit.SECONDS);
         eventLoopGroup.shutdownGracefully().sync();
@@ -235,12 +244,18 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   }
 
   @Override
+  public boolean isStarted() {
+    return isStarted;
+  }
+
+  @Override
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerGrpc." + request.getCmdType().name(),
-            request.getTraceID());
+            request.getTraceID(),
+            SpanKind.SERVER);
     try (Scope ignore = span.makeCurrent()) {
       ContainerProtos.ContainerCommandResponseProto response =
           storageContainer.dispatch(request, null);

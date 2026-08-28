@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -220,7 +221,7 @@ public abstract class AbstractOzoneManagerHATest {
    * @return the key name.
    */
   public static String createKey(OzoneBucket ozoneBucket) throws IOException {
-    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String keyName = uniqueObjectName("key");
     createKey(ozoneBucket, keyName);
     return keyName;
   }
@@ -234,7 +235,7 @@ public abstract class AbstractOzoneManagerHATest {
   }
 
   public static String createPrefixName() {
-    return "prefix" + RandomStringUtils.secure().nextNumeric(5) + OZONE_URI_DELIMITER;
+    return uniqueObjectName("prefix") + OZONE_URI_DELIMITER;
   }
 
   public static void createPrefix(OzoneObj prefixObj) throws IOException {
@@ -272,7 +273,7 @@ public abstract class AbstractOzoneManagerHATest {
   protected OzoneBucket linkBucket(OzoneBucket srcBuk) throws Exception {
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String linkedVolName = "volume-link-" + RandomStringUtils.secure().nextNumeric(5);
+    String linkedVolName = uniqueObjectName("volume-link-");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -309,7 +310,7 @@ public abstract class AbstractOzoneManagerHATest {
   protected void createVolumeTest(boolean checkSuccess) throws Exception {
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -399,7 +400,7 @@ public abstract class AbstractOzoneManagerHATest {
   protected void createKeyTest(boolean checkSuccess) throws Exception {
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)

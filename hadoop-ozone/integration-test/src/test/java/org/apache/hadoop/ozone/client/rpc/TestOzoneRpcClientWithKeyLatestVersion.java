@@ -30,7 +30,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -102,7 +102,7 @@ public abstract class TestOzoneRpcClientWithKeyLatestVersion implements NonHATes
 
   private static void writeKey(OzoneBucket bucket, String key, byte[] content,
       ReplicationConfig replication) throws IOException {
-    TestDataUtil.createKey(bucket, key, replication, content);
+    DataTestUtil.createKey(bucket, key, replication, content);
   }
 
   private void assertListStatus(OzoneBucket bucket, String keyName,

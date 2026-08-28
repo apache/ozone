@@ -474,6 +474,11 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
               "oldVersion = {}, newVersion = {}.",
               datanodeDetails, oldNode.getVersion(), datanodeDetails.getVersion());
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
+        } else if (oldNode.portsChanged(datanodeDetails)) {
+          // Refresh the stored node when its port set changes
+          LOG.info("Updating ports for registered datanode {}: {} -> {}",
+              datanodeDetails, oldNode.getPorts(), datanodeDetails.getPorts());
+          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",

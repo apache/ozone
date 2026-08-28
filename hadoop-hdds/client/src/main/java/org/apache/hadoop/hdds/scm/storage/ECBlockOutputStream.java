@@ -59,6 +59,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 public class ECBlockOutputStream extends BlockOutputStream {
 
   private final DatanodeDetails datanodeDetails;
+  private final boolean containerAutoCreate;
   private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
       currentChunkRspFuture = null;
 
@@ -84,10 +85,32 @@ public class ECBlockOutputStream extends BlockOutputStream {
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       Supplier<ExecutorService> executorServiceSupplier
   ) throws IOException {
+    this(blockID, xceiverClientManager, pipeline, bufferPool, config, token, clientMetrics,
+        streamBufferArgs, executorServiceSupplier, true);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public ECBlockOutputStream(
+      BlockID blockID,
+      XceiverClientFactory xceiverClientManager,
+      Pipeline pipeline,
+      BufferPool bufferPool,
+      OzoneClientConfig config,
+      Token<? extends TokenIdentifier> token,
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
+      Supplier<ExecutorService> executorServiceSupplier,
+      boolean containerAutoCreate
+  ) throws IOException {
     super(blockID, -1, xceiverClientManager,
         pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs, executorServiceSupplier);
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
+    this.containerAutoCreate = containerAutoCreate;
+  }
+
+  @Override
+  protected boolean containerAutoCreate() {
+    return containerAutoCreate;
   }
 
   @Override
@@ -272,7 +295,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
     try {
       ContainerProtos.BlockData blockData = getContainerBlockData().build();
       XceiverClientReply asyncReply =
-          putBlockAsync(getXceiverClient(), blockData, close, getTokenString());
+          putBlockAsync(getXceiverClient(), blockData, close, getTokenString(), containerAutoCreate());
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {

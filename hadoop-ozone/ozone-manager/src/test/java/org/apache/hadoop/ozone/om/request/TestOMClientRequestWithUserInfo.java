@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
@@ -138,35 +139,43 @@ public class TestOMClientRequestWithUserInfo {
   }
 
   @Test
-  public void testUserInfoInCaseOfGrpcTransport() throws IOException {
-    try (MockedStatic<Context> mockedGrpcRequestContextKey =
-             mockStatic(Context.class)) {
-      // given
-      Context.Key<String> hostnameKey = mock(Context.Key.class);
-      when(hostnameKey.get()).thenReturn("hostname");
+  public void testUserInfoInCaseOfGrpcTransport() throws Exception {
+    OMRequest s3SignedOMRequest = createRequestWithS3Credentials("AccessId",
+        "Signature", "StringToSign");
+    OMClientRequest omClientRequest =
+        new OMKeyCommitRequest(s3SignedOMRequest, mock(BucketLayout.class));
 
-      Context.Key<String> ipAddress = mock(Context.Key.class);
-      when(ipAddress.get()).thenReturn("172.5.3.5");
+    // The gRPC transport propagates the client host/IP through the request
+    // Context rather than the Hadoop RPC Server thread-local, so attach a real
+    // Context carrying those values and resolve the UserInfo within it.
+    Context grpcContext = Context.current()
+        .withValue(GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY, "hostname")
+        .withValue(GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY, "172.5.3.5");
+    OzoneManagerProtocolProtos.UserInfo userInfo =
+        grpcContext.call(omClientRequest::getUserInfo);
 
-      mockedGrpcRequestContextKey.when(() -> Context.key("CLIENT_HOSTNAME"))
-          .thenReturn(hostnameKey);
-      mockedGrpcRequestContextKey.when(() -> Context.key("CLIENT_IP_ADDRESS"))
-          .thenReturn(ipAddress);
+    assertEquals("hostname", userInfo.getHostName());
+    assertEquals("172.5.3.5", userInfo.getRemoteAddress());
+    assertEquals("AccessId", userInfo.getUserName());
+  }
 
-      OMRequest s3SignedOMRequest = createRequestWithS3Credentials("AccessId",
-          "Signature", "StringToSign");
-      OMClientRequest omClientRequest =
-          new OMKeyCommitRequest(s3SignedOMRequest, mock(BucketLayout.class));
+  @Test
+  public void testClientSuppliedUserNameDoesNotOverrideS3AuthIdentity()
+      throws IOException {
+    // A gRPC S3G request carries validated S3 authentication (accessId
+    // "AccessId") but also a client-supplied userInfo.userName. The
+    // client-supplied name is unauthenticated and must never override the
+    // identity derived from S3 authentication; getUserInfo() must resolve the
+    // acting user from the accessId, not the forged name.
+    OMRequest request = createRequestWithS3Credentials("AccessId", "Signature",
+        "StringToSign").toBuilder()
+        .setUserInfo(OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName("forged-admin"))
+        .build();
+    OMClientRequest omClientRequest =
+        new OMKeyCommitRequest(request, mock(BucketLayout.class));
 
-      // when
-      OzoneManagerProtocolProtos.UserInfo userInfo =
-          omClientRequest.getUserInfo();
-
-      // then
-      assertEquals("hostname", userInfo.getHostName());
-      assertEquals("172.5.3.5", userInfo.getRemoteAddress());
-      assertEquals("AccessId", userInfo.getUserName());
-    }
+    assertEquals("AccessId", omClientRequest.getUserInfo().getUserName());
   }
 
 }

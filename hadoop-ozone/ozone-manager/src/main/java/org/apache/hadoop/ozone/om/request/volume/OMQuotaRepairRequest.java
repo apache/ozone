@@ -143,7 +143,14 @@ public class OMQuotaRepairRequest extends OMClientRequest {
 
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey), CacheValue.get(transactionLogIndex, bucketInfo));
-      bucketMap.put(Pair.of(bucketCountInfo.getVolName(), bucketCountInfo.getBucketName()), bucketInfo);
+
+      // Store an immutable snapshot in the response map so the double buffer
+      // serializes the repair result, not a value later mutated in place by a
+      // concurrent key commit that reads the same live cached OmBucketInfo.
+      // Every other mutating request copies its response bucket for the same
+      // reason (see OMKeyCommitRequest#validateAndUpdateCache).
+      bucketMap.put(Pair.of(bucketCountInfo.getVolName(), bucketCountInfo.getBucketName()),
+          bucketInfo.copyObject());
     } finally {
       if (acquiredBucketLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
@@ -156,7 +163,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
       OMMetadataManager metadataManager, long transactionLogIndex) throws IOException {
     LOG.info("Starting volume quota support update");
     Map<String, OmVolumeArgs> volUpdateMap = new HashMap<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
+    try (TableIterator<String, Table.KeyValue<String, OmVolumeArgs>>
              iterator = metadataManager.getVolumeTable().iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmVolumeArgs> entry = iterator.next();

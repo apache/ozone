@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -44,7 +45,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -54,10 +54,10 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -100,7 +100,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     cluster = cluster();
     client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil
+    OzoneBucket bucket = DataTestUtil
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
@@ -148,7 +148,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   @Test
   public void testCreateKey() throws Exception {
     String parent = "a/b/c/";
-    String file = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String file = uniqueObjectName("key");
     String key = parent + file;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -210,13 +210,13 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   @Test
   public void testDeleteBucketWithKeys() throws Exception {
     // Create temporary volume and bucket for this test.
-    OzoneBucket testBucket = TestDataUtil
+    OzoneBucket testBucket = DataTestUtil
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     String testVolumeName = testBucket.getVolumeName();
     String testBucketName = testBucket.getName();
 
     String parent = "a/b/c/";
-    String file = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String file = uniqueObjectName("key");
     String key = parent + file;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -268,7 +268,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   @Test
   public void testLookupKey() throws Exception {
     String parent = "a/b/c/";
-    String fileName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String fileName = uniqueObjectName("key");
     String key = parent + fileName;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -556,7 +556,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
       throws Exception {
 
     for (String key : keys) {
-      byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, 10);
+      byte[] input = DataTestUtil.createStringKey(ozoneBucket, key, 10);
       // Read the key with given key name.
       readKey(ozoneBucket, key, 10, input);
     }

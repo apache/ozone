@@ -281,9 +281,10 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count) {
+  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerHealthState healthState,
+      ContainerID start, int count) {
     try (AutoCloseableLock ignored = readLock()) {
-      return containers.getContainerIDs(state, start, count);
+      return containers.getContainerIDs(state, healthState, start, count);
     }
   }
 
@@ -382,6 +383,36 @@ public final class ContainerStateManagerImpl
   public boolean contains(ContainerID id) {
     try (AutoCloseableLock ignored = readLock(id)) {
       return containers.contains(id);
+    }
+  }
+
+  @Deprecated
+  @Override
+  public void updateContainerState(final HddsProtos.ContainerID containerID,
+      final LifeCycleEvent event)
+      throws IOException, InvalidStateTransitionException {
+    // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
+    final ContainerID id = ContainerID.getFromProtobuf(containerID);
+
+    try (AutoCloseableLock ignored = writeLock(id)) {
+      if (containers.contains(id)) {
+        final ContainerInfo oldInfo = containers.getContainerInfo(id);
+        final LifeCycleState oldState = oldInfo.getState();
+        final LifeCycleState newState = stateMachine.getNextState(
+            oldInfo.getState(), event);
+        if (newState.getNumber() > oldState.getNumber()) {
+          ExecutionUtil.create(() -> {
+            containers.updateState(id, oldState, newState);
+            transactionBuffer.addToBuffer(containerStore, id,
+                containers.getContainerInfo(id));
+          }).onException(() -> {
+            transactionBuffer.addToBuffer(containerStore, id, oldInfo);
+            containers.updateState(id, newState, oldState);
+          }).execute();
+          containerStateChangeActions.getOrDefault(event, info -> { })
+              .accept(oldInfo);
+        }
+      }
     }
   }
 

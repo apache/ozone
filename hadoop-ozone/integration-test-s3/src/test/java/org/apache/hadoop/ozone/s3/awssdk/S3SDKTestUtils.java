@@ -25,12 +25,17 @@ import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.ozone.test.InputSubstream;
@@ -48,6 +53,60 @@ public final class S3SDKTestUtils {
           "$", "%", "&", "'", "<", ">", "_", "_ ", "_ _", "__"));
 
   public static final Pattern UPLOAD_ID_PATTERN = Pattern.compile("<UploadId>(.+?)</UploadId>");
+
+  /**
+   * One page of a paginated ListBuckets response.
+   */
+  public static final class BucketListPage {
+    private final List<String> bucketNames;
+    private final String continuationToken;
+
+    public BucketListPage(List<String> bucketNames, String continuationToken) {
+      this.bucketNames = bucketNames;
+      this.continuationToken = continuationToken;
+    }
+
+    public List<String> getBucketNames() {
+      return bucketNames;
+    }
+
+    public String getContinuationToken() {
+      return continuationToken;
+    }
+  }
+
+  /**
+   * Lists buckets one per page and returns all bucket names from the pages.
+   *
+   * @param listPage fetches one page; first arg is continuation token (nullable),
+   *                 second arg is max buckets per page
+   */
+  public static List<String> collectBucketsOnePerPage(
+      BiFunction<String, Integer, BucketListPage> listPage) {
+    List<String> found = new ArrayList<>();
+    String continuationToken = null;
+    do {
+      BucketListPage page = listPage.apply(continuationToken, 1);
+      if (page.getBucketNames().size() != 1) {
+        throw new AssertionError(
+            "Expected 1 bucket per page, got " + page.getBucketNames().size());
+      }
+      found.add(page.getBucketNames().get(0));
+      continuationToken = page.getContinuationToken();
+    } while (continuationToken != null);
+    return found;
+  }
+
+  /**
+   * Filters a paginated bucket list down to the buckets created by the test.
+   */
+  public static List<String> filterToExpectedBuckets(
+      List<String> paginatedBuckets, String... expectedBuckets) {
+    Set<String> expected = new HashSet<>(Arrays.asList(expectedBuckets));
+    return paginatedBuckets.stream()
+        .filter(expected::contains)
+        .collect(Collectors.toList());
+  }
 
   private S3SDKTestUtils() {
   }

@@ -32,7 +32,6 @@
     <module>cli-shell</module>
     <module>client</module>
     <module>common</module>
-    <module>csi</module>
     <module>datanode</module>
     <module>dist</module>
     <module>fault-injection-test</module>

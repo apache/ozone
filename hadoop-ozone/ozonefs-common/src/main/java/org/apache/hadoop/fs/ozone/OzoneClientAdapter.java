@@ -89,6 +89,17 @@ public interface OzoneClientAdapter {
   FileStatusAdapter getFileStatus(String key, URI uri,
       Path qualifiedPath, String userName) throws IOException;
 
+  /**
+   * @param headOp when true, request a metadata-only (type) check so the OM
+   *               skips the pipeline refresh (SCM round-trip) and datanode
+   *               sorting. Implementations that cannot honor it fall back to a
+   *               full status.
+   */
+  default FileStatusAdapter getFileStatus(String key, URI uri,
+      Path qualifiedPath, String userName, boolean headOp) throws IOException {
+    return getFileStatus(key, uri, qualifiedPath, userName);
+  }
+
   boolean isFSOptimizedBucket();
 
   FileChecksum getFileChecksum(String keyName, long length) throws IOException;

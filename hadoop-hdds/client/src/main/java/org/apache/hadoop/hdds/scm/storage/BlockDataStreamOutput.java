@@ -211,9 +211,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     // TODO: The datanode UUID is not used meaningfully, consider deprecating
     //  it or remove it completely if possible
     String id = pipeline.getFirstNode().getUuidString();
+    ContainerProtos.Type streamInitType = config.isDatastreamPutBlockOnCloseEnabled()
+        ? ContainerProtos.Type.StreamInitWithPutBlock
+        : ContainerProtos.Type.StreamInit;
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.StreamInit)
+            .setCmdType(streamInitType)
             .setContainerID(blockID.get().getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
 
@@ -416,6 +419,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       byteBufferList = null;
     }
     waitFuturesComplete();
+    if (close && config.isDatastreamPutBlockOnCloseEnabled()) {
+      // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
+      waitPutBlockFuturesComplete();
+    }
     final BlockData blockData = containerBlockData.build();
     if (close) {
       // HDDS-12007 changed datanodes to ignore the following PutBlock request.
@@ -437,8 +444,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           }
         }
       });
+      if (config.isDatastreamPutBlockOnCloseEnabled()) {
+        // PutBlock is supposed to be committed after the data stream close so there
+        // is no need to continue.
+        return;
+      }
     }
-
     try {
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, tokenString);
@@ -541,6 +552,19 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       futures.clear();
     } catch (Exception e) {
       LOG.warn("Failed to write all chunks through stream: " + e);
+      throw new IOException(e);
+    }
+  }
+
+  private void waitPutBlockFuturesComplete() throws IOException {
+    if (putBlockFutures.isEmpty()) {
+      return;
+    }
+    try {
+      CompletableFuture.allOf(putBlockFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
+      checkOpen();
+    } catch (Exception e) {
+      LOG.warn("Failed to commit PutBlock before stream close: " + e);
       throw new IOException(e);
     }
   }

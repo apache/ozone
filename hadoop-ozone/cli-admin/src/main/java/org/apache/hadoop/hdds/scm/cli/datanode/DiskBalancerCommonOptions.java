@@ -35,6 +35,14 @@ public class DiskBalancerCommonOptions {
       required = false)
   private boolean inServiceDatanodes;
 
+  @CommandLine.Option(names = {"--node-id"},
+      description = "Datanode UUID(s). Requires SCM to resolve each UUID to a CLIENT_RPC address. "
+          + "Pass a comma-separated list (for example, --node-id uuid1,uuid2). "
+          + "When SCM is unavailable, use hostname or host:port positional arguments instead.",
+      paramLabel = "<uuid>",
+      split = ",\\s*")
+  private List<String> nodeIds;
+
   @CommandLine.Option(names = {"--json"},
       description = "Format output as JSON",
       defaultValue = "false")
@@ -48,6 +56,10 @@ public class DiskBalancerCommonOptions {
 
   public boolean isInServiceDatanodes() {
     return inServiceDatanodes;
+  }
+
+  public List<String> getNodeIds() {
+    return nodeIds != null ? nodeIds : Collections.emptyList();
   }
 
   public boolean isJson() {

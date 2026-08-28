@@ -90,7 +90,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -121,7 +121,7 @@ public class TestDiskBalancerTask {
   private HddsVolume sourceVolume;
   private HddsVolume destVolume;
   private DiskBalancerServiceTestImpl diskBalancerService;
-  private TestClock clock;
+  private MockClock clock;
 
   private static final long CONTAINER_ID = 1L;
   private static final long CONTAINER_SIZE = 1024L * 1024L; // 1 MB
@@ -252,7 +252,7 @@ public class TestDiskBalancerTask {
     DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
     diskBalancerConfiguration.setDiskBalancerShouldRun(true);
     conf.setFromObject(diskBalancerConfiguration);
-    clock = TestClock.newInstance();
+    clock = MockClock.newInstance();
     diskBalancerService = new DiskBalancerServiceTestImpl(ozoneContainer,
         100, conf, 1, clock);
     diskBalancerService.setReplicaDeletionDelay(0);
@@ -831,7 +831,7 @@ public class TestDiskBalancerTask {
     assertNotNull(task1);
     assertNotNull(task2);
 
-    // Run both moves concurrently; fixed TestClock => same deadline key.
+    // Run both moves concurrently; fixed MockClock => same deadline key.
     ExecutorService pool = Executors.newFixedThreadPool(2);
     try {
       List<Future<BackgroundTaskResult>> futures = pool.invokeAll(Arrays.asList(

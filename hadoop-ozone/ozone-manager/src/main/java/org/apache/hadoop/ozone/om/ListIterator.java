@@ -115,8 +115,7 @@ public class ListIterator {
   public static class DbTableIter<Value> implements
       ClosableIterator {
     private final int entryIteratorId;
-    private final TableIterator<String,
-        ? extends Table.KeyValue<String, Value>> tableIterator;
+    private final TableIterator<String, Table.KeyValue<String, Value>> tableIterator;
 
     private final Table<String, Value> table;
     private HeapEntry currentEntry;

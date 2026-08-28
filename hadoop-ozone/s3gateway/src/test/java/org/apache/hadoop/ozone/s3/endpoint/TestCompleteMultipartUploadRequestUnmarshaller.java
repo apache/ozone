@@ -93,7 +93,7 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
   }
 
   @Test
-  public void emptyBodyIsRejectedAsInvalidRequest() {
+  public void emptyBodyIsRejectedAsMalformedXml() {
     InputStream emptyBody = new ByteArrayInputStream(new byte[0]);
 
     WebApplicationException ex = assertThrows(WebApplicationException.class,
@@ -102,7 +102,7 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
 
     // Assert on the stable S3 error code rather than the human-readable message.
     OS3Exception cause = assertInstanceOf(OS3Exception.class, ex.getCause());
-    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), cause.getCode());
+    assertEquals(S3ErrorTable.MALFORMED_XML.getCode(), cause.getCode());
   }
 
   @Test

@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -49,6 +50,7 @@ import java.security.Signature;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -585,5 +587,53 @@ public class TestDefaultCertificateClient {
         .filter(monitorFilterPredicate)
         .count();
     assertThat(monitorThreadCount).isEqualTo(0L);
+  }
+
+  /**
+   * A renewal that fails with an unchecked exception must not let it escape the renewer task.
+   * The task is scheduled at a fixed rate, so an escaping exception cancels every further
+   * execution and the component stops renewing its certificate until it is restarted.
+   */
+  @Test
+  public void testRenewerContainsUnexpectedFailure(@TempDir File metaDir)
+      throws Exception {
+    OzoneConfiguration ozoneConf = new OzoneConfiguration();
+    ozoneConf.set(HDDS_METADATA_DIR_NAME, metaDir.getPath());
+    SecurityConfig conf = new SecurityConfig(ozoneConf);
+    String compName = "test-unexpected-failure";
+
+    CertificateCodec certCodec = new CertificateCodec(conf, compName);
+    X509Certificate cert = generateX509Cert(null);
+    certCodec.writeCertificate(cert);
+    String certId = cert.getSerialNumber().toString();
+
+    AtomicInteger attempts = new AtomicInteger();
+    DefaultCertificateClient client = new DefaultCertificateClient(
+        conf, null, mock(Logger.class), certId, compName, "", null, null) {
+
+      @Override
+      protected SCMGetCertResponseProto sign(CertificateSignRequest request) {
+        return null;
+      }
+
+      @Override
+      protected String signAndStoreCertificate(CertificateSignRequest request, Path certificatePath, boolean renew) {
+        return null;
+      }
+
+      @Override
+      public String renewAndStoreKeyAndCertificate(boolean force) {
+        attempts.incrementAndGet();
+        throw new IllegalStateException("renewal failed unexpectedly");
+      }
+    };
+
+    try {
+      // Runs exactly what the scheduled task runs.
+      assertDoesNotThrow(client.new CertificateRenewerService(true, () -> { })::run);
+      assertThat(attempts.get()).isPositive();
+    } finally {
+      client.close();
+    }
   }
 }

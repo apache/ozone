@@ -66,10 +66,12 @@ public interface ContainerManager {
    *              Usually the count will be replaced with a very big
    *              value instead of being unlimited in case the db is very big.
    * @param state container state
+   * @param healthState container health state              
    *
    * @return a list of container IDs.
    */
-  List<ContainerID> getContainerIDs(ContainerID startID, int count, LifeCycleState state);
+  List<ContainerID> getContainerIDs(ContainerID startID, int count, LifeCycleState state, 
+      ContainerHealthState healthState);
 
   /**
    * Returns containers under certain conditions.

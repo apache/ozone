@@ -135,7 +135,7 @@ public class OpenKeysInsightHandler implements OmTableHandler {
     long replicatedSize = 0;
 
     Table<String, OmKeyInfo> table = (Table<String, OmKeyInfo>) omMetadataManager.getTable(tableName);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = table.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {

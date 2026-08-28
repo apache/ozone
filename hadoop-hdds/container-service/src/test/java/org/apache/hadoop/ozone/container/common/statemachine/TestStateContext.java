@@ -49,6 +49,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -702,10 +703,10 @@ public class TestStateContext {
   @Test
   public void testCommandQueueSummary() throws IOException {
     StateContext ctx = createSubject();
-    ctx.addCommand(ReplicateContainerCommand.forTest(1));
+    ctx.addCommand(ReplicateContainerCommand.toTarget(1, MockDatanodeDetails.randomDatanodeDetails()));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
-    ctx.addCommand(ReplicateContainerCommand.forTest(2));
-    ctx.addCommand(ReplicateContainerCommand.forTest(3));
+    ctx.addCommand(ReplicateContainerCommand.toTarget(2, MockDatanodeDetails.randomDatanodeDetails()));
+    ctx.addCommand(ReplicateContainerCommand.toTarget(3, MockDatanodeDetails.randomDatanodeDetails()));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
     ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
     ctx.addCommand(new ReconcileContainerCommand(4, Collections.emptySet()));
@@ -772,7 +773,7 @@ public class TestStateContext {
   }
 
   private static SCMCommand<?> someCommand() {
-    return ReplicateContainerCommand.forTest(1);
+    return ReplicateContainerCommand.toTarget(1, MockDatanodeDetails.randomDatanodeDetails());
   }
 
 }

@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,7 +56,7 @@ import org.junit.jupiter.api.Test;
 public class TestContainerReplicaPendingOps {
 
   private ContainerReplicaPendingOps pendingOps;
-  private TestClock clock;
+  private MockClock clock;
   private DatanodeDetails dn1;
   private DatanodeDetails dn2;
   private DatanodeDetails dn3;
@@ -70,7 +70,7 @@ public class TestContainerReplicaPendingOps {
 
   @BeforeEach
   public void setup() {
-    clock = new TestClock(Instant.now(), ZoneOffset.UTC);
+    clock = new MockClock(Instant.now(), ZoneOffset.UTC);
     deadline = clock.millis() + 10000; // Current time plus 10 seconds
 
     OzoneConfiguration conf = new OzoneConfiguration();

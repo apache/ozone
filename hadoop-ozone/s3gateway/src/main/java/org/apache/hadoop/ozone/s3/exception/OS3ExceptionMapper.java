@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.exception;
 
 import javax.inject.Inject;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
@@ -45,6 +46,7 @@ public class OS3ExceptionMapper implements ExceptionMapper<OS3Exception> {
     }
     exception.setRequestId(requestIdentifier.getRequestId());
     return Response.status(exception.getHttpCode())
+        .type(MediaType.APPLICATION_XML_TYPE)
         .entity(exception.toXml()).build();
   }
 }

@@ -18,13 +18,13 @@
 package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet.RecoveringContainer;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,16 +55,15 @@ public class StaleRecoveringContainerScrubbingService
     BackgroundTaskQueue backgroundTaskQueue =
         new BackgroundTaskQueue();
     long currentTime = containerSet.getCurrentTime();
-    Iterator<RecoveringContainer> it =
-        containerSet.getRecoveringContainerIterator();
+    Iterator<Map.Entry<Long, Long>> it = containerSet.getRecoveringContainerMap().entrySet().iterator();
     while (it.hasNext()) {
-      RecoveringContainer entry = it.next();
-      if (currentTime >= entry.getTimeout()) {
+      Map.Entry<Long, Long> entry = it.next();
+      long containerId = entry.getKey();
+      long deadline = entry.getValue();
+      if (currentTime >= deadline) {
         backgroundTaskQueue.add(new RecoveringContainerScrubbingTask(
-            containerSet, entry.getContainerId()));
+            containerSet, containerId));
         it.remove();
-      } else {
-        break;
       }
     }
     return backgroundTaskQueue;
@@ -82,6 +81,12 @@ public class StaleRecoveringContainerScrubbingService
 
     @Override
     public BackgroundTaskResult call() throws Exception {
+      Long deadline = containerSet.getRecoveringContainerMap().get(containerID);
+      if (deadline != null && containerSet.getCurrentTime() < deadline) {
+        LOG.debug("Skipping stale recovering scrub for container {} - deadline extended",
+            containerID);
+        return new BackgroundTaskResult.EmptyTaskResult();
+      }
       Container con = containerSet.getContainer(containerID);
       if (null != con) {
         con.markContainerUnhealthy();

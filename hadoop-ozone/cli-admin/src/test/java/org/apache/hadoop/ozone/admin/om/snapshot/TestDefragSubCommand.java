@@ -17,10 +17,13 @@
 
 package org.apache.hadoop.ozone.admin.om.snapshot;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,9 +57,15 @@ public class TestDefragSubCommand {
    */
   private static class TestableDefragSubCommand extends DefragSubCommand {
     private final OMAdminProtocolClientSideImpl mockClient;
+    private final OzoneConfiguration testConf = new OzoneConfiguration();
 
     TestableDefragSubCommand(OMAdminProtocolClientSideImpl mockClient) {
       this.mockClient = mockClient;
+    }
+
+    @Override
+    protected OzoneConfiguration getOzoneConf() {
+      return testConf;
     }
 
     @Override
@@ -139,6 +148,19 @@ public class TestDefragSubCommand {
     // Verify success message
     String output = outContent.toString(DEFAULT_ENCODING);
     assertTrue(output.contains("Snapshot defragmentation completed successfully"));
+  }
+
+  @Test
+  public void testDefragHAWithoutNodeIdFailsFast() throws Exception {
+    cmd.testConf.set(OZONE_OM_SERVICE_IDS_KEY, "omservice");
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs();
+    cmd.call();
+
+    verify(omAdminClient, never()).triggerSnapshotDefrag(anyBoolean());
+    String error = errContent.toString(DEFAULT_ENCODING);
+    assertTrue(error.contains("specify --node-id"));
   }
 
   @Test

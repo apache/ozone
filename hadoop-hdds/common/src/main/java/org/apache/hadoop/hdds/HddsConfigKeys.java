@@ -39,6 +39,10 @@ public final class HddsConfigKeys {
       "hdds.heartbeat.recon.initial-interval";
   public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
       "2s";
+  /** Missed heartbeats against one SCM before the DN re-resolves its hostname (HDDS-15533). */
+  public static final String HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD =
+      "hdds.heartbeat.address.refresh.missed-count-threshold";
+  public static final int HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT = 3;
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =

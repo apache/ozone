@@ -48,7 +48,7 @@ import org.junit.jupiter.api.Test;
  * Tests OMBucketSetPropertyRequest class which handles OMSetBucketProperty
  * request.
  */
-public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
+public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
 
   private static final String TEST_KEY = "key1";
 

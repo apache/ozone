@@ -173,10 +173,10 @@
         templateUrl: 'ratis-events.html',
         controller: function ($http) {
             var ctrl = this;
-            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OzoneManagerInfo,component=ServerRuntime")
                 .then(function (result) {
                     var metrics = result.data.beans[0];
-                    var rawEvents = metrics['tag.RatisEvents'] ? metrics['tag.RatisEvents'].split('\n') : [];
+                    var rawEvents = (metrics && metrics['RatisEvents']) ? metrics['RatisEvents'].split('\n') : [];
                     ctrl.events = rawEvents.map(function(e) {
                         var parts = e.split('|');
                         return {

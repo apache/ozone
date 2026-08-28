@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -76,9 +76,9 @@ public class TestOmSnapshotDisabledRestart {
     // Verify that OM start up will indeed fail when there are still snapshots
     // while snapshot feature is disabled.
 
-    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck-" + RandomStringUtils.secure().nextNumeric(5);
-    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol-");
+    String bucketName = uniqueObjectName("buck-");
+    String snapshotName = uniqueObjectName("snap-");
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);

@@ -96,6 +96,11 @@ public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public void clear() {
+    map.clear();
+  }
+
+  @Override
   public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, IteratorType type) {
     throw new UnsupportedOperationException();
   }

@@ -39,6 +39,7 @@ public class TestLlmRouting {
     Map<String, List<String>> supportedModels = new HashMap<>();
     supportedModels.put("gemini", Arrays.asList("gemini-2.5-flash", "gemini-2.5-pro"));
     supportedModels.put("openai", Arrays.asList("gpt-4.1", "gpt-4.1-mini"));
+    supportedModels.put("gateway", Arrays.asList("claude-sonnet", "gpt-4.1-gateway"));
     routing = new LlmRouting(DEFAULT_PROVIDER, DEFAULT_MODEL, supportedModels);
   }
 
@@ -47,6 +48,13 @@ public class TestLlmRouting {
     LlmRouting.Resolved resolved = routing.resolve("openai", "gpt-4.1");
     assertEquals("openai", resolved.getProvider());
     assertEquals("gpt-4.1", resolved.getModel());
+  }
+
+  @Test
+  public void testValidGatewayProviderAndModel() {
+    LlmRouting.Resolved resolved = routing.resolve("gateway", "claude-sonnet");
+    assertEquals("gateway", resolved.getProvider());
+    assertEquals("claude-sonnet", resolved.getModel());
   }
 
   @Test

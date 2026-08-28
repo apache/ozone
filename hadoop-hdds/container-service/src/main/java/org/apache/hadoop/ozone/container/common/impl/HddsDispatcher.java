@@ -80,6 +80,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -225,7 +226,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
             == DispatcherContext.WriteChunkStage.WRITE_DATA)
-            || (cmdType == Type.StreamInit);
+            || (cmdType == Type.StreamInit)
+            || (cmdType == Type.StreamInitWithPutBlock);
     boolean isWriteCommitStage =
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
@@ -298,6 +300,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       if (container == null && ((isWriteStage || isCombinedStage)
           || cmdType == Type.PutSmallFile
           || cmdType == Type.PutBlock)) {
+
+        if (!ContainerUtils.isContainerCreatable(msg)) {
+          StorageContainerException sce = new StorageContainerException(
+              "ContainerID " + containerID + " does not exist",
+              ContainerProtos.Result.CONTAINER_NOT_FOUND);
+          audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
+          return ContainerUtils.logAndReturnError(LOG, sce, msg);
+        }
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
         responseProto = createContainer(msg);
@@ -807,13 +817,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-          ContainerCommandRequestProto msg)
-          throws StorageContainerException {
+      ContainerCommandRequestProto msg,
+      CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock)
+      throws StorageContainerException {
     long containerID = msg.getContainerID();
     Container container = getContainer(containerID);
     if (container != null) {
       Handler handler = getHandler(getContainerType(container));
-      return handler.getStreamDataChannel(container, msg);
+      return handler.getStreamDataChannel(container, msg, putBlock);
     } else {
       throw new StorageContainerException(
               "ContainerID " + containerID + " does not exist",
@@ -915,6 +926,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case CloseContainer   : return DNAction.CLOSE_CONTAINER;
     case GetCommittedBlockLength : return DNAction.GET_COMMITTED_BLOCK_LENGTH;
     case StreamInit       : return DNAction.STREAM_INIT;
+    case StreamInitWithPutBlock: return DNAction.STREAM_INIT_WITH_PUT_BLOCK;
     case FinalizeBlock    : return DNAction.FINALIZE_BLOCK;
     case Echo             : return DNAction.ECHO;
     case GetContainerChecksumInfo: return DNAction.GET_CONTAINER_CHECKSUM_INFO;

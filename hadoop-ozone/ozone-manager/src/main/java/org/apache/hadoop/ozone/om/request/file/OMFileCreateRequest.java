@@ -101,14 +101,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
       return getOmRequest().toBuilder().setUserInfo(userInfo).build();
     }
 
-    long scmBlockSize = ozoneManager.getScmBlockSize();
-
     // NOTE size of a key is not a hard limit on anything, it is a value that
     // client should expect, in terms of current size of key. If client sets
     // a value, then this value is used, otherwise, we allocate a single
     // block which is the current size, if read by the client.
     final long requestedSize = keyArgs.getDataSize() > 0 ?
-        keyArgs.getDataSize() : scmBlockSize;
+        keyArgs.getDataSize() : ozoneManager.getScmBlockSize();
 
     HddsProtos.ReplicationFactor factor = keyArgs.getFactor();
     HddsProtos.ReplicationType type = keyArgs.getType();
@@ -129,16 +127,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
     // File system client does not know the final file size in advance but use 0 as
     // the placeholder for the data size. Therefore, we should at least allocate a
     // single block and we cannot simply skip the allocate block call
-    List< OmKeyLocationInfo > omKeyLocationInfoList =
-        allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), repConfig,
-              new ExcludeList(), requestedSize, scmBlockSize,
-              ozoneManager.getPreallocateBlocksMax(),
-              ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMServiceId(),
-              ozoneManager.getMetrics(),
-              keyArgs.getSortDatanodes(),
-              userInfo);
+    final List< OmKeyLocationInfo > omKeyLocationInfoList = allocateBlock(
+        repConfig, new ExcludeList(), requestedSize, keyArgs.getSortDatanodes(), userInfo, ozoneManager);
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
         .setModificationTime(Time.now()).setType(type).setFactor(factor)

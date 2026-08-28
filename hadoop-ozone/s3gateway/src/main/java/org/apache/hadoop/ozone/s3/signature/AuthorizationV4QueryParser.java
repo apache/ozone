@@ -135,12 +135,15 @@ public class AuthorizationV4QueryParser implements SignatureParser {
     if (expires >= X_AMZ_EXPIRES_MIN && expires <= X_AMZ_EXPIRES_MAX) {
       if (ZonedDateTime.parse(dateString, StringToSignProducer.TIME_FORMATTER)
           .plus(expires, SECONDS).isBefore(ZonedDateTime.now())) {
-        throw new MalformedResourceException("Pre-signed S3 url is expired. "
+        // An expired pre-signed URL is an authorization failure (403), not a
+        // malformed header (400).
+        throw new AccessDeniedResourceException("Pre-signed S3 url is expired. "
             + "dateString:" + dateString
             + " expiresString:" + expiresString);
       }
     } else {
-      throw new MalformedResourceException("Invalid expiry duration. "
+      // An out-of-range X-Amz-Expires is rejected by AWS with 403, not 400.
+      throw new AccessDeniedResourceException("Invalid expiry duration. "
           + "X-Amz-Expires should be between " + X_AMZ_EXPIRES_MIN
           + "and" + X_AMZ_EXPIRES_MAX + " expiresString:" + expiresString);
     }

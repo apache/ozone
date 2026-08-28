@@ -62,6 +62,20 @@ public final class EndpointTestUtils {
     return subject.get(bucket, key);
   }
 
+  /** Get object attributes (?attributes). */
+  public static Response getObjectAttributes(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      String attributesHeader
+  ) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.ATTRIBUTES, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
+    when(subject.getHeaders().getHeaderString(S3Consts.OBJECT_ATTRIBUTES_HEADER))
+        .thenReturn(attributesHeader);
+    return subject.get(bucket, key);
+  }
+
   /** List parts of MPU. */
   public static Response listParts(
       ObjectEndpoint subject,

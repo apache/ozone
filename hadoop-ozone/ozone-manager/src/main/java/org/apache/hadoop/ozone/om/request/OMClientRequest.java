@@ -115,7 +115,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         .setVersion(ozoneManager.getVersionManager().getMetadataLayoutVersion())
         .build();
     omRequest = getOmRequest().toBuilder()
-        .setUserInfo(getUserInfo())
+        .setUserInfo(getUserIfNotExists(ozoneManager))
         .setLayoutVersion(layoutVersion).build();
     return omRequest;
   }
@@ -177,8 +177,11 @@ public abstract class OMClientRequest implements RequestAuditor {
       userInfo.setUserName(user.getUserName());
     }
 
-    // for gRPC s3g omRequests that contain user name
-    if (user == null && omRequest.hasUserInfo()) {
+    // for gRPC s3g omRequests that contain user name. Only adopt the
+    // client-supplied user name when no identity was established above:
+    // it is unauthenticated data and must never override the identity
+    // derived from S3 authentication or from the RPC user.
+    if (user == null && !userInfo.hasUserName() && omRequest.hasUserInfo()) {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 
@@ -193,16 +196,39 @@ public abstract class OMClientRequest implements RequestAuditor {
         && grpcContextClientIpAddress != null) {
       userInfo.setHostName(grpcContextClientHostname);
       userInfo.setRemoteAddress(grpcContextClientIpAddress);
-    } else if (omRequest.hasUserInfo()
-        && omRequest.getUserInfo().hasRemoteAddress()) {
-      // For non-RPC internal service requests (e.g. the Trash emptier) that
-      // populate their own UserInfo, preserve the supplied host/address since
-      // there is no RPC or gRPC client context to derive it from.
-      userInfo.setHostName(omRequest.getUserInfo().getHostName());
-      userInfo.setRemoteAddress(omRequest.getUserInfo().getRemoteAddress());
     }
 
     return userInfo.build();
+  }
+
+  /**
+   * For non-rpc internal calls Server.getRemoteUser()
+   * and Server.getRemoteIp() will be null.
+   * Passing getCurrentUser() and Ip of the Om node that started it.
+   * @return User Info.
+   */
+  public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(
+      OzoneManager ozoneManager) throws IOException {
+    OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
+    if (!userInfo.hasRemoteAddress() || !userInfo.hasUserName()) {
+      OzoneManagerProtocolProtos.UserInfo.Builder newuserInfo =
+          OzoneManagerProtocolProtos.UserInfo.newBuilder();
+      UserGroupInformation user;
+      InetAddress remoteAddress;
+      try {
+        user = UserGroupInformation.getCurrentUser();
+        remoteAddress = ozoneManager.getOmRpcServerAddr()
+            .getAddress();
+      } catch (Exception e) {
+        LOG.debug("Couldn't get om Rpc server address", e);
+        return getUserInfo();
+      }
+      newuserInfo.setUserName(user.getUserName());
+      newuserInfo.setHostName(remoteAddress.getHostName());
+      newuserInfo.setRemoteAddress(remoteAddress.getHostAddress());
+      return newuserInfo.build();
+    }
+    return getUserInfo();
   }
 
   /**

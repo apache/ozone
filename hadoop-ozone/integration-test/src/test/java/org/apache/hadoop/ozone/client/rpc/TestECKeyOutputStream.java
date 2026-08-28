@@ -73,7 +73,7 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
@@ -175,7 +175,7 @@ public class TestECKeyOutputStream {
 
   @Test
   public void testCreateKeyWithECReplicationConfig() throws Exception {
-    try (OzoneOutputStream key = TestHelper
+    try (OzoneOutputStream key = OzoneTestHelper
         .createKey(keyString, new ECReplicationConfig(3, 2,
                 ECReplicationConfig.EcCodec.RS, chunkSize), inputSize,
             objectStore, volumeName, bucketName)) {
@@ -207,7 +207,7 @@ public class TestECKeyOutputStream {
       ObjectStore store = client1.getObjectStore();
       store.createVolume(volumeName);
       store.getVolume(volumeName).createBucket(bucketName);
-      OzoneOutputStream key = TestHelper.createKey(keyString, new ECReplicationConfig(3, 2,
+      OzoneOutputStream key = OzoneTestHelper.createKey(keyString, new ECReplicationConfig(3, 2,
           ECReplicationConfig.EcCodec.RS, 1024), inputSize, store, volumeName, bucketName);
       byte[] b = new byte[6 * 1024];
       ECKeyOutputStream groupOutputStream = (ECKeyOutputStream) key.getOutputStream();
@@ -568,7 +568,7 @@ public class TestECKeyOutputStream {
   @Test
   public void testBlockedHflushAndHsync() throws Exception {
     // Expect ECKeyOutputStream hflush and hsync calls to throw exception
-    try (OzoneOutputStream oOut = TestHelper.createKey(
+    try (OzoneOutputStream oOut = OzoneTestHelper.createKey(
         keyString, new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, chunkSize),
         inputSize, objectStore, volumeName, bucketName)) {
       assertInstanceOf(ECKeyOutputStream.class, oOut.getOutputStream());
