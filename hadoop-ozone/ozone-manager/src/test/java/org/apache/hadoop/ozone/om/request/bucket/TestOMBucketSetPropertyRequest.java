@@ -497,20 +497,31 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     assertEquals(BucketVersioningStatus.UNVERSIONED,
         omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
 
-    // legacy true -> ENABLED
+    // legacy true does NOT opt the bucket into S3 versioning: it only sets the
+    // legacy flag, which selects the in-record block version list
     response = new OMBucketSetPropertyRequest(
         createSetVersioningFlagRequest(volumeName, bucketName, true))
         .validateAndUpdateCache(ozoneManager, 2);
     assertTrue(response.getOMResponse().getSuccess());
-    assertEquals(BucketVersioningStatus.ENABLED,
-        omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
+    OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertFalse(dbBucketInfo.hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        dbBucketInfo.getVersioningStatus());
+    assertTrue(dbBucketInfo.getIsVersionEnabled());
 
-    // legacy false after enabling -> SUSPENDED, not UNVERSIONED
+    // once a status exists, an old client's flag is kept consistent with it:
+    // disabling maps to SUSPENDED rather than back to UNVERSIONED
     response = new OMBucketSetPropertyRequest(
-        createSetVersioningFlagRequest(volumeName, bucketName, false))
+        createSetVersioningStatusRequest(volumeName, bucketName,
+            BucketVersioningStatus.ENABLED))
         .validateAndUpdateCache(ozoneManager, 3);
     assertTrue(response.getOMResponse().getSuccess());
-    OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+
+    response = new OMBucketSetPropertyRequest(
+        createSetVersioningFlagRequest(volumeName, bucketName, false))
+        .validateAndUpdateCache(ozoneManager, 4);
+    assertTrue(response.getOMResponse().getSuccess());
+    dbBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(BucketVersioningStatus.SUSPENDED, dbBucketInfo.getVersioningStatus());
     assertFalse(dbBucketInfo.getIsVersionEnabled());
   }

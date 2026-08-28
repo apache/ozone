@@ -818,8 +818,11 @@ message BucketInfo {
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
     repeated hadoop.hdds.KeyValue tags = 23;
-    // S3-compatible object versioning status. When absent, derived from
-    // isVersionEnabled (true -> VERSIONING_ENABLED, false -> UNVERSIONED).
+    // S3-compatible object versioning status. When absent the bucket carries
+    // no S3 versioning status at all: it reads as UNVERSIONED whatever
+    // isVersionEnabled says, and that flag alone drives the legacy in-record
+    // block version list. When set it is authoritative, and isVersionEnabled
+    // is kept in sync with it (VERSIONING_ENABLED -> true).
     optional BucketVersioningStatusProto versioningStatus = 24;
 }
 

@@ -204,6 +204,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
         getMetadata().get(OzoneConsts.GDPR_FLAG));
     auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
                 String.valueOf(this.isVersionEnabled));
+    if (this.versioningStatus != null) {
+      auditMap.put(OzoneConsts.VERSIONING_STATUS, this.versioningStatus.name());
+    }
     if (this.storageType != null) {
       auditMap.put(OzoneConsts.STORAGE_TYPE, this.storageType.name());
     }

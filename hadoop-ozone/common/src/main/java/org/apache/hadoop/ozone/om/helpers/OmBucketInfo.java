@@ -122,9 +122,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
     this.acls = b.acls.build();
-    this.versioningStatus = b.versioningStatus != null ? b.versioningStatus
-        : BucketVersioningStatus.fromVersionEnabledFlag(b.isVersionEnabled);
-    this.isVersionEnabled = this.versioningStatus.toVersionEnabledFlag();
+    // A null versioningStatus means the bucket carries no S3 versioning status
+    // at all, mirroring the optional proto field: such a bucket is driven by the
+    // legacy isVersionEnabled flag alone. The flag is derived from the status
+    // only when a status was actually set, so that a legacy client enabling
+    // versioning does not silently opt an existing bucket into S3 versioning.
+    this.versioningStatus = b.versioningStatus;
+    this.isVersionEnabled = b.versioningStatus != null
+        ? b.versioningStatus.toVersionEnabledFlag() : b.isVersionEnabled;
     this.storageType = b.storageType;
     this.creationTime = b.creationTime;
     this.modificationTime = b.modificationTime;
@@ -180,11 +185,24 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   }
 
   /**
-   * Returns the S3-compatible versioning status; never null.
+   * Returns the S3-compatible versioning status; never null. A bucket that only
+   * carries the legacy isVersionEnabled flag is UNVERSIONED as far as S3
+   * versioning is concerned: the legacy flag selects the in-record block version
+   * list, which is a different feature.
    * @return BucketVersioningStatus
    */
   public BucketVersioningStatus getVersioningStatus() {
-    return versioningStatus;
+    return versioningStatus != null
+        ? versioningStatus : BucketVersioningStatus.UNVERSIONED;
+  }
+
+  /**
+   * Whether an S3 versioning status was explicitly set on this bucket, as
+   * opposed to the bucket carrying only the legacy isVersionEnabled flag.
+   * @return whether the optional status field is present
+   */
+  public boolean hasVersioningStatus() {
+    return versioningStatus != null;
   }
 
   /**
@@ -352,6 +370,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         (this.acls != null) ? this.acls.toString() : null);
     auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
         String.valueOf(this.isVersionEnabled));
+    auditMap.put(OzoneConsts.VERSIONING_STATUS,
+        this.versioningStatus != null ? this.versioningStatus.name() : null);
     auditMap.put(OzoneConsts.STORAGE_TYPE,
         (this.storageType != null) ? this.storageType.name() : null);
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
@@ -423,6 +443,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     return toBuilder()
         .setStorageType(source.getStorageType())
         .setIsVersionEnabled(source.getIsVersionEnabled())
+        // Only when the real bucket actually carries a status: copying the
+        // value getVersioningStatus() derives for a legacy bucket would give
+        // the link an explicit status the real bucket does not have.
+        .setVersioningStatus(source.hasVersioningStatus()
+            ? source.getVersioningStatus() : null)
         .setBucketEncryptionKey(source.getEncryptionKeyInfo())
         .setUsedBytes(source.getUsedBytes())
         .setUsedNamespace(source.getUsedNamespace())
@@ -502,15 +527,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       return this;
     }
 
+    /**
+     * Sets the legacy flag only. It deliberately does not derive a
+     * versioningStatus: a legacy client enabling versioning must not opt the
+     * bucket into S3 versioning semantics. Deriving the status is the job of
+     * OMBucketSetPropertyRequest, where an actual state transition is requested.
+     */
     public Builder setIsVersionEnabled(boolean versionFlag) {
       this.isVersionEnabled = versionFlag;
-      // Keep versioningStatus in sync for callers that only know the legacy
-      // flag; an explicitly SUSPENDED status is preserved on disable.
-      if (versionFlag) {
-        this.versioningStatus = BucketVersioningStatus.ENABLED;
-      } else if (versioningStatus != BucketVersioningStatus.SUSPENDED) {
-        this.versioningStatus = BucketVersioningStatus.UNVERSIONED;
-      }
       return this;
     }
 
@@ -658,7 +682,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setBucketName(bucketName)
         .addAllAcls(OzoneAclUtil.toProtobuf(acls))
         .setIsVersionEnabled(isVersionEnabled)
-        .setVersioningStatus(versioningStatus.toProto())
         .setStorageType(storageType.toProto())
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
@@ -672,6 +695,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setQuotaInNamespace(quotaInNamespace)
         .setSnapshotUsedBytes(snapshotUsedBytes)
         .setSnapshotUsedNamespace(snapshotUsedNamespace);
+    // Written only when actually set, so that hasVersioningStatus() keeps
+    // telling a legacy-flag bucket apart from an S3-versioned one after a
+    // round trip through RocksDB.
+    if (versioningStatus != null) {
+      bib.setVersioningStatus(versioningStatus.toProto());
+    }
     if (bucketLayout != null) {
       bib.setBucketLayout(bucketLayout.toProto());
     }

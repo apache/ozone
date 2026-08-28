@@ -89,7 +89,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  * |        Column Family |                           Mapping                         |
  * |----------------------------------------------------------------------------------|
  * |             keyTable | /volume/bucket/key                     :- KeyInfo         |
- * |    versionedKeyTable | /volume/bucket/key/revVersionId        :- KeyInfo         |
+ * |    versionedKeyTable | /volume/bucket/key\0revVersionId       :- KeyInfo         |
  * |         deletedTable | /volume/bucket/key                     :- RepeatedKeyInfo |
  * |         openKeyTable | /volume/bucket/key/id                  :- KeyInfo         |
  * |   multipartInfoTable | /volume/bucket/key/uploadId            :- parts           |
@@ -216,11 +216,13 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
 
   public static final String VERSIONED_KEY_TABLE = "versionedKeyTable";
   /**
-   * versionedKeyTable: /volume/bucket/key/revVersionId :- KeyInfo.
+   * versionedKeyTable: /volume/bucket/key\0revVersionId :- KeyInfo.
    * Noncurrent object versions (including noncurrent delete markers) of
    * versioning-enabled buckets; the current version stays in keyTable.
    * revVersionId is the fixed-width hex of (Long.MAX_VALUE - versionId), so
-   * versions of a key are adjacent and ordered newest first.
+   * versions of a key are adjacent and ordered newest first. The separator is
+   * OM_VERSIONED_KEY_SEPARATOR (0x00), not '/', because OBJECT_STORE key names
+   * contain '/' verbatim.
    */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> VERSIONED_KEY_TABLE_DEF
       = new DBColumnFamilyDefinition<>(VERSIONED_KEY_TABLE,
