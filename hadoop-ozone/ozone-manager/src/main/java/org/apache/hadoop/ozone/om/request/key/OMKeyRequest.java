@@ -1513,38 +1513,60 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // request that throws here is answered with an OMKeyDeleteResponse, whose
     // cleanup does not cover the versionedKeyTable, so a cache entry left
     // behind would never be removed and would outlive the failed request.
+    // The null version the marker replaces is removed: the current one when
+    // the last write was also suspended, and a noncurrent one when versioning
+    // was enabled in between. Resolved before the quota check so that the
+    // check sees what the marker removes as well as what it adds.
+    final Pair<String, OmKeyInfo> noncurrentNullVersion =
+        suspended && !replacesCurrent
+            ? getNoncurrentNullVersion(
+                omMetadataManager, volumeName, bucketName, keyName)
+            : null;
+    final OmKeyInfo replacedNullVersion = replacesCurrent ? currentVersion
+        : (noncurrentNullVersion == null
+            ? null : noncurrentNullVersion.getValue());
     // The marker is a record of its own; it holds no blocks, so it consumes
-    // namespace but no space.
-    checkBucketQuotaInNamespace(omBucketInfo, 1L);
+    // namespace but no space - unless it takes the null version slot, which
+    // replaces a record rather than adding one.
+    final long addedNamespace = replacedNullVersion == null ? 1L : 0L;
+    checkBucketQuotaInNamespace(omBucketInfo, addedNamespace);
 
-    OmKeyInfo.Builder markerBuilder;
-    if (currentVersion != null) {
-      markerBuilder = currentVersion.toBuilder()
-          .setMetadata(new HashMap<>())
-          .setTags(new HashMap<>())
-          .setFileChecksum(null);
-    } else {
-      markerBuilder = new OmKeyInfo.Builder()
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName(keyName)
-          .setReplicationConfig(RatisReplicationConfig.getInstance(
-              ReplicationFactor.ONE))
-          .setObjectID(ozoneManager.getObjectIdFromTxId(trxnLogIndex))
-          .setOwnerName(omBucketInfo.getOwner())
-          .setFile(true);
-    }
-    OmKeyInfo deleteMarker = markerBuilder
+    // The marker is built from a stated set of fields rather than copied from
+    // the version it supersedes. It keeps the key's identity - objectID,
+    // owner, replication and ACLs - and holds nothing else: no blocks, no
+    // metadata or tags, no encryption info or checksum, which describe content
+    // a marker does not have. Listing the fields rather than copying and
+    // clearing also keeps a field added to OmKeyInfo off markers by default.
+    OmKeyInfo.Builder markerBuilder = new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setDataSize(0L)
         .setCreationTime(modificationTime)
         .setModificationTime(modificationTime)
         .setUpdateID(trxnLogIndex)
+        .setFile(true)
         .setVersionId(markerVersionId)
         .setDeleteMarker(true)
-        .setNullVersion(suspended)
-        .build();
+        .setNullVersion(suspended);
+    if (currentVersion != null) {
+      markerBuilder
+          .setObjectID(currentVersion.getObjectID())
+          .setOwnerName(currentVersion.getOwnerName())
+          .setReplicationConfig(currentVersion.getReplicationConfig())
+          .setAcls(currentVersion.getAcls());
+    } else {
+      // S3 inserts a delete marker for a key that does not exist, so the
+      // marker has no identity to inherit and gets one of its own.
+      markerBuilder
+          .setObjectID(ozoneManager.getObjectIdFromTxId(trxnLogIndex))
+          .setOwnerName(omBucketInfo.getOwner())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(
+              ReplicationFactor.ONE));
+    }
+    OmKeyInfo deleteMarker = markerBuilder.build();
 
     String movedVersionedKeyName = null;
     OmKeyInfo movedVersionedKeyInfo = null;
@@ -1562,21 +1584,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
           movedVersionedKeyName, movedVersionedKeyInfo, trxnLogIndex);
     }
 
-    // The null version the marker replaces is removed: the current one when
-    // the last write was also suspended, and a noncurrent one when versioning
-    // was enabled in between.
-    OmKeyInfo replacedNullVersion = replacesCurrent ? currentVersion : null;
     String replacedNullVersionKey = null;
-    if (suspended && !replacesCurrent) {
-      Pair<String, OmKeyInfo> nullVersion = getNoncurrentNullVersion(
-          omMetadataManager, volumeName, bucketName, keyName);
-      if (nullVersion != null) {
-        replacedNullVersionKey = nullVersion.getKey();
-        replacedNullVersion = nullVersion.getValue();
-        omMetadataManager.getVersionedKeyTable().addCacheEntry(
-            new CacheKey<>(replacedNullVersionKey),
-            CacheValue.get(trxnLogIndex));
-      }
+    if (noncurrentNullVersion != null) {
+      replacedNullVersionKey = noncurrentNullVersion.getKey();
+      omMetadataManager.getVersionedKeyTable().addCacheEntry(
+          new CacheKey<>(replacedNullVersionKey),
+          CacheValue.get(trxnLogIndex));
     }
     Map<String, RepeatedOmKeyInfo> keysToDelete = null;
     if (replacedNullVersion != null) {
@@ -1584,10 +1597,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
           objectKey, omBucketInfo.getObjectID(),
           replacedNullVersion.withCommittedKeyDeletedFlag(true), null);
       omBucketInfo.decrUsedBytes(sumBlockLengths(replacedNullVersion), true);
-      omBucketInfo.decrUsedNamespace(1L, true);
     }
 
-    omBucketInfo.incrUsedNamespace(1L);
+    omBucketInfo.incrUsedNamespace(addedNamespace);
 
     omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
         objectKey, deleteMarker, trxnLogIndex);

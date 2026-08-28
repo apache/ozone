@@ -26,12 +26,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -86,7 +88,12 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
   }
 
   private void setupSuspendedBucket() throws Exception {
-    setupVersionedBucket(OzoneConsts.QUOTA_RESET, OzoneConsts.QUOTA_RESET, 0L,
+    setupSuspendedBucket(OzoneConsts.QUOTA_RESET, OzoneConsts.QUOTA_RESET, 0L);
+  }
+
+  private void setupSuspendedBucket(long quotaInBytes, long quotaInNamespace,
+      long usedNamespace) throws Exception {
+    setupVersionedBucket(quotaInBytes, quotaInNamespace, usedNamespace,
         BucketVersioningStatus.SUSPENDED);
   }
 
@@ -902,6 +909,102 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertNull(currentVersion());
   }
 
+  /**
+   * S3 calls the object itself the null version on a bucket that has never
+   * been versioned, so addressing it is the plain delete rather than an
+   * unsupported request.
+   */
+  @Test
+  public void testDeleteByNullVersionOnAnUnversionedBucketDeletes()
+      throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    seedCurrentVersion(null);
+
+    OMClientResponse response = deleteVersionAt(null, true, 200L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertNull(currentVersion());
+  }
+
+  /** There is no version history for an id to name, though. */
+  @Test
+  public void testDeleteByVersionIdOnAnUnversionedBucketIsRejected()
+      throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    seedCurrentVersion(null);
+
+    OMClientResponse response = deleteVersionAt(100L, false, 200L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
+        response.getOMResponse().getStatus());
+    assertNotNull(currentVersion());
+  }
+
+  /**
+   * A marker that takes the key's null version slot replaces a record instead
+   * of adding one, so a bucket sitting exactly at its namespace quota still
+   * accepts the delete.
+   */
+  @Test
+  public void testSuspendedMarkerAtNamespaceQuotaReplacesTheNullVersion()
+      throws Exception {
+    // the one record the key holds is all the quota allows
+    setupSuspendedBucket(OzoneConsts.QUOTA_RESET, 1L, 1L);
+    seedCurrentVersion(100L, false, true);
+
+    OMClientResponse response =
+        new OMKeyDeleteRequest(deleteRequest(PROPOSED), getBucketLayout())
+            .validateAndUpdateCache(ozoneManager, 200L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertTrue(currentVersion().isDeleteMarker());
+    assertEquals(1, omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName))
+        .getUsedNamespace());
+  }
+
+  /**
+   * A marker keeps the key's identity and none of its content, so what it
+   * carries is listed rather than inherited from the version it supersedes.
+   */
+  @Test
+  public void testDeleteMarkerKeepsIdentityAndDropsContent() throws Exception {
+    setupVersionedBucket();
+    OmKeyInfo seeded = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(100L)
+        .setOwnerName("owner1")
+        .setAcls(Collections.singletonList(
+            OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]")))
+        .addMetadata("meta", "value")
+        .addTag("tag", "value")
+        .build();
+    OMRequestTestUtils.addKeyLocationInfo(seeded, 0L, 1000L);
+    String ozoneKey =
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+    omMetadataManager.getKeyTable(getBucketLayout()).put(ozoneKey, seeded);
+
+    deleteAt(200L, PROPOSED);
+
+    OmKeyInfo marker = currentVersion();
+    assertTrue(marker.isDeleteMarker());
+    assertEquals(seeded.getObjectID(), marker.getObjectID());
+    assertEquals("owner1", marker.getOwnerName());
+    assertEquals(seeded.getReplicationConfig(),
+        marker.getReplicationConfig());
+    assertEquals(1, marker.getAcls().size());
+
+    assertEquals(0L, marker.getDataSize());
+    assertTrue(marker.getMetadata().isEmpty());
+    assertTrue(marker.getTags().isEmpty());
+    assertTrue(marker.getKeyLocationVersions().get(0)
+        .getLocationList().isEmpty());
+  }
+
   private OMRequest batchDeleteRequest(long proposedVersionId, String... keys) {
     return OMRequest.newBuilder()
         .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
@@ -1148,6 +1251,30 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertNull(noncurrentVersion(200L));
     assertNotNull(noncurrentVersion(300L));
     assertNotNull(noncurrentVersion(100L));
+  }
+
+  /**
+   * Replacing the key's null version leaves the bucket's record count
+   * unchanged, so the quota check must not see the record the write adds
+   * without the one it removes: a bucket sitting exactly at its namespace
+   * quota still accepts the write.
+   */
+  @Test
+  public void testSuspendedWriteAtNamespaceQuotaReplacesTheNullVersion()
+      throws Exception {
+    // the two records the key already holds are all the quota allows
+    setupSuspendedBucket(OzoneConsts.QUOTA_RESET, 2L, 2L);
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(200L, true);
+
+    OMClientResponse response = commitAt(500L, PROPOSED, false, 0L, clientID);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertNull(noncurrentVersion(200L));
+    assertEquals(2, omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName))
+        .getUsedNamespace());
   }
 
   /**

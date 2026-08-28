@@ -347,8 +347,31 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       List<OmKeyLocationInfo> uncommitted =
           omKeyInfo.updateLocationInfoList(locationInfoList, false);
 
+      // A suspended write replaces the key's null version wherever it is. It is
+      // the current version when the previous write was also suspended, and a
+      // noncurrent version when versioning was enabled in between - the version
+      // that demoted it is still current, and is retained below.
+      //
+      // Resolved before the quota checks so that they see the whole
+      // transaction. The replaced record goes away in the same batch, so a
+      // write that leaves the bucket no larger must not be rejected for being
+      // over quota. The version retained below always carries a real versionId,
+      // since a null version record would not have been retained, so it cannot
+      // be what this finds.
+      final Pair<String, OmKeyInfo> replacedNullVersion =
+          suspendedWrite && !isSameHsyncKey && supersededVersionRetained
+              ? getNoncurrentNullVersion(
+                  omMetadataManager, volumeName, bucketName, keyName)
+              : null;
+      // The write adds a record, unless it also removes one: replacing the
+      // key's null version leaves the number of records unchanged.
+      final long addedNamespace = replacedNullVersion == null ? 1L : 0L;
+
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       long correctedSpace = omKeyInfo.getReplicatedSize();
+      if (replacedNullVersion != null) {
+        correctedSpace -= sumBlockLengths(replacedNullVersion.getValue());
+      }
       // if keyToDelete isn't null, usedNamespace needn't check and
       // increase.
       if (keyToDelete != null && (isSameHsyncKey)) {
@@ -402,11 +425,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         omBucketInfo.decrUsedNamespace(filteredUsedBlockCnt.getRight(), false);
         omBucketInfo.decrUsedBytes(totalSize, true);
       } else {
-        checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        checkBucketQuotaInNamespace(omBucketInfo, addedNamespace);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
       }
-      omBucketInfo.incrUsedNamespace(1L);
+      omBucketInfo.incrUsedNamespace(addedNamespace);
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
       final OmKeyInfo pseudoKeyInfo = isHSync ? null
@@ -458,22 +481,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // noncurrent version when versioning was enabled in between - the version
       // that demoted it is still current, and is retained above.
       String replacedNullVersionKey = null;
-      if (suspendedWrite && !isSameHsyncKey && supersededVersionRetained) {
-        Pair<String, OmKeyInfo> nullVersion = getNoncurrentNullVersion(
-            omMetadataManager, volumeName, bucketName, keyName);
-        if (nullVersion != null) {
-          replacedNullVersionKey = nullVersion.getKey();
-          oldKeyVersionsToDeleteMap = addKeyInfoToDeleteMap(ozoneManager,
-              trxnLogIndex, dbOzoneKey, omBucketInfo.getObjectID(),
-              nullVersion.getValue().withCommittedKeyDeletedFlag(true),
-              oldKeyVersionsToDeleteMap);
-          omBucketInfo.decrUsedBytes(
-              sumBlockLengths(nullVersion.getValue()), true);
-          omBucketInfo.decrUsedNamespace(1L, true);
-          omMetadataManager.getVersionedKeyTable().addCacheEntry(
-              new CacheKey<>(replacedNullVersionKey),
-              CacheValue.get(trxnLogIndex));
-        }
+      if (replacedNullVersion != null) {
+        replacedNullVersionKey = replacedNullVersion.getKey();
+        oldKeyVersionsToDeleteMap = addKeyInfoToDeleteMap(ozoneManager,
+            trxnLogIndex, dbOzoneKey, omBucketInfo.getObjectID(),
+            replacedNullVersion.getValue().withCommittedKeyDeletedFlag(true),
+            oldKeyVersionsToDeleteMap);
+        omMetadataManager.getVersionedKeyTable().addCacheEntry(
+            new CacheKey<>(replacedNullVersionKey),
+            CacheValue.get(trxnLogIndex));
       }
 
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(

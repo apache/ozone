@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
@@ -167,18 +168,37 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
 
-      if (keyArgs.hasVersionId() || keyArgs.getNullVersion()) {
-        // DELETE ?versionId= permanently removes one version. It is the only
-        // delete that destroys data on a versioned bucket.
+      final boolean addressesVersion =
+          keyArgs.hasVersionId() || keyArgs.getNullVersion();
+      if (addressesVersion) {
+        // Only OBJECT_STORE buckets can hold versions, so addressing one
+        // anywhere else is not supported, as on the read path.
+        if (omBucketInfo.getBucketLayout() != BucketLayout.OBJECT_STORE) {
+          throw new OMException("Object versioning is only supported on "
+              + BucketLayout.OBJECT_STORE + " buckets, but bucket "
+              + bucketName + " has layout " + omBucketInfo.getBucketLayout()
+              + ".", NOT_SUPPORTED_OPERATION);
+        }
+        // A bucket that has never been versioned holds no version an id could
+        // name. It does hold the key's null version, though: S3 calls the
+        // object itself the null version wherever there is no version history,
+        // so a delete that addresses it is the plain delete below rather than
+        // a version delete at all.
+        //
         // Reported as not-found rather than unsupported: S3 answers a delete
         // naming a version that does not exist with a plain success, which the
         // gateway reaches by swallowing KEY_NOT_FOUND. NOT_SUPPORTED_OPERATION
         // would surface an error AWS never returns here.
-        if (!omBucketInfo.hasEverBeenVersioned()) {
+        if (keyArgs.hasVersionId() && !omBucketInfo.hasEverBeenVersioned()) {
           throw new OMException("Bucket " + bucketName
               + " does not have S3 versioning enabled, so it holds no version "
               + "the request could name", KEY_NOT_FOUND);
         }
+      }
+
+      if (addressesVersion && omBucketInfo.hasEverBeenVersioned()) {
+        // DELETE ?versionId= permanently removes one version. It is the only
+        // delete that destroys data on a versioned bucket.
         deletingVersion = true;
         omClientResponse = deleteVersion(omMetadataManager, omBucketInfo,
             omKeyInfo, keyArgs, volumeName, bucketName, keyName, trxnLogIndex,
@@ -434,9 +454,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
         inserted.getDeleteMarker(), inserted.getObjectKey(),
         inserted.getDemotedVersionKey(), inserted.getDemotedVersion(),
-        omBucketInfo.copyObject())
-        .withReplacedNullVersion(inserted.getReplacedNullVersionKey(),
-            inserted.getKeysToDelete());
+        omBucketInfo.copyObject(), inserted.getReplacedNullVersionKey(),
+        inserted.getKeysToDelete());
   }
 
   /**
