@@ -42,10 +42,12 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -56,24 +58,27 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -101,6 +106,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,6 +119,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   // transaction (recursive directory creations) is 2^8 - 1 as only 8
   // bits are set aside for this in ObjectID.
   private static final long MAX_NUM_OF_RECURSIVE_DIRS = 255;
+  private static final Set<AccessModeProto> READ_WRITE = EnumSet.of(READ, WRITE);
 
   protected static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
@@ -180,60 +187,97 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return resolvedArgs;
   }
 
-  /**
-   * This methods avoids multiple rpc calls to SCM by allocating multiple blocks
-   * in one rpc call.
-   * @throws IOException
-   */
-  @SuppressWarnings("parameternumber")
-  protected List< OmKeyLocationInfo > allocateBlock(ScmClient scmClient,
-      OzoneBlockTokenSecretManager secretManager,
+  /** Allocate multiple blocks using one rpc to SCM. */
+  protected List<OmKeyLocationInfo> allocateBlock(
       ReplicationConfig replicationConfig, ExcludeList excludeList,
-      long requestedSize, long scmBlockSize, int preallocateBlocksMax,
-      boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
-      boolean shouldSortDatanodes, UserInfo userInfo)
+      long requestedSize, boolean shouldSortDatanodes,
+      UserInfo userInfo, OzoneManager ozoneManager)
       throws IOException {
+    final long scmBlockSize = ozoneManager.getScmBlockSize();
+    final KeyManager keyManager = ozoneManager.getKeyManager();
+
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
-    int numBlocks = (int) Math.min(preallocateBlocksMax,
+    final int numBlocks = (int) Math.min(ozoneManager.getPreallocateBlocksMax(),
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
-    String clientMachine = "";
-    if (shouldSortDatanodes) {
-      clientMachine = userInfo.getRemoteAddress();
+    final String scmClientMachine;
+    final String omClientMachine;
+    // Sorted order cached by datanode set so blocks whose pipelines share the
+    // same datanodes are sorted once (mirrors the read path's caching). Keyed by
+    // the UUID set so it is order-insensitive and dedups across pipelines.
+    final Map<Set<String>, List<? extends DatanodeDetails>> sortedByNodes;
+    final String remoteAddress = userInfo.getRemoteAddress();
+    final NetworkTopology clusterMap = shouldSortDatanodes
+        && keyManager.isSortDatanodesForWriteEnabled()
+        ? ozoneManager.getClusterMapAllowNull() : null;
+    if (!shouldSortDatanodes) {
+      scmClientMachine = "";
+      omClientMachine = "";
+      sortedByNodes = null;
+    } else if (clusterMap != null && !remoteAddress.isEmpty()) {
+      // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
+      scmClientMachine = "";
+      omClientMachine = remoteAddress;
+      sortedByNodes = new HashMap<>();
+    } else {
+      // Sort in SCM (or keep order when remoteAddress is empty, since SCM skips
+      // sorting for an empty client machine).
+      scmClientMachine = remoteAddress;
+      omClientMachine = "";
+      sortedByNodes = null;
     }
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
-    List<AllocatedBlock> allocatedBlocks;
+    final List<AllocatedBlock> allocatedBlocks;
     try {
       // TODO Use the actually passed `allowFallbackStoragePolicy` instead of `true`
-      allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine, OzoneStoragePolicy.getDefaultPolicy(), true);
+      allocatedBlocks = ozoneManager.getScmClient().getBlockClient().allocateBlock(
+          scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, scmClientMachine,
+          OzoneStoragePolicy.getDefaultPolicy(), true);
     } catch (IOException ex) {
-      omMetrics.incNumBlockAllocateCallFails();
+      ozoneManager.getMetrics().incNumBlockAllocateCallFails();
       if (ex instanceof SCMException) {
         if (((SCMException)ex).getResult()
             .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
-          throw new OMException(ex.getMessage(),
-              OMException.ResultCodes.SCM_IN_SAFE_MODE);
+          throw new OMException(ex.getMessage(), OMException.ResultCodes.SCM_IN_SAFE_MODE);
         }
       }
       throw ex;
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
+      Pipeline pipeline = allocatedBlock.getPipeline();
+      if (sortedByNodes != null) {
+        final List<DatanodeDetails> nodes = pipeline.getNodes();
+        final Set<String> uuidSet = nodes.stream()
+            .map(DatanodeDetails::getUuidString).collect(Collectors.toSet());
+        List<? extends DatanodeDetails> sorted = sortedByNodes.get(uuidSet);
+        if (sorted == null) {
+          sorted = keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap);
+          // Cache only a freshly sorted order, not an input list returned
+          // unchanged when the client is unresolved: that order is per-pipeline
+          // and must not be reused for another pipeline with the same node set.
+          if (sorted != nodes) {
+            sortedByNodes.put(uuidSet, sorted);
+          }
+        }
+        if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
+          pipeline = pipeline.copyWithNodesInOrder(sorted);
+        }
+      }
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
           .setBlockID(blockID)
           .setLength(scmBlockSize)
           .setOffset(0)
-          .setPipeline(allocatedBlock.getPipeline())
+          .setPipeline(pipeline)
           .setStorageTier(allocatedBlock.getStorageTier())
           .setIsFallBack(allocatedBlock.isFallBack());
-      if (grpcBlockTokenEnabled) {
-        builder.setToken(secretManager.generateToken(remoteUser, blockID,
-            EnumSet.of(READ, WRITE), scmBlockSize));
+      if (ozoneManager.isGrpcBlockTokenEnabled()) {
+        final Token<OzoneBlockTokenIdentifier> token = ozoneManager.getBlockTokenSecretManager().generateToken(
+            remoteUser, blockID, READ_WRITE, scmBlockSize);
+        builder.setToken(token);
       }
       locationInfos.add(builder.build());
     }
@@ -334,12 +378,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return edek;
   }
 
-  protected List<OzoneAcl> getAclsForKey(KeyArgs keyArgs,
+  protected Set<OzoneAcl> getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
       PrefixManager prefixManager, OmConfig config) throws OMException {
 
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.addAll(getDefaultAclList(createUGIForApi(), config));
+    final Set<OzoneAcl> acls = new LinkedHashSet<>(getDefaultAclList(createUGIForApi(), config));
     if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
@@ -358,7 +401,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         if (prefixInfo  != null) {
           if (OzoneAclUtil.inheritDefaultAcls(acls, prefixInfo.getAcls(), ACCESS)) {
             // Remove the duplicates
-            acls = acls.stream().distinct().collect(Collectors.toList());
             return acls;
           }
         }
@@ -369,7 +411,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // prefix are not set
     if (omPathInfo != null) {
       if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls(), ACCESS)) {
-        acls = acls.stream().distinct().collect(Collectors.toList());
         return acls;
       }
     }
@@ -378,12 +419,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // parent-dir are not set.
     if (bucketInfo != null) {
       if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls(), ACCESS)) {
-        acls = acls.stream().distinct().collect(Collectors.toList());
         return acls;
       }
     }
 
-    acls = acls.stream().distinct().collect(Collectors.toList());
     return acls;
   }
 
@@ -395,12 +434,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param config
    * @return Acls which inherited parent DEFAULT and keyArgs ACCESS acls.
    */
-  protected List<OzoneAcl> getAclsForDir(KeyArgs keyArgs, OmBucketInfo bucketInfo,
+  protected Set<OzoneAcl> getAclsForDir(KeyArgs keyArgs, OmBucketInfo bucketInfo,
       OMFileRequest.OMPathInfo omPathInfo, OmConfig config) throws OMException {
     // Acls inherited from parent or bucket will convert to DEFAULT scope
-    List<OzoneAcl> acls = new ArrayList<>();
     // add default ACLs
-    acls.addAll(getDefaultAclList(createUGIForApi(), config));
+    final Set<OzoneAcl> acls = new LinkedHashSet<>(getDefaultAclList(createUGIForApi(), config));
 
     // Inherit DEFAULT acls from parent-dir
     if (omPathInfo != null) {
@@ -417,7 +455,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
-    acls = acls.stream().distinct().collect(Collectors.toList());
     return acls;
   }
 
@@ -903,9 +940,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   public static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
     for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
-        bytesUsed += QuotaUtil.getReplicatedSize(
-            locationInfo.getLength(), omKeyInfo.getReplicationConfig());
+      for (List<OmKeyLocationInfo> locationInfoList : group.getLocationLists()) {
+        for (OmKeyLocationInfo locationInfo : locationInfoList) {
+          bytesUsed += QuotaUtil.getReplicatedSize(
+              locationInfo.getLength(), omKeyInfo.getReplicationConfig());
+        }
       }
     }
 
@@ -914,6 +953,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Return bucket info for the specified bucket.
+   * <p>
+   * The returned {@link OmBucketInfo} is the cached instance, returned by
+   * reference. A caller that mutates it (for example quota accounting) before a
+   * point where the request may still fail must first take a
+   * {@link OmBucketInfo#copyObject()} and publish that copy only on success,
+   * otherwise a failed request leaks the mutation into the cache.
    */
   @Nullable
   public static OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
@@ -1217,7 +1262,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // the referenceKey.
     Map<ContainerBlockID, OmKeyLocationInfo> cbIdSet = referenceKey.getKeyLocationVersions()
         .stream()
-        .flatMap(e -> e.getLocationList().stream())
+        .flatMap(e -> e.createLocationList().stream())
         .collect(Collectors.toMap(omKeyLocationInfo -> omKeyLocationInfo.getBlockID().getContainerBlockID(),
             Function.identity()));
     Map<OmKeyInfo, List<OmKeyLocationInfo>> filteredOutBlocks = new HashMap<>();
@@ -1330,7 +1375,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (keyArgs.hasExpectedDataGeneration()) {
       long expectedGen = keyArgs.getExpectedDataGeneration();
       // If expectedGen is EXPECTED_GEN_CREATE_IF_NOT_EXISTS, it means the key MUST NOT exist (If-None-Match)
-      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
         if (dbKeyInfo != null) {
           throw new OMException("Key already exists",
               OMException.ResultCodes.KEY_ALREADY_EXISTS);

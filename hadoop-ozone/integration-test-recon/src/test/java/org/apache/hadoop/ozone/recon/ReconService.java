@@ -23,8 +23,10 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDR
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.HOST_ADDRESS;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 import java.io.File;
@@ -104,5 +106,6 @@ public class ReconService implements MiniOzoneCluster.Service {
     conf.set(OZONE_RECON_ADDRESS_KEY, datanodeAddress);
     conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, datanodeAddress);
     conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, httpAddress);
+    conf.set(OZONE_RECON_HTTP_BIND_HOST_KEY, HOST_ADDRESS);
   }
 }

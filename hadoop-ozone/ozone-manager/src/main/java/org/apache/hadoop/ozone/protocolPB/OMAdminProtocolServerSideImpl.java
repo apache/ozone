@@ -25,12 +25,14 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.CompactRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.CompactResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMRequest;
@@ -57,6 +59,18 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
   @Override
   public OMConfigurationResponse getOMConfiguration(RpcController controller,
       OMConfigurationRequest request) throws ServiceException {
+
+    try {
+      if (ozoneManager.isAdminAuthorizationEnabled() &&
+          !ozoneManager.isAdmin(getRemoteUser())) {
+        throw new OMException("Only administrators are authorized to get OM configuration.", PERMISSION_DENIED);
+      }
+    } catch (IOException ex) {
+      return OMConfigurationResponse.newBuilder()
+          .setSuccess(false)
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
+          .build();
+    }
 
     List<OMNodeDetails> oldOMNodesList = ozoneManager.getAllOMNodesInMemory();
     List<OMNodeDetails> newOMNodesList = ozoneManager.getAllOMNodesInNewConf();
@@ -121,7 +135,9 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     try {
       // check if table exists. IOException is thrown if table is not found.
       ozoneManager.getMetadataManager().getStore().getTable(compactRequest.getColumnFamily());
-      ozoneManager.compactOMDB(compactRequest.getColumnFamily());
+      ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction =
+          CompactDBUtil.getBottommostLevelCompaction(compactRequest.getBottommostLevelCompaction());
+      ozoneManager.compactOMDB(compactRequest.getColumnFamily(), bottommostLevelCompaction);
     } catch (IOException ex) {
       return CompactResponse.newBuilder()
           .setSuccess(false)

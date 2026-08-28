@@ -48,12 +48,15 @@ import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -122,14 +125,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
-    OmKeyArgs resolvedArgs = bucket.update(args);
+    OmKeyArgs resolvedArgs = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getLookupAclCheckLatencyNs(),
             () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
                 ACLType.READ, bucket,
-                args.getKeyName())
+                resolvedArgs.getKeyName())
         );
       }
       metrics.incNumKeyLookups();
@@ -175,14 +178,15 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         () -> ozoneManager.resolveBucketLink(resolvedVolumeArgs));
 
     boolean auditSuccess = true;
-    OmKeyArgs resolvedArgs = bucket.update(resolvedVolumeArgs);
+    OmKeyArgs resolvedArgs =
+        normalizeKeyArgs(bucket.update(resolvedVolumeArgs), bucket);
 
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
             checkAcls(ResourceType.KEY,
                 StoreType.OZONE, ACLType.READ,
-                bucket, args.getKeyName())
+                bucket, resolvedArgs.getKeyName())
         );
       }
 
@@ -257,12 +261,39 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException {
-    List<OzoneFileStatus> ozoneFileStatuses =
-        listStatus(args, recursive, startKey, numEntries, allowPartialPrefixes);
+    long maxListingPageSize = ozoneManager.getConfiguration().getInt(
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    maxListingPageSize = OzoneConfigUtil.limitValue(numEntries,
+        OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        maxListingPageSize);
 
-    return ozoneFileStatuses.stream()
-        .map(OzoneFileStatusLight::fromOzoneFileStatus)
-        .collect(Collectors.toList());
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
+    OmKeyArgs resolvedArgs = bucket.update(args);
+
+    try {
+      if (isAclEnabled) {
+        checkAcls(getResourceType(resolvedArgs), StoreType.OZONE, ACLType.READ,
+            bucket, resolvedArgs.getKeyName());
+      }
+      metrics.incNumListStatus();
+      List<OzoneFileStatus> ozoneFileStatuses = keyManager.listStatus(
+          resolvedArgs, recursive,
+          startKey, maxListingPageSize, getClientAddress(),
+          allowPartialPrefixes, false);
+      List<OzoneFileStatusLight> lightStatuses = ozoneFileStatuses.stream()
+          .map(OzoneFileStatusLight::fromOzoneFileStatus)
+          .collect(Collectors.toList());
+      audit.logReadSuccess(buildAuditMessageForSuccess(
+          OMAction.LIST_STATUS, auditMap));
+      return lightStatuses;
+    } catch (Exception ex) {
+      metrics.incNumListStatusFails();
+      audit.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_STATUS,
+          auditMap, ex));
+      throw ex;
+    }
   }
   
   @Override
@@ -302,7 +333,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
-    args = bucket.update(args);
+    args = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
       if (isAclEnabled) {
@@ -444,14 +475,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
-    OmKeyArgs resolvedArgs = bucket.update(args);
+    OmKeyArgs resolvedArgs = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getGetObjectTaggingAclCheckLatencyNs(),
             () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
                 ACLType.READ, bucket,
-                args.getKeyName())
+                resolvedArgs.getKeyName())
         );
       }
       metrics.incNumGetObjectTagging();
@@ -470,6 +501,70 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
       perfMetrics.addGetObjectTaggingLatencyNs(Time.monotonicNowNanos() - start);
     }
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
+    long start = Time.monotonicNowNanos();
+
+    ResolvedBucket bucket = captureLatencyNs(
+        perfMetrics.getGetBucketTaggingResolveBucketLatencyNs(),
+        () -> ozoneManager.resolveBucketLink(Pair.of(
+            args.getVolumeName(), args.getBucketName())));
+
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
+
+    try {
+      if (isAclEnabled) {
+        captureLatencyNs(perfMetrics.getGetBucketTaggingAclCheckLatencyNs(),
+            () -> checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+                ACLType.READ, bucket, null));
+      }
+      metrics.incNumGetBucketTagging();
+
+      OmBucketInfo info =
+          bucketManager.getBucketInfo(bucket.realVolume(), bucket.realBucket());
+      return info.getTags();
+    } catch (Exception ex) {
+      metrics.incNumGetBucketTaggingFails();
+      auditSuccess = false;
+      audit.logReadFailure(buildAuditMessageForFailure(
+          OMAction.GET_BUCKET_TAGGING, auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        audit.logReadSuccess(buildAuditMessageForSuccess(
+            OMAction.GET_BUCKET_TAGGING, auditMap));
+      }
+      perfMetrics.addGetBucketTaggingLatencyNs(Time.monotonicNowNanos() - start);
+    }
+  }
+
+  /**
+   * Normalize the key name on the read args up front, so the ACL check and the
+   * key read resolve the SAME key. The read path
+   * ({@link KeyManagerImpl#readKeyInfo}) normalizes '.'/'..' path segments before
+   * the DB lookup for layouts that use filesystem semantics (FSO, and LEGACY when
+   * {@code ozone.om.enable.filesystem.paths} is set). If the ACL check instead ran
+   * on the raw name, a request such as {@code a/../k1} would be evaluated against a
+   * different (literal) path than the normalized key {@code k1} that the read
+   * actually serves. Normalizing here keeps the check and the read in agreement for
+   * every authorizer (native and Ranger). Layouts that do not normalize (OBJECT_STORE)
+   * are returned unchanged.
+   */
+  private OmKeyArgs normalizeKeyArgs(OmKeyArgs args, ResolvedBucket bucket)
+      throws OMException {
+    String keyName = args.getKeyName();
+    if (keyName == null || keyName.isEmpty() || bucket.bucketLayout() == null) {
+      return args;
+    }
+    String normalized = OMClientRequest.validateAndNormalizeKey(
+        ozoneManager.getEnableFileSystemPaths(), keyName, bucket.bucketLayout());
+    if (normalized.equals(keyName)) {
+      return args;
+    }
+    return args.toBuilder().setKeyName(normalized).build();
   }
 
   /**

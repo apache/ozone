@@ -38,7 +38,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -94,7 +93,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeResponseProto;
@@ -122,7 +120,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse.Status;
@@ -629,10 +626,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
                 request.getGetPipelineRequest(), request.getVersion()))
             .build();
       case GetSafeModeRuleStatuses:
+        final GetSafeModeRuleStatusesResponseProto proto = GetSafeModeRuleStatusesResponseProto.newBuilder()
+            .addAllSafeModeRuleStatusesProto(impl.getSafeModeRuleStatuses())
+            .build();
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType()).setStatus(Status.OK)
-            .setGetSafeModeRuleStatusesResponse(getSafeModeRuleStatues(
-                request.getGetSafeModeRuleStatusesRequest()))
+            .setGetSafeModeRuleStatusesResponse(proto)
             .build();
       case DecommissionNodes:
         return ScmContainerLocationResponse.newBuilder()
@@ -1059,21 +1058,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   }
 
-  public GetSafeModeRuleStatusesResponseProto getSafeModeRuleStatues(
-      GetSafeModeRuleStatusesRequestProto request) throws IOException {
-    Map<String, Pair<Boolean, String>>
-        map = impl.getSafeModeRuleStatuses();
-    List<SafeModeRuleStatusProto> proto = new ArrayList();
-    for (Map.Entry<String, Pair<Boolean, String>> entry : map.entrySet()) {
-      proto.add(SafeModeRuleStatusProto.newBuilder().setRuleName(entry.getKey())
-          .setValidate(entry.getValue().getLeft())
-          .setStatusText(entry.getValue().getRight())
-          .build());
-    }
-    return GetSafeModeRuleStatusesResponseProto.newBuilder()
-        .addAllSafeModeRuleStatusesProto(proto).build();
-  }
-
   public FinalizeScmUpgradeResponseProto getFinalizeScmUpgrade(
       FinalizeScmUpgradeRequestProto request) throws IOException {
     StatusAndMessages progress =
@@ -1354,9 +1338,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public GetContainerCountResponseProto getContainerCount(
       StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
       request) throws IOException {
+    long containerCount = request.hasState()
+        ? impl.getContainerCount(request.getState())
+        : impl.getContainerCount();
 
     return GetContainerCountResponseProto.newBuilder()
-      .setContainerCount(impl.getContainerCount())
+      .setContainerCount(containerCount)
       .build();
   }
 

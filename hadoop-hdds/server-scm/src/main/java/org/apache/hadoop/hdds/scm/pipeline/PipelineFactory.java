@@ -81,6 +81,12 @@ public class PipelineFactory {
 
   public Pipeline create(
       ReplicationConfig replicationConfig, List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> favoredNodes) throws IOException {
+    return create(replicationConfig, excludedNodes, favoredNodes, StorageTier.getDefaultTier());
+  }
+
+  public Pipeline create(
+      ReplicationConfig replicationConfig, List<DatanodeDetails> excludedNodes,
       List<DatanodeDetails> favoredNodes, StorageTier storageTier)
       throws IOException {
     Pipeline pipeline = providers.get(replicationConfig.getReplicationType())
@@ -104,6 +110,11 @@ public class PipelineFactory {
           .getRequiredNodes() + " do not match",
           SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
     }
+  }
+
+  public Pipeline create(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes) throws IOException {
+    return create(replicationConfig, nodes, StorageTier.getDefaultTier());
   }
 
   public Pipeline create(ReplicationConfig replicationConfig,

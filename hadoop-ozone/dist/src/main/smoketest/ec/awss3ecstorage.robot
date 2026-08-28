@@ -18,6 +18,7 @@ Documentation       S3 gateway test with aws cli with STANDARD_IA storage class
 Library             OperatingSystem
 Library             String
 Resource            ../commonlib.robot
+Resource            lib.resource
 Resource            ../s3/commonawslib.robot
 Resource            ../s3/mpu_lib.robot
 Resource            ../ozone-lib/shell.robot
@@ -33,16 +34,6 @@ Setup EC Multipart Tests
 
 Teardown EC Multipart Tests
     Remove Files    /tmp/1mb
-
-Count Datanodes In Service
-    ${actual} =    Execute    ozone admin datanode list --node-state HEALTHY --operational-state IN_SERVICE --json | jq -r 'length'
-    [return]       ${actual}
-
-Has Enough Datanodes
-    [arguments]    ${expected}
-    ${actual} =    Count Datanodes In Service
-    Should Be True    ${expected} <= ${actual}
-
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878

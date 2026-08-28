@@ -53,7 +53,7 @@ import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -75,7 +75,7 @@ public class TestClosingContainerHandler {
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
 
-  private final TestClock clock = TestClock.newInstance();
+  private final MockClock clock = MockClock.newInstance();
 
   @BeforeEach
   public void setup() {

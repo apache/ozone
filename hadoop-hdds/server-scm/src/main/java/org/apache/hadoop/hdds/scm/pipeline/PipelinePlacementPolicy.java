@@ -102,6 +102,13 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         .count();
   }
 
+  static int currentRatisThreePipelineCount(
+      NodeManager nodeManager,
+      PipelineStateManager stateManager,
+      DatanodeDetails datanodeDetails) {
+    return currentRatisThreePipelineCount(nodeManager, stateManager, datanodeDetails, null);
+  }
+
   /** Filter the given datanodes within its pipeline limit. */
   List<DatanodeDetails> filterPipelineLimit(Iterable<DatanodeDetails> datanodes, StorageType storageType) {
     final SortedList<DatanodeDetails> sorted = new SortedList<>(DatanodeDetails.class);
@@ -114,12 +121,21 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     return sorted;
   }
 
+  List<DatanodeDetails> filterPipelineLimit(Iterable<DatanodeDetails> datanodes) {
+    return filterPipelineLimit(datanodes, null);
+  }
+
   private static boolean isNonClosedRatisThreePipeline(Pipeline p, StorageType storageType) {
-    if (p == null || storageType == null ||
-        p.getSupportedStorageTier() == null ||
+    if (p == null ||
         !p.getReplicationConfig().equals(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE)) ||
         p.isClosed()) {
+      return false;
+    }
+    if (storageType == null) {
+      return true;
+    }
+    if (p.getSupportedStorageTier() == null) {
       return false;
     }
     try {
@@ -169,8 +185,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
               .FAILED_TO_FIND_HEALTHY_NODES);
     }
 
-    healthyNodes = filterNodesWithSpaceAndStorageType(healthyNodes, nodesRequired,
-        metadataSizeRequired, dataSizeRequired, storageType);
+    healthyNodes = storageType == null
+        ? filterNodesWithSpace(healthyNodes, nodesRequired, metadataSizeRequired)
+        : filterNodesWithSpaceAndStorageType(healthyNodes, nodesRequired,
+            metadataSizeRequired, dataSizeRequired, storageType);
     boolean multipleRacks = multipleRacksAvailable(healthyNodes);
     int excludedNodesSize = 0;
     if (excludedNodes != null) {
@@ -184,9 +202,13 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     int initialHealthyNodesCount = healthyNodes.size();
 
     if (initialHealthyNodesCount < nodesRequired) {
-      msg = String.format("Pipeline creation failed due to no sufficient" +
-              " healthy datanodes. Required %d StorageType Required %s. Found %d. Excluded %d.",
-          nodesRequired, storageType, initialHealthyNodesCount, excludedNodesSize);
+      msg = storageType == null
+          ? String.format("Pipeline creation failed due to no sufficient" +
+                  " healthy datanodes. Required %d. Found %d. Excluded %d.",
+              nodesRequired, initialHealthyNodesCount, excludedNodesSize)
+          : String.format("Pipeline creation failed due to no sufficient" +
+                  " healthy datanodes. Required %d StorageType Required %s. Found %d. Excluded %d.",
+              nodesRequired, storageType, initialHealthyNodesCount, excludedNodesSize);
       LOG.debug(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -199,12 +221,19 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
     if (healthyList.size() < nodesRequired) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Unable to find enough nodes that meet the criteria that" +
-            " cannot engage in more than" + datanodePipelineLimit +
-            " pipelines. StorageType required: " + storageType + " Nodes required: " +
-            nodesRequired + " Excluded: " +
-            excludedNodesSize + " Found:" + healthyList.size() +
-            " healthy nodes count in NodeManager: " + initialHealthyNodesCount);
+        if (storageType == null) {
+          LOG.debug("Unable to find enough nodes that meet the criteria that" +
+              " cannot engage in more than" + datanodePipelineLimit +
+              " pipelines. Nodes required: " + nodesRequired + " Excluded: " +
+              excludedNodesSize + " Found:" + healthyList.size() +
+              " healthy nodes count in NodeManager: " + initialHealthyNodesCount);
+        } else {
+          LOG.debug("Unable to find enough nodes that meet the criteria that" +
+              " cannot engage in more than" + datanodePipelineLimit +
+              " pipelines. StorageType required: " + storageType + " Nodes required: " +
+              nodesRequired + " Excluded: " + excludedNodesSize + " Found:" + healthyList.size() +
+              " healthy nodes count in NodeManager: " + initialHealthyNodesCount);
+        }
       }
       msg = String.format("Pipeline creation failed because nodes are engaged" +
               " in other pipelines and every node can only be engaged in" +
@@ -224,6 +253,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       }
     }
     return healthyList;
+  }
+
+  List<DatanodeDetails> filterViableNodes(
+      List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> usedNodes, int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
+    return filterViableNodes(excludedNodes, usedNodes, nodesRequired,
+        metadataSizeRequired, dataSizeRequired, null);
   }
 
   /**

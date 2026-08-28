@@ -17,6 +17,8 @@
 
 package org.apache.ozone.lib.wsrs;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -33,7 +35,6 @@ import javax.ws.rs.ext.MessageBodyWriter;
 import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.http.JettyUtils;
-import org.json.simple.JSONObject;
 
 /**
  * A <code>MessageBodyWriter</code> implementation providing a JSON map.
@@ -43,6 +44,10 @@ import org.json.simple.JSONObject;
 @InterfaceAudience.Private
 public class JSONMapProvider implements MessageBodyWriter<Map> {
   private static final String ENTER = System.getProperty("line.separator");
+  // AUTO_CLOSE_TARGET is disabled so the underlying response stream stays
+  // open for the trailing newline and container-managed close.
+  private static final ObjectMapper MAPPER = new ObjectMapper()
+      .disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
 
   @Override
   public boolean isWriteable(Class<?> aClass,
@@ -72,7 +77,7 @@ public class JSONMapProvider implements MessageBodyWriter<Map> {
       throws IOException, WebApplicationException {
     Writer writer
         = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
-    JSONObject.writeJSONString(map, writer);
+    MAPPER.writeValue(writer, map);
     writer.write(ENTER);
     writer.flush();
   }

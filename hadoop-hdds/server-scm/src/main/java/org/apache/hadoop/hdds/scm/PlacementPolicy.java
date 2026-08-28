@@ -35,6 +35,14 @@ public interface PlacementPolicy {
   default List<DatanodeDetails> chooseDatanodes(
       List<DatanodeDetails> excludedNodes,
       List<DatanodeDetails> favoredNodes, int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
+    return chooseDatanodes(excludedNodes, favoredNodes, nodesRequired,
+        metadataSizeRequired, dataSizeRequired, null);
+  }
+
+  default List<DatanodeDetails> chooseDatanodes(
+      List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> favoredNodes, int nodesRequired,
       long metadataSizeRequired, long dataSizeRequired,
       StorageType storageType) throws SCMException {
     return this.chooseDatanodes(Collections.emptyList(), excludedNodes,
@@ -61,6 +69,15 @@ public interface PlacementPolicy {
           List<DatanodeDetails> favoredNodes,
           int nodesRequired, long metadataSizeRequired,
           long dataSizeRequired, StorageType storageType) throws SCMException;
+
+  default List<DatanodeDetails> chooseDatanodes(List<DatanodeDetails> usedNodes,
+      List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> favoredNodes,
+      int nodesRequired, long metadataSizeRequired,
+      long dataSizeRequired) throws SCMException {
+    return chooseDatanodes(usedNodes, excludedNodes, favoredNodes,
+        nodesRequired, metadataSizeRequired, dataSizeRequired, null);
+  }
 
   /**
    * Given a list of datanode and the number of replicas required, return

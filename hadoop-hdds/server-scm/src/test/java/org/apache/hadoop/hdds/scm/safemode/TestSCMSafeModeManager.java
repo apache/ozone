@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -34,10 +35,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
@@ -47,7 +45,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
@@ -73,6 +73,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,7 +85,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Test class for SCMSafeModeManager.
+/**
+ * Test class for SCMSafeModeManager.
  */
 public class TestSCMSafeModeManager {
 
@@ -109,6 +111,7 @@ public class TestSCMSafeModeManager {
         false);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 1);
+    config.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, "0s");
     scmMetadataStore = new SCMMetadataStoreImpl(config);
   }
 
@@ -167,6 +170,76 @@ public class TestSCMSafeModeManager {
     assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
 
+  }
+
+  @Test
+  public void testSafeModeExitWithPeriodicContainerRuleRefresh() throws Exception {
+    /*
+     * Start SCM with 5 closed Ratis containers.
+     * Mark 2 containers as deleted in ContainerManager.
+     * Wait until the rule’s total drops from 5 to 3.
+     * Fires DN reports and checks safemode exits using the refreshed count.
+     */
+    config.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, "100ms");
+
+    List<ContainerInfo> ratisContainers = new ArrayList<>();
+    List<ContainerInfo> deletedContainers = new ArrayList<>();
+    ratisContainers.addAll(HddsTestUtils.getContainerInfo(5));
+    for (ContainerInfo container : ratisContainers) {
+      container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
+    }
+
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers(ReplicationType.RATIS))
+        .thenAnswer(invocation -> new ArrayList<>(ratisContainers));
+    when(containerManager.getContainers(ReplicationType.EC))
+        .thenReturn(Collections.emptyList());
+    when(containerManager.getContainers(HddsProtos.LifeCycleState.DELETED))
+        .thenAnswer(invocation -> new ArrayList<>(deletedContainers));
+
+    scmSafeModeManager = new SCMSafeModeManager(config, null, null, containerManager,
+        serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
+
+    assertTrue(scmSafeModeManager.getInSafeMode());
+
+    RatisContainerSafeModeRule ratisRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(RatisContainerSafeModeRule.class);
+    assertEquals(5, ratisRule.getTotalNumberOfContainers(),
+        "initial Ratis container count from ContainerManager");
+
+    for (int i = 3; i < ratisContainers.size(); i++) {
+      ratisContainers.get(i).setState(HddsProtos.LifeCycleState.DELETED);
+      ratisContainers.get(i).setNumberOfKeys(10);
+      deletedContainers.add(ratisContainers.get(i));
+    }
+
+    GenericTestUtils.waitFor(
+        () -> ratisRule.getTotalNumberOfContainers() == 3,
+        100,
+        15000);
+
+    SCMDatanodeProtocolServer.NodeRegistrationContainerReport report =
+        HddsTestUtils.createNodeRegistrationContainerReport(ratisContainers);
+    queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, report);
+    queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, report);
+
+    long cutOff = (long) Math.ceil(3 * config.getDouble(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT));
+
+    assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
+        .getNumContainerWithOneReplicaReportedThreshold().value());
+
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
+        100, 1000 * 30);
+    GenericTestUtils.waitFor(() ->
+            scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
+        100, 1000 * 5);
+
+    assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
+        .getCurrentContainersWithOneReplicaReportedCount().value());
   }
 
   @Test
@@ -336,10 +409,10 @@ public class TestSCMSafeModeManager {
     assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
     if (healthyPipelinePercent > 0) {
       validateRuleStatus("HealthyPipelineSafeModeRule",
-          "healthy Ratis/THREE pipelines");
+          "healthy RATIS/THREE pipelines");
     }
     validateRuleStatus("OneReplicaPipelineSafeModeRule",
-        "reported Ratis/THREE pipelines with at least one datanode");
+        "reported RATIS/THREE pipelines with at least one datanode");
 
     testContainerThreshold(containers, 1.0);
 
@@ -405,13 +478,11 @@ public class TestSCMSafeModeManager {
    * @param stringToMatch string to match in the rule status.
    */
   private void validateRuleStatus(String safeModeRule, String stringToMatch) {
-    Set<Map.Entry<String, Pair<Boolean, String>>> ruleStatuses =
-        scmSafeModeManager.getRuleStatus().entrySet();
-    for (Map.Entry<String, Pair<Boolean, String>> entry : ruleStatuses) {
-      if (entry.getKey().equals(safeModeRule)) {
-        Pair<Boolean, String> value = entry.getValue();
-        assertEquals(false, value.getLeft());
-        assertThat(value.getRight()).contains(stringToMatch);
+    List<SafeModeRuleStatusProto> ruleStatuses = scmSafeModeManager.getRuleStatus();
+    for (SafeModeRuleStatusProto proto : ruleStatuses) {
+      if (proto.getRuleName().equals(safeModeRule)) {
+        assertFalse(proto.getValidate());
+        assertThat(proto.getStatusText()).containsIgnoringCase(stringToMatch);
       }
     }
   }
@@ -753,6 +824,81 @@ public class TestSCMSafeModeManager {
   }
 
   @Test
+  public void testEcDefaultDisablesHealthyPipelineRuleWhenRatisThreeDisabled() {
+    OzoneConfiguration conf = new OzoneConfiguration(config);
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+        ReplicationType.EC.name());
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
+        false);
+
+    MockNodeManager mockNodeManager = new MockNodeManager(true, 5);
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    when(pipelineManager.getPipelines(any(), any()))
+        .thenReturn(Collections.emptyList());
+    when(pipelineManager.getPipelines())
+        .thenReturn(Collections.emptyList());
+
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers(ReplicationType.RATIS))
+        .thenReturn(Collections.emptyList());
+    when(containerManager.getContainers(ReplicationType.EC))
+        .thenReturn(Collections.emptyList());
+    when(containerManager.getContainers())
+        .thenReturn(Collections.emptyList());
+
+    scmSafeModeManager = new SCMSafeModeManager(conf, mockNodeManager,
+        pipelineManager, containerManager, serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
+
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(HealthyPipelineSafeModeRule.class)).isNull();
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(OneReplicaPipelineSafeModeRule.class)).isNull();
+    ECMinDataNodeSafeModeRule ecMinDnRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(ECMinDataNodeSafeModeRule.class);
+    assertThat(ecMinDnRule).isNotNull();
+    assertThat(ecMinDnRule.isEnabled()).isTrue();
+    assertThat(ecMinDnRule.getRequiredDns()).isEqualTo(5);
+  }
+
+  @Test
+  public void testEcDefaultKeepsHealthyPipelineRuleWhenRatisThreeEnabled() {
+    OzoneConfiguration conf = new OzoneConfiguration(config);
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+        ReplicationType.EC.name());
+    conf.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024k");
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
+        true);
+
+    MockNodeManager mockNodeManager = new MockNodeManager(true, 5);
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    when(pipelineManager.getPipelines(any(), any()))
+        .thenReturn(Collections.emptyList());
+    when(pipelineManager.getPipelines())
+        .thenReturn(Collections.emptyList());
+
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers(ReplicationType.RATIS))
+        .thenReturn(Collections.emptyList());
+    when(containerManager.getContainers(ReplicationType.EC))
+        .thenReturn(Collections.emptyList());
+    when(containerManager.getContainers())
+        .thenReturn(Collections.emptyList());
+
+    scmSafeModeManager = new SCMSafeModeManager(conf, mockNodeManager,
+        pipelineManager, containerManager, serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
+
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(HealthyPipelineSafeModeRule.class)).isNotNull();
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(OneReplicaPipelineSafeModeRule.class)).isNotNull();
+    assertThat(SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(ECMinDataNodeSafeModeRule.class)).isNotNull();
+  }
+
+  @Test
   public void testPipelinesNotCreatedUntilPreCheckPasses() throws Exception {
     int numOfDns = 5;
     // enable pipeline check
@@ -960,7 +1106,7 @@ public class TestSCMSafeModeManager {
    */
   private void verifyPeriodicLoggingActive(GenericTestUtils.LogCapturer logCapturer)
       throws InterruptedException {
-    Map<String, Pair<Boolean, String>> ruleStatuses = scmSafeModeManager.getRuleStatus();
+    List<SafeModeRuleStatusProto> ruleStatuses = scmSafeModeManager.getRuleStatus();
     for (int i = 0; i < 2; i++) {
       logCapturer.clearOutput();
       // Wait for configured interval (500ms + small buffer) for next log message
@@ -968,8 +1114,8 @@ public class TestSCMSafeModeManager {
       String logOutput = logCapturer.getOutput();
 
       assertThat(logOutput).contains("SCM SafeMode Status | state=");
-      for (String ruleName : ruleStatuses.keySet()) {
-        assertThat(logOutput).contains("SCM SafeMode Status | " + ruleName);
+      for (SafeModeRuleStatusProto proto: ruleStatuses) {
+        assertThat(logOutput).contains("SCM SafeMode Status | " + proto.getRuleName());
       }
     }
   }

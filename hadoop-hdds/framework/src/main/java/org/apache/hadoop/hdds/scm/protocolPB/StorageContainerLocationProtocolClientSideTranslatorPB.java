@@ -37,7 +37,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
@@ -141,7 +140,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
 import org.apache.hadoop.ipc_.RPC;
@@ -883,29 +882,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
-      throws IOException {
-    GetSafeModeRuleStatusesRequestProto request =
-        GetSafeModeRuleStatusesRequestProto.getDefaultInstance();
-    GetSafeModeRuleStatusesResponseProto response =
-        submitRequest(Type.GetSafeModeRuleStatuses,
-            builder -> builder.setGetSafeModeRuleStatusesRequest(request))
-            .getGetSafeModeRuleStatusesResponse();
-    return buildSafeModeRuleStatusesMap(response);
-  }
-
-  /**
-   * Helper method to build a map from GetSafeModeRuleStatusesResponseProto.
-   * Extracts rule names and their status information.
-   */
-  private Map<String, Pair<Boolean, String>> buildSafeModeRuleStatusesMap(
-      GetSafeModeRuleStatusesResponseProto response) {
-    Map<String, Pair<Boolean, String>> ruleStatuses = new HashMap<>();
-    for (SafeModeRuleStatusProto statusProto : response.getSafeModeRuleStatusesProtoList()) {
-      ruleStatuses.put(statusProto.getRuleName(),
-          Pair.of(statusProto.getValidate(), statusProto.getStatusText()));
-    }
-    return ruleStatuses;
+  public List<SafeModeRuleStatusProto> getSafeModeRuleStatuses() throws IOException {
+    GetSafeModeRuleStatusesRequestProto request = GetSafeModeRuleStatusesRequestProto.getDefaultInstance();
+    GetSafeModeRuleStatusesResponseProto response = submitRequest(Type.GetSafeModeRuleStatuses,
+        builder -> builder.setGetSafeModeRuleStatusesRequest(request)).getGetSafeModeRuleStatusesResponse();
+    return response.getSafeModeRuleStatusesProtoList();
   }
 
   /**
@@ -1007,9 +988,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     }
     if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
       int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
-      Preconditions.checkState(mdti >= 0,
+      Preconditions.checkState(mdti > 0,
           "Max Datanodes Percentage To Involve Per Iteration must be " +
-              "greater than equal to zero.");
+              "greater than zero.");
       Preconditions.checkState(mdti <= 100,
           "Max Datanodes Percentage To Involve Per Iteration must be " +
               "lesser than equal to hundred.");
@@ -1250,10 +1231,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException {
     GetContainerCountRequestProto request =
-        GetContainerCountRequestProto.newBuilder().build();
+        GetContainerCountRequestProto.newBuilder()
+            .setState(state)
+            .build();
 
     GetContainerCountResponseProto response =
-        submitRequest(Type.GetClosedContainerCount,
+        submitRequest(Type.GetContainerCount,
             builder -> builder.setGetContainerCountRequest(request))
             .getGetContainerCountResponse();
     return response.getContainerCount();
