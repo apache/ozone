@@ -22,9 +22,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_VERSIONED_KEY_SEPARATOR;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLCNoncurrentVersionExpiration;
@@ -35,10 +35,10 @@ import org.apache.hadoop.ozone.om.helpers.OmLCRule;
  * NoncurrentVersionExpiration rules expires.
  *
  * <p>The versionedKeyTable holds a key's versions adjacent and newest first,
- * so one pass gives both things the rules need: position N is the Nth newest
- * noncurrent version, and the moment a version stopped being current is the
- * moment the version above it was written. For the newest noncurrent version
- * that is the key's current version, which the keyTable holds.
+ * so one pass gives the position a NewerNoncurrentVersions rule counts:
+ * position N is the Nth newest noncurrent version. The moment a version
+ * stopped being current is on the record itself, stamped when it was moved
+ * out of the keyTable.
  *
  * <p>Separate from the scan that drives it so that what gets selected can be
  * checked without running a lifecycle service.
@@ -52,16 +52,65 @@ public class NoncurrentVersionSelector {
   }
 
   /**
+   * A record the rules expired, named by its dbKey and by the write that
+   * produced it.
+   *
+   * <p>The dbKey alone does not identify it. Scan and reclaim are separated by
+   * replication, and a dbKey names a position rather than a record: the key
+   * can be rewritten in between, leaving a different record where the scan
+   * looked. The updateId is carried so the reclaim can tell the two apart.
+   */
+  public static final class ExpiredRecord {
+    private final String dbKey;
+    private final long updateId;
+
+    public ExpiredRecord(String dbKey, long updateId) {
+      this.dbKey = dbKey;
+      this.updateId = updateId;
+    }
+
+    public String getDbKey() {
+      return dbKey;
+    }
+
+    public long getUpdateId() {
+      return updateId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      ExpiredRecord other = (ExpiredRecord) o;
+      return updateId == other.updateId && dbKey.equals(other.dbKey);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(dbKey, updateId);
+    }
+
+    @Override
+    public String toString() {
+      return dbKey + "@" + updateId;
+    }
+  }
+
+  /**
    * What one pass selected, and where it stopped.
    */
   public static final class Selection {
-    private final List<String> expiredVersionKeys;
+    private final List<ExpiredRecord> expiredVersions;
     private final String resumeFrom;
     private final long versionsScanned;
 
-    private Selection(List<String> expiredVersionKeys, String resumeFrom,
+    private Selection(List<ExpiredRecord> expiredVersions, String resumeFrom,
         long versionsScanned) {
-      this.expiredVersionKeys = expiredVersionKeys;
+      this.expiredVersions = expiredVersions;
       this.resumeFrom = resumeFrom;
       this.versionsScanned = versionsScanned;
     }
@@ -75,9 +124,9 @@ public class NoncurrentVersionSelector {
       return versionsScanned;
     }
 
-    /** versionedKeyTable dbKeys of the versions the rules expire. */
-    public List<String> getExpiredVersionKeys() {
-      return expiredVersionKeys;
+    /** The versions the rules expire, in the order the pass met them. */
+    public List<ExpiredRecord> getExpiredVersions() {
+      return expiredVersions;
     }
 
     /**
@@ -113,12 +162,11 @@ public class NoncurrentVersionSelector {
 
     final String bucketPrefix = metadataManager.getBucketKey(
         bucket.getVolumeName(), bucket.getBucketName());
-    final List<String> expired = new ArrayList<>();
+    final List<ExpiredRecord> expired = new ArrayList<>();
 
     String currentKeyName = null;
     int seenInKey = 0;
     long scanned = 0;
-    long becameNoncurrentAt = 0L;
 
     try (Table.KeyValueIterator<String, OmKeyInfo> versions =
              metadataManager.getVersionedKeyTable().iterator(bucketPrefix)) {
@@ -129,7 +177,10 @@ public class NoncurrentVersionSelector {
       while (versions.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = versions.next();
         final String dbKey = entry.getKey();
-        final int separator = dbKey.indexOf(OM_VERSIONED_KEY_SEPARATOR);
+        // The versionId suffix is fixed-width lower-case hex, so the last
+        // separator is the one that starts it. Searching forward would cut
+        // the name short on a key that contains the separator itself.
+        final int separator = dbKey.lastIndexOf(OM_VERSIONED_KEY_SEPARATOR);
         if (separator < 0) {
           continue;
         }
@@ -143,18 +194,13 @@ public class NoncurrentVersionSelector {
           }
           currentKeyName = keyName;
           seenInKey = 0;
-          becameNoncurrentAt = supersedingTime(bucket, keyName);
         }
 
         final OmKeyInfo version = entry.getValue();
         scanned++;
-        if (isExpired(rules, version, ++seenInKey, becameNoncurrentAt)) {
-          expired.add(dbKey);
+        if (isExpired(rules, version, ++seenInKey)) {
+          expired.add(new ExpiredRecord(dbKey, version.getUpdateID()));
         }
-
-        // Walking a key newest first, the version just visited is the one that
-        // superseded the next one.
-        becameNoncurrentAt = version.getModificationTime();
       }
     }
 
@@ -168,7 +214,8 @@ public class NoncurrentVersionSelector {
    *     because it has been noncurrent long enough.
    */
   private boolean isExpired(List<OmLCRule> rules, OmKeyInfo version,
-      int position, long becameNoncurrentAt) {
+      int position) {
+    final long becameNoncurrentAt = version.getNoncurrentTime();
     for (OmLCRule rule : rules) {
       // Scope only: whether the version is expired is this action's own
       // decision, not the Expiration action's modification-time check.
@@ -181,28 +228,14 @@ public class NoncurrentVersionSelector {
       if (keep != null && position > keep) {
         return true;
       }
-      // A version with no superseding time is one whose key has no current
-      // version, which breaks the keyTable invariant. Expiring on a broken
-      // invariant would destroy data, so it is left alone.
+      // Every record in the versionedKeyTable is stamped as it is moved
+      // there, so an unstamped one means that invariant is broken. Expiring
+      // on a broken invariant would destroy data, so it is left alone.
       if (becameNoncurrentAt > 0
           && expiration.isExpired(becameNoncurrentAt)) {
         return true;
       }
     }
     return false;
-  }
-
-  /**
-   * When the key's current version was committed, which is the moment the
-   * newest noncurrent version stopped being current. Returns 0 when the key
-   * has no current version at all.
-   */
-  private long supersedingTime(OmBucketInfo bucket, String keyName)
-      throws IOException {
-    final OmKeyInfo current = metadataManager
-        .getKeyTable(BucketLayout.OBJECT_STORE)
-        .get(metadataManager.getOzoneKey(bucket.getVolumeName(),
-            bucket.getBucketName(), keyName));
-    return current == null ? 0L : current.getModificationTime();
   }
 }

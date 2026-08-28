@@ -104,6 +104,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionRecord;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReclaimObjectVersionsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
@@ -310,7 +311,8 @@ public class KeyLifecycleService extends BackgroundService {
     private long numKeyIterated = 0;
     private long numDeleteMarkersInserted = 0;
     /** keyTable dbKeys of markers an ExpiredObjectDeleteMarker rule removes. */
-    private final List<String> expiredMarkerKeys = new ArrayList<>();
+    private final List<NoncurrentVersionSelector.ExpiredRecord>
+        expiredMarkerKeys = new ArrayList<>();
     private long numDirIterated = 0;
     private long numDirDeleted = 0;
     private long numKeyDeleted = 0;
@@ -1072,7 +1074,7 @@ public class KeyLifecycleService extends BackgroundService {
               selector.select(bucket, ruleList, resumeFrom, listMaxSize);
           numKeyIterated += selection.getVersionsScanned();
           lastScannedVersionKey = selection.getResumeFrom();
-          submitExpiredVersions(bucket, selection.getExpiredVersionKeys());
+          submitExpiredVersions(bucket, selection.getExpiredVersions());
 
           // Saving state costs a Ratis write, so it is throttled the same way
           // the keyTable scan throttles it. Resuming from an older boundary
@@ -1096,7 +1098,7 @@ public class KeyLifecycleService extends BackgroundService {
      * Submits the versions one pass selected, if any.
      */
     private void submitExpiredVersions(OmBucketInfo bucket,
-        List<String> expiredVersions) {
+        List<NoncurrentVersionSelector.ExpiredRecord> expiredVersions) {
       submitForReclaim(bucket, expiredVersions, Collections.emptyList());
     }
 
@@ -1111,15 +1113,29 @@ public class KeyLifecycleService extends BackgroundService {
       submitForReclaim(bucket, Collections.emptyList(), expiredMarkerKeys);
     }
 
+    /** Each record with the updateID it carried when the scan read it. */
+    private List<ObjectVersionRecord> toProto(
+        List<NoncurrentVersionSelector.ExpiredRecord> records) {
+      List<ObjectVersionRecord> proto = new ArrayList<>(records.size());
+      for (NoncurrentVersionSelector.ExpiredRecord record : records) {
+        proto.add(ObjectVersionRecord.newBuilder()
+            .setDbKey(record.getDbKey())
+            .setUpdateId(record.getUpdateId())
+            .build());
+      }
+      return proto;
+    }
+
     private void submitForReclaim(OmBucketInfo bucket,
-        List<String> expiredVersions, List<String> expiredMarkers) {
+        List<NoncurrentVersionSelector.ExpiredRecord> expiredVersions,
+        List<NoncurrentVersionSelector.ExpiredRecord> expiredMarkers) {
       final int submitted = expiredVersions.size() + expiredMarkers.size();
       if (submitted > 0) {
         ObjectVersionsBucket versionsBucket = ObjectVersionsBucket.newBuilder()
             .setVolumeName(bucket.getVolumeName())
             .setBucketName(bucket.getBucketName())
-            .addAllVersionKeys(expiredVersions)
-            .addAllMarkerKeys(expiredMarkers)
+            .addAllVersions(toProto(expiredVersions))
+            .addAllMarkers(toProto(expiredMarkers))
             .build();
 
         OMRequest omRequestRaw = OMRequest.newBuilder()
@@ -1235,9 +1251,10 @@ public class KeyLifecycleService extends BackgroundService {
               bucketInfo.getBucketName(), marker.getKeyName(), e);
           return;
         }
-        expiredMarkerKeys.add(omMetadataManager.getOzoneKey(
-            bucketInfo.getVolumeName(), bucketInfo.getBucketName(),
-            marker.getKeyName()));
+        expiredMarkerKeys.add(new NoncurrentVersionSelector.ExpiredRecord(
+            omMetadataManager.getOzoneKey(bucketInfo.getVolumeName(),
+                bucketInfo.getBucketName(), marker.getKeyName()),
+            marker.getUpdateID()));
         if (expiredMarkerKeys.size() >= listMaxSize) {
           submitExpiredMarkers(bucketInfo);
         }
