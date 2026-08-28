@@ -351,6 +351,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   synchronized void readBlock(int length, boolean preRead) throws IOException {
     final long required = position + length - requestedLength;
     final long preReadLength = preRead ? preReadSize : 0;
+    // Refill the pre-read window in bulk once it drains below half, instead of after every response.
+    // Safe to skip: required <= 0 means the DataNode still owes bytes that poll() is waiting for.
+    if (required <= 0 && requestedLength - position >= preReadLength / 2) {
+      return;
+    }
     // Clamp so requestedLength never exceeds blockLength: requesting past the end
     // produces an offset the DataNode cannot serve, causing a read timeout.
     final long readLength = Math.min(required + preReadLength, blockLength - requestedLength);
