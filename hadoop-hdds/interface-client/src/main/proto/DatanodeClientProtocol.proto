@@ -203,7 +203,8 @@ message ContainerCommandRequestProto {
 
   optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
   optional   ReadBlockRequestProto readBlock = 28;
-  // Write version of the pipeline as set by SCM in DatanodeDetails.currentVersion
+  // Version that datanodes should use for this write operation.
+  // Set by SCM and forwarded by the client to the datanodes.
   optional   uint32 writePipelineVersion = 29;
 
   // clientId and callId are used to distinguish different requests from different local clients for shortCircuitRead

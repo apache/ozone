@@ -33,7 +33,7 @@ public class TestDispatcherContext {
         .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
         .build();
 
-    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT.serialize(),
+    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT,
         context.getWriteVersion());
   }
 
@@ -41,10 +41,10 @@ public class TestDispatcherContext {
   void writeVersionIsCarried() {
     DispatcherContext context = DispatcherContext
         .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
-        .setWriteVersion(HDDSVersion.ZDU.serialize())
+        .setWriteVersion(HDDSVersion.ZDU)
         .build();
 
-    assertEquals(HDDSVersion.ZDU.serialize(),
+    assertEquals(HDDSVersion.ZDU,
         context.getWriteVersion());
   }
 }

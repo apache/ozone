@@ -57,7 +57,7 @@ public final class DispatcherContext {
   // the component version the client asked the datanode to execute this write at
   // defaults to HDDSVersion.STREAM_BLOCK_SUPPORT (pre-ZDU behavior) when the client
   // did not supply one
-  private final int writeVersion;
+  private final HDDSVersion writeVersion;
 
   private final boolean releaseSupported;
   private volatile Runnable releaseMethod;
@@ -173,7 +173,7 @@ public final class DispatcherContext {
    *     Defaults to {@link HDDSVersion#STREAM_BLOCK_SUPPORT}, the last
    *     component version before ZDU, when the client did not supply one.
    */
-  public int getWriteVersion() {
+  public HDDSVersion getWriteVersion() {
     return writeVersion;
   }
 
@@ -214,7 +214,7 @@ public final class DispatcherContext {
     private long term;
     private long logIndex;
     private Map<Long, Long> container2BCSIDMap;
-    private int writeVersion = HDDSVersion.STREAM_BLOCK_SUPPORT.serialize();
+    private HDDSVersion writeVersion = HDDSVersion.STREAM_BLOCK_SUPPORT;
     private boolean releaseSupported;
 
     private Builder(Op op) {
@@ -271,7 +271,7 @@ public final class DispatcherContext {
      * @param version the write pipeline (component) version
      * @return Builder
      */
-    public Builder setWriteVersion(int version) {
+    public Builder setWriteVersion(HDDSVersion version) {
       this.writeVersion = version;
       return this;
     }

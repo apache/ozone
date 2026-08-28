@@ -39,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -287,6 +288,14 @@ public final class Pipeline {
     }
     throw new IOException(String.format(
         "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
+  }
+
+  /**
+   * Returns the component version this pipeline should execute writes at. All nodes in a
+   * pipeline are expected to share the same version, so we use the first node's current version.
+   */
+  public HDDSVersion getWriteVersion() {
+    return nodeStatus.keySet().iterator().next().getCurrentVersion();
   }
 
   public DatanodeDetails getClosestNode() throws IOException {

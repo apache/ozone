@@ -19,11 +19,15 @@ package org.apache.hadoop.hdds.scm.utils;
 
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * These methods should be merged with other similar utility classes.
  */
 public final class ClientCommandsUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ClientCommandsUtils.class);
 
   /** Utility classes should not be constructed. **/
   private ClientCommandsUtils() {
@@ -51,18 +55,29 @@ public final class ClientCommandsUtils {
   /**
    * Returns the write pipeline (component) version the client asked the datanode
    * to execute the write at, as set by the client from the SCM-provided pipeline
-   * version (HDDS-15641 / HDDS-15718). When the request does not carry the field
+   * version. When the request does not carry the field
    * (a client predating zero downtime upgrade support), the datanode defaults to
    * {@link HDDSVersion#STREAM_BLOCK_SUPPORT}, the last component version before ZDU,
    * so the write keeps pre-ZDU behavior. This matches the value SCM advertises for
    * pipelines while the cluster has not finalized ZDU.
    */
-  public static int getWritePipelineVersion(
-      ContainerProtos.ContainerCommandRequestProto request) {
+  public static HDDSVersion getWritePipelineVersion(ContainerProtos.ContainerCommandRequestProto request) {
+    HDDSVersion defaultVersion = HDDSVersion.STREAM_BLOCK_SUPPORT;
     if (request.hasWritePipelineVersion()) {
-      return request.getWritePipelineVersion();
+      int serializedVersion = request.getWritePipelineVersion();
+      HDDSVersion writeVersion = HDDSVersion.deserialize(serializedVersion);
+      if (writeVersion.equals(HDDSVersion.UNKNOWN_VERSION)) {
+        // This case should never happen since SCM is aware of Datanodes' software and apparent versions and will
+        // choose a version for the pipeline accordingly. If a client somehow passes an invalid version, maybe one
+        // that did not come from SCM, fall back to the safe default.
+        LOG.error("Datanode was provided an invalid write version {} for software version {}. Falling back to {}",
+            serializedVersion, HDDSVersion.SOFTWARE_VERSION, defaultVersion);
+      } else {
+        return writeVersion;
+      }
     } else {
-      return HDDSVersion.STREAM_BLOCK_SUPPORT.serialize();
+      LOG.trace("No write pipeline version was supplied by the client. Falling back to {}", defaultVersion);
     }
+    return defaultVersion;
   }
 }

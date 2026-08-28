@@ -42,7 +42,7 @@ public class TestClientCommandsUtils {
         .setWritePipelineVersion(HDDSVersion.ZDU.serialize())
         .build();
 
-    assertEquals(HDDSVersion.ZDU.serialize(),
+    assertEquals(HDDSVersion.ZDU,
         ClientCommandsUtils.getWritePipelineVersion(request));
   }
 
@@ -50,7 +50,17 @@ public class TestClientCommandsUtils {
   void defaultsToStreamBlockSupportWhenAbsent() {
     ContainerCommandRequestProto request = baseRequest().build();
 
-    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT.serialize(),
+    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT,
+        ClientCommandsUtils.getWritePipelineVersion(request));
+  }
+
+  @Test
+  void fallsBackToStreamBlockSupportForUnknownVersion() {
+    ContainerCommandRequestProto request = baseRequest()
+        .setWritePipelineVersion(HDDSVersion.UNKNOWN_VERSION.serialize())
+        .build();
+
+    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT,
         ClientCommandsUtils.getWritePipelineVersion(request));
   }
 }
