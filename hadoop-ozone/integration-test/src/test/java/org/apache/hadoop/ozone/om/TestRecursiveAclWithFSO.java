@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.TestDataUtil.createKey;
+import static org.apache.hadoop.ozone.DataTestUtil.createKey;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,8 +31,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -330,7 +330,7 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
     String aclWorldAll = "world::a";
 
     for (String key : keys) {
-      TestDataUtil.createStringKey(ozoneBucket, key, 10);
+      DataTestUtil.createStringKey(ozoneBucket, key, 10);
       setKeyAcl(objectStore, ozoneBucket.getVolumeName(), ozoneBucket.getName(),
           key, aclWorldAll);
     }

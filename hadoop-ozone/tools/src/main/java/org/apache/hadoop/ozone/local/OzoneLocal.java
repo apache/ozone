@@ -17,32 +17,38 @@
 
 package org.apache.hadoop.ozone.local;
 
+import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.TimeDurationUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ITypeConverter;
 import picocli.CommandLine.Option;
 
 /**
- * Internal CLI entry point for local Ozone cluster commands.
+ * CLI entry point for local single-node Ozone.
  */
 @Command(name = "ozone local",
-    hidden = true,
-    description = "Internal commands for local Ozone cluster runtime",
+    description = "Run a single-node local Ozone cluster",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     subcommands = {
         OzoneLocal.RunCommand.class
     })
 public class OzoneLocal extends GenericCli {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneLocal.class);
 
   static final String ENV_DATA_DIR = "OZONE_LOCAL_DATA_DIR";
   static final String ENV_FORMAT = "OZONE_LOCAL_FORMAT";
@@ -108,8 +114,7 @@ public class OzoneLocal extends GenericCli {
   }
 
   @Command(name = "run",
-      hidden = true,
-      description = "Resolve configuration for local Ozone runtime startup")
+      description = "Start SCM, OM, and datanodes in one local process")
   static class RunCommand extends AbstractSubcommand implements Callable<Void> {
 
     @Option(names = "--data-dir",
@@ -189,9 +194,54 @@ public class OzoneLocal extends GenericCli {
     private String s3Region;
 
     @Override
-    public Void call() {
-      resolveConfig();
+    public Void call() throws Exception {
+      LocalOzoneClusterConfig config = resolveConfig();
+      try (LocalOzoneRuntime runtime = createRuntime(config, getOzoneConf())) {
+        runtime.start();
+        printSummary(runtime, config);
+        awaitShutdown(runtime);
+      }
       return null;
+    }
+
+    LocalOzoneRuntime createRuntime(LocalOzoneClusterConfig config, OzoneConfiguration seedConfiguration) {
+      return new LocalOzoneCluster(config, seedConfiguration);
+    }
+
+    private void printSummary(LocalOzoneRuntime runtime, LocalOzoneClusterConfig config) {
+      PrintWriter writer = out();
+      writer.println("Local Ozone is running from " + config.getDataDir());
+      writer.println("SCM RPC: " + runtime.getDisplayHost() + ":" + runtime.getScmPort());
+      writer.println("OM RPC: " + runtime.getDisplayHost() + ":" + runtime.getOmPort());
+      writer.println("Press Ctrl+C to stop.");
+      writer.flush();
+    }
+
+    /**
+     * Blocks until the JVM is asked to shut down (for example by Ctrl+C), closing the runtime from
+     * the shutdown hook before the JVM exits.
+     */
+    void awaitShutdown(LocalOzoneRuntime runtime) throws InterruptedException {
+      CountDownLatch stopped = new CountDownLatch(1);
+      Thread shutdownHook = new Thread(() -> {
+        try {
+          runtime.close();
+        } catch (Exception ex) {
+          LOG.warn("Failed to close ozone local runtime", ex);
+        } finally {
+          stopped.countDown();
+        }
+      }, "ozone-local-shutdown");
+      Runtime.getRuntime().addShutdownHook(shutdownHook);
+      try {
+        stopped.await();
+      } finally {
+        try {
+          Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        } catch (IllegalStateException ignored) {
+          // JVM shutdown is already in progress.
+        }
+      }
     }
 
     LocalOzoneClusterConfig resolveConfig() {

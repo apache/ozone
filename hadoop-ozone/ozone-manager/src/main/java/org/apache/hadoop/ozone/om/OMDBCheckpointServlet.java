@@ -138,10 +138,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
-    boolean isOmLeader = om.isLeaderReady();
-    if (!isOmLeader) {
-      String msg = "Unable to process metadata snapshot request as "
-          + "this OM is not the leader or not ready to serve requests";
+    if (!om.isLeader()) {
+      String msg = "Unable to process metadata snapshot request as this OM is not the leader";
       LOG.warn(msg);
       try {
         response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, msg);
@@ -387,7 +385,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     try (OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
             conf, checkpoint);
-        TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+        TableIterator<String, Table.KeyValue<String, SnapshotInfo>>
             iterator = checkpointMetadataManager
             .getSnapshotInfoTable().iterator()) {
 

@@ -86,11 +86,11 @@ fi
 # memory size.
 # export OZONE_HEAPSIZE_MIN=
 
-# Extra Java runtime options for all Ozone commands. We don't support
-# IPv6 yet/still, so by default the preference is set to IPv4.
+# Extra Java runtime options for all Ozone commands. Ozone does not override
+# the JVM's IP stack preference. To force IPv4-only networking:
 # export OZONE_OPTS="-Djava.net.preferIPv4Stack=true"
-# For Kerberos debugging, an extended option set logs more information
-# export OZONE_OPTS="-Djava.net.preferIPv4Stack=true -Dsun.security.krb5.debug=true -Dsun.security.spnego.debug"
+# For Kerberos debugging, an extended option set logs more information:
+# export OZONE_OPTS="-Dsun.security.krb5.debug=true -Dsun.security.spnego.debug"
 
 # Some parts of the shell code may do special things dependent upon
 # the operating system.  We have to set this here. See the next

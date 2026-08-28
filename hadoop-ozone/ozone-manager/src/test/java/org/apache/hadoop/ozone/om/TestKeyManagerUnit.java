@@ -79,12 +79,14 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -159,8 +161,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
   }
 
   @Test
-  public void listMultipartUploadPartsWithoutEtagField() throws IOException {
-    // For backward compatibility reasons
+  public void listMultipartUploadPartsWithEtagField() throws IOException {
     final String volume = volumeName();
     final String bucket = "bucketForEtag";
     final String key = "dir/key1";
@@ -169,7 +170,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         initMultipartUpload(writeClient, volume, bucket, key);
 
 
-    // Commit some MPU parts without eTag field
+    // Commit some MPU parts, each carrying its (now mandatory) eTag.
     for (int i = 1; i <= 5; i++) {
       OmKeyArgs partKeyArgs =
           new OmKeyArgs.Builder()
@@ -199,6 +200,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
               .setReplicationConfig(
                   RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
               .setLocationInfoList(Collections.emptyList())
+              .addMetadata(OzoneConsts.ETAG, "etag-" + i)
               .build();
 
       writeClient.commitMultipartUploadPart(commitPartKeyArgs, openKey.getId());
@@ -510,7 +512,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .build();
 
     ContainerInfo ci = mock(ContainerInfo.class);
-    when(ci.getContainerID()).thenReturn(1L);
+    when(ci.getContainerID()).thenReturn(containerID);
 
     // Setup SCM containerClient so that 1st call returns pipeline1 and
     // 2nd call returns pipeline2.
@@ -765,5 +767,56 @@ class TestKeyManagerUnit extends OzoneTestBase {
     keyManager.listStatus(builder.build(), false,
         null, Long.MAX_VALUE, client);
     verify(containerClient, times(1)).getContainerWithPipelineBatch(anySet());
+  }
+
+  @Test
+  public void listStatusLightDoesNotRefreshPipeline() throws Exception {
+    String volume = volumeName();
+    String bucket = "bucket-light";
+    String keyPrefix = "key-light-";
+
+    OMRequestTestUtils.addVolumeToDB(volume, OzoneConsts.OZONE, metadataManager);
+    OMRequestTestUtils.addBucketToDB(volume, bucket, metadataManager);
+
+    final Pipeline pipeline = MockPipeline.createPipeline(3);
+    for (long i = 1; i <= 5; i++) {
+      final long containerID = CONTAINER_ID.incrementAndGet();
+      final OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
+          .setBlockID(new BlockID(containerID, 1L))
+          .setPipeline(pipeline)
+          .setOffset(0)
+          .setLength(1024)
+          .build();
+
+      OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+          .setVolumeName(volume)
+          .setBucketName(bucket)
+          .setCreationTime(Time.now())
+          .setOmKeyLocationInfos(singletonList(
+              new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+          .setReplicationConfig(RatisReplicationConfig
+              .getInstance(ReplicationFactor.THREE))
+          .setKeyName(keyPrefix + i)
+          .setObjectID(i)
+          .setUpdateID(i)
+          .build();
+      keyInfo.appendNewBlocks(singletonList(keyLocationInfo), false);
+      OMRequestTestUtils.addKeyToOM(metadataManager, keyInfo);
+    }
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setKeyName("");
+
+    List<OzoneFileStatusLight> fileStatusList;
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader =
+             om.getOmMetadataReader()) {
+      fileStatusList = rcReader.get().listStatusLight(builder.build(), false,
+          null, Long.MAX_VALUE, false);
+    }
+
+    assertEquals(5, fileStatusList.size());
+    verify(containerClient, times(0)).getContainerWithPipelineBatch(anySet());
   }
 }

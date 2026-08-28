@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -57,6 +58,8 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -84,6 +87,7 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   private ArrayList<OzoneAcl> aclList = new ArrayList<>();
   private ReplicationConfig replicationConfig;
+  private Map<String, OzoneLifecycleConfiguration> lifecyclesMap = new HashMap<>();
 
   public static Builder newBuilder() {
     return new Builder();
@@ -846,6 +850,70 @@ public final class OzoneBucketStub extends OzoneBucket {
     if (keyDetails.get(keyName) != null) {
       throw new OMException("already exists", ResultCodes.FILE_ALREADY_EXISTS);
     }
+  }
+
+  @Override
+  public void setLifecycleConfiguration(
+      OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
+    lifecyclesMap.put(lifecycleConfiguration.getBucket(),
+        toOzoneLifecycleConfiguration(lifecycleConfiguration));
+  }
+
+  @Override
+  public OzoneLifecycleConfiguration getLifecycleConfiguration() throws IOException {
+    OzoneLifecycleConfiguration lcc = lifecyclesMap.get(getName());
+    if (lcc == null) {
+      throw new OMException("Lifecycle configuration not found",
+          LIFECYCLE_CONFIGURATION_NOT_FOUND);
+    }
+    return lcc;
+  }
+
+  @Override
+  public void deleteLifecycleConfiguration()
+      throws IOException {
+    if (!lifecyclesMap.containsKey(getName())) {
+      throw new OMException("Lifecycle configurations does not exist",
+          OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND);
+    }
+    lifecyclesMap.remove(getName());
+  }
+
+  private static OzoneLifecycleConfiguration toOzoneLifecycleConfiguration(
+      OmLifecycleConfiguration omLifecycleConfiguration) {
+    List<OzoneLifecycleConfiguration.OzoneLCRule> rules = new ArrayList<>();
+
+    for (OmLCRule r: omLifecycleConfiguration.getRules()) {
+      OzoneLifecycleConfiguration.OzoneLCExpiration e = null;
+      OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload a = null;
+      OzoneLifecycleConfiguration.OzoneLCFilter f = null;
+
+      if (r.getExpiration() != null) {
+        e = new OzoneLifecycleConfiguration.OzoneLCExpiration(
+            r.getExpiration().getDays(), r.getExpiration().getDate());
+      }
+      if (r.getAbortIncompleteMultipartUpload() != null) {
+        a = new OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload(
+            r.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+      }
+      if (r.getFilter() != null) {
+        OzoneLifecycleConfiguration.LifecycleAndOperator andOperator = null;
+        if (r.getFilter().getAndOperator() != null) {
+          andOperator = new OzoneLifecycleConfiguration.LifecycleAndOperator(r.getFilter().getAndOperator()
+              .getTags(), r.getFilter().getAndOperator().getPrefix());
+        }
+        f = new OzoneLifecycleConfiguration.OzoneLCFilter(
+            r.getFilter().getPrefix(), r.getFilter().getTag(), andOperator);
+      }
+
+      rules.add(new OzoneLifecycleConfiguration.OzoneLCRule(r.getId(),
+          r.getEffectivePrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, a, f));
+    }
+
+    return new OzoneLifecycleConfiguration(
+        omLifecycleConfiguration.getVolume(),
+        omLifecycleConfiguration.getBucket(),
+        omLifecycleConfiguration.getCreationTime(), rules);
   }
 
   /**

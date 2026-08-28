@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -155,6 +157,20 @@ public interface ClientProtocol {
    * @return OzoneKey which gives basic information about the key.
    */
   OzoneKey headS3Object(String bucketName, String keyName) throws IOException;
+
+  /**
+   * Look up metadata for a single part of a multipart object in S3 context.
+   * Uses HEAD semantics (no block tokens or pipeline refresh), while still
+   * validating the requested part number.
+   *
+   * @param bucketName Name of the Bucket
+   * @param keyName Key name
+   * @param partNumber Multipart-upload part number
+   * @return {@link OzoneKey} for the requested part
+   * @throws IOException
+   */
+  OzoneKey headS3Object(String bucketName, String keyName, int partNumber)
+      throws IOException;
 
   /**
    * Get OzoneKey in S3 context.
@@ -504,6 +520,82 @@ public interface ClientProtocol {
       String bucketName, String keyName, long size, String expectedETag,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags) throws IOException;
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream createKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return createKey(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream createKeyIfNotExists(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return createKeyIfNotExists(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName,
+      String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return rewriteKeyIfMatch(volumeName, bucketName, keyName, size, expectedETag,
+        replicationConfig, metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream createMultipartKey(String volumeName, String bucketName,
+                                       String keyName, long size,
+                                       int partNumber, String uploadID,
+                                       boolean derivedKeyPiggyBacking)
+      throws IOException {
+    return createMultipartKey(volumeName, bucketName, keyName, size, partNumber,
+        uploadID);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput createStreamKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return createStreamKey(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput createStreamKeyIfNotExists(String volumeName,
+      String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return createStreamKeyIfNotExists(volumeName, bucketName, keyName, size,
+        replicationConfig, metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput rewriteStreamKeyIfMatch(String volumeName,
+      String bucketName, String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return rewriteStreamKeyIfMatch(volumeName, bucketName, keyName, size, expectedETag,
+        replicationConfig, metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput createMultipartStreamKey(String volumeName,
+                                                 String bucketName,
+                                                 String keyName, long size,
+                                                 int partNumber,
+                                                 String uploadID,
+                                                 boolean derivedKeyPiggyBacking)
+      throws IOException {
+    return createMultipartStreamKey(volumeName, bucketName, keyName, size,
+        partNumber, uploadID);
+  }
 
   /**
    * Reads a key from an existing bucket.
@@ -1525,6 +1617,35 @@ public interface ClientProtocol {
    * @throws IOException
    */
   void deleteObjectTagging(String volumeName, String bucketName, String keyName)
+      throws IOException;
+
+  /**
+   * Gets the lifecycle configuration information.
+   * @param volumeName - Volume name.
+   * @param bucketName - Bucket name.
+   * @return OzoneLifecycleConfiguration or exception is thrown.
+   * @throws IOException
+   */
+  OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
+      throws IOException;
+
+  /**
+   * Creates a new lifecycle configuration.
+   * This operation will completely overwrite any existing lifecycle configuration on the bucket.
+   * If the bucket already has a lifecycle configuration, it will be replaced with the new one.
+   * @param lifecycleConfiguration - lifecycle configuration info.
+   * @throws IOException
+   */
+  void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration)
+      throws IOException;
+
+  /**
+   * Deletes existing lifecycle configuration.
+   * @param volumeName - Volume name.
+   * @param bucketName - Bucket name.
+   * @throws IOException
+   */
+  void deleteLifecycleConfiguration(String volumeName, String bucketName)
       throws IOException;
 
   /**
