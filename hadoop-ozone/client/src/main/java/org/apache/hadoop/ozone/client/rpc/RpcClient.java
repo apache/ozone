@@ -2971,6 +2971,27 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void copyKey(String volumeName, String bucketName, String sourceKeyName,
+                      String destinationKeyName, Map<String, String> metadata) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Objects.requireNonNull(sourceKeyName, "sourceKeyName == null");
+    Objects.requireNonNull(destinationKeyName, "destinationKeyName == null");
+    OmKeyArgs sourceArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(sourceKeyName)
+        .build();
+    OmKeyArgs destinationArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(destinationKeyName)
+        .addAllMetadata(metadata == null ? Collections.emptyMap() : metadata)
+        .build();
+    ozoneManagerClient.copyKey(sourceArgs, destinationArgs);
+  }
+
+  @Override
   public void putObjectTagging(String volumeName, String bucketName,
                                String keyName, Map<String, String> tags) throws IOException {
     if (omVersion.compareTo(OzoneManagerVersion.S3_OBJECT_TAGGING_API) < 0) {

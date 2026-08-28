@@ -345,6 +345,24 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
       StringCodec.get(),
       OmLifecycleScanState.getCodec());
 
+  public static final String SHARED_BLOCK_GROUP_TABLE = "sharedBlockGroupTable";
+  /**
+   * sharedBlockGroupTable: sharedBlockGroupId :- number of keys sharing the blocks.
+   * <p>
+   * A row exists only for block groups that a server side copy has shared between
+   * keys, so keys that were never copied never touch this table. An absent row
+   * means the single key carrying the group id owns its blocks exclusively, which
+   * is why existing databases need no backfill.
+   * <p>
+   * {@link org.apache.hadoop.ozone.om.service.KeyDeletingService} consults this
+   * table before releasing blocks of a deleted key: while other sharers remain,
+   * the blocks are withheld from SCM and only the metadata is purged.
+   */
+  public static final DBColumnFamilyDefinition<Long, Long> SHARED_BLOCK_GROUP_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(SHARED_BLOCK_GROUP_TABLE,
+          LongCodec.get(), // sharedBlockGroupId, the objectID of the lineage root
+          LongCodec.get()); // sharer count, always >= 2 while the row exists
+
   //---------------------------------------------------------------------------
   private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
       = DBColumnFamilyDefinition.newUnmodifiableMap(
@@ -372,7 +390,8 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           USER_TABLE_DEF,
           VOLUME_TABLE_DEF,
           LIFECYCLE_CONFIGURATION_TABLE_DEF,
-          LIFECYCLE_SCAN_STATE_TABLE_DEF);
+          LIFECYCLE_SCAN_STATE_TABLE_DEF,
+          SHARED_BLOCK_GROUP_TABLE_DEF);
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 

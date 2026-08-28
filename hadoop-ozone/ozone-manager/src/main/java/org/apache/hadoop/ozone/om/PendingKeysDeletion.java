@@ -69,9 +69,11 @@ public class PendingKeysDeletion {
     private final long purgedBytes;
     private final boolean isCommittedKey;
     private final String deleteKeyName;
+    private final long sharedBlockGroupId;
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public PurgedKey(String volume, String bucket, long bucketId, BlockGroup group, String deleteKeyName,
-        long purgedBytes, boolean isCommittedKey) {
+        long purgedBytes, boolean isCommittedKey, long sharedBlockGroupId) {
       this.volume = volume;
       this.bucket = bucket;
       this.bucketId = bucketId;
@@ -79,6 +81,7 @@ public class PendingKeysDeletion {
       this.purgedBytes = purgedBytes;
       this.isCommittedKey = isCommittedKey;
       this.deleteKeyName = deleteKeyName;
+      this.sharedBlockGroupId = sharedBlockGroupId;
     }
 
     public BlockGroup getBlockGroup() {
@@ -107,6 +110,14 @@ public class PendingKeysDeletion {
 
     public String getDeleteKeyName() {
       return deleteKeyName;
+    }
+
+    /**
+     * @return the block group this key shares its blocks with, or 0 when the
+     * key owns its blocks exclusively.
+     */
+    public long getSharedBlockGroupId() {
+      return sharedBlockGroupId;
     }
 
     @Override

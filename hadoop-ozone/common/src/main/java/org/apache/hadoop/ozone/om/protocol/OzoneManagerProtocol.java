@@ -1207,6 +1207,19 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Copies a committed key to a new key that reuses the source key's blocks,
+   * without reading or writing any data.
+   *
+   * @param sourceArgs the key to copy from
+   * @param destinationArgs the key to create, carrying the metadata to set on it
+   * @return the key info of the created copy
+   */
+  default OmKeyInfo copyKey(OmKeyArgs sourceArgs, OmKeyArgs destinationArgs) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
    * Removes all the tags from the specified key.
    * @param args Key args
    */

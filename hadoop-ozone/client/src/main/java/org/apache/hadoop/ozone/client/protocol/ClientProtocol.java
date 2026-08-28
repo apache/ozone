@@ -1598,6 +1598,22 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Copies a key to a new key in the same bucket without moving any data: the
+   * copy reuses the source key's blocks and the two keys stay independent for
+   * every other operation.
+   *
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param sourceKeyName Key to copy from.
+   * @param destinationKeyName Key to create.
+   * @param metadata Metadata to set on the copy, on top of the source's.
+   * @throws IOException when the copy is not eligible for block sharing, in
+   * which case the caller should read and rewrite the data instead.
+   */
+  void copyKey(String volumeName, String bucketName, String sourceKeyName,
+               String destinationKeyName, Map<String, String> metadata) throws IOException;
+
+  /**
    * Sets the tags to an existing key.
    * @param volumeName Volume name.
    * @param bucketName Bucket name.

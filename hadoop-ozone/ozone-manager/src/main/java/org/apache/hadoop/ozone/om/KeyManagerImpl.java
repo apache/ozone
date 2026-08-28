@@ -901,7 +901,8 @@ public class KeyManagerImpl implements KeyManager {
                   .build();
               reclaimableKeys.put(blockGroupName,
                   new PurgedKey(info.getVolumeName(), info.getBucketName(), bucketId,
-                  keyBlocks, kv.getKey(), OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
+                  keyBlocks, kv.getKey(), OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted(),
+                  info.getSharedBlockGroupId()));
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);

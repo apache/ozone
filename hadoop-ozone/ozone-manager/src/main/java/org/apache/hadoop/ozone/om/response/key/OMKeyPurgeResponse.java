@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SHARED_BLOCK_GROUP_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
 import static org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse.createRepeatedOmKeyInfo;
@@ -26,6 +27,7 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -49,26 +51,31 @@ import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 /**
  * Response for {@link OMKeyPurgeRequest} request.
  */
-@CleanupTableInfo(cleanupTables = {DELETED_TABLE, SNAPSHOT_INFO_TABLE})
+@CleanupTableInfo(cleanupTables = {DELETED_TABLE, SNAPSHOT_INFO_TABLE, SHARED_BLOCK_GROUP_TABLE})
 public class OMKeyPurgeResponse extends OmKeyResponse {
   private List<OmBucketInfo> bucketInfosToBeUpdated;
   private List<String> purgeKeyList;
   private List<String> renamedList;
   private SnapshotInfo fromSnapshot;
   private List<SnapshotMoveKeyInfos> keysToUpdateList;
+  private Map<Long, Long> updatedSharerCounts = Collections.emptyMap();
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyPurgeResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<String> keyList,
       @Nonnull List<String> renamedList,
       SnapshotInfo fromSnapshot,
       List<SnapshotMoveKeyInfos> keysToUpdate,
-      List<OmBucketInfo> bucketInfosToBeUpdated) {
+      List<OmBucketInfo> bucketInfosToBeUpdated,
+      Map<Long, Long> updatedSharerCounts) {
     super(omResponse);
     this.purgeKeyList = keyList;
     this.renamedList = renamedList;
     this.fromSnapshot = fromSnapshot;
     this.keysToUpdateList = keysToUpdate;
     this.bucketInfosToBeUpdated = bucketInfosToBeUpdated == null ? Collections.emptyList() : bucketInfosToBeUpdated;
+    this.updatedSharerCounts =
+        updatedSharerCounts == null ? Collections.emptyMap() : updatedSharerCounts;
   }
 
   /**
@@ -113,6 +120,19 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
       processKeys(batchOperation, omMetadataManager);
       processKeysToUpdate(batchOperation, omMetadataManager);
     }
+    // Always the active DB's table, even when the purged keys came from a
+    // snapshot: that is where the copies recorded their sharing.
+    for (Map.Entry<Long, Long> sharerCount : updatedSharerCounts.entrySet()) {
+      if (sharerCount.getValue() > 1) {
+        omMetadataManager.getSharedBlockGroupTable()
+            .putWithBatch(batchOperation, sharerCount.getKey(), sharerCount.getValue());
+      } else {
+        // Down to a single key, which owns the blocks exclusively again.
+        omMetadataManager.getSharedBlockGroupTable()
+            .deleteWithBatch(batchOperation, sharerCount.getKey());
+      }
+    }
+
     for (OmBucketInfo bucketInfo : bucketInfosToBeUpdated) {
       String bucketKey = omMetadataManager.getBucketKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName());
       omMetadataManager.getBucketTable().putWithBatch(batchOperation, bucketKey, bucketInfo);

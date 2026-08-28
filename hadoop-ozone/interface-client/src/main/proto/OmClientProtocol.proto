@@ -166,6 +166,7 @@ enum Type {
   GetLifecycleServiceStatus    = 150;
   SetLifecycleServiceStatus    = 151;
   SaveLifecycleScanState       = 152;
+  CopyKey                      = 153;
 }
 
 enum SafeMode {
@@ -326,6 +327,7 @@ message OMRequest {
   optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 151;
   optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 152;
   optional SaveLifecycleScanStateRequest saveLifecycleScanStateRequest = 153;
+  optional CopyKeyRequest                   copyKeyRequest                 = 154;
 }
 
 message OMResponse {
@@ -471,6 +473,7 @@ message OMResponse {
   optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 150;
   optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 151;
   optional SaveLifecycleScanStateResponse saveLifecycleScanStateResponse = 152;
+  optional CopyKeyResponse                   copyKeyResponse               = 153;
 }
 
 enum Status {
@@ -1226,6 +1229,12 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+  // sharedBlockGroupId marks this key as sharing its block locations with other
+  // keys created by a server side copy. Absent or 0 means the key exclusively
+  // owns its blocks. A non-zero value is the objectID of the lineage root, and
+  // the matching sharedBlockGroupTable row counts how many keys still share it.
+  // Blocks of a shared key are only released once the last sharer is reclaimed.
+    optional uint64 sharedBlockGroupId = 23;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -1427,6 +1436,20 @@ message RenameKeyResponse{
 
 }
 
+// Server side copy of a committed key. The destination key is created as an
+// independent key that shares the source key's committed block locations, so
+// no data is read or written. Only eligible when source and destination agree
+// on replication and encryption; the S3 gateway falls back to a byte copy
+// otherwise.
+message CopyKeyRequest {
+    required KeyArgs sourceKeyArgs = 1;
+    required KeyArgs destinationKeyArgs = 2;
+}
+
+message CopyKeyResponse {
+    optional KeyInfo keyInfo = 1;
+}
+
 message DeleteKeyRequest {
     required KeyArgs keyArgs = 1;
 }
@@ -1486,6 +1509,16 @@ message PurgeKeysRequest {
     optional NullableUUID expectedPreviousSnapshotID = 4;
     repeated string renamedKeys = 5;
     repeated BucketPurgeKeysSize bucketPurgeKeysSize = 6;
+    repeated SharedBlockGroupDecrement sharedBlockGroupDecrements = 7;
+}
+
+// Applied together with the deletedTable purge: each entry drops the sharer
+// count of a block group by the number of its sharers reclaimed in this batch.
+// The row is removed once the count reaches one, giving the last remaining key
+// exclusive ownership of the blocks again.
+message SharedBlockGroupDecrement {
+    required uint64 sharedBlockGroupId = 1;
+    required uint32 sharerCount = 2;
 }
 
 message BucketPurgeKeysSize {

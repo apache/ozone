@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -72,6 +73,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketP
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NullableUUID;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SharedBlockGroupDecrement;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -140,10 +142,16 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
     long startTime = Time.monotonicNow();
     Pair<Pair<Integer, Long>, Boolean> purgeResult = Pair.of(Pair.of(0, 0L), false);
-    
+
+    // Keys whose blocks another live key still shares are withheld from SCM:
+    // like empty keys they get a synthetic success below, so their metadata is
+    // purged while the blocks stay until the last sharer is reclaimed.
+    SharedBlockGroupPlan sharedPlan = planSharedBlockGroups(keyBlocksList);
+
     // Filter out empty files (files with no blocks) before sending to SCM
     Map<String, PurgedKey> nonEmptyKeyBlocksList = keyBlocksList.entrySet().stream()
-        .filter(entry -> entry.getValue().getBlockGroup() != null && 
+        .filter(entry -> !sharedPlan.isWithheld(entry.getKey()))
+        .filter(entry -> entry.getValue().getBlockGroup() != null &&
                          entry.getValue().getBlockGroup().getDeletedBlocks() != null &&
                          !entry.getValue().getBlockGroup().getDeletedBlocks().isEmpty())
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -191,7 +199,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     if (blockDeletionResults != null) {
       long purgeStartTime = Time.monotonicNow();
       purgeResult = submitPurgeKeysRequest(blockDeletionResults, keyBlocksList, keysToModify, renameEntries,
-          snapTableKey, expectedPreviousSnapshotId, ratisByteLimit);
+          snapTableKey, expectedPreviousSnapshotId, ratisByteLimit, sharedPlan.getDecrements());
       int limit = getOzoneManager().getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
@@ -199,6 +207,83 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     }
     getPerfMetrics().setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
     return purgeResult;
+  }
+
+  /**
+   * Works out, for the keys about to be reclaimed, which ones still share their
+   * blocks with a key that is staying alive, and by how much each block group's
+   * sharer count should drop.
+   *
+   * <p>Keys that were never copied carry no group id and never reach the
+   * sharedBlockGroupTable, so the common case costs one field check per key.
+   * An absent row means the group is down to its last key, which owns the
+   * blocks again and releases them normally.
+   */
+  private SharedBlockGroupPlan planSharedBlockGroups(Map<String, PurgedKey> keyBlocksList)
+      throws IOException {
+    Map<Long, List<String>> membersByGroup = new HashMap<>();
+    for (Map.Entry<String, PurgedKey> entry : keyBlocksList.entrySet()) {
+      long groupId = entry.getValue().getSharedBlockGroupId();
+      if (groupId != 0) {
+        membersByGroup.computeIfAbsent(groupId, k -> new ArrayList<>()).add(entry.getKey());
+      }
+    }
+    if (membersByGroup.isEmpty()) {
+      return SharedBlockGroupPlan.EMPTY;
+    }
+
+    Table<Long, Long> sharedBlockGroupTable =
+        getOzoneManager().getMetadataManager().getSharedBlockGroupTable();
+    Set<String> withheld = new HashSet<>();
+    List<SharedBlockGroupDecrement> decrements = new ArrayList<>();
+    for (Map.Entry<Long, List<String>> entry : membersByGroup.entrySet()) {
+      long groupId = entry.getKey();
+      List<String> members = entry.getValue();
+      Long sharerCount = sharedBlockGroupTable.get(groupId);
+      if (sharerCount != null) {
+        decrements.add(SharedBlockGroupDecrement.newBuilder()
+            .setSharedBlockGroupId(groupId)
+            .setSharerCount(members.size())
+            .build());
+      }
+      // While a sharer outside this batch survives, every member here is
+      // withheld. Once the whole group dies together, one member releases the
+      // blocks and the rest are withheld so SCM is told only once.
+      long remainingSharers = sharerCount == null ? 1L : sharerCount;
+      int withheldCount = remainingSharers > members.size() ? members.size() : members.size() - 1;
+      withheld.addAll(members.subList(0, withheldCount));
+    }
+    if (!withheld.isEmpty()) {
+      LOG.info("Withholding blocks of {} key(s) from deletion: they are still shared with a live key.",
+          withheld.size());
+    }
+    return new SharedBlockGroupPlan(withheld, decrements);
+  }
+
+  /**
+   * Which reclaimed keys must keep their blocks, and the sharer count drops to
+   * persist alongside the purge.
+   */
+  private static final class SharedBlockGroupPlan {
+    private static final SharedBlockGroupPlan EMPTY =
+        new SharedBlockGroupPlan(Collections.emptySet(), Collections.emptyList());
+
+    private final Set<String> withheldBlockGroupNames;
+    private final List<SharedBlockGroupDecrement> decrements;
+
+    private SharedBlockGroupPlan(Set<String> withheldBlockGroupNames,
+        List<SharedBlockGroupDecrement> decrements) {
+      this.withheldBlockGroupNames = withheldBlockGroupNames;
+      this.decrements = decrements;
+    }
+
+    private boolean isWithheld(String blockGroupName) {
+      return withheldBlockGroupNames.contains(blockGroupName);
+    }
+
+    private List<SharedBlockGroupDecrement> getDecrements() {
+      return decrements;
+    }
   }
 
   private static final class BucketPurgeSize {
@@ -261,7 +346,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * @param results DeleteBlockGroups returned by SCM.
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
-  @SuppressWarnings("checkstyle:MethodLength")
+  @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
   private Pair<Pair<Integer, Long>, Boolean> submitPurgeKeysRequest(
       List<DeleteBlockGroupResult> results,
       Map<String, PurgedKey> purgedKeys,
@@ -269,7 +354,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       List<String> renameEntriesToBeDeleted,
       String snapTableKey,
       UUID expectedPreviousSnapshotId,
-      int ratisLimit) {
+      int ratisLimit,
+      List<SharedBlockGroupDecrement> sharedBlockGroupDecrements) {
 
     Set<String> completePurgedKeys = new HashSet<>();
 
@@ -415,6 +501,13 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           requestBuilder.addDeletedKeys(bucketDeleteKeys.build());
           bucketDeleteKeys = null;
         }
+        if (allDone) {
+          // Carried by the final batch on purpose. Losing the batch after the
+          // rows were already purged leaks the blocks, which a later audit can
+          // reclaim; decrementing first and then failing to purge would let a
+          // retry decrement twice and release blocks a live key still uses.
+          requestBuilder.addAllSharedBlockGroupDecrements(sharedBlockGroupDecrements);
+        }
         bucketPurgeKeysSizeMap.values().stream().map(BucketPurgeSize::toProtobuf)
             .forEach(requestBuilder::addBucketPurgeKeysSize);
         bucketPurgeKeysSizeMap.clear();
@@ -430,7 +523,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private boolean hasPendingItems(PurgeKeysRequest.Builder builder) {
     return builder.getDeletedKeysCount() > 0
         || builder.getKeysToUpdateCount() > 0
-        || builder.getRenamedKeysCount() > 0;
+        || builder.getRenamedKeysCount() > 0
+        || builder.getSharedBlockGroupDecrementsCount() > 0;
   }
 
   private static PurgeKeysRequest.Builder getPurgeKeysRequest(String snapTableKey,

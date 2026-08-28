@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.key.OMKeyCopyRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
@@ -193,6 +194,13 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
     addRequestClass(Type.SetTimes,
         OMKeySetTimesRequestWithFSO.class,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    // CopyKey. Only registered for OBJECT_STORE: an FSO destination gets
+    // NOT_SUPPORTED_OPERATION from the factory, which is what the proof of
+    // concept wants until the parent directory handling is written.
+    addRequestClass(Type.CopyKey,
+        OMKeyCopyRequest.class,
+        BucketLayout.OBJECT_STORE);
 
     // PutObjectTagging
     addRequestClass(Type.PutObjectTagging,

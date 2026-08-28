@@ -348,6 +348,13 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
+    case CopyKey:
+      // The destination bucket owns the key being created, so its layout
+      // selects the request implementation.
+      keyArgs = omRequest.getCopyKeyRequest().getDestinationKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case SetLifecycleConfiguration:
       return new OMLifecycleConfigurationSetRequest(omRequest);
     case DeleteLifecycleConfiguration:

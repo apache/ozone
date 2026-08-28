@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validatePrevious
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Deleted
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SharedBlockGroupDecrement;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,7 +123,11 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     deletingServiceMetrics.incrNumKeysPurged(numKeysDeleted);
     deletingServiceMetrics.incrNumRenameEntriesPurged(renamedKeysToBePurged.size());
 
-    if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
+    List<SharedBlockGroupDecrement> sharedBlockGroupDecrements =
+        purgeKeysRequest.getSharedBlockGroupDecrementsList();
+
+    if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()
+        && sharedBlockGroupDecrements.isEmpty()) {
       OMException oe = new OMException("No keys found to be purged or renamed in the request.",
           OMException.ResultCodes.KEY_DELETION_ERROR);
       AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
@@ -144,6 +150,11 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       List<OmBucketInfo> bucketInfoList = updateBucketSize(purgeKeysRequest.getBucketPurgeKeysSizeList(),
           omMetadataManager);
 
+      // The counts always live in the active DB, even while purging a
+      // snapshot's deleted keys, because that is where the copies were made.
+      Map<Long, Long> updatedSharerCounts =
+          applySharedBlockGroupDecrements(sharedBlockGroupDecrements, omMetadataManager, context.getIndex());
+
       if (LOG.isDebugEnabled()) {
         Map<String, String> auditParams = new LinkedHashMap<>();
         if (fromSnapshotInfo != null) {
@@ -160,11 +171,47 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.KEY_DELETION, auditParams));
       }
       return new OMKeyPurgeResponse(omResponse.build(), keysToBePurgedList, renamedKeysToBePurged, fromSnapshotInfo,
-          keysToUpdateList, bucketInfoList);
+          keysToUpdateList, bucketInfoList, updatedSharerCounts);
     } catch (IOException e) {
       AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
     }
+  }
+
+  /**
+   * Drops the sharer count of each block group whose sharers were reclaimed in
+   * this batch, and returns the new counts for the response to persist. A count
+   * that falls to one is removed instead: the single key left owns the blocks
+   * again, so its own deletion releases them through the ordinary path.
+   *
+   * @return new count per block group id, where a value of one or less means
+   * the row should be deleted.
+   */
+  private Map<Long, Long> applySharedBlockGroupDecrements(
+      List<SharedBlockGroupDecrement> decrements, OMMetadataManager omMetadataManager, long trxnLogIndex)
+      throws IOException {
+    if (decrements.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<Long, Long> updatedCounts = new HashMap<>();
+    for (SharedBlockGroupDecrement decrement : decrements) {
+      long groupId = decrement.getSharedBlockGroupId();
+      Long currentCount = omMetadataManager.getSharedBlockGroupTable().get(groupId);
+      if (currentCount == null) {
+        // Already removed by an earlier batch; nothing left to count down.
+        continue;
+      }
+      long newCount = currentCount - decrement.getSharerCount();
+      updatedCounts.put(groupId, newCount);
+      if (newCount > 1) {
+        omMetadataManager.getSharedBlockGroupTable().addCacheEntry(
+            new CacheKey<>(groupId), CacheValue.get(trxnLogIndex, newCount));
+      } else {
+        omMetadataManager.getSharedBlockGroupTable().addCacheEntry(
+            new CacheKey<>(groupId), CacheValue.get(trxnLogIndex));
+      }
+    }
+    return updatedCounts;
   }
 
   private List<OmBucketInfo> updateBucketSize(List<BucketPurgeKeysSize> bucketPurgeKeysSizeList,

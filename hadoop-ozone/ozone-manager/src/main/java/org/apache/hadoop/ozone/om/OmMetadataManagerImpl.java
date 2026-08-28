@@ -188,6 +188,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Table<String, SnapshotInfo> snapshotInfoTable;
   private Table<String, String> snapshotRenamedTable;
+  private Table<Long, Long> sharedBlockGroupTable;
   private Table<String, CompactionLogEntry> compactionLogTable;
 
   private OzoneManager ozoneManager;
@@ -534,6 +535,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     // volumeName/bucketName/objectID -> renamedKey or renamedDir
     snapshotRenamedTable = initializer.get(OMDBDefinition.SNAPSHOT_RENAMED_TABLE_DEF);
+
+    // sharedBlockGroupId -> number of keys sharing that group's blocks
+    sharedBlockGroupTable = initializer.get(OMDBDefinition.SHARED_BLOCK_GROUP_TABLE_DEF);
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
@@ -1744,6 +1748,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, String> getSnapshotRenamedTable() {
     return snapshotRenamedTable;
+  }
+
+  @Override
+  public Table<Long, Long> getSharedBlockGroupTable() {
+    return sharedBlockGroupTable;
   }
 
   @Override
