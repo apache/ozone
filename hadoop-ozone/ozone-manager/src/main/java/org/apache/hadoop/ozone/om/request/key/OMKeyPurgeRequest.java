@@ -202,6 +202,16 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         continue;
       }
       long newCount = currentCount - decrement.getSharerCount();
+      if (newCount < 0) {
+        // More sharers were reclaimed than the count knew about, so the count
+        // and the tagged keys disagree. Keeping the row costs a leak that the
+        // audit can reclaim, while dropping it would let the next deletion
+        // release blocks another key may still be using.
+        LOG.error("Shared block group {} was asked to drop {} sharers but only holds {}. Keeping the row; "
+            + "the count and the keys tagged with this group need to be reconciled.",
+            groupId, decrement.getSharerCount(), currentCount);
+        continue;
+      }
       updatedCounts.put(groupId, newCount);
       if (newCount > 1) {
         omMetadataManager.getSharedBlockGroupTable().addCacheEntry(

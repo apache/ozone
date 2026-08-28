@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.SERVER_SIDE_COPY;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCopyResponse;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CopyKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CopyKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -77,7 +79,14 @@ public class OMKeyCopyRequest extends OMKeyRequest {
     super(omRequest, bucketLayout);
   }
 
+  /**
+   * Gated on finalization because the destination key carries a proto field an
+   * older OM does not know about. Such an OM would see a key whose blocks look
+   * exclusively owned and release them while the other sharer is still alive,
+   * so the copy must be impossible until every OM understands the tag.
+   */
   @Override
+  @DisallowedUntilLayoutVersion(SERVER_SIDE_COPY)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CopyKeyRequest copyKeyRequest =
         super.preExecute(ozoneManager).getCopyKeyRequest();

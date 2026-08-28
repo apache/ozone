@@ -170,12 +170,15 @@ the client API, and an integration test in `TestKeyPurging` that copies a key,
 deletes the source, and asserts the copy is still readable and the count row is
 gone before deleting the copy.
 
+`CopyKey` is gated on the `SERVER_SIDE_COPY` layout feature through
+`@DisallowedUntilLayoutVersion`, so no copy and therefore no shared block can
+exist until every OM in the cluster understands the tag. This is the
+load-bearing guard rather than optional polish: to an older OM the tag is an
+unknown proto field, so it would see a key whose blocks look exclusively owned
+and release them while the other sharer is still alive.
+
 Deliberately left out, and required before this could merge:
 
-- **`OMLayoutFeature` gating.** This is the load-bearing guard, not optional
-  polish: the tag is an unknown proto field to an older OM, which would reclaim
-  shared blocks normally and lose data. Finalization is the only thing that can
-  prevent a downgrade from doing that.
 - Cross-bucket copy, which needs ordered multi-bucket locking.
 - Overwriting an existing destination key, which needs the commit path's old
   version handling.
