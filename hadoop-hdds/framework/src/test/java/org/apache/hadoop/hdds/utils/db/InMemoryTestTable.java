@@ -96,7 +96,7 @@ public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public List<VALUE> multiGetSkipCache(List<KEY> keys) {
-    if (keys.isEmpty()) {
+    if (keys == null || keys.isEmpty()) {
       return Collections.emptyList();
     }
     List<VALUE> values = new ArrayList<>(keys.size());

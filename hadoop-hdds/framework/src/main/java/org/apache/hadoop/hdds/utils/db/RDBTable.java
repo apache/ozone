@@ -127,7 +127,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public List<byte[]> multiGetSkipCache(List<byte[]> keys) throws RocksDatabaseException {
-    if (keys.isEmpty()) {
+    if (keys == null || keys.isEmpty()) {
       return Collections.emptyList();
     }
     for (byte[] ignored : keys) {
@@ -142,7 +142,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   List<ByteBufferGetStatus> multiGetSkipCache(List<ByteBuffer> keys, List<ByteBuffer> values)
       throws RocksDatabaseException {
-    if (keys.isEmpty()) {
+    if (keys == null || keys.isEmpty()) {
       return Collections.emptyList();
     }
     for (ByteBuffer ignored : keys) {

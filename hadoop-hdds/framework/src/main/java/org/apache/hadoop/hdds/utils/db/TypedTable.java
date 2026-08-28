@@ -233,7 +233,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public List<VALUE> multiGetSkipCache(List<KEY> keys)
       throws RocksDatabaseException, CodecException {
-    if (keys.isEmpty()) {
+    if (keys == null || keys.isEmpty()) {
       return Collections.emptyList();
     }
     return multiGetFromTable(keys);

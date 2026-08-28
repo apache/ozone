@@ -177,6 +177,7 @@ public class TestRDBTableStore {
     assertNull(values.get(1));
     assertArrayEquals(value2, values.get(2));
     assertTrue(testTable.multiGetSkipCache(Collections.emptyList()).isEmpty());
+    assertTrue(testTable.multiGetSkipCache(null).isEmpty());
   }
 
   @Test

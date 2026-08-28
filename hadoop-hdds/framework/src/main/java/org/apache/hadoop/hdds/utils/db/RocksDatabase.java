@@ -684,7 +684,7 @@ public final class RocksDatabase implements Closeable {
 
   List<byte[]> multiGet(ColumnFamily family, List<byte[]> keys)
       throws RocksDatabaseException {
-    if (keys.isEmpty()) {
+    if (keys == null || keys.isEmpty()) {
       return Collections.emptyList();
     }
     try (UncheckedAutoCloseable ignored = acquire()) {
@@ -728,7 +728,7 @@ public final class RocksDatabase implements Closeable {
 
   List<ByteBufferGetStatus> multiGet(ColumnFamily family, List<ByteBuffer> keys, List<ByteBuffer> values)
       throws RocksDatabaseException {
-    if (keys.isEmpty()) {
+    if (keys == null || keys.isEmpty()) {
       return Collections.emptyList();
     }
     try (UncheckedAutoCloseable ignored = acquire()) {
