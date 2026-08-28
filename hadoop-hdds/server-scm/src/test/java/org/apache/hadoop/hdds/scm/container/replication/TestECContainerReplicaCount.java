@@ -92,7 +92,7 @@ public class TestECContainerReplicaCount {
     // appears missing
     ContainerReplicaOp op = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        MockDatanodeDetails.randomDatanodeDetails(), 5, null, Long.MAX_VALUE, 0);
+        MockDatanodeDetails.randomDatanodeDetails(), 5, null, Long.MAX_VALUE, 0, null);
     rcnt.addPendingOp(op);
     assertTrue(rcnt.isSufficientlyReplicated(true));
     assertEquals(0, rcnt.unavailableIndexes(true).size());
@@ -213,7 +213,7 @@ public class TestECContainerReplicaCount {
     // as not over replicated.
     rcnt.addPendingOp(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
-        MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
+        MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0, null));
     assertFalse(rcnt.isOverReplicated(true));
   }
 
@@ -229,7 +229,7 @@ public class TestECContainerReplicaCount {
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
     pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
-        MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
+        MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0, null));
 
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica, pending, 1);
@@ -532,14 +532,14 @@ public class TestECContainerReplicaCount {
       pending.add(new ContainerReplicaOp(
           ContainerReplicaOp.PendingOpType.ADD,
           MockDatanodeDetails.randomDatanodeDetails(), addIndex,
-          null, Long.MAX_VALUE, 0));
+          null, Long.MAX_VALUE, 0, null));
     }
 
     for (Integer deleteIndex : deleteIndexes) {
       pending.add(new ContainerReplicaOp(
           ContainerReplicaOp.PendingOpType.DELETE,
           MockDatanodeDetails.randomDatanodeDetails(), deleteIndex,
-          null, Long.MAX_VALUE, 0));
+          null, Long.MAX_VALUE, 0, null));
     }
     return pending;
   }
@@ -716,7 +716,7 @@ public class TestECContainerReplicaCount {
     pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
         unhealthyReplica.getDatanodeDetails(),
-        unhealthyReplica.getReplicaIndex(), null, System.currentTimeMillis(), 0));
+        unhealthyReplica.getReplicaIndex(), null, System.currentTimeMillis(), 0, null));
 
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica, pendingOps, 1);
@@ -725,7 +725,7 @@ public class TestECContainerReplicaCount {
     // Add another pending delete to an index that is not an unhealthy index
     pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
-        MockDatanodeDetails.randomDatanodeDetails(), 2, null, System.currentTimeMillis(), 0));
+        MockDatanodeDetails.randomDatanodeDetails(), 2, null, System.currentTimeMillis(), 0, null));
 
     rcnt = new ECContainerReplicaCount(container, replica, pendingOps, 1);
     assertFalse(rcnt.isSufficientlyReplicated(false));

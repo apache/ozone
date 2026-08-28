@@ -204,13 +204,13 @@ public class TestMoveManager {
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
-    pendingOps.add(new ContainerReplicaOp(ADD, tgt, 0, null, clock.millis(), 0));
+    pendingOps.add(new ContainerReplicaOp(ADD, tgt, 0, null, clock.millis(), 0, null));
 
     assertMoveFailsWith(REPLICATION_FAIL_INFLIGHT_REPLICATION,
         containerInfo.containerID());
 
     pendingOps.clear();
-    pendingOps.add(new ContainerReplicaOp(DELETE, src, 0, null, clock.millis(), 0));
+    pendingOps.add(new ContainerReplicaOp(DELETE, src, 0, null, clock.millis(), 0, null));
     assertMoveFailsWith(REPLICATION_FAIL_INFLIGHT_DELETION,
         containerInfo.containerID());
   }
@@ -330,7 +330,7 @@ public class TestMoveManager {
         .when(containerManager).getContainer(any(ContainerID.class));
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, null, clock.millis() + 1000, 0);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult moveResult = res.get();
@@ -342,14 +342,14 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, null, clock.millis() + 1000, 0);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
 
     op = new ContainerReplicaOp(
-        DELETE, src, 0, null, clock.millis() + 1000, 0);
+        DELETE, src, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -379,7 +379,7 @@ public class TestMoveManager {
         anyLong());
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0);
+        ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     verify(replicationManager).sendDeleteCommand(
@@ -387,7 +387,7 @@ public class TestMoveManager {
         eq(true), anyLong());
 
     op = new ContainerReplicaOp(
-        DELETE, src, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0);
+        DELETE, src, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -399,7 +399,7 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, null, clock.millis() + 1000, 0);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), true);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -411,14 +411,14 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, null, clock.millis() + 1000, 0);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
 
     op = new ContainerReplicaOp(
-        DELETE, src, 0, null, clock.millis() + 1000, 0);
+        DELETE, src, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), true);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -439,7 +439,7 @@ public class TestMoveManager {
       }
     }
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, null, clock.millis() + 1000, 0);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -455,7 +455,7 @@ public class TestMoveManager {
 
     nodes.put(src, NodeStatus.inServiceStale());
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, null, clock.millis() + 1000, 0);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -473,7 +473,7 @@ public class TestMoveManager {
         HddsProtos.NodeOperationalState.DECOMMISSIONING,
         HddsProtos.NodeState.HEALTHY));
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, null, clock.millis() + 1000, 0);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -492,7 +492,7 @@ public class TestMoveManager {
             .MisReplicatedHealthResult(containerInfo, false, null));
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, null, clock.millis() + 1000, 0);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -528,7 +528,7 @@ public class TestMoveManager {
         eq(tgt), longCaptorReplicate.capture());
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0);
+        ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
     ArgumentCaptor<Long> longCaptorDelete = ArgumentCaptor.forClass(Long.class);
     verify(replicationManager).sendDeleteCommand(
@@ -544,7 +544,7 @@ public class TestMoveManager {
     assertTrue((longCaptorDelete.getValue() - Duration.ofMinutes(6).toMillis()) > clock.millis());
 
     op = new ContainerReplicaOp(
-        DELETE, src, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0);
+        DELETE, src, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
     MoveManager.MoveResult finalResult = res.get();
     assertEquals(COMPLETED, finalResult);
@@ -739,14 +739,14 @@ public class TestMoveManager {
   private void completeMove(ContainerInfo container, DatanodeDetails source,
       DatanodeDetails target, CompletableFuture<MoveManager.MoveResult> moveResult) throws Exception {
     ContainerReplicaOp addOp = new ContainerReplicaOp(
-        ADD, target, 0, null, clock.millis() + 1000, 0);
+        ADD, target, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(addOp, container.containerID(), false);
 
     verify(replicationManager).sendDeleteCommand(
         eq(container), eq(0), eq(source), eq(true), anyLong());
 
     ContainerReplicaOp deleteOp = new ContainerReplicaOp(
-        DELETE, source, 0, null, clock.millis() + 1000, 0);
+        DELETE, source, 0, null, clock.millis() + 1000, 0, null);
     moveManager.opCompleted(deleteOp, container.containerID(), false);
 
     assertEquals(COMPLETED, moveResult.get());

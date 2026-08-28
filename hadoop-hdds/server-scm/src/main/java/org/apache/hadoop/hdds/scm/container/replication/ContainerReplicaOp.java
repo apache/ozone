@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 /**
  * ContainerReplicaOp wraps the information needed to track a pending
  * replication operation (ADD or DELETE) against a specific datanode.
- * It uses a single constructor so all call sites follow the same code path.
  */
 public class ContainerReplicaOp {
 
@@ -33,6 +33,7 @@ public class ContainerReplicaOp {
   private final SCMCommand<?> command;
   private final long deadlineEpochMillis;
   private final long containerSize;
+  private final StorageType storageType;
 
   /**
    * Create a ContainerReplicaOp with all parameters.
@@ -43,16 +44,18 @@ public class ContainerReplicaOp {
    * @param command SCM command associated with the op (nullable)
    * @param deadlineEpochMillis deadline in epoch milliseconds
    * @param containerSize size of the container in bytes
+   * @param storageType storage type for ADD operations (nullable)
    */
   public ContainerReplicaOp(PendingOpType opType,
       DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
-      long deadlineEpochMillis, long containerSize) {
+      long deadlineEpochMillis, long containerSize, StorageType storageType) {
     this.opType = opType;
     this.target = target;
     this.replicaIndex = replicaIndex;
     this.command = command;
     this.deadlineEpochMillis = deadlineEpochMillis;
     this.containerSize = containerSize;
+    this.storageType = storageType;
   }
 
   public PendingOpType getOpType() {
@@ -77,6 +80,10 @@ public class ContainerReplicaOp {
 
   public long getContainerSize() {
     return containerSize;
+  }
+
+  public StorageType getStorageType() {
+    return storageType;
   }
 
   /**
