@@ -144,7 +144,6 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.ozone.OmUtils;
@@ -379,15 +378,15 @@ public class KeyManagerImpl implements KeyManager {
       keyLifecycleService.start();
     }
 
-    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
-        configuration.getClass(
+    dnsToSwitchMapping = createDNSToSwitchMapping(configuration);
+  }
+
+  static DNSToSwitchMapping createDNSToSwitchMapping(OzoneConfiguration conf) {
+    Class<? extends DNSToSwitchMapping> mappingClass =
+        conf.getClass(
             ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             ScriptBasedMapping.class, DNSToSwitchMapping.class);
-    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
-        dnsToSwitchMappingClass, configuration);
-    dnsToSwitchMapping =
-        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
-            : new CachedDNSToSwitchMapping(newInstance));
+    return ReflectionUtils.newInstance(mappingClass, conf);
   }
 
   /**
