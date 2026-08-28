@@ -53,16 +53,29 @@ public class OMKeyDeleteMarkerResponse extends OmKeyResponse {
   private String replacedNullVersionKey;
   private Map<String, RepeatedOmKeyInfo> keysToDelete;
 
+  /**
+   * @param movedVersionedKeyName the versionedKeyTable entry the superseded
+   *     version moves to, or null when the marker replaced it instead
+   * @param replacedNullVersionKey the versionedKeyTable entry of the null
+   *     version the marker replaced, when versioning is suspended and it had
+   *     one
+   * @param keysToDelete the replaced null version's blocks, queued for
+   *     reclamation
+   */
+  @SuppressWarnings("parameternumber")
   public OMKeyDeleteMarkerResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo deleteMarker, @Nonnull String ozoneKeyName,
       String movedVersionedKeyName, OmKeyInfo movedVersionedKeyInfo,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo, String replacedNullVersionKey,
+      Map<String, RepeatedOmKeyInfo> keysToDelete) {
     super(omResponse, omBucketInfo.getBucketLayout());
     this.deleteMarker = deleteMarker;
     this.ozoneKeyName = ozoneKeyName;
     this.movedVersionedKeyName = movedVersionedKeyName;
     this.movedVersionedKeyInfo = movedVersionedKeyInfo;
     this.omBucketInfo = omBucketInfo;
+    this.replacedNullVersionKey = replacedNullVersionKey;
+    this.keysToDelete = keysToDelete;
   }
 
   /**
@@ -73,18 +86,6 @@ public class OMKeyDeleteMarkerResponse extends OmKeyResponse {
       @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
     checkStatusNotOK();
-  }
-
-  /**
-   * The null version the marker replaced, when versioning is suspended: the
-   * versionedKeyTable entry to remove, if it had one, and its blocks to queue
-   * for reclamation.
-   */
-  public OMKeyDeleteMarkerResponse withReplacedNullVersion(
-      String dbVersionedKey, Map<String, RepeatedOmKeyInfo> deleteMap) {
-    this.replacedNullVersionKey = dbVersionedKey;
-    this.keysToDelete = deleteMap;
-    return this;
   }
 
   @VisibleForTesting
