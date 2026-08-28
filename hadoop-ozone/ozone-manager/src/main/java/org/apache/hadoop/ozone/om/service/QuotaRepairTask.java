@@ -563,38 +563,45 @@ public class QuotaRepairTask {
     }
   }
 
+  /**
+   * Counts committed parts of incomplete multipart uploads from the active DB checkpoint.
+   * Parts of a snapshot's incomplete uploads stay charged to that snapshot's own bucket,
+   * so only the active multipartInfoTable is scanned here.
+   */
   private void recalculateMultipartUsages(
-      OMMetadataManager metadataManager, Map<String, CountPair> mpuCountMap) throws UncheckedIOException {
-    LOG.info("Starting recalculate multipart upload usages");
-
-    int count = 0;
-    long startTime = Time.monotonicNow();
+      OMMetadataManager metadataManager, Map<String, CountPair> mpuCountMap)
+      throws UncheckedIOException, UncheckedExecutionException {
     try (Table.KeyValueIterator<String, OmMultipartKeyInfo> keyIter
         = metadataManager.getMultipartInfoTable().iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmMultipartKeyInfo> kv = keyIter.next();
-        count++;
-        CountPair usage = mpuCountMap.get(getVolumeBucketPrefix(kv.getKey()));
-        if (usage == null) {
-          continue;
-        }
-        OmMultipartKeyInfo multipartKeyInfo = kv.getValue();
-        long replicatedSize = 0;
-        if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
-          for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-            replicatedSize += QuotaUtil.getReplicatedSize(
-                partKeyInfo.getPartKeyInfo().getDataSize(), multipartKeyInfo.getReplicationConfig());
-          }
-        } else {
-          SortedMap<Integer, OmMultipartPartInfo> parts =
-              OMMultipartUploadUtils.scanParts(metadataManager, multipartKeyInfo.getUploadID());
-          replicatedSize = OMMultipartUploadUtils.getReplicatedSize(
-              parts, multipartKeyInfo.getReplicationConfig());
-        }
-        usage.incrSpace(replicatedSize);
+      scanTableInBatches(executor, keyIter, "Multipart upload usages",
+          kv -> extractMultipartCount(kv, mpuCountMap, metadataManager));
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  private static void extractMultipartCount(
+      Table.KeyValue<String, OmMultipartKeyInfo> kv, Map<String, CountPair> mpuCountMap,
+      OMMetadataManager metadataManager) throws UncheckedIOException {
+    try {
+      CountPair usage = mpuCountMap.get(getVolumeBucketPrefix(kv.getKey()));
+      if (usage == null) {
+        return;
       }
-      LOG.info("Recalculate multipart upload usages completed, count {} time {}ms",
-          count, (Time.monotonicNow() - startTime));
+      OmMultipartKeyInfo multipartKeyInfo = kv.getValue();
+      long replicatedSize = 0;
+      if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
+        for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
+          replicatedSize += QuotaUtil.getReplicatedSize(
+              partKeyInfo.getPartKeyInfo().getDataSize(), multipartKeyInfo.getReplicationConfig());
+        }
+      } else {
+        SortedMap<Integer, OmMultipartPartInfo> parts =
+            OMMultipartUploadUtils.scanParts(metadataManager, multipartKeyInfo.getUploadID());
+        replicatedSize = OMMultipartUploadUtils.getReplicatedSize(
+            parts, multipartKeyInfo.getReplicationConfig());
+      }
+      usage.incrSpace(replicatedSize);
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
