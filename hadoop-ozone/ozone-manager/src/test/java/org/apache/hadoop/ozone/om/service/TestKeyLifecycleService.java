@@ -1205,7 +1205,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       metadataManager.getLifecycleScanStateTable().addCacheEntry(new CacheKey<>(bucketKey),
           CacheValue.get(1L, scanState));
           
-      keyLifecycleService.resume();
+      runSingleLifecycleScan(volumeName, bucketName);
 
       // It should seek to key2. key1 is skipped, key2 is skipped too.
       // So key1 and key2 are skipped, key3 is deleted.
@@ -1216,7 +1216,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(2, getKeyCount(layout) - initialKeyCount);
       GenericTestUtils.waitFor(() ->
           expectedDeleted == metrics.getNumKeyIterated().value() - keyIterated, WAIT_CHECK_INTERVAL, 5000);
-      deleteLifecyclePolicy(volumeName, bucketName);
     }
 
     @ParameterizedTest
