@@ -1840,7 +1840,7 @@ public class TestReplicationManager {
       "false, true",
       "false, false",
   })
-  public void testApparentVersionIsLowestOfSourceAndTarget(
+  public void testReplicationApparentVersionIsLowestOfSourceAndTarget(
       boolean throttled, boolean sourceNewer)
       throws CommandTargetOverloadedException, NotLeaderException,
       NodeNotFoundException {
@@ -1868,7 +1868,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testApparentVersionLookupThrowsWhenNodeNotFound()
+  public void testReplicationApparentVersionLookupThrowsWhenNodeNotFound()
       throws NodeNotFoundException {
     ContainerInfo containerInfo =
         ReplicationTestUtil.createContainerInfo(repConfig, 1,
