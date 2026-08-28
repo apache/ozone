@@ -516,7 +516,7 @@ public class ReconContainerMetadataManagerImpl
     if (null != omKeyInfo) {
       omKeyInfo.getKeyLocationVersions().stream().map(
           omKeyLocationInfoGroup ->
-              omKeyLocationInfoGroup.getLocationList()
+              omKeyLocationInfoGroup.createLocationList()
                   .stream().map(omKeyLocationInfo -> pipelines.add(
                       omKeyLocationInfo.getPipeline())));
     }
