@@ -183,6 +183,36 @@ Deliberately left out, and required before this could merge:
   that rebuilds counts by scanning for tags, Recon awareness, S3 Gateway wiring
   with fallback, and metrics.
 
+## Measurements
+
+`BenchmarkCopyKey` in the integration-test module copies one key both ways on a
+three-datanode `MiniOzoneCluster`, five iterations per size with the order
+alternated between iterations and unique destination keys so that no block
+reclamation runs inside a measurement. Medians:
+
+| object size | read-and-rewrite copy | CopyKey | ratio |
+|-------------|----------------------|---------|-------|
+| 1 MiB       | 117 ms               | 7.5 ms  | 16x   |
+| 16 MiB      | 889 ms               | 8.2 ms  | 108x  |
+| 64 MiB      | 2 983 ms             | 6.7 ms  | 446x  |
+| 256 MiB     | 11 100 ms            | 9.2 ms  | 1204x |
+
+The shape is the result, not the ratios. CopyKey costs 6.7 to 9.2 ms with no
+trend across a 256-fold size range, because it is one OM Ratis transaction no
+matter how much data the key holds, while the byte copy grows linearly.
+
+**The ratios above overstate what a real cluster would show.** Three datanodes,
+OM, SCM and the client share one disk and one CPU here, so the byte copy only
+reaches 18 to 23 MiB/s; a production cluster does several times better. Taking
+100 MiB/s, which is roughly what S3 CopyObject delivers in practice, as the
+byte-copy rate and keeping the measured 8 ms for CopyKey, the honest projection
+is about 320x for a 256 MiB object, 1 280x for 1 GiB, and 6 400x at the 5 GiB
+single-copy limit. Below a few MiB the gap closes, since both paths are then
+dominated by round trips rather than data.
+
+A second benchmark case reads both keys back and compares MD5 digests, so the
+timings are known to describe copies that produced identical bytes.
+
 ## Independent quick wins
 
 Two improvements need none of this machinery and are worth landing first:
