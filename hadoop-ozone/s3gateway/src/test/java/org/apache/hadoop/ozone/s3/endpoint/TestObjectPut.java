@@ -433,6 +433,35 @@ class TestObjectPut {
   }
 
   @Test
+  void testCopyObjectToSelfWithMetadataReplacePreservesTags() throws Exception {
+    // Seed the source object with both tags and custom metadata.
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
+    MultivaluedMap<String, String> metadataHeaders = new MultivaluedHashMap<>();
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-1", "custom-value-1");
+    when(headers.getRequestHeaders()).thenReturn(metadataHeaders);
+    assertSucceeds(() -> putObject(CONTENT));
+    assertThat(bucket.getKey(KEY_NAME).getTags()).hasSize(2);
+
+    // Replace only the metadata. The tagging directive defaults to COPY, so the
+    // existing tag set has to survive the in-place update.
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("REPLACE");
+    metadataHeaders.clear();
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-2", "custom-value-2");
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertThat(keyDetails.getMetadata())
+        .containsEntry("custom-key-2", "custom-value-2")
+        .doesNotContainKey("custom-key-1");
+    assertThat(keyDetails.getTags())
+        .containsEntry("tag1", "value1")
+        .containsEntry("tag2", "value2");
+  }
+
+  @Test
   void testCopyObjectToSelfWithMetadataReplaceOldOmFallback() throws Exception {
     // Seed the source object with some custom metadata.
     MultivaluedMap<String, String> metadataHeaders = new MultivaluedHashMap<>();

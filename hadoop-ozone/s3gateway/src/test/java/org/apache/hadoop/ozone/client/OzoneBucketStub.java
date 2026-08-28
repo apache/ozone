@@ -778,16 +778,21 @@ public final class OzoneBucketStub extends OzoneBucket {
     if (ozoneKeyDetails == null) {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
+    // Copy the arguments before mutating the key: this stub hands out the live
+    // maps, so a self-copy passes in the key's own metadata or tags (e.g. the
+    // COPY tagging directive), which clearing in place would wipe.
+    Map<String, String> newMetadata = new HashMap<>(metadata);
+    Map<String, String> newTags = new HashMap<>(tags);
     // Mimics the OM: replace the custom metadata but preserve the stored ETag,
     // and replace the tag set.
     String eTag = ozoneKeyDetails.getMetadata().get(ETAG);
-    ozoneKeyDetails.getMetadata().clear();
-    ozoneKeyDetails.getMetadata().putAll(metadata);
     if (eTag != null) {
-      ozoneKeyDetails.getMetadata().put(ETAG, eTag);
+      newMetadata.put(ETAG, eTag);
     }
+    ozoneKeyDetails.getMetadata().clear();
+    ozoneKeyDetails.getMetadata().putAll(newMetadata);
     ozoneKeyDetails.getTags().clear();
-    ozoneKeyDetails.getTags().putAll(tags);
+    ozoneKeyDetails.getTags().putAll(newTags);
   }
 
   @Override
