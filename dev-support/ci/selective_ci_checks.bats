@@ -191,7 +191,7 @@ load bats-assert/load.bash
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
-  assert_output -p test-classes=org/apache/ozone/test/Test*,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetOwnerRequest.java,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetQuotaRequest.java
+  assert_output -p test-classes=org/apache/ozone/test/Test*,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetOwnerRequest.java,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetOwnerRequestWithFSO.java,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetQuotaRequest.java,org/apache/hadoop/ozone/om/request/volume/TestOMVolumeSetQuotaRequestWithFSO.java
 }
 
 @test "unit helper" {

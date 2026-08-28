@@ -285,6 +285,13 @@ function get_changed_test_classes() {
           test_classes="${test_classes},org/apache/hadoop/fs/ozone/contract/Test*"
         else
           test_classes="${test_classes},${f}"
+          # add WithFSO subclass (no problem if it does not exist)
+          if echo "$f" | grep -q 'hadoop-ozone/ozone-manager/src/test/java/org/apache/hadoop/ozone/om/re\(quest\|sponse\)' \
+              && ! echo "$f" | grep -q 'WithFSO'; then
+            local with_fso
+            with_fso=$(echo "$f" | sed 's/\.java/WithFSO.java/')
+            test_classes="${test_classes},${with_fso}"
+          fi
         fi
       done
     fi
