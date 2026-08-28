@@ -2689,9 +2689,10 @@ class TestKeyLifecycleService extends OzoneTestBase {
       final String keyPrefix = "key";
       String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
       long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
-      long initialSuccessTaskCount = metrics.getNumSuccessTask().value();
 
-      createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, 1, 1, keyPrefix, null);
+      List<OmKeyArgs> createdKeys =
+          createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, 1, 1, keyPrefix, null);
+      assertEquals(1, createdKeys.size());
       Thread.sleep(SERVICE_INTERVAL);
       GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == 1,
           WAIT_CHECK_INTERVAL, 1000);
@@ -2740,7 +2741,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
         assertTrue(log.getOutput().contains("Failed to prepare trash root"));
         assertTrue(log.getOutput().contains("Failed to evaluate lifecycle configuration for bucket"));
-        assertEquals(initialSuccessTaskCount, metrics.getNumSuccessTask().value());
+        // Verify local bucket state instead of global lifecycle metrics, which are shared across parameterized runs.
+        assertNotNull(writeClient.getKeyInfo(createdKeys.get(0), false));
         assertEquals(1, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
       } finally {
         ozoneManagerField.set(keyLifecycleService, om);
