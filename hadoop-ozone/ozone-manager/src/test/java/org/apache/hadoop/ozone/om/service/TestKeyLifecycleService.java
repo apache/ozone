@@ -645,6 +645,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(testKeyCount, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == testKeyCount,
           WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(bucketLayout, volumeName, bucketName);
 
       // determine db keys
       List<String> dbKeys = new ArrayList<>();
