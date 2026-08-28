@@ -1088,13 +1088,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   }
 
   /**
-   * Writes the source object content to the destination key. When
-   * {@code reusedETag} is null, {@code src} must be a {@link DigestInputStream} and the MD5 digest
-   * computed during the copy becomes the destination ETag; otherwise {@code reusedETag} is stored
-   * as-is and the content is not re-hashed.
+   * Writes the source object content to the destination key. When {@code reusedETag} is null the
+   * MD5 digest {@code src} computes during the copy becomes the destination ETag; otherwise
+   * {@code reusedETag} is stored as-is and {@code src} has digesting switched off, so the content
+   * is not re-hashed.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  void copy(OzoneVolume volume, InputStream src, String reusedETag, long srcKeyLen,
+  void copy(OzoneVolume volume, DigestInputStream src, String reusedETag, long srcKeyLen,
       String destKey, String destBucket,
       ReplicationConfig replication,
       Map<String, String> metadata,
@@ -1122,7 +1122,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         copyLength = dest.copyFrom(src, getIOBufferSize(expectedLength));
         String eTag = reusedETag != null ? reusedETag
-            : DatatypeConverter.printHexBinary(((DigestInputStream) src).getMessageDigest().digest()).toLowerCase();
+            : DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
         dest.getMetadata().put(OzoneConsts.ETAG, eTag);
       }
     }
@@ -1239,14 +1239,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       try (OzoneInputStream src = getClientProtocol().getKey(volume.getName(),
           sourceBucket, sourceKey)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
-        final InputStream copySource;
+        sourceDigestInputStream = new DigestInputStream(src, getMD5DigestInstance());
         if (reusedETag != null) {
-          copySource = src;
-        } else {
-          sourceDigestInputStream = new DigestInputStream(src, getMD5DigestInstance());
-          copySource = sourceDigestInputStream;
+          // Nothing reads the digest in this case, so do not hash the copied bytes at all.
+          sourceDigestInputStream.on(false);
         }
-        copy(volume, copySource, reusedETag, sourceKeyLen, destkey, destBucket, replicationConfig,
+        copy(volume, sourceDigestInputStream, reusedETag, sourceKeyLen, destkey, destBucket, replicationConfig,
                 customMetadata, perf, startNanos, tags, writeConditions);
       }
 

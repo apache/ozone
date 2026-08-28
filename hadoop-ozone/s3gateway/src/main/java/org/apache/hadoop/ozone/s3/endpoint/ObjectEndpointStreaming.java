@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.util.Map;
@@ -171,10 +170,10 @@ final class ObjectEndpointStreaming {
   }
 
   /**
-   * Writes the copy source stream to the destination key. When {@code reusedETag} is null,
-   * {@code body} must be a {@link DigestInputStream} and the MD5 digest computed during the copy
-   * becomes the destination ETag; otherwise {@code reusedETag} is stored as-is and the content is
-   * not re-hashed.
+   * Writes the copy source stream to the destination key. When {@code reusedETag} is null the MD5
+   * digest {@code body} computes during the copy becomes the destination ETag; otherwise
+   * {@code reusedETag} is stored as-is and {@code body} has digesting switched off, so the content
+   * is not re-hashed.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   public static long copyKeyWithStream(
@@ -184,7 +183,7 @@ final class ObjectEndpointStreaming {
       int bufferSize,
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
-      InputStream body, String reusedETag, PerformanceStringBuilder perf, long startNanos,
+      DigestInputStream body, String reusedETag, PerformanceStringBuilder perf, long startNanos,
       Map<String, String> tags,
       S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException {
@@ -197,7 +196,7 @@ final class ObjectEndpointStreaming {
           METRICS.updateCopyKeyMetadataStats(startNanos);
       writeLen = writeGuard.copyFrom(body, bufferSize);
       String eTag = reusedETag != null ? reusedETag
-          : DatatypeConverter.printHexBinary(((DigestInputStream) body).getMessageDigest().digest()).toLowerCase();
+          : DatatypeConverter.printHexBinary(body.getMessageDigest().digest()).toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       writeGuard.getMetadata().put(OzoneConsts.ETAG, eTag);
     }
