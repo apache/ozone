@@ -158,7 +158,8 @@ public final class IamSessionPolicyResolver {
       final Condition condition = parsePrefixesFromConditions(stmt);
 
       // An empty s3:prefix array matches no prefixes and therefore grants no access (AWS behavior).
-      if (condition != null && condition.prefixes.isEmpty()) {
+      if (condition != null && condition.prefixes != null
+          && condition.prefixes.isEmpty()) {
         continue;
       }
 
