@@ -3496,20 +3496,26 @@ class TestKeyLifecycleService extends OzoneTestBase {
   // scanned, so both have to be cleared for the next test to start from a quiet service.
   private void cleanUpService() throws Exception {
     try {
-      for (String policyKey : new ArrayList<>(createdLifecyclePolicies)) {
-        deleteLifecyclePolicy(policyKey);
-      }
-    } finally {
+      // Suspending first closes the window where a cycle has already read the policies but has not
+      // registered its task yet, which would let that task run into the next test.
+      keyLifecycleService.suspend();
       installedInjectors.forEach(FaultInjectorImpl::release);
-      installedInjectors.clear();
-      KeyLifecycleService.setInjectors(null);
-      keyLifecycleService.setOzoneTrash(null);
-      keyLifecycleService.setMoveToTrashEnabled(true);
-      keyLifecycleService.setListMaxSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
-          OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
-      keyLifecycleService.resume();
       GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
           WAIT_CHECK_INTERVAL, 30000);
+    } finally {
+      try {
+        for (String policyKey : new ArrayList<>(createdLifecyclePolicies)) {
+          deleteLifecyclePolicy(policyKey);
+        }
+      } finally {
+        installedInjectors.clear();
+        KeyLifecycleService.setInjectors(null);
+        keyLifecycleService.setOzoneTrash(null);
+        keyLifecycleService.setMoveToTrashEnabled(true);
+        keyLifecycleService.setListMaxSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
+            OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
+        keyLifecycleService.resume();
+      }
     }
   }
 
