@@ -67,18 +67,13 @@ public class FaultInjectorImpl extends FaultInjector {
     wait.countDown();
   }
 
-  /**
-   * Wait until someone is paused here, without letting them through.
-   */
+  /** Wait until someone is paused here, without letting them through. */
   public void awaitPaused(long timeoutMillis) throws InterruptedException {
     Assertions.assertTrue(ready.await(timeoutMillis, TimeUnit.MILLISECONDS),
         "Timed out waiting for the injector to be reached");
   }
 
-  /**
-   * Let anyone waiting in {@link #pause()} through without waiting for the pause to happen, so an
-   * injector can be discarded without leaving a background thread parked in it forever.
-   */
+  /** Unlike {@link #resume()}, does not wait for a pause first, so a discarded injector cannot park a thread. */
   public void release() {
     wait.countDown();
   }

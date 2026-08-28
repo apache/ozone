@@ -920,7 +920,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
           }
         }
       } finally {
-        // Let the follow-up task resume from the saved state and finish the scan
         nextTaskStart.release();
       }
 
@@ -2134,9 +2133,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
           key.getBucketName() + "/" + key.getKeyName() + " whose updateID not match or null";
       GenericTestUtils.waitFor(() -> requestLog.getOutput().contains(expectedString), WAIT_CHECK_INTERVAL, 10000);
 
-      // The update changes the key's modificationTime, but the expiration action is an absolute timestamp,
-      // so the key still expires and a later task deletes it. How many candidates a single task reports
-      // depends on when it starts relative to the in-flight delete, so assert on the outcome instead.
+      // How many candidates a task reports depends on whether the in-flight delete has landed when it
+      // starts, so assert on the outcome instead.
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == 0, WAIT_CHECK_INTERVAL, 10000);
       assertEquals(KEY_COUNT, getDeletedKeyCount() - initialDeletedKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
@@ -3268,9 +3266,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       String expectedString = "Received a request to delete a Key does not exist /" + key.getVolumeName() + "/" +
           key.getBucketName() + "/" + key.getKeyName();
       GenericTestUtils.waitFor(() -> requestLog.getOutput().contains(expectedString), WAIT_CHECK_INTERVAL, 10000);
-      // The expiration action is an absolute timestamp, so a renamed key still expires and a later task
-      // deletes it. How many candidates a single task reports depends on whether the in-flight delete has
-      // landed when it starts, so assert on the outcome instead.
+      // How many candidates a task reports depends on whether the in-flight delete has landed when it
+      // starts, so assert on the outcome instead.
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == 0, WAIT_CHECK_INTERVAL, 10000);
       assertEquals(KEY_COUNT, getDeletedKeyCount() - initialDeletedKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
@@ -3413,9 +3410,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
     putLifecyclePolicy(volume, bucket, lcc, false);
   }
 
-  /**
-   * Track policies created by the test helpers so that @AfterEach can drop the ones a test leaves behind.
-   */
   private void putLifecyclePolicy(String volume, String bucket, OmLifecycleConfiguration lcc, boolean validate)
       throws IOException {
     String key = metadataManager.getBucketKey(volume, bucket);
@@ -3441,12 +3435,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
     createdLifecyclePolicies.remove(policyKey);
   }
 
-  /**
-   * Wait until the bucket's keys are only in the DB. A scan reads keys still in the key table cache
-   * from an unordered map, skips them in the sorted table iterator and does not count them, so
-   * lastScannedKey and numKeyIterated are not stable until the cache entries are gone. The cache is
-   * cleaned up asynchronously after the write, so being able to read a key back is not enough.
-   */
+  // A scan reads keys still in the cache from an unordered map and skips them in the sorted table
+  // iterator without counting them, so lastScannedKey and numKeyIterated are unstable until they drain.
   private void awaitKeyCacheDrained(BucketLayout layout, String volume, String bucket)
       throws TimeoutException, InterruptedException {
     Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(layout);
@@ -3462,11 +3452,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }, WAIT_CHECK_INTERVAL, 10000);
   }
 
-  /**
-   * Wait until the multipart upload is only in the DB, so a direct write to the table is not undone by
-   * the pending flush of its creation. The cache is cleaned up asynchronously after the write, so being
-   * able to read the upload back is not enough.
-   */
   private void awaitMultipartCacheDrained(String dbKey) throws TimeoutException, InterruptedException {
     Table<String, OmMultipartKeyInfo> mpuTable = metadataManager.getMultipartInfoTable();
     GenericTestUtils.waitFor(() -> {
@@ -3486,12 +3471,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
     KeyLifecycleService.setInjectors(new ArrayList<FaultInjector>(Arrays.asList(injectors)));
   }
 
-  /**
-   * Leave the service usable for the next test. A task parked in an injector blocks every following
-   * cycle, because BackgroundService waits for the previous batch before scheduling a new one, so
-   * injectors must be released rather than just dropped. Policies left behind keep their bucket
-   * scanned for the rest of the run, which shifts the global counters other tests assert on.
-   */
+  // A task parked in an injector blocks every following cycle, and a policy left behind keeps its bucket
+  // scanned, so both have to be cleared for the next test to start from a quiet service.
   private void cleanUpService() throws Exception {
     try {
       for (String policyKey : new ArrayList<>(createdLifecyclePolicies)) {
@@ -3511,12 +3492,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
   }
 
-  /**
-   * Resume the service and let exactly one lifecycle scan run for the bucket: the task is held at
-   * its start, the policy is dropped so the periodic service does not schedule a follow-up scan,
-   * then the task is released and waited for. Without this the next scan starts SERVICE_INTERVAL
-   * after the first one finished and deletes the objects the caller expects to remain.
-   */
+  // Runs exactly one scan: without dropping the policy first, the next scan starts SERVICE_INTERVAL
+  // later and deletes the objects the caller expects to remain.
   private void runSingleLifecycleScan(String volume, String bucket)
       throws IOException, TimeoutException, InterruptedException {
     FaultInjectorImpl taskStart = new FaultInjectorImpl();
@@ -3697,9 +3674,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       String keyName, String uploadId, long newCreationTime)
       throws IOException, TimeoutException, InterruptedException {
     String dbKey = metadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadId);
-    // The upload was created through the request pipeline, which flushes to the DB asynchronously.
-    // Writing straight to the table before that flush lands lets the flush overwrite the new creation
-    // time, so the upload never looks expired. Wait for the entry to leave the cache first.
+    // The create is flushed to the DB asynchronously, and that flush would overwrite the new creation
+    // time, leaving the upload looking fresh. Wait for the entry to leave the cache first.
     awaitMultipartCacheDrained(dbKey);
     OmMultipartKeyInfo existingInfo = metadataManager.getMultipartInfoTable().get(dbKey);
     if (existingInfo == null) {
