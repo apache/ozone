@@ -14,10 +14,10 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Keywords for Upgrade Tests
+Documentation       Keywords for Non-Rolling Upgrade Tests
 Library             OperatingSystem
-Resource            ../lib/os.robot
-Resource            ../admincli/lib.resource
+Resource            ../../lib/os.robot
+Resource            ../../admincli/lib.resource
 
 *** Keywords ***
 OM Finalization Status

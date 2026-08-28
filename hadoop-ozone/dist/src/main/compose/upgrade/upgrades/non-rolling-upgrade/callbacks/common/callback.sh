@@ -20,7 +20,7 @@ source "$TEST_DIR"/testlib.sh
 ### CALLBACKS ###
 
 with_old_version() {
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/non-rolling/check-finalization.robot
   generate old1 "$SCM"
   validate old1 "$SCM"
 }
@@ -37,7 +37,7 @@ with_this_version_pre_finalized() {
 }
 
 with_old_version_downgraded() {
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/non-rolling/check-finalization.robot
   validate old1 "$SCM"
   validate new1 "$SCM"
 
@@ -50,7 +50,7 @@ with_old_version_downgraded() {
 }
 
 with_this_version_finalized() {
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/non-rolling/check-finalization.robot
   validate old1 "$SCM"
   validate new1 "$SCM"
   validate old2 "$SCM"
