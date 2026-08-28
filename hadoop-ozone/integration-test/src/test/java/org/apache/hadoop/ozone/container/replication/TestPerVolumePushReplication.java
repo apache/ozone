@@ -54,7 +54,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
-import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -131,6 +130,7 @@ class TestPerVolumePushReplication {
 
   private MiniOzoneCluster cluster;
   private XceiverClientFactory clientFactory;
+  private OzoneBucket bucket;
 
   @BeforeAll
   void setUp() throws Exception {
@@ -138,6 +138,9 @@ class TestPerVolumePushReplication {
     cluster = newCluster(conf, DATANODE_COUNT);
     cluster.waitForClusterToBeReady();
     clientFactory = new XceiverClientManager(conf);
+    try (OzoneClient client = cluster.newClient()) {
+      bucket = DataTestUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
+    }
   }
 
   @AfterAll
@@ -148,31 +151,28 @@ class TestPerVolumePushReplication {
   @Order(1)
   @Test
   void testPushAndScmReplicationWithPerVolumeEnabled() throws Exception {
-    try (OzoneClient client = cluster.newClient()) {
-      HddsDatanodeService sourceDn = selectHealthyDatanode(0);
-      DatanodeDetails source = sourceDn.getDatanodeDetails();
-      DatanodeDetails target = selectOtherHealthyNode(source);
-      long containerId = createClosedContainer(clientFactory, source, 0L);
+    HddsDatanodeService sourceDn = selectHealthyDatanode(0);
+    DatanodeDetails source = sourceDn.getDatanodeDetails();
+    DatanodeDetails target = selectOtherHealthyNode(source);
+    long containerId = createClosedContainer(clientFactory, source, 0L);
 
-      ReplicateContainerCommand cmd =
-          ReplicateContainerCommand.toTarget(containerId, target);
-      queuePushAndWait(cluster, cmd, source, ReplicationSupervisor::getReplicationSuccessCount);
-      assertNotNull(getContainer(cluster, target, containerId));
-      assertVolumePools(sourceDn, DATA_VOLUMES, 1);
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(containerId, target);
+    queuePushAndWaitForContainer(cluster, cmd, source, target, containerId);
+    getContainer(cluster, target, containerId);
+    assertVolumePools(sourceDn, DATA_VOLUMES, 1);
 
-      OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
-      DataTestUtil.createKey(bucket, "pushKey1", RATIS_THREE, "data".getBytes(UTF_8));
-      OzoneKeyDetails keyDetails = bucket.getKey("pushKey1");
-      long scmContainerId = keyDetails.getOzoneKeyLocations().get(0).getContainerID();
-      waitForContainerClose(cluster, scmContainerId);
+    DataTestUtil.createKey(bucket, "pushKey1", RATIS_THREE, "data".getBytes(UTF_8));
+    OzoneKeyDetails keyDetails = bucket.getKey("pushKey1");
+    long scmContainerId = keyDetails.getOzoneKeyLocations().get(0).getContainerID();
+    waitForContainerClose(cluster, scmContainerId);
 
-      ContainerManager containerManager = cluster.getStorageContainerManager().getContainerManager();
-      Set<ContainerReplica> replicas =
-          containerManager.getContainerReplicas(ContainerID.valueOf(scmContainerId));
-      DatanodeDetails replicaDn = replicas.iterator().next().getDatanodeDetails();
-      cluster.shutdownHddsDatanode(replicaDn);
-      waitForReplicaCount(scmContainerId, 3, cluster);
-    }
+    ContainerManager containerManager = cluster.getStorageContainerManager().getContainerManager();
+    Set<ContainerReplica> replicas =
+        containerManager.getContainerReplicas(ContainerID.valueOf(scmContainerId));
+    DatanodeDetails replicaDn = replicas.iterator().next().getDatanodeDetails();
+    cluster.shutdownHddsDatanode(replicaDn);
+    waitForReplicaCount(scmContainerId, 3, cluster);
   }
 
   @Order(2)
@@ -197,8 +197,8 @@ class TestPerVolumePushReplication {
 
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(containerOnVol1, target);
-    queuePushAndWait(cluster, cmd, source, ReplicationSupervisor::getReplicationSuccessCount);
-    assertNotNull(getContainer(cluster, target, containerOnVol1));
+    queuePushAndWaitForContainer(cluster, cmd, source, target, containerOnVol1);
+    getContainer(cluster, target, containerOnVol1);
     assertEquals(1, volSet.getFailedVolumesList().size());
 
     // Task routes via global pool fallback (HDDS-15327); replication fails on bad volume.
@@ -207,8 +207,8 @@ class TestPerVolumePushReplication {
     ReplicationSupervisor supervisor =
         sourceDn.getDatanodeStateMachine().getSupervisor();
     long previousFailures = supervisor.getReplicationFailureCount();
-    queuePushAndWait(cluster, failedVolCmd, source,
-        ReplicationSupervisor::getReplicationFailureCount);
+    queuePushAndWaitForFailure(cluster, failedVolCmd, source, target,
+        containerOnVol0, supervisor, previousFailures);
     assertTrue(supervisor.getReplicationFailureCount() >= previousFailures + 1);
 
     DatanodeTestUtils.restoreBadVolume(vol0);
@@ -217,14 +217,12 @@ class TestPerVolumePushReplication {
   @Order(3)
   @Test
   void testDecommissionWithPerVolumePools() throws Exception {
-    try (OzoneClient client = cluster.newClient();
-        ContainerOperationClient scmClient = new ContainerOperationClient(cluster.getConf())) {
+    try (ContainerOperationClient scmClient = new ContainerOperationClient(cluster.getConf())) {
       StorageContainerManager scm = cluster.getStorageContainerManager();
       NodeManager nm = scm.getScmNodeManager();
       ContainerManager cm = scm.getContainerManager();
       PipelineManager pm = scm.getPipelineManager();
 
-      OzoneBucket bucket = client.getObjectStore().getVolume(VOLUME).getBucket(BUCKET);
       generateData(bucket, 20, "decomKey", RATIS_THREE);
       generateData(bucket, 20, "decomEcKey", EC_REP);
 
@@ -321,19 +319,43 @@ class TestPerVolumePushReplication {
     assertTrue(pools.hasPool(healthyPath));
   }
 
-  private static void queuePushAndWait(MiniOzoneCluster cluster,
+  private static void queuePushAndWaitForContainer(MiniOzoneCluster cluster,
       ReplicateContainerCommand cmd, DatanodeDetails source,
-      ToLongFunction<ReplicationSupervisor> counter)
+      DatanodeDetails target, long containerId)
       throws IOException, InterruptedException, TimeoutException {
+    queueReplicationCommand(cluster, cmd, source);
+    GenericTestUtils.waitFor((BooleanSupplier) () ->
+        hasContainer(cluster, target, containerId), 100, 30000);
+  }
+
+  private static void queuePushAndWaitForFailure(MiniOzoneCluster cluster,
+      ReplicateContainerCommand cmd, DatanodeDetails source,
+      DatanodeDetails target, long containerId, ReplicationSupervisor supervisor,
+      long previousFailureCount)
+      throws IOException, InterruptedException, TimeoutException {
+    queueReplicationCommand(cluster, cmd, source);
+    GenericTestUtils.waitFor((BooleanSupplier) () ->
+        supervisor.getReplicationFailureCount() >= previousFailureCount + 1
+            && !hasContainer(cluster, target, containerId),
+        100, 30000);
+  }
+
+  private static void queueReplicationCommand(MiniOzoneCluster cluster,
+      ReplicateContainerCommand cmd, DatanodeDetails source) throws IOException {
     DatanodeStateMachine stateMachine = cluster.getHddsDatanode(source).getDatanodeStateMachine();
-    ReplicationSupervisor supervisor = stateMachine.getSupervisor();
-    long previousCount = counter.applyAsLong(supervisor);
-    long targetCount = previousCount + 1;
     StateContext context = stateMachine.getContext();
     context.getTermOfLeaderSCM().ifPresent(cmd::setTerm);
     context.addCommand(cmd);
-    GenericTestUtils.waitFor((BooleanSupplier) () ->
-        counter.applyAsLong(supervisor) >= targetCount, 100, 30000);
+  }
+
+  private static boolean hasContainer(MiniOzoneCluster cluster,
+      DatanodeDetails datanode, long containerId) {
+    try {
+      return cluster.getHddsDatanode(datanode).getDatanodeStateMachine().getContainer()
+          .getContainerSet().getContainer(containerId) != null;
+    } catch (IOException e) {
+      return false;
+    }
   }
 
   private static long findOrCreateContainerOnVolume(MiniOzoneCluster cluster,
@@ -510,17 +532,14 @@ class TestPerVolumePushReplication {
   private static void waitForContainerReplicas(ContainerManager cm,
       ContainerInfo container, int count) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(
-        (BooleanSupplier) () -> getContainerReplicas(cm, container).size() == count,
+        (BooleanSupplier) () -> {
+          try {
+            return cm.getContainerReplicas(container.containerID()).size() == count;
+          } catch (Exception e) {
+            return false;
+          }
+        },
         200, 60000);
-  }
-
-  private static Set<ContainerReplica> getContainerReplicas(ContainerManager cm,
-      ContainerInfo container) {
-    try {
-      return cm.getContainerReplicas(container.containerID());
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
   }
 
 }
