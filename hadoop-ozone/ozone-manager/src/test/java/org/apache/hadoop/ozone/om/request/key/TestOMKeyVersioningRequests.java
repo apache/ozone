@@ -677,6 +677,56 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
   }
 
   /**
+   * A NoncurrentVersionExpiration rule counts from the moment a version
+   * stopped being current, so the record is stamped with it as it is moved.
+   * Its own modification time stays put: that is when it was written, which is
+   * a different moment and is what an Expiration rule reads.
+   */
+  @Test
+  public void testOverwriteStampsWhenTheVersionBecameNoncurrent()
+      throws Exception {
+    setupVersionedBucket();
+    String ozoneKey = seedCurrentVersion(100L);
+    long writtenAt = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(ozoneKey).getModificationTime();
+
+    commitAt(500L, PROPOSED);
+
+    OmKeyInfo current =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    OmKeyInfo noncurrent = noncurrentVersion(100L);
+    assertEquals(current.getModificationTime(),
+        noncurrent.getNoncurrentTime());
+    assertEquals(writtenAt, noncurrent.getModificationTime());
+    // the version that superseded it is current, so it has no such moment
+    assertEquals(0L, current.getNoncurrentTime());
+  }
+
+  /**
+   * Promoting a version back to current clears the stamp: it is current
+   * again, so it has no moment of having stopped being current. Left behind,
+   * the stamp would expire the promoted version as if it were still
+   * noncurrent.
+   */
+  @Test
+  public void testPromotingAVersionClearsItsNoncurrentStamp()
+      throws Exception {
+    setupVersionedBucket();
+    String ozoneKey = seedCurrentVersion(100L);
+
+    commitAt(500L, PROPOSED);
+    assertTrue(noncurrentVersion(100L).getNoncurrentTime() > 0);
+
+    // delete the current version, promoting 100 back into the keyTable
+    deleteVersionAt(PROPOSED, false, 600L);
+
+    OmKeyInfo promoted =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    assertEquals(100L, promoted.getVersionId());
+    assertEquals(0L, promoted.getNoncurrentTime());
+  }
+
+  /**
    * A record written before versioning was enabled carries no versionId, so on
    * the first overwrite it becomes the key's single null version.
    */

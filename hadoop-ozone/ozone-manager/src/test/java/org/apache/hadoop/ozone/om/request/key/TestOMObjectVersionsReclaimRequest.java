@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMObjectVersionsReclaimResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionRecord;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReclaimObjectVersionsRequest;
 import org.apache.hadoop.util.Time;
@@ -144,7 +146,7 @@ public class TestOMObjectVersionsReclaimRequest extends OMKeyRequestTests {
     OMRequest request = reclaimRequest(ObjectVersionsBucket.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName("deleted-bucket")
-        .addVersionKeys(versionKey(100L))
+        .addVersions(versionRecord(versionKey(100L)))
         .build());
     OMObjectVersionsReclaimResponse response =
         (OMObjectVersionsReclaimResponse) new OMObjectVersionsReclaimRequest(
@@ -246,14 +248,89 @@ public class TestOMObjectVersionsReclaimRequest extends OMKeyRequestTests {
 
   private OMObjectVersionsReclaimResponse reclaimMarkers(long trxnLogIndex)
       throws Exception {
+    return reclaimMarkers(trxnLogIndex, markerRecord(ozoneKey()));
+  }
+
+  private OMObjectVersionsReclaimResponse reclaimMarkers(long trxnLogIndex,
+      ObjectVersionRecord marker) throws Exception {
     OMRequest request = reclaimRequest(ObjectVersionsBucket.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .addMarkerKeys(ozoneKey())
+        .addMarkers(marker)
         .build());
     return (OMObjectVersionsReclaimResponse)
         new OMObjectVersionsReclaimRequest(request)
             .validateAndUpdateCache(ozoneManager, trxnLogIndex);
+  }
+
+  /** A record naming what sits at the dbKey right now. */
+  private ObjectVersionRecord versionRecord(String dbKey) throws Exception {
+    OmKeyInfo version = omMetadataManager.getVersionedKeyTable().get(dbKey);
+    return record(dbKey, version == null ? 0L : version.getUpdateID());
+  }
+
+  private ObjectVersionRecord markerRecord(String dbKey) throws Exception {
+    OmKeyInfo marker =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(dbKey);
+    return record(dbKey, marker == null ? 0L : marker.getUpdateID());
+  }
+
+  private static ObjectVersionRecord record(String dbKey, long updateId) {
+    return ObjectVersionRecord.newBuilder()
+        .setDbKey(dbKey)
+        .setUpdateId(updateId)
+        .build();
+  }
+
+  /**
+   * A marker's dbKey is the plain key name, so it names whichever version of
+   * the key is current. Deleting the key, writing it and deleting it again
+   * leaves another marker there, which every other check here accepts: it is
+   * a marker, and nothing survives under it. Only the updateID tells it from
+   * the one the scan selected.
+   */
+  @Test
+  public void testAMarkerReplacedSinceTheScanIsNotReclaimed()
+      throws Exception {
+    setupVersionedBucket(BLOCK_LENGTH, 1L);
+    seedCurrentMarker(300L);
+
+    // the scan read a marker that has since been replaced
+    OMObjectVersionsReclaimResponse response =
+        reclaimMarkers(500L, record(ozoneKey(), 4711L));
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertNotNull(
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey()),
+        "a marker the scan never selected was reclaimed");
+  }
+
+  /**
+   * A versionId is allocated against the key's current version alone, so one
+   * that was permanently deleted can be handed out again, putting a different
+   * version at the dbKey the scan selected.
+   */
+  @Test
+  public void testAVersionReplacedSinceTheScanIsNotReclaimed()
+      throws Exception {
+    setupVersionedBucket(BLOCK_LENGTH, 1L);
+    seedNoncurrentVersion(100L);
+
+    OMRequest request = reclaimRequest(ObjectVersionsBucket.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .addVersions(record(versionKey(100L), 4711L))
+        .build());
+    OMObjectVersionsReclaimResponse response =
+        (OMObjectVersionsReclaimResponse) new OMObjectVersionsReclaimRequest(
+            request).validateAndUpdateCache(ozoneManager, 500L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertNotNull(
+        omMetadataManager.getVersionedKeyTable().get(versionKey(100L)),
+        "a version the scan never selected was reclaimed");
   }
 
   private void setupVersionedBucket(long usedBytes, long usedNamespace)
@@ -273,6 +350,38 @@ public class TestOMObjectVersionsReclaimRequest extends OMKeyRequestTests {
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
         CacheValue.get(1L, bucketInfo));
+  }
+
+  /**
+   * A version demoted by a transaction the double buffer has not flushed yet
+   * lives in the table cache alone, and a prefix iteration over the DB reads
+   * straight past it. Removing the marker then promotes that version back to
+   * current, resurrecting an object the user deleted.
+   */
+  @Test
+  public void testAMarkerIsKeptForAVersionOnlyInTheCache() throws Exception {
+    setupVersionedBucket(BLOCK_LENGTH, 1L);
+    seedCurrentMarker(300L);
+    cacheOnlyNoncurrentVersion(100L);
+
+    OMObjectVersionsReclaimResponse response = reclaimMarkers(500L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertNotNull(
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey()),
+        "the marker was reclaimed while a version survived in the cache");
+  }
+
+  /** A noncurrent version that only exists in the table cache, not the DB. */
+  private void cacheOnlyNoncurrentVersion(long versionId) throws Exception {
+    OmKeyInfo version = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(versionId)
+        .build();
+    OMRequestTestUtils.addKeyLocationInfo(version, 0L, BLOCK_LENGTH);
+    omMetadataManager.getVersionedKeyTable()
+        .addCacheEntry(versionKey(versionId), version, 350L);
   }
 
   private void seedNoncurrentVersion(long versionId) throws Exception {
@@ -313,10 +422,14 @@ public class TestOMObjectVersionsReclaimRequest extends OMKeyRequestTests {
 
   private OMObjectVersionsReclaimResponse reclaim(long trxnLogIndex,
       List<String> keys) throws Exception {
+    List<ObjectVersionRecord> records = new ArrayList<>();
+    for (String key : keys) {
+      records.add(versionRecord(key));
+    }
     OMRequest request = reclaimRequest(ObjectVersionsBucket.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .addAllVersionKeys(keys)
+        .addAllVersions(records)
         .build());
     return (OMObjectVersionsReclaimResponse)
         new OMObjectVersionsReclaimRequest(request)

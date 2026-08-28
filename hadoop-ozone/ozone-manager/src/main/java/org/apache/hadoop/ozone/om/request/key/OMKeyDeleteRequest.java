@@ -395,7 +395,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           omMetadataManager, volumeName, bucketName, keyName);
       if (newest != null) {
         promotedKey = newest.getKey();
-        promoted = newest.getValue();
+        // Current again, so it has no moment of becoming noncurrent.
+        promoted = newest.getValue().toBuilder()
+            .setNoncurrentTime(0L)
+            .build();
       }
     }
 

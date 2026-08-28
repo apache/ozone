@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -115,8 +116,31 @@ public class TestNoncurrentVersionSelector {
         .build();
   }
 
-  private void addNoncurrent(String keyName, long versionId, long modTime)
-      throws Exception {
+  /** A noncurrent version stamped as having gone noncurrent at that time. */
+  private void addNoncurrent(String keyName, long versionId,
+      long noncurrentAt) throws Exception {
+    addNoncurrent(keyName, versionId, noncurrentAt, noncurrentAt);
+  }
+
+  private void addNoncurrent(String keyName, long versionId, long modTime,
+      long noncurrentAt) throws Exception {
+    addNoncurrent(keyName, versionId, modTime, noncurrentAt, 0L);
+  }
+
+  private void addNoncurrent(String keyName, long versionId, long modTime,
+      long noncurrentAt, long updateId) throws Exception {
+    omMetadataManager.getVersionedKeyTable().put(
+        omMetadataManager.getVersionedOzoneKey(VOLUME, BUCKET, keyName,
+            versionId),
+        version(keyName, versionId, modTime).toBuilder()
+            .setNoncurrentTime(noncurrentAt)
+            .setUpdateID(updateId)
+            .build());
+  }
+
+  /** A version with no stamp, as a broken invariant would leave it. */
+  private void addUnstampedNoncurrent(String keyName, long versionId,
+      long modTime) throws Exception {
     omMetadataManager.getVersionedKeyTable().put(
         omMetadataManager.getVersionedOzoneKey(VOLUME, BUCKET, keyName,
             versionId),
@@ -130,12 +154,39 @@ public class TestNoncurrentVersionSelector {
         version(keyName, versionId, modTime));
   }
 
+  /** The dbKeys of what a pass selected, in the order it met them. */
+  private static List<String> keysOf(
+      List<NoncurrentVersionSelector.ExpiredRecord> records) {
+    return records.stream()
+        .map(NoncurrentVersionSelector.ExpiredRecord::getDbKey)
+        .collect(Collectors.toList());
+  }
+
   private String versionKey(String keyName, long versionId) {
     return omMetadataManager.getVersionedOzoneKey(VOLUME, BUCKET, keyName,
         versionId);
   }
 
   // ---- NewerNoncurrentVersions ----
+
+  /**
+   * A dbKey names a position rather than a record, so what is selected carries
+   * the updateID of the record the rules matched. The reclaim runs after
+   * replication, by which time the key may hold something else.
+   */
+  @Test
+  public void testWhatIsSelectedCarriesTheRecordsUpdateId() throws Exception {
+    addCurrent("key", 500L, daysAgo(0));
+    addNoncurrent("key", 300L, daysAgo(1), daysAgo(1), 4711L);
+    addNoncurrent("key", 200L, daysAgo(2), daysAgo(2), 4712L);
+
+    NoncurrentVersionSelector.Selection selection =
+        selector.select(versionedBucket(), rules(null, 1), null, NO_LIMIT);
+
+    assertEquals(Collections.singletonList(new
+        NoncurrentVersionSelector.ExpiredRecord(versionKey("key", 200L),
+            4712L)), selection.getExpiredVersions());
+  }
 
   /** Versions are visited newest first, so the ones over the limit are oldest. */
   @Test
@@ -150,7 +201,7 @@ public class TestNoncurrentVersionSelector {
         selector.select(versionedBucket(), rules(null, 2), null, NO_LIMIT);
 
     assertEquals(Arrays.asList(versionKey("key", 200L),
-        versionKey("key", 100L)), selection.getExpiredVersionKeys());
+        versionKey("key", 100L)), keysOf(selection.getExpiredVersions()));
     assertTrue(selection.isFinished());
   }
 
@@ -168,7 +219,7 @@ public class TestNoncurrentVersionSelector {
 
     // one over the limit per key, never more
     assertEquals(Arrays.asList(versionKey("a", 200L), versionKey("b", 200L),
-        versionKey("c", 200L)), selection.getExpiredVersionKeys());
+        versionKey("c", 200L)), keysOf(selection.getExpiredVersions()));
   }
 
   @Test
@@ -179,54 +230,74 @@ public class TestNoncurrentVersionSelector {
     NoncurrentVersionSelector.Selection selection =
         selector.select(versionedBucket(), rules(null, 5), null, NO_LIMIT);
 
-    assertTrue(selection.getExpiredVersionKeys().isEmpty());
+    assertTrue(selection.getExpiredVersions().isEmpty());
   }
 
   // ---- NoncurrentDays ----
 
   /**
-   * A version's age is counted from when the version above it was written,
-   * not from its own modification time: that is the moment it stopped being
-   * current.
+   * A version's age is counted from when it stopped being current, which the
+   * record carries, and not from its own modification time.
    */
   @Test
   public void testAgeIsCountedFromWhenTheVersionWasSuperseded()
       throws Exception {
-    // written long ago, but only superseded yesterday
     addCurrent("key", 500L, daysAgo(1));
-    addNoncurrent("key", 400L, daysAgo(90));
+    // written long ago, but only superseded yesterday
+    addNoncurrent("key", 400L, daysAgo(90), daysAgo(1));
+    // written at the same time, and noncurrent ever since
+    addNoncurrent("key", 300L, daysAgo(90), daysAgo(90));
 
     NoncurrentVersionSelector.Selection selection =
         selector.select(versionedBucket(), rules(30, null), null, NO_LIMIT);
 
-    assertTrue(selection.getExpiredVersionKeys().isEmpty(),
-        "a version superseded yesterday is not 30 days noncurrent");
-
-    // the one below it went noncurrent 90 days ago, when 400 was written
-    addNoncurrent("key", 300L, daysAgo(120));
-    selection = selector.select(versionedBucket(), rules(30, null), null,
-        NO_LIMIT);
-
     assertEquals(Collections.singletonList(versionKey("key", 300L)),
-        selection.getExpiredVersionKeys());
+        keysOf(selection.getExpiredVersions()),
+        "a version superseded yesterday is not 30 days noncurrent");
   }
 
   /**
-   * A key with no current version breaks the keyTable invariant, and expiring
-   * on a broken invariant would destroy data.
+   * The moment a version went noncurrent is fixed when it happens, so
+   * removing the version that superseded it does not restart its clock. A
+   * derived age would: with the version above gone, the current version is
+   * the only thing left to date it against.
    */
   @Test
-  public void testVersionsOfAKeyWithNoCurrentVersionAreLeftAlone()
+  public void testRemovingTheSupersedingVersionKeepsTheClock()
       throws Exception {
-    addNoncurrent("key", 400L, daysAgo(90));
-    addNoncurrent("key", 300L, daysAgo(120));
+    addCurrent("key", 500L, daysAgo(1));
+    // 400 superseded it 90 days ago and has since been reclaimed itself
+    addNoncurrent("key", 300L, daysAgo(120), daysAgo(90));
 
     NoncurrentVersionSelector.Selection selection =
         selector.select(versionedBucket(), rules(30, null), null, NO_LIMIT);
 
-    // only the newest is unexpirable; the one below it is dated normally
     assertEquals(Collections.singletonList(versionKey("key", 300L)),
-        selection.getExpiredVersionKeys());
+        keysOf(selection.getExpiredVersions()));
+  }
+
+  /**
+   * Every record is stamped as it is moved into the versionedKeyTable, so an
+   * unstamped one means that invariant is broken, and expiring on a broken
+   * invariant would destroy data.
+   */
+  @Test
+  public void testAnUnstampedVersionIsNotExpiredByAge() throws Exception {
+    addCurrent("key", 500L, daysAgo(1));
+    addUnstampedNoncurrent("key", 400L, daysAgo(90));
+    addUnstampedNoncurrent("key", 300L, daysAgo(120));
+
+    NoncurrentVersionSelector.Selection selection =
+        selector.select(versionedBucket(), rules(30, null), null, NO_LIMIT);
+
+    assertTrue(selection.getExpiredVersions().isEmpty());
+
+    // the count rule does not depend on the stamp, so it still applies
+    selection = selector.select(versionedBucket(), rules(null, 1), null,
+        NO_LIMIT);
+
+    assertEquals(Collections.singletonList(versionKey("key", 300L)),
+        keysOf(selection.getExpiredVersions()));
   }
 
   /** Either limit on its own is enough, so each catches what the other misses. */
@@ -234,20 +305,20 @@ public class TestNoncurrentVersionSelector {
   public void testCountAndAgeCombine() throws Exception {
     // 400 went noncurrent a day ago, 300 went noncurrent 100 days ago
     addCurrent("key", 500L, daysAgo(1));
-    addNoncurrent("key", 400L, daysAgo(100));
-    addNoncurrent("key", 300L, daysAgo(200));
+    addNoncurrent("key", 400L, daysAgo(1));
+    addNoncurrent("key", 300L, daysAgo(100));
 
     // age catches 300 even though the count limit is nowhere near
     NoncurrentVersionSelector.Selection byAge =
         selector.select(versionedBucket(), rules(30, 5), null, NO_LIMIT);
     assertEquals(Collections.singletonList(versionKey("key", 300L)),
-        byAge.getExpiredVersionKeys());
+        keysOf(byAge.getExpiredVersions()));
 
     // count catches 300 even though it is nowhere near the age limit
     NoncurrentVersionSelector.Selection byCount =
         selector.select(versionedBucket(), rules(3650, 1), null, NO_LIMIT);
     assertEquals(Collections.singletonList(versionKey("key", 300L)),
-        byCount.getExpiredVersionKeys());
+        keysOf(byCount.getExpiredVersions()));
   }
 
   // ---- resume ----
@@ -268,7 +339,7 @@ public class TestNoncurrentVersionSelector {
         selector.select(versionedBucket(), rules(null, 1), null, 1);
 
     assertEquals(Collections.singletonList(versionKey("a", 200L)),
-        first.getExpiredVersionKeys());
+        keysOf(first.getExpiredVersions()));
     assertFalse(first.isFinished());
     // the boundary is b's newest version, never the middle of a key
     assertEquals(versionKey("b", 300L), first.getResumeFrom());
@@ -277,7 +348,7 @@ public class TestNoncurrentVersionSelector {
         versionedBucket(), rules(null, 1), first.getResumeFrom(), NO_LIMIT);
 
     assertEquals(Arrays.asList(versionKey("b", 200L), versionKey("c", 200L)),
-        second.getExpiredVersionKeys());
+        keysOf(second.getExpiredVersions()));
     assertTrue(second.isFinished());
     assertNull(second.getResumeFrom());
   }
@@ -297,7 +368,7 @@ public class TestNoncurrentVersionSelector {
     NoncurrentVersionSelector.Selection first =
         selector.select(versionedBucket(), rules(null, 5), null, 2);
 
-    assertTrue(first.getExpiredVersionKeys().isEmpty());
+    assertTrue(first.getExpiredVersions().isEmpty());
     assertFalse(first.isFinished());
     assertEquals(2, first.getVersionsScanned());
     assertEquals(versionKey("b", 300L), first.getResumeFrom());
@@ -326,7 +397,7 @@ public class TestNoncurrentVersionSelector {
     NoncurrentVersionSelector.Selection selection =
         selector.select(versionedBucket(), rules(null, 1), null, NO_LIMIT);
 
-    assertEquals(2, selection.getExpiredVersionKeys().size());
+    assertEquals(2, selection.getExpiredVersions().size());
     assertEquals(3, selection.getVersionsScanned());
   }
 
@@ -335,7 +406,7 @@ public class TestNoncurrentVersionSelector {
     NoncurrentVersionSelector.Selection selection =
         selector.select(versionedBucket(), rules(null, 1), null, NO_LIMIT);
 
-    assertTrue(selection.getExpiredVersionKeys().isEmpty());
+    assertTrue(selection.getExpiredVersions().isEmpty());
     assertTrue(selection.isFinished());
     assertEquals(0, selection.getVersionsScanned());
   }

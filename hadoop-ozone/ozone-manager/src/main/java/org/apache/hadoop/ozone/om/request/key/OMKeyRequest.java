@@ -1571,12 +1571,16 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String movedVersionedKeyName = null;
     OmKeyInfo movedVersionedKeyInfo = null;
     if (currentVersion != null && !replacesCurrent) {
-      movedVersionedKeyInfo = currentVersion.getVersionId() != null
-          ? currentVersion
-          : currentVersion.toBuilder()
-              .setVersionId(VersionIdGenerator.UNSET_VERSION_ID)
-              .setNullVersion(true)
-              .build();
+      // The marker is what supersedes it, so this is when it stopped being
+      // current.
+      OmKeyInfo.Builder movedBuilder = currentVersion.toBuilder()
+          .setNoncurrentTime(modificationTime);
+      if (currentVersion.getVersionId() == null) {
+        movedBuilder
+            .setVersionId(VersionIdGenerator.UNSET_VERSION_ID)
+            .setNullVersion(true);
+      }
+      movedVersionedKeyInfo = movedBuilder.build();
       movedVersionedKeyName = omMetadataManager.getVersionedOzoneKey(
           volumeName, bucketName, keyName,
           movedVersionedKeyInfo.getVersionId());

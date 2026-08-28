@@ -1283,6 +1283,12 @@ message KeyInfo {
     optional uint64 versionId = 23;
     optional bool isDeleteMarker = 24;
     optional bool isNullVersion = 25;
+
+  // When this record stopped being the key's current version, which is when
+  // the version that superseded it was written. Set on the record as it is
+  // moved into the versionedKeyTable and unset while it is current. This is
+  // the clock a NoncurrentVersionExpiration rule counts from.
+    optional uint64 noncurrentTime = 26;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -2731,14 +2737,25 @@ message SetLifecycleServiceStatusResponse {
  * Noncurrent object versions of one bucket that the lifecycle scan selected for
  * reclamation, addressed by their versionedKeyTable dbKeys.
  */
+// One record the scan selected, named by its dbKey and by the write that
+// produced it. A dbKey names a position rather than a record: a marker key is
+// the plain key name, and holds whatever version of the key is current. Scan
+// and apply are separated by replication, so the record can be replaced in
+// between, and the updateId is what tells the record the rules expired apart
+// from whatever took its place.
+message ObjectVersionRecord {
+  required string dbKey = 1;
+  required uint64 updateId = 2;
+}
+
 message ObjectVersionsBucket {
   required string volumeName = 1;
   required string bucketName = 2;
-  repeated string versionKeys = 3;
-  // keyTable dbKeys of keys whose only remaining version is a delete marker.
+  repeated ObjectVersionRecord versions = 3;
+  // keyTable records of keys whose only remaining version is a delete marker.
   // These leave the keyTable rather than the versionedKeyTable, so the key
   // disappears entirely.
-  repeated string markerKeys = 4;
+  repeated ObjectVersionRecord markers = 4;
 }
 
 message ReclaimObjectVersionsRequest {

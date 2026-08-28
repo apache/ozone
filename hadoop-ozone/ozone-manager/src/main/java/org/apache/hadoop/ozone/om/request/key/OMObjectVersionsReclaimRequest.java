@@ -25,12 +25,12 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
+import org.apache.hadoop.ozone.om.NoncurrentVersions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMObjectVersionsReclaimResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionRecord;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ObjectVersionsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReclaimObjectVersionsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReclaimObjectVersionsResponse;
@@ -91,8 +92,7 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
 
     long numSubmitted = 0;
     for (ObjectVersionsBucket bucket : versionsPerBucket) {
-      numSubmitted +=
-          bucket.getVersionKeysCount() + bucket.getMarkerKeysCount();
+      numSubmitted += bucket.getVersionsCount() + bucket.getMarkersCount();
     }
 
     OMResponse.Builder omResponse =
@@ -144,13 +144,8 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
   /** Whether the key has any version left in the versionedKeyTable. */
   private boolean hasNoncurrentVersion(OMMetadataManager omMetadataManager,
       OmKeyInfo marker) throws IOException {
-    try (Table.KeyValueIterator<String, OmKeyInfo> versions =
-             omMetadataManager.getVersionedKeyTable().iterator(
-                 omMetadataManager.getVersionedOzoneKeyPrefix(
-                     marker.getVolumeName(), marker.getBucketName(),
-                     marker.getKeyName()))) {
-      return versions.hasNext();
-    }
+    return NoncurrentVersions.any(omMetadataManager, marker.getVolumeName(),
+        marker.getBucketName(), marker.getKeyName());
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -175,13 +170,14 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
       if (omBucketInfo == null) {
         LOG.debug("Bucket {}/{} no longer exists, skipping the {} object "
             + "versions and {} delete markers submitted for it.", volumeName,
-            bucketName, versionsBucket.getVersionKeysCount(),
-            versionsBucket.getMarkerKeysCount());
+            bucketName, versionsBucket.getVersionsCount(),
+            versionsBucket.getMarkersCount());
         return;
       }
 
       boolean reclaimedAny = false;
-      for (String versionKey : versionsBucket.getVersionKeysList()) {
+      for (ObjectVersionRecord submitted : versionsBucket.getVersionsList()) {
+        String versionKey = submitted.getDbKey();
         OmKeyInfo version =
             omMetadataManager.getVersionedKeyTable().get(versionKey);
         if (version == null) {
@@ -189,10 +185,13 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
           // keyTable since the service selected it.
           continue;
         }
-        if (trxnLogIndex < version.getUpdateID()) {
-          LOG.warn("Transaction log index {} is smaller than the current "
-              + "updateID {} of version {}, skipping reclamation.",
-              trxnLogIndex, version.getUpdateID(), versionKey);
+        if (version.getUpdateID() != submitted.getUpdateId()) {
+          // A different record sits where the scan looked. A versionId is
+          // allocated against the key's current version alone, so one that was
+          // permanently deleted can be handed out again, putting a new version
+          // at the dbKey the scan selected.
+          LOG.debug("Version {} was written again since the scan selected it, "
+              + "skipping reclamation.", versionKey);
           continue;
         }
 
@@ -221,7 +220,8 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
         reclaimedAny = true;
       }
 
-      for (String markerKey : versionsBucket.getMarkerKeysList()) {
+      for (ObjectVersionRecord submitted : versionsBucket.getMarkersList()) {
+        String markerKey = submitted.getDbKey();
         OmKeyInfo marker =
             omMetadataManager.getKeyTable(getBucketLayout()).get(markerKey);
         if (marker == null) {
@@ -232,10 +232,13 @@ public class OMObjectVersionsReclaimRequest extends OMKeyRequest {
         if (!marker.isDeleteMarker()) {
           continue;
         }
-        if (trxnLogIndex < marker.getUpdateID()) {
-          LOG.warn("Transaction log index {} is smaller than the current "
-              + "updateID {} of marker {}, skipping reclamation.",
-              trxnLogIndex, marker.getUpdateID(), markerKey);
+        // A marker's dbKey is the plain key name, so it names whichever
+        // version of the key is current rather than the record the scan read.
+        // Deleting the key and deleting it again leaves another marker there,
+        // which no other check here can tell from the expired one.
+        if (marker.getUpdateID() != submitted.getUpdateId()) {
+          LOG.debug("The delete marker of {} was replaced since the scan "
+              + "selected it, skipping reclamation.", markerKey);
           continue;
         }
         // Re-checked here and not only in the scan: removing the marker while

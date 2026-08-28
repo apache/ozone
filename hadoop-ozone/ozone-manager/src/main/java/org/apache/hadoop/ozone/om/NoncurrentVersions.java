@@ -40,6 +40,22 @@ public final class NoncurrentVersions {
   }
 
   /**
+   * Whether the key still has any noncurrent version.
+   *
+   * <p>Not a plain prefix iteration: {@link Table#iterator} reads RocksDB
+   * alone, so a version demoted by a transaction the double buffer has not
+   * flushed yet is invisible to it. Answering "none left" then removes the
+   * key's delete marker and promotes that version back to current,
+   * resurrecting an object the user deleted.
+   */
+  public static boolean any(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName)
+      throws IOException {
+    return newestMatching(omMetadataManager, volumeName, bucketName, keyName,
+        keyInfo -> true) != null;
+  }
+
+  /**
    * Returns the key's null version as a (dbKey, keyInfo) pair, or null if the
    * key has no noncurrent null version. A key has at most one.
    */

@@ -378,11 +378,16 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         String dbVersionedKey = null;
         OmKeyInfo versionedKeyInfo = null;
         if (supersededVersionRetained) {
-          versionedKeyInfo = keyToDelete.getVersionId() != null ? keyToDelete
-              : keyToDelete.toBuilder()
-                  .setVersionId(VersionIdGenerator.UNSET_VERSION_ID)
-                  .setNullVersion(true)
-                  .build();
+          // This upload is what supersedes it, so this is when it stopped
+          // being current.
+          OmKeyInfo.Builder versionedBuilder = keyToDelete.toBuilder()
+              .setNoncurrentTime(keyArgs.getModificationTime());
+          if (keyToDelete.getVersionId() == null) {
+            versionedBuilder
+                .setVersionId(VersionIdGenerator.UNSET_VERSION_ID)
+                .setNullVersion(true);
+          }
+          versionedKeyInfo = versionedBuilder.build();
           dbVersionedKey = omMetadataManager.getVersionedOzoneKey(
               volumeName, bucketName, keyName, versionedKeyInfo.getVersionId());
           omMetadataManager.getVersionedKeyTable().addCacheEntry(

@@ -465,11 +465,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       String dbVersionedKey = null;
       OmKeyInfo versionedKeyInfo = null;
       if (supersededVersionRetained && !isSameHsyncKey) {
-        versionedKeyInfo = keyToDelete.getVersionId() != null ? keyToDelete
-            : keyToDelete.toBuilder()
-                .setVersionId(VersionIdGenerator.UNSET_VERSION_ID)
-                .setNullVersion(true)
-                .build();
+        // This commit is what supersedes it, so this is when it stopped being
+        // current.
+        OmKeyInfo.Builder versionedBuilder = keyToDelete.toBuilder()
+            .setNoncurrentTime(commitKeyArgs.getModificationTime());
+        if (keyToDelete.getVersionId() == null) {
+          versionedBuilder
+              .setVersionId(VersionIdGenerator.UNSET_VERSION_ID)
+              .setNullVersion(true);
+        }
+        versionedKeyInfo = versionedBuilder.build();
         dbVersionedKey = omMetadataManager.getVersionedOzoneKey(
             volumeName, bucketName, keyName, versionedKeyInfo.getVersionId());
         omMetadataManager.getVersionedKeyTable().addCacheEntry(
