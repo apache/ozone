@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 
@@ -109,6 +110,22 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   /** @return whether a version other than the current one is addressed */
   public boolean addressesVersion() {
     return versionId != null || nullVersion;
+  }
+
+  /**
+   * Refuses a request that names a version in two ways at once. S3 names the
+   * null version with the literal versionId "null", so a well-formed request
+   * sets exactly one of the two. The builder below keeps the two fields
+   * mutually exclusive by dropping one when the other is set, which would
+   * otherwise turn a malformed request into a silent choice between them.
+   */
+  public static void validateAddressedVersion(KeyArgs keyArgs)
+      throws OMException {
+    if (keyArgs.hasVersionId() && keyArgs.getNullVersion()) {
+      throw new OMException("A request addresses either a versionId or the"
+          + " null version, not both",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
   }
 
   public boolean getIsMultipartKey() {
@@ -242,6 +259,12 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     }
     if (expectedETag != null) {
       builder.setExpectedETag(expectedETag);
+    }
+    if (versionId != null) {
+      builder.setVersionId(versionId);
+    }
+    if (nullVersion) {
+      builder.setNullVersion(true);
     }
     return builder.build();
   }

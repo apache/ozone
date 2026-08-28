@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -177,6 +179,20 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
         .setDeleteKeyRequest(DeleteKeyRequest.newBuilder().setKeyArgs(keyArgs))
         .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
         .setClientId(UUID.randomUUID().toString()).build();
+  }
+
+  /**
+   * S3 names the null version with the literal versionId "null", so a request
+   * that also carries a numeric id names a version twice and is malformed.
+   */
+  @Test
+  public void testDeleteRejectsNamingAVersionTwice() throws Exception {
+    setupVersionedBucket();
+
+    OMException ex = assertThrows(OMException.class,
+        () -> new OMKeyDeleteRequest(deleteVersionRequest(200L, true),
+            getBucketLayout()).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
   }
 
   private OMClientResponse deleteVersionAt(Long versionId, boolean nullVersion,
