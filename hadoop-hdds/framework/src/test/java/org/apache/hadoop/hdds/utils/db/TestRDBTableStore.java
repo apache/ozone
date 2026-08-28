@@ -137,6 +137,7 @@ public class TestRDBTableStore {
       options.close();
     }
     CodecTestUtil.gc();
+    CodecBuffer.assertNoLeaks();
   }
 
   @Test
@@ -184,7 +185,6 @@ public class TestRDBTableStore {
     byte[] largeKey1 = "large-key-1".getBytes(StandardCharsets.UTF_8);
     byte[] largeKey2 = "large-key-2".getBytes(StandardCharsets.UTF_8);
     byte[] emptyKey = "empty-key".getBytes(StandardCharsets.UTF_8);
-    byte[] missingKey = "missing-key".getBytes(StandardCharsets.UTF_8);
     byte[] smallValue = "small".getBytes(StandardCharsets.UTF_8);
     byte[] largeValue1 = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 100];
     byte[] largeValue2 = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 200];

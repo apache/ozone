@@ -320,109 +320,138 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   List<VALUE> multiGetFromTable(List<KEY> keys)
       throws RocksDatabaseException, CodecException {
     if (supportCodecBuffer) {
-      final int n = keys.size();
-      final List<CodecBuffer> keyBuffers = new ArrayList<>(n);
-      final List<CodecBuffer> valueBuffers = new ArrayList<>(n);
-      final List<ByteBuffer> keyByteBuffers = new ArrayList<>(n);
-      final List<ByteBuffer> valueByteBuffers = new ArrayList<>(n);
-      final int initial = bufferCapacity.get();
-      for (int i = 0; i < n; i++) {
-        final CodecBuffer keyBuffer = keyCodec.toDirectCodecBuffer(keys.get(i));
-        keyBuffers.add(keyBuffer);
-        keyByteBuffers.add(keyBuffer.asReadOnlyByteBuffer());
-        final CodecBuffer valueBuffer = CodecBuffer.allocateDirect(initial);
-        valueBuffers.add(valueBuffer);
-        valueBuffer.clear();
-        final ByteBuffer out = valueBuffer.asWritableByteBuffer();
-        out.position(0).limit(initial);
-        valueByteBuffers.add(out);
-      }
+      return multiGetFromTableWithCodecBuffer(keys);
+    }
+    return multiGetFromTableWithByteArray(keys);
+  }
+
+  List<VALUE> multiGetFromTableWithByteArray(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    List<byte[]> keyBytesList = new ArrayList<>(keys.size());
+    for (KEY key : keys) {
+      keyBytesList.add(encodeKey(key));
+    }
+    List<byte[]> valueBytesList = rawTable.multiGetSkipCache(keyBytesList);
+    List<VALUE> values = new ArrayList<>(keys.size());
+    for (byte[] valueBytes : valueBytesList) {
+      values.add(decodeValue(valueBytes));
+    }
+    return values;
+  }
+
+  List<VALUE> multiGetFromTableWithCodecBuffer(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    final int n = keys.size();
+    final List<CodecBuffer> keyBuffers = new ArrayList<>(n);
+    final List<ByteBuffer> keyByteBuffers = new ArrayList<>(n);
+    final List<CodecBuffer> valueBuffers = new ArrayList<>(n);
+    final List<ByteBuffer> valueByteBuffers = new ArrayList<>(n);
+    final int initialCapacity = bufferCapacity.get();
+    for (KEY key : keys) {
+      final CodecBuffer keyBuffer = keyCodec.toDirectCodecBuffer(key);
+      keyBuffers.add(keyBuffer);
+      keyByteBuffers.add(keyBuffer.asReadOnlyByteBuffer());
+      final CodecBuffer valueBuffer = CodecBuffer.allocateDirect(initialCapacity);
+      valueBuffers.add(valueBuffer);
+      addWritableValueByteBuffer(valueBuffer, initialCapacity, valueByteBuffers);
+    }
+
+    try {
+      final List<VALUE> values = new ArrayList<>(Collections.nCopies(n, null));
+      final List<Integer> retryIndices = new ArrayList<>();
+      final List<Integer> retrySizes = new ArrayList<>();
       try {
-        final List<ByteBufferGetStatus> statuses =
-            rawTable.multiGetSkipCache(keyByteBuffers, valueByteBuffers);
-        final List<VALUE> values = new ArrayList<>(Collections.nCopies(n, null));
-        final List<Integer> retryIndices = new ArrayList<>();
-        final List<Integer> retrySizes = new ArrayList<>();
-        for (int i = 0; i < n; i++) {
-          final ByteBufferGetStatus status = statuses.get(i);
-          final CodecBuffer valueBuffer = valueBuffers.get(i);
-          try {
-            if (status.value == null) {
-              continue;
-            }
-            if (status.requiredSize < 0 || status.status.getCode() != org.rocksdb.Status.Code.Ok) {
-              throw new IllegalStateException("status = " + status.status.getCode()
-                  + "; required = " + status.requiredSize + " < 0");
-            }
-            if (status.requiredSize > initial) {
-              // Buffer size too small. Track the keys for retry with increased capacity.
-              retryIndices.add(i);
-              retrySizes.add(status.requiredSize);
-            } else {
-              // Buffer size is adequate.
-              valueBuffer.clear();
-              valueBuffer.put(status.value.asReadOnlyBuffer());
-              values.set(i, valueCodec.fromCodecBuffer(valueBuffer));
-            }
-          } finally {
-            valueBuffer.close();
-          }
-        }
-        // Retry multiGet for keys with larger values with increased capacity.
+        applyMultiGetStatuses(rawTable.multiGetSkipCache(keyByteBuffers, valueByteBuffers),
+            valueBuffers, initialCapacity, values, retryIndices, retrySizes);
         if (!retryIndices.isEmpty()) {
-          final List<ByteBuffer> retryKeyByteBuffers = new ArrayList<>(retryIndices.size());
-          final List<CodecBuffer> retryValueBuffers = new ArrayList<>(retryIndices.size());
-          final List<ByteBuffer> retryValueByteBuffers = new ArrayList<>(retryIndices.size());
-          for (int j = 0; j < retryIndices.size(); j++) {
-            final int required = retrySizes.get(j);
-            retryKeyByteBuffers.add(keyByteBuffers.get(retryIndices.get(j)));
-            final CodecBuffer valueBuffer = CodecBuffer.allocateDirect(required);
-            retryValueBuffers.add(valueBuffer);
-            valueBuffer.clear();
-            final ByteBuffer out = valueBuffer.asWritableByteBuffer();
-            out.position(0).limit(required);
-            retryValueByteBuffers.add(out);
-          }
-          final List<ByteBufferGetStatus> retryStatuses =
-              rawTable.multiGetSkipCache(retryKeyByteBuffers, retryValueByteBuffers);
-          for (int j = 0; j < retryIndices.size(); j++) {
-            final int i = retryIndices.get(j);
-            final int required = retrySizes.get(j);
-            final ByteBufferGetStatus status = retryStatuses.get(j);
-            final CodecBuffer valueBuffer = retryValueBuffers.get(j);
-            try {
-              if (status.value == null) {
-                continue;
-              }
-              if (status.status.getCode() != org.rocksdb.Status.Code.Ok
-                  || required != status.requiredSize) {
-                throw new IllegalStateException("status = " + status.status.getCode()
-                    + "; expectedSize = " + required + ", actualSize = " + status.requiredSize);
-              }
-              valueBuffer.clear();
-              valueBuffer.put(status.value.asReadOnlyBuffer());
-              values.set(i, valueCodec.fromCodecBuffer(valueBuffer));
-            } finally {
-              valueBuffer.close();
-            }
-          }
+          retryOversizedMultiGet(keyByteBuffers, retryIndices, retrySizes, values);
+          bufferCapacity.increase(Collections.max(retrySizes));
         }
         return values;
       } finally {
-        IOUtils.closeQuietly(keyBuffers);
+        IOUtils.closeQuietly(valueBuffers);
       }
-    } else {
-      List<byte[]> keyBytesList = new ArrayList<>(keys.size());
-      for (KEY key : keys) {
-        keyBytesList.add(encodeKey(key));
-      }
-      List<byte[]> valueBytesList = rawTable.multiGetSkipCache(keyBytesList);
-      List<VALUE> values = new ArrayList<>(keys.size());
-      for (byte[] valueBytes : valueBytesList) {
-        values.add(decodeValue(valueBytes));
-      }
-      return values;
+    } finally {
+      IOUtils.closeQuietly(keyBuffers);
     }
+  }
+
+  void applyMultiGetStatuses(List<ByteBufferGetStatus> statuses, List<CodecBuffer> valueBuffers,
+      int valueBufferCapacity, List<VALUE> values, List<Integer> retryIndices, List<Integer> retrySizes)
+      throws CodecException {
+    for (int i = 0; i < statuses.size(); i++) {
+      final ByteBufferGetStatus status = statuses.get(i);
+      final CodecBuffer valueBuffer = valueBuffers.get(i);
+      if (status.value == null) {
+        continue;
+      }
+      validateMultiGetStatus(status, null);
+      if (status.requiredSize > valueBufferCapacity) {
+        retryIndices.add(i);
+        retrySizes.add(status.requiredSize);
+      } else {
+        values.set(i, decodeFromMultiGetStatus(status, valueBuffer));
+      }
+    }
+  }
+
+  void retryOversizedMultiGet(List<ByteBuffer> keyByteBuffers, List<Integer> retryIndices,
+      List<Integer> retrySizes, List<VALUE> values) throws RocksDatabaseException, CodecException {
+    final int retryCount = retryIndices.size();
+    final List<ByteBuffer> retryKeyByteBuffers = new ArrayList<>(retryCount);
+    final List<CodecBuffer> retryValueBuffers = new ArrayList<>(retryCount);
+    final List<ByteBuffer> retryValueByteBuffers = new ArrayList<>(retryCount);
+    for (int j = 0; j < retryCount; j++) {
+      final int requiredSize = retrySizes.get(j);
+      retryKeyByteBuffers.add(keyByteBuffers.get(retryIndices.get(j)).duplicate());
+      final CodecBuffer valueBuffer = CodecBuffer.allocateDirect(requiredSize);
+      retryValueBuffers.add(valueBuffer);
+      addWritableValueByteBuffer(valueBuffer, requiredSize, retryValueByteBuffers);
+    }
+
+    try {
+      final List<ByteBufferGetStatus> retryStatuses =
+          rawTable.multiGetSkipCache(retryKeyByteBuffers, retryValueByteBuffers);
+      for (int j = 0; j < retryCount; j++) {
+        final int index = retryIndices.get(j);
+        final int expectedSize = retrySizes.get(j);
+        final ByteBufferGetStatus status = retryStatuses.get(j);
+        final CodecBuffer valueBuffer = retryValueBuffers.get(j);
+        if (status.value == null) {
+          continue;
+        }
+        validateMultiGetStatus(status, expectedSize);
+        values.set(index, decodeFromMultiGetStatus(status, valueBuffer));
+      }
+    } finally {
+      IOUtils.closeQuietly(retryValueBuffers);
+    }
+  }
+
+  static void addWritableValueByteBuffer(CodecBuffer valueBuffer, int capacity,
+      List<ByteBuffer> valueByteBuffers) {
+    valueBuffer.clear();
+    final ByteBuffer out = valueBuffer.asWritableByteBuffer();
+    out.position(0).limit(capacity);
+    valueByteBuffers.add(out);
+  }
+
+  static void validateMultiGetStatus(ByteBufferGetStatus status, Integer expectedSize) {
+    if (status.requiredSize < 0 || status.status.getCode() != org.rocksdb.Status.Code.Ok) {
+      throw new IllegalStateException("status = " + status.status.getCode()
+          + "; required = " + status.requiredSize + " < 0");
+    }
+    if (expectedSize != null && expectedSize.intValue() != status.requiredSize) {
+      throw new IllegalStateException("status = " + status.status.getCode()
+          + "; expectedSize = " + expectedSize + ", actualSize = " + status.requiredSize);
+    }
+  }
+
+  VALUE decodeFromMultiGetStatus(ByteBufferGetStatus status, CodecBuffer valueBuffer)
+      throws CodecException {
+    valueBuffer.clear();
+    valueBuffer.put(status.value.asReadOnlyBuffer());
+    return valueCodec.fromCodecBuffer(valueBuffer);
   }
 
   /**
