@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -42,6 +43,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -462,49 +464,80 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
   }
 
   @Test
-  public void testQuotaRepairCountsMpuParts() throws Exception {
+  public void testQuotaRepairCountsMPUParts() throws Exception {
     AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, BucketLayout.OBJECT_STORE);
+    String otherBucketName = "other" + bucketName;
+    OMRequestTestUtils.addBucketToDB(volumeName, otherBucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
 
+    // committed keys stay charged after the MPU parts are released
+    int keyCount = 3;
+    for (int i = 0; i < keyCount; i++) {
+      OMRequestTestUtils.addKeyToTableAndCache(volumeName, bucketName, "key" + i, -1,
+          RatisReplicationConfig.getInstance(ONE), 10L + i, omMetadataManager);
+    }
+    long keyBytes = keyCount * 1000L;
+
+    // legacy schema: part 1 is committed twice (100 then 300), only the current 300 counts
     String legacyKey = "legacyMpuKey";
     String legacyUploadId = UUID.randomUUID().toString();
-    OmMultipartKeyInfo legacyInfo = OMRequestTestUtils.createOmMultipartKeyInfo(
-        legacyUploadId, Time.now(), HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, 1001L);
-    legacyInfo.addPartKeyInfo(createPart(legacyKey, legacyUploadId, 1, 100L));
-    legacyInfo.addPartKeyInfo(createPart(legacyKey, legacyUploadId, 1, 300L));
-    legacyInfo.addPartKeyInfo(createPart(legacyKey, legacyUploadId, 2, 200L));
-    addMultipartInfo(legacyKey, legacyInfo, 1L);
+    OmMultipartKeyInfo legacyInfo = newMultipartInfo(legacyUploadId, 1001L, false);
+    legacyInfo.addPartKeyInfo(createPart(bucketName, legacyKey, legacyUploadId, 1, 100L));
+    legacyInfo.addPartKeyInfo(createPart(bucketName, legacyKey, legacyUploadId, 1, 300L));
+    legacyInfo.addPartKeyInfo(createPart(bucketName, legacyKey, legacyUploadId, 2, 200L));
+    addMultipartInfo(bucketName, legacyKey, legacyInfo, 1L);
+    long legacyBytes = 300L + 200L;
 
+    // split-parts schema: part 1 is rewritten (111 then 400), only the current 400 counts
     String splitKey = "splitMpuKey";
     String splitUploadId = UUID.randomUUID().toString();
-    OmMultipartKeyInfo splitInfo = OMRequestTestUtils.createOmMultipartKeyInfo(
-        splitUploadId, Time.now(), HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, 1002L).toBuilder()
-        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION).build();
-    addMultipartInfo(splitKey, splitInfo, 2L);
-    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(splitUploadId, 1),
-        createSplitPart(bucketName, splitKey, splitUploadId, 1, 111L));
-    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(splitUploadId, 1),
-        createSplitPart(bucketName, splitKey, splitUploadId, 1, 400L));
-    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(splitUploadId, 2),
-        createSplitPart(bucketName, splitKey, splitUploadId, 2, 500L));
+    addMultipartInfo(bucketName, splitKey, newMultipartInfo(splitUploadId, 1002L, true), 2L);
+    putSplitPart(bucketName, splitKey, splitUploadId, 1, 111L);
+    putSplitPart(bucketName, splitKey, splitUploadId, 1, 400L);
+    putSplitPart(bucketName, splitKey, splitUploadId, 2, 500L);
+    long splitBytes = 400L + 500L;
 
-    String bucketKey = corruptBucketUsage(bucketName, 12345L, 99L, 3L);
-    applyQuotaRepair(request, 4L);
+    // uploads initiated but with no part committed yet must contribute nothing
+    String emptyLegacyUploadId = UUID.randomUUID().toString();
+    addMultipartInfo(bucketName, "emptyLegacyMpuKey",
+        newMultipartInfo(emptyLegacyUploadId, 1003L, false), 3L);
+    String emptySplitUploadId = UUID.randomUUID().toString();
+    addMultipartInfo(bucketName, "emptySplitMpuKey",
+        newMultipartInfo(emptySplitUploadId, 1004L, true), 4L);
+
+    // a second bucket proves parts are charged to the bucket that owns them
+    String otherKey = "otherMpuKey";
+    String otherUploadId = UUID.randomUUID().toString();
+    OmMultipartKeyInfo otherInfo = newMultipartInfo(otherUploadId, 2001L, false);
+    otherInfo.addPartKeyInfo(createPart(otherBucketName, otherKey, otherUploadId, 1, 700L));
+    addMultipartInfo(otherBucketName, otherKey, otherInfo, 5L);
+    long otherBytes = 700L;
+
+    String bucketKey = corruptBucketUsage(bucketName, 12345L, 99L, 6L);
+    String otherBucketKey = corruptBucketUsage(otherBucketName, 54321L, 77L, 7L);
+    applyQuotaRepair(request, 8L);
 
     OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
-    assertEquals(1400L, repaired.getUsedBytes());
-    assertEquals(0L, repaired.getUsedNamespace());
+    assertEquals(keyBytes + legacyBytes + splitBytes, repaired.getUsedBytes());
+    // MPU parts consume no namespace, only the committed keys do
+    assertEquals(keyCount, repaired.getUsedNamespace());
+    OmBucketInfo otherRepaired = omMetadataManager.getBucketTable().get(otherBucketKey);
+    assertEquals(otherBytes, otherRepaired.getUsedBytes());
+    assertEquals(0L, otherRepaired.getUsedNamespace());
 
-    abortMpu(bucketName, legacyKey, legacyUploadId, BucketLayout.OBJECT_STORE, 1003L);
-    abortMpu(bucketName, splitKey, splitUploadId, BucketLayout.OBJECT_STORE, 1004L);
-    assertEquals(0L, omMetadataManager.getBucketTable().get(bucketKey).getUsedBytes());
+    // aborting through the real request path must release exactly what repair counted.
+    // No open key is staged, so abort takes its orphan-parts path.
+    abortMpu(bucketName, legacyKey, legacyUploadId, BucketLayout.OBJECT_STORE, 5001L);
+    abortMpu(bucketName, splitKey, splitUploadId, BucketLayout.OBJECT_STORE, 5002L);
+    assertEquals(keyBytes, omMetadataManager.getBucketTable().get(bucketKey).getUsedBytes());
+    abortMpu(otherBucketName, otherKey, otherUploadId, BucketLayout.OBJECT_STORE, 5003L);
+    assertEquals(0L, omMetadataManager.getBucketTable().get(otherBucketKey).getUsedBytes());
   }
 
   @Test
-  public void testQuotaRepairCountsMpuPartsFso() throws Exception {
+  public void testQuotaRepairCountsMPUPartsWithFSO() throws Exception {
     AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
     String fsoBucketName = "fsomup" + bucketName;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, fsoBucketName,
@@ -512,24 +545,64 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
 
     String keyName = "fsoMpuFile";
     String uploadId = UUID.randomUUID().toString();
-    OmMultipartKeyInfo mpuInfo = OMRequestTestUtils.createOmMultipartKeyInfo(
-        uploadId, Time.now(), HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE, 3001L).toBuilder()
-        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION).build();
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, fsoBucketName,
-        keyName, RatisReplicationConfig.getInstance(THREE)).build();
-    OMRequestTestUtils.addMultipartInfoToTable(false, omKeyInfo, mpuInfo, 1L, omMetadataManager);
-    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(uploadId, 1),
-        createSplitPart(fsoBucketName, keyName, uploadId, 1, 100L));
+    OmMultipartKeyInfo mpuInfo = newMultipartInfo(uploadId, 3001L, true).toBuilder()
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE)).build();
+    addMultipartInfo(fsoBucketName, keyName, mpuInfo, 1L);
+    putSplitPart(fsoBucketName, keyName, uploadId, 1, 100L);
+    long ratisBytes = 100L * 3;
 
-    String bucketKey = corruptBucketUsage(fsoBucketName, 777L, 88L, 2L);
-    applyQuotaRepair(request, 3L);
+    // EC parity overhead is charged too: one full rs-3-2-1024k stripe of data
+    // costs the 3 MiB of data plus 2 MiB of parity
+    String ecKeyName = "ecMpuFile";
+    String ecUploadId = UUID.randomUUID().toString();
+    OmMultipartKeyInfo ecInfo = newMultipartInfo(ecUploadId, 3002L, true).toBuilder()
+        .setReplicationConfig(new ECReplicationConfig("rs-3-2-1024k")).build();
+    addMultipartInfo(fsoBucketName, ecKeyName, ecInfo, 2L);
+    putSplitPart(fsoBucketName, ecKeyName, ecUploadId, 1, 3 * 1024 * 1024L);
+    long ecBytes = 5 * 1024 * 1024L;
+
+    String bucketKey = corruptBucketUsage(fsoBucketName, 777L, 88L, 3L);
+    applyQuotaRepair(request, 4L);
 
     OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
-    assertEquals(300L, repaired.getUsedBytes());
+    assertEquals(ratisBytes + ecBytes, repaired.getUsedBytes());
     assertEquals(0L, repaired.getUsedNamespace());
-    abortMpu(fsoBucketName, keyName, uploadId, BucketLayout.FILE_SYSTEM_OPTIMIZED, 3002L);
+
+    abortMpu(fsoBucketName, keyName, uploadId, BucketLayout.FILE_SYSTEM_OPTIMIZED, 5001L);
+    abortMpu(fsoBucketName, ecKeyName, ecUploadId, BucketLayout.FILE_SYSTEM_OPTIMIZED, 5002L);
     assertEquals(0L, omMetadataManager.getBucketTable().get(bucketKey).getUsedBytes());
+  }
+
+  @Test
+  public void testQuotaRepairSkipsMPUOutsideRequestedBuckets() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    String skippedBucketName = "skipped" + bucketName;
+    OMRequestTestUtils.addBucketToDB(volumeName, skippedBucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+
+    String repairedKey = "repairedMpuKey";
+    String repairedUploadId = UUID.randomUUID().toString();
+    OmMultipartKeyInfo repairedInfo = newMultipartInfo(repairedUploadId, 4001L, false);
+    repairedInfo.addPartKeyInfo(createPart(bucketName, repairedKey, repairedUploadId, 1, 500L));
+    addMultipartInfo(bucketName, repairedKey, repairedInfo, 1L);
+
+    String skippedKey = "skippedMpuKey";
+    String skippedUploadId = UUID.randomUUID().toString();
+    OmMultipartKeyInfo skippedInfo = newMultipartInfo(skippedUploadId, 4002L, false);
+    skippedInfo.addPartKeyInfo(createPart(skippedBucketName, skippedKey, skippedUploadId, 1, 900L));
+    addMultipartInfo(skippedBucketName, skippedKey, skippedInfo, 2L);
+
+    String bucketKey = corruptBucketUsage(bucketName, 12345L, 99L, 3L);
+    String skippedBucketKey = corruptBucketUsage(skippedBucketName, 54321L, 77L, 4L);
+    applyQuotaRepair(request, 5L, bucketKey);
+
+    assertEquals(500L, omMetadataManager.getBucketTable().get(bucketKey).getUsedBytes());
+    // the unrequested bucket keeps its stored usage, its parts are not folded in anywhere
+    OmBucketInfo skipped = omMetadataManager.getBucketTable().get(skippedBucketKey);
+    assertEquals(54321L, skipped.getUsedBytes());
+    assertEquals(77L, skipped.getUsedNamespace());
   }
 
   private AtomicReference<OzoneManagerProtocolProtos.OMRequest> mockQuotaRepairRequest() throws Exception {
@@ -545,12 +618,30 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     return request;
   }
 
-  private void addMultipartInfo(String keyName, OmMultipartKeyInfo multipartInfo, long transactionIndex)
-      throws IOException {
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName,
-        keyName, RatisReplicationConfig.getInstance(ONE)).build();
+  private OmMultipartKeyInfo newMultipartInfo(String uploadId, long objectId, boolean splitParts) {
+    OmMultipartKeyInfo info = OMRequestTestUtils.createOmMultipartKeyInfo(
+        uploadId, Time.now(), HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE, objectId);
+    if (!splitParts) {
+      return info;
+    }
+    return info.toBuilder()
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION).build();
+  }
+
+  private void addMultipartInfo(String bucket, String keyName, OmMultipartKeyInfo multipartInfo,
+      long transactionIndex) throws IOException {
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucket,
+        keyName, multipartInfo.getReplicationConfig()).build();
     OMRequestTestUtils.addMultipartInfoToTable(false, omKeyInfo, multipartInfo, transactionIndex,
         omMetadataManager);
+  }
+
+  // repair scans a RocksDB checkpoint, so parts must be written to the table, not the cache
+  private void putSplitPart(String bucket, String keyName, String uploadId, int partNumber,
+      long dataSize) throws IOException {
+    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(uploadId, partNumber),
+        createSplitPart(bucket, keyName, uploadId, partNumber, dataSize));
   }
 
   private String corruptBucketUsage(String bucket, long usedBytes, long usedNamespace, long transactionIndex)
@@ -565,9 +656,9 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
   }
 
   private void applyQuotaRepair(AtomicReference<OzoneManagerProtocolProtos.OMRequest> request,
-      long transactionIndex) throws Exception {
+      long transactionIndex, String... buckets) throws Exception {
     QuotaRepairTask quotaRepairTask = new QuotaRepairTask(ozoneManager);
-    assertTrue(awaitRepair(quotaRepairTask.repair()));
+    assertTrue(awaitRepair(quotaRepairTask.repair(Arrays.asList(buckets))));
     OMClientResponse response = new OMQuotaRepairRequest(request.get())
         .validateAndUpdateCache(ozoneManager, transactionIndex);
     BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
@@ -593,10 +684,11 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     assertTrue(response.getOMResponse().getSuccess());
   }
 
-  private PartKeyInfo createPart(String keyName, String uploadId, int partNumber, long dataSize) {
+  private PartKeyInfo createPart(String bucket, String keyName, String uploadId, int partNumber,
+      long dataSize) {
     return PartKeyInfo.newBuilder().setPartNumber(partNumber)
-        .setPartName(OmMultipartUpload.getDbKey(volumeName, bucketName, keyName, uploadId))
-        .setPartKeyInfo(KeyInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+        .setPartName(OmMultipartUpload.getDbKey(volumeName, bucket, keyName, uploadId) + "/" + partNumber)
+        .setPartKeyInfo(KeyInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucket)
             .setKeyName(keyName).setDataSize(dataSize).setCreationTime(Time.now()).setModificationTime(Time.now())
             .setType(HddsProtos.ReplicationType.RATIS).setFactor(ONE).build())
         .build();
@@ -606,8 +698,10 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
       int partNumber, long dataSize) {
     OmKeyInfo partKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucket, keyName,
         RatisReplicationConfig.getInstance(ONE)).setDataSize(dataSize)
+        .setObjectID(2000L + partNumber).setUpdateID(2000L + partNumber)
         .addMetadata(OzoneConsts.ETAG, "etag-" + partNumber).build();
-    return OmMultipartPartInfo.from(OmMultipartUpload.getDbKey(volumeName, bucket, keyName, uploadId),
+    return OmMultipartPartInfo.from(
+        OmMultipartUpload.getDbKey(volumeName, bucket, keyName, uploadId) + "/" + partNumber,
         partNumber, partKeyInfo);
   }
 }
