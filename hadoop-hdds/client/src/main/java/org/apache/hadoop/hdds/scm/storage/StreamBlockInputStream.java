@@ -578,12 +578,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
         if (verifyChecksum) {
           ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
-          if (readBlock.hasChunkInfoList()) {
-            Checksum.verifyChecksum(data, checksumData, readBlock.getOffset(),
-                readBlock.getChunkInfoList().getChunksList());
-          } else {
-            Checksum.verifyChecksum(data, checksumData, 0);
-          }
+          Checksum.verifyChecksum(data, checksumData, 0);
         }
         offerToQueue(readBlock);
       } catch (IOException | RuntimeException e) {

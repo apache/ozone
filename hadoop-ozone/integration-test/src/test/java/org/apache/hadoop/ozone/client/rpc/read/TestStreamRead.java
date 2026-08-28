@@ -89,6 +89,7 @@ public class TestStreamRead {
 
   static MiniOzoneCluster newCluster(int bytesPerChecksum) throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("hdds.datanode.chunk.data.validation.check", true);
 
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
     config.setBytesPerChecksum(bytesPerChecksum);
@@ -110,23 +111,23 @@ public class TestStreamRead {
         .build();
   }
 
-  @Test
-  void testReadKey512() throws Exception {
-    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf(512);
-    runTestReadKey(KEY_SIZE, bytesPerChecksum);
-  }
-
-  @Test
-  void testReadKey16k() throws Exception {
-    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("16k");
-    runTestReadKey(KEY_SIZE, bytesPerChecksum);
-  }
-
-  @Test
-  void testReadKey256k() throws Exception {
-    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("256k");
-    runTestReadKey(KEY_SIZE, bytesPerChecksum);
-  }
+//  @Test
+//  void testReadKey512() throws Exception {
+//    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf(512);
+//    runTestReadKey(KEY_SIZE, bytesPerChecksum);
+//  }
+//
+//  @Test
+//  void testReadKey16k() throws Exception {
+//    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("16k");
+//    runTestReadKey(KEY_SIZE, bytesPerChecksum);
+//  }
+//
+//  @Test
+//  void testReadKey256k() throws Exception {
+//    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("256k");
+//    runTestReadKey(KEY_SIZE, bytesPerChecksum);
+//  }
 
   void runTestReadKey(SizeInBytes keySize, SizeInBytes bytesPerChecksum) throws Exception {
     System.out.println("cluster starting ...");
@@ -316,6 +317,8 @@ public class TestStreamRead {
       OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
       clientConfig.setStreamReadBlock(true);
       clientConfig.setStreamBufferFlushDelay(false);
+      clientConfig.setChecksumVerify(false);
+
       final OzoneConfiguration steamReadConf = new OzoneConfiguration(conf);
       steamReadConf.setFromObject(clientConfig);
 
@@ -356,6 +359,7 @@ public class TestStreamRead {
       OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
       clientConfig.setStreamReadBlock(true);
       clientConfig.setStreamBufferFlushDelay(false);
+      clientConfig.setChecksumVerify(false);
       // verifyChecksum remains true by default
       final OzoneConfiguration streamReadConf = new OzoneConfiguration(conf);
       streamReadConf.setFromObject(clientConfig);

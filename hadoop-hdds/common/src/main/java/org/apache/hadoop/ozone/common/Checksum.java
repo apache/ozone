@@ -23,14 +23,17 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -429,45 +432,5 @@ public class Checksum {
   @VisibleForTesting
   public static ContainerProtos.ChecksumData getNoChecksumDataProto() {
     return new ChecksumData(ChecksumType.NONE, 0).getProtoBufMessage();
-  }
-
-  public static void verifyChecksum(
-      ByteBuffer data, ChecksumData checksumData, long blockOffset, List<ContainerProtos.ChunkInfo> chunkInfoList)
-      throws OzoneChecksumException {
-    if (!checksumData.getChecksumType().equals(ChecksumType.NONE)) {
-      int bytesPerChecksum = checksumData.getBytesPerChecksum();
-      long readLength = data.remaining();
-      long currentChunkOffset = 0;
-      int checksumIndex = 0;
-      int dataOffset = 0;
-
-      for (ContainerProtos.ChunkInfo chunk : chunkInfoList) {
-        long chunkStart = currentChunkOffset;
-        long chunkEnd = chunkStart + chunk.getLen();
-
-        long overlapStart = Math.max(blockOffset, chunkStart);
-        long overlapEnd = Math.min(blockOffset + readLength, chunkEnd);
-
-        if (overlapStart < overlapEnd) {
-          int overlapLen = Math.toIntExact(overlapEnd - overlapStart);
-          ByteBuffer chunkData = data.duplicate();
-          chunkData.position(data.position() + dataOffset);
-          chunkData.limit(data.position() + dataOffset + overlapLen);
-
-          Checksum.verifyChecksum(chunkData, checksumData, checksumIndex);
-
-          dataOffset += overlapLen;
-
-          long offsetInChunk = overlapStart - chunkStart;
-          long endOffsetInChunk = overlapEnd - chunkStart;
-
-          int firstChecksumIndex = Math.toIntExact(offsetInChunk / bytesPerChecksum);
-          int lastChecksumIndex = Math.toIntExact((endOffsetInChunk - 1) / bytesPerChecksum);
-
-          checksumIndex += (lastChecksumIndex - firstChecksumIndex + 1);
-        }
-        currentChunkOffset += chunk.getLen();
-      }
-    }
   }
 }
