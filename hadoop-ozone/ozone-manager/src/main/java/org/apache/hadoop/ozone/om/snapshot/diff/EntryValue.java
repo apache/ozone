@@ -77,7 +77,7 @@ public final class EntryValue {
     return isDir;
   }
 
-  public byte[] getSignature() {
+  byte[] getSignature() {
     return signature;
   }
 
