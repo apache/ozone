@@ -31,8 +31,9 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -57,7 +58,7 @@ import org.junit.jupiter.api.Test;
  * Tests upgrade finalization failure scenarios and corner cases specific to DN data distribution feature.
  */
 public class TestDNDataDistributionFinalization {
-  private StorageContainerLocationProtocol scmClient;
+  private ScmBlockLocationProtocol scmBlockClient;
   private MiniOzoneHAClusterImpl cluster;
 
   private static final int NUM_DATANODES = 3;
@@ -104,7 +105,7 @@ public class TestDNDataDistributionFinalization {
             .build());
     this.cluster = clusterBuilder.build();
 
-    scmClient = cluster.getStorageContainerLocationClient();
+    scmBlockClient = HAUtils.getScmBlockClient(conf);
     cluster.waitForClusterToBeReady();
     assertEquals(HDDSLayoutFeature.HBASE_SUPPORT,
         cluster.getStorageContainerManager().getVersionManager().getApparentVersion());
@@ -155,8 +156,8 @@ public class TestDNDataDistributionFinalization {
     validatePreDataDistributionFeatureState();
 
     // Wait for finalization to complete
-    scmClient.finalizeUpgrade();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
+    scmBlockClient.finalizeUpgrade();
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmBlockClient);
 
     // Verify finalization completed
     assertFalse(cluster.getStorageContainerManager().getVersionManager().needsFinalization());
@@ -191,8 +192,8 @@ public class TestDNDataDistributionFinalization {
       out.write(data);
     }
     bucket.deleteKey(keyName);
-    scmClient.finalizeUpgrade();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
+    scmBlockClient.finalizeUpgrade();
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmBlockClient);
     assertFalse(cluster.getStorageContainerManager().getVersionManager().needsFinalization());
     assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
 

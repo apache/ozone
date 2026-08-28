@@ -80,7 +80,7 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
 
   @Test
   public void testPreExecuteCallsScmFinalizeUpgrade() throws IOException {
-    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    doNothing().when(scmBlockLocationProtocol).finalizeUpgrade();
 
     OMFinalizeUpgradeRequestBase request = newRequest();
     OMRequest original = request.getOmRequest();
@@ -92,14 +92,14 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
     assertNotNull(modified.getUserInfo());
 
     // A non-forced initiate request must route to SCM's non-force finalize path.
-    verify(scmContainerLocationProtocol).finalizeUpgrade();
-    verify(scmContainerLocationProtocol, never()).forceFinalizeUpgrade();
+    verify(scmBlockLocationProtocol).finalizeUpgrade();
+    verify(scmBlockLocationProtocol, never()).forceFinalizeUpgrade();
   }
 
   @Test
   public void testScmFinalizeFailurePropagatesToClient() throws IOException {
     IOException scmFailure = new IOException("SCM finalize upgrade failed");
-    doThrow(scmFailure).when(scmContainerLocationProtocol).finalizeUpgrade();
+    doThrow(scmFailure).when(scmBlockLocationProtocol).finalizeUpgrade();
 
     OMFinalizeUpgradeRequestBase request = newRequest();
 
@@ -108,14 +108,14 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
     IOException ex = assertThrows(IOException.class, () -> request.preExecute(ozoneManager));
     assertSame(scmFailure, ex);
 
-    verify(scmContainerLocationProtocol).finalizeUpgrade();
+    verify(scmBlockLocationProtocol).finalizeUpgrade();
   }
 
   @Test
   public void testScmUnsupportedOperationBecomesOmNotSupportedOperation() throws IOException {
     SCMException scmFailure =
         new SCMException("SCM version mismatch", SCMException.ResultCodes.UNSUPPORTED_OPERATION);
-    doThrow(scmFailure).when(scmContainerLocationProtocol).finalizeUpgrade();
+    doThrow(scmFailure).when(scmBlockLocationProtocol).finalizeUpgrade();
 
     OMFinalizeUpgradeRequestBase request = newRequest();
 
@@ -126,13 +126,13 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
     assertEquals(scmFailure.getMessage(), ex.getMessage());
     assertSame(scmFailure, ex.getCause());
 
-    verify(scmContainerLocationProtocol).finalizeUpgrade();
+    verify(scmBlockLocationProtocol).finalizeUpgrade();
   }
 
   @Test
   public void testOtherScmExceptionPropagatesUnchanged() throws IOException {
     SCMException scmFailure = new SCMException("SCM is in safe mode", SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
-    doThrow(scmFailure).when(scmContainerLocationProtocol).finalizeUpgrade();
+    doThrow(scmFailure).when(scmBlockLocationProtocol).finalizeUpgrade();
 
     OMFinalizeUpgradeRequestBase request = newRequest();
 
@@ -140,7 +140,7 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
     SCMException ex = assertThrows(SCMException.class, () -> request.preExecute(ozoneManager));
     assertSame(scmFailure, ex);
 
-    verify(scmContainerLocationProtocol).finalizeUpgrade();
+    verify(scmBlockLocationProtocol).finalizeUpgrade();
   }
 
   @Test
@@ -162,23 +162,23 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
         "non-admin user should receive ACCESS_DENIED from preExecute");
 
     // SCM must NOT have been called — auth is checked before the SCM call.
-    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
+    verify(scmBlockLocationProtocol, never()).finalizeUpgrade();
   }
 
   @Test
   public void testPeerVersionCheckPassesWhenNoPeers() throws IOException {
     assertTrue(ozoneManager.getPeerNodes().isEmpty());
     // preExecute must complete normally and call SCM finalize.
-    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    doNothing().when(scmBlockLocationProtocol).finalizeUpgrade();
 
     newRequest().preExecute(ozoneManager);
 
-    verify(scmContainerLocationProtocol).finalizeUpgrade();
+    verify(scmBlockLocationProtocol).finalizeUpgrade();
   }
 
   @Test
   public void testPeerVersionCheckPassesWhenAllPeersMatch() throws IOException {
-    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    doNothing().when(scmBlockLocationProtocol).finalizeUpgrade();
     when(ozoneManager.getPeerNodes()).thenReturn(Arrays.asList(buildPeer("om2"), buildPeer("om3")));
     OMAdminProtocolClientSideImpl matchingClient = peerClientWithVersion(OzoneManagerVersion.SOFTWARE_VERSION);
 
@@ -190,7 +190,7 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
       newRequest().preExecute(ozoneManager);
     }
 
-    verify(scmContainerLocationProtocol).finalizeUpgrade();
+    verify(scmBlockLocationProtocol).finalizeUpgrade();
   }
 
   @Test
@@ -208,7 +208,7 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
       assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION, ex.getResult());
     }
 
-    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
+    verify(scmBlockLocationProtocol, never()).finalizeUpgrade();
   }
 
   @Test
@@ -226,7 +226,7 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
       assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION, ex.getResult());
     }
 
-    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
+    verify(scmBlockLocationProtocol, never()).finalizeUpgrade();
   }
 
   @Test
@@ -244,12 +244,12 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
       assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION, ex.getResult());
     }
 
-    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
+    verify(scmBlockLocationProtocol, never()).finalizeUpgrade();
   }
 
   @Test
   public void testValidateAndUpdateCacheAddsFinalizationInProgressKey() throws IOException {
-    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    doNothing().when(scmBlockLocationProtocol).finalizeUpgrade();
 
     assertNull(omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY),
         "key should not exist before the request");
@@ -271,7 +271,7 @@ public abstract class TestOMStartFinalizeUpgradeRequestBase extends OMKeyRequest
 
   @Test
   public void testValidateAndUpdateCacheSkipsMarkerWhenAlreadyFinalized() throws IOException {
-    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    doNothing().when(scmBlockLocationProtocol).finalizeUpgrade();
     // Simulate an admin initiating finalize on a cluster that is already finalized.
     OMVersionManager finalizedVersionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
     when(ozoneManager.getVersionManager()).thenReturn(finalizedVersionManager);

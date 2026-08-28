@@ -41,11 +41,13 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HddsUpgradeTestUtils;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -73,6 +75,7 @@ public class TestBlockDeletionService {
   private static final int KEY_SIZE = 5 * 1024; // 5 KB
   private static MiniOzoneCluster cluster;
   private static StorageContainerLocationProtocol scmClient;
+  private static ScmBlockLocationProtocol scmBlockClient;
   private static OzoneBucket bucket;
   private static SCMPerformanceMetrics metrics;
 
@@ -100,6 +103,7 @@ public class TestBlockDeletionService {
         .build();
     cluster.waitForClusterToBeReady();
     scmClient = cluster.getStorageContainerLocationClient();
+    scmBlockClient = HAUtils.getScmBlockClient(conf);
     assertEquals(HBASE_SUPPORT, cluster.getStorageContainerManager().getVersionManager().getApparentVersion());
     metrics = cluster.getStorageContainerManager().getBlockProtocolServer().getMetrics();
 
@@ -139,8 +143,8 @@ public class TestBlockDeletionService {
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeyFailedBlocks() - initialFailedBlocks == 0, 50, 1000);
 
     // Step 5: wait for finalizing upgrade
-    scmClient.finalizeUpgrade();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
+    scmBlockClient.finalizeUpgrade();
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmBlockClient);
     assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
 
     // POST-UPGRADE

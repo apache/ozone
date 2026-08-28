@@ -45,9 +45,11 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Allo
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.FinalizeUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.QueryUpgradeStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesRequestProto;
@@ -397,6 +399,38 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
 
     return (InnerNode) setParent(
         InnerNodeImpl.fromProtobuf(resp.getClusterTree()));
+  }
+
+  @Override
+  public void finalizeUpgrade() throws IOException {
+    finalizeUpgrade(false);
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    finalizeUpgrade(true);
+  }
+
+  private void finalizeUpgrade(boolean force) throws IOException {
+    FinalizeUpgradeRequestProto request = FinalizeUpgradeRequestProto.newBuilder()
+        .setForce(force)
+        .build();
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(Type.FinalizeUpgrade)
+        .setFinalizeUpgradeRequest(request)
+        .build();
+    handleError(submitRequest(wrapper));
+  }
+
+  @Override
+  public HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException {
+    QueryUpgradeStatusRequestProto request =
+        QueryUpgradeStatusRequestProto.newBuilder().build();
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(Type.QueryUpgradeStatus)
+        .setQueryUpgradeStatusRequest(request)
+        .build();
+    final SCMBlockLocationResponse wrappedResponse =
+        handleError(submitRequest(wrapper));
+    return wrappedResponse.getQueryUpgradeStatusResponse().getStatus();
   }
 
   /**

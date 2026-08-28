@@ -3780,7 +3780,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException {
     HddsProtos.UpgradeStatus scmStatus;
     try {
-      scmStatus = scmClient.getContainerClient().queryUpgradeStatus();
+      scmStatus = scmClient.getBlockClient().queryUpgradeStatus();
     } catch (SCMException e) {
       // SCM refuses the query while in safe mode
       if (e.getResult() == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {

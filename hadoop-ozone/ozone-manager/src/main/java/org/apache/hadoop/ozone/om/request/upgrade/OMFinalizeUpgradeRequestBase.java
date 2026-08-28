@@ -80,9 +80,9 @@ public abstract class OMFinalizeUpgradeRequestBase extends OMClientRequest {
 
     try {
       if (force) {
-        ozoneManager.getScmClient().getContainerClient().forceFinalizeUpgrade();
+        ozoneManager.getScmClient().getBlockClient().forceFinalizeUpgrade();
       } else {
-        ozoneManager.getScmClient().getContainerClient().finalizeUpgrade();
+        ozoneManager.getScmClient().getBlockClient().finalizeUpgrade();
       }
     } catch (SCMException e) {
       if (e.getResult() == SCMException.ResultCodes.UNSUPPORTED_OPERATION) {

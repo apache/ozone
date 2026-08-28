@@ -32,7 +32,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -63,7 +63,7 @@ public class TestOMUpgradeFinalizeService {
   private OMVersionManager versionManager;
   private TypedTable<String, String> metaTable;
   private ScmClient scmClient;
-  private StorageContainerLocationProtocol containerClient;
+  private ScmBlockLocationProtocol blockClient;
   private OzoneManagerRatisServer omRatisServer;
   private OMUpgradeFinalizeService service;
 
@@ -88,9 +88,9 @@ public class TestOMUpgradeFinalizeService {
     // OzoneManagerRatisUtils.submitRequest() calls ozoneManager.getOmRatisServer().submitRequest(...)
     when(ozoneManager.getOmRatisServer()).thenReturn(omRatisServer);
 
-    containerClient = mock(StorageContainerLocationProtocol.class);
+    blockClient = mock(ScmBlockLocationProtocol.class);
     scmClient = mock(ScmClient.class);
-    when(scmClient.getContainerClient()).thenReturn(containerClient);
+    when(scmClient.getBlockClient()).thenReturn(blockClient);
 
     service = new OMUpgradeFinalizeService(ozoneManager, versionManager, scmClient, INTERVAL_MS);
   }
@@ -140,19 +140,19 @@ public class TestOMUpgradeFinalizeService {
         .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
         .build();
-    when(containerClient.queryUpgradeStatus()).thenReturn(scmStatus);
+    when(blockClient.queryUpgradeStatus()).thenReturn(scmStatus);
     // Finalization command not given yet
     when(metaTable.get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY)).thenReturn(null);
 
     service.runPeriodicalTaskNow();
 
-    verifyNoInteractions(containerClient);
+    verifyNoInteractions(blockClient);
     verifyNoInteractions(omRatisServer);
 
     when(metaTable.get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY)).thenReturn("ignored");
     service.runPeriodicalTaskNow();
 
-    verify(containerClient).queryUpgradeStatus();
+    verify(blockClient).queryUpgradeStatus();
     // Implementation submits a FinalizeUpgrade request through Ratis
     verify(omRatisServer).submitRequest(any(), any(ClientId.class), anyLong());
   }
@@ -173,11 +173,11 @@ public class TestOMUpgradeFinalizeService {
         .setNumDatanodesFinalized(0)
         .setNumDatanodesTotal(3)
         .build();
-    when(containerClient.queryUpgradeStatus()).thenReturn(scmStatus);
+    when(blockClient.queryUpgradeStatus()).thenReturn(scmStatus);
 
     service.runPeriodicalTaskNow();
 
-    verify(containerClient).queryUpgradeStatus();
+    verify(blockClient).queryUpgradeStatus();
     verifyNoInteractions(omRatisServer);
   }
 
@@ -189,12 +189,12 @@ public class TestOMUpgradeFinalizeService {
   void testExceptionFromScmClientIsHandledGracefully() throws Exception {
     when(ozoneManager.isLeaderReady()).thenReturn(true);
     when(versionManager.needsFinalization()).thenReturn(true);
-    when(containerClient.queryUpgradeStatus()).thenThrow(new IOException("SCM unavailable"));
+    when(blockClient.queryUpgradeStatus()).thenThrow(new IOException("SCM unavailable"));
 
     // The catch block in the task swallows the exception.
     service.runPeriodicalTaskNow();
 
-    verify(containerClient).queryUpgradeStatus();
+    verify(blockClient).queryUpgradeStatus();
     verifyNoInteractions(omRatisServer);
   }
 
@@ -255,7 +255,7 @@ public class TestOMUpgradeFinalizeService {
         .setNumDatanodesFinalized(3)
         .setNumDatanodesTotal(3)
         .build();
-    when(containerClient.queryUpgradeStatus()).thenReturn(scmStatus);
+    when(blockClient.queryUpgradeStatus()).thenReturn(scmStatus);
     when(omRatisServer.submitRequest(any(), any(ClientId.class), anyLong()))
         .thenThrow(new ServiceException("Ratis unavailable"));
 

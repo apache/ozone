@@ -28,10 +28,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -55,6 +57,7 @@ public class TestScmHAFinalization {
       LoggerFactory.getLogger(TestScmHAFinalization.class);
 
   private StorageContainerLocationProtocol scmClient;
+  private ScmBlockLocationProtocol scmBlockClient;
   private MiniOzoneHAClusterImpl cluster;
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;
@@ -80,6 +83,7 @@ public class TestScmHAFinalization {
     this.cluster = clusterBuilder.build();
 
     scmClient = cluster.getStorageContainerLocationClient();
+    scmBlockClient = HAUtils.getScmBlockClient(cluster.getConf());
     cluster.waitForClusterToBeReady();
   }
 
@@ -129,8 +133,8 @@ public class TestScmHAFinalization {
   public void testFinalization() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     init(conf, 0);
-    scmClient.finalizeUpgrade();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
+    scmBlockClient.finalizeUpgrade();
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmBlockClient);
     // Ensure all SCMs finalize, indicating the message has been propagated across them all
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
@@ -168,8 +172,8 @@ public class TestScmHAFinalization {
 
     // Wait for finalization from the client perspective.
     // Force finalize skips the peer version checks that require all peers to be active.
-    scmClient.forceFinalizeUpgrade();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient);
+    scmBlockClient.forceFinalizeUpgrade();
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmBlockClient);
     // Wait for two running SCMs to finish finalization.
     waitForScmsToFinalize(activeScms);
 

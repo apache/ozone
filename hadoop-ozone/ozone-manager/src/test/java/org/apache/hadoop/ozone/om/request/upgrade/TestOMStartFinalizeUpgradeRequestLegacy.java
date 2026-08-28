@@ -42,7 +42,7 @@ public class TestOMStartFinalizeUpgradeRequestLegacy extends TestOMStartFinalize
 
   @Test
   public void testValidateAndUpdateCacheReturnsStartingFinalization() throws IOException {
-    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    doNothing().when(scmBlockLocationProtocol).finalizeUpgrade();
 
     OMClientResponse response = submitRequest();
     OMResponse omResponse = response.getOMResponse();
