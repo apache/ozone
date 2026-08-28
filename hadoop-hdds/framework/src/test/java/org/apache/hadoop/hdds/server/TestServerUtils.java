@@ -55,10 +55,6 @@ public class TestServerUtils {
   private Path folder;
 
   /**
-   * Test case for {@link ServerUtils#getPermissions}.
-   * Verifies the retrieval of permissions for different configs.
-   */
-  /**
    * The address written back after a server binds must stay parseable, so an
    * IPv6 listen address is bracketed rather than joined with a plain colon.
    */
@@ -73,6 +69,10 @@ public class TestServerUtils {
     assertEquals("[2001:db8:0:0:0:0:0:1]:9860", conf.get("test.address.key"));
   }
 
+  /**
+   * Test case for {@link ServerUtils#getPermissions}.
+   * Verifies the retrieval of permissions for different configs.
+   */
   @Test
   public void testGetPermissions() {
     // Create an OzoneConfiguration object and set the permissions
