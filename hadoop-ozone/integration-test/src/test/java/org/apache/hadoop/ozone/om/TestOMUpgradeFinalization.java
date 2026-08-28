@@ -28,19 +28,22 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.upgrade.RatisBasedVersionManager;
@@ -121,7 +124,7 @@ class TestOMUpgradeFinalization {
         OzoneManager leaderOM = cluster.getOMLeader();
         assertNotNull(leaderOM);
         OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
-        OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster.newClient());
+        OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(cluster.newClient());
         long targetLogIndex = leaderRatisServer.getLastAppliedTermIndex().getIndex() + 100;
         LOG.info("Writing keys to advance log index");
         writeKeysToIncreaseLogIndex(leaderRatisServer, targetLogIndex, bucket);
@@ -200,6 +203,66 @@ class TestOMUpgradeFinalization {
         OMUpgradeTestUtils.waitForFinalization(omClient);
         assertEquals(HddsProtos.FinalizationStatus.FINALIZED,
             omClient.queryUpgradeStatus().getOmFinalizationStatus());
+      }
+    }
+  }
+
+  /**
+   * The OM version advertised in its {@link ServiceInfo} should track
+   * {@code getVersionForClient()} across finalization: the last pre-ZDU client
+   * version before ZDU is finalized, and the software version after.
+   *
+   * On an HA cluster every OM should report the same client-facing version, both
+   * for itself and for its peers, in every OM's {@code getServiceList()}.
+   */
+  @Test
+  void testServiceInfoOmVersionTracksClientVersion() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, INITIAL_VERSION.serialize());
+
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(UUID.randomUUID().toString())
+        .setNumOfOzoneManagers(3)
+        .setNumOfActiveOMs(3)
+        .withoutDatanodes();
+    try (MiniOzoneHAClusterImpl cluster = builder.build()) {
+      cluster.waitForClusterToBeReady();
+
+      try (OzoneClient client = cluster.newClient()) {
+        OzoneManagerProtocol omClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();
+
+        // Every OM is pre-finalized for ZDU. The version returned to clients should reflect the last software
+        // version before ZDU to remain compatible with the old version framework.
+        assertAllOmServiceInfoVersions(cluster, OzoneManagerVersion.S3_BUCKET_TAGGING_API);
+
+        omClient.finalizeUpgrade();
+        OMUpgradeTestUtils.waitForFinalization(omClient);
+        for (OzoneManager om : cluster.getOzoneManagersList()) {
+          waitFor(() -> !om.getVersionManager().needsFinalization(), 100, 30000);
+        }
+
+        // After finalization: every OM advertises the software version for all three OMs.
+        assertAllOmServiceInfoVersions(cluster, OzoneManagerVersion.SOFTWARE_VERSION);
+      }
+    }
+  }
+
+  /**
+   * Assert that, from every OM's {@code getServiceList()}, all three OM entries report {@code expected}.
+   */
+  private static void assertAllOmServiceInfoVersions(MiniOzoneHAClusterImpl cluster, OzoneManagerVersion expected)
+      throws IOException {
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      assertEquals(expected, om.getVersionManager().getVersionForClient());
+
+      List<OzoneManagerVersion> omVersions = om.getServiceList().stream()
+          .filter(info -> info.getNodeType() == HddsProtos.NodeType.OM)
+          .map(info -> OzoneManagerVersion.deserialize(info.getProtobuf().getOMVersion()))
+          .collect(Collectors.toList());
+      assertEquals(3, omVersions.size());
+      for (OzoneManagerVersion version : omVersions) {
+        assertEquals(expected, version);
       }
     }
   }

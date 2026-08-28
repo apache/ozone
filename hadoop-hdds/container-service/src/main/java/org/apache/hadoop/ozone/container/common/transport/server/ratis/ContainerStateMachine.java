@@ -111,6 +111,7 @@ import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.TaskQueue;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -728,7 +729,17 @@ public class ContainerStateMachine extends BaseStateMachine {
               requestProto.getTraceID());
     }
     dispatchCommand(requestProto, context);  // stream init
-    return dispatcher.getStreamDataChannel(requestProto);
+    final CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock
+        = requestProto.getCmdType() == Type.StreamInitWithPutBlock ? this::streamPutBlock : null;
+    return dispatcher.getStreamDataChannel(requestProto, putBlock);
+  }
+
+  void streamPutBlock(ContainerCommandRequestProto request) throws IOException {
+    final DispatcherContext context = DispatcherContext.newBuilder(DispatcherContext.Op.STREAM_LINK)
+        .setStage(DispatcherContext.WriteChunkStage.COMBINED)
+        .setContainer2BCSIDMap(container2BCSIDMap)
+        .build();
+    dispatchCommand(request, context);
   }
 
   @Override
@@ -744,7 +755,7 @@ public class ContainerStateMachine extends BaseStateMachine {
                 .setContainer2BCSIDMap(container2BCSIDMap)
                 .setWriteVersion(ClientCommandsUtils.getWritePipelineVersion(requestProto))
                 .build();
-        DataChannel channel = getStreamDataChannel(requestProto, context);
+        final DataChannel channel = getStreamDataChannel(requestProto, context);
         final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
             getChunkExecutor(requestProto.getWriteChunk()) : null;
         return new LocalStream(channel, chunkExecutor);
@@ -776,7 +787,10 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     final KeyValueStreamDataChannel kvStreamDataChannel =
         (KeyValueStreamDataChannel) dataChannel;
-    kvStreamDataChannel.setLinked();
+    if (!kvStreamDataChannel.link()) {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "PutBlock was not committed on stream close: " + kvStreamDataChannel));
+    }
     return CompletableFuture.completedFuture(null);
   }
 

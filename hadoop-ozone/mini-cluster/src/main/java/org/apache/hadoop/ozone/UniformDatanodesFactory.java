@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -60,7 +61,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
   private final int numDataVolumes;
   private final String reservedSpace;
-  private final Integer apparentVersion;
+  private final ComponentVersion apparentVersion;
   private final HDDSVersion currentVersion;
 
   protected UniformDatanodesFactory(Builder builder) {
@@ -104,7 +105,13 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
     if (apparentVersion != null) {
       DatanodeStorage layoutStorage = new DatanodeStorage(
-          dnConf, UUID.randomUUID().toString(), apparentVersion);
+          dnConf, UUID.randomUUID().toString(), apparentVersion.serialize());
+      layoutStorage.initialize();
+    } else {
+      // TODO HDDS-16206 workaround. Once that is resolved MiniOzoneCluster Datanodes should start with
+      //  SOFTWARE_VERSION by default.
+      DatanodeStorage layoutStorage = new DatanodeStorage(
+          dnConf, UUID.randomUUID().toString(), HDDSVersion.SOFTWARE_VERSION.serialize());
       layoutStorage.initialize();
     }
 
@@ -140,7 +147,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
     private int numDataVolumes = 1;
     private String reservedSpace;
-    private Integer apparentVersion;
+    private ComponentVersion apparentVersion;
     private HDDSVersion currentVersion;
 
     /**
@@ -164,7 +171,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
       return this;
     }
 
-    public Builder setApparentVersion(int apparentVersion) {
+    public Builder setApparentVersion(ComponentVersion apparentVersion) {
       this.apparentVersion = apparentVersion;
       return this;
     }

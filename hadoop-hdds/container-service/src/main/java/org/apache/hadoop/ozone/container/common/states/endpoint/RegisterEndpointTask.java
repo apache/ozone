@@ -47,7 +47,7 @@ public final class RegisterEndpointTask implements
   static final Logger LOG = LoggerFactory.getLogger(RegisterEndpointTask.class);
 
   private final EndpointStateMachine rpcEndPoint;
-  private DatanodeDetails datanodeDetails;
+  private final DatanodeDetails datanodeDetails;
   private final OzoneContainer datanodeContainerManager;
   private StateContext stateContext;
   private final DatanodeVersionManager versionManager;
@@ -66,6 +66,7 @@ public final class RegisterEndpointTask implements
     this.rpcEndPoint = rpcEndPoint;
     this.datanodeContainerManager = ozoneContainer;
     this.stateContext = context;
+    this.datanodeDetails = context.getParent().getDatanodeDetails();
     this.versionManager = context.getParent().getVersionManager();
   }
 
@@ -76,16 +77,6 @@ public final class RegisterEndpointTask implements
    */
   public DatanodeDetails getDatanodeDetails() {
     return datanodeDetails;
-  }
-
-  /**
-   * Set the contiainerNodeID Proto.
-   *
-   * @param datanodeDetails - Container Node ID.
-   */
-  public void setDatanodeDetails(
-      DatanodeDetails datanodeDetails) {
-    this.datanodeDetails = datanodeDetails;
   }
 
   /**
@@ -119,6 +110,7 @@ public final class RegisterEndpointTask implements
         NodeReportProto nodeReport = datanodeContainerManager.getNodeReport();
         PipelineReportsProto pipelineReportsProto =
             datanodeContainerManager.getPipelineReport();
+        datanodeDetails.setCurrentVersion(versionManager.getVersionForClient());
         // TODO : Add responses to the command Queue.
         SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
             .register(datanodeDetails.getExtendedProtoBufMessage(),
@@ -177,7 +169,6 @@ public final class RegisterEndpointTask implements
   public static class Builder {
     private EndpointStateMachine endPointStateMachine;
     private ConfigurationSource conf;
-    private DatanodeDetails datanodeDetails;
     private OzoneContainer container;
     private StateContext context;
 
@@ -210,17 +201,6 @@ public final class RegisterEndpointTask implements
     }
 
     /**
-     * Sets the NodeID.
-     *
-     * @param dnDetails - NodeID proto
-     * @return Builder
-     */
-    public Builder setDatanodeDetails(DatanodeDetails dnDetails) {
-      this.datanodeDetails = dnDetails;
-      return this;
-    }
-
-    /**
      * Sets the ozonecontainer.
      * @param ozoneContainer
      * @return Builder
@@ -249,12 +229,6 @@ public final class RegisterEndpointTask implements
                 + "task");
       }
 
-      if (datanodeDetails == null) {
-        LOG.error("No datanode specified.");
-        throw new IllegalArgumentException("A valid Node ID is needed to " +
-            "construct RegisterEndpoint task");
-      }
-
       if (container == null) {
         LOG.error("Container is not specified");
         throw new IllegalArgumentException("Container is not specified to " +
@@ -267,10 +241,8 @@ public final class RegisterEndpointTask implements
             "construct RegisterEndpoint task");
       }
 
-      RegisterEndpointTask task = new RegisterEndpointTask(this
-          .endPointStateMachine, this.container, this.context);
-      task.setDatanodeDetails(datanodeDetails);
-      return task;
+      return new RegisterEndpointTask(this.endPointStateMachine,
+          this.container, this.context);
     }
   }
 }

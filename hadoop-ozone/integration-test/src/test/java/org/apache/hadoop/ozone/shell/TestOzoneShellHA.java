@@ -34,6 +34,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -96,11 +97,13 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -111,6 +114,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.AfterParameterizedClassInvocation;
+import org.junit.jupiter.params.BeforeParameterizedClassInvocation;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -127,6 +134,8 @@ import picocli.CommandLine.RunLast;
  * This class tests Ozone sh shell command.
  * Inspired by TestS3Shell
  */
+@ParameterizedClass
+@ValueSource(booleans = {true, false})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestOzoneShellHA {
@@ -141,9 +150,9 @@ public class TestOzoneShellHA {
   private static File kmsDir;
   private static File testFile;
   private static String testFilePathString;
-  private static MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneHAClusterImpl cluster;
   private static MiniKMS miniKMS;
-  private static OzoneClient client;
+  private OzoneClient client;
   private OzoneShell ozoneShell = null;
   private OzoneAdmin ozoneAdminShell = null;
 
@@ -155,58 +164,67 @@ public class TestOzoneShellHA {
   private static String omServiceId;
   private static int numOfOMs;
 
-  private static OzoneConfiguration ozoneConfiguration;
+  @Parameter
+  private boolean followerReadEnabled;
 
-  @BeforeAll
+  @BeforeParameterizedClassInvocation
   public void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
-    conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
-    startKMS();
-    startCluster(conf);
+    cluster = startCluster(followerReadEnabled);
+    cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
   }
 
-  protected static void startKMS() throws Exception {
+  @BeforeAll
+  static void startKMS() throws Exception {
+    testFilePathString = path + OZONE_URI_DELIMITER + "testFile";
+    testFile = new File(testFilePathString);
+    FileUtils.touch(testFile);
+
     MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
     miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
     miniKMS.start();
   }
 
-  protected static void startCluster(OzoneConfiguration conf) throws Exception {
-
-    testFilePathString = path + OZONE_URI_DELIMITER + "testFile";
-    testFile = new File(testFilePathString);
-    FileUtils.touch(testFile);
-
+  static MiniOzoneHAClusterImpl startCluster(boolean followerReadEnabled) throws Exception {
     // Init HA cluster
-    omServiceId = "om-service-test1";
+    omServiceId = uniqueObjectName("om-service-test");
     numOfOMs = 3;
     final int numDNs = 5;
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
+    conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
         getKeyProviderURI(miniKMS));
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 10);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     conf.setInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT, 1);
-    ozoneConfiguration = conf;
+    conf.setBoolean(OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, true);
+
+    conf.setBoolean("ozone.om.allow.leader.skip.linearizable.read", followerReadEnabled);
+    conf.setBoolean("ozone.client.follower.read.enabled", followerReadEnabled);
+    OzoneManagerRatisServerConfig omRatisConfig = conf.getObject(OzoneManagerRatisServerConfig.class);
+    omRatisConfig.setReadLeaderLeaseEnabled(followerReadEnabled);
+    RaftServerConfigKeys.Read.Option option = followerReadEnabled
+        ? RaftServerConfigKeys.Read.Option.LINEARIZABLE
+        : RaftServerConfigKeys.Read.Option.DEFAULT;
+    omRatisConfig.setReadOption(option.name());
+    conf.setFromObject(omRatisConfig);
+
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .setNumDatanodes(numDNs);
-    cluster = builder.build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+    return builder.build();
   }
 
-  /**
-   * shutdown MiniOzoneCluster.
-   */
-  @AfterAll
+  @AfterParameterizedClassInvocation
   public void shutdown() {
-    IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    IOUtils.closeQuietly(client, cluster);
+  }
 
+  @AfterAll
+  void stopKMS() {
     if (miniKMS != null) {
       miniKMS.stop();
     }
@@ -231,7 +249,11 @@ public class TestOzoneShellHA {
     System.setErr(OLD_ERR);
   }
 
-  protected void execute(GenericCli shell, String[] args) {
+  private void execute(GenericCli shell, String[] args) {
+    execute(cluster.getConf(), shell, args);
+  }
+
+  static void execute(OzoneConfiguration conf, GenericCli shell, String[] args) {
     LOG.info("Executing OzoneShell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
 
@@ -252,7 +274,7 @@ public class TestOzoneShellHA {
 
     // Since there is no elegant way to pass Ozone config to the shell,
     // the idea is to use 'set' to place those OM HA configs.
-    String[] argsWithHAConf = getHASetConfStrings(args);
+    String[] argsWithHAConf = getHASetConfStrings(args, conf);
 
     cmd.parseWithHandlers(new RunLast(), exceptionHandler, argsWithHAConf);
   }
@@ -286,11 +308,11 @@ public class TestOzoneShellHA {
     return omLeader.getOMNodeId();
   }
 
-  private String getSetConfStringFromConf(String key) {
-    return String.format("--set=%s=%s", key, cluster.getConf().get(key));
+  static String getSetConfStringFromConf(String key, OzoneConfiguration conf) {
+    return generateSetConfString(key, conf.get(key));
   }
 
-  private String generateSetConfString(String key, String value) {
+  static String generateSetConfString(String key, String value) {
     return String.format("--set=%s=%s", key, value);
   }
 
@@ -299,9 +321,10 @@ public class TestOzoneShellHA {
    * @param numOfArgs Additional number of arguments after the HA conf string,
    *                  this translates into the number of empty array elements
    *                  after the HA conf string.
+   * @param conf
    * @return String array.
    */
-  private String[] getHASetConfStrings(int numOfArgs) {
+  static String[] getHASetConfStrings(int numOfArgs, OzoneConfiguration conf) {
     assert (numOfArgs >= 0);
     String[] res = new String[1 + 1 + numOfOMs + numOfArgs];
     final int indexOmServiceIds = 0;
@@ -309,11 +332,11 @@ public class TestOzoneShellHA {
     final int indexOmAddressStart = 2;
 
     res[indexOmServiceIds] = getSetConfStringFromConf(
-        OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
+        OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, conf);
 
     String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
-    String omNodesVal = cluster.getConf().get(omNodesKey);
+    String omNodesVal = conf.get(omNodesKey);
     res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
 
     String[] omNodesArr = omNodesVal.split(",");
@@ -322,7 +345,7 @@ public class TestOzoneShellHA {
     for (int i = 0; i < numOfOMs; i++) {
       res[indexOmAddressStart + i] =
           getSetConfStringFromConf(ConfUtils.addKeySuffixes(
-              OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodesArr[i]));
+              OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodesArr[i]), conf);
     }
 
     return res;
@@ -331,11 +354,12 @@ public class TestOzoneShellHA {
   /**
    * Helper function to create a new set of arguments that contains HA configs.
    * @param existingArgs Existing arguments to be fed into OzoneShell command.
+   * @param conf
    * @return String array.
    */
-  private String[] getHASetConfStrings(String[] existingArgs) {
+  static String[] getHASetConfStrings(String[] existingArgs, OzoneConfiguration conf) {
     // Get a String array populated with HA configs first
-    String[] res = getHASetConfStrings(existingArgs.length);
+    String[] res = getHASetConfStrings(existingArgs.length, conf);
 
     int indexCopyStart = res.length - existingArgs.length;
     // Then copy the existing args to the returned String array
@@ -1812,7 +1836,7 @@ public class TestOzoneShellHA {
         client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket0");
     assertNull(bucket.getEncryptionKeyName());
-    String newEncKey = "enckey1";
+    String newEncKey = uniqueObjectName("enckey");
 
     KeyProvider provider = cluster.getOzoneManager().getKmsProvider();
     KeyProvider.Options options = KeyProvider.options(cluster.getConf());
@@ -1825,6 +1849,81 @@ public class TestOzoneShellHA {
         newEncKey};
     execute(ozoneShell, args);
     assertEquals(newEncKey, volume.getBucket("bucket0").getEncryptionKeyName());
+  }
+
+  @Test
+  public void testLifecycleStatus() throws UnsupportedEncodingException {
+    String[] args = new String[] {"om", "lifecycle", "status", "--service-id", omServiceId};
+    execute(ozoneAdminShell, args);
+    String output = out.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("IsEnabled:");
+  }
+
+  @Test
+  public void testLifecycleSuspendAndResume() throws Exception {
+    List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
+    for (OzoneManager om : ozoneManagers) {
+      assertNotNull(om.getKeyManager().getKeyLifecycleService());
+      assertTrue(om.getLifecycleServiceStatus().getIsEnabled());
+      assertFalse(om.getLifecycleServiceStatus().getIsSuspended());
+    }
+
+    // Execute suspend command
+    String[] args = new String[] {"om", "lifecycle", "suspend", "--service-id", omServiceId};
+    execute(ozoneAdminShell, args);
+    String output = out.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("Lifecycle Service has been suspended");
+    out.reset();
+
+    // Wait for the suspend command to propagate through Ratis to all OMs
+    GenericTestUtils.waitFor(() -> {
+      for (OzoneManager om : ozoneManagers) {
+        assertNotNull(om.getKeyManager().getKeyLifecycleService());
+        if (!om.getLifecycleServiceStatus().getIsSuspended()) {
+          return false;
+        }
+      }
+      return true;
+    }, 100, 10000);
+
+    // Verify lifecycle service is suspended on all OMs
+    for (OzoneManager om : ozoneManagers) {
+      if (om.getKeyManager().getKeyLifecycleService() != null) {
+        assertTrue(om.getLifecycleServiceStatus().getIsSuspended(),
+            "Lifecycle service should be suspended on OM: " + om.getOMNodeId());
+        // isEnabled should still be true (based on configuration)
+        assertTrue(om.getLifecycleServiceStatus().getIsEnabled(),
+            "Lifecycle service isEnabled should still be true on OM: " + om.getOMNodeId());
+      }
+    }
+
+    // Execute resume command
+    args = new String[] {"om", "lifecycle", "resume", "--service-id", omServiceId};
+    execute(ozoneAdminShell, args);
+    output = out.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("Lifecycle Service has been resumed");
+    out.reset();
+
+    // Wait for the resume command to propagate through Ratis to all OMs
+    GenericTestUtils.waitFor(() -> {
+      for (OzoneManager om : ozoneManagers) {
+        assertNotNull(om.getKeyManager().getKeyLifecycleService());
+        if (om.getLifecycleServiceStatus().getIsSuspended()) {
+          return false;
+        }
+      }
+      return true;
+    }, 100, 10000);
+
+    // Verify lifecycle service is resumed on all OMs
+    for (OzoneManager om : ozoneManagers) {
+      if (om.getKeyManager().getKeyLifecycleService() != null) {
+        assertFalse(om.getLifecycleServiceStatus().getIsSuspended(),
+            "Lifecycle service should be resumed on OM: " + om.getOMNodeId());
+        assertTrue(om.getLifecycleServiceStatus().getIsEnabled(),
+            "Lifecycle service isEnabled should be true on OM: " + om.getOMNodeId());
+      }
+    }
   }
 
   @Test
@@ -2306,8 +2405,8 @@ public class TestOzoneShellHA {
   @ValueSource(ints = {1, 5})
   public void testRecursiveVolumeDelete(int threadCount)
       throws Exception {
-    String volume1 = "volume10";
-    String volume2 = "volume20";
+    String volume1 = uniqueObjectName("volume10");
+    String volume2 = uniqueObjectName("volume20");
 
     // Create volume volume1
     // Create bucket bucket1 with layout FILE_SYSTEM_OPTIMIZED

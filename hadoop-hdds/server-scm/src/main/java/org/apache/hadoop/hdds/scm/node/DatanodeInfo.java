@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
@@ -122,6 +123,18 @@ public class DatanodeInfo extends DatanodeDetails {
           HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(version.getSoftwareVersion());
       lastKnownApparentVersion =
           HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(version.getApparentVersion());
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Updates the current version reported by this datanode on its heartbeat in a thread-safe manner.
+   */
+  public void updateCurrentVersion(HDDSVersion version) {
+    try {
+      lock.writeLock().lock();
+      setCurrentVersion(version);
     } finally {
       lock.writeLock().unlock();
     }

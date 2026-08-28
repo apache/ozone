@@ -636,7 +636,7 @@ function ozone_bootstrap
   export HDDS_LIB_JARS_DIR="${OZONE_HOME}/share/ozone/lib"
 
   export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
-  export OZONE_OPTS=${OZONE_OPTS:-"-Djava.net.preferIPv4Stack=true"}
+  export OZONE_OPTS=${OZONE_OPTS:-}
   ozone_using_envvar OZONE_OPTS
   JSVC_HOME=${JSVC_HOME:-"/usr/bin"}
 
@@ -1327,6 +1327,23 @@ function ozone_add_to_classpath_userpath
   fi
 }
 
+function ozone_update_native_symlink
+{
+  if [ -z "$TARGET_FILE" ]; then
+    echo "Error: libhadoop doesn't support platform combination ($OS_TYPE / $ARCH_TYPE)." >&2
+    return 1
+  elif pushd "${OZONE_HOME}/lib/native" > /dev/null 2>&1; then
+    # Check if it already exists but points to the wrong target
+    if [ -L "$LINK_FILE" ] && [ "$(readlink "$LINK_FILE")" != "$TARGET_FILE" ]; then
+      # Forcefully recreate it so it points to the correct target file
+      ln -sf "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
+    fi
+    popd > /dev/null
+  else
+    return 1
+  fi
+}
+
 ## @description  Routine to configure any OS-specific settings.
 ## @audience     public
 ## @stability    stable
@@ -1334,9 +1351,8 @@ function ozone_add_to_classpath_userpath
 ## @return       may exit on failure conditions
 function ozone_os_tricks
 {
-  local bindv6only
-
   OZONE_IS_CYGWIN=false
+  ARCH_TYPE=$(uname -m)
   case ${OZONE_OS_TYPE} in
     Darwin)
       if [[ -z "${JAVA_HOME}" ]]; then
@@ -1348,6 +1364,15 @@ function ozone_os_tricks
           export JAVA_HOME
         fi
       fi
+
+      if [ "$ARCH_TYPE" = "arm64" ]; then
+        TARGET_FILE="libhadoop_osx_aarch_64.dylib"
+      fi
+
+      LINK_FILE="libhadoop.dylib"
+      if ozone_update_native_symlink; then
+        export DYLD_LIBRARY_PATH="${OZONE_HOME}/lib/native":$DYLD_LIBRARY_PATH
+      fi
     ;;
     Linux)
 
@@ -1356,24 +1381,16 @@ function ozone_os_tricks
       # with the many threads that we use in Hadoop. Tune the variable
       # down to prevent vmem explosion.
       export MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX:-4}
-      # we put this in QA test mode off so that non-Linux can test
-      if [[ "${QATESTMODE}" = true ]]; then
-        return
+
+      if [ "$ARCH_TYPE" = "aarch64" ]; then
+        TARGET_FILE="libhadoop_linux_aarch_64.so"
+      elif [ "$ARCH_TYPE" = "x86_64" ]; then
+        TARGET_FILE="libhadoop_linux_x86_64.so"
       fi
 
-      # NOTE! OZONE_ALLOW_IPV6 is a developer hook.  We leave it
-      # undocumented in ozone-env.sh because we don't want users to
-      # shoot themselves in the foot while devs make IPv6 work.
-
-      bindv6only=$(/sbin/sysctl -n net.ipv6.bindv6only 2> /dev/null)
-
-      if [[ -n "${bindv6only}" ]] &&
-         [[ "${bindv6only}" -eq "1" ]] &&
-         [[ "${OZONE_ALLOW_IPV6}" != "yes" ]]; then
-        ozone_error "ERROR: \"net.ipv6.bindv6only\" is set to 1 "
-        ozone_error "ERROR: Hadoop networking could be broken. Aborting."
-        ozone_error "ERROR: For more info: http://wiki.apache.org/hadoop/HadoopIPv6"
-        exit 1
+      LINK_FILE="libhadoop.so"
+      if ozone_update_native_symlink; then
+        export LD_LIBRARY_PATH="${OZONE_HOME}/lib/native":$LD_LIBRARY_PATH
       fi
     ;;
     CYGWIN*)

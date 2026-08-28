@@ -19,9 +19,13 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
@@ -56,6 +60,30 @@ public class ScmVersionManager extends RatisBasedVersionManager {
     upgradeActions = upgradeActionProvider.load();
   }
 
+  public static ComponentVersion computeVersionForReplication(List<DatanodeInfo> datanodes) {
+    return computeCommonVersion(datanodes.stream()
+        .map(DatanodeInfo::getLastKnownApparentVersion)
+        .collect(Collectors.toList()));
+  }
+
+  public static HDDSVersion computeVersionForClientWrite(List<DatanodeDetails> datanodes) {
+    return computeCommonVersion(datanodes.stream()
+        .map(DatanodeDetails::getCurrentVersion)
+        .collect(Collectors.toList()));
+  }
+
+  private static <T extends ComponentVersion> T computeCommonVersion(List<T> dnVersions) {
+    if (dnVersions.isEmpty()) {
+      throw new IllegalArgumentException("No nodes provided");
+    }
+
+    T minVersion = dnVersions.get(0);
+    for (int i = 1; i < dnVersions.size(); i++) {
+      minVersion = ComponentVersion.min(dnVersions.get(i), minVersion);
+    }
+    return minVersion;
+  }
+
   @Override
   protected void persistApparentVersion(ComponentVersion newVersion) throws IOException {
     storage.setApparentVersion(newVersion.serialize());
@@ -70,6 +98,16 @@ public class ScmVersionManager extends RatisBasedVersionManager {
   @VisibleForTesting
   public Map<ComponentVersion, ScmUpgradeAction> getUpgradeActionsForTesting() {
     return upgradeActions;
+  }
+
+  @Override
+  public HDDSVersion getVersionForClient() {
+    ComponentVersion apparentVersion = getApparentVersion();
+    // Once ZDU is finalized, the apparent version should always belong to the HDDSVersion enum.
+    if (isAllowed(HDDSVersion.ZDU) && apparentVersion instanceof HDDSVersion) {
+      return (HDDSVersion) apparentVersion;
+    }
+    return HDDSVersion.values()[HDDSVersion.ZDU.ordinal() - 1];
   }
 
   @Override

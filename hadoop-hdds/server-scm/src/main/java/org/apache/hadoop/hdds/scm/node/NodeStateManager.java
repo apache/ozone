@@ -318,6 +318,17 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Updates the current version reported by the node on its heartbeat.
+   *
+   * @throws NodeNotFoundException if the node is not present
+   */
+  public void updateCurrentVersion(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    nodeStateMap.getNodeInfo(datanodeDetails.getID())
+        .updateCurrentVersion(datanodeDetails.getCurrentVersion());
+  }
+
+  /**
    * Updates the last known version of the node.
    * @param datanodeDetails DataNode Details
    * @param versionInfo DataNode Version Information

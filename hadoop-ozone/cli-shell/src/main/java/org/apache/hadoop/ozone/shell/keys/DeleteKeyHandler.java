@@ -100,7 +100,7 @@ public class DeleteKeyHandler extends KeyHandler {
         return;
       }
 
-      if (bucket.getFileStatus(keyName).isDirectory()) {
+      if (bucket.getFileStatus(keyName, true).isDirectory()) {
         List<OzoneFileStatus> ozoneFileStatusList =
             bucket.listStatus(keyName, false, "", 1);
         if (ozoneFileStatusList != null && !ozoneFileStatusList.isEmpty()) {
@@ -122,7 +122,7 @@ public class DeleteKeyHandler extends KeyHandler {
 
       String toKeyName = new Path(userTrashCurrent, keyName).toUri().getPath();
       if (isKeyExist(bucket, toKeyName)) {
-        if (bucket.getFileStatus(toKeyName).isDirectory()) {
+        if (bucket.getFileStatus(toKeyName, true).isDirectory()) {
           // if directory already exist in trash, just delete the directory
           bucket.deleteKey(keyName);
           return;

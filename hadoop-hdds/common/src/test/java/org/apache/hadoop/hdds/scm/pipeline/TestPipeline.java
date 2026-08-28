@@ -32,9 +32,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -47,15 +53,87 @@ public class TestPipeline {
     Pipeline subject = MockPipeline.createPipeline(3);
 
     HddsProtos.Pipeline proto =
-        subject.getProtobufMessage(DEFAULT_VERSION.serialize());
+        subject.getProtobufMessage(DEFAULT_VERSION);
     for (HddsProtos.DatanodeDetailsProto dn : proto.getMembersList()) {
       assertPorts(dn, V0_PORTS);
     }
 
     HddsProtos.Pipeline protoV1 = subject.getProtobufMessage(
-        VERSION_HANDLES_UNKNOWN_DN_PORTS.serialize());
+        VERSION_HANDLES_UNKNOWN_DN_PORTS);
     for (HddsProtos.DatanodeDetailsProto dn : protoV1.getMembersList()) {
       assertPorts(dn, ALL_PORTS);
+    }
+  }
+
+  @Test
+  public void testDefaultPreservesCurrentVersion() {
+    // Read path: each member's own reported currentVersion must survive serialization.
+    Map<DatanodeID, Integer> expected = new HashMap<>();
+    DatanodeDetails dn0 = randomDatanodeDetails();
+    dn0.setCurrentVersion(HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC);
+    DatanodeDetails dn1 = randomDatanodeDetails();
+    dn1.setCurrentVersion(HDDSVersion.STREAM_BLOCK_SUPPORT);
+    DatanodeDetails dn2 = randomDatanodeDetails();
+    dn2.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
+    expected.put(dn0.getID(), HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize());
+    expected.put(dn1.getID(), HDDSVersion.STREAM_BLOCK_SUPPORT.serialize());
+    expected.put(dn2.getID(), HDDSVersion.SOFTWARE_VERSION.serialize());
+
+    Pipeline subject = MockPipeline.createPipeline(Arrays.asList(dn0, dn1, dn2));
+
+    assertPerMemberVersions(expected, subject.getProtobufMessage(ClientVersion.CURRENT));
+  }
+
+  @Test
+  public void testOverrideAllMemberVersions() {
+    // Write path: the explicit datanodeVersion overrides every member's currentVersion.
+    final HDDSVersion override = HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
+    DatanodeDetails dn0 = randomDatanodeDetails();
+    dn0.setCurrentVersion(override);
+    DatanodeDetails dn1 = randomDatanodeDetails();
+    dn1.setCurrentVersion(HDDSVersion.STREAM_BLOCK_SUPPORT);
+    DatanodeDetails dn2 = randomDatanodeDetails();
+    dn2.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
+
+    Pipeline subject = MockPipeline.createPipeline(Arrays.asList(dn0, dn1, dn2));
+
+    HddsProtos.Pipeline proto =
+        subject.getProtobufMessage(ClientVersion.CURRENT, ALL_PORTS, override);
+    for (HddsProtos.DatanodeDetailsProto member : proto.getMembersList()) {
+      assertEquals(override.serialize(), member.getCurrentVersion());
+    }
+  }
+
+  @Test
+  public void testOverrideEachMemberVersion() {
+    // Read path: the translator substitutes each member's live currentVersion via a per-datanode map,
+    // overriding the stale version frozen into the pipeline member.
+    DatanodeDetails dn0 = randomDatanodeDetails();
+    DatanodeDetails dn1 = randomDatanodeDetails();
+    DatanodeDetails dn2 = randomDatanodeDetails();
+    for (DatanodeDetails dn : Arrays.asList(dn0, dn1, dn2)) {
+      dn.setCurrentVersion(HDDSVersion.DEFAULT_VERSION);
+    }
+
+    Map<DatanodeID, ComponentVersion> overrides = new HashMap<>();
+    overrides.put(dn0.getID(), HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC);
+    overrides.put(dn1.getID(), HDDSVersion.STREAM_BLOCK_SUPPORT);
+    overrides.put(dn2.getID(), HDDSVersion.SOFTWARE_VERSION);
+
+    Pipeline subject = MockPipeline.createPipeline(Arrays.asList(dn0, dn1, dn2));
+
+    Map<DatanodeID, Integer> expected = new HashMap<>();
+    expected.put(dn0.getID(), HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize());
+    expected.put(dn1.getID(), HDDSVersion.STREAM_BLOCK_SUPPORT.serialize());
+    expected.put(dn2.getID(), HDDSVersion.SOFTWARE_VERSION.serialize());
+    assertPerMemberVersions(expected, subject.getProtobufMessage(DEFAULT_VERSION, ALL_PORTS, overrides));
+  }
+
+  private static void assertPerMemberVersions(Map<DatanodeID, Integer> expected, HddsProtos.Pipeline proto) {
+    assertEquals(expected.size(), proto.getMembersCount());
+    for (HddsProtos.DatanodeDetailsProto member : proto.getMembersList()) {
+      DatanodeID id = DatanodeDetails.getFromProtoBuf(member).getID();
+      assertEquals(expected.get(id).intValue(), member.getCurrentVersion());
     }
   }
 
@@ -64,14 +142,14 @@ public class TestPipeline {
     Pipeline subject = MockPipeline.createPipeline(3);
 
     //when EC config is empty/null
-    HddsProtos.Pipeline protobufMessage = subject.getProtobufMessage(1);
+    HddsProtos.Pipeline protobufMessage = subject.getProtobufMessage(VERSION_HANDLES_UNKNOWN_DN_PORTS);
     assertEquals(0, protobufMessage.getEcReplicationConfig().getData());
 
 
     //when EC config is NOT empty
     subject = MockPipeline.createEcPipeline();
 
-    protobufMessage = subject.getProtobufMessage(1);
+    protobufMessage = subject.getProtobufMessage(VERSION_HANDLES_UNKNOWN_DN_PORTS);
     assertEquals(3, protobufMessage.getEcReplicationConfig().getData());
     assertEquals(2, protobufMessage.getEcReplicationConfig().getParity());
 
@@ -80,7 +158,7 @@ public class TestPipeline {
   @Test
   public void testReplicaIndexesSerialisedCorrectly() {
     Pipeline pipeline = MockPipeline.createEcPipeline();
-    HddsProtos.Pipeline protobufMessage = pipeline.getProtobufMessage(1);
+    HddsProtos.Pipeline protobufMessage = pipeline.getProtobufMessage(VERSION_HANDLES_UNKNOWN_DN_PORTS);
     Pipeline reloadedPipeline = Pipeline.getFromProtobuf(protobufMessage);
 
     for (DatanodeDetails dn : pipeline.getNodes()) {

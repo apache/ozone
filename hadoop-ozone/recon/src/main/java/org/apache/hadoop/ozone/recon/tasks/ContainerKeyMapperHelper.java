@@ -378,7 +378,7 @@ public abstract class ContainerKeyMapperHelper {
       throws IOException {
 
     Set<ContainerKeyPrefix> keysToBeDeleted = new HashSet<>();
-    try (TableIterator<KeyPrefixContainer, ? extends Table.KeyValue<KeyPrefixContainer, Integer>>
+    try (TableIterator<KeyPrefixContainer, Table.KeyValue<KeyPrefixContainer, Integer>>
              keyContainerIterator = reconContainerMetadataManager.getKeyContainerTableIterator()) {
 
       // Check if we have keys in this container in the DB

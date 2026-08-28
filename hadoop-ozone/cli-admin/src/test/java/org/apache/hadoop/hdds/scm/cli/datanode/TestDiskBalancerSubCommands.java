@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -40,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -60,6 +63,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import picocli.CommandLine;
 
 /**
@@ -102,6 +106,10 @@ public class TestDiskBalancerSubCommands {
       this.mockedClient = mockedClient;
       this.mockedUtil = mockedUtil;
     }
+
+    MockedStatic<DiskBalancerSubCommandUtil> getMockedUtil() {
+      return mockedUtil;
+    }
     
     @Override
     public void close() {
@@ -123,7 +131,8 @@ public class TestDiskBalancerSubCommands {
         mockConstruction(ContainerOperationClient.class);
     
     MockedStatic<DiskBalancerSubCommandUtil> mockedUtil = 
-        mockStatic(DiskBalancerSubCommandUtil.class);
+        mockStatic(DiskBalancerSubCommandUtil.class, withSettings().defaultAnswer(
+            Mockito.CALLS_REAL_METHODS));
     Map<String, String> addressToDisplay = new LinkedHashMap<>();
     for (String addr : inServiceDatanodes) {
       addressToDisplay.put(addr, addr);
@@ -134,38 +143,6 @@ public class TestDiskBalancerSubCommands {
     mockedUtil.when(() -> DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(anyString()))
         .thenReturn(mockProtocol);
-    // Mock getDatanodeHostAndIp(HddsProtos.DatanodeDetailsProto) to format the output
-    mockedUtil.when(() -> DiskBalancerSubCommandUtil
-        .getDatanodeHostAndIp(any(HddsProtos.DatanodeDetailsProto.class)))
-        .thenAnswer(invocation -> {
-          HddsProtos.DatanodeDetailsProto proto = invocation.getArgument(0);
-          return proto.getHostName() + " (" + proto.getIpAddress() + ":" +
-              HDDS_DATANODE_CLIENT_PORT_DEFAULT + ")";
-        });
-    // Mock getDatanodeHostAndIp(String, String, int) to format the output
-    // Return value is used by Mockito internally for mock setup
-    mockedUtil.when(() -> {
-      @SuppressWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
-      String ignored = DiskBalancerSubCommandUtil
-          .getDatanodeHostAndIp(any(DatanodeDetailsProto.class));
-      // Use the value to avoid "ignored return value" static analysis warnings.
-      System.out.println(ignored);
-    }).thenAnswer(invocation -> {
-      DatanodeDetailsProto proto = invocation.getArgument(0);
-      String hostname = proto.getHostName();
-      String ipAddress = proto.getIpAddress();
-      int port = proto.getPortsList().stream()
-          .filter(p -> p.getName().equals(
-              DatanodeDetails.Port.Name.CLIENT_RPC.name()))
-          .mapToInt(HddsProtos.Port::getValue)
-          .findFirst()
-          .orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT);
-      String addressPort = ipAddress + ":" + port;
-      if (hostname != null && !hostname.isEmpty() && !hostname.equals(ipAddress)) {
-        return hostname + " (" + addressPort + ")";
-      }
-      return addressPort;
-    });
 
     return new DiskBalancerMocks(mockedClient, mockedUtil);
   }
@@ -534,6 +511,293 @@ public class TestDiskBalancerSubCommands {
   }
 
   @Test
+  public void testStatusDiskBalancerWithDatanodeUuid() throws Exception {
+    final String dnUuid = "a3b63511-bdf8-4fa1-8ab6-d19c0e806f84";
+    final String resolvedAddress = "10.140.95.199:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+
+    HddsProtos.DatanodeDetailsProto dnd = HddsProtos.DatanodeDetailsProto.newBuilder()
+        .setUuid(dnUuid)
+        .setHostName("nodename")
+        .setIpAddress("10.140.95.199")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName(DatanodeDetails.Port.Name.CLIENT_RPC.name())
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+    HddsProtos.Node node = HddsProtos.Node.newBuilder().setNodeID(dnd).build();
+
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+    DatanodeDiskBalancerInfoProto statusProto = generateRandomStatusProto("nodename").toBuilder()
+        .setNode(dnd)
+        .build();
+    when(mockProtocol.getDiskBalancerInfo()).thenReturn(statusProto);
+
+    try (MockedConstruction<ContainerOperationClient> mockedClient =
+        mockConstruction(ContainerOperationClient.class, (mock, context) ->
+            when(mock.queryNode(UUID.fromString(dnUuid))).thenReturn(node));
+        MockedStatic<DiskBalancerSubCommandUtil> mockedUtil =
+            mockStatic(DiskBalancerSubCommandUtil.class, withSettings().defaultAnswer(
+                Mockito.CALLS_REAL_METHODS))) {
+
+      mockedUtil.when(() -> DiskBalancerSubCommandUtil
+          .getSingleNodeDiskBalancerProxy(resolvedAddress))
+          .thenReturn(mockProtocol);
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--node-id", dnUuid);
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("Status result"));
+      assertTrue(output.contains(dnUuid));
+      mockedUtil.verify(() -> DiskBalancerSubCommandUtil
+          .getSingleNodeDiskBalancerProxy(resolvedAddress));
+    }
+  }
+
+  @Test
+  public void testStatusDiskBalancerWithMixedValidAndInvalidUuids() throws Exception {
+    final String validUuid = "a3b63511-bdf8-4fa1-8ab6-d19c0e806f84";
+    final String invalidUuid = "00000000-0000-0000-0000-000000000000";
+    final String resolvedAddress = "10.140.95.199:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+
+    HddsProtos.DatanodeDetailsProto dnd = HddsProtos.DatanodeDetailsProto.newBuilder()
+        .setUuid(validUuid)
+        .setHostName("nodename")
+        .setIpAddress("10.140.95.199")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName(DatanodeDetails.Port.Name.CLIENT_RPC.name())
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+    HddsProtos.Node node = HddsProtos.Node.newBuilder().setNodeID(dnd).build();
+
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+    DatanodeDiskBalancerInfoProto statusProto = generateRandomStatusProto("nodename").toBuilder()
+        .setNode(dnd)
+        .build();
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(generateRandomStatusProto("host-1"), statusProto);
+
+    try (MockedConstruction<ContainerOperationClient> mockedClient =
+        mockConstruction(ContainerOperationClient.class, (mock, context) -> {
+          when(mock.queryNode(UUID.fromString(validUuid))).thenReturn(node);
+          when(mock.queryNode(UUID.fromString(invalidUuid)))
+              .thenReturn(HddsProtos.Node.getDefaultInstance());
+        });
+        MockedStatic<DiskBalancerSubCommandUtil> mockedUtil =
+            mockStatic(DiskBalancerSubCommandUtil.class, withSettings().defaultAnswer(
+                Mockito.CALLS_REAL_METHODS))) {
+
+      mockedUtil.when(() -> DiskBalancerSubCommandUtil
+          .getSingleNodeDiskBalancerProxy(resolvedAddress))
+          .thenReturn(mockProtocol);
+      mockedUtil.when(() -> DiskBalancerSubCommandUtil
+          .getSingleNodeDiskBalancerProxy("host-1"))
+          .thenReturn(mockProtocol);
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--node-id", validUuid + "," + invalidUuid, "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      String err = errContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("Status result"));
+      assertTrue(output.contains(validUuid));
+      assertTrue(output.contains("host-1"));
+      assertTrue(err.contains(invalidUuid));
+      assertTrue(err.contains("Datanode not found"));
+    }
+  }
+
+  @Test
+  public void testStartDiskBalancerWithDatanodeUuidJson() throws Exception {
+    final String dnUuid = "a3b63511-bdf8-4fa1-8ab6-d19c0e806f84";
+    final String resolvedAddress = "10.140.95.199:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+
+    HddsProtos.DatanodeDetailsProto dnd = HddsProtos.DatanodeDetailsProto.newBuilder()
+        .setUuid(dnUuid)
+        .setHostName("nodename")
+        .setIpAddress("10.140.95.199")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName(DatanodeDetails.Port.Name.CLIENT_RPC.name())
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+    HddsProtos.Node node = HddsProtos.Node.newBuilder().setNodeID(dnd).build();
+
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    try (MockedConstruction<ContainerOperationClient> mockedClient =
+        mockConstruction(ContainerOperationClient.class, (mock, context) ->
+            when(mock.queryNode(UUID.fromString(dnUuid))).thenReturn(node));
+        MockedStatic<DiskBalancerSubCommandUtil> mockedUtil =
+            mockStatic(DiskBalancerSubCommandUtil.class, withSettings().defaultAnswer(
+                Mockito.CALLS_REAL_METHODS))) {
+
+      mockedUtil.when(() -> DiskBalancerSubCommandUtil
+          .getSingleNodeDiskBalancerProxy(resolvedAddress))
+          .thenReturn(mockProtocol);
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--json", "-t", "0.005", "-b", "100", "--node-id", dnUuid);
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("\"datanode\" : \"" + dnUuid + "\""));
+    }
+  }
+
+  @Test
+  public void testStatusDiskBalancerWithSpaceAfterCommaNodeIds() throws Exception {
+    final String uuid1 = "59c14bfa-1ccd-45e4-83e6-8c2c3a5de873";
+    final String uuid2 = "0d4a065f-db6c-4649-9906-1a4df09ffbdf";
+    final String resolvedAddress1 = "10.140.95.199:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+    final String resolvedAddress2 = "10.140.95.200:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+
+    HddsProtos.Node node1 = buildScmNode(uuid1, "nodename-1", "10.140.95.199");
+    HddsProtos.Node node2 = buildScmNode(uuid2, "nodename-2", "10.140.95.200");
+
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(generateRandomStatusProto("nodename-1"), generateRandomStatusProto("nodename-2"));
+
+    try (MockedConstruction<ContainerOperationClient> mockedClient =
+        mockConstruction(ContainerOperationClient.class, (mock, context) -> {
+          when(mock.queryNode(UUID.fromString(uuid1))).thenReturn(node1);
+          when(mock.queryNode(UUID.fromString(uuid2))).thenReturn(node2);
+        });
+        MockedStatic<DiskBalancerSubCommandUtil> mockedUtil =
+            mockStatic(DiskBalancerSubCommandUtil.class, withSettings().defaultAnswer(
+                Mockito.CALLS_REAL_METHODS))) {
+
+      mockedUtil.when(() -> DiskBalancerSubCommandUtil
+          .getSingleNodeDiskBalancerProxy(resolvedAddress1))
+          .thenReturn(mockProtocol);
+      mockedUtil.when(() -> DiskBalancerSubCommandUtil
+          .getSingleNodeDiskBalancerProxy(resolvedAddress2))
+          .thenReturn(mockProtocol);
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--node-id", uuid1 + ",", uuid2);
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("Status result"));
+      assertTrue(output.contains(uuid1));
+      assertTrue(output.contains(uuid2));
+    }
+  }
+
+  @Test
+  public void testPositionalUuidRejected() throws Exception {
+    final String dnUuid = "a3b63511-bdf8-4fa1-8ab6-d19c0e806f84";
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs(dnUuid);
+    cmd.call();
+
+    String err = errContent.toString(DEFAULT_ENCODING);
+    assertTrue(err.contains("Datanode UUID must be specified with --node-id"));
+  }
+
+  @Test
+  public void testResolutionFailuresDoNotLeakAcrossInvocations() throws Exception {
+    final String invalidUuid = "00000000-0000-0000-0000-000000000000";
+    final String resolvedAddress = "127.0.0.1:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+    final String expectedDisplay = "host-1 (" + resolvedAddress + ")";
+
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+    DatanodeDiskBalancerInfoProto statusProto = generateRandomStatusProto("host-1");
+
+    try (MockedConstruction<ContainerOperationClient> mockedClient =
+        mockConstruction(ContainerOperationClient.class, (mock, context) ->
+            when(mock.queryNode(UUID.fromString(invalidUuid)))
+                .thenReturn(HddsProtos.Node.getDefaultInstance()));
+        MockedStatic<DiskBalancerSubCommandUtil> mockedUtil =
+            mockStatic(DiskBalancerSubCommandUtil.class, withSettings().defaultAnswer(
+                Mockito.CALLS_REAL_METHODS))) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--node-id", invalidUuid);
+      cmd.call();
+      assertTrue(errContent.toString(DEFAULT_ENCODING).contains(invalidUuid));
+
+      outContent.reset();
+      errContent.reset();
+      when(mockProtocol.getDiskBalancerInfo()).thenReturn(statusProto);
+
+      Map<String, String> addressToDisplay = new LinkedHashMap<>();
+      addressToDisplay.put(resolvedAddress, expectedDisplay);
+      mockedUtil.when(() -> DiskBalancerSubCommandUtil
+          .getAllOperableNodesClientRpcAddress(any()))
+          .thenReturn(addressToDisplay);
+      mockedUtil.when(() -> DiskBalancerSubCommandUtil
+          .getSingleNodeDiskBalancerProxy(resolvedAddress))
+          .thenReturn(mockProtocol);
+
+      c.parseArgs("--in-service-datanodes");
+      cmd.call();
+
+      String err = errContent.toString(DEFAULT_ENCODING);
+      assertFalse(err.contains(invalidUuid));
+      assertTrue(outContent.toString(DEFAULT_ENCODING).contains("Status result"));
+    }
+  }
+
+  @Test
+  public void testStatusStateDoesNotLeakAcrossInvocations() throws Exception {
+    DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
+    DatanodeDiskBalancerInfoProto statusProto1 = generateRandomStatusProto("host-1");
+    DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-2");
+
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(statusProto1, statusProto2, statusProto2);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1", "host-2");
+      cmd.call();
+
+      outContent.reset();
+      errContent.reset();
+      c.parseArgs("host-2");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("host-2"));
+      assertFalse(output.contains("host-1"));
+    }
+  }
+
+  @Test
+  public void testReportStateDoesNotLeakAcrossInvocations() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+    DatanodeDiskBalancerInfoProto reportProto1 = generateRandomReportProto("host-1");
+    DatanodeDiskBalancerInfoProto reportProto2 = generateRandomReportProto("host-2");
+
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(reportProto1, reportProto2, reportProto2);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1", "host-2");
+      cmd.call();
+
+      outContent.reset();
+      errContent.reset();
+      c.parseArgs("host-2");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("host-2"));
+      assertFalse(output.contains("host-1"));
+    }
+  }
+
+  @Test
   public void testStatusDiskBalancerFailure() throws Exception {
     DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
     
@@ -778,6 +1042,7 @@ public class TestDiskBalancerSubCommands {
     DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
         .setHostName(hostname)
         .setIpAddress("127.0.0.1")
+        .setUuid(UUID.nameUUIDFromBytes(hostname.getBytes(StandardCharsets.UTF_8)).toString())
         .addPorts(HddsProtos.Port.newBuilder()
             .setName("CLIENT_RPC")
             .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
@@ -831,6 +1096,7 @@ public class TestDiskBalancerSubCommands {
     DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
         .setHostName(hostname)
         .setIpAddress("127.0.0.1")
+        .setUuid(UUID.nameUUIDFromBytes(hostname.getBytes(StandardCharsets.UTF_8)).toString())
         .addPorts(HddsProtos.Port.newBuilder()
             .setName("CLIENT_RPC")
             .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
@@ -911,5 +1177,18 @@ public class TestDiskBalancerSubCommands {
         .setParallelThread(parallelThread)
         .setStopAfterDiskEven(stopAfterDiskEven)
         .build();
+  }
+
+  private static HddsProtos.Node buildScmNode(String uuid, String hostname, String ipAddress) {
+    HddsProtos.DatanodeDetailsProto dnd = HddsProtos.DatanodeDetailsProto.newBuilder()
+        .setUuid(uuid)
+        .setHostName(hostname)
+        .setIpAddress(ipAddress)
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName(DatanodeDetails.Port.Name.CLIENT_RPC.name())
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+    return HddsProtos.Node.newBuilder().setNodeID(dnd).build();
   }
 }

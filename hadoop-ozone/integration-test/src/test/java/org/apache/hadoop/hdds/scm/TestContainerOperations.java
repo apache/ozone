@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -97,7 +98,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     // call create Container again
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.secure().next(RandomUtils.secure().randomInt(0, 1024)).getBytes(UTF_8);
+        RandomStringUtils.secure().next(RandomUtils.secure().randomInt(1, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,
@@ -169,7 +170,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
         .getScmNodeManager()
         .getAllNodes()
         .get(0);
-    dn.setCurrentVersion(0);
+    dn.setCurrentVersion(HDDSVersion.DEFAULT_VERSION);
 
     List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
         storageClient.getDatanodeUsageInfo(

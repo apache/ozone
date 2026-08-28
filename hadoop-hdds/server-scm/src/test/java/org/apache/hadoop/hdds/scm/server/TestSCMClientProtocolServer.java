@@ -312,7 +312,7 @@ public class TestSCMClientProtocolServer {
     try (SCMClientProtocolServer testServer =
              peerCheckServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
-      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any())).thenReturn(matching);
+      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any())).thenReturn(matching);
       testServer.finalizeUpgrade();
     }
     verify(finalizationManager).finalizeUpgrade();
@@ -327,7 +327,7 @@ public class TestSCMClientProtocolServer {
     try (SCMClientProtocolServer testServer =
              peerCheckServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
-      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any())).thenReturn(matching, older);
+      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any())).thenReturn(matching, older);
       // A peer on an older version is rejected without force.
       assertThrows(SCMException.class, testServer::finalizeUpgrade);
       verify(finalizationManager, never()).finalizeUpgrade();
@@ -347,7 +347,7 @@ public class TestSCMClientProtocolServer {
     try (SCMClientProtocolServer testServer =
              peerCheckServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
-      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any()))
+      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any()))
           .thenReturn(matching, unknown);
       // A peer on an unrecognized future version is rejected without force.
       assertThrows(SCMException.class, testServer::finalizeUpgrade);
@@ -367,7 +367,7 @@ public class TestSCMClientProtocolServer {
     try (SCMClientProtocolServer testServer =
              peerCheckServer(finalizationManager, Collections.singletonList(peerNode("scm2")));
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
-      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any())).thenReturn(unreachable);
+      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any())).thenReturn(unreachable);
       // An unreachable peer is rejected without force.
       assertThrows(SCMException.class, testServer::finalizeUpgrade);
       verify(finalizationManager, never()).finalizeUpgrade();

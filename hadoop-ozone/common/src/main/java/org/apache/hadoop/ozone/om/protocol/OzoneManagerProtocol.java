@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -64,6 +65,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
@@ -492,6 +494,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            when finalization is already in progress.
    */
+  @Deprecated
   UpgradeFinalization.StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
 
   /**
@@ -528,6 +531,9 @@ public interface OzoneManagerProtocol
   OzoneManagerProtocolProtos.QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException;
 
   /**
+   * This command is retained so that new clients can query status of old OM servers. All new finalize requests should
+   * use `void queryUpgradeStatus()`.
+   *
    * Queries the current status of finalization.
    * This method when called, returns the status messages from the finalization
    * progress, if any. The status returned is
@@ -555,6 +561,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            if finalization is needed but not yet started
    */
+  @Deprecated
   UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException;
@@ -1287,4 +1294,67 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   void startQuotaRepair(List<String> buckets) throws IOException;
+
+  /**
+   * Gets the lifecycle configuration information.
+   * @param volumeName - Volume name.
+   * @param bucketName - Bucket name.
+   * @return OmLifecycleConfiguration or exception is thrown.
+   * @throws IOException
+   */
+  OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException;
+
+  /**
+   * Creates a new lifecycle configuration.
+   * This operation will completely overwrite any existing lifecycle configuration on the bucket.
+   * If the bucket already has a lifecycle configuration, it will be replaced with the new one.
+   * @param lifecycleConfiguration - lifecycle configuration info.
+   * @throws IOException
+   */
+  default void setLifecycleConfiguration(
+      OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
+   * Deletes existing lifecycle configuration.
+   * @param volumeName - Volume name.
+   * @param bucketName - Bucket name.
+   * @throws IOException
+   */
+  default void deleteLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
+   * Gets the lifecycle service status.
+   * @return GetLifecycleServiceStatusResponse
+   * @throws IOException
+   */
+  default GetLifecycleServiceStatusResponse getLifecycleServiceStatus() throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
+   * Suspends the lifecycle service.
+   * @throws IOException
+   */
+  default void suspendLifecycleService() throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
+   * Resumes the lifecycle service.
+   * @throws IOException
+   */
+  default void resumeLifecycleService() throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
 }

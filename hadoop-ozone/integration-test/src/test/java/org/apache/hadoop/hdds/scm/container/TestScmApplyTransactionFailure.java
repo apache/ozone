@@ -94,7 +94,7 @@ public abstract class TestScmApplyTransactionFailure implements HATests.TestCase
         replication, PipelineState.OPEN).get(0);
 
     HddsProtos.Pipeline pipelineToCreate =
-        existing.getProtobufMessage(CURRENT.serialize());
+        existing.getProtobufMessage(CURRENT);
     Throwable ex = assertThrows(SCMException.class,
         () -> pipelineManager.getStateManager().addPipeline(
             pipelineToCreate));

@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.upgrade.OMCompleteFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
@@ -102,6 +103,19 @@ public class TestOzoneManagerRatisRequest {
 
     OzoneManager mockOm = mock(OzoneManager.class);
     assertInstanceOf(OMStartFinalizeUpgradeRequest.class,
+        OzoneManagerRatisUtils.createClientRequest(omRequest, mockOm));
+  }
+
+  @Test
+  public void testCompleteFinalizeUpgradeRequestIsDispatched() throws IOException {
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.CompleteFinalizeUpgrade)
+            .setClientId("test-client-id")
+            .build();
+
+    OzoneManager mockOm = mock(OzoneManager.class);
+    assertInstanceOf(OMCompleteFinalizeUpgradeRequest.class,
         OzoneManagerRatisUtils.createClientRequest(omRequest, mockOm));
   }
 

@@ -34,9 +34,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -280,7 +280,7 @@ public class TestSCMFollowerCatchupWithContainerReport {
 
       for (int i = 0; i < NUM_KEYS; i++) {
         String keyName = "key-" + i;
-        TestDataUtil.createKey(bucket, keyName,
+        DataTestUtil.createKey(bucket, keyName,
             RatisReplicationConfig.getInstance(THREE), keyData);
         OzoneKeyDetails keyDetails = bucket.getKey(keyName);
         keyDetails.getOzoneKeyLocations()

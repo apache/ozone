@@ -68,7 +68,7 @@ public final class Pipeline {
   private static final Codec<Pipeline> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(HddsProtos.Pipeline.getDefaultInstance()),
       Pipeline::getFromProtobufSetCreationTimestamp,
-      p -> p.getProtobufMessage(ClientVersion.CURRENT.serialize()),
+      p -> p.getProtobufMessage(ClientVersion.CURRENT),
       Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
@@ -364,21 +364,41 @@ public final class Pipeline {
     return replicationConfig;
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion) {
-    return getProtobufMessage(clientVersion, Collections.emptySet());
+  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion) {
+    return getProtobufMessageInternal(clientVersion, Collections.emptySet(), null);
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts) {
-    return getProtobufMessage(clientVersion, filterPorts, null);
+  /**
+   * Write-path override: when {@code datanodeVersion} is non-null it is set as the currentVersion on <b>every</b>
+   * member proto, so clients target a single pipeline-wide version (typically the pipeline minimum).
+   */
+  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion, Set<DatanodeDetails.Port.Name> filterPorts,
+      ComponentVersion datanodeVersion) {
+    return getProtobufMessageInternal(clientVersion, filterPorts,
+        datanodeVersion == null ? null : nodeId -> datanodeVersion);
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts,
-      ComponentVersion versionOverride) {
+  /**
+   * Read-path override: set each member proto's currentVersion from {@code memberVersions} (keyed by datanode id),
+   * so clients see each datanode's own up-to-date version. Members absent from the map keep their own version.
+   */
+  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion, Set<DatanodeDetails.Port.Name> filterPorts,
+      Map<DatanodeID, ComponentVersion> memberVersions) {
+    return getProtobufMessageInternal(clientVersion, filterPorts,
+        memberVersions == null ? null : memberVersions::get);
+  }
+
+  private HddsProtos.Pipeline getProtobufMessageInternal(ClientVersion clientVersion,
+      Set<DatanodeDetails.Port.Name> filterPorts, Function<DatanodeID, ComponentVersion> versionOverride) {
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     List<Integer> memberReplicaIndexes = new ArrayList<>();
 
     for (DatanodeDetails dn : nodeStatus.keySet()) {
-      members.add(dn.toProto(clientVersion, filterPorts, versionOverride));
+      HddsProtos.DatanodeDetailsProto.Builder memberBuilder = dn.toProtoBuilder(clientVersion, filterPorts);
+      if (versionOverride != null) {
+        memberBuilder.setCurrentVersion(versionOverride.apply(dn.getID()).serialize());
+      }
+      members.add(memberBuilder.build());
       memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
     }
 
@@ -551,6 +571,7 @@ public final class Pipeline {
       b.append(" {").append(datanodeDetails)
           .append(", ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails)).append("},");
     }
+
     b.append(']')
         .append(", ReplicationConfig: ").append(replicationConfig)
         .append(", State:").append(getPipelineState())

@@ -117,6 +117,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -358,7 +359,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
-      long containerId, int clientVersion) throws IOException {
+      long containerId, ClientVersion clientVersion) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put("containerId", String.valueOf(containerId));
@@ -681,7 +682,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
-      HddsProtos.QueryScope queryScope, String poolName, int clientVersion)
+      HddsProtos.QueryScope queryScope, String poolName, ClientVersion clientVersion)
       throws IOException {
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("opState", String.valueOf(opState));
@@ -1221,7 +1222,10 @@ public class SCMClientProtocolServer implements
       target.setNodeId(peerId);
       StorageContainerLocationProtocol peerClient = null;
       try {
-        peerClient = HAUtils.getScmContainerClientForNode(conf, target);
+        // Contact the peer SCM as this SCM's service (Kerberos keytab) identity, not the remote client's identity.
+        // This runs inside the finalize RPC handler's doAs context, whose UGI has no credentials to open a fresh
+        // outbound RPC to the peer SCM.
+        peerClient = HAUtils.getScmContainerClientForNode(conf, target, UserGroupInformation.getLoginUser());
         HDDSVersion peerVersion = peerClient.getPeerUpgradeStatus();
         if (!peerVersion.equals(leaderVersion)) {
           LOG.warn("SCM peer {} is running software version {} but leader is running version {}. "
@@ -1385,9 +1389,9 @@ public class SCMClientProtocolServer implements
         int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
         auditMap.put("maxDatanodesPercentageToInvolvePerIteration",
             String.valueOf(mdti));
-        if (mdti < 0 || mdti > 100) {
+        if (mdti <= 0 || mdti > 100) {
           throw new IOException("Max Datanodes Percentage To Involve Per Iteration" +
-                  "should be specified in the range [0, 100]");
+                  "should be specified in the range (0, 100]");
         }
         cbc.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
       }
@@ -1550,7 +1554,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String address, String uuid, int clientVersion) throws IOException {
+      String address, String uuid, ClientVersion clientVersion) throws IOException {
 
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("address", address);
@@ -1595,7 +1599,7 @@ public class SCMClientProtocolServer implements
    * @return Usage info such as capacity, SCMUsed, and remaining space.
    */
   private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
-      DatanodeDetails node, int clientVersion) {
+      DatanodeDetails node, ClientVersion clientVersion) {
     DatanodeUsageInfo usageInfo = scm.getScmNodeManager().getUsageInfo(node);
     return usageInfo.toProto(clientVersion);
   }
@@ -1614,7 +1618,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count, int clientVersion)
+      boolean mostUsed, int count, ClientVersion clientVersion)
       throws IOException, IllegalArgumentException {
 
     final Map<String, String> auditMap = Maps.newHashMap();

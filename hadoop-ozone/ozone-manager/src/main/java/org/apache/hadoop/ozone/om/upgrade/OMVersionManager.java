@@ -88,6 +88,16 @@ public class OMVersionManager extends RatisBasedVersionManager {
     return computeApparentVersionInternal(serializedApparentVersion);
   }
 
+  @Override
+  public OzoneManagerVersion getVersionForClient() {
+    ComponentVersion apparentVersion = getApparentVersion();
+    // Once ZDU is finalized, the apparent version should always belong to the OzoneManagerVersion enum.
+    if (isAllowed(OzoneManagerVersion.ZDU) && apparentVersion instanceof OzoneManagerVersion) {
+      return (OzoneManagerVersion) apparentVersion;
+    }
+    return OzoneManagerVersion.values()[OzoneManagerVersion.ZDU.ordinal() - 1];
+  }
+
   /**
    * Maps a serialized apparent version to a {@link ComponentVersion}.
    * If the value is &gt;= {@link OzoneManagerVersion#ZDU} serialized, the OM has been finalized for ZDU and the

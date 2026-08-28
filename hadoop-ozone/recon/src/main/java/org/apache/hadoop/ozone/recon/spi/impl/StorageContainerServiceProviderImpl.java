@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -114,7 +115,7 @@ public class StorageContainerServiceProviderImpl
   @Override
   public List<HddsProtos.Node> getNodes() throws IOException {
     return scmClient.queryNode(null, null, HddsProtos.QueryScope.CLUSTER,
-        "", ClientVersion.CURRENT.serialize());
+        "", ClientVersion.CURRENT);
   }
 
   @Override
@@ -138,7 +139,7 @@ public class StorageContainerServiceProviderImpl
       try {
         List<String> ratisRoles = scmClient.getScmInfo().getPeerRoles();
         for (String ratisRole : ratisRoles) {
-          String[] role = ratisRole.split(":");
+          String[] role = HddsUtils.parseRatisRoleString(ratisRole);
           if (role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
             String hostAddress = role[4].trim();
             int grpcPort = configuration.getInt(

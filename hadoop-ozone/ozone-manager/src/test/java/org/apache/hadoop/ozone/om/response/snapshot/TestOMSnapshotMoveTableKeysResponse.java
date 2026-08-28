@@ -128,9 +128,9 @@ public class TestOMSnapshotMoveTableKeysResponse extends SnapshotRequestAndRespo
         getVolumeName(), getBucketName(), snapshotName1);
          UncheckedAutoCloseableSupplier<OmSnapshot> snapshot2 = nextSnapshotExists ? getOmSnapshotManager().getSnapshot(
              getVolumeName(), getBucketName(), snapshotName2) : null) {
-      List<List<String>> expectedSnapshotIdLocks =
-          Arrays.asList(Collections.singletonList(snapshot1.get().getSnapshotID().toString()),
-          nextSnapshotExists ? Collections.singletonList(snapshot2.get().getSnapshotID().toString()) : null);
+      final List<String> first = Collections.singletonList(snapshot1.get().getSnapshotID().toString());
+      final List<List<String>> expectedSnapshotIdLocks = !nextSnapshotExists ? Collections.singletonList(first)
+          : Arrays.asList(first, Collections.singletonList(snapshot2.get().getSnapshotID().toString()));
       List<List<String>> locks = new ArrayList<>();
       doAnswer(i -> {
         for (String[] id : (Collection<String[]>)i.getArgument(1)) {
@@ -147,13 +147,13 @@ public class TestOMSnapshotMoveTableKeysResponse extends SnapshotRequestAndRespo
           .forEachRemaining(entry -> {
             deletedTable.add(OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.newBuilder().setKey(entry.getKey())
                 .addAllKeyInfos(entry.getValue().getOmKeyInfoList().stream().map(omKeyInfo -> omKeyInfo.getProtobuf(
-                    ClientVersion.CURRENT.serialize())).collect(Collectors.toList())).build());
+                    ClientVersion.CURRENT)).collect(Collectors.toList())).build());
           });
 
       snapshot.getMetadataManager().getDeletedDirTable().iterator()
           .forEachRemaining(entry -> {
             deletedDirTable.add(OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.newBuilder().setKey(entry.getKey())
-                .addKeyInfos(entry.getValue().getProtobuf(ClientVersion.CURRENT.serialize())).build());
+                .addKeyInfos(entry.getValue().getProtobuf(ClientVersion.CURRENT)).build());
           });
       snapshot.getMetadataManager().getSnapshotRenamedTable().iterator().forEachRemaining(entry -> {
         renamedTable.add(HddsProtos.KeyValue.newBuilder().setKey(entry.getKey()).setValue(entry.getValue()).build());

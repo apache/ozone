@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import static com.amazonaws.services.s3.internal.SkipMd5CheckStrategy.DISABLE_PUT_OBJECT_MD5_VALIDATION_PROPERTY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
 
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
@@ -101,7 +100,7 @@ public class S3KeyGenerator extends S3EntityGenerator
 
     timer = getMetrics().timer("key-create");
 
-    System.setProperty(DISABLE_PUT_OBJECT_MD5_VALIDATION_PROPERTY, "true");
+    System.setProperty("com.amazonaws.services.s3.disablePutObjectMD5Validation", "true");
     runTests(this::createKey);
 
     return null;
