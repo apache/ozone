@@ -25,9 +25,10 @@ import static org.apache.hadoop.hdds.protocol.TestDatanodeDetails.assertPorts;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,6 +37,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.jupiter.api.Test;
 
@@ -151,23 +153,38 @@ public class TestPipeline {
   }
 
   @Test
-  void getReplicaIndexesIsMemoizedUnmodifiableView() throws IOException {
+  void getReplicaIndexesIsMemoizedUnmodifiableView() {
     Pipeline pipeline = MockPipeline.createEcPipeline();
 
     Map<DatanodeDetails, Integer> indexes = pipeline.getReplicaIndexes();
-    // The derived view covers every node with its replica index.
-    assertEquals(pipeline.getNodes().size(), indexes.size());
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      assertEquals(pipeline.getReplicaIndex(dn), indexes.get(dn).intValue());
+      assertThat(indexes).containsEntry(dn, pipeline.getReplicaIndex(dn));
     }
 
-    // It is an unmodifiable view, memoized across calls.
     DatanodeDetails node = pipeline.getNodes().get(0);
-    assertThrows(UnsupportedOperationException.class, () -> indexes.put(node, 99));
-    assertSame(indexes, pipeline.getReplicaIndexes());
+    assertThatThrownBy(() -> indexes.put(node, 99)).isInstanceOf(UnsupportedOperationException.class);
+    assertThat(pipeline.getReplicaIndexes()).isSameAs(indexes);
+  }
 
-    // Re-reporting a present node keeps the node count, so the memoized view stays valid.
+  @Test
+  void getReplicaIndexesIsInvalidatedAcrossSiblingPipelines() throws IOException {
+    Pipeline pipeline = MockPipeline.createRatisPipeline();
+    Pipeline sibling = pipeline.toBuilder().build();
+    Map<DatanodeDetails, Integer> indexes = sibling.getReplicaIndexes();
+    DatanodeDetails node = pipeline.getNodes().get(0);
+    DatanodeDetails restartedNode = DatanodeDetails.newBuilder()
+        .setDatanodeDetails(node)
+        .setID(DatanodeID.randomID())
+        .build();
+
     pipeline.reportDatanode(node);
-    assertSame(indexes, pipeline.getReplicaIndexes());
+    assertThat(sibling.getReplicaIndexes()).isSameAs(indexes);
+
+    pipeline.reportDatanode(restartedNode);
+
+    assertThat(sibling.getReplicaIndexes())
+        .isNotSameAs(indexes)
+        .hasSameSizeAs(pipeline.getNodes())
+        .containsEntry(restartedNode, 0);
   }
 }

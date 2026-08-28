@@ -34,7 +34,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -79,7 +78,7 @@ public final class Pipeline {
   private final Map<DatanodeDetails, Long> nodeStatus;
   private final Map<DatanodeDetails, Integer> replicaIndexes;
   // Lazily-derived {node -> replicaIndex} view; rebuilt when the node count changes.
-  private volatile Map<DatanodeDetails, Integer> replicaIndexesView;
+  private volatile ImmutableMap<DatanodeDetails, Integer> replicaIndexesView;
   // nodes with ordered distance to client
   private final ImmutableList<DatanodeDetails> nodesInOrder;
   // Current reported Leader for the pipeline
@@ -247,12 +246,12 @@ public final class Pipeline {
    * Get the replicaIndex Map.
    */
   public Map<DatanodeDetails, Integer> getReplicaIndexes() {
-    Map<DatanodeDetails, Integer> view = replicaIndexesView;
+    ImmutableMap<DatanodeDetails, Integer> view = replicaIndexesView;
     // The view holds one entry per node; rebuild when the node count changes. reportDatanode only
     // adds nodes and may run on a sibling Pipeline that shares this nodeStatus, so key off the size.
     if (view == null || view.size() != nodeStatus.size()) {
-      view = Collections.unmodifiableMap(getNodes().stream()
-          .collect(Collectors.toMap(Function.identity(), this::getReplicaIndex)));
+      view = getNodes().stream()
+          .collect(ImmutableMap.toImmutableMap(Function.identity(), this::getReplicaIndex));
       replicaIndexesView = view;
     }
     return view;
