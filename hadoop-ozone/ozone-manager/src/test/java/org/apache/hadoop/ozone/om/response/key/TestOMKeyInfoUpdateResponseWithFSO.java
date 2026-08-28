@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.response.s3.metadata;
+package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 
@@ -24,12 +24,12 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
- * Test set object metadata response for FSO bucket.
+ * Test the shared in-place key update response for FSO bucket.
  */
-public class TestS3SetObjectMetadataResponseWithFSO extends TestS3SetObjectMetadataResponse {
+public class TestOMKeyInfoUpdateResponseWithFSO extends TestOMKeyInfoUpdateResponse {
 
   @Override
   public BucketLayout getBucketLayout() {
@@ -61,9 +61,15 @@ public class TestS3SetObjectMetadataResponseWithFSO extends TestS3SetObjectMetad
   }
 
   @Override
-  protected S3SetObjectMetadataResponse getSetObjectMetadataResponse(OmKeyInfo omKeyInfo, OMResponse omResponse)
-      throws IOException {
-    return new S3SetObjectMetadataResponseWithFSO(omResponse, omKeyInfo,
+  protected OMKeyInfoUpdateResponse getResponse(OmKeyInfo omKeyInfo) throws IOException {
+    OzoneManagerProtocolProtos.OMResponse omResponse =
+        OzoneManagerProtocolProtos.OMResponse.newBuilder()
+            .setPutObjectTaggingResponse(
+                OzoneManagerProtocolProtos.PutObjectTaggingResponse.getDefaultInstance())
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCmdType(OzoneManagerProtocolProtos.Type.PutObjectTagging)
+            .build();
+    return new OMKeyInfoUpdateResponseWithFSO(omResponse, omKeyInfo,
         omMetadataManager.getVolumeId(volumeName), omBucketInfo.getObjectID());
   }
 }

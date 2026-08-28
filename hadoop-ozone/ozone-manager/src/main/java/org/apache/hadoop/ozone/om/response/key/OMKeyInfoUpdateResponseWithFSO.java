@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.response.s3.tagging;
+package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 
@@ -29,18 +29,19 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Response for put object tagging request for FSO bucket.
+ * Response for requests that update an existing key in place for FSO bucket.
+ * Only files are updated, so the directory table is never touched.
  */
 @CleanupTableInfo(cleanupTables = {FILE_TABLE})
-public class S3PutObjectTaggingResponseWithFSO extends S3PutObjectTaggingResponse {
+public class OMKeyInfoUpdateResponseWithFSO extends OMKeyInfoUpdateResponse {
 
   private long volumeId;
   private long bucketId;
 
-  public S3PutObjectTaggingResponseWithFSO(@Nonnull OMResponse omResponse,
-                                           @Nonnull OmKeyInfo omKeyInfo,
-                                           @Nonnull long volumeId,
-                                           @Nonnull long bucketId) {
+  public OMKeyInfoUpdateResponseWithFSO(@Nonnull OMResponse omResponse,
+                                        @Nonnull OmKeyInfo omKeyInfo,
+                                        long volumeId,
+                                        long bucketId) {
     super(omResponse, omKeyInfo);
     this.volumeId = volumeId;
     this.bucketId = bucketId;
@@ -50,8 +51,8 @@ public class S3PutObjectTaggingResponseWithFSO extends S3PutObjectTaggingRespons
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public S3PutObjectTaggingResponseWithFSO(@Nonnull OMResponse omResponse,
-                                           @Nonnull BucketLayout bucketLayout) {
+  public OMKeyInfoUpdateResponseWithFSO(@Nonnull OMResponse omResponse,
+                                        @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
   }
 

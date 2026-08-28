@@ -17,41 +17,26 @@
 
 package org.apache.hadoop.ozone.om.request.s3.metadata;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.SET_OBJECT_METADATA;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
-import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
-import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.s3.metadata.S3SetObjectMetadataResponse;
+import org.apache.hadoop.ozone.om.request.key.OMKeyInfoUpdateRequest;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetObjectMetadataRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetObjectMetadataResponse;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +45,7 @@ import org.slf4j.LoggerFactory;
  * of an existing key without touching its data. Used by the S3 gateway for a
  * CopyObject onto itself with metadata directive REPLACE.
  */
-public class S3SetObjectMetadataRequest extends OMKeyRequest {
+public class S3SetObjectMetadataRequest extends OMKeyInfoUpdateRequest {
 
   /**
    * System-managed metadata entries that a SetObjectMetadata request may never
@@ -106,133 +91,67 @@ public class S3SetObjectMetadataRequest extends OMKeyRequest {
   @Override
   @DisallowedUntilLayoutVersion(SET_OBJECT_METADATA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    SetObjectMetadataRequest setObjectMetadataRequest =
-        super.preExecute(ozoneManager).getSetObjectMetadataRequest();
-    Objects.requireNonNull(setObjectMetadataRequest, "setObjectMetadataRequest == null");
+    return super.preExecute(ozoneManager);
+  }
 
-    KeyArgs keyArgs = setObjectMetadataRequest.getKeyArgs();
+  @Override
+  protected KeyArgs getKeyArgs(OMRequest omRequest) {
+    return omRequest.getSetObjectMetadataRequest().getKeyArgs();
+  }
 
-    String keyPath = keyArgs.getKeyName();
-    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-        keyPath, getBucketLayout());
-
-    KeyArgs.Builder newKeyArgs =
-        keyArgs.toBuilder()
-            .setKeyName(keyPath)
-            .setModificationTime(Time.now());
-
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
-        ozoneManager, ACLType.WRITE);
+  @Override
+  protected OMRequest buildUpdatedRequest(OMRequest preExecutedRequest, KeyArgs resolvedKeyArgs)
+      throws IOException {
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
         .setSetObjectMetadataRequest(
-            setObjectMetadataRequest.toBuilder().setKeyArgs(resolvedArgs))
+            preExecutedRequest.getSetObjectMetadataRequest().toBuilder().setKeyArgs(resolvedKeyArgs))
         .build();
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+  protected OmKeyInfo.Builder applyUpdate(OmKeyInfo existingKeyInfo, KeyArgs keyArgs) {
+    // Note: unlike object tagging, the key modification time is updated
+    // because AWS CopyObject updates the object's LastModified.
+    return existingKeyInfo.toBuilder()
+        .setMetadata(replaceMetadata(existingKeyInfo.getMetadata(),
+            KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList())))
+        .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
+        .setModificationTime(keyArgs.getModificationTime());
+  }
 
-    SetObjectMetadataRequest setObjectMetadataRequest = getOmRequest().getSetObjectMetadataRequest();
+  @Override
+  protected boolean updatesModificationTime() {
+    return true;
+  }
 
-    KeyArgs keyArgs = setObjectMetadataRequest.getKeyArgs();
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
-    String keyName = keyArgs.getKeyName();
+  @Override
+  protected void setSuccessResponse(OMResponse.Builder omResponse) {
+    omResponse.setSetObjectMetadataResponse(SetObjectMetadataResponse.newBuilder());
+  }
 
-    OMMetrics omMetrics = ozoneManager.getMetrics();
+  @Override
+  protected OMAction getAuditAction() {
+    return OMAction.SET_OBJECT_METADATA;
+  }
+
+  @Override
+  protected void incRequestMetric(OMMetrics omMetrics) {
     omMetrics.incNumSetObjectMetadata();
+  }
 
-    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+  @Override
+  protected void incFailureMetric(OMMetrics omMetrics) {
+    omMetrics.incNumSetObjectMetadataFails();
+  }
 
-    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
-        getOmRequest());
+  @Override
+  protected String getOperationName() {
+    return "SetObjectMetadata";
+  }
 
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    boolean acquiredLock = false;
-    OMClientResponse omClientResponse = null;
-    IOException exception = null;
-    Result result = null;
-    try {
-      mergeOmLockDetails(
-          omMetadataManager.getLock()
-              .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName)
-      );
-      acquiredLock = getOmLockDetails().isLockAcquired();
-
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-
-      String dbOzoneKey =
-          omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
-
-      OmKeyInfo omKeyInfo =
-          omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
-      if (omKeyInfo == null) {
-        throw new OMException("Key not found", KEY_NOT_FOUND);
-      }
-
-      omKeyInfo = omKeyInfo.toBuilder()
-          .setMetadata(replaceMetadata(omKeyInfo.getMetadata(),
-              KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList())))
-          .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
-          .setModificationTime(keyArgs.getModificationTime())
-          .setUpdateID(trxnLogIndex)
-          .build();
-
-      // Note: unlike object tagging, the key modification time is updated
-      // because AWS CopyObject updates the object's LastModified.
-
-      // Update table cache
-      omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(dbOzoneKey),
-          CacheValue.get(trxnLogIndex, omKeyInfo)
-      );
-
-      omClientResponse = new S3SetObjectMetadataResponse(
-          omResponse.setSetObjectMetadataResponse(SetObjectMetadataResponse.newBuilder()).build(),
-          omKeyInfo
-      );
-
-      result = Result.SUCCESS;
-    } catch (IOException ex) {
-      result = Result.FAILURE;
-      exception = ex;
-      omClientResponse = new S3SetObjectMetadataResponse(
-          createErrorOMResponse(omResponse, exception),
-          getBucketLayout()
-      );
-    } finally {
-      if (acquiredLock) {
-        mergeOmLockDetails(omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
-      }
-      if (omClientResponse != null) {
-        omClientResponse.setOmLockDetails(getOmLockDetails());
-      }
-    }
-
-    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.SET_OBJECT_METADATA, auditMap, exception, getOmRequest().getUserInfo()
-    ));
-
-    switch (result) {
-    case SUCCESS:
-      LOG.debug("Set object metadata success. Volume:{}, Bucket:{}, Key:{}.", volumeName,
-          bucketName, keyName);
-      break;
-    case FAILURE:
-      omMetrics.incNumSetObjectMetadataFails();
-      if (OMClientRequestUtils.shouldLogClientRequestFailure(exception)) {
-        LOG.error("Set object metadata failed. Volume:{}, Bucket:{}, Key:{}.", volumeName,
-            bucketName, keyName, exception);
-      }
-      break;
-    default:
-      LOG.error("Unrecognized Result for S3SetObjectMetadataRequest: {}",
-          setObjectMetadataRequest);
-    }
-
-    return omClientResponse;
+  @Override
+  protected Logger getLogger() {
+    return LOG;
   }
 }

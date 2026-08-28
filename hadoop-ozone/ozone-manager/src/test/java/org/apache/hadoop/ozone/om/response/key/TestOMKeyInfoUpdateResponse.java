@@ -15,53 +15,50 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.response.s3.metadata;
+package org.apache.hadoop.ozone.om.response.key;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.response.key.OMKeyResponseTests;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.jupiter.api.Test;
 
 /**
- * Test set object metadata response.
+ * Test the response shared by the requests that update an existing key in
+ * place (object tagging, object metadata).
  */
-public class TestS3SetObjectMetadataResponse extends OMKeyResponseTests {
+public class TestOMKeyInfoUpdateResponse extends OMKeyResponseTests {
 
   @Test
-  public void testAddToDBBatch() throws Exception {
-    OzoneManagerProtocolProtos.OMResponse omResponse =
-        OzoneManagerProtocolProtos.OMResponse.newBuilder().setSetObjectMetadataResponse(
-                OzoneManagerProtocolProtos.SetObjectMetadataResponse.getDefaultInstance())
-            .setStatus(OzoneManagerProtocolProtos.Status.OK)
-            .setCmdType(OzoneManagerProtocolProtos.Type.SetObjectMetadata)
-            .build();
-
+  public void testAddToDBBatchUpdatesTagsAndMetadata() throws Exception {
     String ozoneKey = addKeyToTable();
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
     assertNotNull(omKeyInfo);
-    assertThat(omKeyInfo.getMetadata()).doesNotContainKey("meta-key1");
+    assertTrue(omKeyInfo.getTags().isEmpty());
 
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
     Map<String, String> metadata = new HashMap<>();
     metadata.put("meta-key1", "meta-value1");
-    metadata.put("meta-key2", "meta-value2");
 
     omKeyInfo = omKeyInfo.toBuilder()
+        .setTags(tags)
         .setMetadata(metadata)
         .build();
 
-    S3SetObjectMetadataResponse setObjectMetadataResponse = getSetObjectMetadataResponse(omKeyInfo, omResponse);
-
-    setObjectMetadataResponse.addToDBBatch(omMetadataManager, batchOperation);
+    getResponse(omKeyInfo).addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
@@ -69,7 +66,32 @@ public class TestS3SetObjectMetadataResponse extends OMKeyResponseTests {
     OmKeyInfo updatedOmKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
     assertNotSame(omKeyInfo, updatedOmKeyInfo);
     assertNotNull(updatedOmKeyInfo);
+    assertThat(updatedOmKeyInfo.getTags()).containsAllEntriesOf(tags);
     assertThat(updatedOmKeyInfo.getMetadata()).containsAllEntriesOf(metadata);
+  }
+
+  @Test
+  public void testAddToDBBatchClearsTags() throws Exception {
+    String ozoneKey = addKeyToTable();
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
+        .toBuilder()
+        .setTags(Collections.singletonMap("tag-key1", "tag-value1"))
+        .build();
+
+    getResponse(omKeyInfo).addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey).getTags()).hasSize(1);
+
+    // An update that clears the tag set is written through as well.
+    omKeyInfo = omKeyInfo.toBuilder()
+        .setTags(Collections.emptyMap())
+        .build();
+    try (BatchOperation batch = omMetadataManager.getStore().initBatchOperation()) {
+      getResponse(omKeyInfo).addToDBBatch(omMetadataManager, batch);
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
+
+    assertTrue(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey).getTags().isEmpty());
   }
 
   protected String addKeyToTable() throws Exception {
@@ -81,9 +103,14 @@ public class TestS3SetObjectMetadataResponse extends OMKeyResponseTests {
         keyName);
   }
 
-  protected S3SetObjectMetadataResponse getSetObjectMetadataResponse(OmKeyInfo omKeyInfo,
-                                                                     OzoneManagerProtocolProtos.OMResponse omResponse)
-      throws IOException {
-    return new S3SetObjectMetadataResponse(omResponse, omKeyInfo);
+  protected OMKeyInfoUpdateResponse getResponse(OmKeyInfo omKeyInfo) throws IOException {
+    OzoneManagerProtocolProtos.OMResponse omResponse =
+        OzoneManagerProtocolProtos.OMResponse.newBuilder()
+            .setPutObjectTaggingResponse(
+                OzoneManagerProtocolProtos.PutObjectTaggingResponse.getDefaultInstance())
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCmdType(OzoneManagerProtocolProtos.Type.PutObjectTagging)
+            .build();
+    return new OMKeyInfoUpdateResponse(omResponse, omKeyInfo);
   }
 }
