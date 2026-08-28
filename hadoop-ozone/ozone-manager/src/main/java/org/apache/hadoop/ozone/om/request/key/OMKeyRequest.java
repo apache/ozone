@@ -97,6 +97,7 @@ import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
@@ -1172,6 +1173,27 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     return omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, uploadID);
+  }
+
+  /**
+   * Start of the visibility interval for the version being committed; null before the layout feature
+   * is finalized. hsync re-commits and MPU overwrite reuse the existing objectID, so the interval
+   * must start where that objectID first became visible, or a snapshot taken between two commits
+   * falls outside it and its blocks could be reclaimed.
+   *
+   * <p>When the objectID is carried over from a version written before finalization its first
+   * visible transaction is unknown, so this returns null and the version stays on the
+   * previous-snapshot lookup path rather than getting an interval that starts too late.
+   */
+  protected static Long resolveSeqNumMin(OzoneManager ozoneManager, OmKeyInfo keyToDelete,
+      OmKeyInfo committedKeyInfo, long trxnLogIndex) {
+    if (!ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.SNAPSHOT_RECLAIM_SEQ_NUM)) {
+      return null;
+    }
+    if (keyToDelete != null && keyToDelete.getObjectID() == committedKeyInfo.getObjectID()) {
+      return keyToDelete.getSeqNumMin();
+    }
+    return trxnLogIndex;
   }
 
   /**

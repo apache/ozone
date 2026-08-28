@@ -1226,6 +1226,12 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+  // Visibility interval in OM transaction indexes: a snapshot sees this version when
+  // seqNumMin <= snapshotCreateTxnIndex < seqNumMax. Either field absent means the version
+  // predates HDDS-15125 and falls back to previous-snapshot lookups.
+  // 23 is retired (was expectedETag, removed by HDDS-13919).
+    optional uint64 seqNumMin = 24;
+    optional uint64 seqNumMax = 25;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing

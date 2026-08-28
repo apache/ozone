@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +59,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -805,6 +807,74 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     List<OmKeyInfo> omKeyInfoList = keyValue.getValue().getOmKeyInfoList();
     assertEquals(1, omKeyInfoList.size());
     assertThat(key).doesNotEndWith(String.valueOf(omKeyInfoList.get(0).getObjectID()));
+  }
+
+  @Test
+  public void testCommitOpensVisibilityInterval() throws Exception {
+    testValidateAndUpdateCache();
+
+    OmKeyInfo committed = omMetadataManager.getKeyTable(getBucketLayout()).get(getOzonePathKey());
+    assertEquals(100L, committed.getSeqNumMin());
+    assertNull(committed.getSeqNumMax());
+  }
+
+  @Test
+  public void testOverwriteClosesVisibilityInterval() throws Exception {
+    testValidateAndUpdateCacheOnOverwrite();
+
+    String deletedKeyPrefix = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+    List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs =
+        omMetadataManager.getDeletedTable().getRangeKVs(null, 100, deletedKeyPrefix);
+    assertThat(rangeKVs.size()).isGreaterThan(0);
+    OmKeyInfo deletedVersion = rangeKVs.get(0).getValue().getOmKeyInfoList().get(0);
+    assertEquals(100L, deletedVersion.getSeqNumMin());
+    assertEquals(102L, deletedVersion.getSeqNumMax());
+
+    OmKeyInfo current = omMetadataManager.getKeyTable(getBucketLayout()).get(getOzonePathKey());
+    assertNull(current.getSeqNumMax());
+    // The harness gives every open key objectID 0, so this also covers the same-objectID rule:
+    // the replacing version keeps the interval start of the version it replaced.
+    assertEquals(100L, current.getSeqNumMin());
+  }
+
+  @Test
+  public void testNoVisibilityIntervalBeforeLayoutFeatureFinalization() throws Exception {
+    when(ozoneManager.getVersionManager().isAllowed(any(OMLayoutFeature.class))).thenReturn(false);
+    testValidateAndUpdateCache();
+
+    OmKeyInfo committed = omMetadataManager.getKeyTable(getBucketLayout()).get(getOzonePathKey());
+    assertNull(committed.getSeqNumMin());
+    assertNull(committed.getSeqNumMax());
+  }
+
+  /**
+   * hsync re-commits and MPU overwrite reuse the existing objectID, so the interval must keep the
+   * transaction where that objectID first became visible.
+   */
+  @Test
+  public void testSeqNumMinPreservedAcrossCommitsOfSameObjectId() {
+    OmKeyInfo committing = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationConfig).setObjectID(1L).build();
+
+    OmKeyInfo sameObjectIdWithInterval = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationConfig).setObjectID(1L).setSeqNumMin(50L).build();
+    assertEquals(50L,
+        OMKeyRequest.resolveSeqNumMin(ozoneManager, sameObjectIdWithInterval, committing, 200L));
+
+    // An objectID carried over from before finalization has no known first-visible transaction, so
+    // no interval may be opened: a snapshot taken before this commit could still reference it.
+    OmKeyInfo sameObjectIdWithoutInterval = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationConfig).setObjectID(1L).build();
+    assertNull(OMKeyRequest.resolveSeqNumMin(ozoneManager, sameObjectIdWithoutInterval, committing, 200L));
+
+    OmKeyInfo differentObjectId = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationConfig).setObjectID(2L).setSeqNumMin(50L).build();
+    assertEquals(200L, OMKeyRequest.resolveSeqNumMin(ozoneManager, differentObjectId, committing, 200L));
+
+    assertEquals(200L, OMKeyRequest.resolveSeqNumMin(ozoneManager, null, committing, 200L));
+
+    when(ozoneManager.getVersionManager().isAllowed(any(OMLayoutFeature.class))).thenReturn(false);
+    assertNull(OMKeyRequest.resolveSeqNumMin(ozoneManager, sameObjectIdWithInterval, committing, 200L));
   }
 
   @Test

@@ -690,6 +690,12 @@ public final class OmUtils {
     // Set the updateID
     builder.setUpdateID(trxnLogIndex);
 
+    // Close the visibility interval. toBuilder() carries seqNumMin over; leaving seqNumMax unset
+    // when there is no seqNumMin keeps such versions on the previous-snapshot lookup path.
+    if (keyInfo.getSeqNumMin() != null) {
+      builder.setSeqNumMax(trxnLogIndex);
+    }
+
     //The key doesn't exist in deletedTable, so create a new instance.
     return new RepeatedOmKeyInfo(builder.build(), bucketId);
   }
