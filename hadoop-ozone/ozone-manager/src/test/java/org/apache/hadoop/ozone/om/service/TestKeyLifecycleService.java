@@ -120,6 +120,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -854,6 +855,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.waitFor(
           () -> getKeyCount(bucketLayout) - initialKeyCount == testKeyCount, WAIT_CHECK_INTERVAL, 1000);
       awaitKeyCacheDrained(bucketLayout, volumeName, bucketName);
+      awaitDirCacheDrained(volumeName, bucketName);
 
       // Create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -3445,6 +3447,25 @@ class TestKeyLifecycleService extends OzoneTestBase {
       while (cacheIter.hasNext()) {
         OmKeyInfo key = cacheIter.next().getValue().getCacheValue();
         if (key != null && volume.equals(key.getVolumeName()) && bucket.equals(key.getBucketName())) {
+          return false;
+        }
+      }
+      return true;
+    }, WAIT_CHECK_INTERVAL, 10000);
+  }
+
+  // getSubDirectory evaluates directories still in the cache and adds them again from the table iterator,
+  // so a scan sees them twice until they drain.
+  private void awaitDirCacheDrained(String volume, String bucket)
+      throws IOException, TimeoutException, InterruptedException {
+    long volumeId = metadataManager.getVolumeTable().get(metadataManager.getVolumeKey(volume)).getObjectID();
+    long bucketId = metadataManager.getBucketTable().get(metadataManager.getBucketKey(volume, bucket)).getObjectID();
+    String bucketPrefix = OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
+    Table<String, OmDirectoryInfo> dirTable = metadataManager.getDirectoryTable();
+    GenericTestUtils.waitFor(() -> {
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>> cacheIter = dirTable.cacheIterator();
+      while (cacheIter.hasNext()) {
+        if (cacheIter.next().getKey().getCacheKey().startsWith(bucketPrefix)) {
           return false;
         }
       }
