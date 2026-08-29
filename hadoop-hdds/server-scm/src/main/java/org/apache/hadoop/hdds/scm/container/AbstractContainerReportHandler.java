@@ -250,7 +250,7 @@ abstract class AbstractContainerReportHandler {
       // If the state of a container is OPEN and a replica is in different state, finalize the container.
       if (replica.getState() != State.OPEN) {
         getLogger().info("FINALIZE (i.e. CLOSING) {}", detailsForLogging);
-        updateContainerState(containerId, LifeCycleEvent.FINALIZE);
+        containerManager.updateContainerState(containerId, LifeCycleEvent.FINALIZE);
       }
       return false;
     case CLOSING:
@@ -261,7 +261,7 @@ abstract class AbstractContainerReportHandler {
       // If the replica is in QUASI_CLOSED state, move the container to QUASI_CLOSED state.
       if (replica.getState() == State.QUASI_CLOSED) {
         getLogger().info("QUASI_CLOSE {}", detailsForLogging);
-        updateContainerState(containerId, LifeCycleEvent.QUASI_CLOSE);
+        containerManager.updateContainerState(containerId, LifeCycleEvent.QUASI_CLOSE);
         return false;
       }
 
@@ -286,7 +286,7 @@ abstract class AbstractContainerReportHandler {
           return true;
         }
         getLogger().info("CLOSE {}", detailsForLogging);
-        updateContainerState(containerId, LifeCycleEvent.CLOSE);
+        containerManager.updateContainerState(containerId, LifeCycleEvent.CLOSE);
       }
       return false;
     case QUASI_CLOSED:
@@ -299,7 +299,7 @@ abstract class AbstractContainerReportHandler {
           return true;
         }
         getLogger().info("FORCE_CLOSE for {}", detailsForLogging);
-        updateContainerState(containerId, LifeCycleEvent.FORCE_CLOSE);
+        containerManager.updateContainerState(containerId, LifeCycleEvent.FORCE_CLOSE);
       }
       return false;
     case CLOSED:
@@ -327,24 +327,6 @@ abstract class AbstractContainerReportHandler {
       getLogger().error("Replica not processed due to container state {}: {}",
           container.getState(), detailsForLogging);
       return false;
-    }
-  }
-
-  /**
-   * Apply a container lifecycle state transition, but only on the leader SCM.
-   * On a follower the underlying {@code containerManager.updateContainerState}
-   * is a Ratis write and would throw {@code NotLeaderException}, which would
-   * abort {@code processContainerReplica} and skip recording the replica
-   * location. Skipping the state change on a follower is safe: the leader
-   * drives the transition and it replicates back via the Ratis log.
-   */
-  private void updateContainerState(ContainerID containerID, LifeCycleEvent event)
-      throws IOException {
-    if (scmContext.isLeader()) {
-      containerManager.updateContainerState(containerID, event);
-    } else {
-      getLogger().debug("Skipping updateContainerState on non-leader SCM, container {} event {}",
-          containerID, event);
     }
   }
 

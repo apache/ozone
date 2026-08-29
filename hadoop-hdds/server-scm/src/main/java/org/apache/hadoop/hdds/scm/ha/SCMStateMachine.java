@@ -34,6 +34,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
@@ -84,13 +85,8 @@ public class SCMStateMachine extends BaseStateMachine {
   private DBCheckpoint installingDBCheckpoint = null;
   private List<ManagedSecretKey> installingSecretKeys = null;
 
-  private AtomicBoolean isStateMachineReady = new AtomicBoolean();
-
-  // The leader's committed index captured when this SCM (re)joins as a
-  // follower. Catch-up is measured against this fixed target rather than the
-  // leader's live commit index, which on a busy cluster keeps advancing and
-  // would never be reached. Set only while not yet ready; -1 means uncaptured.
-  private volatile long leaderCommitIndexOnStart = -1L;
+  private AtomicLong currentLeaderTerm = new AtomicLong(-1L);
+  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean();
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
@@ -166,15 +162,14 @@ public class SCMStateMachine extends BaseStateMachine {
         applyTransactionFuture.completeExceptionally(ex);
       }
 
-
+      // After previous term transactions are applied, still in safe mode,
+      // perform refreshAndValidate to update the safemode rule state.
+      if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
+        scm.getScmSafeModeManager().refreshAndValidate();
+      }
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
       updateLastAppliedTermIndex(appliedTermIndex);
-
-      // A restarted follower may catch up by applying data-carrying entries
-      // here rather than through notifyTermIndexUpdated, so check for catch-up
-      // in both places. No-op once the datanode protocol server has started.
-      tryStartDNServerAndRefreshSafeMode();
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
@@ -287,40 +282,19 @@ public class SCMStateMachine extends BaseStateMachine {
       return;
     }
 
-    final boolean isLeader = groupMemberId.getPeerId().equals(newLeaderId);
+    currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
+        .getInfo().getCurrentTerm());
 
-    if (!isLeader) {
-      // Follower: capture the (possibly new) leader's current committed index
-      // as the fixed catch-up target, then start the datanode protocol server
-      // if we are already caught up with it; otherwise applyTransaction /
-      // notifyTermIndexUpdated start it as catch-up completes. Set it always:
-      // getLeaderCommitIndex() returns -1 when the leader is not known yet,
-      // which isFollowerCaughtUp() treats as uncaptured and re-reads later.
-      if (!isStateMachineReady.get()) {
-        leaderCommitIndexOnStart = getLeaderCommitIndex();
-      }
-      tryStartDNServerAndRefreshSafeMode();
-      LOG.info("Leader changed to {}, current SCM {} is still follower.",
-          newLeaderId, scm.getScmId());
+    if (!groupMemberId.getPeerId().equals(newLeaderId)) {
+      LOG.info("leader changed, yet current SCM is still follower.");
       return;
     }
 
-    long currentTerm = scm.getScmHAManager().getRatisServer().getDivision()
-        .getInfo().getCurrentTerm();
-    LOG.info("current SCM {} becomes leader of term {}.", scm.getScmId(), currentTerm);
+    LOG.info("current SCM becomes leader of term {}.", currentLeaderTerm);
 
-    scm.getScmContext().updateLeaderAndTerm(true, currentTerm);
+    scm.getScmContext().updateLeaderAndTerm(true,
+        currentLeaderTerm.get());
     scm.getSequenceIdGen().invalidateBatch();
-
-    // isLeader() is now true -> start the datanode protocol server for the new
-    // leader (a leader has applied all committed entries) and refresh safe mode.
-    tryStartDNServerAndRefreshSafeMode();
-
-    try {
-      transactionBuffer.flush();
-    } catch (Exception ex) {
-      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
-    }
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
@@ -380,95 +354,20 @@ public class SCMStateMachine extends BaseStateMachine {
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
     }
 
-    // As committed entries are applied (e.g. a restarted follower catching up),
-    // start the datanode protocol server once we are caught up with the leader's
-    // committed index. No-op once the server has already been started.
-    tryStartDNServerAndRefreshSafeMode();
-  }
-
-  /**
-   * Start the DatanodeProtocolServer and re-evaluate safe-mode rules, but only
-   * when this SCM is safe to accept datanode reports: it is the leader, or it
-   * is a follower whose state machine has caught up with the leader's committed
-   * log. Guarded by {@code isStateMachineReady} (CAS) so the non-idempotent
-   * {@code DatanodeProtocolServer.start()} runs exactly once.
-   *
-   * <p>In HA mode {@link StorageContainerManager#start()} deliberately does not
-   * start the datanode protocol server; it is deferred to here so datanode
-   * container reports are processed against the up-to-date container/pipeline
-   * state rather than a stale, mid-replay snapshot.
-   */
-  private void tryStartDNServerAndRefreshSafeMode() {
-    if (isStateMachineReady.get()) {
-      return;
-    }
-    if (scm.getScmContext().isLeader() || isFollowerCaughtUp()) {
-      if (isStateMachineReady.compareAndSet(false, true)) {
+    if (currentLeaderTerm.get() == term) {
+      // Means all transactions before this term have been applied.
+      // This means after a restart, all pending transactions have been applied.
+      // Perform
+      // 1. Refresh Safemode rules state.
+      // 2. Start DN Rpc server.
+      if (!refreshedAfterLeaderReady.get()) {
+        scm.getScmSafeModeManager().refresh();
         scm.getDatanodeProtocolServer().start();
-        scm.getScmSafeModeManager().refreshAndValidate();
+
+        refreshedAfterLeaderReady.set(true);
       }
+      currentLeaderTerm.set(-1L);
     }
-  }
-
-  /**
-   * @return true if this follower's last applied index has reached the leader's
-   * committed index captured when it (re)joined, i.e. all transactions the
-   * leader had committed at that point have been replayed. Comparing against a
-   * fixed target avoids chasing the leader's ever-advancing live commit index.
-   */
-  private boolean isFollowerCaughtUp() {
-    try {
-      long target = leaderCommitIndexOnStart;
-      if (target < 0) {
-        // Not captured at leader-change time yet; capture the leader's current
-        // commit index once here so we still compare against a fixed target.
-        target = getLeaderCommitIndex();
-        if (target < 0) {
-          // Normal transient condition during startup/catch-up; this is polled
-          // from multiple callbacks, so keep it at DEBUG to avoid log flooding.
-          LOG.debug("Leader commit index not available yet");
-          return false;
-        }
-        leaderCommitIndexOnStart = target;
-      }
-
-      long lastAppliedIndex = scm.getScmHAManager().getRatisServer()
-          .getDivision().getInfo().getLastAppliedIndex();
-      boolean caughtUp = lastAppliedIndex >= target;
-      if (caughtUp) {
-        LOG.info("Follower caught up with leader: lastAppliedIndex={}, leaderCommitOnStart={}",
-            lastAppliedIndex, target);
-      } else {
-        LOG.debug("Follower not caught up: lastAppliedIndex={}, leaderCommitOnStart={}",
-            lastAppliedIndex, target);
-      }
-      return caughtUp;
-    } catch (Exception e) {
-      LOG.warn("Failed to check follower catch-up status", e);
-      return false;
-    }
-  }
-
-  /**
-   * @return the leader's current committed index as seen by this SCM, or -1 if
-   * the leader or its commit info is not available yet.
-   */
-  private long getLeaderCommitIndex() {
-    RaftServer.Division division = scm.getScmHAManager()
-        .getRatisServer().getDivision();
-    RaftPeerId leaderId = division.getInfo().getLeaderId();
-    if (leaderId != null) {
-      for (RaftProtos.CommitInfoProto info : division.getCommitInfos()) {
-        if (info.getServer().getId().equals(leaderId.toByteString())) {
-          return info.getCommitIndex();
-        }
-      }
-    }
-    return -1L;
-  }
-
-  public boolean getIsStateMachineReady() {
-    return isStateMachineReady.get();
   }
 
   @Override
