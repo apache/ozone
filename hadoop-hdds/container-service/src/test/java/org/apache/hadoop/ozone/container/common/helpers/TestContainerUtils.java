@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -55,8 +56,10 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeInfoMetrics;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,6 +77,45 @@ public class TestContainerUtils {
   void setup(@TempDir File dir) {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+  }
+
+  @Test
+  void getChunkDirCachesResolvedDirectory(@TempDir File dir) throws Exception {
+    File chunks = new File(dir, "chunks");
+    assertTrue(chunks.mkdirs());
+
+    KeyValueContainerData data = new KeyValueContainerData(1L,
+        ContainerLayoutVersion.FILE_PER_BLOCK, 1024L * 1024 * 1024,
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    data.setChunksPath(chunks.getAbsolutePath());
+
+    // Resolved and validated once, then cached: same instance on every call.
+    File first = ContainerUtils.getChunkDir(data);
+    assertSame(first, ContainerUtils.getChunkDir(data));
+
+    // Cache survives the directory disappearing; a mid-life disappearance is
+    // caught later by open(), not by getChunkDir.
+    assertTrue(chunks.delete());
+    assertSame(first, ContainerUtils.getChunkDir(data));
+
+    // Changing the path invalidates the cache and re-resolves.
+    File other = new File(dir, "chunks2");
+    assertTrue(other.mkdirs());
+    data.setChunksPath(other.getAbsolutePath());
+    assertEquals(other.getAbsolutePath(),
+        ContainerUtils.getChunkDir(data).getAbsolutePath());
+  }
+
+  @Test
+  void getChunkDirThrowsWhenChunksDirMissing(@TempDir File dir) {
+    KeyValueContainerData data = new KeyValueContainerData(1L,
+        ContainerLayoutVersion.FILE_PER_BLOCK, 1024L * 1024 * 1024,
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    data.setChunksPath(new File(dir, "missing").getAbsolutePath());
+
+    StorageContainerException e = assertThrows(StorageContainerException.class,
+        () -> ContainerUtils.getChunkDir(data));
+    assertEquals(Result.UNABLE_TO_FIND_DATA_DIR, e.getResult());
   }
 
   @Test

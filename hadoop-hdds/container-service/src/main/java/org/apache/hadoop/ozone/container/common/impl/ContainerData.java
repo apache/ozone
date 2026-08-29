@@ -32,6 +32,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import jakarta.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -76,6 +77,10 @@ public abstract class ContainerData {
 
   // Path to Physical file system where chunks are stored.
   private String chunksPath;
+
+  // Chunks directory resolved and validated once from chunksPath, cached to
+  // avoid re-stat-ing it on every chunk operation. Not serialized.
+  private transient volatile File chunksDirFile;
 
   // State of the Container
   private ContainerDataProto.State state;
@@ -263,6 +268,21 @@ public abstract class ContainerData {
    */
   public void setChunksPath(String chunkPath) {
     this.chunksPath = chunkPath;
+    this.chunksDirFile = null;
+  }
+
+  /**
+   * @return the chunks directory resolved and validated once from
+   *         {@link #getChunksPath()} and cached for the container's lifetime,
+   *         or {@code null} if it has not been resolved yet.
+   */
+  public File getChunksDirFile() {
+    return chunksDirFile;
+  }
+
+  /** Caches the chunks directory resolved by {@code ContainerUtils#getChunkDir}. */
+  public void setChunksDirFile(File chunksDirFile) {
+    this.chunksDirFile = chunksDirFile;
   }
 
   /**

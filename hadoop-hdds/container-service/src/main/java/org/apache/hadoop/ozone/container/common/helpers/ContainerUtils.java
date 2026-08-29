@@ -308,6 +308,11 @@ public final class ContainerUtils {
       throws StorageContainerException {
     Objects.requireNonNull(containerData, "containerData == null");
 
+    File chunksDir = containerData.getChunksDirFile();
+    if (chunksDir != null) {
+      return chunksDir;
+    }
+
     String chunksPath = containerData.getChunksPath();
     if (chunksPath == null) {
       LOG.error("Chunks path is null in the container data");
@@ -315,13 +320,14 @@ public final class ContainerUtils {
           UNABLE_TO_FIND_DATA_DIR);
     }
 
-    File chunksDir = new File(chunksPath);
+    chunksDir = new File(chunksPath);
     if (!chunksDir.exists()) {
       LOG.error("Chunks dir {} does not exist", chunksDir.getAbsolutePath());
       throw new StorageContainerException("Chunks directory " +
           chunksDir.getAbsolutePath() + " does not exist.",
           UNABLE_TO_FIND_DATA_DIR);
     }
+    containerData.setChunksDirFile(chunksDir);
     return chunksDir;
   }
 
