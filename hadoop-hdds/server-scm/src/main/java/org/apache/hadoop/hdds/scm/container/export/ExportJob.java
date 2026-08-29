@@ -19,34 +19,32 @@ package org.apache.hadoop.hdds.scm.container.export;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 /**
  * In-memory state for a container ID export job.
- * <p>Mutable fields are guarded by a {@link ReadWriteLock} so {@link #toStatus()} returns a
- * consistent snapshot while the worker updates progress.
  */
 public final class ExportJob {
 
-  private final ReadWriteLock lock = new ReentrantReadWriteLock();
-
   private final Id id;
   private final ExportScope scope;
-  private final String jobStartTime;
+  private final String jobStartTime = ExportFileManager.formatJobStartTime(Instant.now());
   private final ContainerID startContainerId;
   private final int batchSize;
   private final int partSize;
-  // Planned .tar.gz output path, fixed at job creation; used by the worker to write the archive.
-  private final String plannedArchivePath;
-  private ExecutionState executionState = ExecutionState.RUNNING;
-  private long totalRows;
-  private String errorMessage;
+  /** The .tar.gz output path, fixed at job creation; used by the worker to write the archive. */
+  private final String fileName;
+
+  private final CompletableFuture<Long> idsWrittenFuture = new CompletableFuture<>();
 
   /**
    * Unique job identifier.
@@ -64,10 +62,6 @@ public final class ExportJob {
 
     public static Id of(String value) {
       return new Id(value);
-    }
-
-    public String getValue() {
-      return value;
     }
 
     @Override
@@ -95,70 +89,55 @@ public final class ExportJob {
   /**
    * Immutable snapshot of export progress.
    */
-  public static final class Status {
-    private final Id id;
-    private final ExecutionState executionState;
-    private final long totalRows;
-    // plannedArchivePath when the job SUCCEEDED with rows; null while running, on failure, or zero matches.
-    private final String completedArchivePath;
-    private final String errorMessage;
+  public final class Status {
+    private final Long idsWritten;
+    private final Throwable exception;
 
-    private Status(Id id, ExecutionState executionState, long totalRows, String completedArchivePath,
-        String errorMessage) {
-      this.id = id;
-      this.executionState = executionState;
-      this.totalRows = totalRows;
-      this.completedArchivePath = completedArchivePath;
-      this.errorMessage = errorMessage;
+    private Status() {
+      if (!idsWrittenFuture.isDone()) {
+        this.idsWritten = null;
+        this.exception = null;
+      } else {
+        long rows = -1;
+        Throwable cause = null;
+        try {
+          rows = idsWrittenFuture.join();
+        } catch (CompletionException e) {
+          cause = e.getCause();
+        }
+        this.idsWritten = rows;
+        this.exception = cause;
+      }
     }
 
-    public Id getId() {
+    public ExportJob.Id getId() {
       return id;
     }
 
-    public ExecutionState getExecutionState() {
-      return executionState;
+    public boolean isDone() {
+      return idsWritten != null || exception != null;
     }
 
-    public long getTotalRows() {
-      return totalRows;
+    public long getIdsWritten() {
+      if (!isDone()) {
+        throw new IllegalStateException("Export is not done");
+      }
+      if (exception != null) {
+        throw new IllegalStateException("Export failed", exception);
+      }
+      return idsWritten;
     }
 
-    public String getCompletedArchivePath() {
-      return completedArchivePath;
-    }
-
-    public String getErrorMessage() {
-      return errorMessage;
-    }
-  }
-
-  /**
-   * Job execution state.
-   */
-  public enum ExecutionState {
-    RUNNING(false),
-    SUCCEEDED(true),
-    FAILED(true);
-
-    private final boolean terminal;
-
-    ExecutionState(boolean terminal) {
-      this.terminal = terminal;
-    }
-
-    public boolean isTerminal() {
-      return terminal;
+    public Throwable getException() {
+      return exception;
     }
   }
 
-  ExportJob(Id id, ExportScope scope, String jobStartTime, String plannedArchivePath, ContainerID startContainerId,
-      int batchSize, int partSize) {
-    this.id = id;
+  ExportJob(ExportScope scope, ContainerID startContainerId, int batchSize, int partSize) {
+    this.id = Id.newId();
     this.scope = scope;
-    this.jobStartTime = jobStartTime;
-    this.plannedArchivePath = plannedArchivePath;
     this.startContainerId = startContainerId != null ? startContainerId : ContainerID.valueOf(0);
+    this.fileName = ExportFileManager.archiveFileName(scope, jobStartTime, id);
     this.batchSize = batchSize;
     this.partSize = partSize;
   }
@@ -175,8 +154,8 @@ public final class ExportJob {
     return scope.getHealthState();
   }
 
-  String getPlannedArchivePath() {
-    return plannedArchivePath;
+  String getFileName() {
+    return fileName;
   }
 
   ContainerID getStartContainerId() {
@@ -191,86 +170,38 @@ public final class ExportJob {
     return partSize;
   }
 
-  void updateTotalRows(long rows) {
-    lock.writeLock().lock();
-    try {
-      totalRows = rows;
-    } finally {
-      lock.writeLock().unlock();
-    }
+  CompletableFuture<Long> getFuture() {
+    return idsWrittenFuture;
   }
 
-  void completeWithNoMatches() {
-    lock.writeLock().lock();
-    try {
-      transitionToTerminal(ExecutionState.SUCCEEDED);
-    } finally {
-      lock.writeLock().unlock();
-    }
+  Status getStatus() {
+    return new Status();
   }
 
-  void completeSucceeded() {
-    lock.writeLock().lock();
-    try {
-      transitionToTerminal(ExecutionState.SUCCEEDED);
-    } finally {
-      lock.writeLock().unlock();
-    }
+  String partFileName(int partNumber) {
+    return String.format("container-ids_%s_%s_part%03d.txt", scope, jobStartTime, partNumber);
   }
 
-  void fail(String message) {
-    lock.writeLock().lock();
-    try {
-      errorMessage = message;
-      transitionToTerminal(ExecutionState.FAILED);
-    } finally {
-      lock.writeLock().unlock();
-    }
-  }
-
-  Status toStatus() {
-    lock.readLock().lock();
-    try {
-      String completedArchivePath =
-          executionState == ExecutionState.SUCCEEDED && totalRows > 0 ? plannedArchivePath : null;
-      return new Status(id, executionState, totalRows, completedArchivePath, errorMessage);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  private void transitionToTerminal(ExecutionState terminalState) {
-    if (executionState.isTerminal()) {
-      throw new IllegalStateException("Export job " + id + " is already terminal: " + executionState);
-    }
-    executionState = terminalState;
-  }
-
-  String partFileName(int partIndex) {
-    return String.format("container-ids_%s_%s_part%03d.txt",
-        scope.getValue(), jobStartTime, partIndex);
-  }
-
-  void writeMetadataHeader(BufferedWriter writer, int partNumber, long partStartContainerId)
-      throws IOException {
-    writer.write("# jobId=" + id.getValue());
+  void writeMetadataHeader(OutputStream out, int partNumber, ContainerID partStartContainerId) throws IOException {
+    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out));
+    writer.write("# jobId=" + id);
     writer.newLine();
     writer.write("# jobStartTime=" + jobStartTime);
     writer.newLine();
-    if (scope.getHealthState() != null) {
-      writer.write("# healthState=" + scope.getHealthState().name());
-      writer.newLine();
-    }
-    if (scope.getLifeCycleState() != null) {
-      writer.write("# lifecycleState=" + scope.getLifeCycleState().name());
-      writer.newLine();
-    }
-    writer.write("# startContainerId=" + partStartContainerId);
+    writer.write("# scope=" + scope);
+    writer.newLine();
+    writer.write("# partStartContainerId=" + partStartContainerId);
     writer.newLine();
     writer.write("# part=" + partNumber);
     writer.newLine();
     writer.write("# format=container-id-per-line");
     writer.newLine();
     writer.newLine();
+    writer.flush();
+  }
+  
+  @Override
+  public String toString() {
+    return "ExportJob" + id;
   }
 }

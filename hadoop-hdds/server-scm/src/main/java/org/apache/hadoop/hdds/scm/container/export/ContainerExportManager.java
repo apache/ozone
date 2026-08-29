@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.container.export;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.time.Instant;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,14 +27,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,10 +49,6 @@ import org.slf4j.LoggerFactory;
  * and the operator must re-submit on the new leader. {@link ExportFileManager} owns on-disk layout,
  * locking, part files, and completed archives; this class tracks {@link ExportJob} state and
  * schedules work.
- *
- * <p>Job submission and the running-job slot are guarded by a {@link ReadWriteLock}. Per-job
- * progress is read via {@link ExportJob#toStatus()}, which uses its own read lock for a consistent
- * snapshot.
  */
 public class ContainerExportManager {
 
@@ -62,9 +58,8 @@ public class ContainerExportManager {
   private static final int DEFAULT_PART_SIZE = 500_000;
   private static final long SHUTDOWN_TIMEOUT_MS = 5_000;
 
-  private final ReadWriteLock lock = new ReentrantReadWriteLock();
   private final Map<ExportJob.Id, ExportJob> jobMap = new ConcurrentHashMap<>();
-  private ExportJob.Id runningJobId;
+  private final AtomicReference<ExportJob> runningJob = new AtomicReference<>();
   private final ExecutorService workerPool;
   private final ContainerManager containerManager;
   private final ExportFileManager fileManager;
@@ -108,43 +103,29 @@ public class ContainerExportManager {
   /**
    * Submit a container ID export job on the SCM leader.
    *
-   * @return job id, or {@code null} if not leader or another export is already running
+   * @return the submitted job, or {@code null} if not leader or another export is already running
    */
-  public ExportJob.Id submitJob(ContainerID start, LifeCycleState lifeCycleState,
-      ContainerHealthState healthState) {
+  public ExportJob submitJob(ContainerID start, LifeCycleState lifeCycleState, ContainerHealthState healthState) {
     if (!isLeaderReady.getAsBoolean()) {
       return null;
     }
 
     final ExportScope scope = ExportScope.of(lifeCycleState, healthState);
-
-    lock.writeLock().lock();
-    try {
-      if (runningJobId != null) {
-        return null;
-      }
-
-      ExportJob.Id jobId = ExportJob.Id.newId();
-      Instant now = Instant.now();
-      String jobStartTime = ExportFileManager.formatJobStartTime(now);
-      String plannedArchivePath = fileManager.resolveArchiveFile(scope, jobStartTime, jobId).getAbsolutePath();
-
-      ExportJob job = new ExportJob(jobId, scope, jobStartTime, plannedArchivePath, start, batchSize, partSize);
-      runningJobId = jobId;
-      jobMap.put(jobId, job);
-
-      workerPool.submit(() -> executeExport(job));
-      LOG.info("Submitted container ID export job {} (scope={}, start={}, batchSize={}, partSize={})",
-          jobId, scope, start, batchSize, partSize);
-      return jobId;
-    } finally {
-      lock.writeLock().unlock();
+    final ExportJob job = new ExportJob(scope, start, batchSize, partSize);
+    if (!runningJob.compareAndSet(null, job)) {
+      return null;
     }
+
+    jobMap.put(job.getId(), job);
+    workerPool.submit(() -> executeExport(job));
+    LOG.info("Submitted container ID export job {} (scope={}, start={}, batchSize={}, partSize={})",
+        job, scope, start, batchSize, partSize);
+    return job;
   }
 
   public ExportJob.Status getExportStatus(ExportJob.Id jobId) {
     ExportJob job = jobMap.get(jobId);
-    return job != null ? job.toStatus() : null;
+    return job != null ? job.getStatus() : null;
   }
 
   public void shutdown() {
@@ -166,110 +147,114 @@ public class ContainerExportManager {
   }
 
   private void executeExport(ExportJob job) {
-    String jobIdValue = job.getId().getValue();
-    String plannedArchivePath = job.getPlannedArchivePath();
-
     try {
       fileManager.createJobDirectory(job.getId());
 
-      ContainerID cursor = job.getStartContainerId();
-      int partIndex = 1;
-      long totalRows = 0;
-      long recordsInCurrentPart = 0;
-      BufferedWriter writer = null;
-      // Pre-allocated buffer: ~12 chars per ID (up to 20 digits + newline) per batch.
-      StringBuilder buf = new StringBuilder(job.getBatchSize() * 12);
+      final Long idsWritten = writeContainerIDs(job);
+      if (idsWritten == null) {
+        fileManager.cleanupFailedJob(job);
+        job.getFuture().completeExceptionally(new InterruptedException("Export cancelled"));
+        LOG.info("Export {} was cancelled", job);
+      } else {
+        job.getFuture().complete(idsWritten);
+        if (idsWritten > 0) {
+          fileManager.writeArchive(job);
+          LOG.info("{} completed: {} ids, archive={}", job, idsWritten, job.getFileName());
+        } else {
+          LOG.info("{} completed with {} matching containers", job, idsWritten);
+        }
+      }
 
-      try {
-        while (true) {
-          if (Thread.currentThread().isInterrupted()) {
-            throw new InterruptedException("Export job " + jobIdValue + " cancelled");
-          }
-          if (!isLeaderReady.getAsBoolean()) {
-            throw new IOException("SCM lost leadership during export job " + jobIdValue);
-          }
+      fileManager.deleteJobDirectory(job.getId());
+    } catch (Exception e) {
+      fileManager.cleanupFailedJob(job);
+      job.getFuture().completeExceptionally(e);
+      LOG.error("Export {} failed", job, e);
+    } finally {
+      final boolean cleared = runningJob.compareAndSet(job, null);
+      Preconditions.assertTrue(cleared);
+    }
+  }
 
-          List<ContainerID> batch = containerManager.getContainerIDs(
-              cursor, job.getBatchSize(), job.getLifeCycleState(), job.getHealthState());
-          if (batch.isEmpty()) {
-            break;
-          }
+  private Long writeContainerIDs(ExportJob job) throws IOException {
+    // Pre-allocated buffer: ~12 chars per ID (up to 20 digits + newline) per batch.
+    final byte[] buffer = new byte[job.getBatchSize() * 12];
+    final WriteState state = new WriteState();
 
-          for (ContainerID containerId : batch) {
-            if (recordsInCurrentPart == 0) {
-              writer = closeWriter(writer);
-              writer = fileManager.newPartWriter(job.getId(), job.partFileName(partIndex));
-              job.writeMetadataHeader(writer, partIndex, containerId.getProtobuf().getId());
-              LOG.info("Export job {} created part{}", jobIdValue, partIndex);
-            }
-
-            buf.append(containerId.getProtobuf().getId()).append('\n');
-            totalRows++;
-            recordsInCurrentPart++;
-            job.updateTotalRows(totalRows);
-
-            if (recordsInCurrentPart >= job.getPartSize()) {
-              writer.write(buf.toString());
-              buf.setLength(0);
-              writer = closeWriter(writer);
-              recordsInCurrentPart = 0;
-              partIndex++;
-            }
-          }
-
-          if (buf.length() > 0 && writer != null) {
-            writer.write(buf.toString());
-            buf.setLength(0);
-          }
-
-          cursor = ContainerID.valueOf(
-              batch.get(batch.size() - 1).getProtobuf().getId() + 1);
+    try {
+      for (ContainerID cursor = job.getStartContainerId(); cursor != null;) {
+        if (Thread.interrupted()) {
+          return null;
+        }
+        if (!isLeaderReady.getAsBoolean()) {
+          throw new IOException("SCM lost leadership during " + job);
         }
 
-        writer = closeWriter(writer);
-      } finally {
-        closeWriter(writer);
+        final List<ContainerID> batch = containerManager.getContainerIDs(
+            cursor, job.getBatchSize(), job.getLifeCycleState(), job.getHealthState());
+        if (batch.isEmpty()) {
+          cursor = null;
+        } else {
+          writeBatch(job, state, batch, buffer);
+          cursor = ContainerID.valueOf(batch.get(batch.size() - 1).getProtobuf().getId() + 1);
+        }
+      }
+      state.out = closeOutputStream(state.out);
+    } finally {
+      closeOutputStream(state.out);
+      state.out = null;
+    }
+    return state.idsWritten;
+  }
+
+  private void writeBatch(ExportJob job, WriteState state, List<ContainerID> batch, byte[] buffer)
+      throws IOException {
+    int offset = 0;
+    for (ContainerID containerId : batch) {
+      if (state.idsInCurrentPart == 0) {
+        state.out = closeOutputStream(state.out);
+        state.out = fileManager.newPartOutputStream(job.getId(), job.partFileName(state.partNumber));
+        job.writeMetadataHeader(state.out, state.partNumber, containerId);
+        LOG.info("{} created part{}", job, state.partNumber);
       }
 
-      if (totalRows == 0) {
-        job.completeWithNoMatches();
-        LOG.info("Export job {} completed with zero matching containers", jobIdValue);
-      } else {
-        fileManager.writeArchive(job.getId(), plannedArchivePath);
-        job.completeSucceeded();
-        LOG.info("Export job {} completed ({} rows, archive={}).",
-            jobIdValue, totalRows, plannedArchivePath);
+      final byte[] idBytes = (containerId.getProtobuf().getId() + "\n").getBytes(StandardCharsets.UTF_8);
+      if (offset + idBytes.length > buffer.length) {
+        state.out.write(buffer, 0, offset);
+        offset = 0;
       }
-      fileManager.deleteJobDirectory(job.getId());
-    } catch (InterruptedException e) {
-      fileManager.cleanupFailedJob(job.getId(), plannedArchivePath);
-      job.fail(e.getMessage());
-      LOG.info("Export job {} was cancelled", jobIdValue);
-      Thread.currentThread().interrupt();
-    } catch (IOException | RuntimeException e) {
-      fileManager.cleanupFailedJob(job.getId(), plannedArchivePath);
-      job.fail(e.getMessage() != null ? e.getMessage() : e.toString());
-      LOG.error("Export job {} failed", jobIdValue, e);
-    } finally {
-      clearRunningJob(job.getId());
+      System.arraycopy(idBytes, 0, buffer, offset, idBytes.length);
+      offset += idBytes.length;
+      state.idsWritten++;
+      state.idsInCurrentPart++;
+
+      if (state.idsInCurrentPart >= job.getPartSize()) {
+        if (offset > 0) {
+          state.out.write(buffer, 0, offset);
+          offset = 0;
+        }
+        state.out = closeOutputStream(state.out);
+        state.idsInCurrentPart = 0;
+        state.partNumber++;
+      }
+    }
+
+    if (offset > 0) {
+      state.out.write(buffer, 0, offset);
     }
   }
 
-  private void clearRunningJob(ExportJob.Id jobId) {
-    lock.writeLock().lock();
-    try {
-      if (runningJobId != null && runningJobId.equals(jobId)) {
-        runningJobId = null;
-      }
-    } finally {
-      lock.writeLock().unlock();
-    }
+  private static final class WriteState {
+    private int partNumber = 1;
+    private long idsInCurrentPart = 0;
+    private long idsWritten = 0;
+    private OutputStream out = null;
   }
 
-  private static BufferedWriter closeWriter(BufferedWriter writer) throws IOException {
-    if (writer != null) {
-      writer.flush();
-      writer.close();
+  private static OutputStream closeOutputStream(OutputStream out) throws IOException {
+    if (out != null) {
+      out.flush();
+      out.close();
     }
     return null;
   }
