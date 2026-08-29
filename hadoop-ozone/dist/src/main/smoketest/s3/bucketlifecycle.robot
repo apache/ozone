@@ -61,3 +61,24 @@ Delete bucket lifecycle configuration when none exists
     ${bucket} =         Create bucket
     ${result} =         Execute AWSS3APICli     delete-bucket-lifecycle --bucket ${bucket}
                         Should Be Empty         ${result}
+
+Head object reports expiration of matching lifecycle rule
+    [tags]    no-bucket-type
+    ${bucket} =         Create bucket
+    ${lifecycle_json} =     Set Variable    {"Rules": [{"ID": "Rule1", "Prefix": "prefix1/", "Status": "Enabled", "Expiration": {"Days": 1}}]}
+                        Execute AWSS3APICli     put-bucket-lifecycle-configuration --bucket ${bucket} --lifecycle-configuration '${lifecycle_json}'
+                        Execute                 echo "Randomtext" > /tmp/lifecycle-testfile
+                        Execute AWSS3APICli     put-object --bucket ${bucket} --key prefix1/f1 --body /tmp/lifecycle-testfile
+    ${result} =         Execute AWSS3APICli     head-object --bucket ${bucket} --key prefix1/f1
+                        Should contain          ${result}           Expiration
+                        Should contain          ${result}           Rule1
+
+Head object omits expiration when no lifecycle rule matches
+    [tags]    no-bucket-type
+    ${bucket} =         Create bucket
+    ${lifecycle_json} =     Set Variable    {"Rules": [{"ID": "Rule1", "Prefix": "prefix1/", "Status": "Enabled", "Expiration": {"Days": 1}}]}
+                        Execute AWSS3APICli     put-bucket-lifecycle-configuration --bucket ${bucket} --lifecycle-configuration '${lifecycle_json}'
+                        Execute                 echo "Randomtext" > /tmp/lifecycle-testfile
+                        Execute AWSS3APICli     put-object --bucket ${bucket} --key other/f1 --body /tmp/lifecycle-testfile
+    ${result} =         Execute AWSS3APICli     head-object --bucket ${bucket} --key other/f1
+                        Should not contain      ${result}           Expiration

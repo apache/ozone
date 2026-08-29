@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.TestObjectGet.EXPIRES1;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPIRATION_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
@@ -49,7 +50,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
@@ -61,6 +64,12 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmLCAbortIncompleteMultipartUpload;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
+import org.apache.hadoop.ozone.om.helpers.OmLCFilter;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
@@ -319,6 +328,150 @@ public class TestObjectHead {
         Arguments.of(HttpHeaders.CONTENT_ENCODING, CONTENT_ENCODING_CUSTOM, "gzip", "user-encoding"),
         Arguments.of(HttpHeaders.CONTENT_LANGUAGE, CONTENT_LANGUAGE_CUSTOM, "en-CA", "user-lang"),
         Arguments.of(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION_CUSTOM, "inline", "user-disp"));
+  }
+
+  @Test
+  public void testHeadObjectIncludesExpirationForDaysRule() throws Exception {
+    String keyName = "logs/app.log";
+    createKey(keyName);
+    setLifecycleRules(daysRule("logs-30d", "logs/", 30));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    ZonedDateTime expiry = expectedDaysExpiry(keyName, 30);
+    assertEquals("expiry-date=\"" + RFC1123Util.FORMAT.format(expiry) + "\", rule-id=\"logs-30d\"",
+        response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  public void testHeadObjectIncludesExpirationForDateRule() throws Exception {
+    String keyName = "logs/app.log";
+    createKey(keyName);
+    setLifecycleRules(new OmLCRule.Builder()
+        .setId("logs-date")
+        .setPrefix("logs/")
+        .setEnabled(true)
+        .setAction(new OmLCExpiration.Builder().setDate("2042-04-02T00:00:00Z").build())
+        .build());
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+
+    assertEquals("expiry-date=\"Wed, 02 Apr 2042 00:00:00 GMT\", rule-id=\"logs-date\"",
+        response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  public void testHeadObjectIncludesExpirationForTagFilterRule() throws Exception {
+    String keyName = "head-tagged";
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "c"));
+    setLifecycleRules(new OmLCRule.Builder()
+        .setId("tagged-10d")
+        .setEnabled(true)
+        .setFilter(new OmLCFilter.Builder().setTag("tag1", "value1").build())
+        .setAction(new OmLCExpiration.Builder().setDays(10).build())
+        .build());
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+
+    ZonedDateTime expiry = expectedDaysExpiry(keyName, 10);
+    assertEquals("expiry-date=\"" + RFC1123Util.FORMAT.format(expiry) + "\", rule-id=\"tagged-10d\"",
+        response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  public void testHeadObjectReportsEarliestExpirationOfMatchingRules() throws Exception {
+    String keyName = "logs/app.log";
+    createKey(keyName);
+    setLifecycleRules(daysRule("logs-30d", "logs/", 30), daysRule("logs-7d", "logs/", 7));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+
+    ZonedDateTime expiry = expectedDaysExpiry(keyName, 7);
+    assertEquals("expiry-date=\"" + RFC1123Util.FORMAT.format(expiry) + "\", rule-id=\"logs-7d\"",
+        response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  public void testHeadObjectOmitsExpirationWhenNoRuleMatches() throws Exception {
+    String keyName = "data/app.log";
+    createKey(keyName);
+    setLifecycleRules(daysRule("logs-30d", "logs/", 30));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    assertNull(response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  public void testHeadObjectOmitsExpirationForDisabledRule() throws Exception {
+    String keyName = "logs/app.log";
+    createKey(keyName);
+    setLifecycleRules(new OmLCRule.Builder()
+        .setId("logs-30d")
+        .setPrefix("logs/")
+        .setEnabled(false)
+        .setAction(new OmLCExpiration.Builder().setDays(30).build())
+        .build());
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+
+    assertNull(response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  public void testHeadObjectOmitsExpirationForAbortIncompleteMultipartUploadRule() throws Exception {
+    String keyName = "uploads/part";
+    createKey(keyName);
+    setLifecycleRules(new OmLCRule.Builder()
+        .setId("abort-7d")
+        .setPrefix("uploads/")
+        .setEnabled(true)
+        .setAction(new OmLCAbortIncompleteMultipartUpload.Builder().setDaysAfterInitiation(7).build())
+        .build());
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+
+    assertNull(response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  public void testHeadObjectOmitsExpirationWithoutLifecycleConfiguration() throws Exception {
+    String keyName = "logs/app.log";
+    createKey(keyName);
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    assertNull(response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  private void setLifecycleRules(OmLCRule... rules) throws IOException {
+    bucket.setLifecycleConfiguration(new OmLifecycleConfiguration.Builder()
+        .setVolume(bucket.getVolumeName())
+        .setBucket(bucketName)
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
+        .setCreationTime(Instant.now().toEpochMilli())
+        .setRules(Arrays.asList(rules))
+        .build());
+  }
+
+  private static OmLCRule daysRule(String id, String prefix, int days) {
+    return new OmLCRule.Builder()
+        .setId(id)
+        .setPrefix(prefix)
+        .setEnabled(true)
+        .setAction(new OmLCExpiration.Builder().setDays(days).build())
+        .build();
+  }
+
+  /** S3 reports modification time plus Days, rounded up to the next midnight UTC. */
+  private ZonedDateTime expectedDaysExpiry(String keyName, int days) throws IOException {
+    ZoneId gmt = ZoneId.of(OzoneConsts.OZONE_TIME_ZONE);
+    return bucket.headObject(keyName).getModificationTime().atZone(gmt)
+        .plusDays(days).toLocalDate().plusDays(1).atStartOfDay(gmt);
   }
 
   private byte[] createKey(String keyPath) throws IOException {

@@ -36,6 +36,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPIRATION_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.MP_PARTS_COUNT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_MATCH_PATTERN;
@@ -57,6 +58,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,6 +90,7 @@ import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -515,6 +518,64 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   }
 
   /**
+   * Adds the {@code x-amz-expiration} header when an enabled lifecycle
+   * expiration rule covers the key, as S3 does: the value names the date the
+   * object is scheduled for deletion and the rule that schedules it. When more
+   * than one rule covers the key, the earliest expiry is reported.
+   * <p>
+   * The header is advisory, so a bucket without a lifecycle configuration, a
+   * caller who may not read it, or any other lookup failure only leaves the
+   * header out; the HEAD itself still succeeds.
+   */
+  private void addExpirationHeader(ResponseBuilder responseBuilder,
+      String bucketName, String keyPath, OzoneKey key) {
+    try {
+      OzoneLifecycleConfiguration lifecycleConfiguration = getClientProtocol()
+          .getLifecycleConfiguration(key.getVolumeName(), bucketName);
+
+      ZonedDateTime earliest = null;
+      String ruleId = null;
+      for (OzoneLifecycleConfiguration.OzoneLCRule rule : lifecycleConfiguration.getRules()) {
+        if (!rule.isEnabled() || rule.getExpiration() == null
+            || !rule.matches(keyPath, key.getTags())) {
+          continue;
+        }
+        ZonedDateTime expiryDate = expiryDateOf(rule.getExpiration(), key.getModificationTime());
+        if (expiryDate != null && (earliest == null || expiryDate.isBefore(earliest))) {
+          earliest = expiryDate;
+          ruleId = rule.getId();
+        }
+      }
+
+      if (earliest != null) {
+        responseBuilder.header(EXPIRATION_HEADER,
+            String.format("expiry-date=\"%s\", rule-id=\"%s\"", RFC1123Util.FORMAT.format(earliest), ruleId));
+      }
+    } catch (IOException | RuntimeException ex) {
+      LOG.debug("Omitting {} header for {}/{}", EXPIRATION_HEADER, bucketName, keyPath, ex);
+    }
+  }
+
+  /**
+   * S3 reports a {@code Days} expiry as the object's modification time plus the
+   * configured days, rounded up to the next midnight UTC. A {@code Date} expiry
+   * is already validated to be midnight UTC, so it is reported as is.
+   */
+  private static ZonedDateTime expiryDateOf(
+      OzoneLifecycleConfiguration.OzoneLCExpiration expiration, Instant modificationTime) {
+    ZoneId gmt = ZoneId.of(OzoneConsts.OZONE_TIME_ZONE);
+    if (expiration.getDays() != null) {
+      return modificationTime.atZone(gmt).plusDays(expiration.getDays())
+          .toLocalDate().plusDays(1).atStartOfDay(gmt);
+    }
+    if (expiration.getDate() != null) {
+      return ZonedDateTime.parse(expiration.getDate(), DateTimeFormatter.ISO_DATE_TIME)
+          .withZoneSameInstant(gmt);
+    }
+    return null;
+  }
+
+  /**
    * Store the request's Content-Type (preserved by {@link HeaderPreprocessor}
    * as {@code X-Ozone-Original-Content-Type}) in the key metadata.
    */
@@ -685,6 +746,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     addLastModifiedDate(response, key);
     addTagCountIfAny(response, key);
     addCustomMetadataHeaders(response, key);
+    addExpirationHeader(response, bucketName, keyPath, key);
     getMetrics().updateHeadKeySuccessStats(startNanos);
     auditReadSuccess(s3GAction);
     return response.build();
