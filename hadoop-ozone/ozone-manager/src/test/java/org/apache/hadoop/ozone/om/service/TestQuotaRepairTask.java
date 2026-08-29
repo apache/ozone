@@ -45,6 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -83,6 +84,7 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
 
   /** Seconds; must match {@link Timeout} on this class. */
   private static final int REPAIR_TEST_TIMEOUT_SECONDS = 120;
+  private static final ReplicationConfig RATIS_ONE = RatisReplicationConfig.getInstance(ONE);
 
   private static Boolean awaitRepair(CompletableFuture<Boolean> repair) throws Exception {
     return repair.get(REPAIR_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -480,21 +482,21 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     }
     long keyBytes = keyCount * 1000L;
 
-    // legacy schema: part 1 is committed twice (100 then 300), only the current 300 counts
+    // legacy schema: parts are inlined in the upload record, keyed by part number,
+    // so committing part 1 twice (100 then 300) leaves only the current 300
     String legacyKey = "legacyMpuKey";
     String legacyUploadId = UUID.randomUUID().toString();
-    OmMultipartKeyInfo legacyInfo = newMultipartInfo(legacyUploadId, 1001L, false);
+    OmMultipartKeyInfo legacyInfo = newMultipartInfo(legacyUploadId, 1001L, RATIS_ONE, false);
     legacyInfo.addPartKeyInfo(createPart(bucketName, legacyKey, legacyUploadId, 1, 100L));
     legacyInfo.addPartKeyInfo(createPart(bucketName, legacyKey, legacyUploadId, 1, 300L));
     legacyInfo.addPartKeyInfo(createPart(bucketName, legacyKey, legacyUploadId, 2, 200L));
     addMultipartInfo(bucketName, legacyKey, legacyInfo, 1L);
     long legacyBytes = 300L + 200L;
 
-    // split-parts schema: part 1 is rewritten (111 then 400), only the current 400 counts
+    // split-parts schema: parts live in their own table
     String splitKey = "splitMpuKey";
     String splitUploadId = UUID.randomUUID().toString();
-    addMultipartInfo(bucketName, splitKey, newMultipartInfo(splitUploadId, 1002L, true), 2L);
-    putSplitPart(bucketName, splitKey, splitUploadId, 1, 111L);
+    addMultipartInfo(bucketName, splitKey, newMultipartInfo(splitUploadId, 1002L, RATIS_ONE, true), 2L);
     putSplitPart(bucketName, splitKey, splitUploadId, 1, 400L);
     putSplitPart(bucketName, splitKey, splitUploadId, 2, 500L);
     long splitBytes = 400L + 500L;
@@ -502,17 +504,17 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     // uploads initiated but with no part committed yet must contribute nothing
     String emptyLegacyUploadId = UUID.randomUUID().toString();
     addMultipartInfo(bucketName, "emptyLegacyMpuKey",
-        newMultipartInfo(emptyLegacyUploadId, 1003L, false), 3L);
+        newMultipartInfo(emptyLegacyUploadId, 1003L, RATIS_ONE, false), 3L);
     String emptySplitUploadId = UUID.randomUUID().toString();
     addMultipartInfo(bucketName, "emptySplitMpuKey",
-        newMultipartInfo(emptySplitUploadId, 1004L, true), 4L);
+        newMultipartInfo(emptySplitUploadId, 1004L, RATIS_ONE, true), 4L);
 
     // a second bucket proves parts are charged to the bucket that owns them.
     // Its upload replicates three ways, so the part size is charged three times over.
     String otherKey = "otherMpuKey";
     String otherUploadId = UUID.randomUUID().toString();
-    OmMultipartKeyInfo otherInfo = newMultipartInfo(otherUploadId, 2001L, false).toBuilder()
-        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE)).build();
+    OmMultipartKeyInfo otherInfo = newMultipartInfo(otherUploadId, 2001L,
+        RatisReplicationConfig.getInstance(THREE), false);
     otherInfo.addPartKeyInfo(createPart(otherBucketName, otherKey, otherUploadId, 1, 700L));
     addMultipartInfo(otherBucketName, otherKey, otherInfo, 5L);
     long otherBytes = 700L * 3;
@@ -547,8 +549,8 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
 
     String keyName = "fsoMpuFile";
     String uploadId = UUID.randomUUID().toString();
-    OmMultipartKeyInfo mpuInfo = newMultipartInfo(uploadId, 3001L, true).toBuilder()
-        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE)).build();
+    OmMultipartKeyInfo mpuInfo = newMultipartInfo(uploadId, 3001L,
+        RatisReplicationConfig.getInstance(THREE), true);
     addMultipartInfo(fsoBucketName, keyName, mpuInfo, 1L);
     putSplitPart(fsoBucketName, keyName, uploadId, 1, 100L);
     long ratisBytes = 100L * 3;
@@ -557,8 +559,8 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     // costs the 3 MiB of data plus 2 MiB of parity
     String ecKeyName = "ecMpuFile";
     String ecUploadId = UUID.randomUUID().toString();
-    OmMultipartKeyInfo ecInfo = newMultipartInfo(ecUploadId, 3002L, true).toBuilder()
-        .setReplicationConfig(new ECReplicationConfig("rs-3-2-1024k")).build();
+    OmMultipartKeyInfo ecInfo = newMultipartInfo(ecUploadId, 3002L,
+        new ECReplicationConfig("rs-3-2-1024k"), true);
     addMultipartInfo(fsoBucketName, ecKeyName, ecInfo, 2L);
     putSplitPart(fsoBucketName, ecKeyName, ecUploadId, 1, 3 * 1024 * 1024L);
     long ecBytes = 5 * 1024 * 1024L;
@@ -586,13 +588,13 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
 
     String repairedKey = "repairedMpuKey";
     String repairedUploadId = UUID.randomUUID().toString();
-    OmMultipartKeyInfo repairedInfo = newMultipartInfo(repairedUploadId, 4001L, false);
+    OmMultipartKeyInfo repairedInfo = newMultipartInfo(repairedUploadId, 4001L, RATIS_ONE, false);
     repairedInfo.addPartKeyInfo(createPart(bucketName, repairedKey, repairedUploadId, 1, 500L));
     addMultipartInfo(bucketName, repairedKey, repairedInfo, 1L);
 
     String skippedKey = "skippedMpuKey";
     String skippedUploadId = UUID.randomUUID().toString();
-    OmMultipartKeyInfo skippedInfo = newMultipartInfo(skippedUploadId, 4002L, false);
+    OmMultipartKeyInfo skippedInfo = newMultipartInfo(skippedUploadId, 4002L, RATIS_ONE, false);
     skippedInfo.addPartKeyInfo(createPart(skippedBucketName, skippedKey, skippedUploadId, 1, 900L));
     addMultipartInfo(skippedBucketName, skippedKey, skippedInfo, 2L);
 
@@ -620,15 +622,16 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     return request;
   }
 
-  private OmMultipartKeyInfo newMultipartInfo(String uploadId, long objectId, boolean splitParts) {
-    OmMultipartKeyInfo info = OMRequestTestUtils.createOmMultipartKeyInfo(
+  private OmMultipartKeyInfo newMultipartInfo(String uploadId, long objectId,
+      ReplicationConfig replicationConfig, boolean splitParts) {
+    OmMultipartKeyInfo.Builder builder = OMRequestTestUtils.createOmMultipartKeyInfo(
         uploadId, Time.now(), HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, objectId);
-    if (!splitParts) {
-      return info;
+        HddsProtos.ReplicationFactor.ONE, objectId).toBuilder()
+        .setReplicationConfig(replicationConfig);
+    if (splitParts) {
+      builder.setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION);
     }
-    return info.toBuilder()
-        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION).build();
+    return builder.build();
   }
 
   private void addMultipartInfo(String bucket, String keyName, OmMultipartKeyInfo multipartInfo,
