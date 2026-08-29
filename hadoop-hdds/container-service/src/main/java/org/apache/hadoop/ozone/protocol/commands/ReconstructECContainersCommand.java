@@ -104,7 +104,8 @@ public class ReconstructECContainersCommand
     }
     builder.setMissingContainerIndexes(missingContainerIndexes);
     builder.setEcReplicationConfig(ecReplicationConfig.toProto());
-    builder.setApparentVersion(apparentVersion.serialize());
+    ComponentVersion version = apparentVersion != null ? apparentVersion : HDDSVersion.DEFAULT_VERSION;
+    builder.setApparentVersion(version.serialize());
     return builder.build();
   }
 

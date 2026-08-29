@@ -73,7 +73,8 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
     for (DatanodeDetails dd : peerDatanodes) {
       builder.addPeers(dd.getProtoBufMessage());
     }
-    builder.setApparentVersion(apparentVersion.serialize());
+    ComponentVersion version = apparentVersion != null ? apparentVersion : HDDSVersion.DEFAULT_VERSION;
+    builder.setApparentVersion(version.serialize());
     return builder.build();
   }
 
