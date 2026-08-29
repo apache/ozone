@@ -471,7 +471,35 @@ public class TestS3AssumeRoleRequest {
 
   @Test
   public void testAssumeRoleWithSessionPolicyPresent() throws IOException {
-    final String sessionPolicy = "{\"Version\":\"2012-10-17\",\"Statement\":[]}";
+    final OMRequest omRequest = baseOmRequestBuilder()
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(3600)
+                .setAwsIamSessionPolicy(AWS_IAM_POLICY)
+                .setRequestId(REQUEST_ID)
+        ).build();
+
+    // Call preExecute first to generate credentials
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+    final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
+    final OMClientResponse response = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
+    assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.OK);
+    assertMarkForAuditCalled(requestWithCredentials);
+  }
+
+  @Test
+  public void testMalformedSessionPolicyDoesNotIssueCredentials() throws IOException {
+    final String sessionPolicy = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
     final OMRequest omRequest = baseOmRequestBuilder()
         .setAssumeRoleRequest(
             AssumeRoleRequest.newBuilder()
@@ -482,12 +510,17 @@ public class TestS3AssumeRoleRequest {
                 .setRequestId(REQUEST_ID)
         ).build();
 
-    // Call preExecute first to generate credentials
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
     final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
     final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
     final OMClientResponse response = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
-    assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.OK);
+    final OMResponse omResponse = response.getOMResponse();
+
+    assertThat(omResponse.getStatus()).isEqualTo(Status.MALFORMED_POLICY_DOCUMENT);
+    assertThat(omResponse.getMessage()).isEqualTo("IAM session policy: Duplicate field 'Action' in session policy");
+    assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
+    verify(accessAuthorizer, never()).generateAssumeRoleSessionPolicy(
+        any(org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class));
     assertMarkForAuditCalled(requestWithCredentials);
   }
 

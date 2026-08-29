@@ -198,6 +198,17 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
+  public void testInvalidJsonWithEmptyStatementArrayThrows() {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": []\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: No Statement(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
   public void testInvalidEffectThrows() {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
@@ -209,6 +220,18 @@ public class TestIamSessionPolicyResolver {
 
     expectResolveThrowsForBothAuthorizers(
         json, "IAM session policy: Invalid Effect in JSON policy (must be a String) - [\"Allow\"]",
+        MALFORMED_POLICY_DOCUMENT);
+
+    final String jsonWithNull = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": null,\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        jsonWithNull, "IAM session policy: Invalid Effect in JSON policy (must be a String) - null",
         MALFORMED_POLICY_DOCUMENT);
   }
 
@@ -223,6 +246,265 @@ public class TestIamSessionPolicyResolver {
 
     expectResolveThrowsForBothAuthorizers(
         json, "IAM session policy: Effect is missing from JSON policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testDuplicateStatementKeysThrow() {
+    final String duplicateActionGetThenStar = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String duplicateActionStarThenGet = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String duplicateEffect = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Effect\": \"Deny\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String duplicateResource = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket2/*\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateActionGetThenStar, "Action");
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateActionStarThenGet, "Action");
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateEffect, "Effect");
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateResource, "Resource");
+  }
+
+  @Test
+  public void testDuplicateNestedConditionKeysThrow() {
+    final String duplicateS3Prefix = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"team/*\", \"s3:prefix\": \"other/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateS3Prefix, "s3:prefix");
+  }
+
+  @Test
+  public void testDuplicateConditionAtStatementLevelThrows() {
+    final String duplicateConditionStringEqualsThenStringLike = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"team/*\" } },\n" +
+        "    \"Condition\": { \"StringLike\": { \"s3:prefix\": \"other/*\" } }\n" +
+        "  }]\n" +
+        "}";
+    final String duplicateConditionStringLikeThenStringEquals = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
+        "    \"Condition\": { \"StringLike\": { \"s3:prefix\": \"other/*\" } },\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"team/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateConditionStringEqualsThenStringLike, "Condition");
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateConditionStringLikeThenStringEquals, "Condition");
+  }
+
+  @Test
+  public void testInvalidStatementElementThrows() {
+    final String statementScalar = "{\n" +
+        "  \"Statement\": \"not-an-object\"\n" +
+        "}";
+    final String statementArrayWithNonObject = "{\n" +
+        "  \"Statement\": [\"not-an-object\"]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        statementScalar, "IAM session policy: Invalid Statement in JSON policy (must be an Object) - \"not-an-object\"",
+        MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        statementArrayWithNonObject,
+        "IAM session policy: Invalid Statement in JSON policy (must be an Object) - \"not-an-object\"",
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testMissingActionInStatementThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: No Action(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testMissingResourceInStatementThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: No Resource(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testNullResourceInStatementThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": null\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: No Resource(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidResourceInStatementThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"INVALID\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Unsupported Resource Arn - INVALID", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testUnsupportedStatementElementsThrow() {
+    final Set<String> unsupportedStatementElements = strSet("NotAction", "NotResource", "Principal");
+    for (String unsupportedStatementElement : unsupportedStatementElements) {
+      final String json = "{\n" +
+          "  \"Statement\": [{\n" +
+          "    \"Effect\": \"Allow\",\n" +
+          "    \"Action\": \"s3:GetObject\",\n" +
+          "    \"Resource\": \"arn:aws:s3:::bucket1/*\",\n" +
+          "    \"" + unsupportedStatementElement + "\": \"ignored\"\n" +
+          "  }]\n" +
+          "}";
+
+      expectResolveThrowsForBothAuthorizers(
+          json, "IAM session policy: Unsupported statement element - " + unsupportedStatementElement,
+          MALFORMED_POLICY_DOCUMENT);
+    }
+  }
+
+  @Test
+  public void testInvalidActionShapeThrows() {
+    final String actionObject = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": {\"Name\":\"s3:GetObject\"},\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String actionArrayWithNonString = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": [\"s3:GetObject\", 1],\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String emptyActionArray = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": [],\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String nullAction = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": null,\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        actionObject, "IAM session policy: Invalid Action in JSON policy (must be a String or Array of Strings) - " +
+        "{\"Name\":\"s3:GetObject\"}", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        actionArrayWithNonString,
+        "IAM session policy: Invalid Action in JSON policy (must be a String or Array of Strings) - " +
+        "[\"s3:GetObject\",1]", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        emptyActionArray, "IAM session policy: No Action(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        nullAction, "IAM session policy: No Action(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidResourceShapeThrows() {
+    final String resourceObject = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": {\"Arn\":\"arn:aws:s3:::bucket1/*\"}\n" +
+        "  }]\n" +
+        "}";
+    final String resourceArrayWithNonString = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": [\"arn:aws:s3:::bucket1/*\", 1]\n" +
+        "  }]\n" +
+        "}";
+    final String emptyResourceArray = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": []\n" +
+        "  }]\n" +
+        "}";
+    final String nullResource = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": null\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        resourceObject, "IAM session policy: Invalid Resource in JSON policy (must be a String or " +
+            "Array of Strings) - {\"Arn\":\"arn:aws:s3:::bucket1/*\"}", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        resourceArrayWithNonString,
+        "IAM session policy: Invalid Resource in JSON policy (must be a String or Array of Strings) - " +
+        "[\"arn:aws:s3:::bucket1/*\",1]", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        emptyResourceArray, "IAM session policy: No Resource(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        nullResource, "IAM session policy: No Resource(s) found in policy", MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
@@ -301,6 +583,140 @@ public class TestIamSessionPolicyResolver {
     expectResolveThrowsForBothAuthorizers(
         json, "IAM session policy: Invalid Condition operator value structure - [{\"s3:prefix\":\"folder/\"}]",
         MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidS3PrefixConditionValueThrows() {
+    final String nullPrefix = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": null } }\n" +
+        "  }]\n" +
+        "}";
+    final String objectPrefix = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": {} } }\n" +
+        "  }]\n" +
+        "}";
+    final String mixedStringAndNumberArray = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [\"team/*\", 1] } }\n" +
+        "  }]\n" +
+        "}";
+
+    final String invalidPrefixMessagePrefix = "IAM session policy: Invalid s3:prefix in Condition (must be a " +
+        "String, Number, Boolean, or homogeneous Array of Strings, Numbers, or Booleans) - ";
+
+    expectResolveThrowsForBothAuthorizers(nullPrefix, invalidPrefixMessagePrefix + "null", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(objectPrefix, invalidPrefixMessagePrefix + "{}", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        mixedStringAndNumberArray, invalidPrefixMessagePrefix + "[\"team/*\",1]", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testAcceptedS3PrefixConditionValueCoercion() throws OMException {
+    final String numericScalar = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": 123 } }\n" +
+        "  }]\n" +
+        "}";
+    final String booleanScalar = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": true } }\n" +
+        "  }]\n" +
+        "}";
+    final String numericArray = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [123] } }\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> numericScalarNative = resolve(numericScalar, VOLUME, NATIVE);
+    final Set<OzoneGrant> numericScalarRanger = resolve(numericScalar, VOLUME, RANGER);
+    assertThat(numericScalarNative).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), prefix("my-bucket", "123")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+    assertThat(numericScalarRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), key("my-bucket", "123")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+
+    final Set<OzoneGrant> booleanScalarNative = resolve(booleanScalar, VOLUME, NATIVE);
+    final Set<OzoneGrant> booleanScalarRanger = resolve(booleanScalar, VOLUME, RANGER);
+    assertThat(booleanScalarNative).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), prefix("my-bucket", "true")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+    assertThat(booleanScalarRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), key("my-bucket", "true")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+
+    final Set<OzoneGrant> numericArrayNative = resolve(numericArray, VOLUME, NATIVE);
+    final Set<OzoneGrant> numericArrayRanger = resolve(numericArray, VOLUME, RANGER);
+    assertThat(numericArrayNative).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), prefix("my-bucket", "123")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+    assertThat(numericArrayRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), key("my-bucket", "123")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+  }
+
+  @Test
+  public void testEmptyS3PrefixConditionArrayDoesNotGrantAccess() throws OMException {
+    final String emptyPrefixArrayOnAnyResource = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"*\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [] } }\n" +
+        "  }]\n" +
+        "}";
+    final String emptyPrefixArrayOnBucket = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [] } }\n" +
+        "  }]\n" +
+        "}";
+
+    assertThat(resolve(emptyPrefixArrayOnAnyResource, VOLUME, NATIVE)).isEmpty();
+    assertThat(resolve(emptyPrefixArrayOnAnyResource, VOLUME, RANGER)).isEmpty();
+    assertThat(resolve(emptyPrefixArrayOnBucket, VOLUME, NATIVE)).isEmpty();
+    assertThat(resolve(emptyPrefixArrayOnBucket, VOLUME, RANGER)).isEmpty();
+  }
+
+  @Test
+  public void testEmptyS3PrefixConditionArrayWithMultipleActionsAndResourcesDoesNotGrantAccess() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": [\"s3:ListBucket\", \"s3:PutObject\", \"s3:DeleteObject\"],\n" +
+        "    \"Resource\": [\n" +
+        "      \"arn:aws:s3:::my-bucket\",\n" +
+        "      \"arn:aws:s3:::my-bucket/*\"\n" +
+        "    ],\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [] } }\n" +
+        "  }]\n" +
+        "}";
+
+    assertThat(resolve(json, VOLUME, NATIVE)).isEmpty();
+    assertThat(resolve(json, VOLUME, RANGER)).isEmpty();
   }
 
   @Test
@@ -2452,6 +2868,12 @@ public class TestIamSessionPolicyResolver {
       OMException.ResultCodes expectedCode) {
     expectResolveThrows(json, NATIVE, expectedMessage, expectedCode);
     expectResolveThrows(json, RANGER, expectedMessage, expectedCode);
+  }
+
+  private static void expectDuplicateFieldThrowsForBothAuthorizers(String json, String duplicateFieldName) {
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Duplicate field '" + duplicateFieldName + "' in session policy",
+        MALFORMED_POLICY_DOCUMENT);
   }
 
   /**
