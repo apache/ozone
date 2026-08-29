@@ -345,6 +345,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           // container ID and local ID with omKeyInfo blocks'.
           // Otherwise, it causes data loss once those shared blocks are added
           // to deletedTable and processed by KeyDeletingService for deletion.
+          // Unlike OMKeyCommitRequest, the returned filtered-block sizes are
+          // not applied to quota: part bytes were already counted at
+          // commit-part, and this transaction does not charge the new key,
+          // so there is no double-charge to correct.
           filterOutBlocksStillInUse(omKeyInfo, oldKeyVersionsToDelete);
           allKeyInfoToRemove.addAll(oldKeyVersionsToDelete.getOmKeyInfoList());
           usedBytesDiff -= keyToDelete.getReplicatedSize();
