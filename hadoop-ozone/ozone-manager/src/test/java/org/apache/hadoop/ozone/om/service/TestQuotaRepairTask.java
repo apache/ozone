@@ -507,13 +507,15 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     addMultipartInfo(bucketName, "emptySplitMpuKey",
         newMultipartInfo(emptySplitUploadId, 1004L, true), 4L);
 
-    // a second bucket proves parts are charged to the bucket that owns them
+    // a second bucket proves parts are charged to the bucket that owns them.
+    // Its upload replicates three ways, so the part size is charged three times over.
     String otherKey = "otherMpuKey";
     String otherUploadId = UUID.randomUUID().toString();
-    OmMultipartKeyInfo otherInfo = newMultipartInfo(otherUploadId, 2001L, false);
+    OmMultipartKeyInfo otherInfo = newMultipartInfo(otherUploadId, 2001L, false).toBuilder()
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE)).build();
     otherInfo.addPartKeyInfo(createPart(otherBucketName, otherKey, otherUploadId, 1, 700L));
     addMultipartInfo(otherBucketName, otherKey, otherInfo, 5L);
-    long otherBytes = 700L;
+    long otherBytes = 700L * 3;
 
     String bucketKey = corruptBucketUsage(bucketName, 12345L, 99L, 6L);
     String otherBucketKey = corruptBucketUsage(otherBucketName, 54321L, 77L, 7L);

@@ -93,10 +93,11 @@ public class QuotaRepairTask {
   static final int BATCH_SIZE = 5000;
   /**
    * A legacy schema multipart upload holds every committed part inline, so its rows are far
-   * larger than a key or file row. Batch fewer of them to keep the in-flight batches bounded.
+   * larger than a key or file row: measured at roughly 320 bytes per part, a 1000 part upload
+   * decodes to about 320KB. Batch fewer of them to keep the in-flight batches bounded.
    */
   @VisibleForTesting
-  static final int MPU_BATCH_SIZE = 250;
+  static final int MPU_BATCH_SIZE = 100;
   private static final int TASK_THREAD_CNT = 3;
   /**
    * Parallel full-table scans: OBS keys, FSO files, dirs, active deleted keys/dirs,
