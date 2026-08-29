@@ -547,13 +547,31 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         }
       }
 
-      if (earliest != null) {
+      String quotedRuleId = earliest == null ? null : quoteRuleId(ruleId);
+      if (quotedRuleId != null) {
         responseBuilder.header(EXPIRATION_HEADER,
-            String.format("expiry-date=\"%s\", rule-id=\"%s\"", RFC1123Util.FORMAT.format(earliest), ruleId));
+            String.format("expiry-date=\"%s\", rule-id=%s", RFC1123Util.FORMAT.format(earliest), quotedRuleId));
       }
     } catch (IOException | RuntimeException ex) {
       LOG.debug("Omitting {} header for {}/{}", EXPIRATION_HEADER, bucketName, keyPath, ex);
     }
+  }
+
+  /**
+   * Renders a lifecycle rule id as an RFC 7230 quoted-string. Rule ids are
+   * supplied by the client and only validated for length, so a quote or a
+   * backslash is escaped here. An id carrying a control character cannot be
+   * represented in a header value at all; that yields null so the caller drops
+   * the header rather than emitting a malformed one.
+   */
+  private static String quoteRuleId(String ruleId) {
+    for (int i = 0; i < ruleId.length(); i++) {
+      char c = ruleId.charAt(i);
+      if ((c < 0x20 && c != '\t') || c == 0x7f) {
+        return null;
+      }
+    }
+    return '"' + ruleId.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
   }
 
   /**

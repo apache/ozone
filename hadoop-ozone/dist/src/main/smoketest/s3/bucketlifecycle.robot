@@ -70,8 +70,7 @@ Head object reports expiration of matching lifecycle rule
                         Execute                 echo "Randomtext" > /tmp/lifecycle-testfile
                         Execute AWSS3APICli     put-object --bucket ${bucket} --key prefix1/f1 --body /tmp/lifecycle-testfile
     ${result} =         Execute AWSS3APICli     head-object --bucket ${bucket} --key prefix1/f1
-                        Should contain          ${result}           Expiration
-                        Should contain          ${result}           Rule1
+                        Should Match Regexp     ${result}           expiry-date=.*GMT.*rule-id=.*Rule1
 
 Head object omits expiration when no lifecycle rule matches
     [tags]    no-bucket-type

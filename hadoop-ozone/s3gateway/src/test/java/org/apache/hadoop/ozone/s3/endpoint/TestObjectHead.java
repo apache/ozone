@@ -438,6 +438,33 @@ public class TestObjectHead {
   }
 
   @Test
+  public void testHeadObjectEscapesQuoteInRuleId() throws Exception {
+    String keyName = "logs/app.log";
+    createKey(keyName);
+    setLifecycleRules(daysRule("we\"ird", "logs/", 30));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+
+    ZonedDateTime expiry = expectedDaysExpiry(keyName, 30);
+    assertEquals("expiry-date=\"" + RFC1123Util.FORMAT.format(expiry) + "\", rule-id=\"we\\\"ird\"",
+        response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  public void testHeadObjectOmitsExpirationForRuleIdWithControlCharacter() throws Exception {
+    String keyName = "logs/app.log";
+    createKey(keyName);
+    // A CR/LF cannot be represented in a header value, so the header is dropped
+    // rather than emitted malformed.
+    setLifecycleRules(daysRule("bad\r\nid", "logs/", 30));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    assertNull(response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
   public void testHeadObjectOmitsExpirationWithoutLifecycleConfiguration() throws Exception {
     String keyName = "logs/app.log";
     createKey(keyName);

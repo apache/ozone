@@ -213,6 +213,10 @@ public class OzoneLifecycleConfiguration {
      * server-side OmLCRule#match, which the lifecycle service uses to pick keys
      * that are already due for deletion, this only answers whether the rule
      * covers the key, so callers can report a future expiry date for it.
+     * <p>
+     * OM rejects a rule that sets both prefix and filter, and one that sets
+     * neither, so exactly one of the two is present here. The order below picks
+     * whichever is set; it is not a precedence rule.
      */
     public boolean matches(String keyPath, Map<String, String> keyTags) {
       if (prefix != null) {
