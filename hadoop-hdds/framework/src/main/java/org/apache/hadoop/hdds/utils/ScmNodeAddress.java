@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import java.util.Objects;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 
 /**
@@ -39,23 +38,6 @@ public final class ScmNodeAddress {
 
   public HostAndPort getHostAndPort() {
     return hostAndPort;
-  }
-
-  @Override
-  public boolean equals(Object other) {
-    if (this == other) {
-      return true;
-    }
-    if (!(other instanceof ScmNodeAddress)) {
-      return false;
-    }
-    ScmNodeAddress that = (ScmNodeAddress) other;
-    return Objects.equals(scmNodeId, that.scmNodeId) && Objects.equals(hostAndPort, that.hostAndPort);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(scmNodeId, hostAndPort);
   }
 
   @Override

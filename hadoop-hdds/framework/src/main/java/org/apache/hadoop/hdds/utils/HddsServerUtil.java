@@ -926,7 +926,7 @@ public final class HddsServerUtil {
    */
   public static Collection<ScmNodeAddress> getSCMAddressForDatanodes(
       ConfigurationSource conf, String scmServiceId, Set<String> scmNodeIds) {
-    Collection<ScmNodeAddress> scmNodeAddresses = new HashSet<>(scmNodeIds.size());
+    Collection<ScmNodeAddress> scmNodeAddresses = new ArrayList<>(scmNodeIds.size());
     for (String scmNodeId : scmNodeIds) {
       String addressKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
       String scmAddress = conf.get(addressKey);
