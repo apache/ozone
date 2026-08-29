@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -123,7 +122,6 @@ public class TestSCMFollowerCatchupWithContainerReport {
    * be CLOSED with a full replica set and all keys must remain readable.
    */
   @Test
-  @Flaky("HDDS-14989")
   void testFollowerCatchupAfterContainerClose() throws Exception {
     String vol = "vol-close";
     String buck = "buck-close";

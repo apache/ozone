@@ -407,7 +407,6 @@ public class TestAddRemoveOzoneManager {
    * 3.
    */
   @Test
-  @Flaky("HDDS-14017")
   public void testDecommission() throws Exception {
     setupCluster(3);
 
