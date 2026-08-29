@@ -91,6 +91,12 @@ public class QuotaRepairTask {
       QuotaRepairTask.class);
   @VisibleForTesting
   static final int BATCH_SIZE = 5000;
+  /**
+   * A legacy schema multipart upload holds every committed part inline, so its rows are far
+   * larger than a key or file row. Batch fewer of them to keep the in-flight batches bounded.
+   */
+  @VisibleForTesting
+  static final int MPU_BATCH_SIZE = 250;
   private static final int TASK_THREAD_CNT = 3;
   /**
    * Parallel full-table scans: OBS keys, FSO files, dirs, active deleted keys/dirs,
@@ -573,7 +579,7 @@ public class QuotaRepairTask {
       throws UncheckedIOException, UncheckedExecutionException {
     try (Table.KeyValueIterator<String, OmMultipartKeyInfo> keyIter
         = metadataManager.getMultipartInfoTable().iterator()) {
-      scanTableInBatches(executor, keyIter, "Multipart upload usages",
+      scanTableInBatches(executor, keyIter, "Multipart upload usages", MPU_BATCH_SIZE,
           kv -> extractMultipartCount(kv, mpuCountMap, metadataManager));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
@@ -649,9 +655,18 @@ public class QuotaRepairTask {
       Table.KeyValueIterator<String, VALUE> keyIter, String strType,
       Consumer<Table.KeyValue<String, VALUE>> kvConsumer)
       throws UncheckedIOException, UncheckedExecutionException {
+    scanTableInBatches(executor, keyIter, strType, BATCH_SIZE, kvConsumer);
+  }
+
+  @VisibleForTesting
+  static <VALUE> void scanTableInBatches(
+      ExecutorService executor,
+      Table.KeyValueIterator<String, VALUE> keyIter, String strType, int batchSize,
+      Consumer<Table.KeyValue<String, VALUE>> kvConsumer)
+      throws UncheckedIOException, UncheckedExecutionException {
     LOG.info("Starting recalculate {}", strType);
 
-    List<Table.KeyValue<String, VALUE>> kvList = new ArrayList<>(BATCH_SIZE);
+    List<Table.KeyValue<String, VALUE>> kvList = new ArrayList<>(batchSize);
     BlockingQueue<List<Table.KeyValue<String, VALUE>>> q
         = new ArrayBlockingQueue<>(TASK_THREAD_CNT);
     List<Future<?>> tasks = new ArrayList<>();
@@ -666,9 +681,9 @@ public class QuotaRepairTask {
       while (keyIter.hasNext()) {
         count++;
         kvList.add(keyIter.next());
-        if (kvList.size() == BATCH_SIZE) {
+        if (kvList.size() == batchSize) {
           putBatch(q, kvList, tasks);
-          kvList = new ArrayList<>(BATCH_SIZE);
+          kvList = new ArrayList<>(batchSize);
         }
       }
       if (!kvList.isEmpty()) {
