@@ -1937,6 +1937,9 @@ public class TestReplicationManager {
     config.setEcDecommissionReconstructionLoadFactor(-0.1);
     assertThrows(IllegalArgumentException.class, config::validate);
 
+    config.setEcDecommissionReconstructionLoadFactor(Double.NaN);
+    assertThrows(IllegalArgumentException.class, config::validate);
+
     config.setEcDecommissionReconstructionLoadFactor(1.1);
     assertThrows(IllegalArgumentException.class, config::validate);
 
@@ -1945,6 +1948,10 @@ public class TestReplicationManager {
     assertThrows(IllegalArgumentException.class, config::validate);
 
     config.setReconstructionGlobalLimit(0);
+    config.setInflightReplicationLimitFactor(Double.NaN);
+    assertThrows(IllegalArgumentException.class, config::validate);
+
+    config.setInflightReplicationLimitFactor(0.75);
     config.validate();
   }
 
@@ -2052,5 +2059,63 @@ public class TestReplicationManager {
         () -> rm.sendThrottledReconstructionCommand(container, cmd));
     assertEquals(0, rm.getInflightReconstructionCount());
     assertEquals(0, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+  }
+
+  @Test
+  public void testNotifyStatusChangedBlocksUntilReconstructionSendCompletes()
+      throws Exception {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+    enableProcessAll();
+
+    CountDownLatch sendReachedAddCommand = new CountDownLatch(1);
+    CountDownLatch releaseSend = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      sendReachedAddCommand.countDown();
+      try {
+        releaseSend.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
+      }
+      return null;
+    }).when(nodeManager).addDatanodeCommand(any(), any());
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
+        (ECReplicationConfig) repConfig);
+
+    Thread sender = new Thread(() -> {
+      try {
+        rm.sendThrottledReconstructionCommand(container, cmd);
+      } catch (CommandTargetOverloadedException | NotLeaderException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    sender.start();
+    assertTrue(sendReachedAddCommand.await(30, TimeUnit.SECONDS));
+    assertEquals(1, rm.getInflightReconstructionCount());
+    assertEquals(1, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+
+    AtomicBoolean notifyCompleted = new AtomicBoolean(false);
+    Thread notifyThread = new Thread(() -> {
+      rm.notifyStatusChanged();
+      notifyCompleted.set(true);
+    });
+    notifyThread.start();
+    notifyThread.join(500);
+    assertFalse(notifyCompleted.get(),
+        "notifyStatusChanged must wait for in-flight reconstruction send");
+    assertEquals(1, rm.getInflightReconstructionCount());
+
+    releaseSend.countDown();
+    sender.join(TimeUnit.SECONDS.toMillis(30));
+    notifyThread.join(TimeUnit.SECONDS.toMillis(30));
+    assertTrue(notifyCompleted.get());
   }
 }

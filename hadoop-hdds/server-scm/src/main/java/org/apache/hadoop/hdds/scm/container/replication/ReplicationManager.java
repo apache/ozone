@@ -601,34 +601,39 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
       ReconstructECContainersCommand command)
       throws CommandTargetOverloadedException, NotLeaderException {
-    if (!tryReserveReconstructionSlot()) {
-      metrics.incrECReconstructionCmdsDeferredTotal();
-      throw new CommandTargetOverloadedException(
-          "Global reconstruction limit (" + getReconstructionInFlightLimit()
-              + ") reached for container " + containerInfo.getContainerID());
-    }
-    final long cmdId = command.getId();
-    final int fragmentCount = command.getMissingContainerIndexes().size();
-    reconstructionCommandIdToPendingFragmentCount.put(cmdId, fragmentCount);
-    boolean sent = false;
+    serviceLock.lock();
     try {
-      List<DatanodeDetails> targets = command.getTargetDatanodes();
-      List<Pair<Integer, DatanodeDetails>> targetWithCmds =
-          getAvailableDatanodesForReplication(targets);
-      if (targetWithCmds.isEmpty()) {
+      if (!tryReserveReconstructionSlot()) {
         metrics.incrECReconstructionCmdsDeferredTotal();
-        throw new CommandTargetOverloadedException("No target with capacity " +
-            "available for reconstruction of " + containerInfo.getContainerID());
+        throw new CommandTargetOverloadedException(
+            "Global reconstruction limit (" + getReconstructionInFlightLimit()
+                + ") reached for container " + containerInfo.getContainerID());
       }
-      DatanodeDetails target = selectAndOptionallyExcludeDatanode(
-          rmConf.getReconstructionCommandWeight(), targetWithCmds);
-      sendDatanodeCommand(command, containerInfo, target);
-      sent = true;
+      final long cmdId = command.getId();
+      final int fragmentCount = command.getMissingContainerIndexes().size();
+      reconstructionCommandIdToPendingFragmentCount.put(cmdId, fragmentCount);
+      boolean sent = false;
+      try {
+        List<DatanodeDetails> targets = command.getTargetDatanodes();
+        List<Pair<Integer, DatanodeDetails>> targetWithCmds =
+            getAvailableDatanodesForReplication(targets);
+        if (targetWithCmds.isEmpty()) {
+          metrics.incrECReconstructionCmdsDeferredTotal();
+          throw new CommandTargetOverloadedException("No target with capacity " +
+              "available for reconstruction of " + containerInfo.getContainerID());
+        }
+        DatanodeDetails target = selectAndOptionallyExcludeDatanode(
+            rmConf.getReconstructionCommandWeight(), targetWithCmds);
+        sendDatanodeCommand(command, containerInfo, target);
+        sent = true;
+      } finally {
+        if (!sent) {
+          reconstructionCommandIdToPendingFragmentCount.remove(cmdId);
+          releaseReconstructionSlot();
+        }
+      }
     } finally {
-      if (!sent) {
-        reconstructionCommandIdToPendingFragmentCount.remove(cmdId);
-        releaseReconstructionSlot();
-      }
+      serviceLock.unlock();
     }
   }
 
@@ -1571,7 +1576,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + " must be >= datanode.reconstruction.weight: "
             + reconstructionCommandWeight);
       }
-      if (inflightReplicationLimitFactor < 0) {
+      if (!Double.isFinite(inflightReplicationLimitFactor)
+          || inflightReplicationLimitFactor < 0) {
         throw new IllegalArgumentException(
             "inflight.limit.factor is set to " + inflightReplicationLimitFactor
                 + " and must be >= 0");
@@ -1581,7 +1587,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             "inflight.limit.factor is set to " + inflightReplicationLimitFactor
                 + " and must be <= 1");
       }
-      if (ecDecommissionReconstructionLoadFactor < 0) {
+      if (!Double.isFinite(ecDecommissionReconstructionLoadFactor)
+          || ecDecommissionReconstructionLoadFactor < 0) {
         throw new IllegalArgumentException(
             "decommission.ec.reconstruction.load.factor is set to "
                 + ecDecommissionReconstructionLoadFactor + " and must be >= 0");
