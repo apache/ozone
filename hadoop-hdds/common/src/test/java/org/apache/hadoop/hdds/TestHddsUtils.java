@@ -107,19 +107,6 @@ public class TestHddsUtils {
   }
 
   @Test
-  void testGetHostPortStringFromAddress() {
-    assertEquals("1.2.3.4:9858",
-        HddsUtils.getHostPortString(new InetSocketAddress("1.2.3.4", 9858)));
-
-    // Hadoop's NetUtils.getHostPortString joins these with a plain colon, which
-    // is ambiguous; the host must come back bracketed.
-    assertEquals("[2001:db8:0:0:0:0:0:1]:9858",
-        HddsUtils.getHostPortString(new InetSocketAddress("2001:db8::1", 9858)));
-    assertEquals("[0:0:0:0:0:0:0:0]:9858",
-        HddsUtils.getHostPortString(new InetSocketAddress("::", 9858)));
-  }
-
-  @Test
   void testGetDatanodeRpcAddressWithIPv6BindHost() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_CLIENT_BIND_HOST_KEY, "::");

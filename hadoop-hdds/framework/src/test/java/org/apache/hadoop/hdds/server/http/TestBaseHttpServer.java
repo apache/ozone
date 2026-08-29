@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.file.Path;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -155,6 +156,17 @@ class TestBaseHttpServer {
         .getBindAddress("bindhostkey", "addresskey", "default", 65);
     assertEquals(InetAddress.getByName("2001:db8::1"), literal.getAddress());
     assertEquals(1234, literal.getPort());
+  }
+
+  @Test
+  void endpointUriKeepsHostAndPort() {
+    URI ipv4 = BaseHttpServer.newEndpointUri("http", new InetSocketAddress("192.0.2.1", 9874));
+    assertEquals("192.0.2.1", ipv4.getHost());
+    assertEquals(9874, ipv4.getPort());
+
+    URI ipv6 = BaseHttpServer.newEndpointUri("https", new InetSocketAddress("2001:db8::1", 9875));
+    assertEquals("[2001:db8:0:0:0:0:0:1]", ipv6.getHost());
+    assertEquals(9875, ipv6.getPort());
   }
 
   @ParameterizedTest
