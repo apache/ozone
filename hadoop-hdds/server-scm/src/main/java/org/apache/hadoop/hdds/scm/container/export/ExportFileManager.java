@@ -83,7 +83,6 @@ final class ExportFileManager {
   static final String EXPORT_ARCHIVE_SUFFIX = ".tar.gz";
   static final String EXPORT_ARCHIVE_TMP_SUFFIX = EXPORT_ARCHIVE_SUFFIX + AtomicFileOutputStream.TMP_EXTENSION;
   static final String EXPORT_LOCK_NAME = "in_use.lock";
-  private static final int EXPORT_JOB_START_TIME_LENGTH = 19;
   private static final DateTimeFormatter EXPORT_JOB_START_TIME_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss").withZone(ZoneOffset.UTC);
 
