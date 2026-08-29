@@ -50,7 +50,7 @@
     <com.nimbusds.nimbus-jose-jwt.version>10.9.1</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
     <commons-codec.version>1.22.1</commons-codec.version>
-    <commons-collections.version>4.5.0</commons-collections.version>
+    <commons-collections.version>4.6.0</commons-collections.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <commons-configuration2.version>2.15.1</commons-configuration2.version>
     <commons-csv.version>1.14.1</commons-csv.version>
