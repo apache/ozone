@@ -224,7 +224,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
         builder.setFindPort(true);
       }
 
-      URI uri = URI.create("http://" + getHostPortString(httpAddr));
+      URI uri = newEndpointUri("http", httpAddr);
       builder.addEndpoint(uri);
       LOG.info("Starting Web-server for {} at: {}", name, uri);
     }
@@ -237,7 +237,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
         builder.setFindPort(true);
       }
 
-      URI uri = URI.create("https://" + getHostPortString(httpsAddr));
+      URI uri = newEndpointUri("https", httpsAddr);
       builder.addEndpoint(uri);
       LOG.info("Starting Web-server for {} at: {}", name, uri);
     }
@@ -280,6 +280,17 @@ public abstract class BaseHttpServer implements AutoCloseable {
    */
   protected WebAppContext getWebAppContext() {
     return httpServer.getWebAppContext();
+  }
+
+  /**
+   * Build a listener endpoint URI. Jetty reads the host and port straight off
+   * this URI, and an unbracketed IPv6 authority parses to a null host and a
+   * port of -1 without raising, which binds the server to every interface on
+   * an ephemeral port.
+   */
+  static URI newEndpointUri(String scheme, InetSocketAddress addr) {
+    return URI.create(scheme + "://"
+        + getHostPortString(addr.getHostName(), addr.getPort()));
   }
 
   protected InetSocketAddress getBindAddress(String bindHostKey,
@@ -359,14 +370,16 @@ public abstract class BaseHttpServer implements AutoCloseable {
     int connIdx = 0;
     if (policy.isHttpEnabled()) {
       httpAddress = httpServer.getConnectorAddress(connIdx++);
-      String realAddress = getHostPortString(NetUtils.getConnectAddress(httpAddress));
+      InetSocketAddress connectAddress = NetUtils.getConnectAddress(httpAddress);
+      String realAddress = getHostPortString(connectAddress.getHostName(), connectAddress.getPort());
       conf.set(getHttpAddressKey(), realAddress);
       LOG.info("HTTP server of {} listening at http://{}", name, realAddress);
     }
 
     if (policy.isHttpsEnabled()) {
       httpsAddress = httpServer.getConnectorAddress(connIdx);
-      String realAddress = getHostPortString(NetUtils.getConnectAddress(httpsAddress));
+      InetSocketAddress connectAddress = NetUtils.getConnectAddress(httpsAddress);
+      String realAddress = getHostPortString(connectAddress.getHostName(), connectAddress.getPort());
       conf.set(getHttpsAddressKey(), realAddress);
       LOG.info("HTTPS server of {} listening at https://{}", name, realAddress);
     }
