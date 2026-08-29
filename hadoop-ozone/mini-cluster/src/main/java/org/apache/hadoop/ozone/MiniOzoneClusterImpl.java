@@ -74,6 +74,7 @@ import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectMetrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.DNSToSwitchMapping;
+import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
@@ -622,7 +623,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
 
     private void configureHostAndRackTopology() throws IOException {
-      FixedHostMapping.clear();
+      StaticMapping.resetMap();
       if (racks == null && hosts == null) {
         return;
       }
@@ -645,10 +646,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         }
 
         conf.setClass(CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            FixedHostMapping.class, DNSToSwitchMapping.class);
+            StaticMapping.class, DNSToSwitchMapping.class);
 
         for (int i = 0; i < racks.length; i++) {
-          FixedHostMapping.addNode(hosts[i], racks[i]);
+          StaticMapping.addNodeToRack(hosts[i], racks[i]);
         }
       }
     }
