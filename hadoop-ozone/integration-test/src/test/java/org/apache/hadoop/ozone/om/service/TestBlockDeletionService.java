@@ -74,7 +74,6 @@ public class TestBlockDeletionService {
   private static final String BUCKET_NAME = "bucket1";
   private static final int KEY_SIZE = 5 * 1024; // 5 KB
   private static MiniOzoneCluster cluster;
-  private static StorageContainerLocationProtocol scmClient;
   private static ScmBlockLocationProtocol scmBlockClient;
   private static OzoneBucket bucket;
   private static SCMPerformanceMetrics metrics;
@@ -102,7 +101,6 @@ public class TestBlockDeletionService {
             .setApparentVersion(HBASE_SUPPORT).build())
         .build();
     cluster.waitForClusterToBeReady();
-    scmClient = cluster.getStorageContainerLocationClient();
     scmBlockClient = HAUtils.getScmBlockClient(conf);
     assertEquals(HBASE_SUPPORT, cluster.getStorageContainerManager().getVersionManager().getApparentVersion());
     metrics = cluster.getStorageContainerManager().getBlockProtocolServer().getMetrics();

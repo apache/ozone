@@ -88,7 +88,6 @@ import org.junit.jupiter.api.Test;
  * Tests upgrade finalization failure scenarios and corner cases specific to SCM data distribution feature.
  */
 public class TestScmDataDistributionFinalization {
-  private StorageContainerLocationProtocol scmClient;
   private ScmBlockLocationProtocol scmBlockClient;
   private MiniOzoneHAClusterImpl cluster;
   private static final int NUM_DATANODES = 3;
@@ -136,7 +135,6 @@ public class TestScmDataDistributionFinalization {
             .build());
     this.cluster = clusterBuilder.build();
 
-    scmClient = cluster.getStorageContainerLocationClient();
     scmBlockClient = HAUtils.getScmBlockClient(conf);
     cluster.waitForClusterToBeReady();
     assertEquals(HDDSLayoutFeature.HBASE_SUPPORT,
