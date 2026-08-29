@@ -38,6 +38,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.net.HostAndPort;
+import com.google.common.net.InetAddresses;
 import io.opentelemetry.api.trace.Span;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -165,7 +166,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
 
     if (authority.indexOf(':') != authority.lastIndexOf(':') && !authority.startsWith("[")) {
-      throw new IllegalArgumentException(UNBRACKETED_IPV6_EXCEPTION_TEXT);
+      if (InetAddresses.isInetAddress(authority)) {
+        throw new IllegalArgumentException(UNBRACKETED_IPV6_EXCEPTION_TEXT);
+      }
+      throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
     // Parse hostname and port. HostAndPort is bracket-aware, so IPv6 literal

@@ -48,7 +48,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -211,6 +210,14 @@ public class TestBasicOzoneFileSystems {
     assertTrue(exception.getMessage().contains("must be enclosed in brackets"));
   }
 
+  @Test
+  public void testRootedMalformedAuthorityUsesGeneralError() throws Exception {
+    BasicRootedOzoneFileSystem ofs = new BasicRootedOzoneFileSystem();
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> ofs.initialize(new URI("ofs://host:123:456/"), new OzoneConfiguration()));
+    assertTrue(exception.getMessage().contains("URL should be one of the following formats"));
+  }
+
   @ParameterizedTest
   @CsvSource(value = {
       "o3fs://bucket.volume/, NULL, -1",
@@ -234,9 +241,8 @@ public class TestBasicOzoneFileSystems {
   }
 
   @Test
-  public void testO3fsConfiguredIpv6Endpoint() throws Exception {
+  public void testO3fsNullEndpoint() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "[2001:db8::10]:9862");
     BasicOzoneFileSystem o3fs = spy(new BasicOzoneFileSystem());
     BasicOzoneClientAdapterImpl adapter = mock(BasicOzoneClientAdapterImpl.class);
     doReturn(adapter).when(o3fs).createAdapter(any(), anyString(), anyString(), nullable(String.class), anyInt());
