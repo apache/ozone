@@ -236,11 +236,11 @@ class TestChunkUtils {
     try (FileChannel fileChannel =
              FileChannel.open(tempFile, StandardOpenOption.READ)) {
       assertTrue(
-          ChunkUtils.validateChunkForOverwrite(fileChannel,
+          ChunkUtils.validateChunkForOverwrite(fileChannel.size(),
               new ChunkInfo("chunk", 3, 5)));
 
       assertFalse(
-          ChunkUtils.validateChunkForOverwrite(fileChannel,
+          ChunkUtils.validateChunkForOverwrite(fileChannel.size(),
               new ChunkInfo("chunk", 5, 5)));
     }
   }
