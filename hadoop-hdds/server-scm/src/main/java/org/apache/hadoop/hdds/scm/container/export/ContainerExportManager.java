@@ -179,9 +179,7 @@ public class ContainerExportManager {
   private Long writeContainerIDs(ExportJob job) throws IOException {
     // Pre-allocated buffer: ~12 chars per ID (up to 20 digits + newline) per batch.
     final byte[] buffer = new byte[job.getBatchSize() * 12];
-    final WriteState state = new WriteState();
-
-    try {
+    try (PartWriter partWriter = new PartWriter(job, fileManager)) {
       for (ContainerID cursor = job.getStartContainerId(); cursor != null;) {
         if (Thread.interrupted()) {
           return null;
@@ -195,67 +193,87 @@ public class ContainerExportManager {
         if (batch.isEmpty()) {
           cursor = null;
         } else {
-          writeBatch(job, state, batch, buffer);
+          partWriter.writeBatch(batch, buffer);
           cursor = ContainerID.valueOf(batch.get(batch.size() - 1).getProtobuf().getId() + 1);
         }
       }
-      state.out = closeOutputStream(state.out);
-    } finally {
-      closeOutputStream(state.out);
-      state.out = null;
-    }
-    return state.idsWritten;
-  }
-
-  private void writeBatch(ExportJob job, WriteState state, List<ContainerID> batch, byte[] buffer)
-      throws IOException {
-    int offset = 0;
-    for (ContainerID containerId : batch) {
-      if (state.idsInCurrentPart == 0) {
-        state.out = closeOutputStream(state.out);
-        state.out = fileManager.newPartOutputStream(job.getId(), job.partFileName(state.partNumber));
-        job.writeMetadataHeader(state.out, state.partNumber, containerId);
-        LOG.info("{} created part{}", job, state.partNumber);
-      }
-
-      final byte[] idBytes = (containerId.getProtobuf().getId() + "\n").getBytes(StandardCharsets.UTF_8);
-      if (offset + idBytes.length > buffer.length) {
-        state.out.write(buffer, 0, offset);
-        offset = 0;
-      }
-      System.arraycopy(idBytes, 0, buffer, offset, idBytes.length);
-      offset += idBytes.length;
-      state.idsWritten++;
-      state.idsInCurrentPart++;
-
-      if (state.idsInCurrentPart >= job.getPartSize()) {
-        if (offset > 0) {
-          state.out.write(buffer, 0, offset);
-          offset = 0;
-        }
-        state.out = closeOutputStream(state.out);
-        state.idsInCurrentPart = 0;
-        state.partNumber++;
-      }
-    }
-
-    if (offset > 0) {
-      state.out.write(buffer, 0, offset);
+      return partWriter.getIdsWritten();
     }
   }
 
-  private static final class WriteState {
+  /**
+   * Writes container IDs into part files for one export job.
+   */
+  private static final class PartWriter implements AutoCloseable {
+    private final ExportJob job;
+    private final ExportFileManager fileManager;
     private int partNumber = 1;
     private long idsInCurrentPart = 0;
     private long idsWritten = 0;
-    private OutputStream out = null;
-  }
+    private OutputStream out;
 
-  private static OutputStream closeOutputStream(OutputStream out) throws IOException {
-    if (out != null) {
-      out.flush();
-      out.close();
+    PartWriter(ExportJob job, ExportFileManager fileManager) {
+      this.job = job;
+      this.fileManager = fileManager;
     }
-    return null;
+
+    long getIdsWritten() {
+      return idsWritten;
+    }
+
+    void writeBatch(List<ContainerID> batch, byte[] buffer) throws IOException {
+      int offset = 0;
+      for (ContainerID containerId : batch) {
+        if (idsInCurrentPart == 0) {
+          closeCurrentPart();
+          openPart(containerId);
+        }
+
+        final byte[] idBytes = (containerId.getProtobuf().getId() + "\n").getBytes(StandardCharsets.UTF_8);
+        if (offset + idBytes.length > buffer.length) {
+          out.write(buffer, 0, offset);
+          offset = 0;
+        }
+        System.arraycopy(idBytes, 0, buffer, offset, idBytes.length);
+        offset += idBytes.length;
+        idsWritten++;
+        idsInCurrentPart++;
+
+        if (idsInCurrentPart >= job.getPartSize()) {
+          if (offset > 0) {
+            out.write(buffer, 0, offset);
+            offset = 0;
+          }
+          closeCurrentPart();
+          idsInCurrentPart = 0;
+          partNumber++;
+        }
+      }
+
+      if (offset > 0) {
+        out.write(buffer, 0, offset);
+      }
+    }
+
+    private void openPart(ContainerID firstContainerId) throws IOException {
+      out = fileManager.newPartOutputStream(job.getId(), job.partFileName(partNumber));
+      job.writeMetadataHeader(out, partNumber, firstContainerId);
+      LOG.info("{} created part{}", job, partNumber);
+    }
+
+    private void closeCurrentPart() throws IOException {
+      final OutputStream current = out;
+      out = null;
+      if (current != null) {
+        try (OutputStream stream = current) {
+          stream.flush();
+        }
+      }
+    }
+
+    @Override
+    public void close() throws IOException {
+      closeCurrentPart();
+    }
   }
 }
