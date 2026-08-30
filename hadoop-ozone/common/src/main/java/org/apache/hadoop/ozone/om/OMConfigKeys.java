@@ -525,6 +525,22 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
       true;
 
+  /**
+   * When {@code ozone.security.enabled} is true, reject OMRequests received on
+   * the OM S3 gateway gRPC endpoint that do not carry S3 authentication. The S3
+   * Gateway attaches S3 authentication to the requests it forwards on behalf of
+   * its clients; requests without it would otherwise be processed with a
+   * client-asserted identity. Identity-free bootstrap reads the S3 Gateway must
+   * issue before any per-request S3 authentication exists (ServiceList) are
+   * exempt. Set to false only for compatibility with deployments that rely on
+   * unauthenticated (anonymous) access through this endpoint. Has no effect when
+   * {@code ozone.security.enabled} is false.
+   */
+  public static final String OZONE_OM_S3_GRPC_AUTH_REQUIRED =
+      "ozone.om.s3.grpc.auth.required";
+  public static final boolean OZONE_OM_S3_GRPC_AUTH_REQUIRED_DEFAULT =
+      true;
+
   public static final String OZONE_OM_NAMESPACE_STRICT_S3 =
       "ozone.om.namespace.s3.strict";
   public static final boolean OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT =
