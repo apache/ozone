@@ -109,6 +109,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -161,6 +162,31 @@ public class TestOmMetadataManager {
     ozoneConfiguration.set(OZONE_OM_DB_DIRS,
         folder.getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+  }
+
+  @Test
+  public void testGetMissingLifecycleConfigurationIsNotLoggedAsError()
+      throws Exception {
+    LogCapturer logCapturer = LogCapturer.captureLogs(OmMetadataManagerImpl.class);
+
+    OMException ex = assertThrows(OMException.class, () ->
+        omMetadataManager.getLifecycleConfiguration("volume1", "bucket1"));
+
+    assertEquals(ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND, ex.getResult());
+    // A bucket without a lifecycle configuration is an expected outcome, so the
+    // catch-all must not report it with an error and a stack trace.
+    assertFalse(logCapturer.getOutput()
+        .contains("Exception while getting lifecycle configuration"));
+  }
+
+  @Test
+  public void testOnlyMissingLifecycleConfigurationIsTreatedAsNotFound() {
+    assertTrue(OmMetadataManagerImpl.isLifecycleConfigurationNotFound(
+        new OMException("not found", ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND)));
+    assertFalse(OmMetadataManagerImpl.isLifecycleConfigurationNotFound(
+        new OMException("internal error", ResultCodes.INTERNAL_ERROR)));
+    assertFalse(OmMetadataManagerImpl.isLifecycleConfigurationNotFound(
+        new IOException("read failure")));
   }
 
   @Test

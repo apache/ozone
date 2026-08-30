@@ -1814,12 +1814,25 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       value.valid();
       return value;
     } catch (IOException ex) {
-      LOG.error("Exception while getting lifecycle configuration for " +
-          "bucket: /{}/{}, LifecycleConfiguration {}", volumeName, bucketName,
-          value != null ? value.getProtobuf() : "", ex);
+      // An absent configuration is an expected outcome, already logged above at
+      // debug level. Only a genuine failure is worth an error and a stack trace.
+      if (!isLifecycleConfigurationNotFound(ex)) {
+        LOG.error("Exception while getting lifecycle configuration for " +
+            "bucket: /{}/{}, LifecycleConfiguration {}", volumeName, bucketName,
+            value != null ? value.getProtobuf() : "", ex);
+      }
 
       throw ex;
     }
+  }
+
+  /**
+   * @return true if the exception reports that the bucket carries no lifecycle
+   *     configuration, rather than a failure to read it.
+   */
+  public static boolean isLifecycleConfigurationNotFound(Exception ex) {
+    return ex instanceof OMException
+        && ((OMException) ex).getResult() == LIFECYCLE_CONFIGURATION_NOT_FOUND;
   }
 
   /**

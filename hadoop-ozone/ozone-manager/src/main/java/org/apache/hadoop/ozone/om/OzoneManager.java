@@ -3297,9 +3297,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return metadataManager.getLifecycleConfiguration(
           resolvedBucket.realVolume(), resolvedBucket.realBucket());
     } catch (Exception ex) {
-      auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap, ex));
+      // A bucket without a lifecycle configuration is an expected outcome, so it
+      // is audited as a completed read rather than a failure.
+      if (!OmMetadataManagerImpl.isLifecycleConfigurationNotFound(ex)) {
+        auditSuccess = false;
+        AUDIT.logReadFailure(buildAuditMessageForFailure(
+            OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap, ex));
+      }
       throw ex;
     } finally {
       if (lockAcquired) {
