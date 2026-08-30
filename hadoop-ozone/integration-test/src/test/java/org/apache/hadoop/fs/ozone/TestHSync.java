@@ -492,9 +492,9 @@ public class TestHSync {
         try (FSDataOutputStream os1 = fs.create(key2, true)) {
           os1.write(1);
           // There should be 2 key in openFileTable
-          assertEquals(2, getOpenKeyInfo(BUCKET_LAYOUT).size());
+          assertEquals(2, filterByKeyName(getOpenKeyInfo(BUCKET_LAYOUT), key1.getName(), key2.getName()).size());
           // One key will be in fileTable as hsynced
-          assertEquals(1, getKeyInfo(BUCKET_LAYOUT).size());
+          assertEquals(1, filterByKeyName(getKeyInfo(BUCKET_LAYOUT), key1.getName(), key2.getName()).size());
 
           // Resume openKeyCleanupService
           openKeyCleanupService.resume();
@@ -503,7 +503,7 @@ public class TestHSync {
           GenericTestUtils.waitFor(() ->
               getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
           // Verify only one key is still present in fileTable
-          assertEquals(1, getKeyInfo(BUCKET_LAYOUT).size());
+          assertEquals(1, filterByKeyName(getKeyInfo(BUCKET_LAYOUT), key1.getName(), key2.getName()).size());
 
           // Clean up
           assertTrue(fs.delete(key1, false));
@@ -631,6 +631,23 @@ public class TestHSync {
     } catch (Exception e) {
     }
     return omKeyInfo;
+  }
+
+  /**
+   * Tests in this class share one bucket, so other tests' keys can still be in the tables.
+   * Narrow a table listing down to the keys the calling test created.
+   */
+  private List<OmKeyInfo> filterByKeyName(List<OmKeyInfo> omKeyInfos, String... keyNames) {
+    List<OmKeyInfo> filtered = new ArrayList<>();
+    for (OmKeyInfo omKeyInfo : omKeyInfos) {
+      for (String keyName : keyNames) {
+        if (keyName.equals(omKeyInfo.getKeyName())) {
+          filtered.add(omKeyInfo);
+          break;
+        }
+      }
+    }
+    return filtered;
   }
 
   @Test
