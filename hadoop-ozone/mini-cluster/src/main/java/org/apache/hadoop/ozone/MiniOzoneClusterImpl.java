@@ -547,7 +547,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
         // Recreate the Ratis pipeline to prevent imbalanced node placement across racks
         // caused by asynchronous DN registration.
-        if (racks != null && startDataNodes) {
+        if (racks != null && startDataNodes && numOfDatanodes >= HddsProtos.ReplicationFactor.THREE.getNumber()) {
           resetPipelinesForRackAwareness(cluster);
         }
 
