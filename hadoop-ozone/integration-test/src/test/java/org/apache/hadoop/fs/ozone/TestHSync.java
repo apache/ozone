@@ -35,7 +35,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -493,9 +492,9 @@ public class TestHSync {
         try (FSDataOutputStream os1 = fs.create(key2, true)) {
           os1.write(1);
           // There should be 2 key in openFileTable
-          assertThat(2 == getOpenKeyInfo(BUCKET_LAYOUT).size());
+          assertEquals(2, getOpenKeyInfo(BUCKET_LAYOUT).size());
           // One key will be in fileTable as hsynced
-          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
+          assertEquals(1, getKeyInfo(BUCKET_LAYOUT).size());
 
           // Resume openKeyCleanupService
           openKeyCleanupService.resume();
@@ -504,7 +503,7 @@ public class TestHSync {
           GenericTestUtils.waitFor(() ->
               getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
           // Verify only one key is still present in fileTable
-          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
+          assertEquals(1, getKeyInfo(BUCKET_LAYOUT).size());
 
           // Clean up
           assertTrue(fs.delete(key1, false));
@@ -579,7 +578,7 @@ public class TestHSync {
         os.write(1);
         os.hsync();
         // There should be 1 key in openFileTable
-        assertThat(1 == getOpenKeyInfo(BUCKET_LAYOUT).size());
+        assertEquals(1, getOpenKeyInfo(BUCKET_LAYOUT).size());
         // Delete directory recursively
         fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
             bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);
