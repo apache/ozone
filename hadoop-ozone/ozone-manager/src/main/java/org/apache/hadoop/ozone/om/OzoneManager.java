@@ -116,6 +116,7 @@ import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
+import com.facebook.infer.annotation.ThreadSafe;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -374,6 +375,7 @@ import org.slf4j.LoggerFactory;
  * Ozone Manager is the metadata manager of ozone.
  */
 @InterfaceAudience.LimitedPrivate({"HDFS", "CBLOCK", "OZONE", "HBASE"})
+@ThreadSafe
 public final class OzoneManager extends ServiceRuntimeInfoImpl
     implements OzoneManagerProtocol, OMInterServiceProtocol, OMMXBean, Auditor {
   public static final Logger LOG =
