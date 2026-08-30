@@ -75,7 +75,11 @@ public final class RangeHeaderParserUtil {
             end = length - 1;
           }
         } else {
-          if (end >= length) {
+          if (start > end) {
+            readFull = true;
+            start = 0;
+            end = length - 1;
+          } else if (end >= length) {
             end = length - 1;
           }
         }
