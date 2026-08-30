@@ -623,11 +623,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
 
     private void configureHostAndRackTopology() throws IOException {
-      StaticMapping.resetMap();
       if (racks == null && hosts == null) {
         return;
       }
 
+      StaticMapping.resetMap();
       conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME, true);
 
       if (hosts == null) {
