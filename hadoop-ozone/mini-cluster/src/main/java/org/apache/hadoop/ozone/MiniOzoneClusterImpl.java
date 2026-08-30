@@ -395,6 +395,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
+    } finally {
+      resetStaticMappingIfConfigured(conf);
+    }
+  }
+
+  private static void resetStaticMappingIfConfigured(
+      OzoneConfiguration conf) {
+    if (StaticMapping.class.getName().equals(
+        conf.get(CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY))) {
+      StaticMapping.resetMap();
     }
   }
 
