@@ -43,7 +43,8 @@ env:
   TEST_JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml and populate-cache.yml, please keep in sync
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  # Maven 3.9 downloads dependencies via maven-resolver-transport-http, which reads aether.* and ignores maven.wagon.*
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Daether.connector.http.retryHandler.count=10
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 
 permissions: { }
