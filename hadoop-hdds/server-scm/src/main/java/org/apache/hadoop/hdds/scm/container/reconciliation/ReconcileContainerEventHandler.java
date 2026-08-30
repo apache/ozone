@@ -19,8 +19,8 @@ package org.apache.hadoop.hdds.scm.container.reconciliation;
 
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 
+import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -28,6 +28,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.EligibilityResult;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -44,10 +47,13 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
   public static final Logger LOG =
       LoggerFactory.getLogger(ReconcileContainerEventHandler.class);
 
+  private final NodeManager nodeManager;
   private final ContainerManager containerManager;
   private final SCMContext scmContext;
 
-  public ReconcileContainerEventHandler(ContainerManager containerManager, SCMContext scmContext) {
+  public ReconcileContainerEventHandler(NodeManager nodeManager, ContainerManager containerManager,
+      SCMContext scmContext) {
+    this.nodeManager = nodeManager;
     this.containerManager = containerManager;
     this.scmContext = scmContext;
   }
@@ -67,21 +73,46 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
     }
 
     try {
-      // TODO HDDS-10714 restriction peer and target nodes based on node status.
-      Set<DatanodeDetails> allReplicaNodes = containerManager.getContainerReplicas(containerID)
-          .stream()
-          .map(ContainerReplica::getDatanodeDetails)
-          .collect(Collectors.toSet());
+      // Restrict which nodes participate in reconciliation based on their status (HDDS-10714).
+      // Stale, dead, decommissioned, and in-maintenance nodes are neither peers nor targets.
+      // Decommissioning and entering-maintenance nodes can be peers but not targets, so their
+      // data can be reconciled off before they leave the cluster. Healthy, in-service nodes are both.
+      Set<DatanodeDetails> targets = new HashSet<>();
+      Set<DatanodeDetails> peers = new HashSet<>();
+      for (ContainerReplica replica : containerManager.getContainerReplicas(containerID)) {
+        DatanodeDetails datanode = replica.getDatanodeDetails();
+        final NodeStatus status;
+        try {
+          status = nodeManager.getNodeStatus(datanode);
+        } catch (NodeNotFoundException ex) {
+          LOG.warn("Skipping datanode {} for reconciliation of container {} since its status is unknown.",
+              datanode, containerID);
+          continue;
+        }
+        if (!status.isHealthy()) {
+          continue;
+        }
+        if (!status.isDecommissioned() && !status.isInMaintenance()) {
+          peers.add(datanode);
+        }
+        if (status.isInService()) {
+          targets.add(datanode);
+        }
+      }
 
-      LOG.info("Reconcile container event triggered for container {} with peers {}", containerID, allReplicaNodes);
+      LOG.info("Reconcile container event triggered for container {} with targets {} and peers {}",
+          containerID, targets, peers);
 
-      for (DatanodeDetails replica : allReplicaNodes) {
-        Set<DatanodeDetails> otherReplicas = allReplicaNodes.stream()
-            .filter(other -> !other.equals(replica))
-            .collect(Collectors.toSet());
-        ReconcileContainerCommand command = new ReconcileContainerCommand(containerID.getId(), otherReplicas);
+      for (DatanodeDetails target : targets) {
+        Set<DatanodeDetails> otherPeers = new HashSet<>(peers);
+        otherPeers.remove(target);
+        if (otherPeers.isEmpty()) {
+          // No eligible peer to reconcile against, so skip sending a command with an empty peer list.
+          continue;
+        }
+        ReconcileContainerCommand command = new ReconcileContainerCommand(containerID.getId(), otherPeers);
         command.setTerm(scmContext.getTermOfLeader());
-        publisher.fireEvent(DATANODE_COMMAND, new CommandForDatanode<>(replica, command));
+        publisher.fireEvent(DATANODE_COMMAND, new CommandForDatanode<>(target, command));
       }
     } catch (ContainerNotFoundException ex) {
       LOG.error("Failed to start reconciliation for container {}. Container not found.", containerID);

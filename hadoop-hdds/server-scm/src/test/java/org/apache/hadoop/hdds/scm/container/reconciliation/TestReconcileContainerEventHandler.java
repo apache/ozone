@@ -17,6 +17,15 @@
 
 package org.apache.hadoop.hdds.scm.container.reconciliation;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
@@ -31,6 +40,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +49,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -54,6 +65,9 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.Result;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -68,6 +82,7 @@ import org.mockito.ArgumentCaptor;
  * container state, and dispatches commands to datanodes accordingly.
  */
 public class TestReconcileContainerEventHandler {
+  private NodeManager nodeManager;
   private ContainerManager containerManager;
   private EventPublisher eventPublisher;
   private ReconcileContainerEventHandler eventHandler;
@@ -90,7 +105,10 @@ public class TestReconcileContainerEventHandler {
     when(scmContext.isLeader()).thenReturn(true);
     when(scmContext.getTermOfLeader()).thenReturn(LEADER_TERM);
     eventPublisher = mock(EventPublisher.class);
-    eventHandler = new ReconcileContainerEventHandler(containerManager, scmContext);
+    nodeManager = mock(NodeManager.class);
+    // Unless a test overrides it, every datanode is healthy and in service so all replicas participate.
+    when(nodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
+    eventHandler = new ReconcileContainerEventHandler(nodeManager, containerManager, scmContext);
   }
 
   /**
@@ -201,7 +219,7 @@ public class TestReconcileContainerEventHandler {
     }
   }
 
-  // TODO HDDS-10714 will change which datanodes are eligible to participate in reconciliation.
+  // When every node is healthy and in service, all replicas are both peers and targets.
   @Test
   public void testReconcileSentToAllPeers() throws Exception {
     addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
@@ -247,6 +265,113 @@ public class TestReconcileContainerEventHandler {
     }
 
     assertEquals(allNodeIDs, nodesReceivingCommands);
+  }
+
+  /**
+   * Only healthy, in-service nodes receive reconcile commands. Decommissioning and entering-maintenance
+   * nodes are used as peers but not targets, while stale, dead, decommissioned, and in-maintenance nodes
+   * are neither peers nor targets.
+   */
+  @Test
+  public void testReconcileRestrictedByNodeStatus() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    List<DatanodeDetails> nodes = addReplicasToContainer(9).stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toCollection(ArrayList::new));
+
+    // Assign a distinct node status to each replica's datanode.
+    NodeStatus[] statuses = {
+        NodeStatus.valueOf(IN_SERVICE, HEALTHY),
+        NodeStatus.valueOf(IN_SERVICE, HEALTHY),
+        NodeStatus.valueOf(IN_SERVICE, STALE),
+        NodeStatus.valueOf(IN_SERVICE, DEAD),
+        NodeStatus.valueOf(DECOMMISSIONING, HEALTHY),
+        NodeStatus.valueOf(ENTERING_MAINTENANCE, HEALTHY),
+        NodeStatus.valueOf(DECOMMISSIONED, HEALTHY),
+        NodeStatus.valueOf(IN_MAINTENANCE, HEALTHY),
+        NodeStatus.valueOf(IN_SERVICE, HEALTHY_READONLY),
+    };
+    for (int i = 0; i < nodes.size(); i++) {
+      when(nodeManager.getNodeStatus(nodes.get(i))).thenReturn(statuses[i]);
+    }
+
+    // Healthy (including read-only) in-service nodes are targets.
+    Set<DatanodeID> expectedTargets = new HashSet<>(Arrays.asList(
+        nodes.get(0).getID(), nodes.get(1).getID(), nodes.get(8).getID()));
+    // Healthy nodes that have not decommissioned or entered maintenance are peers.
+    Set<DatanodeID> expectedPeers = new HashSet<>(Arrays.asList(
+        nodes.get(0).getID(), nodes.get(1).getID(), nodes.get(4).getID(), nodes.get(5).getID(),
+        nodes.get(8).getID()));
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher, times(expectedTargets.size())).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+
+    Set<DatanodeID> actualTargets = new HashSet<>();
+    for (CommandForDatanode<ReconcileContainerCommandProto> dnCommand : commandCaptor.getAllValues()) {
+      DatanodeID targetID = dnCommand.getDatanodeId();
+      assertTrue(actualTargets.add(targetID), "Duplicate reconcile command sent to datanode.");
+
+      // A target reconciles against every eligible peer except itself.
+      Set<DatanodeID> expectedPeerIDs = expectedPeers.stream()
+          .filter(id -> !id.equals(targetID))
+          .collect(Collectors.toSet());
+      Set<DatanodeID> actualPeerIDs = dnCommand.getCommand().getProto().getPeersList().stream()
+          .map(dn -> DatanodeID.fromProto(dn.getId()))
+          .collect(Collectors.toSet());
+      assertEquals(expectedPeerIDs, actualPeerIDs);
+    }
+    assertEquals(expectedTargets, actualTargets);
+  }
+
+  /**
+   * A healthy in-service node whose only other replicas are stale or dead has no eligible peer, so it
+   * receives no reconcile command since there is nothing to reconcile against.
+   */
+  @Test
+  public void testReconcileSkipsTargetWithNoEligiblePeers() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    List<DatanodeDetails> nodes = addReplicasToContainer(3).stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toCollection(ArrayList::new));
+    when(nodeManager.getNodeStatus(nodes.get(0))).thenReturn(NodeStatus.valueOf(IN_SERVICE, HEALTHY));
+    when(nodeManager.getNodeStatus(nodes.get(1))).thenReturn(NodeStatus.valueOf(IN_SERVICE, STALE));
+    when(nodeManager.getNodeStatus(nodes.get(2))).thenReturn(NodeStatus.valueOf(IN_SERVICE, DEAD));
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
+  }
+
+  /**
+   * A replica whose datanode has no known status is skipped for both roles, while the remaining healthy
+   * in-service nodes still reconcile against each other.
+   */
+  @Test
+  public void testReconcileSkipsNodeWithUnknownStatus() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    List<DatanodeDetails> nodes = addReplicasToContainer(3).stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toCollection(ArrayList::new));
+    when(nodeManager.getNodeStatus(nodes.get(0))).thenReturn(NodeStatus.valueOf(IN_SERVICE, HEALTHY));
+    when(nodeManager.getNodeStatus(nodes.get(1))).thenReturn(NodeStatus.valueOf(IN_SERVICE, HEALTHY));
+    when(nodeManager.getNodeStatus(nodes.get(2))).thenThrow(new NodeNotFoundException(nodes.get(2).getID()));
+
+    Set<DatanodeID> eligible = new HashSet<>(Arrays.asList(nodes.get(0).getID(), nodes.get(1).getID()));
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher, times(eligible.size())).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+
+    Set<DatanodeID> actualTargets = new HashSet<>();
+    for (CommandForDatanode<ReconcileContainerCommandProto> dnCommand : commandCaptor.getAllValues()) {
+      DatanodeID targetID = dnCommand.getDatanodeId();
+      actualTargets.add(targetID);
+      Set<DatanodeID> peerIDs = dnCommand.getCommand().getProto().getPeersList().stream()
+          .map(dn -> DatanodeID.fromProto(dn.getId()))
+          .collect(Collectors.toSet());
+      // The unknown-status node appears in no peer list.
+      assertFalse(peerIDs.contains(nodes.get(2).getID()), "Unknown-status node used as a peer.");
+      assertEquals(eligible.stream().filter(id -> !id.equals(targetID)).collect(Collectors.toSet()), peerIDs);
+    }
+    assertEquals(eligible, actualTargets);
   }
 
   @ParameterizedTest
@@ -299,8 +424,8 @@ public class TestReconcileContainerEventHandler {
     // Add one container replica for each replica state specified.
     // If no states are specified, replica list will be empty.
     Set<ContainerReplica> replicas = new HashSet<>();
-    try (MockNodeManager nodeManager = new MockNodeManager(true, replicaStates.length)) {
-      List<DatanodeInfo> nodes = nodeManager.getAllNodes();
+    try (MockNodeManager mockNodeManager = new MockNodeManager(true, replicaStates.length)) {
+      List<DatanodeInfo> nodes = mockNodeManager.getAllNodes();
       for (int i = 0; i < replicaStates.length; i++) {
         replicas.addAll(HddsTestUtils.getReplicas(CONTAINER_ID, replicaStates[i], nodes.get(i)));
       }
