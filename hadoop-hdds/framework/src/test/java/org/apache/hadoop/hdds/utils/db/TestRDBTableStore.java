@@ -655,6 +655,37 @@ public class TestRDBTableStore {
   }
 
   @Test
+  public void testRangeKVsStartKeyInclusiveAndAbsent() throws Exception {
+    Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFour");
+    byte[] prefix = "p/".getBytes(StandardCharsets.UTF_8);
+    for (String suffix : new String[] {"a", "c", "e"}) {
+      byte[] key = ("p/" + suffix).getBytes(StandardCharsets.UTF_8);
+      testTable.put(key, key);
+    }
+    byte[] present = "p/c".getBytes(StandardCharsets.UTF_8);
+    byte[] absentMiddle = "p/b".getBytes(StandardCharsets.UTF_8);
+    byte[] absentPastEnd = "p/z".getBytes(StandardCharsets.UTF_8);
+
+    // Existing start key: the range starts at that key (inclusive).
+    List<Table.KeyValue<byte[], byte[]>> rangeKVs =
+        testTable.getRangeKVs(present, 10, prefix);
+    assertEquals(2, rangeKVs.size());
+    assertArrayEquals(present, rangeKVs.get(0).getKey());
+
+    // Absent start key with a later key under the prefix: seek lands on a
+    // different key, so the range is empty.
+    assertEquals(0, testTable.getRangeKVs(absentMiddle, 10, prefix).size());
+    // Absent start key past every key: seek lands on nothing, range is empty.
+    assertEquals(0, testTable.getRangeKVs(absentPastEnd, 10, prefix).size());
+
+    // Same checks with no prefix (whole-table range).
+    rangeKVs = testTable.getRangeKVs(present, 10, null);
+    assertEquals(2, rangeKVs.size());
+    assertArrayEquals(present, rangeKVs.get(0).getKey());
+    assertEquals(0, testTable.getRangeKVs(absentMiddle, 10, null).size());
+  }
+
+  @Test
   public void testDumpAndLoadBasic() throws Exception {
     int containerCount = 3;
     int blockCount = 5;
