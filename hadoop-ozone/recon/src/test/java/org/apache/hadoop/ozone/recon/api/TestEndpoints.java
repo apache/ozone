@@ -960,7 +960,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertTrue(o.getVolume().equals("vol1") && o.getBucket().equals("bucket1") &&
         o.getFileSize() == 131072);
 
-    // Test for non-existent fileSize.
+    // Test for a fileSize that is not a bin boundary. It is mapped to bin 131072.
+    response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 100000);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(1, resultSet.size());
+    o = resultSet.get(0);
+    assertTrue(o.getVolume().equals("vol1") && o.getBucket().equals("bucket1") &&
+        o.getFileSize() == 131072 && o.getCount() == 2L);
+
+    // Test for a fileSize that is mapped to an empty bin.
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 1310725);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
