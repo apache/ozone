@@ -166,15 +166,15 @@ public class TestOmMetadataManager {
 
   @Test
   public void testGetMissingLifecycleConfigurationIsNotLoggedAsError() throws Exception {
-    LogCapturer logCapturer = LogCapturer.captureLogs(OmMetadataManagerImpl.class);
+    try (LogCapturer logCapturer = LogCapturer.captureLogs(OmMetadataManagerImpl.class)) {
+      OMException ex = assertThrows(OMException.class, () ->
+          omMetadataManager.getLifecycleConfiguration("volume1", "bucket1"));
 
-    OMException ex = assertThrows(OMException.class, () ->
-        omMetadataManager.getLifecycleConfiguration("volume1", "bucket1"));
-
-    assertEquals(ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND, ex.getResult());
-    // A bucket without a lifecycle configuration is an expected outcome, so the
-    // catch-all must not report it with an error and a stack trace.
-    assertFalse(logCapturer.getOutput().contains("Exception while getting lifecycle configuration"));
+      assertEquals(ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND, ex.getResult());
+      // A bucket without a lifecycle configuration is an expected outcome, so the
+      // catch-all must not report it with an error and a stack trace.
+      assertFalse(logCapturer.getOutput().contains("Exception while getting lifecycle configuration"));
+    }
   }
 
   @Test
