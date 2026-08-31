@@ -367,8 +367,7 @@ public final class ChunkUtils {
    * @return true if the chunkOffset is less than the chunkFile length,
    *         false otherwise.
    */
-  public static boolean validateChunkForOverwrite(long fileLen,
-                                                  ChunkInfo info) {
+  public static boolean validateChunkForOverwrite(long fileLen, ChunkInfo info) {
 
     if (isOverWriteRequested(fileLen, info)) {
       if (!isOverWritePermitted(info)) {
@@ -412,8 +411,7 @@ public final class ChunkUtils {
    * @return true if the offset is less than the file length, indicating
    *         a request to overwrite an existing range; false otherwise
    */
-  public static boolean isOverWriteRequested(long fileLen, ChunkInfo
-      chunkInfo) {
+  public static boolean isOverWriteRequested(long fileLen, ChunkInfo chunkInfo) {
     return chunkInfo.getOffset() < fileLen;
   }
 
@@ -518,8 +516,7 @@ public final class ChunkUtils {
    * Checks if the block file length is equal to the chunk offset.
    *
    */
-  public static void validateChunkSize(long fileLen,
-      ChunkInfo chunkInfo, String fileName)
+  public static void validateChunkSize(long fileLen, ChunkInfo chunkInfo, String fileName)
       throws StorageContainerException {
     long offset = chunkInfo.getOffset();
     if (fileLen != offset) {

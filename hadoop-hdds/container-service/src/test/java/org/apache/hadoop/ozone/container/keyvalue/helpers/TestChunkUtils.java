@@ -32,7 +32,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -233,16 +232,9 @@ class TestChunkUtils {
         ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
             new ChunkInfo("chunk", 5, 5)));
 
-    try (FileChannel fileChannel =
-             FileChannel.open(tempFile, StandardOpenOption.READ)) {
-      assertTrue(
-          ChunkUtils.validateChunkForOverwrite(fileChannel.size(),
-              new ChunkInfo("chunk", 3, 5)));
+    assertTrue(ChunkUtils.validateChunkForOverwrite(4L, new ChunkInfo("chunk", 3, 5)));
 
-      assertFalse(
-          ChunkUtils.validateChunkForOverwrite(fileChannel.size(),
-              new ChunkInfo("chunk", 5, 5)));
-    }
+    assertFalse(ChunkUtils.validateChunkForOverwrite(4L, new ChunkInfo("chunk", 5, 5)));
   }
 
   @Test
