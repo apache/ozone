@@ -116,6 +116,9 @@ class TestObjectPut {
   private static final String DEST_BUCKET_NAME = "b2";
   private static final String DEST_KEY = "key=value/2";
   private static final String NONEXISTENT_BUCKET = "nonexist";
+  /** Well-formed but meaningless signature, for the path that only strips the chunk framing. */
+  private static final String FAKE_SIGNATURE = StringUtils.repeat('0', 64);
+
   private ObjectEndpoint objectEndpoint;
   private HttpHeaders headers;
   private OzoneBucket bucket;
@@ -266,6 +269,24 @@ class TestObjectPut {
   }
 
   @Test
+  void testPutObjectWithUnverifiedSignedChunks() throws Exception {
+    // Only STREAMING-AWS4-HMAC-SHA256-PAYLOAD opts into verification; the -TRAILER variant is
+    // HDDS-15142. Here the stream just strips the chunk framing, so the signatures are not checked
+    // and a body without the terminating zero-byte chunk is still accepted, as before this change.
+    String chunkedContent = "0a;chunk-signature=" + FAKE_SIGNATURE + "\r\n"
+        + "1234567890\r\n"
+        + "05;chunk-signature=" + FAKE_SIGNATURE + "\r\n"
+        + "abcde\r\n";
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("15");
+
+    assertSucceeds(() -> putObject(chunkedContent));
+
+    assertKeyContent(bucket, KEY_NAME, "1234567890abcde");
+  }
+
+  @Test
   void testPutObjectRejectsTamperedSignedChunk() {
     configureSignedChunks(CONTENT.length());
 
@@ -289,9 +310,9 @@ class TestObjectPut {
   void testPutObjectRejectsMissingFinalChunk() {
     configureSignedChunks(CONTENT.length());
 
-    assertThatThrownBy(() -> putObject(withoutFinalChunk(signedChunkedBody(CONTENT))))
-        .isInstanceOf(IOException.class)
-        .hasMessageContaining("terminating 0-byte chunk");
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> putObject(withoutFinalChunk(signedChunkedBody(CONTENT))));
+    assertThat(ex.getErrorMessage()).contains("terminating 0-byte chunk");
     assertKeyWasNotCommitted();
   }
 
@@ -330,9 +351,8 @@ class TestObjectPut {
     String body = signedChunkedBody(CONTENT)
         .replace(CONTENT + "\r\n", CONTENT + "\n\n");
 
-    assertThatThrownBy(() -> putObject(body))
-        .isInstanceOf(IOException.class)
-        .hasMessageContaining("Invalid chunk data terminator");
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.INVALID_REQUEST, () -> putObject(body));
+    assertThat(ex.getErrorMessage()).contains("Invalid chunk data terminator");
     assertKeyWasNotCommitted();
   }
 
@@ -342,9 +362,8 @@ class TestObjectPut {
     String completeBody = signedChunkedBody(CONTENT);
     String body = completeBody.substring(0, completeBody.length() - 2);
 
-    assertThatThrownBy(() -> putObject(body))
-        .isInstanceOf(IOException.class)
-        .hasMessageContaining("Invalid chunk data terminator");
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.INVALID_REQUEST, () -> putObject(body));
+    assertThat(ex.getErrorMessage()).contains("Invalid chunk data terminator");
     assertKeyWasNotCommitted();
   }
 
@@ -352,9 +371,9 @@ class TestObjectPut {
   void testPutObjectRejectsDecodedLengthEndingMidChunk() {
     configureSignedChunks(CONTENT.length() - 1);
 
-    assertThatThrownBy(() -> putObject(signedChunkedBody(CONTENT)))
-        .isInstanceOf(IOException.class)
-        .hasMessageContaining("Decoded content length ended before the chunked stream");
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> putObject(signedChunkedBody(CONTENT)));
+    assertThat(ex.getErrorMessage()).contains("Decoded content length ended before the chunked stream");
     assertKeyWasNotCommitted();
   }
 
@@ -375,7 +394,23 @@ class TestObjectPut {
     EndpointBase.S3ChunkInputStreamInfo info = objectEndpoint.getS3ChunkInputStreamInfo(
         new ByteArrayInputStream(new byte[0]), 0, "0", KEY_NAME);
 
-    assertThat(objectEndpoint.wantsChunkSignatureVerification(info)).isEqualTo(expected);
+    assertThat(info.isChunkSignatureVerificationRequired()).isEqualTo(expected);
+  }
+
+  @Test
+  void testPresignedRequestDoesNotVerifyChunkSignatures() throws Exception {
+    // A presigned (query auth) request does not sign the payload hash, so its seed signature cannot
+    // start the chunk signature chain and the chunks must not be verified against it.
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
+    ObjectEndpoint presigned = EndpointBuilder.newObjectEndpointBuilder()
+        .setHeaders(headers)
+        .setSignatureInfo(signatureInfo(false))
+        .build();
+
+    EndpointBase.S3ChunkInputStreamInfo info = presigned.getS3ChunkInputStreamInfo(
+        new ByteArrayInputStream(new byte[0]), 0, "0", KEY_NAME);
+
+    assertThat(info.isChunkSignatureVerificationRequired()).isFalse();
   }
 
   @Test

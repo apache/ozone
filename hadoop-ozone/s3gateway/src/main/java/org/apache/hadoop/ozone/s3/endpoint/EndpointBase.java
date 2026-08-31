@@ -759,7 +759,7 @@ public abstract class EndpointBase {
       if (hasUnsignedPayload(amzContentSha256Header)) {
         chunkInputStream = new UnsignedChunksInputStream(body);
       } else {
-        chunkInputStream = new SignedChunksInputStream(body);
+        chunkInputStream = new SignedChunksInputStream(body, keyPath);
       }
       effectiveLength = Long.parseLong(amzDecodedLength);
     } else {
@@ -780,16 +780,11 @@ public abstract class EndpointBase {
     }
     MultiDigestInputStream multiDigestInputStream =
         new MultiDigestInputStream(chunkInputStream, digests);
-    boolean verifyChunkSignature = STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header);
+    // Header auth only: for a presigned (query) request the payload hash is not part of the signed
+    // canonical request, so its seed signature cannot start the chunk signature chain.
+    boolean verifyChunkSignature = signatureInfo.isSignPayload()
+        && STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header);
     return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength, verifyChunkSignature);
-  }
-
-  /**
-   * Whether a signed multi-chunk upload should ask OM to piggyback the derived
-   * signing key so the chunk signatures can be verified (HDDS-15140/15141).
-   */
-  protected boolean wantsChunkSignatureVerification(S3ChunkInputStreamInfo info) {
-    return info.isChunkSignatureVerificationRequired();
   }
 
   /**
@@ -802,19 +797,21 @@ public abstract class EndpointBase {
    * rejected rather than stored unverified. In non-secure mode there is no
    * secret to verify against, so verification is skipped.
    */
-  protected void attachChunkValidator(S3ChunkInputStreamInfo info, ByteBuffer derivedKey)
+  protected void attachChunkValidator(S3ChunkInputStreamInfo info, String keyPath, ByteBuffer derivedKey)
       throws OS3Exception {
     if (!info.isChunkSignatureVerificationRequired()) {
       return;
     }
-    InputStream wrapped = info.getMultiDigestInputStream().getWrappedStream();
-    if (!(wrapped instanceof SignedChunksInputStream)) {
-      return;
+    SignedChunksInputStream signed = SignedChunksInputStream.unwrap(info.getMultiDigestInputStream());
+    if (signed == null) {
+      // Unreachable today: verification is only required for a payload that getS3ChunkInputStreamInfo
+      // wrapped in a SignedChunksInputStream. Fail rather than store the payload unverified.
+      throw internalError(keyPath,
+          "chunk-signature verification requested but the body is not a signed chunked stream");
     }
-    SignedChunksInputStream signed = (SignedChunksInputStream) wrapped;
     if (derivedKey == null) {
       if (OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())) {
-        throw S3ErrorTable.newError(S3ErrorTable.INTERNAL_ERROR,
+        throw internalError(keyPath,
             "chunk-signature verification requested but no derived key was returned");
       }
       return;
@@ -824,7 +821,16 @@ public abstract class EndpointBase {
     key.get(signingKey);
     signed.attachValidator(new ChunksValidator(signingKey,
         signatureInfo.getDateTime(), signatureInfo.getCredentialScope(),
-        signatureInfo.getSignature()));
+        signatureInfo.getSignature(), keyPath));
+  }
+
+  private static OS3Exception internalError(String keyPath, String message) {
+    // OS3Exception logs itself from its constructor, before setErrorMessage can replace the generic
+    // enum text, so the specific reason has to be logged here to reach the operator.
+    LOG.error("Internal Error for {}: {}", keyPath, message);
+    OS3Exception ex = newError(S3ErrorTable.INTERNAL_ERROR, keyPath);
+    ex.setErrorMessage(message);
+    return ex;
   }
 
   public boolean isDatastreamEnabled() {

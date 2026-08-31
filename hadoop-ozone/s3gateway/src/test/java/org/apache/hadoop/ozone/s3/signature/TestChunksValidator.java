@@ -17,14 +17,17 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.SIGNATURE_DOES_NOT_MATCH;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
 import java.util.Locale;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 /**
  * Verifies {@link ChunksValidator} against the canonical AWS SigV4 streaming
@@ -43,6 +46,7 @@ class TestChunksValidator {
   private static final String SEED_SIGNATURE =
       "4f232c4386841ef735655705268965c44a0e4690baa4adea153f7db9fa80a0a9";
 
+  private static final String KEY_PATH = "key1";
   private static final String CHUNK1_SIGNATURE =
       "ad80c730a21e5b8d04586a2213dd63b9a0e99e0e2307b0ade35a65485a288648";
   private static final String CHUNK2_SIGNATURE =
@@ -50,10 +54,17 @@ class TestChunksValidator {
   private static final String FINAL_CHUNK_SIGNATURE =
       "b6c6ea8a5354eaf15b3cb7646744f4275b71ea724fed81ceb9323e279d449df9";
 
+  /** A chunk that fails verification must surface as SignatureDoesNotMatch (HTTP 403), not any other error. */
+  private static void assertSignatureMismatch(Executable call) {
+    OS3Exception ex = assertThrows(OS3Exception.class, call);
+    assertEquals(SIGNATURE_DOES_NOT_MATCH.getCode(), ex.getCode());
+    assertEquals(SIGNATURE_DOES_NOT_MATCH.getHttpCode(), ex.getHttpCode());
+  }
+
   private ChunksValidator newValidator() {
     return new ChunksValidator(
         SignatureTestUtils.signingKey(SECRET_KEY, "20130524", "us-east-1", "s3"),
-        DATE_TIME, SCOPE, SEED_SIGNATURE);
+        DATE_TIME, SCOPE, SEED_SIGNATURE, KEY_PATH);
   }
 
   @Test
@@ -86,7 +97,7 @@ class TestChunksValidator {
     byte[] chunk1 = repeat('a', 65536);
 
     // Wrong signature for the first chunk.
-    assertThrows(OS3Exception.class, () -> validator.validateChunk(
+    assertSignatureMismatch(() -> validator.validateChunk(
         CHUNK2_SIGNATURE, SignatureTestUtils.sha256Hex(chunk1, 0, chunk1.length)));
   }
 
@@ -96,7 +107,7 @@ class TestChunksValidator {
     byte[] tampered = repeat('b', 65536);
 
     // Correct signature but the payload was modified.
-    assertThrows(OS3Exception.class, () -> validator.validateChunk(
+    assertSignatureMismatch(() -> validator.validateChunk(
         CHUNK1_SIGNATURE,
         SignatureTestUtils.sha256Hex(tampered, 0, tampered.length)));
   }
@@ -108,14 +119,14 @@ class TestChunksValidator {
     ChunksValidator correct = newValidator();
     ChunksValidator wrongKey = new ChunksValidator(
         SignatureTestUtils.signingKey("wrong-secret", "20130524", "us-east-1", "s3"),
-        DATE_TIME, SCOPE, SEED_SIGNATURE);
+        DATE_TIME, SCOPE, SEED_SIGNATURE, KEY_PATH);
     String sha65536 = SignatureTestUtils.sha256Hex(repeat('a', 65536), 0, 65536);
     String sha1024 = SignatureTestUtils.sha256Hex(repeat('a', 1024), 0, 1024);
 
-    assertThrows(OS3Exception.class, () -> wrongKey.validateChunk(CHUNK1_SIGNATURE, sha65536));
+    assertSignatureMismatch(() -> wrongKey.validateChunk(CHUNK1_SIGNATURE, sha65536));
     // If the shared Mac were not re-keyed, this would still hold the wrong key and fail.
     assertDoesNotThrow(() -> correct.validateChunk(CHUNK1_SIGNATURE, sha65536));
-    assertThrows(OS3Exception.class, () -> wrongKey.validateChunk(CHUNK1_SIGNATURE, sha65536));
+    assertSignatureMismatch(() -> wrongKey.validateChunk(CHUNK1_SIGNATURE, sha65536));
     assertDoesNotThrow(() -> correct.validateChunk(CHUNK2_SIGNATURE, sha1024));
   }
 

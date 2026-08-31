@@ -271,7 +271,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           length, amzDecodedLength, keyPath);
       multiDigestInputStream = chunkInputStreamInfo.getMultiDigestInputStream();
       length = chunkInputStreamInfo.getEffectiveLength();
-      final boolean wantDerivedKey = wantsChunkSignatureVerification(chunkInputStreamInfo);
+      final boolean wantDerivedKey = chunkInputStreamInfo.isChunkSignatureVerificationRequired();
 
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
@@ -288,7 +288,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
                 customMetadata, tags, multiDigestInputStream, getHeaders(),
                 signatureInfo.isSignPayload(), perf, writeConditions,
                 wantDerivedKey,
-                derivedKey -> attachChunkValidator(chunkInputStreamInfo, derivedKey));
+                derivedKey -> attachChunkValidator(chunkInputStreamInfo, keyPath, derivedKey));
         md5Hash = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
@@ -303,7 +303,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
-          output.onKeyOpened(derivedKey -> attachChunkValidator(chunkInputStreamInfo, derivedKey));
+          output.onKeyOpened(derivedKey -> attachChunkValidator(chunkInputStreamInfo, keyPath, derivedKey));
           putLength = output.copyFrom(multiDigestInputStream, getIOBufferSize(expectedLength));
           md5Hash = DatatypeConverter.printHexBinary(
                   multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
@@ -920,7 +920,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           body, length, amzDecodedLength, key);
       multiDigestInputStream = chunkInputStreamInfo.getMultiDigestInputStream();
       length = chunkInputStreamInfo.getEffectiveLength();
-      final boolean wantDerivedKey = wantsChunkSignatureVerification(chunkInputStreamInfo);
+      final boolean wantDerivedKey = chunkInputStreamInfo.isChunkSignatureVerificationRequired();
 
       copyHeader = getHeaders().getHeaderString(COPY_SOURCE_HEADER);
       ReplicationConfig replicationConfig = getReplicationConfig(ozoneBucket);
@@ -938,7 +938,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             .createMultipartKey(ozoneBucket, key, length, partNumber,
                 uploadID, getChunkSize(), multiDigestInputStream, perf, getHeaders(),
                 wantDerivedKey,
-                derivedKey -> attachChunkValidator(chunkInputStreamInfo, derivedKey));
+                derivedKey -> attachChunkValidator(chunkInputStreamInfo, key, derivedKey));
       }
       // OmMultipartCommitUploadPartInfo can only be gotten after the
       // OzoneOutputStream is closed, so we need to save the OzoneOutputStream
@@ -1026,15 +1026,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       } else {
         long putLength;
         final long expectedLength = length;
-        OzoneOutputStream ozoneOutputStream = wantDerivedKey
-            ? getClientProtocol().createMultipartKey(volume.getName(), bucketName, key,
-                expectedLength, partNumber, uploadID, true)
-            : getClientProtocol().createMultipartKey(volume.getName(), bucketName, key,
-                expectedLength, partNumber, uploadID);
+        OzoneOutputStream ozoneOutputStream = getClientProtocol().createMultipartKey(
+            volume.getName(), bucketName, key, expectedLength, partNumber, uploadID, wantDerivedKey);
         try (S3ObjectWriteGuard writeGuard = new S3ObjectWriteGuard(ozoneOutputStream, expectedLength, key)) {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
-          writeGuard.onKeyOpened(derivedKey -> attachChunkValidator(chunkInputStreamInfo, derivedKey));
+          writeGuard.onKeyOpened(derivedKey -> attachChunkValidator(chunkInputStreamInfo, key, derivedKey));
           putLength = writeGuard.copyFrom(multiDigestInputStream, getIOBufferSize(expectedLength));
           byte[] digest = multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest();
           String md5Hash = DatatypeConverter.printHexBinary(digest).toLowerCase();
@@ -1121,7 +1118,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       final long expectedLength = srcKeyLen;
       try (S3ObjectWriteGuard dest = new S3ObjectWriteGuard(openKeyForPut(
           volume.getName(), destBucket, destKey, expectedLength,
-          replication, metadata, tags, writeConditions), expectedLength, destKey)) {
+          replication, metadata, tags, writeConditions, false), expectedLength, destKey)) {
         long metadataLatencyNs =
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -1274,55 +1271,28 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
   /**
    * Opens a key for put, applying conditional write logic based on
-   * If-None-Match and If-Match headers.
+   * If-None-Match and If-Match headers. Only signed multi-chunk uploads ask OM to piggyback
+   * the derived signing key (HDDS-15140); every other PUT passes false.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OzoneOutputStream openKeyForPut(String volumeName, String bucketName, String keyPath, long length,
       ReplicationConfig replicationConfig, Map<String, String> customMetadata,
       Map<String, String> tags,
-      S3ConditionalRequest.WriteConditions writeConditions)
-      throws IOException {
-    if (writeConditions.hasIfNoneMatch()) {
-      return getClientProtocol().createKeyIfNotExists(
-          volumeName, bucketName, keyPath, length, replicationConfig,
-          customMetadata, tags);
-    } else if (writeConditions.hasIfMatch()) {
-      return getClientProtocol().rewriteKeyIfMatch(
-          volumeName, bucketName, keyPath, length,
-          writeConditions.getExpectedETag(),
-          replicationConfig, customMetadata, tags);
-    } else {
-      return getClientProtocol().createKey(
-          volumeName, bucketName, keyPath, length, replicationConfig,
-          customMetadata, tags);
-    }
-  }
-
-  @SuppressWarnings("checkstyle:parameternumber")
-  private OzoneOutputStream openKeyForPut(String volumeName, String bucketName, String keyPath, long length,
-      ReplicationConfig replicationConfig, Map<String, String> customMetadata,
-      Map<String, String> tags,
       S3ConditionalRequest.WriteConditions writeConditions, boolean derivedKeyPiggyBacking)
       throws IOException {
-    // Only signed multi-chunk uploads ask OM to piggyback the derived key; every
-    // other PUT uses the same client call as before.
-    if (!derivedKeyPiggyBacking) {
-      return openKeyForPut(volumeName, bucketName, keyPath, length, replicationConfig,
-          customMetadata, tags, writeConditions);
-    }
     if (writeConditions.hasIfNoneMatch()) {
       return getClientProtocol().createKeyIfNotExists(
           volumeName, bucketName, keyPath, length, replicationConfig,
-          customMetadata, tags, true);
+          customMetadata, tags, derivedKeyPiggyBacking);
     } else if (writeConditions.hasIfMatch()) {
       return getClientProtocol().rewriteKeyIfMatch(
           volumeName, bucketName, keyPath, length,
           writeConditions.getExpectedETag(),
-          replicationConfig, customMetadata, tags, true);
+          replicationConfig, customMetadata, tags, derivedKeyPiggyBacking);
     } else {
       return getClientProtocol().createKey(
           volumeName, bucketName, keyPath, length, replicationConfig,
-          customMetadata, tags, true);
+          customMetadata, tags, derivedKeyPiggyBacking);
     }
   }
 

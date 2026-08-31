@@ -164,22 +164,16 @@ final class ObjectEndpointStreaming {
       S3ConditionalRequest.WriteConditions writeConditions,
       boolean derivedKeyPiggyBacking) throws IOException {
     // Only signed multi-chunk uploads ask OM to piggyback the derived key; every
-    // other stream PUT uses the same client call as before.
+    // other stream PUT passes false.
     if (writeConditions.hasIfNoneMatch()) {
-      return derivedKeyPiggyBacking
-          ? bucket.createStreamKeyIfNotExists(keyPath, length, replicationConfig, keyMetadata, tags, true)
-          : bucket.createStreamKeyIfNotExists(keyPath, length, replicationConfig, keyMetadata, tags);
+      return bucket.createStreamKeyIfNotExists(keyPath, length, replicationConfig, keyMetadata, tags,
+          derivedKeyPiggyBacking);
     }
     if (writeConditions.hasIfMatch()) {
-      return derivedKeyPiggyBacking
-          ? bucket.rewriteStreamKeyIfMatch(keyPath, length, writeConditions.getExpectedETag(),
-              replicationConfig, keyMetadata, tags, true)
-          : bucket.rewriteStreamKeyIfMatch(keyPath, length, writeConditions.getExpectedETag(),
-              replicationConfig, keyMetadata, tags);
+      return bucket.rewriteStreamKeyIfMatch(keyPath, length, writeConditions.getExpectedETag(),
+          replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
     }
-    return derivedKeyPiggyBacking
-        ? bucket.createStreamKey(keyPath, length, replicationConfig, keyMetadata, tags, true)
-        : bucket.createStreamKey(keyPath, length, replicationConfig, keyMetadata, tags);
+    return bucket.createStreamKey(keyPath, length, replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -220,11 +214,9 @@ final class ObjectEndpointStreaming {
     String eTag;
     try {
       // Only signed multi-chunk uploads ask OM to piggyback the derived key.
-      OzoneDataStreamOutput streamOutput = derivedKeyPiggyBacking
-          ? ozoneBucket.createMultipartStreamKey(key, length, partNumber, uploadID, true)
-          : ozoneBucket.createMultipartStreamKey(key, length, partNumber, uploadID);
-      try (S3ObjectStreamingWriteGuard writeGuard =
-          new S3ObjectStreamingWriteGuard(streamOutput, length, key)) {
+      try (S3ObjectStreamingWriteGuard writeGuard = new S3ObjectStreamingWriteGuard(
+          ozoneBucket.createMultipartStreamKey(key, length, partNumber, uploadID, derivedKeyPiggyBacking),
+          length, key)) {
         long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
         writeGuard.onKeyOpened(onKeyOpened);
         long putLength = writeGuard.copyFrom(body, chunkSize);

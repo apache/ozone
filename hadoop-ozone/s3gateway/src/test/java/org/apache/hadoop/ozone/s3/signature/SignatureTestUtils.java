@@ -24,7 +24,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.apache.kerby.util.Hex;
+import javax.xml.bind.DatatypeConverter;
 
 /**
  * Shared AWS Signature Version 4 helpers for tests.
@@ -60,11 +60,17 @@ public final class SignatureTestUtils {
   }
 
   public static SignatureInfo signatureInfo() {
+    return signatureInfo(true);
+  }
+
+  /** @param signPayload false models a presigned (query auth) request, which does not sign the payload hash. */
+  public static SignatureInfo signatureInfo(boolean signPayload) {
     return new SignatureInfo.Builder(SignatureInfo.Version.V4)
         .setDate(DATE)
         .setDateTime(DATE_TIME)
         .setCredentialScope(CREDENTIAL_SCOPE)
         .setSignature(SEED_SIGNATURE)
+        .setSignPayload(signPayload)
         .build();
   }
 
@@ -84,7 +90,7 @@ public final class SignatureTestUtils {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
       digest.update(data, off, len);
-      return Hex.encode(digest.digest()).toLowerCase(Locale.ROOT);
+      return DatatypeConverter.printHexBinary(digest.digest()).toLowerCase(Locale.ROOT);
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
     }
@@ -95,7 +101,7 @@ public final class SignatureTestUtils {
       String previousSignature, byte[] payload) {
     String stringToSign = String.join("\n", "AWS4-HMAC-SHA256-PAYLOAD", dateTime, credentialScope,
         previousSignature, EMPTY_STRING_SHA256, sha256Hex(payload, 0, payload.length));
-    return Hex.encode(hmac(signingKey, stringToSign)).toLowerCase(Locale.ROOT);
+    return DatatypeConverter.printHexBinary(hmac(signingKey, stringToSign)).toLowerCase(Locale.ROOT);
   }
 
   /** Build a one-data-chunk SigV4 streaming body, including the terminating zero-byte chunk. */

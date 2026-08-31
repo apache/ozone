@@ -73,6 +73,7 @@ public class TestUploadWithStream {
   private static final String S3_COPY_EXISTING_KEY = "test_copy_existing_key";
   private static final String S3_COPY_EXISTING_KEY_CONTENT =
       "test_copy_existing_key_content";
+
   private ObjectEndpoint rest;
 
   private OzoneClient client;
@@ -196,5 +197,4 @@ public class TestUploadWithStream {
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(decodedLength));
     return bucket;
   }
-
 }

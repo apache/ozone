@@ -27,8 +27,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.kerby.util.Hex;
 
 /**
  * Verifies the per-chunk signatures of a SigV4 chunked upload
@@ -72,23 +72,27 @@ public class ChunksValidator {
     }
   });
 
-  private final byte[] signingKey;
+  /** The signing key is fixed for the request, so the key spec is built once instead of per chunk. */
+  private final SecretKeySpec signingKey;
   private final String dateTime;
   private final String credentialScope;
+  private final String resource;
   private String previousSignature;
 
   public ChunksValidator(byte[] signingKey, String dateTime,
-      String credentialScope, String seedSignature) {
-    this.signingKey = signingKey.clone();
+      String credentialScope, String seedSignature, String resource) {
+    this.signingKey = new SecretKeySpec(signingKey, HMAC_SHA256);
     this.dateTime = dateTime;
     this.credentialScope = credentialScope;
     this.previousSignature = seedSignature;
+    this.resource = resource;
   }
 
   /**
    * Verify one chunk and advance the signature chain.
    *
-   * @param chunkSignature the signature parsed from the chunk header line
+   * @param chunkSignature the signature parsed from the chunk header line. The chunk header pattern in
+   *        {@link org.apache.hadoop.ozone.s3.SignedChunksInputStream} guarantees 64 hex characters.
    * @param payloadSha256Hex hex SHA-256 of the chunk payload
    * @throws OS3Exception if the computed signature does not match
    */
@@ -97,21 +101,20 @@ public class ChunksValidator {
     String stringToSign = String.join(NEWLINE,
         CHUNK_STRING_TO_SIGN_ALGORITHM, dateTime, credentialScope,
         previousSignature, EMPTY_STRING_SHA256, payloadSha256Hex);
-    String expected = hex(hmacSha256(signingKey, stringToSign));
-    String normalizedSignature = chunkSignature == null ? null : chunkSignature.toLowerCase(Locale.ROOT);
-    // Constant-time comparison to avoid leaking the signature via timing.
-    if (normalizedSignature == null || !MessageDigest.isEqual(
-        expected.getBytes(StandardCharsets.UTF_8),
-        normalizedSignature.getBytes(StandardCharsets.UTF_8))) {
-      throw newError(SIGNATURE_DOES_NOT_MATCH, "chunk-signature");
+    byte[] expected = hmacSha256(stringToSign);
+    // Constant-time comparison to avoid leaking the signature via timing. Decoding the hex also
+    // makes the comparison case-insensitive, as the signature may be sent in either case.
+    if (!MessageDigest.isEqual(expected, DatatypeConverter.parseHexBinary(chunkSignature))) {
+      throw newError(SIGNATURE_DOES_NOT_MATCH, resource);
     }
-    previousSignature = expected;
+    // The chain feeds this chunk's signature, in hex, into the next chunk's string-to-sign.
+    previousSignature = hex(expected);
   }
 
-  private static byte[] hmacSha256(byte[] key, String msg) {
+  private byte[] hmacSha256(String msg) {
     try {
       Mac mac = HMAC.get();
-      mac.init(new SecretKeySpec(key, HMAC_SHA256));
+      mac.init(signingKey);
       return mac.doFinal(msg.getBytes(StandardCharsets.UTF_8));
     } catch (InvalidKeyException e) {
       throw new IllegalStateException("Failed to compute " + HMAC_SHA256, e);
@@ -119,6 +122,6 @@ public class ChunksValidator {
   }
 
   private static String hex(byte[] bytes) {
-    return Hex.encode(bytes).toLowerCase();
+    return DatatypeConverter.printHexBinary(bytes).toLowerCase(Locale.ROOT);
   }
 }
