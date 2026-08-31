@@ -119,6 +119,15 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   // container are synchronous.
   private Set<Long> pendingPutBlockCache;
 
+  // Set of Blocks (LocalIDs) that have already been finalized by a PutBlock
+  // with the end-of-block (eof) flag set. PutBlock is not idempotent, so there
+  // should be only one such call per block. It is used to detect and
+  // ignore any further writes on a block after its final PutBlock, (see HDDS-12007).
+  // Like pendingPutBlockCache, it is only populated for OPEN or CLOSING containers and
+  // cleared when the container is closed. Writes to the container are synchronous, so no
+  // explicit synchronization is required.
+  private Set<Long> eofBlockCache;
+
   private boolean bCheckChunksFilePath;
   private static FaultInjector faultInjector;
 
@@ -130,10 +139,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     this.containerData = containerData;
     if (this.containerData.isOpen() || this.containerData.isClosing()) {
       // If container is not in OPEN or CLOSING state, there cannot be block
-      // writes to the container. So pendingPutBlockCache is not needed.
+      // writes to the container. So pendingPutBlockCache and eofBlockCache are not needed.
       this.pendingPutBlockCache = new HashSet<>();
+      this.eofBlockCache = new HashSet<>();
     } else {
       this.pendingPutBlockCache = Collections.emptySet();
+      this.eofBlockCache = Collections.emptySet();
     }
     DatanodeConfiguration dnConf =
         config.getObject(DatanodeConfiguration.class);
@@ -403,6 +414,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         updateContainerState(UNHEALTHY);
       }
       clearPendingPutBlockCache();
+      clearEofBlockCache();
     } finally {
       writeUnlock();
     }
@@ -470,6 +482,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       flushAndSyncDB();
       updateContainerData(closer);
       clearPendingPutBlockCache();
+      clearEofBlockCache();
     } finally {
       writeUnlock();
     }
@@ -862,12 +875,49 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   /**
+   * Return whether the given localID of a block has already been finalized by
+   * a PutBlock with the end-of-block flag set.
+   */
+  public boolean isBlockFinalizedByEof(long localID) {
+    return eofBlockCache.contains(localID);
+  }
+
+  /**
+   * Record that the given localID of a block has been finalized by a PutBlock
+   * with the end-of-block flag set, so that subsequent writes on it can be
+   * ignored.
+   */
+  public void addToEofBlockCache(long localID)
+      throws StorageContainerException {
+    try {
+      eofBlockCache.add(localID);
+    } catch (UnsupportedOperationException e) {
+      // Getting an UnsupportedOperationException here implies that the
+      // eofBlockCache is an Empty Set. This should not happen if the
+      // container is in OPEN or CLOSING state. Log the exception here and
+      // throw a non-Runtime exception so that putBlock request fails.
+      String msg = "Failed to add block " + localID + " to eofBlockCache for " + containerData;
+      LOG.error(msg, e);
+      throw new StorageContainerException(msg, CONTAINER_INTERNAL_ERROR);
+    }
+  }
+
+  /**
    * When a container is closed, quasi-closed or marked unhealthy, clear the
    * pendingPutBlockCache as there won't be any more writes to the container.
    */
   private void clearPendingPutBlockCache() {
     pendingPutBlockCache.clear();
     pendingPutBlockCache = Collections.emptySet();
+  }
+
+  /**
+   * When a container is closed, quasi-closed or marked unhealthy, clear the
+   * eofBlockCache as there won't be any more writes to the container.
+   */
+  private void clearEofBlockCache() {
+    eofBlockCache.clear();
+    eofBlockCache = Collections.emptySet();
   }
 
   /**
