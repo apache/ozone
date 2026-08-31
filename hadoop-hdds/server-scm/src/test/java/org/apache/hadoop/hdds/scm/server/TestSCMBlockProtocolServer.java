@@ -366,7 +366,7 @@ public class TestSCMBlockProtocolServer {
   public void testFinalizeProceedsWhenNoPeers() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
     try (SCMBlockProtocolServer testServer =
-        finalizeServer(finalizationManager, Collections.emptyList())) {
+        buildTestServer(finalizationManager, Collections.emptyList())) {
       testServer.finalizeUpgrade();
       verify(finalizationManager).finalizeUpgrade();
     }
@@ -378,7 +378,7 @@ public class TestSCMBlockProtocolServer {
     StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
 
     try (SCMBlockProtocolServer testServer =
-             finalizeServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
+             buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
       haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any())).thenReturn(matching);
       testServer.finalizeUpgrade();
@@ -393,7 +393,7 @@ public class TestSCMBlockProtocolServer {
     StorageContainerLocationProtocol older = peerClient(HDDSVersion.DEFAULT_VERSION);
 
     try (SCMBlockProtocolServer testServer =
-             finalizeServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
+             buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
       haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any())).thenReturn(matching, older);
       // A peer on an older version is rejected without force.
@@ -413,7 +413,7 @@ public class TestSCMBlockProtocolServer {
     StorageContainerLocationProtocol unknown = peerClient(HDDSVersion.UNKNOWN_VERSION);
 
     try (SCMBlockProtocolServer testServer =
-             finalizeServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
+             buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
       haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any()))
           .thenReturn(matching, unknown);
@@ -433,7 +433,7 @@ public class TestSCMBlockProtocolServer {
     when(unreachable.getPeerUpgradeStatus()).thenThrow(new IOException("connection refused"));
 
     try (SCMBlockProtocolServer testServer =
-             finalizeServer(finalizationManager, Collections.singletonList(peerNode("scm2")));
+             buildTestServer(finalizationManager, Collections.singletonList(peerNode("scm2")));
          MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
       haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any())).thenReturn(unreachable);
       // An unreachable peer is rejected without force.
@@ -455,7 +455,7 @@ public class TestSCMBlockProtocolServer {
         .setMaxApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
         .setAllSoftwareVersionsMatchScm(true)
         .build();
-    try (SCMBlockProtocolServer testServer = finalizeServer(finalizationManager,
+    try (SCMBlockProtocolServer testServer = buildTestServer(finalizationManager,
         Collections.emptyList(), datanodeCounts)) {
       testServer.finalizeUpgrade();
       verify(finalizationManager).finalizeUpgrade();
@@ -472,7 +472,7 @@ public class TestSCMBlockProtocolServer {
         .setMaxApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
         .setAllSoftwareVersionsMatchScm(false)
         .build();
-    try (SCMBlockProtocolServer testServer = finalizeServer(finalizationManager,
+    try (SCMBlockProtocolServer testServer = buildTestServer(finalizationManager,
         Collections.emptyList(), datanodeCounts)) {
       // A datanode on a mismatched version is rejected without force.
       assertThrows(SCMException.class, testServer::finalizeUpgrade);
@@ -491,7 +491,7 @@ public class TestSCMBlockProtocolServer {
     doThrow(new RuntimeException("test")).when(finalizationManager).finalizeUpgrade();
 
     LogCapturer auditLog = LogCapturer.log4j2("SCMAudit");
-    try (SCMBlockProtocolServer testServer = finalizeServer(finalizationManager, Collections.emptyList())) {
+    try (SCMBlockProtocolServer testServer = buildTestServer(finalizationManager, Collections.emptyList())) {
       assertThrows(RuntimeException.class, testServer::forceFinalizeUpgrade);
     } finally {
       auditLog.stopCapturing();
@@ -508,6 +508,8 @@ public class TestSCMBlockProtocolServer {
   public void testQueryUpgradeStatus() throws Exception {
     // SCM starts already finalized in tests.
     HddsProtos.UpgradeStatus status = server.queryUpgradeStatus();
+    assertEquals(NODE_COUNT, status.getNumDatanodesFinalized());
+    assertEquals(NODE_COUNT, status.getNumDatanodesTotal());
     assertEquals(HddsProtos.FinalizationStatus.FINALIZED, status.getScmFinalizationStatus());
   }
 
@@ -552,7 +554,7 @@ public class TestSCMBlockProtocolServer {
     assertEquals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION, ex.getResult());
   }
 
-  private SCMBlockProtocolServer finalizeServer(
+  private SCMBlockProtocolServer buildTestServer(
       FinalizationManager finalizationManager, List<SCMNodeDetails> peers) throws IOException {
     // Default to all datanode versions matching SCM so the SCM peer checks are exercised in isolation.
     NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
@@ -562,10 +564,10 @@ public class TestSCMBlockProtocolServer {
         .setMaxApparentVersion(0)
         .setAllSoftwareVersionsMatchScm(true)
         .build();
-    return finalizeServer(finalizationManager, peers, datanodeCounts);
+    return buildTestServer(finalizationManager, peers, datanodeCounts);
   }
 
-  private SCMBlockProtocolServer finalizeServer(
+  private SCMBlockProtocolServer buildTestServer(
       FinalizationManager finalizationManager, List<SCMNodeDetails> peers,
       NodeManager.DatanodeFinalizationCounts datanodeCounts) throws IOException {
     StorageContainerManager mockScm = mockScmForBlockServer();
