@@ -816,9 +816,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
 
     // Add the new SCM servers
-    for (ScmNodeAddress entry : scmToAdd) {
-      String scmNodeId = entry.getScmNodeId();
-      final HostAndPort scmAddress = entry.getHostAndPort();
+    for (ScmNodeAddress nodeAddress : scmToAdd) {
+      String scmNodeId = nodeAddress.getScmNodeId();
+      final HostAndPort scmAddress = nodeAddress.getHostAndPort();
       if (scmAddress.getAddress().isUnresolved()) {
         LOG.warn("Reconfiguration failed to add SCM address {} for SCM service {} since it can't " +
             "be resolved, skipping", scmAddress, scmServiceId);
@@ -835,9 +835,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
 
     // Remove the old SCM server
-    for (ScmNodeAddress entry : scmToRemove) {
-      String scmNodeId = entry.getScmNodeId();
-      final HostAndPort scmAddress = entry.getHostAndPort();
+    for (ScmNodeAddress nodeAddress : scmToRemove) {
+      String scmNodeId = nodeAddress.getScmNodeId();
+      final HostAndPort scmAddress = nodeAddress.getHostAndPort();
       try {
         connectionManager.removeSCMServer(scmAddress);
         context.removeEndpoint(scmAddress);
