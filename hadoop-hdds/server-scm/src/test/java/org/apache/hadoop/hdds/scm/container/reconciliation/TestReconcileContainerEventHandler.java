@@ -279,10 +279,13 @@ public class TestReconcileContainerEventHandler {
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
 
     verify(eventPublisher, times(replicas.size())).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    int numCmds = 0;
     for (CommandForDatanode<ReconcileContainerCommandProto> dnCommand : commandCaptor.getAllValues()) {
       ReconcileContainerCommand command = (ReconcileContainerCommand) dnCommand.getCommand();
       assertEquals(lower, command.getApparentVersion());
+      numCmds++;
     }
+    assertEquals(3, numCmds);
   }
 
   @ParameterizedTest

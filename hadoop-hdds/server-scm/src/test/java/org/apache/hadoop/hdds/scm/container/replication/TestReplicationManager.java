@@ -112,7 +112,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -1425,10 +1424,27 @@ public class TestReplicationManager {
 
   /**
    * The reconstruction command must carry the lowest apparent version among all
-   * the involved nodes (sources plus targets).
+   * the involved nodes (sources plus targets). This case places the lowest
+   * version on a source.
    */
   @Test
-  public void testReconstructionApparentVersionIsLowestOfInvolvedNodes()
+  public void testReconstructionWhenSourceHasLowestVersion()
+      throws CommandTargetOverloadedException, NodeNotFoundException, NotLeaderException {
+    assertReconstructionCarriesLowestApparentVersion(true);
+  }
+
+  /**
+   * The reconstruction command must carry the lowest apparent version among all
+   * the involved nodes (sources plus targets). This case places the lowest
+   * version on a target.
+   */
+  @Test
+  public void testReconstructionWhenTargetHasLowestVersion()
+      throws CommandTargetOverloadedException, NodeNotFoundException, NotLeaderException {
+    assertReconstructionCarriesLowestApparentVersion(false);
+  }
+
+  private void assertReconstructionCarriesLowestApparentVersion(boolean sourceIsLowest)
       throws CommandTargetOverloadedException, NodeNotFoundException, NotLeaderException {
     Map<DatanodeDetails, Integer> targetNodes = new HashMap<>();
     DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
@@ -1442,11 +1458,13 @@ public class TestReplicationManager {
     ReconstructECContainersCommand command = createReconstructionCommand(
         container, targetNodes.keySet().toArray(new DatanodeDetails[0]));
 
-    // Every node defaults to SOFTWARE_VERSION; stub one source lower so the
+    // Every node defaults to SOFTWARE_VERSION; stub one node lower so the
     // command must fall back to the lower version.
     ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
-    DatanodeDetails olderSource = command.getSources().get(0).getDnDetails();
-    mockDatanodeWithApparentVersion(olderSource, lower);
+    DatanodeDetails olderNode = sourceIsLowest
+        ? command.getSources().get(0).getDnDetails()
+        : command.getTargetDatanodes().get(0);
+    mockDatanodeWithApparentVersion(olderNode, lower);
 
     replicationManager.sendThrottledReconstructionCommand(container, command);
 
@@ -1829,19 +1847,33 @@ public class TestReplicationManager {
   }
 
   /**
-   * Regardless of which datanode is newer, and regardless of the command
-   * sending path, the replicate command must carry the lowest apparent version
-   * among the source and target datanodes.
+   * Regardless of the command sending path, the replicate command must carry
+   * the lowest apparent version among the source and target datanodes. This
+   * case places the lowest version on the source.
    */
   @ParameterizedTest
-  @CsvSource({
-      "true, true",
-      "true, false",
-      "false, true",
-      "false, false",
-  })
-  public void testReplicationApparentVersionIsLowestOfSourceAndTarget(
-      boolean throttled, boolean sourceNewer)
+  @ValueSource(booleans = {true, false})
+  public void testReplicationApparentVersionWhenSourceIsLowest(boolean throttled)
+      throws CommandTargetOverloadedException, NotLeaderException,
+      NodeNotFoundException {
+    assertReplicationCarriesLowestApparentVersion(throttled, true);
+  }
+
+  /**
+   * Regardless of the command sending path, the replicate command must carry
+   * the lowest apparent version among the source and target datanodes. This
+   * case places the lowest version on the target.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testReplicationApparentVersionWhenTargetIsLowest(boolean throttled)
+      throws CommandTargetOverloadedException, NotLeaderException,
+      NodeNotFoundException {
+    assertReplicationCarriesLowestApparentVersion(throttled, false);
+  }
+
+  private void assertReplicationCarriesLowestApparentVersion(
+      boolean throttled, boolean sourceIsLowest)
       throws CommandTargetOverloadedException, NotLeaderException,
       NodeNotFoundException {
     ContainerInfo containerInfo =
@@ -1852,8 +1884,8 @@ public class TestReplicationManager {
 
     ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
     ComponentVersion higher = HDDSVersion.ZDU;
-    mockDatanodeWithApparentVersion(source, sourceNewer ? higher : lower);
-    mockDatanodeWithApparentVersion(target, sourceNewer ? lower : higher);
+    mockDatanodeWithApparentVersion(source, sourceIsLowest ? lower : higher);
+    mockDatanodeWithApparentVersion(target, sourceIsLowest ? higher : lower);
 
     if (throttled) {
       mockReplicationCommandCounts(dn -> 0, dn -> 0);

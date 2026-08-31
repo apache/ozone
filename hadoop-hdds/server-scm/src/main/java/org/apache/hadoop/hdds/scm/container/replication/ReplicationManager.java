@@ -559,8 +559,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     for (ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex source : command.getSources()) {
       involved.add(getDatanodeInfo(source.getDnDetails()));
     }
-    for (ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex target : command.getSources()) {
-      involved.add(getDatanodeInfo(target.getDnDetails()));
+    for (DatanodeDetails target : command.getTargetDatanodes()) {
+      involved.add(getDatanodeInfo(target));
     }
     // Reconstruction is handled as a specific type of replication command which uses the same generic logic within the
     // version manager as computing a version for full container replication.
