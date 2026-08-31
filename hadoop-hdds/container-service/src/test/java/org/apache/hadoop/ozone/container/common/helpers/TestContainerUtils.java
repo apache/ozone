@@ -100,7 +100,7 @@ public class TestContainerUtils {
   }
 
   @Test
-  void getChunkDirForReadCachesResolvedDirectory(@TempDir File dir) throws Exception {
+  void getChunksDirForReadCachesResolvedDirectory(@TempDir File dir) throws Exception {
     File chunks = new File(dir, "chunks");
     assertTrue(chunks.mkdirs());
 
@@ -110,20 +110,20 @@ public class TestContainerUtils {
     data.setChunksPath(chunks.getAbsolutePath());
 
     // Resolved and validated once, then cached: same instance on every read.
-    File first = ContainerUtils.getChunkDirForRead(data);
-    assertSame(first, ContainerUtils.getChunkDirForRead(data));
+    File first = data.getChunksDirForRead();
+    assertSame(first, data.getChunksDirForRead());
 
     // The read cache survives the directory disappearing; a mid-life
     // disappearance is caught by the read's own open(), not by this method.
     assertTrue(chunks.delete());
-    assertSame(first, ContainerUtils.getChunkDirForRead(data));
+    assertSame(first, data.getChunksDirForRead());
 
     // Changing the path invalidates the cache and re-resolves.
     File other = new File(dir, "chunks2");
     assertTrue(other.mkdirs());
     data.setChunksPath(other.getAbsolutePath());
     assertEquals(other.getAbsolutePath(),
-        ContainerUtils.getChunkDirForRead(data).getAbsolutePath());
+        data.getChunksDirForRead().getAbsolutePath());
   }
 
   @Test

@@ -237,7 +237,9 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     HddsVolume volume = containerData.getVolume();
 
-    final File chunkFile = getChunkFileForRead(container, blockID);
+    // Reads use the cached chunks directory to skip the per-read stat; writes
+    // keep validating via getChunkFile so a missing directory is still detected.
+    final File chunkFile = FILE_PER_BLOCK.getChunkFile(containerData.getChunksDirForRead(), blockID, null);
 
     final long len = info.getLen();
     long offset = info.getOffset();
@@ -339,10 +341,6 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private static File getChunkFile(Container container, BlockID blockID) throws StorageContainerException {
     return FILE_PER_BLOCK.getChunkFile(container.getContainerData(), blockID, null);
-  }
-
-  private static File getChunkFileForRead(Container container, BlockID blockID) throws StorageContainerException {
-    return FILE_PER_BLOCK.getChunkFileForRead(container.getContainerData(), blockID, null);
   }
 
   private static void checkFullDelete(ChunkInfo info, File chunkFile)

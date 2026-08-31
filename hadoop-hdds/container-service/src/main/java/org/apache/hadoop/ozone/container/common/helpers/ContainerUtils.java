@@ -329,29 +329,6 @@ public final class ContainerUtils {
   }
 
   /**
-   * Read-path variant of {@link #getChunkDir(ContainerData)} that resolves and
-   * validates the directory once, then returns the cached result on later calls
-   * to skip the per-read stat. Unlike a write, a read does not need the eager
-   * storage-failure probe: a directory that disappears after caching is caught
-   * by the read's own open(), and read failures do not mark the container
-   * unhealthy.
-   *
-   * @param containerData {@link ContainerData}
-   * @return the file of chunk directory
-   * @throws StorageContainerException
-   */
-  public static File getChunkDirForRead(ContainerData containerData)
-      throws StorageContainerException {
-    File cached = containerData.getChunksDirFile();
-    if (cached != null) {
-      return cached;
-    }
-    File chunksDir = getChunkDir(containerData);
-    containerData.setChunksDirFile(chunksDir);
-    return chunksDir;
-  }
-
-  /**
    * ContainerID can be decoded from the container base directory name.
    */
   public static long getContainerID(File containerBaseDir) {

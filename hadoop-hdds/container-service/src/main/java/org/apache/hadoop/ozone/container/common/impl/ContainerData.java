@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.ratis.util.Preconditions;
@@ -272,17 +273,22 @@ public abstract class ContainerData {
   }
 
   /**
-   * @return the chunks directory resolved and validated once from
-   *         {@link #getChunksPath()} and cached for the container's lifetime,
-   *         or {@code null} if it has not been resolved yet.
+   * Read-path accessor for the chunks directory. Resolves and validates it once
+   * via {@link ContainerUtils#getChunkDir(ContainerData)}, then returns the
+   * cached result on later calls to skip the per-read stat. Writes and other
+   * callers use {@code ContainerUtils.getChunkDir} directly, so a missing
+   * directory still surfaces as a storage failure on every operation.
+   *
+   * @return the resolved chunks directory
+   * @throws StorageContainerException if the chunks directory cannot be resolved
    */
-  public File getChunksDirFile() {
-    return chunksDirFile;
-  }
-
-  /** Caches the chunks directory resolved by {@code ContainerUtils#getChunkDir}. */
-  public void setChunksDirFile(File chunksDirFile) {
-    this.chunksDirFile = chunksDirFile;
+  public File getChunksDirForRead() throws StorageContainerException {
+    File dir = chunksDirFile;
+    if (dir == null) {
+      dir = ContainerUtils.getChunkDir(this);
+      chunksDirFile = dir;
+    }
+    return dir;
   }
 
   /**
