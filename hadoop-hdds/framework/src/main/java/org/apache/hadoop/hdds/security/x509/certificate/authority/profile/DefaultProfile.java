@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
-import org.apache.commons.validator.routines.DomainValidator;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.DnsNames;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
@@ -233,7 +233,7 @@ public class DefaultProfile implements PKIProfile {
         return false;
       }
     case GeneralName.dNSName:
-      return DomainValidator.getInstance().isValid(value);
+      return DnsNames.isValidDnsName(value);
     case GeneralName.otherName:
       // for other name it's a general string, nothing to validate
       return true;

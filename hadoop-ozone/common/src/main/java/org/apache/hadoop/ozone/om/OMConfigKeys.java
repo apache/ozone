@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
+import org.rocksdb.CompactRangeOptions.BottommostLevelCompaction;
 
 /**
  * Ozone Manager Constants.
@@ -169,6 +170,47 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL =
       "ozone.om.snapshot.directory.metrics.update.interval";
   public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL_DEFAULT = "5m";
+
+  /**
+   * Properties for Key/Object Lifecycle feature.
+   */
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL =
+      "ozone.lifecycle.service.interval";
+  public static final String
+      OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL_DEFAULT = "24h";
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT =
+      "ozone.lifecycle.service.timeout";
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT_DEFAULT
+      = "2h";
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_WORKERS =
+      "ozone.lifecycle.service.workers";
+  public static final int OZONE_KEY_LIFECYCLE_SERVICE_WORKERS_DEFAULT
+      = 5;
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_ENABLED =
+      "ozone.lifecycle.service.enabled";
+  public static final boolean OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT = false;
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE =
+      "ozone.lifecycle.service.delete.batch-size";
+  public static final int OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT = 1000;
+  // Batch limit for aborting incomplete multipart uploads, based on total part count
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK =
+      "ozone.lifecycle.service.mpu.abort.limit.per.task";
+  public static final int OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT = 1000;
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT =
+      "ozone.lifecycle.service.delete.cached.directory.max-count";
+  public static final long OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT = 1000000;
+
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS =
+      "ozone.lifecycle.service.state.save.interval.ms";
+  public static final long OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT = 5 * 60 * 1000;
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED =
+      "ozone.lifecycle.service.state.save.keys.processed";
+  public static final long OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT = 100000;
+
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED =
+      "ozone.lifecycle.service.move.to.trash.enabled";
+  public static final boolean
+      OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT = true;
 
   /**
    * OM Ratis related configurations.
@@ -483,6 +525,22 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
       true;
 
+  /**
+   * When {@code ozone.security.enabled} is true, reject OMRequests received on
+   * the OM S3 gateway gRPC endpoint that do not carry S3 authentication. The S3
+   * Gateway attaches S3 authentication to the requests it forwards on behalf of
+   * its clients; requests without it would otherwise be processed with a
+   * client-asserted identity. Identity-free bootstrap reads the S3 Gateway must
+   * issue before any per-request S3 authentication exists (ServiceList) are
+   * exempt. Set to false only for compatibility with deployments that rely on
+   * unauthenticated (anonymous) access through this endpoint. Has no effect when
+   * {@code ozone.security.enabled} is false.
+   */
+  public static final String OZONE_OM_S3_GRPC_AUTH_REQUIRED =
+      "ozone.om.s3.grpc.auth.required";
+  public static final boolean OZONE_OM_S3_GRPC_AUTH_REQUIRED_DEFAULT =
+      true;
+
   public static final String OZONE_OM_NAMESPACE_STRICT_S3 =
       "ozone.om.namespace.s3.strict";
   public static final boolean OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT =
@@ -692,6 +750,17 @@ public final class OMConfigKeys {
       = "ozone.om.compaction.service.columnfamilies";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
       "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable,multipartPartsTable";
+
+  /**
+   * Bottommost level compaction type for manual compaction.
+   * Invalid values will default to kSkip.
+   * Valid values: kSkip, kIfHaveCompactionFilter, kForce, kForceOptimized.
+   * Refer to {@code org.rocksdb.CompactRangeOptions.BottommostLevelCompaction}.
+   */
+  public static final String OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION =
+      "ozone.om.compaction.service.bottommost-level-compaction";
+  public static final BottommostLevelCompaction
+      OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT = BottommostLevelCompaction.kSkip;
 
   /**
    * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.

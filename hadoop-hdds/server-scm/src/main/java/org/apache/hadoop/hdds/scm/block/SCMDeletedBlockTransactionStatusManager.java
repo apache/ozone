@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
@@ -468,6 +469,9 @@ public class SCMDeletedBlockTransactionStatusManager {
       try {
         deletedBlockLogStateManager.addTransactionsToDB(txList, getSummary());
       } catch (IOException e) {
+        if (isRatisTimeout(e)) {
+          throw e;
+        }
         // Revert the in-memory changes if the DB update fails
         for (DeletedBlocksTransaction tx: txList) {
           if (tx.hasTotalBlockSize()) {
@@ -480,6 +484,21 @@ public class SCMDeletedBlockTransactionStatusManager {
       return;
     }
     deletedBlockLogStateManager.addTransactionsToDB(txList);
+  }
+
+  private static boolean isRatisTimeout(IOException e) {
+    if (!(e instanceof SCMException)) {
+      return false;
+    }
+    SCMException.ResultCodes code = ((SCMException) e).getResult();
+    if (code == SCMException.ResultCodes.TIMEOUT) {
+      return true;
+    }
+    if (code == SCMException.ResultCodes.INTERNAL_ERROR) {
+      Throwable cause = e.getCause();
+      return cause instanceof InterruptedException;
+    }
+    return false;
   }
 
   private void rollbackDeletedBlocksSummary(TxBlockInfo txBlockInfo) {
@@ -516,6 +535,9 @@ public class SCMDeletedBlockTransactionStatusManager {
       try {
         deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, getSummary());
       } catch (IOException e) {
+        if (isRatisTimeout(e)) {
+          throw e;
+        }
         // Revert the in-memory changes if the DB update fails
         for (TxBlockInfo txBlockInfo : removedTxBlockInfos) {
           txSizeMap.put(txBlockInfo.getTxId(), txBlockInfo);

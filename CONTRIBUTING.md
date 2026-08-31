@@ -40,8 +40,8 @@ If you have any questions, please don't hesitate to contact
 Requirements to compile the code:
 
 * Unix System
-* JDK 1.8 or higher
-* Maven 3.6 or later
+* JDK 17 or later; client modules can be built with JDK 8
+* Maven 3.6.3 or later
 * Internet connection for first build (to fetch all Maven and Ozone dependencies)
 
 (Standard development tools such as make, gcc, etc. are required.)
@@ -95,7 +95,7 @@ When creating a new jira for any kind of new feature, improvement or bug, please
 
 ## New feature development
 
-For large feature development changes, we use a process called "Ozone Enhancement Proposals" (OEP). This process is designed to ensure that major changes to Ozone are well-designed and have community consensus. If you are planning to propose a significant change, please read the [Ozone Enhancement Proposals](https://ozone.apache.org/docs/edge/design/ozone-enhancement-proposals.html) documentation and create a design document before you start coding. Please note that we only accept design documents in Markdown format; PDF or Google Docs are no longer accepted.
+For large feature development changes, we use a process called "Ozone Enhancement Proposals" (OEP). This process is designed to ensure that major changes to Ozone are well-designed and have community consensus. If you are planning to propose a significant change, please read the [Ozone Enhancement Proposals](https://ozone.apache.org/docs/next/developer-guide/project/enhancement-proposal) documentation and create a design document before you start coding. Please note that we only accept design documents in Markdown format; PDF or Google Docs are no longer accepted.
 
 ## Contribute your modifications
 
