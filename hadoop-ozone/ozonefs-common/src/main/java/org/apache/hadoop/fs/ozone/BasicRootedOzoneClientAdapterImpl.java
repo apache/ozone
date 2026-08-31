@@ -43,6 +43,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
@@ -379,14 +380,24 @@ public class BasicRootedOzoneClientAdapterImpl
     String volumeStr = ofsPath.getVolumeName();
     String bucketStr = ofsPath.getBucketName();
     String cacheKey = volumeStr + OZONE_URI_DELIMITER + bucketStr;
-    BucketLayout resolvedBucketLayout = bucketLayoutCache.getIfPresent(cacheKey);
-    if (resolvedBucketLayout == null) {
-      OzoneBucket bucket = proxy.getBucketDetails(volumeStr, bucketStr);
-      resolvedBucketLayout = OzoneClientUtils.resolveLinkBucketLayout(
-          bucket, objectStore, new HashSet<>());
-      bucketLayoutCache.put(cacheKey, resolvedBucketLayout);
+    try {
+      // Atomic get-or-load: a single thread resolves the layout for a given
+      // bucket on a miss while others wait, so concurrent getFileStatus calls
+      // do not each issue a redundant InfoBucket RPC.
+      return bucketLayoutCache.get(cacheKey, () -> {
+        OzoneBucket bucket = proxy.getBucketDetails(volumeStr, bucketStr);
+        return OzoneClientUtils.resolveLinkBucketLayout(
+            bucket, objectStore, new HashSet<>());
+      });
+    } catch (ExecutionException e) {
+      // Preserve the original IOException (e.g. OMException with BUCKET_NOT_FOUND)
+      // so the caller's result-code handling is unchanged.
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      throw new IOException("Failed to resolve bucket layout for " + cacheKey,
+          e.getCause());
     }
-    return resolvedBucketLayout;
   }
 
   /**
