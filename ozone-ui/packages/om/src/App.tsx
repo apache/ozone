@@ -24,6 +24,7 @@ import {
   Chip,
   NotFoundState,
   Sidebar,
+  spacing,
   SyncConfigProvider,
   UtilityBar,
 } from '@ozone-ui/shared';
@@ -42,7 +43,7 @@ const NotFoundRoute = () => {
 const BrandTitle = () => {
   const host = window.location.hostname;
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: spacing.sm }}>
       Ozone Manager
       {host && (
         <Chip color="neutral" size="small">

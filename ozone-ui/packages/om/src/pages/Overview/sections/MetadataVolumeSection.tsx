@@ -18,14 +18,14 @@
 
 import React, { Suspense } from 'react';
 import { Empty, Skeleton } from 'antd';
-import { Card, KeyValuePair, Section } from '@ozone-ui/shared';
+import { Card, KeyValuePair, Section, spacing } from '@ozone-ui/shared';
 import { JMX_QUERY, type OzoneManagerInfoBean } from '../../../api/overview';
 import { useSuspenseJmxBean } from '../../../api/useJmx';
 
 const gridStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-  gap: '16px 24px',
+  gap: `${spacing.lg}px ${spacing.xl}px`,
 };
 
 const MetadataVolumeContent: React.FC = () => {

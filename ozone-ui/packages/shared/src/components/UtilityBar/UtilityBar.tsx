@@ -99,11 +99,13 @@ export const UtilityBar: React.FC<UtilityBarProps> = ({
         color: semanticColors.textSecondary,
       }}
     >
-      <IconButton
-        icon={<QuestionCircleOutlined style={{ fontSize: 18 }} />}
-        label="Help"
-        onClick={onHelp}
-      />
+      {onHelp && (
+        <IconButton
+          icon={<QuestionCircleOutlined style={{ fontSize: 18 }} />}
+          label="Help"
+          onClick={onHelp}
+        />
+      )}
       <SyncChip lastRefreshedAt={lastRefreshedAt} dbSync={dbSyncConfig} />
     </div>
   </div>

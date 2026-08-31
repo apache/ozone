@@ -16,35 +16,15 @@
  * limitations under the License.
  */
 
-import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
+import { useSuspenseQuery } from '@tanstack/react-query';
 import { useRefetchInterval } from '@ozone-ui/shared';
 import { queryJmx } from './jmx';
-
-export interface JmxBeanState<T> {
-  data?: T;
-  isLoading: boolean;
-  isError: boolean;
-  error: Error | null;
-  /** The query succeeded but no MBean matched (`{ beans: [] }`). */
-  isEmpty: boolean;
-}
 
 export interface SuspenseJmxBeanState<T> {
   /** The first matching MBean, or `undefined` when the query returned none. */
   data?: T;
   /** The query succeeded but no MBean matched (`{ beans: [] }`). */
   isEmpty: boolean;
-}
-
-export interface UseJmxBeanOptions {
-  /**
-   * Auto-refresh interval in milliseconds. Omit or pass `false` to disable
-   * polling (the default). This is the hook-level hook for a future
-   * auto-polling toggle.
-   */
-  refetchInterval?: number | false;
-  /** Disable the query until a dependency is ready. Defaults to `true`. */
-  enabled?: boolean;
 }
 
 /** The shared cache key for a JMX query, so callers can invalidate by prefix. */
@@ -64,29 +44,7 @@ export function jmxQueryOptions<T>(qry: string) {
 
 /**
  * Fetch a single JMX MBean (the first bean) for a section via TanStack Query.
- * Requests are de-duplicated by query key, so multiple sections depending on the
- * same MBean share one network call. Refresh by invalidating the `['jmx']` key.
- */
-export function useJmxBean<T>(qry: string, options: UseJmxBeanOptions = {}): JmxBeanState<T> {
-  const { refetchInterval = false, enabled = true } = options;
-
-  const query = useQuery({
-    ...jmxQueryOptions<T>(qry),
-    refetchInterval,
-    enabled,
-  });
-
-  return {
-    data: query.data?.[0],
-    isLoading: query.isLoading,
-    isError: query.isError,
-    error: (query.error as Error | null) ?? null,
-    isEmpty: query.isSuccess && (query.data?.length ?? 0) === 0,
-  };
-}
-
-/**
- * Suspense variant: suspends while loading and throws to the nearest error
+ * Suspends while loading and throws to the nearest error
  * boundary on failure, so the caller renders assuming data is settled. Returns
  * the first matching MBean (or `undefined` when the endpoint returned no beans).
  *

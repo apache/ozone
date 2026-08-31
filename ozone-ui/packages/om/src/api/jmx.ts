@@ -23,7 +23,7 @@ import { fetchJson } from '@ozone-ui/shared';
  * always returning `{ beans: [...] }`. In development Vite proxies `/jmx` to the
  * json-server mock (see `mock/server.cjs`).
  *
- * Requests are issued via TanStack Query (see {@link useJmxBean}); query-key
+ * Requests are issued via TanStack Query (see {@link useSuspenseJmxBean}); query-key
  * de-duplication means several sections depending on the same MBean (e.g. the OM
  * ServerRuntime bean feeds Instance Details, Roles and Metadata Volume) share a
  * single request, and sections fetch lazily so a query is never sent for a

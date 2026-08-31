@@ -27,7 +27,16 @@ import {
   type TableColumnsType,
 } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
-import { Card, Chip, DataTable, Icon, KeyValuePair, Section, SearchInput } from '@ozone-ui/shared';
+import {
+  Card,
+  Chip,
+  DataTable,
+  Icon,
+  KeyValuePair,
+  Section,
+  SearchInput,
+  spacing,
+} from '@ozone-ui/shared';
 import {
   JMX_QUERY,
   buildJvmHighlights,
@@ -42,8 +51,33 @@ import { useSuspenseJmxBean } from '../../../api/useJmx';
 const highlightsGridStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-  gap: '16px 24px',
+  gap: `${spacing.lg}px ${spacing.xl}px`,
 };
+
+/**
+ * Copy text to the clipboard. The async Clipboard API only exists in secure
+ * contexts (HTTPS/localhost); the OM UI can be served over plain HTTP, so fall
+ * back to a hidden textarea + `execCommand('copy')` there.
+ */
+async function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    if (!document.execCommand('copy')) {
+      throw new Error('Copy command was rejected');
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
 
 const categoryColor: Record<JvmParameterCategory, 'blue' | 'orange' | 'neutral'> = {
   'System & Framework': 'blue',
@@ -159,10 +193,14 @@ const JvmContent: React.FC = () => {
     if (!chosen.length) {
       return;
     }
-    await navigator.clipboard.writeText(buildConfigXml(chosen));
-    message.success(
-      `Copied ${chosen.length} ${chosen.length === 1 ? 'parameter' : 'parameters'} as XML`
-    );
+    try {
+      await copyToClipboard(buildConfigXml(chosen));
+      message.success(
+        `Copied ${chosen.length} ${chosen.length === 1 ? 'parameter' : 'parameters'} as XML`
+      );
+    } catch {
+      message.error('Could not copy to clipboard');
+    }
   };
 
   if (isEmpty || !runtime) {
@@ -170,7 +208,7 @@ const JvmContent: React.FC = () => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xl }}>
       <Card title="Highlights">
         <div style={highlightsGridStyle}>
           {highlights.map((h) => (

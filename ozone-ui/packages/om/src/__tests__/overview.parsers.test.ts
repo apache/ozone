@@ -23,6 +23,7 @@ import {
   formatStarted,
   parseJvmArguments,
   parseRatisRoles,
+  parseRatisRolesMessage,
   toSystemPropertyRows,
   type RuntimeBean,
 } from '../api/overview';
@@ -66,6 +67,25 @@ describe('parseRatisRoles', () => {
 
   it('returns an empty array for undefined input (no throw)', () => {
     expect(parseRatisRoles(undefined)).toEqual([]);
+  });
+});
+
+describe('parseRatisRolesMessage', () => {
+  it('returns the message from a single one-element (no-leader) row', () => {
+    expect(parseRatisRolesMessage([['No leader found in the cluster']])).toBe(
+      'No leader found in the cluster'
+    );
+  });
+
+  it('returns undefined for a normal peer list', () => {
+    expect(
+      parseRatisRolesMessage([['host-a', 'om-a', '9872', 'LEADER', 'LEADER_AND_READY']])
+    ).toBeUndefined();
+  });
+
+  it('returns undefined for undefined/empty input', () => {
+    expect(parseRatisRolesMessage(undefined)).toBeUndefined();
+    expect(parseRatisRolesMessage([])).toBeUndefined();
   });
 });
 

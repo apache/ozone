@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { PageHeader, QueryErrorBoundary } from '@ozone-ui/shared';
+import { PageHeader, QueryErrorBoundary, spacing } from '@ozone-ui/shared';
 import InstanceDetailsSection from './sections/InstanceDetailsSection';
 import RolesSection from './sections/RolesSection';
 import MetadataVolumeSection from './sections/MetadataVolumeSection';
@@ -32,10 +32,10 @@ import JvmSection from './sections/JvmSection';
  * via the SyncChip.
  */
 export const OverviewPage: React.FC = () => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xxl }}>
     <PageHeader title="Overview" />
     <QueryErrorBoundary>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xxl }}>
         <InstanceDetailsSection />
         <RolesSection />
         <MetadataVolumeSection />

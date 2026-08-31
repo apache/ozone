@@ -19,7 +19,7 @@
 import React, { Suspense } from 'react';
 import { Divider, Empty, Skeleton } from 'antd';
 import { useSuspenseQueries } from '@tanstack/react-query';
-import { Card, KeyValuePair, Section } from '@ozone-ui/shared';
+import { Card, KeyValuePair, Section, spacing } from '@ozone-ui/shared';
 import {
   JMX_QUERY,
   formatElapsed,
@@ -35,7 +35,7 @@ import { jmxQueryOptions } from '../../../api/useJmx';
 const kvGridStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-  gap: '16px 24px',
+  gap: `${spacing.lg}px ${spacing.xl}px`,
 };
 
 const InstanceDetailsContent: React.FC = () => {
@@ -66,13 +66,12 @@ const InstanceDetailsContent: React.FC = () => {
   const electionElapsed = elapsed != null && elapsed !== -1 ? formatElapsed(elapsed) : '—';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xl }}>
       <div style={kvGridStyle}>
         <KeyValuePair label="Host" value={currentHost ?? '—'} />
         {omInfo.Namespace && <KeyValuePair label="Namespace" value={omInfo.Namespace} />}
         <KeyValuePair label="Started" value={formatStarted(omInfo.StartedTimeInMillis)} />
         <KeyValuePair label="Version" value={omInfo.Version} copyable />
-        <KeyValuePair label="Compiled" value={omInfo.CompileInfo} />
       </div>
       <Divider style={{ margin: 0 }} />
       <div style={kvGridStyle}>

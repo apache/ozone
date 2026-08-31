@@ -17,7 +17,7 @@
  */
 
 import React, { useState } from 'react';
-import { Dropdown, Switch, Tooltip, Typography } from 'antd';
+import { Dropdown, message, Switch, Tooltip, Typography } from 'antd';
 import { colors, radius, semanticColors, spacing, textStyles } from '../../theme/tokens';
 import { useSyncConfig } from '../../data/SyncConfigContext';
 import { fetchJson } from '../../data/fetchJson';
@@ -113,9 +113,13 @@ export const SyncChip: React.FC<SyncChipProps> = ({ lastRefreshedAt, dbSync }) =
     setDbSyncing(true);
     try {
       await fetchJson(dbSync.url, { method: 'POST' });
+      message.success(`${dbSync.label} triggered`);
+      setOpen(false);
+    } catch (err) {
+      // Surface the failure and keep the dropdown open so it's visible.
+      message.error(err instanceof Error ? err.message : `${dbSync.label} failed`);
     } finally {
       setDbSyncing(false);
-      setOpen(false);
     }
   };
 

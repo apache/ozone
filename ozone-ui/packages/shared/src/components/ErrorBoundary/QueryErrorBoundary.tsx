@@ -18,8 +18,8 @@
 
 import React from 'react';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
-import { HttpError } from '../../data/fetchJson';
-import { NetworkErrorState, ServerErrorState } from '../ErrorState/ErrorState';
+import { HttpError, NetworkError } from '../../data/fetchJson';
+import { NetworkErrorState, NotFoundState, ServerErrorState } from '../ErrorState/ErrorState';
 import { ErrorBoundary } from './ErrorBoundary';
 
 /** Arguments passed to a custom {@link QueryErrorBoundary} fallback. */
@@ -38,16 +38,21 @@ export interface QueryErrorBoundaryProps {
 }
 
 /**
- * The default fallback: a server-side failure (HTTP 5xx) shows the 500 state;
- * anything else — a network/timeout failure (native `fetch` rejects with a
- * `TypeError`), an aborted request, or an unclassified error — shows the network
- * state. Both wire their action button to `retry`.
+ * The default fallback, classified by error type (all wire their action to `retry`):
+ * - {@link NetworkError} (request never reached the server) → network state.
+ * - {@link HttpError} `404` → not-found state.
+ * - {@link HttpError} any other status (5xx, or a 4xx the server rejected) → 500 state.
+ * - anything else (e.g. a render-time error) → 500 state, rather than being
+ *   mislabeled as a network problem.
  */
 function defaultFallback({ error, retry }: QueryErrorFallbackProps): React.ReactNode {
-  if (error instanceof HttpError && error.status >= 500) {
-    return <ServerErrorState onAction={retry} />;
+  if (error instanceof NetworkError) {
+    return <NetworkErrorState onAction={retry} />;
   }
-  return <NetworkErrorState onAction={retry} />;
+  if (error instanceof HttpError && error.status === 404) {
+    return <NotFoundState onAction={retry} />;
+  }
+  return <ServerErrorState onAction={retry} />;
 }
 
 /**

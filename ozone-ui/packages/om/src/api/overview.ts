@@ -56,7 +56,6 @@ export interface OzoneManagerInfoBean {
   Version: string;
   SoftwareVersion: string;
   StartedTimeInMillis: number;
-  CompileInfo: string;
 }
 
 export interface RatisServerBean {
@@ -149,6 +148,20 @@ export function parseRatisRoles(rows: string[][] | undefined, currentNodeId?: st
         isCurrent: !!currentNodeId && nodeId === currentNodeId,
       };
     });
+}
+
+/**
+ * When the OM has no leader (or is shutting down), `getRatisRoles` returns a
+ * single one-element row carrying an explanatory message instead of peer tuples
+ * (see `OzoneManager#getRatisRolesException`). Returns that message so the UI can
+ * surface it (the legacy om-overview.html did the same), or `undefined` for a
+ * normal peer list.
+ */
+export function parseRatisRolesMessage(rows: string[][] | undefined): string | undefined {
+  if (rows && rows.length === 1 && rows[0].length === 1) {
+    return rows[0][0];
+  }
+  return undefined;
 }
 
 const MEMORY_GC = /Xm[xsn]|Xss|gc|CMS|Heap|Memory/i;
@@ -266,7 +279,7 @@ export interface JvmHighlight {
 
 /** Build the JVM "Highlights" key-value pairs from the runtime bean. */
 export function buildJvmHighlights(runtime: RuntimeBean): JvmHighlight[] {
-  const props = new Map(runtime.SystemProperties.map((p) => [p.key, p.value]));
+  const props = new Map((runtime.SystemProperties ?? []).map((p) => [p.key, p.value]));
   const args = runtime.InputArguments ?? [];
   const runtimeName = props.get('java.runtime.name') ?? runtime.VmName;
   const javaVersion = props.get('java.version') ?? runtime.VmVersion;

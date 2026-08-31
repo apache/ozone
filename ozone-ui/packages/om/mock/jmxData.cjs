@@ -40,7 +40,6 @@ const ozoneManagerInfo = {
   Version: '2.3.0, r0a1b2c3d4e5f60718293a4b5c6d7e8f901234567',
   SoftwareVersion: '2.3.0',
   StartedTimeInMillis: 1785178223133,
-  CompileInfo: 'built from source (branch master, commit 0a1b2c3)',
 };
 
 const runtime = {

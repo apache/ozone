@@ -18,10 +18,11 @@
 
 import React, { Suspense } from 'react';
 import { Skeleton, type TableColumnsType } from 'antd';
-import { Chip, DataTable, Section } from '@ozone-ui/shared';
+import { Alert, Chip, DataTable, Section } from '@ozone-ui/shared';
 import {
   JMX_QUERY,
   parseRatisRoles,
+  parseRatisRolesMessage,
   type OzoneManagerInfoBean,
   type RatisRole,
   type RatisServerBean,
@@ -67,6 +68,15 @@ const columns: TableColumnsType<RatisRole> = [
 const RolesContent: React.FC = () => {
   const { data: omInfo } = useSuspenseJmxBean<OzoneManagerInfoBean>(JMX_QUERY.omInfo);
   const { data: ratis } = useSuspenseJmxBean<RatisServerBean>(JMX_QUERY.ratisServer);
+
+  // When there is no leader, the bean returns a single explanatory message row
+  // instead of peers — surface it rather than showing an empty table.
+  const message = parseRatisRolesMessage(omInfo?.RatisRoles);
+  if (message) {
+    return (
+      <Alert type="warning" showIcon message="Ratis roles unavailable" description={message} />
+    );
+  }
 
   const roles = omInfo ? parseRatisRoles(omInfo.RatisRoles, ratis?.Id) : [];
 

@@ -26,15 +26,32 @@ export interface FetchJsonOptions extends Omit<RequestInit, 'body'> {
   body?: BodyInit | Record<string, unknown> | null;
 }
 
-/** Error thrown for non-2xx responses, carrying the HTTP status. */
+/** Error thrown for non-2xx responses, carrying the HTTP status and response body. */
 export class HttpError extends Error {
   constructor(
     public readonly status: number,
     public readonly url: string,
-    message?: string
+    /** Raw response body, when the server sent one (e.g. an error explanation). */
+    public readonly body?: string
   ) {
-    super(message ?? `Request to ${url} failed with status ${status}`);
+    super(`Request to ${url} failed with status ${status}` + (body ? `: ${body}` : ''));
     this.name = 'HttpError';
+  }
+}
+
+/**
+ * Error thrown when the request never reached the server — a transport failure
+ * such as DNS/connection refused, CORS, offline, or timeout (a native `fetch`
+ * rejection). Distinct from {@link HttpError} so callers can tell a network
+ * outage apart from a server response.
+ */
+export class NetworkError extends Error {
+  constructor(
+    public readonly url: string,
+    options?: { cause?: unknown }
+  ) {
+    super(`Network request to ${url} failed`, options);
+    this.name = 'NetworkError';
   }
 }
 
@@ -55,8 +72,10 @@ function withParams(url: string, params?: QueryParams): string {
 /**
  * Minimal JSON fetch helper built on the native `fetch` API — the standard
  * transport for the Ozone service UIs (no third-party HTTP client). Appends
- * query parameters, JSON-encodes object bodies, throws {@link HttpError} on
- * non-2xx responses, and parses the JSON response as `T`.
+ * query parameters, JSON-encodes object bodies, and:
+ * - throws {@link NetworkError} when the request never reaches the server,
+ * - throws {@link HttpError} (with the response body) on a non-2xx response,
+ * - parses the JSON response as `T`, returning `undefined` for an empty body.
  */
 export async function fetchJson<T>(url: string, options: FetchJsonOptions = {}): Promise<T> {
   const { params, body, headers, ...rest } = options;
@@ -67,21 +86,31 @@ export async function fetchJson<T>(url: string, options: FetchJsonOptions = {}):
     !(body instanceof FormData) &&
     !(body instanceof Blob);
 
-  const response = await fetch(withParams(url, params), {
-    ...rest,
-    headers: {
-      Accept: 'application/json',
-      ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
-      ...headers,
-    },
-    body: isJsonBody ? JSON.stringify(body) : (body as BodyInit | null | undefined),
-  });
-
-  if (!response.ok) {
-    throw new HttpError(response.status, url, `${response.status} ${response.statusText}`);
+  let response: Response;
+  try {
+    response = await fetch(withParams(url, params), {
+      ...rest,
+      headers: {
+        Accept: 'application/json',
+        ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
+        ...headers,
+      },
+      body: isJsonBody ? JSON.stringify(body) : (body as BodyInit | null | undefined),
+    });
+  } catch (cause) {
+    // `fetch` only rejects when the request never completed (transport failure).
+    throw new NetworkError(url, { cause });
   }
 
-  return (await response.json()) as T;
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => undefined);
+    throw new HttpError(response.status, url, errorBody || undefined);
+  }
+
+  // Tolerate empty / non-JSON success bodies (e.g. a 204 from a POST): parse the
+  // text only when present so callers of no-content endpoints don't blow up.
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export default fetchJson;

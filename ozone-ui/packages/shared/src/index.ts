@@ -68,7 +68,7 @@ export { default as SyncChip } from './components/SyncChip/SyncChip';
 export type { SyncChipProps, DbSyncConfig } from './components/SyncChip/SyncChip';
 
 // Data fetching (TanStack Query foundation)
-export { fetchJson, HttpError } from './data/fetchJson';
+export { fetchJson, HttpError, NetworkError } from './data/fetchJson';
 export type { FetchJsonOptions, QueryParams } from './data/fetchJson';
 export { createQueryClient, defaultQueryClientConfig } from './data/queryClient';
 export { QueryProvider } from './data/QueryProvider';
