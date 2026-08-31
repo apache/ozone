@@ -2375,14 +2375,10 @@ public class KeyValueHandler extends Handler {
       assertTrue(readLength > 0, () -> "readLength = " + readLength + " <= 0");
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
-        getChecksums(buffer.duplicate(), adjustedOffset, checksumBoundaries.startIndex,
+        validateChecksums(buffer.duplicate(), adjustedOffset, checksumBoundaries.startIndex,
             endChunkIndex, readLength, bytesPerChecksum, chunkInfos);
         LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChecksum {}",
             readBlock, adjustedOffset, readLength, bytesPerChecksum);
-//        if (validateChunkChecksumData) {
-//          Checksum.verifyChecksum(
-//              buffer.duplicate(), checksumData, 0);
-//        }
       }
       final ContainerCommandResponseProto response = getReadBlockResponse(
           request, new ChecksumData(checksumType, bytesPerChecksum), buffer, adjustedOffset);
@@ -2458,40 +2454,29 @@ public class KeyValueHandler extends Handler {
     return high;
   }
 
-  static void getChecksums(ByteBuffer data, long blockOffset, int startIndex, int endIndex, int readLength, int bytesPerChecksum,
+  static void validateChecksums(ByteBuffer data, long blockOffset, int startIndex, int endIndex, int readLength, int bytesPerChecksum,
       final List<ContainerProtos.ChunkInfo> chunks) throws OzoneChecksumException {
 
     long chunkRelativeOffset = blockOffset - chunks.get(startIndex).getOffset();
     assertSame(0, chunkRelativeOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
-    int checksumIndex = Math.toIntExact(chunkRelativeOffset / bytesPerChecksum);
     int dataOffset = 0;
+    int chunkIndex = Math.toIntExact(chunkRelativeOffset / bytesPerChecksum);
     for (int i = startIndex; i <= endIndex; i++) {
       ContainerProtos.ChunkInfo chunkInfo = chunks.get(i);
-      List<ByteString> checksumData = chunkInfo.getChecksumData().getChecksumsList();
-      final List<ByteString> checksums = new ArrayList<>();
-      int checksumDataSize, dataLimit;
-      if (i == endIndex) {
-        checksumDataSize = Math.toIntExact(((readLength - (chunkInfo.getOffset() - blockOffset) - 1) / bytesPerChecksum + 1));
-        dataLimit = Math.toIntExact(readLength - (chunkInfo.getOffset() - blockOffset));
-      } else {
-        checksumDataSize = checksumData.size();
-        dataLimit = Math.toIntExact(chunkInfo.getLen() - chunkRelativeOffset);
-      }
-
-      for (int j = checksumIndex; j < checksumDataSize; j++) {
-        checksums.add(checksumData.get(j));
-      }
+      int dataLimit;
+      dataLimit = Math.toIntExact(Math.min(chunkInfo.getLen() - chunkRelativeOffset,
+          readLength - (chunkInfo.getOffset() - blockOffset)));
 
       final ByteBuffer buffer = data.duplicate();
       buffer.position(dataOffset);
       buffer.limit(dataOffset + dataLimit);
       final ChecksumData checksum = new ChecksumData(chunkInfo.getChecksumData().getType(),
-          bytesPerChecksum, checksums);
-      Checksum.verifyChecksum(buffer, checksum, 0);
+          bytesPerChecksum, chunkInfo.getChecksumData().getChecksumsList());
+      Checksum.verifyChecksum(buffer, checksum, chunkIndex);
 
+      chunkIndex = 0;
       dataOffset += dataLimit;
       chunkRelativeOffset = 0;
-      checksumIndex = 0;
     }
   }
 
