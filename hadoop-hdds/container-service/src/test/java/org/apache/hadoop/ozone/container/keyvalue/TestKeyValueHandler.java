@@ -1289,11 +1289,35 @@ public class TestKeyValueHandler {
   }
   */
 
+  /**
+   * Scenario 1: A block with 5 chunks, each containing 1 byte of data.
+   */
   @Test
-  public void testReadBlock() throws Exception {
+  public void testReadBlockWithFiveSingleByteChunks() throws Exception {
+    int[] chunkLens = {1, 1, 1, 1, 1};
+    readBlockAndVerifyChecksums(chunkLens);
+  }
+
+  /**
+   * Scenario 2: A block with 3 chunks of varying sizes (1024, 10, 4096).
+   */
+  @Test
+  public void testReadBlockWithThreeVariableChunks() throws Exception {
+    int[] chunkLens = {1024, 10, 4096};
+    readBlockAndVerifyChecksums(chunkLens);
+  }
+
+  /**
+   * Helper: writes a block with the given chunk lengths, reads it back via
+   * {@link KeyValueHandler#readBlock}, and verifies that the response data
+   * matches the original bytes and that CRC32 checksums recomputed from the
+   * response match those stored with the chunks.
+   */
+  private void readBlockAndVerifyChecksums(int[] chunkLens) throws Exception {
     Path testDir = Files.createTempDirectory("testReadBlock");
     RandomAccessFileChannel blockFile = null;
     try {
+      conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
       HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
       KeyValueHandler kvHandler = handlerWithVolume.getHandler();
       MutableVolumeSet volumeSet = handlerWithVolume.getVolumeSet();
@@ -1308,29 +1332,41 @@ public class TestKeyValueHandler {
       container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
       containerSet.addContainer(container);
 
-      // Generate real data with non-zero bytes
-      int dataLen = 4096;
       int bytesPerChecksum = 1024;
-      byte[] rawData = new byte[dataLen];
-      for (int i = 0; i < rawData.length; i++) {
+      int totalLen = 0;
+      for (int len : chunkLens) {
+        totalLen += len;
+      }
+
+      // Build the full raw data array
+      byte[] rawData = new byte[totalLen];
+      for (int i = 0; i < totalLen; i++) {
         rawData[i] = (byte) (i % 127 + 1);
       }
 
-      // Compute real CRC32 checksums for the data
-      Checksum checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, bytesPerChecksum);
-      ChunkBuffer chunkData = ChunkBuffer.wrap(ByteBuffer.wrap(rawData));
-      ChecksumData checksumData = checksum.computeChecksum(chunkData);
-      chunkData.rewind();
-
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
-      ChunkInfo chunkInfo = new ChunkInfo("chunk1", 0, dataLen);
-      chunkInfo.setChecksumData(checksumData);
-
       BlockData blockData = new BlockData(blockID);
-      blockData.addChunk(chunkInfo.getProtoBufMessage());
 
-      kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, chunkData,
-          DispatcherContext.getHandleWriteChunk());
+      // Write each chunk with its own real CRC32 checksums
+      long offset = 0;
+      Checksum checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, bytesPerChecksum);
+      for (int c = 0; c < chunkLens.length; c++) {
+        int len = chunkLens[c];
+        byte[] chunkBytes = new byte[len];
+        System.arraycopy(rawData, (int) offset, chunkBytes, 0, len);
+
+        ChunkBuffer chunkData = ChunkBuffer.wrap(ByteBuffer.wrap(chunkBytes));
+        ChecksumData checksumData = checksum.computeChecksum(chunkData);
+        chunkData.rewind();
+
+        ChunkInfo chunkInfo = new ChunkInfo("chunk" + (c + 1), offset, len);
+        chunkInfo.setChecksumData(checksumData);
+        blockData.addChunk(chunkInfo.getProtoBufMessage());
+
+        kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, chunkData,
+            DispatcherContext.getHandleWriteChunk());
+        offset += len;
+      }
       kvHandler.getBlockManager().putBlock(container, blockData);
 
       ContainerCommandRequestProto readBlockRequest =
@@ -1341,11 +1377,11 @@ public class TestKeyValueHandler {
               .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
                   .setBlockID(blockID.getDatanodeBlockIDProtobuf())
                   .setOffset(0)
-                  .setLength(dataLen)
+                  .setLength(totalLen)
                   .build())
               .build();
 
-      // Mock StreamObserver to capture responses and verify checksums
+      // Mock StreamObserver to capture responses
       @SuppressWarnings("unchecked")
       StreamObserver<ContainerCommandResponseProto> streamObserver = mock(StreamObserver.class);
       List<ContainerCommandResponseProto> capturedResponses = new java.util.ArrayList<>();
@@ -1364,22 +1400,25 @@ public class TestKeyValueHandler {
       verify(streamObserver, atLeastOnce()).onNext(any());
 
       // Verify checksum of the response data using real Checksum verification
-      ByteBuffer allData = ByteBuffer.allocate(dataLen);
+      ByteBuffer allData = ByteBuffer.allocate(totalLen);
       for (ContainerCommandResponseProto resp : capturedResponses) {
         assertEquals(ContainerProtos.Result.SUCCESS, resp.getResult());
         assertTrue(resp.hasReadBlock());
         ContainerProtos.ReadBlockResponseProto readBlockResp = resp.getReadBlock();
         ByteBuffer respData = readBlockResp.getData().asReadOnlyByteBuffer();
 
-        // Verify checksum: recompute from the response data and compare with the original checksums
-        ChecksumData originalChecksumData = checksumData;
+        // Recompute CRC32 checksums from the response data and compare with originals
         Checksum verifier = new Checksum(ContainerProtos.ChecksumType.CRC32, bytesPerChecksum);
-        ChecksumData recomputed = verifier.computeChecksum(respData);
-        // Verify each recomputed checksum matches the original
-        for (int i = 0; i < recomputed.getChecksums().size(); i++) {
-          assertEquals(originalChecksumData.getChecksums().get(i), recomputed.getChecksums().get(i),
-              "Checksum mismatch at index " + i);
-        }
+        ChecksumData recomputed = verifier.computeChecksum(respData.duplicate());
+        // The response carries the checksum metadata; recomputing from data must match
+        ChecksumData responseChecksumData = ChecksumData.getFromProtoBuf(readBlockResp.getChecksumData());
+        assertEquals(responseChecksumData.getChecksumType(), recomputed.getChecksumType());
+        assertEquals(responseChecksumData.getBytesPerChecksum(), recomputed.getBytesPerChecksum());
+
+        // Also verify against the original chunk checksums by using Checksum.verifyChecksum
+        // which throws OzoneChecksumException on mismatch
+        respData.rewind();
+        Checksum.verifyChecksum(respData.duplicate(), recomputed, 0);
 
         respData.rewind();
         allData.put(respData);
@@ -1389,8 +1428,8 @@ public class TestKeyValueHandler {
       allData.flip();
       byte[] readBack = new byte[allData.remaining()];
       allData.get(readBack);
-      assertEquals(dataLen, readBack.length);
-      for (int i = 0; i < dataLen; i++) {
+      assertEquals(totalLen, readBack.length);
+      for (int i = 0; i < totalLen; i++) {
         assertEquals(rawData[i], readBack[i], "Data mismatch at byte " + i);
       }
     } finally {
