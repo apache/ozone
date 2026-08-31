@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.api.types;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import org.apache.hadoop.ozone.recon.api.types.FeatureProvider.Feature;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -30,12 +29,13 @@ class TestFeatureProvider {
 
   @Test
   void ofReturnsFeatureForKnownName() {
-    assertThat(Feature.of(Feature.HEATMAP.getFeatureName())).isEqualTo(Feature.HEATMAP);
+    assertThat(FeatureProvider.Feature.of(FeatureProvider.Feature.HEATMAP.getFeatureName()))
+        .isEqualTo(FeatureProvider.Feature.HEATMAP);
   }
 
   @Test
   void ofRejectsUnknownName() {
-    assertThatThrownBy(() -> Feature.of("NoSuchFeature"))
+    assertThatThrownBy(() -> FeatureProvider.Feature.of("NoSuchFeature"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("NoSuchFeature");
   }
