@@ -60,7 +60,6 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -122,7 +121,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -1295,7 +1293,7 @@ public class TestKeyValueHandler {
   @Test
   public void testReadBlockWithFiveSingleByteChunks() throws Exception {
     int[] chunkLens = {1, 1, 1, 1, 1};
-    readBlockAndVerifyChecksums(chunkLens);
+    readBlockAndVerifyChecksums(chunkLens, 2, 2);
   }
 
   /**
@@ -1304,7 +1302,7 @@ public class TestKeyValueHandler {
   @Test
   public void testReadBlockWithThreeVariableChunks() throws Exception {
     int[] chunkLens = {1024, 10, 4096};
-    readBlockAndVerifyChecksums(chunkLens);
+    readBlockAndVerifyChecksums(chunkLens, 1024, 10);
   }
 
   /**
@@ -1313,7 +1311,7 @@ public class TestKeyValueHandler {
    * matches the original bytes and that CRC32 checksums recomputed from the
    * response match those stored with the chunks.
    */
-  private void readBlockAndVerifyChecksums(int[] chunkLens) throws Exception {
+  private void readBlockAndVerifyChecksums(int[] chunkLens, long readOffset, long length) throws Exception {
     Path testDir = Files.createTempDirectory("testReadBlock");
     RandomAccessFileChannel blockFile = null;
     try {
@@ -1376,8 +1374,8 @@ public class TestKeyValueHandler {
               .setDatanodeUuid(DATANODE_UUID)
               .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
                   .setBlockID(blockID.getDatanodeBlockIDProtobuf())
-                  .setOffset(0)
-                  .setLength(totalLen)
+                  .setOffset(readOffset)
+                  .setLength(length)
                   .build())
               .build();
 
@@ -1396,11 +1394,23 @@ public class TestKeyValueHandler {
           readBlockRequest, container, blockFile, streamObserver);
 
       assertNull(response, "ReadBlock should return null on success");
+
+      if (readOffset >= totalLen) {
+        assertTrue(capturedResponses.isEmpty(), "Should receive no response if offset >= totalLen");
+        return;
+      }
+
       assertFalse(capturedResponses.isEmpty(), "Should receive at least one response");
       verify(streamObserver, atLeastOnce()).onNext(any());
 
+      int returnedDataLen = 0;
+      for (ContainerCommandResponseProto resp : capturedResponses) {
+        returnedDataLen += resp.getReadBlock().getData().size();
+      }
+      ByteBuffer allData = ByteBuffer.allocate(returnedDataLen);
+      long firstResponseOffset = capturedResponses.get(0).getReadBlock().getOffset();
+
       // Verify checksum of the response data using real Checksum verification
-      ByteBuffer allData = ByteBuffer.allocate(totalLen);
       for (ContainerCommandResponseProto resp : capturedResponses) {
         assertEquals(ContainerProtos.Result.SUCCESS, resp.getResult());
         assertTrue(resp.hasReadBlock());
@@ -1424,13 +1434,12 @@ public class TestKeyValueHandler {
         allData.put(respData);
       }
 
-      // Verify the full data matches what was written
+      // Verify the returned data matches the expected slice of the original data
       allData.flip();
       byte[] readBack = new byte[allData.remaining()];
       allData.get(readBack);
-      assertEquals(totalLen, readBack.length);
-      for (int i = 0; i < totalLen; i++) {
-        assertEquals(rawData[i], readBack[i], "Data mismatch at byte " + i);
+      for (int i = 0; i < readBack.length; i++) {
+        assertEquals(rawData[(int) firstResponseOffset + i], readBack[i], "Data mismatch at returned byte index " + i);
       }
     } finally {
       if (blockFile != null) {
