@@ -225,7 +225,7 @@ public class FilePerChunkStrategy implements ChunkManager {
 
     // In version1, we verify checksum if it is available and return data
     // of the chunk file.
-    File finalChunkFile = getChunkFile(kvContainer, blockID, info);
+    File finalChunkFile = getChunkFileForRead(kvContainer, blockID, info);
 
     List<File> possibleFiles = new ArrayList<>();
     possibleFiles.add(finalChunkFile);
@@ -353,6 +353,11 @@ public class FilePerChunkStrategy implements ChunkManager {
   private static File getChunkFile(KeyValueContainer container, BlockID blockID,
       ChunkInfo info) throws StorageContainerException {
     return FILE_PER_CHUNK.getChunkFile(container.getContainerData(), blockID, info.getChunkName());
+  }
+
+  private static File getChunkFileForRead(KeyValueContainer container, BlockID blockID,
+      ChunkInfo info) throws StorageContainerException {
+    return FILE_PER_CHUNK.getChunkFileForRead(container.getContainerData(), blockID, info.getChunkName());
   }
 
   /**

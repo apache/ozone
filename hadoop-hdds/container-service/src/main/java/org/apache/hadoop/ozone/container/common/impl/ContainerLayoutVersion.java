@@ -116,6 +116,18 @@ public enum ContainerLayoutVersion {
     return getChunkFile(chunkDir, blockID, chunkName);
   }
 
+  /**
+   * Read-path variant that resolves the chunk file from the cached chunks
+   * directory ({@link ContainerUtils#getChunkDirForRead}) to avoid a per-read
+   * stat. Write and other paths keep using {@link #getChunkFile} so a missing
+   * directory still surfaces as a storage failure.
+   */
+  public File getChunkFileForRead(ContainerData containerData, BlockID blockID,
+      String chunkName) throws StorageContainerException {
+    File chunkDir = ContainerUtils.getChunkDirForRead(containerData);
+    return getChunkFile(chunkDir, blockID, chunkName);
+  }
+
   @Override
   public String toString() {
     return "ContainerLayout:v" + version;

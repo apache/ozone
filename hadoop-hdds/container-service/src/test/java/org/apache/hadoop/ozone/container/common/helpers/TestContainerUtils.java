@@ -80,7 +80,7 @@ public class TestContainerUtils {
   }
 
   @Test
-  void getChunkDirCachesResolvedDirectory(@TempDir File dir) throws Exception {
+  void getChunkDirReDetectsMissingDirectory(@TempDir File dir) throws Exception {
     File chunks = new File(dir, "chunks");
     assertTrue(chunks.mkdirs());
 
@@ -89,21 +89,41 @@ public class TestContainerUtils {
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
     data.setChunksPath(chunks.getAbsolutePath());
 
-    // Resolved and validated once, then cached: same instance on every call.
-    File first = ContainerUtils.getChunkDir(data);
-    assertSame(first, ContainerUtils.getChunkDir(data));
-
-    // Cache survives the directory disappearing; a mid-life disappearance is
-    // caught later by open(), not by getChunkDir.
+    // getChunkDir validates on every call, so a write against a failed volume
+    // is detected even after the directory was resolved once.
+    assertEquals(chunks.getAbsolutePath(),
+        ContainerUtils.getChunkDir(data).getAbsolutePath());
     assertTrue(chunks.delete());
-    assertSame(first, ContainerUtils.getChunkDir(data));
+    StorageContainerException e = assertThrows(StorageContainerException.class,
+        () -> ContainerUtils.getChunkDir(data));
+    assertEquals(Result.UNABLE_TO_FIND_DATA_DIR, e.getResult());
+  }
+
+  @Test
+  void getChunkDirForReadCachesResolvedDirectory(@TempDir File dir) throws Exception {
+    File chunks = new File(dir, "chunks");
+    assertTrue(chunks.mkdirs());
+
+    KeyValueContainerData data = new KeyValueContainerData(1L,
+        ContainerLayoutVersion.FILE_PER_BLOCK, 1024L * 1024 * 1024,
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    data.setChunksPath(chunks.getAbsolutePath());
+
+    // Resolved and validated once, then cached: same instance on every read.
+    File first = ContainerUtils.getChunkDirForRead(data);
+    assertSame(first, ContainerUtils.getChunkDirForRead(data));
+
+    // The read cache survives the directory disappearing; a mid-life
+    // disappearance is caught by the read's own open(), not by this method.
+    assertTrue(chunks.delete());
+    assertSame(first, ContainerUtils.getChunkDirForRead(data));
 
     // Changing the path invalidates the cache and re-resolves.
     File other = new File(dir, "chunks2");
     assertTrue(other.mkdirs());
     data.setChunksPath(other.getAbsolutePath());
     assertEquals(other.getAbsolutePath(),
-        ContainerUtils.getChunkDir(data).getAbsolutePath());
+        ContainerUtils.getChunkDirForRead(data).getAbsolutePath());
   }
 
   @Test

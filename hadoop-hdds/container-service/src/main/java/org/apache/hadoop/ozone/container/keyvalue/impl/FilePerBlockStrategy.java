@@ -237,7 +237,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     HddsVolume volume = containerData.getVolume();
 
-    final File chunkFile = getChunkFile(container, blockID);
+    final File chunkFile = getChunkFileForRead(container, blockID);
 
     final long len = info.getLen();
     long offset = info.getOffset();
@@ -339,6 +339,10 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private static File getChunkFile(Container container, BlockID blockID) throws StorageContainerException {
     return FILE_PER_BLOCK.getChunkFile(container.getContainerData(), blockID, null);
+  }
+
+  private static File getChunkFileForRead(Container container, BlockID blockID) throws StorageContainerException {
+    return FILE_PER_BLOCK.getChunkFileForRead(container.getContainerData(), blockID, null);
   }
 
   private static void checkFullDelete(ChunkInfo info, File chunkFile)

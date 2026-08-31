@@ -298,7 +298,10 @@ public final class ContainerUtils {
   }
 
   /**
-   * Get the chunk directory from the containerData.
+   * Resolve and validate the chunk directory from the containerData. The
+   * directory's existence is checked on every call, so a chunk operation
+   * against a failed volume surfaces as a storage failure; write paths rely on
+   * this to mark the container unhealthy.
    *
    * @param containerData {@link ContainerData}
    * @return the file of chunk directory
@@ -308,11 +311,6 @@ public final class ContainerUtils {
       throws StorageContainerException {
     Objects.requireNonNull(containerData, "containerData == null");
 
-    File chunksDir = containerData.getChunksDirFile();
-    if (chunksDir != null) {
-      return chunksDir;
-    }
-
     String chunksPath = containerData.getChunksPath();
     if (chunksPath == null) {
       LOG.error("Chunks path is null in the container data");
@@ -320,13 +318,35 @@ public final class ContainerUtils {
           UNABLE_TO_FIND_DATA_DIR);
     }
 
-    chunksDir = new File(chunksPath);
+    File chunksDir = new File(chunksPath);
     if (!chunksDir.exists()) {
       LOG.error("Chunks dir {} does not exist", chunksDir.getAbsolutePath());
       throw new StorageContainerException("Chunks directory " +
           chunksDir.getAbsolutePath() + " does not exist.",
           UNABLE_TO_FIND_DATA_DIR);
     }
+    return chunksDir;
+  }
+
+  /**
+   * Read-path variant of {@link #getChunkDir(ContainerData)} that resolves and
+   * validates the directory once, then returns the cached result on later calls
+   * to skip the per-read stat. Unlike a write, a read does not need the eager
+   * storage-failure probe: a directory that disappears after caching is caught
+   * by the read's own open(), and read failures do not mark the container
+   * unhealthy.
+   *
+   * @param containerData {@link ContainerData}
+   * @return the file of chunk directory
+   * @throws StorageContainerException
+   */
+  public static File getChunkDirForRead(ContainerData containerData)
+      throws StorageContainerException {
+    File cached = containerData.getChunksDirFile();
+    if (cached != null) {
+      return cached;
+    }
+    File chunksDir = getChunkDir(containerData);
     containerData.setChunksDirFile(chunksDir);
     return chunksDir;
   }
