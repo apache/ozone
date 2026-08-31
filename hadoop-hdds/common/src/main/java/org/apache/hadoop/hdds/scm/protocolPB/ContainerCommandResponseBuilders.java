@@ -346,16 +346,13 @@ public final class ContainerCommandResponseBuilders {
   }
 
   public static ContainerCommandResponseProto getReadBlockResponse(
-      ContainerCommandRequestProto request, ChecksumData checksumData,
-      ByteBuffer data, long offset, List<ChunkInfo> chunkInfoList) {
+      ContainerCommandRequestProto request, ChecksumData checksumData, ByteBuffer data, long offset) {
 
-    ContainerProtos.ReadBlockResponseProto response = ReadBlockResponseProto.newBuilder()
+    ContainerProtos.ReadBlockResponseProto response = ContainerProtos.ReadBlockResponseProto.newBuilder()
         .setChecksumData(checksumData.getProtoBufMessage())
         .setData(ByteString.copyFrom(data))
         .setOffset(offset)
-        .setChunkInfoList(ChunkInfoList.newBuilder().addAllChunks(chunkInfoList).build())
         .build();
-
 
     return getSuccessResponseBuilder(request)
         .setReadBlock(response)

@@ -111,23 +111,23 @@ public class TestStreamRead {
         .build();
   }
 
-//  @Test
-//  void testReadKey512() throws Exception {
-//    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf(512);
-//    runTestReadKey(KEY_SIZE, bytesPerChecksum);
-//  }
-//
-//  @Test
-//  void testReadKey16k() throws Exception {
-//    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("16k");
-//    runTestReadKey(KEY_SIZE, bytesPerChecksum);
-//  }
-//
-//  @Test
-//  void testReadKey256k() throws Exception {
-//    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("256k");
-//    runTestReadKey(KEY_SIZE, bytesPerChecksum);
-//  }
+  @Test
+  void testReadKey512() throws Exception {
+    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf(512);
+    runTestReadKey(KEY_SIZE, bytesPerChecksum);
+  }
+
+  @Test
+  void testReadKey16k() throws Exception {
+    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("16k");
+    runTestReadKey(KEY_SIZE, bytesPerChecksum);
+  }
+
+  @Test
+  void testReadKey256k() throws Exception{
+    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("256k");
+    runTestReadKey(KEY_SIZE, bytesPerChecksum);
+  }
 
   void runTestReadKey(SizeInBytes keySize, SizeInBytes bytesPerChecksum) throws Exception {
     System.out.println("cluster starting ...");

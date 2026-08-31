@@ -46,13 +46,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfoList;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -777,25 +773,15 @@ public class TestStreamBlockInputStream {
   private ContainerCommandResponseProto buildCorruptResponseProto(byte[] data, long offset) {
     return ContainerCommandResponseProto.newBuilder()
         .setCmdType(Type.ReadBlock)
-        .setResult(Result.SUCCESS)
+        .setResult(ContainerProtos.Result.SUCCESS)
         .setReadBlock(ReadBlockResponseProto.newBuilder()
             .setOffset(offset)
             .setData(ByteString.copyFrom(data))
             .setChecksumData(ChecksumData.newBuilder()
-                .setType(ChecksumType.CRC32)
+                .setType(ContainerProtos.ChecksumType.CRC32)
                 .setBytesPerChecksum(data.length)
                 .addChecksums(ByteString.copyFrom(new byte[4]))
                 .build())
-            .setChunkInfoList(ChunkInfoList.newBuilder()
-                .addChunks(ChunkInfo.newBuilder()
-                    .setChunkName("chunk")
-                    .setOffset(offset)
-                    .setChecksumData(ChecksumData.newBuilder()
-                        .setType(ChecksumType.CRC32)
-                        .setBytesPerChecksum(data.length)
-                        .addChecksums(ByteString.copyFrom(new byte[4]))
-                        .build())
-                    .setLen(data.length).build()).build())
             .build())
         .build();
   }

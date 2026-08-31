@@ -581,7 +581,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
           Checksum.verifyChecksum(data, checksumData, 0);
         }
         offerToQueue(readBlock);
-      } catch (IOException | RuntimeException e) {
+      } catch (Exception e) {
         // Record the failure first: the log and observer calls below must not mask it.
         setFailed(e);
         final ByteString data = readBlock.getData();
@@ -668,6 +668,5 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     public String toString() {
       return name;
     }
-
   }
 }
