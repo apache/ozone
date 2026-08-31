@@ -90,6 +90,8 @@ import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
@@ -120,6 +122,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -1164,120 +1167,238 @@ public class TestKeyValueHandler {
     }
   }
 
-//  @Test
-//  public void testGetChecksumsWithVaryingChunkSizes() {
-//    int bytesPerChecksum = 1024;
-//    int bytesPerChunk = 16 * 1024;
-//
-//    ContainerProtos.ChunkInfo chunk1 = ContainerProtos.ChunkInfo.newBuilder()
-//        .setChunkName("chunk1")
-//        .setOffset(0)
-//        .setLen(1024)
-//        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
-//            .setType(ContainerProtos.ChecksumType.CRC32)
-//            .setBytesPerChecksum(bytesPerChecksum)
-//            .addChecksums(ByteString.copyFromUtf8("chk1"))
-//            .build())
-//        .build();
-//
-//    ContainerProtos.ChunkInfo chunk2 = ContainerProtos.ChunkInfo.newBuilder()
-//        .setChunkName("chunk2")
-//        .setOffset(1024)
-//        .setLen(10)
-//        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
-//            .setType(ContainerProtos.ChecksumType.CRC32)
-//            .setBytesPerChecksum(bytesPerChecksum)
-//            .addChecksums(ByteString.copyFromUtf8("chk2"))
-//            .build())
-//        .build();
-//
-//    ContainerProtos.ChunkInfo chunk3 = ContainerProtos.ChunkInfo.newBuilder()
-//        .setChunkName("chunk3")
-//        .setOffset(1034)
-//        .setLen(2048)
-//        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
-//            .setType(ContainerProtos.ChecksumType.CRC32)
-//            .setBytesPerChecksum(bytesPerChecksum)
-//            .addChecksums(ByteString.copyFromUtf8("chk3-1"))
-//            .addChecksums(ByteString.copyFromUtf8("chk3-2"))
-//            .build())
-//        .build();
-//
-//    List<ContainerProtos.ChunkInfo> chunks = Arrays.asList(chunk1, chunk2, chunk3);
-//
-//    long blockOffset1 = 0, blockOffset2 = 1024, blockOffset3 = 2048;
-//    // Read full block (1024 + 10 + 2048)
-//    long adjustedOffset = getAdjustedOffset(blockOffset1, chunks, bytesPerChecksum);
-//    assertEquals(0, adjustedOffset);
-//    List<ByteString> checksums = KeyValueHandler.getChecksums(adjustedOffset, 3082, bytesPerChecksum, chunks);
-//    assertEquals(4, checksums.size());
-//    assertEquals("chk1", checksums.get(0).toStringUtf8());
-//    assertEquals("chk2", checksums.get(1).toStringUtf8());
-//    assertEquals("chk3-1", checksums.get(2).toStringUtf8());
-//    assertEquals("chk3-2", checksums.get(3).toStringUtf8());
-//
-//
-//    // Read from offset 1024
-//    adjustedOffset = getAdjustedOffset(blockOffset2, chunks, bytesPerChecksum);
-//    assertEquals(1024, adjustedOffset);
-//    checksums = KeyValueHandler.getChecksums(adjustedOffset, 2058, bytesPerChecksum, chunks);
-//    assertEquals(3, checksums.size());
-//    assertEquals("chk2", checksums.get(0).toStringUtf8());
-//    assertEquals("chk3-1", checksums.get(1).toStringUtf8());
-//    assertEquals("chk3-2", checksums.get(2).toStringUtf8());
-//
-//    // Read from offset 2048
-//    adjustedOffset = getAdjustedOffset(blockOffset3, chunks, bytesPerChecksum);
-//    assertEquals(1034, adjustedOffset);
-//    checksums = KeyValueHandler.getChecksums(adjustedOffset, 1034, bytesPerChecksum, chunks);
-//    assertEquals(2, checksums.size());
-//    assertEquals("chk3-1", checksums.get(0).toStringUtf8());
-//    assertEquals("chk3-2", checksums.get(1).toStringUtf8());
-//  }
-//
-//  private static long getAdjustedOffset(
-//      long blockOffset, List<ContainerProtos.ChunkInfo> chunks, int bytesPerChecksum) {
-//    final long offsetAlignment = KeyValueHandler.getChecksumBoundaries(blockOffset, chunks, bytesPerChecksum);
-//    return blockOffset - offsetAlignment;
-//  }
-//
-//  @Test
-//  public void testGetChecksumsWithSmallChunks() {
-//    int bytesPerChecksum = 1024;
-//    int bytesPerChunk = 16 * 1024;
-//
-//    ContainerProtos.ChunkInfo chunk1 = ContainerProtos.ChunkInfo.newBuilder()
-//        .setChunkName("chunk1")
-//        .setOffset(0)
-//        .setLen(1)
-//        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
-//            .setType(ContainerProtos.ChecksumType.CRC32)
-//            .setBytesPerChecksum(bytesPerChecksum)
-//            .addChecksums(ByteString.copyFromUtf8("chk1"))
-//            .build())
-//        .build();
-//
-//    ContainerProtos.ChunkInfo chunk2 = ContainerProtos.ChunkInfo.newBuilder()
-//        .setChunkName("chunk2")
-//        .setOffset(1)
-//        .setLen(1)
-//        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
-//            .setType(ContainerProtos.ChecksumType.CRC32)
-//            .setBytesPerChecksum(bytesPerChecksum)
-//            .addChecksums(ByteString.copyFromUtf8("chk2"))
-//            .build())
-//        .build();
-//
-//    List<ContainerProtos.ChunkInfo> chunks = java.util.Arrays.asList(chunk1, chunk2);
-//
-//    // Read full block (1 + 1 = 2 bytes)
-//    long adjustedOffset = getAdjustedOffset(0, chunks, bytesPerChecksum);
-//    assertEquals(0, adjustedOffset);
-//    List<ByteString> checksums = KeyValueHandler.getChecksums(adjustedOffset, 2, bytesPerChecksum, chunks);
-//
-//    // According to the bug report, this should return 2 checksums.
-//    assertEquals(2, checksums.size());
-//    assertEquals("chk1", checksums.get(0).toStringUtf8());
-//    assertEquals("chk2", checksums.get(1).toStringUtf8());
-//  }
+  // TODO: These tests reference stale getChecksums/getChecksumBoundaries signatures
+  //  that were refactored. They need to be updated to the new API.
+  //  Commenting out to unblock compilation.
+  /*
+  @Test
+  public void testGetChecksumsWithVaryingChunkSizes() {
+    int bytesPerChecksum = 1024;
+    int bytesPerChunk = 16 * 1024;
+
+    ContainerProtos.ChunkInfo chunk1 = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("chunk1")
+        .setOffset(0)
+        .setLen(1024)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .setBytesPerChecksum(bytesPerChecksum)
+            .addChecksums(ByteString.copyFromUtf8("chk1"))
+            .build())
+        .build();
+
+    ContainerProtos.ChunkInfo chunk2 = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("chunk2")
+        .setOffset(1024)
+        .setLen(10)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .setBytesPerChecksum(bytesPerChecksum)
+            .addChecksums(ByteString.copyFromUtf8("chk2"))
+            .build())
+        .build();
+
+    ContainerProtos.ChunkInfo chunk3 = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("chunk3")
+        .setOffset(1034)
+        .setLen(2048)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .setBytesPerChecksum(bytesPerChecksum)
+            .addChecksums(ByteString.copyFromUtf8("chk3-1"))
+            .addChecksums(ByteString.copyFromUtf8("chk3-2"))
+            .build())
+        .build();
+
+    List<ContainerProtos.ChunkInfo> chunks = Arrays.asList(chunk1, chunk2, chunk3);
+
+    long blockOffset1 = 0, blockOffset2 = 1024, blockOffset3 = 2048;
+    // Read full block (1024 + 10 + 2048)
+    long adjustedOffset = getAdjustedOffset(blockOffset1, chunks, bytesPerChecksum);
+    assertEquals(0, adjustedOffset);
+    List<ByteString> checksums = KeyValueHandler.getChecksums(adjustedOffset, 3082, bytesPerChecksum, chunks);
+    assertEquals(4, checksums.size());
+    assertEquals("chk1", checksums.get(0).toStringUtf8());
+    assertEquals("chk2", checksums.get(1).toStringUtf8());
+    assertEquals("chk3-1", checksums.get(2).toStringUtf8());
+    assertEquals("chk3-2", checksums.get(3).toStringUtf8());
+
+
+    // Read from offset 1024
+    adjustedOffset = getAdjustedOffset(blockOffset2, chunks, bytesPerChecksum);
+    assertEquals(1024, adjustedOffset);
+    checksums = KeyValueHandler.getChecksums(adjustedOffset, 2058, bytesPerChecksum, chunks);
+    assertEquals(3, checksums.size());
+    assertEquals("chk2", checksums.get(0).toStringUtf8());
+    assertEquals("chk3-1", checksums.get(1).toStringUtf8());
+    assertEquals("chk3-2", checksums.get(2).toStringUtf8());
+
+    // Read from offset 2048
+    adjustedOffset = getAdjustedOffset(blockOffset3, chunks, bytesPerChecksum);
+    assertEquals(1034, adjustedOffset);
+    checksums = KeyValueHandler.getChecksums(adjustedOffset, 1034, bytesPerChecksum, chunks);
+    assertEquals(2, checksums.size());
+    assertEquals("chk3-1", checksums.get(0).toStringUtf8());
+    assertEquals("chk3-2", checksums.get(1).toStringUtf8());
+  }
+
+  private static long getAdjustedOffset(
+      long blockOffset, List<ContainerProtos.ChunkInfo> chunks, int bytesPerChecksum) {
+    final long offsetAlignment = KeyValueHandler.getChecksumBoundaries(blockOffset, chunks, bytesPerChecksum);
+    return blockOffset - offsetAlignment;
+  }
+
+  @Test
+  public void testGetChecksumsWithSmallChunks() {
+    int bytesPerChecksum = 1024;
+    int bytesPerChunk = 16 * 1024;
+
+    ContainerProtos.ChunkInfo chunk1 = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("chunk1")
+        .setOffset(0)
+        .setLen(1)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .setBytesPerChecksum(bytesPerChecksum)
+            .addChecksums(ByteString.copyFromUtf8("chk1"))
+            .build())
+        .build();
+
+    ContainerProtos.ChunkInfo chunk2 = ContainerProtos.ChunkInfo.newBuilder()
+        .setChunkName("chunk2")
+        .setOffset(1)
+        .setLen(1)
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .setBytesPerChecksum(bytesPerChecksum)
+            .addChecksums(ByteString.copyFromUtf8("chk2"))
+            .build())
+        .build();
+
+    List<ContainerProtos.ChunkInfo> chunks = java.util.Arrays.asList(chunk1, chunk2);
+
+    // Read full block (1 + 1 = 2 bytes)
+    long adjustedOffset = getAdjustedOffset(0, chunks, bytesPerChecksum);
+    assertEquals(0, adjustedOffset);
+    List<ByteString> checksums = KeyValueHandler.getChecksums(adjustedOffset, 2, bytesPerChecksum, chunks);
+
+    // According to the bug report, this should return 2 checksums.
+    assertEquals(2, checksums.size());
+    assertEquals("chk1", checksums.get(0).toStringUtf8());
+    assertEquals("chk2", checksums.get(1).toStringUtf8());
+  }
+  */
+
+  @Test
+  public void testReadBlock() throws Exception {
+    Path testDir = Files.createTempDirectory("testReadBlock");
+    RandomAccessFileChannel blockFile = null;
+    try {
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+      KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+      MutableVolumeSet volumeSet = handlerWithVolume.getVolumeSet();
+      ContainerSet containerSet = handlerWithVolume.getContainerSet();
+
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainerData containerData = new KeyValueContainerData(
+          containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
+          (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+          DATANODE_UUID);
+      KeyValueContainer container = new KeyValueContainer(containerData, conf);
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+      containerSet.addContainer(container);
+
+      // Generate real data with non-zero bytes
+      int dataLen = 4096;
+      int bytesPerChecksum = 1024;
+      byte[] rawData = new byte[dataLen];
+      for (int i = 0; i < rawData.length; i++) {
+        rawData[i] = (byte) (i % 127 + 1);
+      }
+
+      // Compute real CRC32 checksums for the data
+      Checksum checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, bytesPerChecksum);
+      ChunkBuffer chunkData = ChunkBuffer.wrap(ByteBuffer.wrap(rawData));
+      ChecksumData checksumData = checksum.computeChecksum(chunkData);
+      chunkData.rewind();
+
+      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+      ChunkInfo chunkInfo = new ChunkInfo("chunk1", 0, dataLen);
+      chunkInfo.setChecksumData(checksumData);
+
+      BlockData blockData = new BlockData(blockID);
+      blockData.addChunk(chunkInfo.getProtoBufMessage());
+
+      kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, chunkData,
+          DispatcherContext.getHandleWriteChunk());
+      kvHandler.getBlockManager().putBlock(container, blockData);
+
+      ContainerCommandRequestProto readBlockRequest =
+          ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.ReadBlock)
+              .setContainerID(containerID)
+              .setDatanodeUuid(DATANODE_UUID)
+              .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+                  .setBlockID(blockID.getDatanodeBlockIDProtobuf())
+                  .setOffset(0)
+                  .setLength(dataLen)
+                  .build())
+              .build();
+
+      // Mock StreamObserver to capture responses and verify checksums
+      @SuppressWarnings("unchecked")
+      StreamObserver<ContainerCommandResponseProto> streamObserver = mock(StreamObserver.class);
+      List<ContainerCommandResponseProto> capturedResponses = new java.util.ArrayList<>();
+      doAnswer(invocation -> {
+        ContainerCommandResponseProto resp = invocation.getArgument(0);
+        capturedResponses.add(resp);
+        return null;
+      }).when(streamObserver).onNext(any(ContainerCommandResponseProto.class));
+
+      blockFile = new RandomAccessFileChannel();
+      ContainerCommandResponseProto response = kvHandler.readBlock(
+          readBlockRequest, container, blockFile, streamObserver);
+
+      assertNull(response, "ReadBlock should return null on success");
+      assertFalse(capturedResponses.isEmpty(), "Should receive at least one response");
+      verify(streamObserver, atLeastOnce()).onNext(any());
+
+      // Verify checksum of the response data using real Checksum verification
+      ByteBuffer allData = ByteBuffer.allocate(dataLen);
+      for (ContainerCommandResponseProto resp : capturedResponses) {
+        assertEquals(ContainerProtos.Result.SUCCESS, resp.getResult());
+        assertTrue(resp.hasReadBlock());
+        ContainerProtos.ReadBlockResponseProto readBlockResp = resp.getReadBlock();
+        ByteBuffer respData = readBlockResp.getData().asReadOnlyByteBuffer();
+
+        // Verify checksum: recompute from the response data and compare with the original checksums
+        ChecksumData originalChecksumData = checksumData;
+        Checksum verifier = new Checksum(ContainerProtos.ChecksumType.CRC32, bytesPerChecksum);
+        ChecksumData recomputed = verifier.computeChecksum(respData);
+        // Verify each recomputed checksum matches the original
+        for (int i = 0; i < recomputed.getChecksums().size(); i++) {
+          assertEquals(originalChecksumData.getChecksums().get(i), recomputed.getChecksums().get(i),
+              "Checksum mismatch at index " + i);
+        }
+
+        respData.rewind();
+        allData.put(respData);
+      }
+
+      // Verify the full data matches what was written
+      allData.flip();
+      byte[] readBack = new byte[allData.remaining()];
+      allData.get(readBack);
+      assertEquals(dataLen, readBack.length);
+      for (int i = 0; i < dataLen; i++) {
+        assertEquals(rawData[i], readBack[i], "Data mismatch at byte " + i);
+      }
+    } finally {
+      if (blockFile != null) {
+        blockFile.close();
+      }
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
+  }
 }

@@ -2322,10 +2322,6 @@ public class KeyValueHandler extends Handler {
     return responseProto;
   }
 
-  // 0 8192 8202
-  // 16384 8192 => 24585
-  // 8202 16384
-
   private long readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
       Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver)
       throws IOException {
@@ -2348,11 +2344,8 @@ public class KeyValueHandler extends Handler {
     final BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
     final List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
     final ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
-    ChecksumData checksumData = null;
     int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;
-    if (checksumType == ContainerProtos.ChecksumType.NONE) {
-      checksumData = new ChecksumData(checksumType, 0);
-    } else {
+    if (checksumType != ContainerProtos.ChecksumType.NONE) {
       bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
     }
 
@@ -2392,7 +2385,7 @@ public class KeyValueHandler extends Handler {
 //        }
       }
       final ContainerCommandResponseProto response = getReadBlockResponse(
-          request, new ChecksumData(checksumType, bytesPerChecksum), buffer, adjustedOffset, chunkInfos);
+          request, new ChecksumData(checksumType, bytesPerChecksum), buffer, adjustedOffset);
       final int dataLength = response.getReadBlock().getData().size();
       LOG.debug("server onNext response {}: dataLength={}, numChecksums={}",
           numResponses, dataLength, response.getReadBlock().getChecksumData().getChecksumsList().size());
