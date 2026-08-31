@@ -184,7 +184,7 @@ public final class ContainerMerkleTreeTestUtils {
   /**
    * Returns the merkle tree and expected diff for that tree.
    */
-  public static ContainerDiffResult
+  static ContainerDiffResult
       buildTestTreeWithMismatches(ContainerMerkleTreeWriter originalTree, int numMissingBlocks, int numMissingChunks,
                                   int numCorruptChunks) {
 
@@ -424,7 +424,7 @@ public final class ContainerMerkleTreeTestUtils {
   /**
    * Result of building a test merkle tree with mismatches.
    */
-  public static final class ContainerDiffResult {
+  static final class ContainerDiffResult {
     private final ContainerProtos.ContainerMerkleTree tree;
     private final ContainerDiffReport diff;
 

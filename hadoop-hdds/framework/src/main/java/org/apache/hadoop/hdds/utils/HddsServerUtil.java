@@ -920,13 +920,12 @@ public final class HddsServerUtil {
    * @param conf Configuration
    * @param scmServiceId SCM service ID
    * @param scmNodeIds Requested SCM node IDs
-   * @return A collection with addresses of the request SCM node IDs.
-   * Null if there is any wrongly configured SCM address. Note that the returned collection
-   * might not be ordered the same way as the requested SCM node IDs
+   * @return A list with addresses of the requested SCM node IDs, in the same iteration
+   * order as scmNodeIds. Null if there is any wrongly configured SCM address.
    */
-  public static Collection<ScmNodeAddress> getSCMAddressForDatanodes(
+  public static List<ScmNodeAddress> getSCMAddressForDatanodes(
       ConfigurationSource conf, String scmServiceId, Set<String> scmNodeIds) {
-    Collection<ScmNodeAddress> scmNodeAddresses = new ArrayList<>(scmNodeIds.size());
+    List<ScmNodeAddress> scmNodeAddresses = new ArrayList<>(scmNodeIds.size());
     for (String scmNodeId : scmNodeIds) {
       String addressKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
       String scmAddress = conf.get(addressKey);
