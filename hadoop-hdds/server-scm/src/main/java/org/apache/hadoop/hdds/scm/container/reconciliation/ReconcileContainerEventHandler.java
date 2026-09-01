@@ -100,9 +100,16 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
       LOG.info("Reconcile container event triggered for container {} with targets {} and peers {}",
           containerID, targets, peers);
 
+      if (targets.isEmpty()) {
+        LOG.warn("Skipping reconciliation for container {} since no eligible target datanodes are available.",
+            containerID);
+        return;
+      }
+
       for (DatanodeDetails target : targets) {
         Set<DatanodeDetails> otherPeers = new HashSet<>(peers);
         otherPeers.remove(target);
+        // Even with no peers, the command generates missing checksum data and triggers a container scan on the target.
         ReconcileContainerCommand command = new ReconcileContainerCommand(containerID.getId(), otherPeers);
         command.setTerm(scmContext.getTermOfLeader());
         publisher.fireEvent(DATANODE_COMMAND, new CommandForDatanode<>(target, command));

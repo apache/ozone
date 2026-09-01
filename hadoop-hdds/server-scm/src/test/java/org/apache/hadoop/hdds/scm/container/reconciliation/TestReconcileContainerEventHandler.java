@@ -337,6 +337,20 @@ public class TestReconcileContainerEventHandler {
   }
 
   @Test
+  public void testReconcileSkipsWhenNoEligibleTargets() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    List<DatanodeDetails> nodes = addReplicasToContainer(3).stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toCollection(ArrayList::new));
+    when(nodeManager.getNodeStatus(nodes.get(0))).thenReturn(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    when(nodeManager.getNodeStatus(nodes.get(1))).thenReturn(NodeStatus.valueOf(IN_MAINTENANCE, HEALTHY));
+    when(nodeManager.getNodeStatus(nodes.get(2))).thenReturn(NodeStatus.valueOf(IN_SERVICE, STALE));
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+    verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
+  }
+
+  @Test
   public void testReconcileSkipsNodeWithUnknownStatus() throws Exception {
     addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
     List<DatanodeDetails> nodes = addReplicasToContainer(3).stream()
