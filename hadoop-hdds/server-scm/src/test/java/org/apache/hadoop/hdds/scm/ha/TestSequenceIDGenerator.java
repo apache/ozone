@@ -20,25 +20,34 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 
 import java.io.File;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Tests for {@link SequenceIdGenerator}.
@@ -269,5 +278,53 @@ public class TestSequenceIDGenerator {
     } catch (Exception e) {
       // ignore
     }
+  }
+
+  /**
+   * Regression test for HDDS-14337. Simulates SCM first start when UTC is
+   * already in the new year but the JVM local timezone is still on Dec 31.
+   * Verifies upgradeToSequenceId succeeds and block localIds are allocated.
+   */
+  @Test
+  public void testUpgradeToSequenceIdNearYearBoundary() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
+    scmMetadataStore.start(conf);
+    SCMHAManager scmHAManager = SCMHAManagerStub
+        .getInstance(true, new SCMDBTransactionBufferImpl());
+
+    LocalDate utcDate = LocalDate.of(2026, 1, 1);
+    LocalDate localTimezoneDate = LocalDate.of(2025, 12, 31);
+    long simulatedUtcMillis = TimeUnit.DAYS.toMillis(utcDate.toEpochDay())
+        + TimeUnit.HOURS.toMillis(6);
+    long expectedLocalId = TimeUnit.DAYS.toMillis(
+        LocalDate.of(2027, 1, 1).toEpochDay()) << Short.SIZE;
+
+    try (MockedStatic<HddsUtils> mockedTime = mockStatic(HddsUtils.class);
+         MockedStatic<LocalDate> mockedLocalDate = mockStatic(LocalDate.class, CALLS_REAL_METHODS)) {
+      mockedTime.when(HddsUtils::getTime).thenReturn(simulatedUtcMillis);
+      mockedLocalDate.when(() -> LocalDate.now(ZoneOffset.UTC)).thenReturn(utcDate);
+      mockedLocalDate.when(LocalDate::now).thenReturn(localTimezoneDate);
+
+      long legacyLocalId = legacyInitialLocalId(localTimezoneDate.getYear());
+      assertFalse(legacyLocalId > UniqueId.next(),
+          "pre-HDDS-14337 local timezone formula would fail the upgrade check");
+
+      SequenceIdGenerator.upgradeToSequenceId(scmMetadataStore);
+      Long initialLocalId = scmMetadataStore.getSequenceIdTable().get(SequenceIdType.localId);
+      assertNotNull(initialLocalId);
+      assertEquals(expectedLocalId, initialLocalId.longValue());
+
+      SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
+          conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
+      assertEquals(expectedLocalId + 1, sequenceIdGen.getNextId(SequenceIdType.localId));
+      assertEquals(expectedLocalId + 2, sequenceIdGen.getNextId(SequenceIdType.localId));
+    }
+  }
+
+  private static long legacyInitialLocalId(int currentYear) {
+    long millisSinceEpoch = TimeUnit.DAYS.toMillis(
+        LocalDate.of(currentYear + 1, 1, 1).toEpochDay());
+    return millisSinceEpoch << Short.SIZE;
   }
 }
