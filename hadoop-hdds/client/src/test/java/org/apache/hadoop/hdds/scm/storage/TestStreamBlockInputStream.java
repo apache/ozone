@@ -323,9 +323,11 @@ public class TestStreamBlockInputStream {
     when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
         .thenReturn(xceiverClient);
 
+    final long refillThreshold;
     try (StreamBlockInputStream sbis = new StreamBlockInputStream(
         blockID, blockLength, mockStandalonePipeline(), null, xceiverClientFactory,
         NO_REFRESH, clientConfig)) {
+      refillThreshold = sbis.getPreReadRefillThreshold();
       // Read one small buffer at a time, as KeyInputStream does, so every response reaches readBlock again.
       byte[] all = new byte[blockLength];
       for (int off = 0; off < blockLength; off += responseSize) {
@@ -336,14 +338,14 @@ public class TestStreamBlockInputStream {
       assertArrayEquals(data, all);
     }
 
-    // One request per half window plus the initial one; without the gate it is one per response.
+    // One request per refill threshold plus the initial one; without the gate it is one per response.
     assertThat(requestLengths)
         .withFailMessage("expected bulk refills, got %s requests for %s responses: %s",
             requestLengths.size(), blockLength / responseSize, requestLengths)
-        .hasSizeLessThanOrEqualTo(1 + blockLength / (preReadSize / 2));
-    // Each request carries at least half a window (the last one may be clamped by the block end).
+        .hasSizeLessThanOrEqualTo(Math.toIntExact(1 + blockLength / refillThreshold));
+    // Each request carries at least the refill threshold (the last one may be clamped by the block end).
     for (long requested : requestLengths) {
-      assertThat(requested).isGreaterThanOrEqualTo(preReadSize / 2);
+      assertThat(requested).isGreaterThanOrEqualTo(refillThreshold);
     }
   }
 
