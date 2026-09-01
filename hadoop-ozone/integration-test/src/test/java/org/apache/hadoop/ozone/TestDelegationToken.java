@@ -118,14 +118,6 @@ public class TestDelegationToken extends KerberosTests {
     createTestUserCredentials();
   }
 
-  @Override
-  protected void createCredentialsInKDC() throws Exception {
-    createScmPrincipalCredential();
-    createOmPrincipalCredential();
-    createSpnegoPrincipalCredential();
-    createTestUserPrincipalCredential();
-  }
-
   public static Stream<Boolean> options() {
     return Stream.of(false, true);
   }

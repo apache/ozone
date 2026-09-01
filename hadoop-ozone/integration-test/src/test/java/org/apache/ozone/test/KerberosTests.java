@@ -131,10 +131,17 @@ public abstract class KerberosTests {
     conf.setBoolean(HADOOP_SECURITY_AUTHORIZATION, true);
   }
 
+  /** Mints the principals for whichever keytabs {@link #setSecureConfig()} configured. */
   protected void createCredentialsInKDC() throws Exception {
-    createScmPrincipalCredential();
-    createSpnegoPrincipalCredential();
-    createTestUserPrincipalCredential();
+    createPrincipal(ozoneKeytab, conf.get(HDDS_SCM_KERBEROS_PRINCIPAL_KEY));
+    if (omKeytab != null) {
+      createPrincipal(omKeytab, conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
+    }
+    SCMHTTPServerConfig httpServerConfig = conf.getObject(SCMHTTPServerConfig.class);
+    createPrincipal(spnegoKeytab, httpServerConfig.getKerberosPrincipal());
+    if (testUserKeytab != null) {
+      createPrincipal(testUserKeytab, testUserPrincipal);
+    }
   }
 
   protected String getRealm() {
@@ -187,23 +194,5 @@ public abstract class KerberosTests {
   protected void createTestUserCredentials() {
     testUserKeytab = new File(workDir, "testuser.keytab");
     testUserPrincipal = "test@" + getRealm();
-  }
-
-  protected void createScmPrincipalCredential() throws Exception {
-    createPrincipal(ozoneKeytab, conf.get(HDDS_SCM_KERBEROS_PRINCIPAL_KEY));
-  }
-
-  protected void createOmPrincipalCredential() throws Exception {
-    createPrincipal(omKeytab, conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
-  }
-
-  protected void createSpnegoPrincipalCredential() throws Exception {
-    SCMHTTPServerConfig httpServerConfig =
-        conf.getObject(SCMHTTPServerConfig.class);
-    createPrincipal(spnegoKeytab, httpServerConfig.getKerberosPrincipal());
-  }
-
-  protected void createTestUserPrincipalCredential() throws Exception {
-    createPrincipal(testUserKeytab, testUserPrincipal);
   }
 }

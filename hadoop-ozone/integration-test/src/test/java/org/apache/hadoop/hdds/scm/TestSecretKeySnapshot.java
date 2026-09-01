@@ -78,12 +78,6 @@ public class TestSecretKeySnapshot extends KerberosTests {
     configureSpnegoPrincipal(hostAndRealm);
   }
 
-  @Override
-  protected void createCredentialsInKDC() throws Exception {
-    createScmPrincipalCredential();
-    createSpnegoPrincipalCredential();
-  }
-
   @BeforeEach
   public void init() throws Exception {
     ExitUtils.disableSystemExit();

@@ -200,14 +200,6 @@ class TestSecureOzoneCluster extends KerberosTests {
     createTestUserCredentials();
   }
 
-  @Override
-  protected void createCredentialsInKDC() throws Exception {
-    createScmPrincipalCredential();
-    createOmPrincipalCredential();
-    createSpnegoPrincipalCredential();
-    createTestUserPrincipalCredential();
-  }
-
   @BeforeAll
   void setupKdc() throws Exception {
     ExitUtils.disableSystemExit();
