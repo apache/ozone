@@ -45,7 +45,8 @@ public class OpenKeysInsightHandler implements OmTableHandler {
                              String tableName,
                              Map<String, Long> objectCountMap,
                              Map<String, Long> unReplicatedSizeMap,
-                             Map<String, Long> replicatedSizeMap) {
+                             Map<String, Long> replicatedSizeMap,
+                             OMMetadataManager omMetadataManager) {
 
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
@@ -69,7 +70,8 @@ public class OpenKeysInsightHandler implements OmTableHandler {
                                 String tableName,
                                 Map<String, Long> objectCountMap,
                                 Map<String, Long> unReplicatedSizeMap,
-                                Map<String, Long> replicatedSizeMap) {
+                                Map<String, Long> replicatedSizeMap,
+                                OMMetadataManager omMetadataManager) {
 
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
@@ -96,7 +98,8 @@ public class OpenKeysInsightHandler implements OmTableHandler {
                                 String tableName,
                                 Map<String, Long> objectCountMap,
                                 Map<String, Long> unReplicatedSizeMap,
-                                Map<String, Long> replicatedSizeMap) {
+                                Map<String, Long> replicatedSizeMap,
+                                OMMetadataManager omMetadataManager) {
 
     if (event.getValue() != null) {
       if (event.getOldValue() == null) {

@@ -37,12 +37,14 @@ public interface OmTableHandler {
    * @param objectCountMap           A map storing object counts.
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.
+   * @param omMetadataManager        OM metadata manager for accessing tables.
    */
   void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                       String tableName,
                       Map<String, Long> objectCountMap,
                       Map<String, Long> unReplicatedSizeMap,
-                      Map<String, Long> replicatedSizeMap);
+                      Map<String, Long> replicatedSizeMap,
+                      OMMetadataManager omMetadataManager);
 
 
   /**
@@ -54,12 +56,14 @@ public interface OmTableHandler {
    * @param objectCountMap           A map storing object counts.
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.
+   * @param omMetadataManager        OM metadata manager for accessing tables.
    */
   void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                          String tableName,
                          Map<String, Long> objectCountMap,
                          Map<String, Long> unReplicatedSizeMap,
-                         Map<String, Long> replicatedSizeMap);
+                         Map<String, Long> replicatedSizeMap,
+                         OMMetadataManager omMetadataManager);
 
 
   /**
@@ -71,12 +75,14 @@ public interface OmTableHandler {
    * @param objectCountMap           A map storing object counts.
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.
+   * @param omMetadataManager        OM metadata manager for accessing tables.
    */
   void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                          String tableName,
                          Map<String, Long> objectCountMap,
                          Map<String, Long> unReplicatedSizeMap,
-                         Map<String, Long> replicatedSizeMap);
+                         Map<String, Long> replicatedSizeMap,
+                         OMMetadataManager omMetadataManager);
 
 
   /**

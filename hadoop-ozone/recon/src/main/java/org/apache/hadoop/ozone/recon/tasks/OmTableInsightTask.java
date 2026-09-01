@@ -311,7 +311,7 @@ public class OmTableInsightTask implements ReconOmTask {
     if (event.getValue() != null) {
       if (tableHandler != null) {
         tableHandler.handlePutEvent(event, tableName, objectCountMap,
-            unReplicatedSizeMap, replicatedSizeMap);
+            unReplicatedSizeMap, replicatedSizeMap, reconOMMetadataManager);
       } else {
         String countKey = getTableCountKeyFromTable(tableName);
         objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
@@ -325,7 +325,7 @@ public class OmTableInsightTask implements ReconOmTask {
     if (event.getValue() != null) {
       if (tableHandler != null) {
         tableHandler.handleDeleteEvent(event, tableName, objectCountMap,
-            unReplicatedSizeMap, replicatedSizeMap);
+            unReplicatedSizeMap, replicatedSizeMap, reconOMMetadataManager);
       } else {
         objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
             (k, count) -> count > 0 ? count - 1L : 0L);
@@ -341,7 +341,7 @@ public class OmTableInsightTask implements ReconOmTask {
       if (tableHandler != null) {
         // Handle update for only size related tables
         tableHandler.handleUpdateEvent(event, tableName, objectCountMap,
-            unReplicatedSizeMap, replicatedSizeMap);
+            unReplicatedSizeMap, replicatedSizeMap, reconOMMetadataManager);
       }
     }
   }

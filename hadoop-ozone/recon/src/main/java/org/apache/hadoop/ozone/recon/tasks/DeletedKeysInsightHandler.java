@@ -46,7 +46,8 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
                              String tableName,
                              Map<String, Long> objectCountMap,
                              Map<String, Long> unReplicatedSizeMap,
-                             Map<String, Long> replicatedSizeMap) {
+                             Map<String, Long> replicatedSizeMap,
+                             OMMetadataManager omMetadataManager) {
 
     if (event.getValue() != null) {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
@@ -74,7 +75,8 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
                                 String tableName,
                                 Map<String, Long> objectCountMap,
                                 Map<String, Long> unReplicatedSizeMap,
-                                Map<String, Long> replicatedSizeMap) {
+                                Map<String, Long> replicatedSizeMap,
+                                OMMetadataManager omMetadataManager) {
 
     if (event.getValue() != null) {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
@@ -102,7 +104,8 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
                                 String tableName,
                                 Map<String, Long> objectCountMap,
                                 Map<String, Long> unReplicatedSizeMap,
-                                Map<String, Long> replicatedSizeMap) {
+                                Map<String, Long> replicatedSizeMap,
+                                OMMetadataManager omMetadataManager) {
     // The size of deleted keys cannot change hence no-op.
     return;
   }
