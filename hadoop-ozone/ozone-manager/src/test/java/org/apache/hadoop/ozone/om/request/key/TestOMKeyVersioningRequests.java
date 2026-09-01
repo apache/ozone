@@ -104,9 +104,15 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
   /** Puts a current version of another key, to batch alongside the first. */
   private void seedCurrentVersion(String otherKey, Long versionId)
       throws Exception {
+    seedCurrentVersion(otherKey, versionId, false);
+  }
+
+  private void seedCurrentVersion(String otherKey, Long versionId,
+      boolean deleteMarker) throws Exception {
     OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
             volumeName, bucketName, otherKey, replicationConfig)
         .setVersionId(versionId)
+        .setDeleteMarker(deleteMarker)
         .build();
     omMetadataManager.getKeyTable(getBucketLayout()).put(
         omMetadataManager.getOzoneKey(volumeName, bucketName, otherKey),
@@ -431,6 +437,81 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
             otherKey, 150L)));
 
     assertInstanceOf(OMKeysDeleteMarkerResponse.class, response);
+  }
+
+  /**
+   * A batch that fails part way through has already put entries into the
+   * versionedKeyTable cache. The double buffer cleans the table cache from the
+   * response's CleanupTableInfo, so the failure response has to declare the
+   * same tables as the successful one or those entries are in no DB and are
+   * never cleaned up.
+   */
+  @Test
+  public void testAFailedBatchDeleteStillCleansTheVersionedKeyTable()
+      throws Exception {
+    // namespace for one more record, so the second marker cannot be written
+    setupVersionedBucket(OzoneConsts.QUOTA_RESET, 3L, 2L);
+    seedCurrentVersion(100L);
+    String otherKey = keyName + "-other";
+    seedCurrentVersion(otherKey, 150L);
+
+    OMClientResponse response = new OMKeysDeleteRequest(
+        batchDeleteRequest(PROPOSED, keyName, otherKey), getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 200L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
+        response.getOMResponse().getStatus());
+    assertInstanceOf(OMKeysDeleteMarkerResponse.class, response);
+  }
+
+  /**
+   * S3 records the delete whether or not the key was there, so a key the
+   * bucket holds no record of takes a delete marker of its own instead of
+   * failing the batch. The single-key delete already does this.
+   */
+  @Test
+  public void testBatchDeleteMarksAKeyThatDoesNotExist() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(100L);
+    String absentKey = keyName + "-absent";
+
+    OMClientResponse response = new OMKeysDeleteRequest(
+        batchDeleteRequest(PROPOSED, keyName, absentKey), getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 200L);
+
+    // the whole batch succeeds: a missing key is not a partial failure
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+
+    OmKeyInfo marker = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneKey(volumeName, bucketName, absentKey));
+    assertNotNull(marker);
+    assertTrue(marker.isDeleteMarker());
+    // nothing was superseded, so the marker stands alone
+    assertNull(omMetadataManager.getVersionedKeyTable().get(
+        omMetadataManager.getVersionedOzoneKey(volumeName, bucketName,
+            absentKey, PROPOSED)));
+  }
+
+  /**
+   * Only a key that stopped being visible to a plain read comes off the key
+   * count. A marker written over a key that was already a marker, or over one
+   * the bucket held no record of, hides nothing that was not hidden already.
+   */
+  @Test
+  public void testBatchDeleteCountsOnlyTheKeysItHides() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(100L);
+    String markedKey = keyName + "-marked";
+    seedCurrentVersion(markedKey, 150L, true);
+    String absentKey = keyName + "-absent";
+
+    long before = omMetrics.getNumKeys();
+    new OMKeysDeleteRequest(
+        batchDeleteRequest(PROPOSED, keyName, markedKey, absentKey),
+        getBucketLayout()).validateAndUpdateCache(ozoneManager, 200L);
+
+    assertEquals(before - 1, omMetrics.getNumKeys());
   }
 
   /** The proposal is a floor for each key independently. */
