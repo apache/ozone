@@ -68,6 +68,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -993,6 +994,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+      getVolumeIterator() {
+    return volumeTable.cacheIterator();
+  }
+
+  @Override
   public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
       getBucketIterator() {
     return bucketTable.cacheIterator();
@@ -1478,7 +1485,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           final String clientIdString
               = dbOpenKeyName.substring(lastPrefix + 1);
 
-          final boolean isHsync = java.util.Optional.of(openKeyInfo)
+          final boolean isHsync = Optional.of(openKeyInfo)
               .map(WithMetadata::getMetadata)
               .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
               .filter(id -> id.equals(clientIdString))
@@ -1503,10 +1510,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .setBucketName(info.getBucketName())
                 .setKeyName(openKeyInfo.getKeyName())
                 .setDataSize(info.getDataSize());
-            java.util.Optional.ofNullable(info.getLatestVersionLocations())
-                .map(OmKeyLocationInfoGroup::createLocationList)
+            Optional.ofNullable(info.getLatestVersionLocations())
+                .map(OmKeyLocationInfoGroup::getLocationLists)
                 .map(Collection::stream)
                 .orElseGet(Stream::empty)
+                .flatMap(List::stream)
                 .map(loc -> loc.getProtobuf(ClientVersion.CURRENT_VERSION))
                 .forEach(keyArgs::addKeyLocations);
 

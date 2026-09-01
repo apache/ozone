@@ -85,8 +85,10 @@ public class TestReconLayoutVersionManager {
     // Define the custom features to be returned
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
 
+    // Inject a no-op task-status schema repair action so these tests exercise
+    // only the layout finalization flow, independent of the real action's SQL.
     layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class),
-        mockDataSource);
+        mockDataSource, mock(ReconUpgradeAction.class));
 
     when(scmFacadeMock.getDataSource()).thenReturn(mockDataSource);
     when(mockDataSource.getConnection()).thenReturn(mockConnection);
@@ -292,6 +294,25 @@ public class TestReconLayoutVersionManager {
 
     // Verify that no schema version updates were attempted
     verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt(), eq(mockConnection));
+  }
+
+  @Test
+  public void testTaskStatusRepairDoesNotChangeMlv() throws Exception {
+    ReconUpgradeAction repairAction = mock(ReconUpgradeAction.class);
+    when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
+    mockedEnum.when(ReconLayoutFeature::values)
+        .thenReturn(new ReconLayoutFeature[]{});
+
+    ReconLayoutVersionManager manager = new ReconLayoutVersionManager(
+        schemaVersionTableManager, mock(ReconContext.class), mockDataSource,
+        repairAction);
+
+    manager.finalizeLayoutFeatures();
+
+    verify(repairAction).execute(mockDataSource);
+    verify(schemaVersionTableManager, never())
+        .updateSchemaVersion(anyInt(), eq(mockConnection));
+    assertEquals(2, manager.getCurrentMLV());
   }
 
   /**
