@@ -25,6 +25,8 @@ import static org.apache.hadoop.hdds.protocol.TestDatanodeDetails.assertPorts;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,8 +34,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Map;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.jupiter.api.Test;
 
@@ -146,5 +150,41 @@ public class TestPipeline {
   void testCopyForReadFromNodeRejectsUnknownNode() {
     Pipeline subject = MockPipeline.createRatisPipeline();
     assertThrows(IllegalStateException.class, () -> subject.copyForReadFromNode(randomDatanodeDetails()));
+  }
+
+  @Test
+  void getReplicaIndexesIsMemoizedUnmodifiableView() {
+    Pipeline pipeline = MockPipeline.createEcPipeline();
+
+    Map<DatanodeDetails, Integer> indexes = pipeline.getReplicaIndexes();
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      assertThat(indexes).containsEntry(dn, pipeline.getReplicaIndex(dn));
+    }
+
+    DatanodeDetails node = pipeline.getNodes().get(0);
+    assertThatThrownBy(() -> indexes.put(node, 99)).isInstanceOf(UnsupportedOperationException.class);
+    assertThat(pipeline.getReplicaIndexes()).isSameAs(indexes);
+  }
+
+  @Test
+  void getReplicaIndexesIsInvalidatedAcrossSiblingPipelines() throws IOException {
+    Pipeline pipeline = MockPipeline.createRatisPipeline();
+    Pipeline sibling = pipeline.toBuilder().build();
+    Map<DatanodeDetails, Integer> indexes = sibling.getReplicaIndexes();
+    DatanodeDetails node = pipeline.getNodes().get(0);
+    DatanodeDetails restartedNode = DatanodeDetails.newBuilder()
+        .setDatanodeDetails(node)
+        .setID(DatanodeID.randomID())
+        .build();
+
+    pipeline.reportDatanode(node);
+    assertThat(sibling.getReplicaIndexes()).isSameAs(indexes);
+
+    pipeline.reportDatanode(restartedNode);
+
+    assertThat(sibling.getReplicaIndexes())
+        .isNotSameAs(indexes)
+        .hasSameSizeAs(pipeline.getNodes())
+        .containsEntry(restartedNode, 0);
   }
 }
