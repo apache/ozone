@@ -116,6 +116,25 @@ public class TestNoncurrentVersionSelector {
         .build();
   }
 
+  /** A noncurrent version of a key in a bucket whose name extends BUCKET. */
+  private void addNoncurrentInSiblingBucket(String bucketName, String keyName,
+      long versionId, long noncurrentAt) throws Exception {
+    OmKeyInfo info = new OmKeyInfo.Builder()
+        .setVolumeName(VOLUME)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+        .setVersionId(versionId)
+        .setModificationTime(noncurrentAt)
+        .setCreationTime(noncurrentAt)
+        .setNoncurrentTime(noncurrentAt)
+        .build();
+    omMetadataManager.getVersionedKeyTable().put(
+        omMetadataManager.getVersionedOzoneKey(VOLUME, bucketName, keyName,
+            versionId),
+        info);
+  }
+
   /** A noncurrent version stamped as having gone noncurrent at that time. */
   private void addNoncurrent(String keyName, long versionId,
       long noncurrentAt) throws Exception {
@@ -409,5 +428,26 @@ public class TestNoncurrentVersionSelector {
     assertTrue(selection.getExpiredVersions().isEmpty());
     assertTrue(selection.isFinished());
     assertEquals(0, selection.getVersionsScanned());
+  }
+
+  /**
+   * The scan is bounded by the bucket. Without the separator its prefix is
+   * also a prefix of every bucket whose name extends it, and this bucket's
+   * rules would expire another bucket's versions.
+   */
+  @Test
+  public void testABucketWhoseNameExtendsThisOneIsNotScanned()
+      throws Exception {
+    addNoncurrent("key", 300L, daysAgo(1));
+    addNoncurrent("key", 200L, daysAgo(2));
+    addNoncurrentInSiblingBucket(BUCKET + "0", "key", 300L, daysAgo(1));
+    addNoncurrentInSiblingBucket(BUCKET + "0", "key", 200L, daysAgo(2));
+
+    NoncurrentVersionSelector.Selection selection =
+        selector.select(versionedBucket(), rules(null, 1), null, NO_LIMIT);
+
+    assertEquals(2, selection.getVersionsScanned());
+    assertEquals(Collections.singletonList(versionKey("key", 200L)),
+        keysOf(selection.getExpiredVersions()));
   }
 }

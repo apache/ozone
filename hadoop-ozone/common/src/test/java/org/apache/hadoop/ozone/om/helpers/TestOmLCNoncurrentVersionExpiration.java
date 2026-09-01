@@ -105,6 +105,21 @@ class TestOmLCNoncurrentVersionExpiration {
     assertFalse(rule.isExpired(System.currentTimeMillis()));
   }
 
+  /**
+   * The age is settled when the rule is built. Deriving it in valid() instead
+   * would make an unvalidated rule read as zero days, which expires every
+   * version the moment it becomes noncurrent.
+   */
+  @Test
+  void ageIsHonouredWithoutValidationHavingRun() {
+    OmLCNoncurrentVersionExpiration rule = of(1, null);
+
+    final long anHourAgo =
+        System.currentTimeMillis()
+            - java.util.concurrent.TimeUnit.HOURS.toMillis(1);
+    assertFalse(rule.isExpired(anHourAgo));
+  }
+
   @Test
   void theActionSurvivesAProtobufRoundTrip() {
     LifecycleAction proto = of(30, 5).getProtobuf();

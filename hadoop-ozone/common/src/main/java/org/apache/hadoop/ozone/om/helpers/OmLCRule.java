@@ -231,6 +231,17 @@ public final class OmLCRule {
       }
     }
 
+    // A delete marker carries no tags, so a tag-filtered rule could never
+    // match one. S3 refuses the combination rather than accepting a rule that
+    // can never fire.
+    OmLCExpiration expirationAction = getExpiration();
+    if (isTagEnable && expirationAction != null
+        && expirationAction.isExpiredObjectDeleteMarker()) {
+      throw new OMException("Invalid lifecycle configuration: "
+          + "'ExpiredObjectDeleteMarker' cannot be specified with a tag "
+          + "filter.", OMException.ResultCodes.INVALID_REQUEST);
+    }
+
     if (prefix != null && filter != null) {
       throw new OMException("Filter and Prefix cannot be used together.",
           OMException.ResultCodes.INVALID_REQUEST);
