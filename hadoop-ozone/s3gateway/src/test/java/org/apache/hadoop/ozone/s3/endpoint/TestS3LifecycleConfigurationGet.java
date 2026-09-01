@@ -84,6 +84,56 @@ public class TestS3LifecycleConfigurationGet {
         lcc.getRules().get(0).getExpiration().getDays().intValue());
   }
 
+  /**
+   * The versioning actions have to survive Put followed by Get: the rule the
+   * gateway parsed is the rule an operator gets back.
+   */
+  @Test
+  public void testGetLifecycleWithVersioningActions() throws Exception {
+    String bucketName = "bucket1";
+    bucketEndpoint.put(bucketName, versioningRules());
+    Response r = bucketEndpoint.get(bucketName);
+
+    assertEquals(HTTP_OK, r.getStatus());
+    S3LifecycleConfiguration lcc = (S3LifecycleConfiguration) r.getEntity();
+    assertEquals(2, lcc.getRules().size());
+
+    S3LifecycleConfiguration.Rule noncurrent = lcc.getRules().get(0);
+    assertEquals(30, noncurrent.getNoncurrentVersionExpiration()
+        .getNoncurrentDays().intValue());
+    assertEquals(5, noncurrent.getNoncurrentVersionExpiration()
+        .getNewerNoncurrentVersions().intValue());
+
+    S3LifecycleConfiguration.Rule marker = lcc.getRules().get(1);
+    assertEquals(Boolean.TRUE,
+        marker.getExpiration().getExpiredObjectDeleteMarker());
+    assertNull(marker.getExpiration().getDays());
+  }
+
+  private static InputStream versioningRules() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws"
+        + ".com/doc/2006-03-01/\">"
+        + "<Rule>"
+        + "<ID>trim noncurrent versions</ID>"
+        + "<Prefix>prefix/</Prefix>"
+        + "<Status>Enabled</Status>"
+        + "<NoncurrentVersionExpiration>"
+        + "<NoncurrentDays>30</NoncurrentDays>"
+        + "<NewerNoncurrentVersions>5</NewerNoncurrentVersions>"
+        + "</NoncurrentVersionExpiration>"
+        + "</Rule>"
+        + "<Rule>"
+        + "<ID>sweep expired delete markers</ID>"
+        + "<Prefix>prefix/</Prefix>"
+        + "<Status>Enabled</Status>"
+        + "<Expiration>"
+        + "<ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker>"
+        + "</Expiration>"
+        + "</Rule>"
+        + "</LifecycleConfiguration>";
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
   @Test
   public void testGetLifecycleWithAbortIncompleteMultipartUpload() throws Exception {
     String bucketName = "bucket1";

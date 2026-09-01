@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_PARTS_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABLE;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -48,7 +49,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * 3) Delete unused parts.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, DELETED_TABLE,
-    MULTIPART_INFO_TABLE, MULTIPART_PARTS_TABLE, BUCKET_TABLE})
+    MULTIPART_INFO_TABLE, MULTIPART_PARTS_TABLE, BUCKET_TABLE,
+    VERSIONED_KEY_TABLE})
 public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
   private String multipartKey;
   private String multipartOpenKey;
@@ -57,6 +59,9 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
   private List<OmMultipartPartKey> multipartPartKeysToDelete;
   private OmBucketInfo omBucketInfo;
   private long bucketId;
+  private String versionedKeyName;
+  private OmKeyInfo versionedKeyInfo;
+  private String replacedNullVersionKey;
 
   @SuppressWarnings("parameternumber")
   public S3MultipartUploadCompleteResponse(
@@ -128,6 +133,19 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
     }
   }
 
+  /**
+   * The version this upload superseded, to be kept in the versionedKeyTable as
+   * a noncurrent version, and the null version it replaced, if any. Both null
+   * for buckets that have never been versioned.
+   */
+  public S3MultipartUploadCompleteResponse withVersionedKey(
+      String dbVersionedKey, OmKeyInfo keyInfo, String replacedNullVersion) {
+    this.versionedKeyName = dbVersionedKey;
+    this.versionedKeyInfo = keyInfo;
+    this.replacedNullVersionKey = replacedNullVersion;
+    return this;
+  }
+
   protected String addToKeyTable(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
@@ -135,6 +153,15 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
     omMetadataManager.getKeyTable(getBucketLayout())
         .putWithBatch(batchOperation, ozoneKey, omKeyInfo);
+
+    if (versionedKeyInfo != null) {
+      omMetadataManager.getVersionedKeyTable()
+          .putWithBatch(batchOperation, versionedKeyName, versionedKeyInfo);
+    }
+    if (replacedNullVersionKey != null) {
+      omMetadataManager.getVersionedKeyTable()
+          .deleteWithBatch(batchOperation, replacedNullVersionKey);
+    }
     return ozoneKey;
   }
 

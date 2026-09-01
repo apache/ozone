@@ -192,6 +192,64 @@ public class TestS3LifecycleConfigurationPut {
   }
 
   @Test
+  public void testPutInvalidVersioningLifecycleConfiguration()
+      throws Exception {
+    // NoncurrentVersionExpiration that limits neither age nor count
+    testInvalidLifecycleConfiguration(
+        TestS3LifecycleConfigurationPut::withEmptyNoncurrentExpiration,
+        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+    // ExpiredObjectDeleteMarker combined with an age
+    testInvalidLifecycleConfiguration(
+        TestS3LifecycleConfigurationPut::withMarkerAndDays,
+        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+    // NewerNoncurrentVersions above S3's ceiling
+    testInvalidLifecycleConfiguration(
+        TestS3LifecycleConfigurationPut::withTooManyNoncurrentVersions,
+        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+  }
+
+  private static InputStream withEmptyNoncurrentExpiration() {
+    return xml(
+        "<Rule>" +
+        "<ID>limits nothing</ID>" +
+        "<Prefix>prefix/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<NoncurrentVersionExpiration></NoncurrentVersionExpiration>" +
+        "</Rule>");
+  }
+
+  private static InputStream withMarkerAndDays() {
+    return xml(
+        "<Rule>" +
+        "<ID>marker and days</ID>" +
+        "<Prefix>prefix/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration>" +
+        "<Days>30</Days>" +
+        "<ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker>" +
+        "</Expiration>" +
+        "</Rule>");
+  }
+
+  private static InputStream withTooManyNoncurrentVersions() {
+    return xml(
+        "<Rule>" +
+        "<ID>too many</ID>" +
+        "<Prefix>prefix/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<NoncurrentVersionExpiration>" +
+        "<NewerNoncurrentVersions>101</NewerNoncurrentVersions>" +
+        "</NoncurrentVersionExpiration>" +
+        "</Rule>");
+  }
+
+  private static InputStream xml(String rules) {
+    String doc = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws"
+        + ".com/doc/2006-03-01/\">" + rules + "</LifecycleConfiguration>";
+    return new ByteArrayInputStream(doc.getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Test
   public void testPutLifecycleConfigurationFailsWithNonBucketOwner()
       throws Exception {
     when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("anotheruser");
