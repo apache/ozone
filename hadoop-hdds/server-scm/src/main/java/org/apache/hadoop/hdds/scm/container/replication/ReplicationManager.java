@@ -159,24 +159,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private final Map<DatanodeDetails, Integer> excludedNodes =
       new ConcurrentHashMap<>();
 
-  /**
-   * Track the number of active EC reconstruction commands across the cluster.
-   */
-  private final AtomicInteger inflightReconstructionCount = new AtomicInteger(0);
-
-  /**
-   * Mapping from reconstruction command ID to the number of pending fragments
-   * for that command. Used to know when the whole command is finished.
-   */
-  private final Map<Long, Integer> reconstructionCommandIdToPendingFragmentCount =
-      new ConcurrentHashMap<>();
+  private final GlobalReconstructionTracker globalReconstructionTracker =
+      new GlobalReconstructionTracker();
 
   /**
    * SCMService related variables.
    * After leaving safe mode, replicationMonitor needs to wait for a while
    * before really take effect.
    */
-  private final Lock serviceLock = new ReentrantLock();
+  private final Lock serviceLifecycleLock = new ReentrantLock();
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
   private final long waitTimeInMillis;
   private long lastTimeToBeReadyInMillis = 0;
@@ -439,11 +430,11 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * progress across the cluster.
    */
   public int getInflightReconstructionCount() {
-    return inflightReconstructionCount.get();
+    return globalReconstructionTracker.getInflightCount();
   }
 
   int getReconstructionPendingFragmentCount(long cmdId) {
-    return reconstructionCommandIdToPendingFragmentCount.getOrDefault(cmdId, 0);
+    return globalReconstructionTracker.getPendingFragmentCount(cmdId);
   }
 
   /**
@@ -461,29 +452,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * @return true if the limit is reached, false otherwise
    */
   public boolean isReconstructionLimitReached() {
-    int limit = getReconstructionInFlightLimit();
-    return limit > 0 && getInflightReconstructionCount() >= limit;
-  }
-
-  private void decrementInflightReconstructionCount() {
-    inflightReconstructionCount.updateAndGet(count -> Math.max(0, count - 1));
-  }
-
-  private boolean tryReserveReconstructionSlot() {
-    int limit = getReconstructionInFlightLimit();
-    while (true) {
-      int current = inflightReconstructionCount.get();
-      if (limit > 0 && current >= limit) {
-        return false;
-      }
-      if (inflightReconstructionCount.compareAndSet(current, current + 1)) {
-        return true;
-      }
-    }
-  }
-
-  private void releaseReconstructionSlot() {
-    decrementInflightReconstructionCount();
+    return globalReconstructionTracker.isLimitReached();
   }
 
   /**
@@ -601,40 +570,23 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
       ReconstructECContainersCommand command)
       throws CommandTargetOverloadedException, NotLeaderException {
-    serviceLock.lock();
-    try {
-      if (!tryReserveReconstructionSlot()) {
-        metrics.incrECReconstructionCmdsDeferredTotal();
-        throw new CommandTargetOverloadedException(
-            "Global reconstruction limit (" + getReconstructionInFlightLimit()
-                + ") reached for container " + containerInfo.getContainerID());
-      }
-      final long cmdId = command.getId();
-      final int fragmentCount = command.getMissingContainerIndexes().size();
-      reconstructionCommandIdToPendingFragmentCount.put(cmdId, fragmentCount);
-      boolean sent = false;
-      try {
-        List<DatanodeDetails> targets = command.getTargetDatanodes();
-        List<Pair<Integer, DatanodeDetails>> targetWithCmds =
-            getAvailableDatanodesForReplication(targets);
-        if (targetWithCmds.isEmpty()) {
-          metrics.incrECReconstructionCmdsDeferredTotal();
-          throw new CommandTargetOverloadedException("No target with capacity " +
-              "available for reconstruction of " + containerInfo.getContainerID());
-        }
-        DatanodeDetails target = selectAndOptionallyExcludeDatanode(
-            rmConf.getReconstructionCommandWeight(), targetWithCmds);
-        sendDatanodeCommand(command, containerInfo, target);
-        sent = true;
-      } finally {
-        if (!sent) {
-          reconstructionCommandIdToPendingFragmentCount.remove(cmdId);
-          releaseReconstructionSlot();
-        }
-      }
-    } finally {
-      serviceLock.unlock();
-    }
+    globalReconstructionTracker.reserveAndSend(
+        command.getId(),
+        command.getMissingContainerIndexes().size(),
+        containerInfo.getContainerID(),
+        () -> {
+          List<DatanodeDetails> targets = command.getTargetDatanodes();
+          List<Pair<Integer, DatanodeDetails>> targetWithCmds =
+              getAvailableDatanodesForReplication(targets);
+          if (targetWithCmds.isEmpty()) {
+            metrics.incrECReconstructionCmdsDeferredTotal();
+            throw new CommandTargetOverloadedException("No target with capacity " +
+                "available for reconstruction of " + containerInfo.getContainerID());
+          }
+          DatanodeDetails target = selectAndOptionallyExcludeDatanode(
+              rmConf.getReconstructionCommandWeight(), targetWithCmds);
+          sendDatanodeCommand(command, containerInfo, target);
+        });
   }
 
   private DatanodeDetails selectAndOptionallyExcludeDatanode(
@@ -1150,17 +1102,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD
         && op.getCommand() != null
         && op.getCommand().getType() == Type.reconstructECContainersCommand) {
-      long cmdId = op.getCommand().getId();
-      reconstructionCommandIdToPendingFragmentCount.compute(cmdId, (k, v) -> {
-        if (v == null) {
-          return null;
-        }
-        if (v <= 1) {
-          decrementInflightReconstructionCount();
-          return null;
-        }
-        return v - 1;
-      });
+      globalReconstructionTracker.onFragmentComplete(op.getCommand().getId());
     }
 
     if (!(timedOut && op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE)) {
@@ -1608,7 +1550,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
   @Override
   public void notifyStatusChanged() {
-    serviceLock.lock();
+    serviceLifecycleLock.lock();
     try {
       // 1) SCMContext#isLeaderReady returns true.
       // 2) not in safe mode.
@@ -1626,27 +1568,26 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
           containerReplicaPendingOps.clear();
           // clear() discards pending ops without firing opCompleted, so also
           // reset the reconstruction tracking that opCompleted maintains.
-          reconstructionCommandIdToPendingFragmentCount.clear();
-          inflightReconstructionCount.set(0);
+          globalReconstructionTracker.clear();
           serviceStatus = ServiceStatus.RUNNING;
         }
       } else {
         serviceStatus = ServiceStatus.PAUSING;
       }
     } finally {
-      serviceLock.unlock();
+      serviceLifecycleLock.unlock();
     }
   }
 
   @Override
   public boolean shouldRun() {
-    serviceLock.lock();
+    serviceLifecycleLock.lock();
     try {
       // If safe mode is off, then this SCMService starts to run with a delay.
       return serviceStatus == ServiceStatus.RUNNING &&
           clock.millis() - lastTimeToBeReadyInMillis >= waitTimeInMillis;
     } finally {
-      serviceLock.unlock();
+      serviceLifecycleLock.unlock();
     }
   }
 
@@ -1771,6 +1712,117 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       LOG.debug("Replication queue is not empty, not waking up replication monitor");
       return false;
     }
+  }
+
+  /**
+   * Cluster-wide EC reconstruction slot accounting.
+   *
+   * <p>All mutations to the inflight reconstruction counter and per-command
+   * fragment map go through this class. External callers do not acquire locks.
+   *
+   * <p>Lock policy:
+   * <ul>
+   *   <li>{@link #reserveAndSend} holds {@link #lock} across reserve, map
+   *       registration, and send so {@link #clear()} on leader transition
+   *       cannot run mid-send.</li>
+   *   <li>{@link #onFragmentComplete} runs without {@link #lock}; it uses
+   *       {@code ConcurrentHashMap.compute} and tolerates a prior
+   *       {@link #clear()}.</li>
+   * </ul>
+   */
+  private final class GlobalReconstructionTracker {
+
+    private final Lock lock = new ReentrantLock();
+    private final AtomicInteger inflightCount = new AtomicInteger(0);
+    private final Map<Long, Integer> pendingFragmentCountByCommandId =
+        new ConcurrentHashMap<>();
+
+    int getInflightCount() {
+      return inflightCount.get();
+    }
+
+    int getPendingFragmentCount(long cmdId) {
+      return pendingFragmentCountByCommandId.getOrDefault(cmdId, 0);
+    }
+
+    boolean isLimitReached() {
+      int limit = getReconstructionInFlightLimit();
+      return limit > 0 && getInflightCount() >= limit;
+    }
+
+    void reserveAndSend(long cmdId, int fragmentCount, long containerId,
+        ReconstructionSendAction send)
+        throws CommandTargetOverloadedException, NotLeaderException {
+      if (fragmentCount <= 0) {
+        throw new IllegalArgumentException(
+            "Reconstruction command " + cmdId + " for container " + containerId
+                + " has no fragments");
+      }
+      lock.lock();
+      try {
+        if (!tryReserve()) {
+          metrics.incrECReconstructionCmdsDeferredTotal();
+          throw new CommandTargetOverloadedException(
+              "Global reconstruction limit (" + getReconstructionInFlightLimit()
+                  + ") reached for container " + containerId);
+        }
+        pendingFragmentCountByCommandId.put(cmdId, fragmentCount);
+        boolean sent = false;
+        try {
+          send.run();
+          sent = true;
+        } finally {
+          if (!sent) {
+            pendingFragmentCountByCommandId.remove(cmdId);
+            releaseSlot();
+          }
+        }
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    void onFragmentComplete(long cmdId) {
+      pendingFragmentCountByCommandId.compute(cmdId, (k, pendingFragments) -> {
+        if (pendingFragments == null) {
+          return null;
+        }
+        if (pendingFragments <= 1) {
+          releaseSlot();
+          return null;
+        }
+        return pendingFragments - 1;
+      });
+    }
+
+    void clear() {
+      lock.lock();
+      try {
+        pendingFragmentCountByCommandId.clear();
+        inflightCount.set(0);
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    private boolean tryReserve() {
+      int limit = getReconstructionInFlightLimit();
+      int current = inflightCount.get();
+      if (limit > 0 && current >= limit) {
+        return false;
+      }
+      inflightCount.incrementAndGet();
+      return true;
+    }
+
+    private void releaseSlot() {
+      inflightCount.updateAndGet(count -> Math.max(0, count - 1));
+    }
+  }
+
+  @FunctionalInterface
+  private interface ReconstructionSendAction {
+    void run() throws CommandTargetOverloadedException, NotLeaderException;
   }
 }
 
