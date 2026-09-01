@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteMarkerResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
@@ -110,7 +111,16 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
     }
 
-    return getOmRequest();
+    // A delete on a versioned bucket creates a marker per key, and a marker is
+    // a version, so it needs an id proposed here on the OM that received the
+    // request. One covers the batch: versionIds only have to increase within a
+    // key, and each key's own current version raises it if needed.
+    return getOmRequest().toBuilder()
+        .setDeleteKeysRequest(deleteKeysRequest.toBuilder()
+            .setDeleteKeys(deleteKeysRequest.getDeleteKeys().toBuilder()
+                .setProposedVersionId(
+                    ozoneManager.getVersionIdAllocator().propose())))
+        .build();
   }
 
   @Override @SuppressWarnings("methodlength")
@@ -149,6 +159,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     boolean acquiredLock = false;
+    // Whether the request may have put an entry into the versionedKeyTable
+    // cache, which decides the failure response below.
+    boolean insertingDeleteMarkers = false;
 
     int indexFailed = 0;
     int length = deleteKeys.size();
@@ -157,6 +170,10 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
             .setVolumeName(volumeName).setBucketName(bucketName);
 
     boolean deleteStatus = true;
+    // Keys that stopped being visible to a plain read. A marker written
+    // over a key that was already a marker, or over one the bucket held no
+    // record of, hides nothing that was not hidden already.
+    int visibleKeysRemoved = 0;
     long startNanos = Time.monotonicNowNanos();
     try {
       long startNanosDeleteKeysResolveBucketLatency = Time.monotonicNowNanos();
@@ -183,15 +200,48 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
+      OmBucketInfo omBucketInfo =
+          getBucketInfo(omMetadataManager, volumeName, bucketName);
+      // Keys the bucket holds no record of. On a versioned bucket they still
+      // get a delete marker, so they are named rather than skipped.
+      List<String> markerOnlyKeys = new ArrayList<>();
 
       for (indexFailed = 0; indexFailed < length; indexFailed++) {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
         String objectKey =
             omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+        // Evaluate key ACL before existence, so that a missing key without
+        // DELETE permission is refused rather than being recorded as deleted.
+        try {
+          long startNanosDeleteKeysAclCheckLatency = Time.monotonicNowNanos();
+          checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
+              volumeOwner);
+          perfMetrics.setDeleteKeysAclCheckLatencyNs(
+              Time.monotonicNowNanos() - startNanosDeleteKeysAclCheckLatency);
+        } catch (Exception ex) {
+          deleteStatus = false;
+          LOG.error("Acl check failed for Key: {}", objectKey, ex);
+          deleteKeys.remove(keyName);
+          unDeletedKeys.addKeys(keyName);
+          keyToError.put(keyName, new ErrorInfo(OMException.ResultCodes.ACCESS_DENIED.name(), "ACL check failed"));
+          continue;
+        }
+
         OmKeyInfo omKeyInfo = getOmKeyInfo(ozoneManager, omMetadataManager,
             volumeName, bucketName, keyName);
 
         if (omKeyInfo == null) {
+          // S3 records the delete whether or not the key was there, so a key
+          // with no record takes a delete marker of its own rather than
+          // failing the batch. The single-key delete does the same. A request
+          // that asserts an updateID is excluded: a key with no record has no
+          // updateID that could match.
+          if (omBucketInfo.isS3VersioningEnabled()
+              && deleteKeyUpdateIDs == null) {
+            markerOnlyKeys.add(keyName);
+            continue;
+          }
           deleteStatus = false;
           LOG.error("Received a request to delete a Key does not exist {}",
               objectKey);
@@ -215,12 +265,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         }
 
         try {
-          // check Acl
-          long startNanosDeleteKeysAclCheckLatency = Time.monotonicNowNanos();
-          checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
-              volumeOwner);
-          perfMetrics.setDeleteKeysAclCheckLatencyNs(Time.monotonicNowNanos() - startNanosDeleteKeysAclCheckLatency);
           OzoneFileStatus fileStatus = getOzoneKeyStatus(
               ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
           addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
@@ -228,26 +272,37 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           deleteKeysInfo.add(omKeyInfo);
         } catch (Exception ex) {
           deleteStatus = false;
-          LOG.error("Acl check failed for Key: {}", objectKey, ex);
+          LOG.error("Failed to prepare Key for deletion: {}", objectKey, ex);
           deleteKeys.remove(keyName);
           unDeletedKeys.addKeys(keyName);
-          keyToError.put(keyName, new ErrorInfo(OMException.ResultCodes.ACCESS_DENIED.name(), "ACL check failed"));
+          keyToError.put(keyName, new ErrorInfo(
+              OMException.ResultCodes.INTERNAL_ERROR.name(), ex.getMessage()));
         }
       }
 
-      OmBucketInfo omBucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
-
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
-      // Mark all keys which can be deleted, in cache as deleted.
-      Pair<Long, Integer> quotaReleasedEmptyKeys =
-          markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
-              dirList, omMetadataManager, openKeyInfoMap);
-      omBucketInfo.decrUsedBytes(quotaReleasedEmptyKeys.getKey(), true);
-      // For empty keyInfos the quota should be released and not added to namespace.
-      omBucketInfo.decrUsedNamespace(omKeyInfoList.size() + dirList.size() -
-              quotaReleasedEmptyKeys.getValue(), true);
-      omBucketInfo.decrUsedNamespace(quotaReleasedEmptyKeys.getValue(), false);
+      // On a versioned bucket a delete removes no data: each key gets a delete
+      // marker as its current version, exactly as a single-key delete does.
+      List<DeleteMarkerInsertion> markerInsertions = null;
+      if (omBucketInfo.isS3VersioningEnabled()) {
+        insertingDeleteMarkers = true;
+        markerInsertions = insertDeleteMarkers(ozoneManager, omMetadataManager,
+            omBucketInfo, omKeyInfoList, markerOnlyKeys,
+            deleteKeyArgs.getProposedVersionId(), trxnLogIndex);
+        visibleKeysRemoved = (int) omKeyInfoList.stream()
+            .filter(keyInfo -> !keyInfo.isDeleteMarker()).count();
+      } else {
+        // Mark all keys which can be deleted, in cache as deleted.
+        Pair<Long, Integer> quotaReleasedEmptyKeys =
+            markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
+                dirList, omMetadataManager, openKeyInfoMap);
+        omBucketInfo.decrUsedBytes(quotaReleasedEmptyKeys.getKey(), true);
+        // For empty keyInfos the quota should be released and not added to namespace.
+        omBucketInfo.decrUsedNamespace(omKeyInfoList.size() + dirList.size() -
+                quotaReleasedEmptyKeys.getValue(), true);
+        omBucketInfo.decrUsedNamespace(quotaReleasedEmptyKeys.getValue(), false);
+        visibleKeysRemoved = deleteKeys.size();
+      }
 
       OmLifecycleScanState state = null;
       if (sourceType == RequestSource.LIFECYCLE && deleteKeyRequest.hasScanState()) {
@@ -259,9 +314,17 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
-      omClientResponse =
-          getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
-              unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap, state);
+      if (markerInsertions != null) {
+        omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
+            .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
+            .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus);
+        omClientResponse = new OMKeysDeleteMarkerResponse(omResponse.build(),
+            markerInsertions, omBucketInfo.copyObject(), state);
+      } else {
+        omClientResponse =
+            getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
+                unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap, state);
+      }
 
       result = Result.SUCCESS;
       long endNanosDeleteKeySuccessLatencyNs = Time.monotonicNowNanos();
@@ -284,8 +347,15 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       omResponse.setDeleteKeysResponse(
           DeleteKeysResponse.newBuilder().setStatus(false)
               .setUnDeletedKeys(unDeletedKeys).build()).build();
-      omClientResponse =
-          new OMKeysDeleteResponse(omResponse.build(), getBucketLayout());
+      // The failure response has to declare the same tables as the successful
+      // one: the double buffer cleans up the table cache from the response's
+      // CleanupTableInfo, so a marker insertion that failed part way through
+      // the batch would otherwise leave a versionedKeyTable entry behind that
+      // is in no DB and is never cleaned up.
+      omClientResponse = insertingDeleteMarkers
+          ? new OMKeysDeleteMarkerResponse(omResponse.build(),
+              getBucketLayout())
+          : new OMKeysDeleteResponse(omResponse.build(), getBucketLayout());
       long endNanosDeleteKeyFailureLatencyNs = Time.monotonicNowNanos();
       perfMetrics.setDeleteKeyFailureLatencyNs(endNanosDeleteKeyFailureLatencyNs - startNanos);
     } finally {
@@ -319,7 +389,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
       omMetrics.incNumKeyDeletes(deleteKeys.size());
       omMetrics.incNumKeyDeleteFails(unDeletedKeys.getKeysList().size());
-      omMetrics.decNumKeys(deleteKeys.size());
+      omMetrics.decNumKeys(visibleKeysRemoved);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Keys delete success. Volume:{}, Bucket:{}, Keys:{}, sourceType:{}",
             volumeName, bucketName, auditMap.get(DELETED_KEYS_LIST), sourceType);
@@ -382,6 +452,40 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         .build(), omKeyInfoList,
         omBucketInfo.copyObject(), openKeyInfoMap, scanState);
     return omClientResponse;
+  }
+
+  /**
+   * Inserts a delete marker for every key that survived validation, reusing
+   * the implementation a single-key delete uses so the two cannot drift.
+   *
+   * @return what each insertion changed, for the response to write out
+   */
+  private List<DeleteMarkerInsertion> insertDeleteMarkers(
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
+      OmBucketInfo omBucketInfo, List<OmKeyInfo> omKeyInfoList,
+      List<String> markerOnlyKeys, long proposedVersionId, long trxnLogIndex)
+      throws IOException {
+
+    List<DeleteMarkerInsertion> insertions = new ArrayList<>();
+    for (OmKeyInfo currentVersion : omKeyInfoList) {
+      String objectKey = omMetadataManager.getOzoneKey(
+          currentVersion.getVolumeName(), currentVersion.getBucketName(),
+          currentVersion.getKeyName());
+      insertions.add(insertDeleteMarker(ozoneManager, omMetadataManager,
+          omBucketInfo, currentVersion, objectKey,
+          currentVersion.getKeyName(), proposedVersionId,
+          Time.now(), trxnLogIndex));
+    }
+    // A key the bucket holds no record of supersedes nothing, so the marker
+    // is built without a current version to inherit from.
+    for (String keyName : markerOnlyKeys) {
+      String objectKey = omMetadataManager.getOzoneKey(
+          omBucketInfo.getVolumeName(), omBucketInfo.getBucketName(), keyName);
+      insertions.add(insertDeleteMarker(ozoneManager, omMetadataManager,
+          omBucketInfo, null, objectKey, keyName, proposedVersionId,
+          Time.now(), trxnLogIndex));
+    }
+    return insertions;
   }
 
   protected Pair<Long, Integer> markKeysAsDeletedInCache(OzoneManager ozoneManager,
