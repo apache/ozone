@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.NetworkTopology;
+import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -130,6 +131,9 @@ public class TestRackAwarePlacement {
       assertPipelinesSpanMultipleRacks(cluster);
       assertContainerReplicationIsRackAware(cluster);
     }
+
+    assertTrue(new StaticMapping().getSwitchMap().isEmpty(),
+        "Static mapping should be cleared after cluster shutdown");
   }
 
   @Nested

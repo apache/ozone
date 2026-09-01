@@ -710,6 +710,13 @@ public final class OMConfigKeys {
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
       = 1_000_000_000L;
 
+  public static final String
+      OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB
+      = "ozone.om.snapshot.diff.max.in.memory.entries.per.job";
+  public static final long
+      OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT
+      = 1_000_000L;
+
   public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
       = "ozone.om.upgrade.quota.recalculate.enabled";
 
