@@ -267,6 +267,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
         () -> s3Client.createBucket(bucketName));
     assertEquals(409, ase.getStatusCode());
     assertEquals(S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU.getCode(), ase.getErrorCode());
+    assertEquals("application/xml", ase.getHttpHeaders().get("Content-Type"));
   }
 
   @Test
@@ -569,6 +570,24 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
     assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
+  }
+
+  @Test
+  public void testPutObjectWithEmptyContentType() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    ObjectMetadata metadata = new ObjectMetadata();
+    metadata.setContentType("");
+    InputStream inputStream = new ByteArrayInputStream(
+        content.getBytes(StandardCharsets.UTF_8));
+
+    PutObjectResult putObjectResult = s3Client.putObject(
+        bucketName, keyName, inputStream, metadata);
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2",
+        putObjectResult.getETag());
   }
 
   @Test
@@ -2281,7 +2300,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
         .withPrefix("")
         .withStatus(BucketLifecycleConfiguration.ENABLED);
     rule3.setAbortIncompleteMultipartUpload(
-        new AbortIncompleteMultipartUpload().withDaysAfterInitiation(30));
+        new AbortIncompleteMultipartUpload().withDaysAfterInitiation(29));
 
     rules.add(rule1);
     rules.add(rule2);
@@ -2313,7 +2332,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals("abort-incomplete-mpu-no-prefix", retrievedRule3.getId());
     assertEquals("", retrievedRule3.getPrefix());
     assertEquals(BucketLifecycleConfiguration.ENABLED, retrievedRule3.getStatus());
-    assertEquals(30, retrievedRule3.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+    assertEquals(29, retrievedRule3.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
   }
 
   /**

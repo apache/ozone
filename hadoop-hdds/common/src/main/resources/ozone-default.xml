@@ -1546,9 +1546,19 @@
     <value>30d</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
-      Controls how long multipart upload is considered active. Specifically, if a multipart info
-      has been ongoing longer than the value of this config entry, that multipart info is considered as
-      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+      Controls how long a multipart upload is considered active before MultipartUploadCleanupService
+      treats it as stale and aborts it. If a multipart upload has been ongoing longer than this
+      threshold (e.g. due to a client crash), it will be cleaned up automatically.
+      Unit can be specified with a postfix (ns, ms, s, m, h, d).
+
+      Interaction with S3 lifecycle AbortIncompleteMultipartUpload rules:
+      When a bucket lifecycle rule specifies an AbortIncompleteMultipartUpload action, its
+      daysAfterInitiation value must be strictly less than this threshold. If
+      daysAfterInitiation is greater than or equal to this threshold, MultipartUploadCleanupService
+      will abort the upload before the lifecycle rule fires, silently making the rule ineffective.
+      Ozone enforces this constraint at lifecycle configuration creation time and will reject
+      configurations that violate it. To use a longer daysAfterInitiation value, increase this
+      threshold accordingly.
     </description>
   </property>
 
@@ -4941,6 +4951,16 @@
     <tag>OZONE, OM</tag>
     <description>
       Max numbers of keys changed allowed for a snapshot diff job.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.max.in.memory.entries.per.job</name>
+    <value>1000000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of diff-candidate object IDs a snapshot diff job may retain
+      in memory before spilling to a temporary RocksDB column family.
     </description>
   </property>
 
