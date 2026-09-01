@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.export;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -156,13 +157,13 @@ public class ContainerExportManager {
         job.getFuture().completeExceptionally(new InterruptedException("Export cancelled"));
         LOG.info("Export {} was cancelled", job);
       } else {
-        job.getFuture().complete(idsWritten);
         if (idsWritten > 0) {
           fileManager.writeArchive(job);
           LOG.info("{} completed: {} ids, archive={}", job, idsWritten, job.getFileName());
         } else {
           LOG.info("{} completed with {} matching containers", job, idsWritten);
         }
+        job.getFuture().complete(idsWritten);
       }
 
       fileManager.deleteJobDirectory(job.getId());
@@ -179,101 +180,73 @@ public class ContainerExportManager {
   private Long writeContainerIDs(ExportJob job) throws IOException {
     // Pre-allocated buffer: ~12 chars per ID (up to 20 digits + newline) per batch.
     final byte[] buffer = new byte[job.getBatchSize() * 12];
-    try (PartWriter partWriter = new PartWriter(job, fileManager)) {
-      for (ContainerID cursor = job.getStartContainerId(); cursor != null;) {
-        if (Thread.interrupted()) {
-          return null;
-        }
-        if (!isLeaderReady.getAsBoolean()) {
-          throw new IOException("SCM lost leadership during " + job);
-        }
+    int partNumber = 1;
+    long idsWritten = 0;
+    ContainerID cursor = job.getStartContainerId();
+    List<ContainerID> batch = Collections.emptyList();
+    int batchIndex = 0;
 
-        final List<ContainerID> batch = containerManager.getContainerIDs(
-            cursor, job.getBatchSize(), job.getLifeCycleState(), job.getHealthState());
+    while (cursor != null || batchIndex < batch.size()) {
+      if (Thread.interrupted()) {
+        return null;
+      }
+      if (!isLeaderReady.getAsBoolean()) {
+        throw new IOException("SCM lost leadership during " + job);
+      }
+
+      if (batchIndex >= batch.size()) {
+        batch = fetchContainerIds(job, cursor);
+        batchIndex = 0;
         if (batch.isEmpty()) {
-          cursor = null;
-        } else {
-          partWriter.writeBatch(batch, buffer);
-          cursor = ContainerID.valueOf(batch.get(batch.size() - 1).getProtobuf().getId() + 1);
+          break;
         }
       }
-      return partWriter.getIdsWritten();
-    }
-  }
 
-  /**
-   * Writes container IDs into part files for one export job.
-   */
-  private static final class PartWriter implements AutoCloseable {
-    private final ExportJob job;
-    private final ExportFileManager fileManager;
-    private int partNumber = 1;
-    private long idsInCurrentPart = 0;
-    private long idsWritten = 0;
-    private OutputStream out;
+      final ContainerID partStartContainerId = batch.get(batchIndex);
+      try (OutputStream out = fileManager.newPartOutputStream(job.getId(), job.partFileName(partNumber))) {
+        job.writeMetadataHeader(out, partNumber, partStartContainerId);
+        LOG.info("{} created part{}", job, partNumber);
 
-    PartWriter(ExportJob job, ExportFileManager fileManager) {
-      this.job = job;
-      this.fileManager = fileManager;
-    }
+        long idsInCurrentPart = 0;
+        int offset = 0;
+        while (idsInCurrentPart < job.getPartSize()
+            && (batchIndex < batch.size() || cursor != null)) {
+          if (batchIndex >= batch.size()) {
+            cursor = ContainerID.valueOf(batch.get(batch.size() - 1).getProtobuf().getId() + 1);
+            batch = fetchContainerIds(job, cursor);
+            batchIndex = 0;
+            if (batch.isEmpty()) {
+              cursor = null;
+              break;
+            }
+          }
 
-    long getIdsWritten() {
-      return idsWritten;
-    }
-
-    void writeBatch(List<ContainerID> batch, byte[] buffer) throws IOException {
-      int offset = 0;
-      for (ContainerID containerId : batch) {
-        if (idsInCurrentPart == 0) {
-          closeCurrentPart();
-          openPart(containerId);
-        }
-
-        final byte[] idBytes = (containerId.getProtobuf().getId() + "\n").getBytes(StandardCharsets.UTF_8);
-        if (offset + idBytes.length > buffer.length) {
-          out.write(buffer, 0, offset);
-          offset = 0;
-        }
-        System.arraycopy(idBytes, 0, buffer, offset, idBytes.length);
-        offset += idBytes.length;
-        idsWritten++;
-        idsInCurrentPart++;
-
-        if (idsInCurrentPart >= job.getPartSize()) {
-          if (offset > 0) {
+          final ContainerID containerId = batch.get(batchIndex++);
+          final byte[] idBytes = (containerId.getProtobuf().getId() + "\n").getBytes(StandardCharsets.UTF_8);
+          if (offset + idBytes.length > buffer.length) {
             out.write(buffer, 0, offset);
             offset = 0;
           }
-          closeCurrentPart();
-          idsInCurrentPart = 0;
-          partNumber++;
+          System.arraycopy(idBytes, 0, buffer, offset, idBytes.length);
+          offset += idBytes.length;
+          idsWritten++;
+          idsInCurrentPart++;
+        }
+
+        if (offset > 0) {
+          out.write(buffer, 0, offset);
         }
       }
-
-      if (offset > 0) {
-        out.write(buffer, 0, offset);
-      }
+      partNumber++;
     }
+    return idsWritten;
+  }
 
-    private void openPart(ContainerID firstContainerId) throws IOException {
-      out = fileManager.newPartOutputStream(job.getId(), job.partFileName(partNumber));
-      job.writeMetadataHeader(out, partNumber, firstContainerId);
-      LOG.info("{} created part{}", job, partNumber);
+  private List<ContainerID> fetchContainerIds(ExportJob job, ContainerID cursor) throws IOException {
+    if (!isLeaderReady.getAsBoolean()) {
+      throw new IOException("SCM lost leadership during " + job);
     }
-
-    private void closeCurrentPart() throws IOException {
-      final OutputStream current = out;
-      out = null;
-      if (current != null) {
-        try (OutputStream stream = current) {
-          stream.flush();
-        }
-      }
-    }
-
-    @Override
-    public void close() throws IOException {
-      closeCurrentPart();
-    }
+    return containerManager.getContainerIDs(
+        cursor, job.getBatchSize(), job.getLifeCycleState(), job.getHealthState());
   }
 }
