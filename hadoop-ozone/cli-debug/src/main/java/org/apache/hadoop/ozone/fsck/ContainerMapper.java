@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
- * Generates Container Id to Blocks and BlockDetails mapping.
+ * Generates Container Id to Blocks and BlockIdDetails mapping.
  */
 public class ContainerMapper {
 
@@ -61,9 +61,9 @@ public class ContainerMapper {
   }
 
   /**
-   * Generates Container Id to Blocks and BlockDetails mapping.
+   * Generates Container Id to Blocks and BlockIdDetails mapping.
    * @param configuration @{@link OzoneConfiguration}
-   * @return {@code Map<Long, List<Map<Long, BlockDetails>>>
+   * @return {@code Map<Long, List<Map<Long, BlockIdDetails>>>
    *   Map of ContainerId -> (Block, Block info)}
    * @throws IOException
    */
@@ -93,29 +93,7 @@ public class ContainerMapper {
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));
             for (OmKeyLocationInfoGroup keyLocationInfoGroup : keyInfo
                 .getKeyLocationVersions()) {
-              for (List<OmKeyLocationInfo> keyLocationInfo : keyLocationInfoGroup
-                  .getLocationLists()) {
-                for (OmKeyLocationInfo keyLocation : keyLocationInfo) {
-                  BlockIdDetails blockIdDetails = new BlockIdDetails();
-                  Map<Long, BlockIdDetails> innerMap = new HashMap<>();
-
-                  long containerID = keyLocation.getBlockID().getContainerID();
-                  long blockID = keyLocation.getBlockID().getLocalID();
-                  blockIdDetails.setBucketName(keyInfo.getBucketName());
-                  blockIdDetails.setBlockVol(keyInfo.getVolumeName());
-                  blockIdDetails.setKeyName(keyInfo.getKeyName());
-
-                  List<Map<Long, BlockIdDetails>> innerList = new ArrayList<>();
-                  innerMap.put(blockID, blockIdDetails);
-
-                  if (dataMap.containsKey(containerID)) {
-                    innerList = dataMap.get(containerID);
-                  }
-
-                  innerList.add(innerMap);
-                  dataMap.put(containerID, innerList);
-                }
-              }
+              addLocations(dataMap, keyInfo, keyLocationInfoGroup);
             }
           }
         }
@@ -125,6 +103,34 @@ public class ContainerMapper {
 
     } finally {
       metadataManager.stop();
+    }
+  }
+
+  private static void addLocations(
+      Map<Long, List<Map<Long, BlockIdDetails>>> dataMap, OmKeyInfo keyInfo,
+      OmKeyLocationInfoGroup keyLocationInfoGroup) {
+    for (List<OmKeyLocationInfo> keyLocationInfo : keyLocationInfoGroup
+        .getLocationLists()) {
+      for (OmKeyLocationInfo keyLocation : keyLocationInfo) {
+        BlockIdDetails blockIdDetails = new BlockIdDetails();
+        Map<Long, BlockIdDetails> innerMap = new HashMap<>();
+
+        long containerID = keyLocation.getBlockID().getContainerID();
+        long blockID = keyLocation.getBlockID().getLocalID();
+        blockIdDetails.setBucketName(keyInfo.getBucketName());
+        blockIdDetails.setBlockVol(keyInfo.getVolumeName());
+        blockIdDetails.setKeyName(keyInfo.getKeyName());
+
+        List<Map<Long, BlockIdDetails>> innerList = new ArrayList<>();
+        innerMap.put(blockID, blockIdDetails);
+
+        if (dataMap.containsKey(containerID)) {
+          innerList = dataMap.get(containerID);
+        }
+
+        innerList.add(innerMap);
+        dataMap.put(containerID, innerList);
+      }
     }
   }
 
