@@ -33,8 +33,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
@@ -240,10 +238,27 @@ public final class Pipeline {
   }
 
   /**
-   * Get the replicaIndex Map.
+   * @param fromIndex the replica index starting from (inclusive)
+   * @param toIndex the replica index starting to (exclusive)
+   * @return true iff this pipeline contain all replica indexes within the given range.
    */
-  public Map<DatanodeDetails, Integer> getReplicaIndexes() {
-    return this.getNodes().stream().collect(Collectors.toMap(Function.identity(), this::getReplicaIndex));
+  public boolean containsAllReplicaIndexes(int fromIndex, int toIndex) {
+    final boolean[] contains = new boolean[toIndex - fromIndex];
+    for (int r : replicaIndexes.values()) {
+      if (r >= fromIndex && r < toIndex) {
+        contains[r - fromIndex] = true;
+      }
+    }
+    for (boolean contain : contains) {
+      if (!contain) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public Map<DatanodeDetails, Integer> getReplicaIndexesForTesting() {
+    return Collections.unmodifiableMap(replicaIndexes);
   }
 
   /**

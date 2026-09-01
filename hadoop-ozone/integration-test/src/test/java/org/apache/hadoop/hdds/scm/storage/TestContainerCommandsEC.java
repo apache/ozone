@@ -516,7 +516,7 @@ public class TestContainerCommandsEC {
         ContainerProtos.ReadChunkResponseProto readChunkResponseProto =
             ContainerProtocolCalls.readChunk(dnClient,
                 writeChunkRequest.getWriteChunk().getChunkData(),
-                blockID.getDatanodeBlockIDProtobufBuilder().setReplicaIndex(replicaIndex).build(), null,
+                blockID.getDatanodeBlockIDProtobufBuilder(replicaIndex).build(), null,
                 blockToken);
         ByteBuffer[] readOnlyByteBuffersArray = BufferUtils
             .getReadOnlyByteBuffersArray(
@@ -834,7 +834,7 @@ public class TestContainerCommandsEC {
       BlockID entryBlockID = blockOutputStreamEntry.getBlockID();
       long entryContainerID = entryBlockID.getContainerID();
       Pipeline entryPipeline = blockOutputStreamEntry.getPipeline();
-      Map<DatanodeDetails, Integer> replicaIndexes = entryPipeline.getReplicaIndexes();
+      Map<DatanodeDetails, Integer> replicaIndexes = entryPipeline.getReplicaIndexesForTesting();
       try {
         for (Map.Entry<DatanodeDetails, Integer> entry : replicaIndexes.entrySet()) {
           DatanodeDetails key = entry.getKey();
