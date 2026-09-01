@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
@@ -171,17 +170,26 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       if (keyArgs.hasVersionId() || keyArgs.getNullVersion()) {
         // DELETE ?versionId= permanently removes one version. It is the only
         // delete that destroys data on a versioned bucket.
+        // Reported as not-found rather than unsupported: S3 answers a delete
+        // naming a version that does not exist with a plain success, which the
+        // gateway reaches by swallowing KEY_NOT_FOUND. NOT_SUPPORTED_OPERATION
+        // would surface an error AWS never returns here.
         if (!omBucketInfo.isS3VersioningEnabled()) {
           throw new OMException("Bucket " + bucketName
-              + " does not have S3 versioning enabled",
-              NOT_SUPPORTED_OPERATION);
+              + " does not have S3 versioning enabled, so it holds no version "
+              + "the request could name", KEY_NOT_FOUND);
         }
         deletingVersion = true;
         omClientResponse = deleteVersion(omMetadataManager, omBucketInfo,
             omKeyInfo, keyArgs, volumeName, bucketName, keyName, trxnLogIndex,
             omResponse);
         // Noncurrent versions are invisible to plain reads, so removing one
-        // does not change the visible key count.
+        // does not change the visible key count. Deleting the current one
+        // with nothing left to promote takes the key away entirely, and the
+        // record that was there is what stops being visible.
+        visibleKeyRemoved = omKeyInfo != null && !omKeyInfo.isDeleteMarker()
+            && omMetadataManager.getKeyTable(getBucketLayout())
+                .get(objectKey) == null;
       } else if (omBucketInfo.isS3VersioningEnabled()) {
         // A delete without a versionId removes no data: a delete marker
         // becomes the current version and the version it supersedes moves to

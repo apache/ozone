@@ -330,6 +330,27 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertNotNull(noncurrentVersion(200L));
   }
 
+  /**
+   * Deleting the current version with nothing left to promote takes the key
+   * away entirely, so it comes off the key count. Promotion keeps the key, so
+   * it does not.
+   */
+  @Test
+  public void testDeletingTheLastVersionTakesTheKeyOffTheCount()
+      throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(200L, false);
+
+    long before = omMetrics.getNumKeys();
+    deleteVersionAt(300L, false, 400L);
+    // 200 was promoted, so the key is still there
+    assertEquals(before, omMetrics.getNumKeys());
+
+    deleteVersionAt(200L, false, 500L);
+    assertEquals(before - 1, omMetrics.getNumKeys());
+  }
+
   @Test
   public void testPermanentDeleteOfUnknownVersionIsNotFound() throws Exception {
     setupVersionedBucket();
@@ -338,6 +359,25 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     OMClientResponse response = deleteVersionAt(999L, false, 400L);
     assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         response.getOMResponse().getStatus());
+  }
+
+  /**
+   * A bucket with no versioning holds no version an id could name, which is the
+   * same answer as naming an id no version carries: not-found, not unsupported.
+   * The gateway turns it into the plain success S3 gives a delete that names a
+   * version which does not exist.
+   */
+  @Test
+  public void testDeletingAVersionOnAnUnversionedBucketIsNotFound()
+      throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    seedCurrentVersion(null);
+
+    OMClientResponse response = deleteVersionAt(300L, false, 400L);
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+        response.getOMResponse().getStatus());
+    assertNotNull(currentVersion());
   }
 
   @Test
