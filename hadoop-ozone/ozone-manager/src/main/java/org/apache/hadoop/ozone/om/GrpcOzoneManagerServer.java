@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_READ_THREAD_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_WORKERGROUP_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_WORKERGROUP_SIZE_KEY;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.Server;
 import io.grpc.ServerInterceptors;
@@ -103,10 +104,30 @@ public class GrpcOzoneManagerServer {
     this.threadNamePrefix = threadPrefix;
     this.omS3gGrpcMetrics = GrpcMetrics.create(config);
 
-    init(omTranslator,
-        delegationTokenMgr,
-        config,
-        caClient);
+    try {
+      init(omTranslator,
+          delegationTokenMgr,
+          config,
+          caClient);
+    } catch (RuntimeException e) {
+      // GrpcMetrics was registered above; if init() fails the server (for
+      // example failing closed on TLS setup) stop() never runs, so drop the
+      // registration here to avoid leaking the metrics source.
+      omS3gGrpcMetrics.unRegister();
+      throw e;
+    }
+  }
+
+  /**
+   * Whether the OM S3 gateway gRPC endpoint must reject OMRequests that carry
+   * no S3 authentication. Only enforced when security is enabled; controlled by
+   * {@link OMConfigKeys#OZONE_OM_S3_GRPC_AUTH_REQUIRED} (default true).
+   */
+  @VisibleForTesting
+  static boolean isS3AuthRequired(OzoneConfiguration conf) {
+    return new SecurityConfig(conf).isSecurityEnabled()
+        && conf.getBoolean(OMConfigKeys.OZONE_OM_S3_GRPC_AUTH_REQUIRED,
+            OMConfigKeys.OZONE_OM_S3_GRPC_AUTH_REQUIRED_DEFAULT);
   }
 
   public void init(OzoneManagerProtocolServerSideTranslatorPB omTranslator,
@@ -142,6 +163,9 @@ public class GrpcOzoneManagerServer {
     workerEventLoopGroup =
         new NioEventLoopGroup(workerGroupSize, workerFactory);
 
+    SecurityConfig secConf = new SecurityConfig(omServerConfig);
+    boolean s3AuthRequired = isS3AuthRequired(omServerConfig);
+
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(maxSize)
         .bossEventLoopGroup(bossEventLoopGroup)
@@ -149,14 +173,13 @@ public class GrpcOzoneManagerServer {
         .channelType(NioServerSocketChannel.class)
         .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
-            new OzoneManagerServiceGrpc(omTranslator),
+            new OzoneManagerServiceGrpc(omTranslator, s3AuthRequired),
             new ClientAddressServerInterceptor(),
             new GrpcMetricsServerResponseInterceptor(omS3gGrpcMetrics),
             new GrpcMetricsServerRequestInterceptor(omS3gGrpcMetrics)))
         .addTransportFilter(
             new GrpcMetricsServerTransportFilter(omS3gGrpcMetrics));
 
-    SecurityConfig secConf = new SecurityConfig(omServerConfig);
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
       try {
         SslContextBuilder sslClientContextBuilder =
@@ -171,7 +194,10 @@ public class GrpcOzoneManagerServer {
             SupportedCipherSuiteFilter.INSTANCE);
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
-        LOG.error("Unable to setup TLS for secure Om S3g GRPC channel.", ex);
+        // Fail closed: silently starting this server in plaintext when TLS
+        // was requested would expose an unauthenticated OM endpoint.
+        throw new IllegalStateException(
+            "Unable to setup TLS for secure Om S3g GRPC channel.", ex);
       }
     }
 
