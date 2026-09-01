@@ -1135,14 +1135,17 @@ public class TestSnapshotDiffManager {
 
     spy.loadJobsOnStartUp();
 
-    // Wait for sometime to make sure that job finishes.
-    attempt(() ->
-        verify(spy, atLeast(1))
-            .generateSnapshotDiffReport(anyString(), anyString(),
-                eq(VOLUME_NAME), eq(BUCKET_NAME), eq(snapshotInfo.getName()),
-                eq(snapshotInfoList.get(1).getName()), eq(false),
-                eq(false)),
-        10, TimeDuration.ONE_SECOND, null, null);
+    // Wait until the job's status is persisted as DONE. Mockito records the
+    // invocation before running the stubbed answer, so waiting on verify(...)
+    // alone can return while the answer is still executing and has not yet
+    // written DONE to the DB, leaving the read below to observe IN_PROGRESS.
+    attempt(() -> {
+      if (getSnapshotDiffJobFromDb(snapshotInfo, snapshotInfoList.get(1))
+          .getStatus() != DONE) {
+        throw new IllegalStateException("Snapshot diff job is not DONE yet.");
+      }
+      return null;
+    }, 10, TimeDuration.ONE_SECOND, null, null);
 
     SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(snapshotInfo,
         snapshotInfoList.get(1));

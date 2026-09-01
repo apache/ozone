@@ -933,9 +933,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   public static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
     for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
-        bytesUsed += QuotaUtil.getReplicatedSize(
-            locationInfo.getLength(), omKeyInfo.getReplicationConfig());
+      for (List<OmKeyLocationInfo> locationInfoList : group.getLocationLists()) {
+        for (OmKeyLocationInfo locationInfo : locationInfoList) {
+          bytesUsed += QuotaUtil.getReplicatedSize(
+              locationInfo.getLength(), omKeyInfo.getReplicationConfig());
+        }
       }
     }
 
@@ -1253,7 +1255,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // the referenceKey.
     Map<ContainerBlockID, OmKeyLocationInfo> cbIdSet = referenceKey.getKeyLocationVersions()
         .stream()
-        .flatMap(e -> e.getLocationList().stream())
+        .flatMap(group -> group.getLocationLists().stream())
+        .flatMap(List::stream)
         .collect(Collectors.toMap(omKeyLocationInfo -> omKeyLocationInfo.getBlockID().getContainerBlockID(),
             Function.identity()));
     Map<OmKeyInfo, List<OmKeyLocationInfo>> filteredOutBlocks = new HashMap<>();

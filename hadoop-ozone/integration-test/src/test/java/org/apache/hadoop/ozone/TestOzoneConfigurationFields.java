@@ -168,6 +168,8 @@ public class TestOzoneConfigurationFields extends ConfigurationFieldsTests {
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         OMConfigKeys.OZONE_OM_HA_PREFIX,
         OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
+        // Security hardening toggle; documented on the OMConfigKeys constant.
+        OMConfigKeys.OZONE_OM_S3_GRPC_AUTH_REQUIRED,
         // TODO HDDS-2856
         OMConfigKeys.OZONE_RANGER_OM_IGNORE_SERVER_CERT,
         OMConfigKeys.OZONE_RANGER_OM_CONNECTION_TIMEOUT,
