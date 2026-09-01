@@ -1769,13 +1769,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(3, attributesResponse.objectParts().totalPartsCount());
     assertFalse(attributesResponse.objectParts().isTruncated());
     assertEquals(1000, attributesResponse.objectParts().maxParts());
-    assertEquals(3, attributesResponse.objectParts().parts().size());
-    long expectedPartSize = 5 * MB;
-    for (int partNumber = 1; partNumber <= 3; partNumber++) {
-      int index = partNumber - 1;
-      assertEquals(partNumber, attributesResponse.objectParts().parts().get(index).partNumber());
-      assertEquals(expectedPartSize, attributesResponse.objectParts().parts().get(index).size());
-    }
+    assertTrue(attributesResponse.objectParts().parts().isEmpty());
 
     GetObjectAttributesResponse firstPage = s3Client.getObjectAttributes(
         GetObjectAttributesRequest.builder()
@@ -1789,7 +1783,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(2, firstPage.objectParts().maxParts());
     assertEquals(0, firstPage.objectParts().partNumberMarker());
     assertEquals(2, firstPage.objectParts().nextPartNumberMarker());
-    assertEquals(2, firstPage.objectParts().parts().size());
+    assertTrue(firstPage.objectParts().parts().isEmpty());
 
     GetObjectAttributesResponse secondPage = s3Client.getObjectAttributes(
         GetObjectAttributesRequest.builder()
@@ -1800,9 +1794,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .partNumberMarker(2)
             .build());
     assertFalse(secondPage.objectParts().isTruncated());
-    assertEquals(1, secondPage.objectParts().parts().size());
-    assertEquals(3, secondPage.objectParts().parts().get(0).partNumber());
-    assertEquals(expectedPartSize, secondPage.objectParts().parts().get(0).size());
+    assertTrue(secondPage.objectParts().parts().isEmpty());
   }
 
   @Test
@@ -1851,11 +1843,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertNotNull(attributesResponse.objectParts());
     assertEquals(2, attributesResponse.objectParts().totalPartsCount());
     assertFalse(attributesResponse.objectParts().isTruncated());
-    assertEquals(2, attributesResponse.objectParts().parts().size());
-    assertEquals(1, attributesResponse.objectParts().parts().get(0).partNumber());
-    assertEquals(partOneContent.length(), attributesResponse.objectParts().parts().get(0).size());
-    assertEquals(3, attributesResponse.objectParts().parts().get(1).partNumber());
-    assertEquals(partThreeContent.length(), attributesResponse.objectParts().parts().get(1).size());
+    assertTrue(attributesResponse.objectParts().parts().isEmpty());
     assertEquals(partOneContent.length() + partThreeContent.length(), attributesResponse.objectSize());
 
     GetObjectAttributesResponse paginatedResponse = s3Client.getObjectAttributes(
@@ -1869,9 +1857,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertTrue(paginatedResponse.objectParts().isTruncated());
     assertEquals(1, paginatedResponse.objectParts().partNumberMarker());
     assertEquals(3, paginatedResponse.objectParts().nextPartNumberMarker());
-    assertEquals(1, paginatedResponse.objectParts().parts().size());
-    assertEquals(3, paginatedResponse.objectParts().parts().get(0).partNumber());
-    assertEquals(partThreeContent.length(), paginatedResponse.objectParts().parts().get(0).size());
+    assertTrue(paginatedResponse.objectParts().parts().isEmpty());
   }
 
   @Test

@@ -439,12 +439,13 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   /**
-   * Test-only helper to simulate inconsistent MPU metadata (ETag suffix vs part list).
+   * Test-only helper to add key metadata for compatibility tests.
    */
-  public void replaceKeyEtagForTest(String key, String eTag) throws IOException {
+  public void putKeyMetadataForTest(String key, String metadataKey, String metadataValue)
+      throws IOException {
     OzoneKeyDetails details = getKey(key);
     Map<String, String> metadata = new HashMap<>(details.getMetadata());
-    metadata.put(ETAG, eTag);
+    metadata.put(metadataKey, metadataValue);
     keyDetails.put(key, new OzoneKeyDetails(
         details.getVolumeName(),
         details.getBucketName(),

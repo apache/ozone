@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
@@ -57,7 +58,9 @@ import org.slf4j.LoggerFactory;
  * Supported attributes: {@code ETag}, {@code ObjectSize}, {@code StorageClass}, {@code ObjectParts}.
  *
  * <p>The {@code Checksum} attribute is not yet supported because Ozone does not store
- * non-MD5 checksum algorithms in key metadata. Object versioning ({@code versionId}) and
+ * non-MD5 checksum algorithms in key metadata. For general-purpose buckets, {@code Part}
+ * elements under {@code ObjectParts} are omitted unless an additional checksum is stored
+ * on the object, matching AWS S3 behavior. Object versioning ({@code versionId}) and
  * SSE-C encryption headers are also not supported and are silently ignored.
  *
  * <p>See https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectAttributes.html
@@ -75,6 +78,28 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
 
   private static final Set<String> KNOWN_ATTRIBUTES = new HashSet<>(Arrays.asList(
       ATTR_ETAG, ATTR_CHECKSUM, ATTR_OBJECT_PARTS, ATTR_STORAGE_CLASS, ATTR_OBJECT_SIZE));
+
+  private static final String ADDITIONAL_CHECKSUM_METADATA_PREFIX = "x-amz-checksum-";
+
+  /**
+   * Returns whether key metadata contains a stored AWS additional checksum.
+   * Ozone does not persist {@code x-amz-checksum-*} on upload today, so this is
+   * false for normal objects until checksum storage is implemented.
+   */
+  static boolean hasStoredAdditionalChecksum(OzoneKey key) {
+    if (key == null || key.getMetadata() == null) {
+      return false;
+    }
+    for (Map.Entry<String, String> entry : key.getMetadata().entrySet()) {
+      String name = entry.getKey();
+      if (name != null
+          && name.toLowerCase(Locale.ROOT).startsWith(ADDITIONAL_CHECKSUM_METADATA_PREFIX)
+          && StringUtils.isNotBlank(entry.getValue())) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   @Override
   Response handleGetRequest(ObjectRequestContext context, String keyPath)
@@ -180,7 +205,7 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
         String partsCountStr = extractPartsCount(eTag);
         if (partsCountStr != null && completedPartSizes != null) {
           resp.setObjectParts(buildObjectParts(keyPath, Integer.parseInt(partsCountStr),
-              keyPath, completedPartSizes));
+              keyPath, completedPartSizes, key));
         }
       }
     }
@@ -200,9 +225,13 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
    * Part numbers and sizes are paginated over the actual part numbers from OM, which may be
    * non-contiguous. {@code TotalPartsCount} follows the block-derived part count when it differs
    * from the ETag suffix.
+   *
+   * <p>For general-purpose buckets, individual {@code Part} elements are returned only when the
+   * object has a stored AWS additional checksum in key metadata; otherwise only {@code ObjectParts}
+   * summary and pagination fields are returned.
    */
   private GetObjectAttributesResponse.ObjectParts buildObjectParts(String keyPath,
-      int totalPartsCount, String resource, NavigableMap<Integer, Long> partSizes)
+      int totalPartsCount, String resource, NavigableMap<Integer, Long> partSizes, OzoneKey key)
       throws OS3Exception {
     int maxParts = parseMaxPartsHeader(resource);
     int marker = parsePartNumberMarkerHeader(resource);
@@ -223,12 +252,19 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
 
     Iterator<Map.Entry<Integer, Long>> partIterator =
         partSizes.tailMap(marker, false).entrySet().iterator();
+    // TODO: For FSO (directory) buckets, always include Part entries per AWS
+    // directory-bucket GetObjectAttributes behavior, regardless of checksum metadata.
+    boolean includePartEntries = hasStoredAdditionalChecksum(key);
     Integer lastPartReturned = null;
-    while (partIterator.hasNext() && parts.getParts().size() < maxParts) {
+    int partsOnPage = 0;
+    while (partIterator.hasNext() && partsOnPage < maxParts) {
       Map.Entry<Integer, Long> partEntry = partIterator.next();
-      parts.addPart(new GetObjectAttributesResponse.Part(
-          partEntry.getKey(), partEntry.getValue()));
+      if (includePartEntries) {
+        parts.addPart(new GetObjectAttributesResponse.Part(
+            partEntry.getKey(), partEntry.getValue()));
+      }
       lastPartReturned = partEntry.getKey();
+      partsOnPage++;
     }
 
     boolean truncated = partIterator.hasNext();
