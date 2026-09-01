@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIFECYCLE_MISSING_CONFIGURATION_CACHE_TTL;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CACHE_CONTROL_CUSTOM;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_DISPOSITION_CUSTOM;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_ENCODING_CUSTOM;
@@ -89,10 +90,11 @@ public class TestObjectHead {
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
   private HttpHeaders headers;
+  private OzoneClient clientStub;
 
   @BeforeEach
   public void setup() throws IOException {
-    OzoneClient clientStub = new OzoneClientStub();
+    clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
     headers = mock(HttpHeaders.class);
@@ -462,6 +464,46 @@ public class TestObjectHead {
 
     assertEquals(HttpStatus.SC_OK, response.getStatus());
     assertNull(response.getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  public void testHeadObjectRemembersAbsentLifecycleConfiguration() throws Exception {
+    String keyName = "logs/app.log";
+    createKey(keyName);
+
+    // The bucket has no configuration, so the lookup fails and is remembered.
+    assertNull(keyEndpoint.head(bucketName, keyName)
+        .getHeaderString(EXPIRATION_HEADER));
+
+    setLifecycleRules(daysRule("logs-30d", "logs/", 30));
+
+    // Within the TTL the gateway does not ask OM again, so the rule added in the
+    // meantime is not reported yet. That bounded staleness is the contract here.
+    assertNull(keyEndpoint.head(bucketName, keyName)
+        .getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  public void testHeadObjectAlwaysLooksUpLifecycleWhenCacheDisabled() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_S3G_LIFECYCLE_MISSING_CONFIGURATION_CACHE_TTL, "0s");
+    keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(clientStub)
+        .setHeaders(headers)
+        .setConfig(conf)
+        .build();
+
+    String keyName = "logs/app.log";
+    createKey(keyName);
+    assertNull(keyEndpoint.head(bucketName, keyName)
+        .getHeaderString(EXPIRATION_HEADER));
+
+    setLifecycleRules(daysRule("logs-30d", "logs/", 30));
+
+    // With the cache off every request looks the configuration up again, so the
+    // rule is reported straight away.
+    assertNotNull(keyEndpoint.head(bucketName, keyName)
+        .getHeaderString(EXPIRATION_HEADER));
   }
 
   @Test

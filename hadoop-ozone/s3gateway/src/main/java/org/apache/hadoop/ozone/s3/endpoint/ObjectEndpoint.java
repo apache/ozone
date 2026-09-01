@@ -63,6 +63,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
+import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -101,6 +102,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.s3.BucketLifecycleAbsenceCache;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -134,6 +136,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
   private ObjectOperationHandler handler;
 
+  @Inject
+  private BucketLifecycleAbsenceCache lifecycleAbsenceCache;
+
   /*FOR the feature Overriding Response Header
   https://docs.aws.amazon.com/de_de/AmazonS3/latest/API/API_GetObject.html */
   private final Map<String, String> overrideQueryParameter;
@@ -151,6 +156,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   @Override
   protected void init() {
     super.init();
+    if (lifecycleAbsenceCache == null) {
+      // Constructed directly rather than by CDI; the cache is then per instance,
+      // which still behaves correctly, only without sharing between requests.
+      lifecycleAbsenceCache = new BucketLifecycleAbsenceCache(getOzoneConfiguration());
+    }
     ObjectOperationHandler chain = ObjectOperationHandlerChain.newBuilder(this)
         .add(new ObjectGetTorrentHandler())
         .add(new ObjectAclHandler())
@@ -529,6 +539,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
    */
   private void addExpirationHeader(ResponseBuilder responseBuilder,
       String bucketName, String keyPath, OzoneKey key) {
+    if (lifecycleAbsenceCache.isKnownAbsent(bucketName)) {
+      return;
+    }
     try {
       OzoneLifecycleConfiguration lifecycleConfiguration = getClientProtocol()
           .getLifecycleConfiguration(key.getVolumeName(), bucketName);
@@ -551,6 +564,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       if (quotedRuleId != null) {
         responseBuilder.header(EXPIRATION_HEADER,
             String.format("expiry-date=\"%s\", rule-id=%s", RFC1123Util.FORMAT.format(earliest), quotedRuleId));
+      }
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND) {
+        lifecycleAbsenceCache.markAbsent(bucketName);
+      } else {
+        LOG.debug("Omitting {} header for {}/{}", EXPIRATION_HEADER, bucketName, keyPath, ex);
       }
     } catch (IOException | RuntimeException ex) {
       LOG.debug("Omitting {} header for {}/{}", EXPIRATION_HEADER, bucketName, keyPath, ex);
