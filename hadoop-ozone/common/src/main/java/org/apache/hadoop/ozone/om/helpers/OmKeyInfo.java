@@ -112,6 +112,17 @@ public final class OmKeyInfo extends WithParentObjectId
   // been modified.
   private final Long expectedDataGeneration;
 
+  // S3-compatible object versioning. versionId is allocated once when a
+  // version is written and then frozen, and increases within a key so its
+  // versions can be ordered newest first; absent on records that predate
+  // versioning support (treated as the null version). A delete marker has
+  // isDeleteMarker set and no data blocks. isNullVersion marks the single
+  // overwritable "null version" slot per key.
+  private final Long versionId;
+  private final boolean isDeleteMarker;
+  private final boolean isNullVersion;
+  private final long noncurrentTime;
+
   private OmKeyInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -130,6 +141,10 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.versionId = b.versionId;
+    this.isDeleteMarker = b.isDeleteMarker;
+    this.isNullVersion = b.isNullVersion;
+    this.noncurrentTime = b.noncurrentTime;
   }
 
   /**
@@ -469,6 +484,50 @@ public final class OmKeyInfo extends WithParentObjectId
     return fileChecksum;
   }
 
+  /**
+   * @return the object version identity, or null for records that predate
+   * versioning support (treated as the null version).
+   */
+  public Long getVersionId() {
+    return versionId;
+  }
+
+  public boolean isDeleteMarker() {
+    return isDeleteMarker;
+  }
+
+  public boolean isNullVersion() {
+    return isNullVersion;
+  }
+
+  /**
+   * When this record stopped being the key's current version, i.e. when the
+   * version that superseded it was written. Stamped as the record is moved
+   * into the versionedKeyTable, so a current version has none.
+   *
+   * <p>This is the clock S3 counts NoncurrentDays from, and it is stored
+   * rather than derived from the neighbouring versions because removing an
+   * intervening version must not move it.
+   *
+   * @return the moment this version became noncurrent, or 0 if it never has
+   */
+  public long getNoncurrentTime() {
+    return noncurrentTime;
+  }
+
+  /**
+   * Whether this record is the key's null version, i.e. what a request naming
+   * version "null" addresses. That is either a record written while versioning
+   * was suspended, which carries the flag, or a record that predates versioning
+   * and so carries no versionId at all: enabling versioning does not rewrite
+   * existing objects, and S3 reports their version as "null".
+   *
+   * @return whether version "null" of the key addresses this record
+   */
+  public boolean isNullVersionRecord() {
+    return isNullVersion || versionId == null;
+  }
+
   @Override
   public String toString() {
     return "OmKeyInfo{" +
@@ -485,6 +544,10 @@ public final class OmKeyInfo extends WithParentObjectId
         ", isFile=" + isFile +
         ", fileName='" + fileName + '\'' +
         ", acls=" + acls +
+        ", versionId=" + versionId +
+        ", isDeleteMarker=" + isDeleteMarker +
+        ", isNullVersion=" + isNullVersion +
+        ", noncurrentTime=" + noncurrentTime +
         '}';
   }
 
@@ -511,6 +574,10 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private Long versionId = null;
+    private boolean isDeleteMarker;
+    private boolean isNullVersion;
+    private long noncurrentTime;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -533,6 +600,10 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
+      this.versionId = obj.versionId;
+      this.isDeleteMarker = obj.isDeleteMarker;
+      this.isNullVersion = obj.isNullVersion;
+      this.noncurrentTime = obj.noncurrentTime;
       this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
@@ -704,6 +775,26 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setVersionId(Long versionId) {
+      this.versionId = versionId;
+      return this;
+    }
+
+    public Builder setDeleteMarker(boolean deleteMarker) {
+      this.isDeleteMarker = deleteMarker;
+      return this;
+    }
+
+    public Builder setNoncurrentTime(long noncurrentTime) {
+      this.noncurrentTime = noncurrentTime;
+      return this;
+    }
+
+    public Builder setNullVersion(boolean nullVersion) {
+      this.isNullVersion = nullVersion;
+      return this;
+    }
+
     @Override
     protected void validate() {
       super.validate();
@@ -855,6 +946,19 @@ public final class OmKeyInfo extends WithParentObjectId
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
+    if (versionId != null) {
+      kb.setVersionId(versionId);
+    }
+    // only persisted when set, to keep records without versioning unchanged
+    if (isDeleteMarker) {
+      kb.setIsDeleteMarker(true);
+    }
+    if (isNullVersion) {
+      kb.setIsNullVersion(true);
+    }
+    if (noncurrentTime > 0) {
+      kb.setNoncurrentTime(noncurrentTime);
+    }
     return kb.build();
   }
 
@@ -909,6 +1013,18 @@ public final class OmKeyInfo extends WithParentObjectId
     if (keyInfo.hasOwnerName()) {
       builder.setOwnerName(keyInfo.getOwnerName());
     }
+    if (keyInfo.hasVersionId()) {
+      builder.setVersionId(keyInfo.getVersionId());
+    }
+    if (keyInfo.hasIsDeleteMarker()) {
+      builder.setDeleteMarker(keyInfo.getIsDeleteMarker());
+    }
+    if (keyInfo.hasIsNullVersion()) {
+      builder.setNullVersion(keyInfo.getIsNullVersion());
+    }
+    if (keyInfo.hasNoncurrentTime()) {
+      builder.setNoncurrentTime(keyInfo.getNoncurrentTime());
+    }
     return builder;
   }
 
@@ -946,7 +1062,11 @@ public final class OmKeyInfo extends WithParentObjectId
         Objects.equals(getMetadata(), omKeyInfo.getMetadata()) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         Objects.equals(getTags(), omKeyInfo.getTags()) &&
-        getObjectID() == omKeyInfo.getObjectID();
+        getObjectID() == omKeyInfo.getObjectID() &&
+        Objects.equals(versionId, omKeyInfo.versionId) &&
+        isDeleteMarker == omKeyInfo.isDeleteMarker &&
+        isNullVersion == omKeyInfo.isNullVersion &&
+        noncurrentTime == omKeyInfo.noncurrentTime;
 
     if (isEqual && checkUpdateID) {
       isEqual = getUpdateID() == omKeyInfo.getUpdateID();

@@ -166,6 +166,8 @@ enum Type {
   GetLifecycleServiceStatus    = 150;
   SetLifecycleServiceStatus    = 151;
   SaveLifecycleScanState       = 152;
+  // Submitted by the lifecycle scan to reclaim noncurrent object versions.
+  ReclaimObjectVersions        = 153;
 }
 
 enum SafeMode {
@@ -326,6 +328,7 @@ message OMRequest {
   optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 151;
   optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 152;
   optional SaveLifecycleScanStateRequest saveLifecycleScanStateRequest = 153;
+  optional ReclaimObjectVersionsRequest reclaimObjectVersionsRequest = 154;
 }
 
 message OMResponse {
@@ -471,6 +474,7 @@ message OMResponse {
   optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 150;
   optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 151;
   optional SaveLifecycleScanStateResponse saveLifecycleScanStateResponse = 152;
+  optional ReclaimObjectVersionsResponse reclaimObjectVersionsResponse = 153;
 }
 
 enum Status {
@@ -609,6 +613,12 @@ enum Status {
 
     LIFECYCLE_CONFIGURATION_NOT_FOUND = 102;
     UPDATE_ID_NOT_MATCH = 103;
+
+    // The addressed version exists but is a delete marker. Kept distinct from
+    // KEY_NOT_FOUND so that the S3 Gateway can answer such a read with 405
+    // MethodNotAllowed rather than 404; the gateway mapping is added with the
+    // rest of the endpoints.
+    KEY_IS_DELETE_MARKER = 104;
 }
 
 /**
@@ -818,12 +828,29 @@ message BucketInfo {
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
     repeated hadoop.hdds.KeyValue tags = 23;
+    // S3-compatible object versioning status. When absent the bucket carries
+    // no S3 versioning status at all: it reads as UNVERSIONED whatever
+    // isVersionEnabled says, and that flag alone drives the legacy in-record
+    // block version list. When set it is authoritative, and isVersionEnabled
+    // is kept in sync with it (VERSIONING_ENABLED -> true).
+    optional BucketVersioningStatusProto versioningStatus = 24;
 }
 
 enum BucketLayoutProto {
     LEGACY = 1;
     FILE_SYSTEM_OPTIMIZED = 2;
     OBJECT_STORE = 3;
+}
+
+/**
+ * S3-compatible bucket versioning state machine:
+ * UNVERSIONED -> VERSIONING_ENABLED <-> VERSIONING_SUSPENDED.
+ * Once enabled, a bucket can never return to UNVERSIONED.
+ */
+enum BucketVersioningStatusProto {
+    UNVERSIONED = 1;
+    VERSIONING_ENABLED = 2;
+    VERSIONING_SUSPENDED = 3;
 }
 
 /**
@@ -892,6 +919,9 @@ message BucketArgs {
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
     optional BucketEncryptionInfoProto bekInfo = 12;
     repeated hadoop.hdds.KeyValue tags = 13;
+    // S3-compatible object versioning status. Takes precedence over
+    // isVersionEnabled when both are set.
+    optional BucketVersioningStatusProto versioningStatus = 14;
 }
 
 message PrefixInfo {
@@ -1133,6 +1163,23 @@ message KeyArgs {
     // the given ETag for the operation to succeed. This is used for
     // S3 conditional writes with the If-Match header.
     optional string expectedETag = 24;
+
+    // S3-compatible object versioning: the versionId proposed for the version
+    // this request creates. It is generated in preExecute, on the OM that
+    // received the request, so every OM applies the same value; the applying
+    // OM raises it to come after the key's current version if the proposal does
+    // not already. Set on every request that can create a version, and ignored
+    // unless the bucket has versioning enabled when the request is applied.
+    optional uint64 proposedVersionId = 25;
+
+    // S3-compatible object versioning: addresses one specific version of the key
+    // instead of its current version. Distinct from proposedVersionId above,
+    // which numbers a version being created rather than selecting an existing
+    // one. nullVersion selects the key's null version slot, which cannot be
+    // addressed by id because a null version carries a normally generated
+    // versionId like any other version. At most one of the two may be set.
+    optional uint64 versionId = 26;
+    optional bool nullVersion = 27;
 }
 
 message KeyLocation {
@@ -1226,6 +1273,22 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+  // S3-compatible object versioning fields. versionId identifies an object
+  // version: allocated once when the version is written and then frozen,
+  // and increasing within a key so its versions can be ordered newest
+  // first. A delete marker is a record with isDeleteMarker set and no data
+  // blocks. isNullVersion marks the single overwritable "null version" slot
+  // per key (writes while versioning is suspended, or objects that predate
+  // enabling versioning).
+    optional uint64 versionId = 23;
+    optional bool isDeleteMarker = 24;
+    optional bool isNullVersion = 25;
+
+  // When this record stopped being the key's current version, which is when
+  // the version that superseded it was written. Set on the record as it is
+  // moved into the versionedKeyTable and unset while it is current. This is
+  // the clock a NoncurrentVersionExpiration rule counts from.
+    optional uint64 noncurrentTime = 26;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -1446,6 +1509,11 @@ message DeleteKeyArgs {
     required string bucketName = 2;
     repeated string keys = 3;
     repeated uint64 updateIDs = 4; // each key's update ID when key is identified for deletion
+    // S3-compatible object versioning: the versionId proposed for the delete
+    // markers this request creates. One is enough for the whole batch, because
+    // a versionId only has to increase within a single key; the applying OM
+    // raises it per key against that key's current version.
+    optional uint64 proposedVersionId = 5;
 }
 
 message DeleteKeyError {
@@ -2569,10 +2637,24 @@ message LifecycleFilter {
 message LifecycleExpiration {
   optional uint32 days = 1;
   optional string date = 2;
+  // On a bucket with S3-compatible versioning, removes a delete marker once it
+  // is the key's only remaining version, taking the key with it. Exclusive with
+  // days and date: the action removes a marker rather than expiring an object.
+  optional bool expiredObjectDeleteMarker = 3;
 }
 
 message AbortIncompleteMultipartUpload {
   optional uint32 daysAfterInitiation = 1;
+}
+
+// Reclaims the noncurrent versions of a key on a bucket with S3-compatible
+// versioning. At least one of the two must be set; when both are, a version is
+// reclaimed once either says so.
+message NoncurrentVersionExpiration {
+  // days a version is retained after it stopped being current
+  optional uint32 noncurrentDays = 1;
+  // how many noncurrent versions of a key are kept, newest first
+  optional uint32 newerNoncurrentVersions = 2;
 }
 
 message LifecycleRule {
@@ -2586,6 +2668,7 @@ message LifecycleRule {
 message LifecycleAction {
   optional LifecycleExpiration expiration = 1;
   optional AbortIncompleteMultipartUpload abortIncompleteMultipartUpload = 2;
+  optional NoncurrentVersionExpiration noncurrentVersionExpiration = 3;
 }
 
 message LifecycleConfiguration {
@@ -2650,6 +2733,38 @@ message SetLifecycleServiceStatusRequest {
 message SetLifecycleServiceStatusResponse {
 }
 
+/**
+ * Noncurrent object versions of one bucket that the lifecycle scan selected for
+ * reclamation, addressed by their versionedKeyTable dbKeys.
+ */
+// One record the scan selected, named by its dbKey and by the write that
+// produced it. A dbKey names a position rather than a record: a marker key is
+// the plain key name, and holds whatever version of the key is current. Scan
+// and apply are separated by replication, so the record can be replaced in
+// between, and the updateId is what tells the record the rules expired apart
+// from whatever took its place.
+message ObjectVersionRecord {
+  required string dbKey = 1;
+  required uint64 updateId = 2;
+}
+
+message ObjectVersionsBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated ObjectVersionRecord versions = 3;
+  // keyTable records of keys whose only remaining version is a delete marker.
+  // These leave the keyTable rather than the versionedKeyTable, so the key
+  // disappears entirely.
+  repeated ObjectVersionRecord markers = 4;
+}
+
+message ReclaimObjectVersionsRequest {
+  repeated ObjectVersionsBucket versionsPerBucket = 1;
+}
+
+message ReclaimObjectVersionsResponse {
+}
+
 message LifecycleScanState {
   optional string bucketKey = 1;  // volume/bucket
   optional uint64 bucketObjID = 2;
@@ -2660,6 +2775,9 @@ message LifecycleScanState {
   optional string lastScannedDir = 7;
   optional string lastScannedDirKey = 8;
   optional string lastScannedMpuKey = 9;
+  // Where the versionedKeyTable scan left off. Its own field because that scan
+  // walks a different table than lastScannedKey's.
+  optional string lastScannedVersionKey = 10;
 }
 
 message SaveLifecycleScanStateRequest {
