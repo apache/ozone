@@ -499,8 +499,12 @@ per-entry version semantics in batch `DeleteObjects` (whose OM-side marker
 insertion lands with the write paths, leaving the gateway to carry the per-entry
 `versionId` and report `DeleteMarker`), `CopyObject` versioning
 behavior, and version-id headers on `PutObject` / `CompleteMultipartUpload`. The
-native interfaces (`ozone sh`, `OzoneBucket` API) are extended in parallel so
-versions are manageable outside the S3 path.
+native interfaces are extended in parallel so versions are manageable outside the
+S3 path: `ozone sh bucket set-versioning` and the versioning status on `bucket
+info`, `ozone sh key list --versions` and `--version-id` on `key info` / `key get`
+/ `key delete`; on the client API, `OzoneBucket#setVersioning` /
+`listObjectVersions` and a `versionId` on the existing key read and delete calls,
+carried down through `ClientProtocol`, `RpcClient` and `OzoneManagerProtocol`.
 
 ## Compatibility and upgrade
 
