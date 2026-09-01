@@ -389,6 +389,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
+
+
     if (blockFileInputStream != null) {
       // a non-empty blockFileInputStream means we have a direct local block replica to read from
       return new LocalChunkInputStream(chunkInfo, blockID, xceiverClientFactory,
@@ -546,7 +548,11 @@ public class BlockInputStream extends BlockExtendedInputStream {
     final int startPosition = dst.position();
     int preadRetries = 0;
     while (true) {
-      final ChunkInputStream chunkStream = createChunkInputStream(chunkInfo);
+      final ChunkInputStream chunkStream;
+      synchronized (this) {
+        checkOpen();
+        chunkStream = createChunkInputStream(chunkInfo);
+      }
       final int numBytesRead;
       try {
         final int oldLimit = dst.limit();
