@@ -236,8 +236,10 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           // with no record takes a delete marker of its own rather than
           // failing the batch. The single-key delete does the same. A request
           // that asserts an updateID is excluded: a key with no record has no
-          // updateID that could match.
-          if (omBucketInfo.isS3VersioningEnabled()
+          // updateID that could match. While versioning is suspended the
+          // marker is the key's null version, which may still replace a
+          // noncurrent null version left behind.
+          if (omBucketInfo.hasEverBeenVersioned()
               && deleteKeyUpdateIDs == null) {
             markerOnlyKeys.add(keyName);
             continue;

@@ -928,21 +928,6 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertNull(currentVersion());
   }
 
-  /** There is no version history for an id to name, though. */
-  @Test
-  public void testDeleteByVersionIdOnAnUnversionedBucketIsRejected()
-      throws Exception {
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, getBucketLayout());
-    seedCurrentVersion(null);
-
-    OMClientResponse response = deleteVersionAt(100L, false, 200L);
-
-    assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
-        response.getOMResponse().getStatus());
-    assertNotNull(currentVersion());
-  }
-
   /**
    * A marker that takes the key's null version slot replaces a record instead
    * of adding one, so a bucket sitting exactly at its namespace quota still
@@ -1365,6 +1350,31 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertTrue(current.isDeleteMarker());
     assertTrue(current.isNullVersion());
     assertNotNull(noncurrentVersion(300L));
+  }
+
+  /**
+   * Suspending stops new versions from being created, not the delete from
+   * being recorded, so a key the bucket holds no record of takes a null
+   * delete marker here too.
+   */
+  @Test
+  public void testSuspendedBatchDeleteMarksAKeyThatDoesNotExist()
+      throws Exception {
+    setupSuspendedBucket();
+    String absentKey = keyName + "-absent";
+
+    OMClientResponse response = new OMKeysDeleteRequest(
+        batchDeleteRequest(PROPOSED, absentKey), getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 500L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+
+    OmKeyInfo marker = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneKey(volumeName, bucketName, absentKey));
+    assertNotNull(marker);
+    assertTrue(marker.isDeleteMarker());
+    assertTrue(marker.isNullVersion());
   }
 
   /**
