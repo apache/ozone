@@ -104,6 +104,45 @@ class TestOmLCRule {
         "Filter and Prefix cannot both be null.");
   }
 
+  /**
+   * A delete marker carries no tags, so a tag-filtered rule could never match
+   * one and S3 refuses the combination.
+   */
+  @Test
+  public void testExpiredObjectDeleteMarkerRejectsATagFilter() {
+    long currentTime = System.currentTimeMillis();
+    OmLCExpiration marker = new OmLCExpiration.Builder()
+        .setExpiredObjectDeleteMarker(true).build();
+
+    OmLCRule tagged = new OmLCRule.Builder()
+        .setId("id").setEnabled(true)
+        .setFilter(getOmLCFilterBuilder(
+            null, Pair.of("key", "value"), null).build())
+        .setAction(marker)
+        .build();
+    assertOMException(() -> tagged.valid(BucketLayout.DEFAULT, currentTime),
+        INVALID_REQUEST,
+        "'ExpiredObjectDeleteMarker' cannot be specified with a tag filter");
+
+    OmLCRule taggedByAndOperator = new OmLCRule.Builder()
+        .setId("id").setEnabled(true)
+        .setFilter(getOmLCFilterBuilder(null, null, getOmLCAndOperatorBuilder(
+            "prefix", ImmutableMap.of("tag1", "value1")).build()).build())
+        .setAction(marker)
+        .build();
+    assertOMException(
+        () -> taggedByAndOperator.valid(BucketLayout.DEFAULT, currentTime),
+        INVALID_REQUEST,
+        "'ExpiredObjectDeleteMarker' cannot be specified with a tag filter");
+
+    OmLCRule byPrefix = new OmLCRule.Builder()
+        .setId("id").setEnabled(true)
+        .setPrefix("logs/")
+        .setAction(marker)
+        .build();
+    assertDoesNotThrow(() -> byPrefix.valid(BucketLayout.DEFAULT, currentTime));
+  }
+
   @Test
   public void testCreateFSOLCRule() throws OMException {
     long currentTime = System.currentTimeMillis();

@@ -38,11 +38,19 @@ public final class OmLCNoncurrentVersionExpiration implements OmLCAction {
 
   private final Integer noncurrentDays;
   private final Integer newerNoncurrentVersions;
-  private long noncurrentDaysInMillis;
+  /**
+   * Derived from noncurrentDays alone, so it is settled here rather than in
+   * {@link #valid()}: an instance whose validation has not run yet would
+   * otherwise read as zero, and every version would be past a rule it is not
+   * past.
+   */
+  private final long noncurrentDaysInMillis;
 
   private OmLCNoncurrentVersionExpiration(Builder builder) {
     this.noncurrentDays = builder.noncurrentDays;
     this.newerNoncurrentVersions = builder.newerNoncurrentVersions;
+    this.noncurrentDaysInMillis = noncurrentDays == null ? 0L
+        : TimeUnit.DAYS.toMillis(noncurrentDays);
   }
 
   @Nullable
@@ -84,7 +92,6 @@ public final class OmLCNoncurrentVersionExpiration implements OmLCAction {
         throw new OMException("'NoncurrentDays' must be a positive integer "
             + "greater than zero.", OMException.ResultCodes.INVALID_REQUEST);
       }
-      noncurrentDaysInMillis = TimeUnit.DAYS.toMillis(noncurrentDays);
     }
 
     if (newerNoncurrentVersions != null
