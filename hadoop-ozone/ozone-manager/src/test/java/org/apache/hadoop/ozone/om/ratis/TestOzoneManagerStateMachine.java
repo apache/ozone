@@ -41,9 +41,11 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -316,6 +318,58 @@ public class TestOzoneManagerStateMachine {
 
     ExecutionException ex = assertThrows(ExecutionException.class, future::get);
     assertInstanceOf(InterruptedException.class, ex.getCause());
+  }
+
+  @Test
+  public void testPauseBlocksApplyUntilUnpause() throws Exception {
+    OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
+        om, doubleBuffer, handler, executor, null) {
+      @Override
+      public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+        return doubleBuffer;
+      }
+    };
+    try {
+      OMRequest request = sampleWriteRequest();
+      TransactionContext trx = mockTrx(request, 1, 5);
+
+      OMResponse expectedResponse = OMResponse.newBuilder()
+          .setCmdType(Type.CreateKey)
+          .setStatus(Status.OK)
+          .setSuccess(true)
+          .build();
+      OMClientResponse clientResponse = mock(OMClientResponse.class);
+      when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+      when(clientResponse.getOmLockDetails()).thenReturn(null);
+
+      CountDownLatch handlerInvoked = new CountDownLatch(1);
+      doAnswer(invocation -> {
+        handlerInvoked.countDown();
+        return clientResponse;
+      }).when(handler).handleWriteRequest(eq(request), any(), eq(doubleBuffer));
+
+      testSm.pause();
+      CompletableFuture<CompletableFuture<Message>> applyFuture = CompletableFuture.supplyAsync(() -> {
+        try {
+          return testSm.applyTransaction(trx);
+        } catch (Exception ex) {
+          throw new RuntimeException(ex);
+        }
+      });
+
+      assertFalse(handlerInvoked.await(200, TimeUnit.MILLISECONDS),
+          "apply should stay blocked while state machine is paused");
+      assertFalse(applyFuture.isDone(), "applyTransaction should block while paused");
+
+      testSm.unpause(5, 1);
+
+      CompletableFuture<Message> future = applyFuture.get(2, TimeUnit.SECONDS);
+      assertTrue(handlerInvoked.await(2, TimeUnit.SECONDS),
+          "apply should continue after state machine unpause");
+      assertNotNull(future.get(2, TimeUnit.SECONDS));
+    } finally {
+      testSm.stop();
+    }
   }
 
   // --- runCommand tests ---
