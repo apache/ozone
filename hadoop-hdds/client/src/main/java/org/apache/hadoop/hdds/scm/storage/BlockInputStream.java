@@ -504,9 +504,15 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (!initialized) {
       initialize();
     }
-    final long[] offsets = chunkOffsets;
-    final BlockData currentBlockData = blockData;
-    final long blockLength = length;
+    final long[] offsets;
+    final BlockData currentBlockData;
+    final long blockLength;
+    synchronized (this) {
+        checkOpen();
+        offsets = chunkOffsets;
+        currentBlockData = blockData;
+        blockLength = length;
+    }
     if (offsets == null || currentBlockData == null
         || blockRelativePosition < 0 || blockRelativePosition >= blockLength) {
       return EOF;
