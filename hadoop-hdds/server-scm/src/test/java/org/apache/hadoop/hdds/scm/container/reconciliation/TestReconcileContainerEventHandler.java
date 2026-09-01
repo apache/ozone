@@ -29,6 +29,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -108,7 +109,7 @@ public class TestReconcileContainerEventHandler {
     nodeManager = mock(NodeManager.class);
     // Unless a test overrides it, every datanode is healthy and in service so all replicas participate.
     when(nodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
-    eventHandler = new ReconcileContainerEventHandler(nodeManager, containerManager, scmContext);
+    eventHandler = new ReconcileContainerEventHandler(containerManager, scmContext, nodeManager);
   }
 
   /**
@@ -267,11 +268,6 @@ public class TestReconcileContainerEventHandler {
     assertEquals(allNodeIDs, nodesReceivingCommands);
   }
 
-  /**
-   * Only healthy, in-service nodes receive reconcile commands. Decommissioning and entering-maintenance
-   * nodes are used as peers but not targets, while stale, dead, decommissioned, and in-maintenance nodes
-   * are neither peers nor targets.
-   */
   @Test
   public void testReconcileRestrictedByNodeStatus() throws Exception {
     addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
@@ -309,7 +305,7 @@ public class TestReconcileContainerEventHandler {
     Set<DatanodeID> actualTargets = new HashSet<>();
     for (CommandForDatanode<ReconcileContainerCommandProto> dnCommand : commandCaptor.getAllValues()) {
       DatanodeID targetID = dnCommand.getDatanodeId();
-      assertTrue(actualTargets.add(targetID), "Duplicate reconcile command sent to datanode.");
+      assertThat(actualTargets.add(targetID)).as("Duplicate reconcile command sent to datanode").isTrue();
 
       // A target reconciles against every eligible peer except itself.
       Set<DatanodeID> expectedPeerIDs = expectedPeers.stream()
@@ -318,17 +314,13 @@ public class TestReconcileContainerEventHandler {
       Set<DatanodeID> actualPeerIDs = dnCommand.getCommand().getProto().getPeersList().stream()
           .map(dn -> DatanodeID.fromProto(dn.getId()))
           .collect(Collectors.toSet());
-      assertEquals(expectedPeerIDs, actualPeerIDs);
+      assertThat(actualPeerIDs).isEqualTo(expectedPeerIDs);
     }
-    assertEquals(expectedTargets, actualTargets);
+    assertThat(actualTargets).isEqualTo(expectedTargets);
   }
 
-  /**
-   * A healthy in-service node whose only other replicas are stale or dead has no eligible peer, so it
-   * receives no reconcile command since there is nothing to reconcile against.
-   */
   @Test
-  public void testReconcileSkipsTargetWithNoEligiblePeers() throws Exception {
+  public void testReconcileTargetWithNoEligiblePeers() throws Exception {
     addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
     List<DatanodeDetails> nodes = addReplicasToContainer(3).stream()
         .map(ContainerReplica::getDatanodeDetails)
@@ -338,13 +330,12 @@ public class TestReconcileContainerEventHandler {
     when(nodeManager.getNodeStatus(nodes.get(2))).thenReturn(NodeStatus.valueOf(IN_SERVICE, DEAD));
 
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
-    verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
+    verify(eventPublisher).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    CommandForDatanode<ReconcileContainerCommandProto> command = commandCaptor.getValue();
+    assertThat(command.getDatanodeId()).isEqualTo(nodes.get(0).getID());
+    assertThat(command.getCommand().getProto().getPeersList()).isEmpty();
   }
 
-  /**
-   * A replica whose datanode has no known status is skipped for both roles, while the remaining healthy
-   * in-service nodes still reconcile against each other.
-   */
   @Test
   public void testReconcileSkipsNodeWithUnknownStatus() throws Exception {
     addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
@@ -367,11 +358,11 @@ public class TestReconcileContainerEventHandler {
       Set<DatanodeID> peerIDs = dnCommand.getCommand().getProto().getPeersList().stream()
           .map(dn -> DatanodeID.fromProto(dn.getId()))
           .collect(Collectors.toSet());
-      // The unknown-status node appears in no peer list.
-      assertFalse(peerIDs.contains(nodes.get(2).getID()), "Unknown-status node used as a peer.");
-      assertEquals(eligible.stream().filter(id -> !id.equals(targetID)).collect(Collectors.toSet()), peerIDs);
+      assertThat(peerIDs).doesNotContain(nodes.get(2).getID());
+      assertThat(peerIDs)
+          .isEqualTo(eligible.stream().filter(id -> !id.equals(targetID)).collect(Collectors.toSet()));
     }
-    assertEquals(eligible, actualTargets);
+    assertThat(actualTargets).isEqualTo(eligible);
   }
 
   @ParameterizedTest

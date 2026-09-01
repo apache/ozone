@@ -40,8 +40,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * When a reconcile container event is fired, this class will check if the container is eligible for reconciliation,
- * and if so, send the reconcile request to all datanodes with a replica of that container.
+ * When a reconcile container event is fired, this class checks whether the container is eligible for reconciliation
+ * and sends reconcile requests to eligible datanodes with a replica of that container.
  */
 public class ReconcileContainerEventHandler implements EventHandler<ContainerID> {
   public static final Logger LOG =
@@ -51,11 +51,11 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
   private final ContainerManager containerManager;
   private final SCMContext scmContext;
 
-  public ReconcileContainerEventHandler(NodeManager nodeManager, ContainerManager containerManager,
-      SCMContext scmContext) {
-    this.nodeManager = nodeManager;
+  public ReconcileContainerEventHandler(ContainerManager containerManager, SCMContext scmContext,
+      NodeManager nodeManager) {
     this.containerManager = containerManager;
     this.scmContext = scmContext;
+    this.nodeManager = nodeManager;
   }
 
   @Override
@@ -73,10 +73,6 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
     }
 
     try {
-      // Restrict which nodes participate in reconciliation based on their status (HDDS-10714).
-      // Stale, dead, decommissioned, and in-maintenance nodes are neither peers nor targets.
-      // Decommissioning and entering-maintenance nodes can be peers but not targets, so their
-      // data can be reconciled off before they leave the cluster. Healthy, in-service nodes are both.
       Set<DatanodeDetails> targets = new HashSet<>();
       Set<DatanodeDetails> peers = new HashSet<>();
       for (ContainerReplica replica : containerManager.getContainerReplicas(containerID)) {
@@ -92,6 +88,7 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
         if (!status.isHealthy()) {
           continue;
         }
+        // Transitioning nodes remain peers so other replicas can recover any unique data before the node leaves.
         if (!status.isDecommissioned() && !status.isInMaintenance()) {
           peers.add(datanode);
         }
@@ -106,10 +103,6 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
       for (DatanodeDetails target : targets) {
         Set<DatanodeDetails> otherPeers = new HashSet<>(peers);
         otherPeers.remove(target);
-        if (otherPeers.isEmpty()) {
-          // No eligible peer to reconcile against, so skip sending a command with an empty peer list.
-          continue;
-        }
         ReconcileContainerCommand command = new ReconcileContainerCommand(containerID.getId(), otherPeers);
         command.setTerm(scmContext.getTermOfLeader());
         publisher.fireEvent(DATANODE_COMMAND, new CommandForDatanode<>(target, command));
