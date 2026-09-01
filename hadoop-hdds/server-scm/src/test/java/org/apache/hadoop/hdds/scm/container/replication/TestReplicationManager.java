@@ -44,6 +44,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -2035,6 +2036,28 @@ public class TestReplicationManager {
     rm.opCompleted(op, container.containerID(), false);
     assertEquals(1, rm.getReconstructionPendingFragmentCount(cmd.getId()));
     assertEquals(1, rm.getInflightReconstructionCount());
+  }
+
+  @Test
+  public void testReconstructionWithNoFragmentsDoesNotReserveSlot()
+      throws NodeNotFoundException, IOException {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        Collections.emptyList(),
+        ECUnderReplicationHandler.integers2ByteString(Collections.emptyList()),
+        (ECReplicationConfig) repConfig);
+
+    assertThrows(IllegalArgumentException.class,
+        () -> rm.sendThrottledReconstructionCommand(container, cmd));
+    assertEquals(0, rm.getInflightReconstructionCount());
+    assertEquals(0, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+    verify(nodeManager, never()).addDatanodeCommand(any(), any());
   }
 
   @Test
