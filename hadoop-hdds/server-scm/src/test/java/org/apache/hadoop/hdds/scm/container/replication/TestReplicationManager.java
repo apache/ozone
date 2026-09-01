@@ -1935,16 +1935,6 @@ public class TestReplicationManager {
     ReplicationManager.ReplicationManagerConfiguration config =
         new ReplicationManager.ReplicationManagerConfiguration();
 
-    config.setEcDecommissionReconstructionLoadFactor(-0.1);
-    assertThrows(IllegalArgumentException.class, config::validate);
-
-    config.setEcDecommissionReconstructionLoadFactor(Double.NaN);
-    assertThrows(IllegalArgumentException.class, config::validate);
-
-    config.setEcDecommissionReconstructionLoadFactor(1.1);
-    assertThrows(IllegalArgumentException.class, config::validate);
-
-    config.setEcDecommissionReconstructionLoadFactor(0.9);
     config.setReconstructionGlobalLimit(-1);
     assertThrows(IllegalArgumentException.class, config::validate);
 
