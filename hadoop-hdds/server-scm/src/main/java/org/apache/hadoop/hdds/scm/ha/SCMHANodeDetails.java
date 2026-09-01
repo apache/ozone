@@ -116,6 +116,13 @@ public class SCMHANodeDetails {
     return peerNodeDetails;
   }
 
+  /** Details of every SCM in the service, the local one included. */
+  public List<SCMNodeDetails> getAllNodeDetails() {
+    final List<SCMNodeDetails> allNodes = new ArrayList<>(peerNodeDetails);
+    allNodes.add(localNodeDetails);
+    return allNodes;
+  }
+
   public static SCMHANodeDetails loadDefaultConfig(
       OzoneConfiguration conf) throws IOException {
     int ratisPort = conf.getInt(

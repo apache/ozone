@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManage
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.any;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,6 +65,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
@@ -489,7 +492,113 @@ public class TestContainerBalancerTask {
       moveCompletionExecutor.shutdownNow();
     }
   }
-  
+
+  @Test
+  public void testExcludeContainersNotFoundPersistsAcrossIterations() throws Exception {
+    DatanodeUsageInfo sourceNode = nodesInCluster.get(nodesInCluster.size() - 1);
+    ContainerManager containerManager = scm.getContainerManager();
+    final ContainerID[] missingContainerId = new ContainerID[1];
+    final AtomicInteger getContainerCallsInLaterIterations = new AtomicInteger(0);
+
+    // Container exists during candidate selection; after it is first selected for
+    // move, SCM can no longer find it (simulates container deleted mid-balance).
+    when(moveManager.move(any(ContainerID.class), any(DatanodeDetails.class),
+        any(DatanodeDetails.class)))
+        .thenAnswer(invocation -> {
+          ContainerID containerId = invocation.getArgument(0);
+          if (missingContainerId[0] == null) {
+            missingContainerId[0] = containerId;
+            doAnswer(inv -> {
+              if (containerBalancerTask.getMetrics().getNumIterations() >= 1) {
+                getContainerCallsInLaterIterations.incrementAndGet();
+              }
+              throw ContainerNotFoundException.newInstanceForTesting();
+            }).when(containerManager).getContainer(containerId);
+            doThrow(ContainerNotFoundException.newInstanceForTesting())
+                .when(containerManager).getContainerReplicas(containerId);
+            cidToInfoMap.remove(containerId);
+          }
+          return CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
+        });
+
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(2);
+    balancerConfiguration.setBalancingInterval(0);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    String includeNodes = nodesInCluster.get(0).getDatanodeDetails().getHostName() + "," +
+        sourceNode.getDatanodeDetails().getHostName();
+    balancerConfiguration.setIncludeNodes(includeNodes);
+
+    startBalancer(balancerConfiguration);
+
+    assertEquals(2, containerBalancerTask.getMetrics().getNumIterations(),
+        "Balancer must complete both iterations");
+
+    ContainerID notFoundId = missingContainerId[0];
+    assertNotNull(notFoundId, "Expected at least one container move");
+    assertTrue(containerBalancerTask.getSelectionCriteria()
+            .getExcludeNotFoundContainers().contains(notFoundId),
+        "Missing container should be in the cross-iteration exclude set");
+
+    // iteration 2 must not probe the missing container again.
+    assertEquals(0, getContainerCallsInLaterIterations.get(),
+        "Iteration 2 must not call getContainer for the not-found container");
+
+    ArgumentCaptor<ContainerID> containerCaptor = ArgumentCaptor.forClass(ContainerID.class);
+    verify(moveManager, atLeast(1)).move(containerCaptor.capture(),
+        any(DatanodeDetails.class), any(DatanodeDetails.class));
+
+    long moveAttempts = containerCaptor.getAllValues().stream()
+        .filter(id -> id.equals(notFoundId))
+        .count();
+    assertEquals(1, moveAttempts,
+        "Permanently missing container should not be retried in later iterations");
+  }
+
+  @Test
+  public void testTransientFailureNotPersistedAcrossIterations() throws Exception {
+    when(moveManager.move(any(ContainerID.class), any(DatanodeDetails.class),
+        any(DatanodeDetails.class)))
+        .thenReturn(CompletableFuture.completedFuture(
+            MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE))
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
+
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(2);
+    balancerConfiguration.setBalancingInterval(0);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    String includeNodes = nodesInCluster.get(0).getDatanodeDetails().getHostName() + "," +
+        nodesInCluster.get(nodesInCluster.size() - 1).getDatanodeDetails().getHostName();
+    balancerConfiguration.setIncludeNodes(includeNodes);
+
+    startBalancer(balancerConfiguration);
+
+    assertEquals(2, containerBalancerTask.getMetrics().getNumIterations(),
+        "Balancer must complete both iterations");
+
+    ArgumentCaptor<ContainerID> containerCaptor = ArgumentCaptor.forClass(ContainerID.class);
+    verify(moveManager, atLeast(1)).move(containerCaptor.capture(),
+        any(DatanodeDetails.class), any(DatanodeDetails.class));
+    ContainerID failedContainerId = containerCaptor.getAllValues().get(0);
+
+    // Transient failure must not land in the cross-iteration not-found set.
+    assertFalse(containerBalancerTask.getSelectionCriteria()
+            .getExcludeNotFoundContainers().contains(failedContainerId),
+        "Transient failure must not be treated as permanently missing");
+
+    // Iteration 2 should retry the same container because excludeDueToFailure
+    // is iteration-scoped and cleared between iterations.
+    long moveAttempts = containerCaptor.getAllValues().stream()
+        .filter(id -> id.equals(failedContainerId))
+        .count();
+    assertEquals(2, moveAttempts,
+        "Transient failure should be retried in the next iteration");
+  }
+
   /**
    * Generates a range of equally spaced utilization(that is, used / capacity)
    * values from 0 to 1.

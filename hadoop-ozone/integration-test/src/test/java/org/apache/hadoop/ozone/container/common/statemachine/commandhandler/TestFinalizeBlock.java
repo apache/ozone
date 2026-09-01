@@ -160,7 +160,7 @@ public class TestFinalizeBlock {
     ContainerProtos.ContainerCommandRequestProto request =
         ContainerTestHelper.getWriteChunkRequest(pipeline, (
             new BlockID(containerId.getIdForTesting(), omKeyLocationInfoGroupList.get(0)
-                .getLocationList().get(0).getLocalID())), 100);
+                .createLocationList().get(0).getLocalID())), 100);
     xceiverClient.sendCommand(request);
 
     // Before finalize block PUT block on the same block should pass through
@@ -173,7 +173,7 @@ public class TestFinalizeBlock {
         xceiverClient.sendCommand(request);
 
     assertEquals(response.getFinalizeBlock().getBlockData().getBlockID().getLocalID(),
-        omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID());
+        omKeyLocationInfoGroupList.get(0).createLocationList().get(0).getLocalID());
 
     assertEquals(1, ((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
         containerId.getIdForTesting()).getContainerData()).getFinalizedBlockSet().size());
@@ -226,7 +226,7 @@ public class TestFinalizeBlock {
     ContainerProtos.ContainerCommandRequestProto request =
         ContainerTestHelper.getWriteChunkRequest(pipeline,
             (new BlockID(containerId.getIdForTesting(), omKeyLocationInfoGroupList.get(0)
-                .getLocationList().get(0).getLocalID())), 100);
+                .createLocationList().get(0).getLocalID())), 100);
 
     try {
       xceiverClient.sendCommand(request);
@@ -251,7 +251,7 @@ public class TestFinalizeBlock {
   private ContainerProtos.ContainerCommandRequestProto getFinalizeBlockRequest(
       List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList, ContainerInfo container) {
     String uuidString = cluster.getHddsDatanodes().get(0).getDatanodeDetails().getUuidString();
-    long localID = omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID();
+    long localID = omKeyLocationInfoGroupList.get(0).createLocationList().get(0).getLocalID();
 
     return ContainerTestHelper.getFinalizeBlockRequest(localID, container, uuidString);
   }

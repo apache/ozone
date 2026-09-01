@@ -499,7 +499,7 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     assertNotNull(omKeyInfo.getLatestVersionLocations());
 
     List<OmKeyLocationInfo> omKeyLocationInfoList =
-        omKeyInfo.getLatestVersionLocations().getLocationList();
+        omKeyInfo.getLatestVersionLocations().createLocationList();
     if (modifiedOmRequest.getCreateKeyRequest().getKeyArgs().getDataSize() > 0) {
       // As our data size is 100, and scmBlockSize is default to 1000, so we
       // shall have only one block.
