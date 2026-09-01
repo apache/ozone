@@ -660,6 +660,10 @@ Assume Role Without Duration Should Default To One Hour
     Configure STS Profile         ${STS_ACCESS_KEY_ID}  ${STS_SECRET_KEY}  ${STS_SESSION_TOKEN}
     Get Object Should Succeed     ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}
 
+Assume Role Should Fail For Invalid Sts Endpoint Path
+    Assume Role Should Fail       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  sts_endpoint_url=${STS_ENDPOINT_URL}/sts
+    Assume Role Should Fail       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  sts_endpoint_url=${STS_ENDPOINT_URL}/invalidEndpoint
+
 Assume Role Should Fail For Too Short Role Arn
     Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=a
 
