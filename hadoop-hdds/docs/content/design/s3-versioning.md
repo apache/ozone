@@ -469,6 +469,11 @@ and noncurrent bytes are exposed via `ozone sh bucket info` and Recon, and the
 version-aware lifecycle actions report through the existing
 `KeyLifecycleServiceMetrics`.
 
+Recon's tasks each declare the tables they consume, so versionedKeyTable has to be
+named in `OmTableInsightTask`, `ContainerKeyMapperTaskOBS`, `NSSummaryTaskWithOBS`
+and `FileSizeCountTaskOBS`, and delete markers counted apart from objects. Existing
+figures go wrong without it, rather than merely missing the new ones.
+
 ## Interaction with Ozone snapshots
 
 OM rejects the combination on the same bucket, in both directions:
@@ -595,7 +600,7 @@ left unguarded).
 | T7 Snapshot exclusion | OM-side rejection matrix for snapshot creation and versioning state transitions, applied to the source of a linked bucket and enforced at apply time so the two directions cannot race; dev-only opt-in config key |
 | T8 S3 Gateway endpoints | bucket versioning endpoints, object `versionId` support, per-entry `versionId` and `DeleteMarker` reporting in batch `DeleteObjects` |
 | T9 ListObjectVersions | OM merged listing, protocol plumbing, gateway `?versions` |
-| T10 Quota and observability | quota edges + QuotaRepair, Recon / metrics |
+| T10 Quota and observability | quota edges + QuotaRepair, version/marker/noncurrent-byte reporting, versionedKeyTable added to the Recon tasks that under-report without it |
 | T11 Wrap-up | upgrade validation, robot tests, benchmarks, docs |
 
 Testing follows three tracks: unit/integration tests per sub-task acceptance
