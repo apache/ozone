@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -418,6 +419,48 @@ public final class OzoneBucketStub extends OzoneBucket {
           ResultCodes.INVALID_PART);
     }
     return toHeadOzoneKey(ozoneKeyDetails, parts.get(partNumber).getContent().length);
+  }
+
+  /**
+   * Returns part numbers and sizes for a completed multipart object from stub state.
+   */
+  public NavigableMap<Integer, Long> getCompletedMultipartPartSizes(String key)
+      throws IOException {
+    getKey(key);
+    Map<Integer, Part> parts = partList.get(key);
+    if (parts == null || parts.isEmpty()) {
+      return Collections.emptyNavigableMap();
+    }
+    NavigableMap<Integer, Long> partSizes = new TreeMap<>();
+    for (Map.Entry<Integer, Part> partEntry : parts.entrySet()) {
+      partSizes.put(partEntry.getKey(), (long) partEntry.getValue().getContent().length);
+    }
+    return partSizes;
+  }
+
+  /**
+   * Test-only helper to simulate inconsistent MPU metadata (ETag suffix vs part list).
+   */
+  public void replaceKeyEtagForTest(String key, String eTag) throws IOException {
+    OzoneKeyDetails details = getKey(key);
+    Map<String, String> metadata = new HashMap<>(details.getMetadata());
+    metadata.put(ETAG, eTag);
+    keyDetails.put(key, new OzoneKeyDetails(
+        details.getVolumeName(),
+        details.getBucketName(),
+        details.getName(),
+        details.getDataSize(),
+        details.getCreationTime().toEpochMilli(),
+        details.getModificationTime().toEpochMilli(),
+        details.getOzoneKeyLocations(),
+        details.getReplicationConfig(),
+        metadata,
+        details.getFileEncryptionInfo(),
+        () -> readKey(key),
+        details.isFile(),
+        details.getOwner(),
+        details.getTags(),
+        details.getGeneration()));
   }
 
   private static OzoneKey toHeadOzoneKey(OzoneKeyDetails details, long dataSize) {

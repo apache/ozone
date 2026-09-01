@@ -166,6 +166,10 @@ public class GetObjectAttributesResponse {
 
   /**
    * A single part entry within {@link ObjectParts}.
+   *
+   * <p>AWS returns {@code PartNumber} and {@code Size} for completed multipart objects.
+   * The optional {@code Checksum} field is omitted because Ozone does not store additional
+   * checksums on completed parts.
    */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "Part")

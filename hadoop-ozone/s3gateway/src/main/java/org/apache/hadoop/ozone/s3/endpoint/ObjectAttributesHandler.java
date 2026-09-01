@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.OzoneConsts.MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
@@ -30,6 +31,9 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -37,11 +41,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.S3HeadObjectAttributes;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint.ObjectRequestContext;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles the GetObjectAttributes S3 API ({@code GET /{bucket}/{key}?attributes}).
@@ -56,6 +63,8 @@ import org.apache.hadoop.ozone.s3.util.S3StorageType;
  * <p>See https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectAttributes.html
  */
 class ObjectAttributesHandler extends ObjectOperationHandler {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ObjectAttributesHandler.class);
 
   /** Valid values for the x-amz-object-attributes request header. */
   static final String ATTR_ETAG = "ETag";
@@ -83,8 +92,16 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
       String bucketName = context.getBucketName();
 
       OzoneKey key;
+      NavigableMap<Integer, Long> completedPartSizes = null;
       try {
-        key = getClientProtocol().headS3Object(bucketName, keyPath);
+        if (requestedAttributes.contains(ATTR_OBJECT_PARTS)) {
+          S3HeadObjectAttributes headAttributes =
+              getClientProtocol().headS3ObjectAttributes(bucketName, keyPath);
+          key = headAttributes.getKey();
+          completedPartSizes = headAttributes.getCompletedMultipartPartSizes();
+        } else {
+          key = getClientProtocol().headS3Object(bucketName, keyPath);
+        }
         validateFileKey(keyPath, key);
       } catch (OMException ex) {
         if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
@@ -96,7 +113,7 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
       }
 
       GetObjectAttributesResponse response =
-          buildResponse(bucketName, keyPath, key, requestedAttributes);
+          buildResponse(keyPath, key, requestedAttributes, completedPartSizes);
 
       Response.ResponseBuilder rb = Response.ok(response, MediaType.APPLICATION_XML_TYPE);
       ObjectEndpoint.addLastModifiedDate(rb, key);
@@ -134,8 +151,9 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
     return requested;
   }
 
-  private GetObjectAttributesResponse buildResponse(String bucketName, String keyPath,
-      OzoneKey key, Set<String> requested) throws IOException, OS3Exception {
+  private GetObjectAttributesResponse buildResponse(String keyPath, OzoneKey key,
+      Set<String> requested, NavigableMap<Integer, Long> completedPartSizes)
+      throws IOException, OS3Exception {
     GetObjectAttributesResponse resp = new GetObjectAttributesResponse();
 
     if (requested.contains(ATTR_ETAG)) {
@@ -160,9 +178,9 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
       String eTag = key.getMetadata().get(OzoneConsts.ETAG);
       if (eTag != null) {
         String partsCountStr = extractPartsCount(eTag);
-        if (partsCountStr != null) {
-          resp.setObjectParts(buildObjectParts(bucketName, keyPath,
-              Integer.parseInt(partsCountStr), keyPath));
+        if (partsCountStr != null && completedPartSizes != null) {
+          resp.setObjectParts(buildObjectParts(keyPath, Integer.parseInt(partsCountStr),
+              keyPath, completedPartSizes));
         }
       }
     }
@@ -179,55 +197,56 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
    * multipart object, including per-part sizes and optional pagination.
    *
    * <p>When {@code x-amz-max-parts} is omitted, the page size defaults to 1000, matching ListParts.
-   * Each part size is fetched via a part-aware {@code headS3Object} call (one OM RPC per part
-   * in the current page).
+   * Part numbers and sizes are paginated over the actual part numbers from OM, which may be
+   * non-contiguous. {@code TotalPartsCount} follows the block-derived part count when it differs
+   * from the ETag suffix.
    */
-  private GetObjectAttributesResponse.ObjectParts buildObjectParts(String bucketName,
-      String keyPath, int totalPartsCount, String resource) throws IOException, OS3Exception {
-    Integer maxPartsHeader = parseMaxPartsHeader(resource);
-    Integer partNumberMarker = parsePartNumberMarkerHeader(resource);
-    int marker = partNumberMarker != null ? partNumberMarker : 0;
-    int maxParts = maxPartsHeader != null
-        ? maxPartsHeader : GET_OBJECT_ATTRIBUTES_MAX_PARTS_LIMIT;
+  private GetObjectAttributesResponse.ObjectParts buildObjectParts(String keyPath,
+      int totalPartsCount, String resource, NavigableMap<Integer, Long> partSizes)
+      throws OS3Exception {
+    int maxParts = parseMaxPartsHeader(resource);
+    int marker = parsePartNumberMarkerHeader(resource);
+    boolean partNumberMarkerSet = isPartNumberMarkerHeaderSet();
 
     GetObjectAttributesResponse.ObjectParts parts = new GetObjectAttributesResponse.ObjectParts();
-    parts.setPartsCount(totalPartsCount);
+    int partsCount = totalPartsCount;
+    if (partSizes.size() != totalPartsCount) {
+      LOG.debug("ETag parts count {} differs from block-derived part count {} for key {}",
+          totalPartsCount, partSizes.size(), keyPath);
+      partsCount = partSizes.size();
+    }
+    parts.setPartsCount(partsCount);
     parts.setMaxParts(maxParts);
-    if (partNumberMarker != null) {
-      parts.setPartNumberMarker(partNumberMarker);
+    if (partNumberMarkerSet) {
+      parts.setPartNumberMarker(marker);
     }
 
-    int lastPartReturned = marker;
-    for (int partNumber = marker + 1;
-         partNumber <= totalPartsCount && parts.getParts().size() < maxParts;
-         partNumber++) {
-      OzoneKey partKey;
-      try {
-        partKey = getClientProtocol().headS3Object(bucketName, keyPath, partNumber);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-          throw newError(NO_SUCH_KEY, keyPath, ex);
-        } else if (isAccessDenied(ex)) {
-          throw newError(ACCESS_DENIED, bucketName + "/" + keyPath, ex);
-        }
-        throw newError(resource, ex);
-      }
-      parts.addPart(new GetObjectAttributesResponse.Part(partNumber, partKey.getDataSize()));
-      lastPartReturned = partNumber;
+    Iterator<Map.Entry<Integer, Long>> partIterator =
+        partSizes.tailMap(marker, false).entrySet().iterator();
+    Integer lastPartReturned = null;
+    while (partIterator.hasNext() && parts.getParts().size() < maxParts) {
+      Map.Entry<Integer, Long> partEntry = partIterator.next();
+      parts.addPart(new GetObjectAttributesResponse.Part(
+          partEntry.getKey(), partEntry.getValue()));
+      lastPartReturned = partEntry.getKey();
     }
 
-    boolean truncated = lastPartReturned < totalPartsCount;
+    boolean truncated = partIterator.hasNext();
     parts.setTruncated(truncated);
-    if (truncated) {
+    if (truncated && lastPartReturned != null) {
       parts.setNextPartNumberMarker(lastPartReturned);
     }
     return parts;
   }
 
-  private Integer parseMaxPartsHeader(String resource) throws OS3Exception {
+  private int parseMaxPartsHeader(String resource) throws OS3Exception {
+    return parseMaxPartsHeader(resource, GET_OBJECT_ATTRIBUTES_MAX_PARTS_LIMIT);
+  }
+
+  private int parseMaxPartsHeader(String resource, int defaultValue) throws OS3Exception {
     String headerValue = getHeaders().getHeaderString(MAX_PARTS_HEADER);
     if (StringUtils.isBlank(headerValue)) {
-      return null;
+      return defaultValue;
     }
     try {
       int maxParts = Integer.parseInt(headerValue.trim());
@@ -242,16 +261,21 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
     }
   }
 
-  private Integer parsePartNumberMarkerHeader(String resource) throws OS3Exception {
+  private boolean isPartNumberMarkerHeaderSet() {
+    return StringUtils.isNotBlank(getHeaders().getHeaderString(PART_NUMBER_MARKER_HEADER));
+  }
+
+  private int parsePartNumberMarkerHeader(String resource) throws OS3Exception {
     String headerValue = getHeaders().getHeaderString(PART_NUMBER_MARKER_HEADER);
     if (StringUtils.isBlank(headerValue)) {
-      return null;
+      return 0;
     }
     try {
       int marker = Integer.parseInt(headerValue.trim());
-      if (marker < 0) {
+      if (marker < 0 || marker > MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD) {
         throw newError(INVALID_ARGUMENT, resource,
-            new IllegalArgumentException("part-number-marker must be >= 0"));
+            new IllegalArgumentException("part-number-marker must be between 0 and "
+                + MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD));
       }
       return marker;
     } catch (NumberFormatException ex) {

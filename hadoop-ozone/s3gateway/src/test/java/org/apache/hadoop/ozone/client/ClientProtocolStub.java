@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -129,6 +130,17 @@ public class ClientProtocolStub implements ClientProtocol {
       return ((OzoneBucketStub) bucket).headObject(keyName, partNumber);
     }
     return bucket.headObject(keyName);
+  }
+
+  @Override
+  public S3HeadObjectAttributes headS3ObjectAttributes(String bucketName, String keyName)
+      throws IOException {
+    OzoneBucket bucket = objectStoreStub.getS3Volume().getBucket(bucketName);
+    OzoneKey key = bucket.headObject(keyName);
+    NavigableMap<Integer, Long> partSizes = bucket instanceof OzoneBucketStub
+        ? ((OzoneBucketStub) bucket).getCompletedMultipartPartSizes(keyName)
+        : Collections.emptyNavigableMap();
+    return new S3HeadObjectAttributes(key, partSizes);
   }
 
   @Override

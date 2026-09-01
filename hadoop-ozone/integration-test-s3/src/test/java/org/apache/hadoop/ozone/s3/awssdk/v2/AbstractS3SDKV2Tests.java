@@ -1806,6 +1806,75 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testGetObjectAttributesNonContiguousMultipartObjectParts() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String partOneContent = "part-one-content";
+    final String partThreeContent = "part-three-content-longer";
+
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    String uploadId = initiateMultipartUpload(bucketName, keyName, new HashMap<>(),
+        Collections.emptyList());
+
+    UploadPartResponse partOneResponse = s3Client.uploadPart(UploadPartRequest.builder()
+        .bucket(bucketName)
+        .key(keyName)
+        .uploadId(uploadId)
+        .partNumber(1)
+        .build(), RequestBody.fromString(partOneContent));
+
+    UploadPartResponse partThreeResponse = s3Client.uploadPart(UploadPartRequest.builder()
+        .bucket(bucketName)
+        .key(keyName)
+        .uploadId(uploadId)
+        .partNumber(3)
+        .build(), RequestBody.fromString(partThreeContent));
+
+    completeMultipartUpload(bucketName, keyName, uploadId, Arrays.asList(
+        CompletedPart.builder()
+            .partNumber(1)
+            .eTag(stripQuotes(partOneResponse.eTag()))
+            .build(),
+        CompletedPart.builder()
+            .partNumber(3)
+            .eTag(stripQuotes(partThreeResponse.eTag()))
+            .build()));
+
+    GetObjectAttributesResponse attributesResponse = s3Client.getObjectAttributes(
+        GetObjectAttributesRequest.builder()
+            .bucket(bucketName)
+            .key(keyName)
+            .objectAttributes(ObjectAttributes.OBJECT_PARTS, ObjectAttributes.OBJECT_SIZE)
+            .build());
+
+    assertNotNull(attributesResponse.objectParts());
+    assertEquals(2, attributesResponse.objectParts().totalPartsCount());
+    assertFalse(attributesResponse.objectParts().isTruncated());
+    assertEquals(2, attributesResponse.objectParts().parts().size());
+    assertEquals(1, attributesResponse.objectParts().parts().get(0).partNumber());
+    assertEquals(partOneContent.length(), attributesResponse.objectParts().parts().get(0).size());
+    assertEquals(3, attributesResponse.objectParts().parts().get(1).partNumber());
+    assertEquals(partThreeContent.length(), attributesResponse.objectParts().parts().get(1).size());
+    assertEquals(partOneContent.length() + partThreeContent.length(), attributesResponse.objectSize());
+
+    GetObjectAttributesResponse paginatedResponse = s3Client.getObjectAttributes(
+        GetObjectAttributesRequest.builder()
+            .bucket(bucketName)
+            .key(keyName)
+            .objectAttributes(ObjectAttributes.OBJECT_PARTS)
+            .maxParts(1)
+            .partNumberMarker(1)
+            .build());
+    assertTrue(paginatedResponse.objectParts().isTruncated());
+    assertEquals(1, paginatedResponse.objectParts().partNumberMarker());
+    assertEquals(3, paginatedResponse.objectParts().nextPartNumberMarker());
+    assertEquals(1, paginatedResponse.objectParts().parts().size());
+    assertEquals(3, paginatedResponse.objectParts().parts().get(0).partNumber());
+    assertEquals(partThreeContent.length(), paginatedResponse.objectParts().parts().get(0).size());
+  }
+
+  @Test
   public void testGetObjectAttributesNoSuchKey() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();

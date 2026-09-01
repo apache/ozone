@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.ozone.OzoneConsts.MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
@@ -45,6 +46,7 @@ import javax.ws.rs.core.Response;
 import javax.xml.bind.JAXB;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
@@ -261,16 +263,112 @@ public class TestObjectAttributesGet {
   }
 
   @Test
-  public void testObjectPartsXmlOmitsUnsetPaginationFields() {
+  public void testGetObjectAttributesNonContiguousMultipartParts() throws IOException, OS3Exception {
+    final String key = "mpu-non-contiguous";
+    String uploadID = initiateMultipartUpload(rest, BUCKET_NAME, key);
+    List<Part> partsList = new ArrayList<>();
+    partsList.add(uploadPart(rest, BUCKET_NAME, key, 1, uploadID, "part-one"));
+    partsList.add(uploadPart(rest, BUCKET_NAME, key, 3, uploadID, "part-three"));
+    completeMultipartUpload(rest, BUCKET_NAME, key, uploadID, partsList);
+
+    Response response = getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts");
+
+    assertEquals(HTTP_OK, response.getStatus());
+    GetObjectAttributesResponse.ObjectParts objectParts =
+        ((GetObjectAttributesResponse) response.getEntity()).getObjectParts();
+    assertEquals(2, objectParts.getPartsCount().intValue());
+    assertFalse(objectParts.isTruncated());
+    assertEquals(2, objectParts.getParts().size());
+    assertEquals(1, objectParts.getParts().get(0).getPartNumber());
+    assertEquals("part-one".length(), objectParts.getParts().get(0).getSize());
+    assertEquals(3, objectParts.getParts().get(1).getPartNumber());
+    assertEquals("part-three".length(), objectParts.getParts().get(1).getSize());
+  }
+
+  @Test
+  public void testGetObjectAttributesNonContiguousMultipartPartsPagination()
+      throws IOException, OS3Exception {
+    final String key = "mpu-non-contiguous-paginated";
+    String uploadID = initiateMultipartUpload(rest, BUCKET_NAME, key);
+    List<Part> partsList = new ArrayList<>();
+    partsList.add(uploadPart(rest, BUCKET_NAME, key, 1, uploadID, "part-one"));
+    partsList.add(uploadPart(rest, BUCKET_NAME, key, 3, uploadID, "part-three"));
+    partsList.add(uploadPart(rest, BUCKET_NAME, key, 5, uploadID, "part-five"));
+    completeMultipartUpload(rest, BUCKET_NAME, key, uploadID, partsList);
+
+    Response response = getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts", 1, 1);
+
+    assertEquals(HTTP_OK, response.getStatus());
+    GetObjectAttributesResponse.ObjectParts objectParts =
+        ((GetObjectAttributesResponse) response.getEntity()).getObjectParts();
+    assertEquals(3, objectParts.getPartsCount().intValue());
+    assertTrue(objectParts.isTruncated());
+    assertEquals(1, objectParts.getPartNumberMarker().intValue());
+    assertEquals(3, objectParts.getNextPartNumberMarker().intValue());
+    assertEquals(1, objectParts.getParts().size());
+    assertEquals(3, objectParts.getParts().get(0).getPartNumber());
+  }
+
+  @Test
+  public void testGetObjectAttributesInvalidPartNumberMarker() throws IOException, OS3Exception {
+    final String key = "mpu-invalid-marker";
+    completeMultipartUploadWithParts(key, "part-one", "part-two");
+
+    assertErrorResponse(INVALID_ARGUMENT,
+        () -> getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts", null,
+            MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD + 1));
+    assertErrorResponse(INVALID_ARGUMENT,
+        () -> getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts", null,
+            Integer.MAX_VALUE));
+  }
+
+  @Test
+  public void testGetObjectAttributesPartNumberMarkerAtLimit() throws IOException, OS3Exception {
+    final String key = "mpu-marker-at-limit";
+    completeMultipartUploadWithParts(key, "part-one", "part-two");
+
+    Response response = getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts", null,
+        MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD);
+
+    assertEquals(HTTP_OK, response.getStatus());
+    GetObjectAttributesResponse.ObjectParts objectParts =
+        ((GetObjectAttributesResponse) response.getEntity()).getObjectParts();
+    assertEquals(MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD,
+        objectParts.getPartNumberMarker().intValue());
+    assertFalse(objectParts.isTruncated());
+    assertTrue(objectParts.getParts().isEmpty());
+  }
+
+  @Test
+  public void testGetObjectAttributesPartsCountUsesBlockDerivedCountWhenEtagDiffers()
+      throws IOException, OS3Exception {
+    final String key = "mpu-etag-mismatch";
+    completeMultipartUploadWithParts(key, "part-one", "part-two");
+    String eTag = bucket.getKey(key).getMetadata().get(org.apache.hadoop.ozone.OzoneConsts.ETAG);
+    ((OzoneBucketStub) bucket).replaceKeyEtagForTest(key, eTag.substring(0, eTag.lastIndexOf('-')) + "-3");
+
+    Response response = getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts");
+
+    assertEquals(HTTP_OK, response.getStatus());
+    GetObjectAttributesResponse.ObjectParts objectParts =
+        ((GetObjectAttributesResponse) response.getEntity()).getObjectParts();
+    assertEquals(2, objectParts.getPartsCount().intValue());
+    assertEquals(2, objectParts.getParts().size());
+    assertFalse(objectParts.isTruncated());
+  }
+
+  @Test
+  public void testObjectPartsXmlIncludesMaxPartsAndOmitsUnsetMarkerFields() {
     GetObjectAttributesResponse.ObjectParts parts = new GetObjectAttributesResponse.ObjectParts();
     parts.setPartsCount(3);
     parts.setTruncated(false);
+    parts.setMaxParts(S3Consts.GET_OBJECT_ATTRIBUTES_MAX_PARTS_LIMIT);
     parts.addPart(new GetObjectAttributesResponse.Part(1, 100));
 
     StringWriter writer = new StringWriter();
     JAXB.marshal(parts, writer);
     String xml = writer.toString();
-    assertFalse(xml.contains("MaxParts"));
+    assertTrue(xml.contains("MaxParts"));
     assertFalse(xml.contains("PartNumberMarker"));
     assertFalse(xml.contains("NextPartNumberMarker"));
   }
