@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_VERSIONED_KEY_SEPARATOR;
 
 import java.io.IOException;
@@ -160,8 +161,11 @@ public class NoncurrentVersionSelector {
   public Selection select(OmBucketInfo bucket, List<OmLCRule> rules,
       String resumeFrom, int limit) throws IOException {
 
+    // Trailing separator included: without it the prefix of a bucket is also
+    // a prefix of every bucket whose name extends it, so scanning one would
+    // expire another's versions under this bucket's rules.
     final String bucketPrefix = metadataManager.getBucketKey(
-        bucket.getVolumeName(), bucket.getBucketName());
+        bucket.getVolumeName(), bucket.getBucketName()) + OM_KEY_PREFIX;
     final List<ExpiredRecord> expired = new ArrayList<>();
 
     String currentKeyName = null;
@@ -185,7 +189,7 @@ public class NoncurrentVersionSelector {
           continue;
         }
         final String keyName =
-            dbKey.substring(bucketPrefix.length() + 1, separator);
+            dbKey.substring(bucketPrefix.length(), separator);
 
         if (!keyName.equals(currentKeyName)) {
           // A key boundary, the only place a pass may stop.
