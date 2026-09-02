@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.QUOTA_EXCEEDED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
@@ -246,6 +248,12 @@ public class TestS3LifecycleConfigurationPut {
 
   private void assertUnhandledOMExceptionPropagated(OMException omException,
       int expectedHttpCode, String expectedErrorCode) throws Exception {
+    OS3Exception ex = putLifecycleConfigurationThrowingOm(omException);
+    assertEquals(expectedHttpCode, ex.getHttpCode());
+    assertEquals(expectedErrorCode, ex.getCode());
+  }
+
+  private OS3Exception putLifecycleConfigurationThrowingOm(OMException omException) throws Exception {
     OzoneClient mockClient = mock(OzoneClient.class);
     ObjectStore mockObjectStore = mock(ObjectStore.class);
     OzoneVolume mockVolume = mock(OzoneVolume.class);
@@ -266,10 +274,23 @@ public class TestS3LifecycleConfigurationPut {
         .build();
     endpoint.queryParamsForTest().set(S3Consts.QueryParams.LIFECYCLE, "");
 
-    OS3Exception ex = assertThrows(OS3Exception.class,
-        () -> endpoint.put("bucket1", onePrefix()));
-    assertEquals(expectedHttpCode, ex.getHttpCode());
-    assertEquals(expectedErrorCode, ex.getCode());
+    return assertThrows(OS3Exception.class, () -> endpoint.put("bucket1", onePrefix()));
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationWithPastExpirationDateReturnsDetailedMessage() throws Exception {
+    OMException omException = assertThrows(OMException.class,
+        () -> new OmLCExpiration.Builder().setDate("2020-01-01T00:00:00Z").build()
+            .valid(System.currentTimeMillis()));
+    assertTrue(omException.getMessage().contains("must be in the future"),
+        "Precondition: OM's real validation message should explain the date is in the past, got: "
+            + omException.getMessage());
+
+    OS3Exception ex = putLifecycleConfigurationThrowingOm(omException);
+    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+    assertEquals(INVALID_REQUEST.getCode(), ex.getCode());
+    assertEquals(omException.getMessage(), ex.getErrorMessage(),
+        "The client should receive OM's detailed message explaining the date is in the past");
   }
 
   @Test
