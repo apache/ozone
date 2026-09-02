@@ -253,11 +253,24 @@ public class TestObjectAttributesGet {
   @Test
   public void testGetObjectAttributesNonContiguousMultipartParts() throws IOException, OS3Exception {
     final String key = "mpu-non-contiguous";
+    final String partOneContent = "part-one";
+    final String partThreeContent = "part-three";
     String uploadID = initiateMultipartUpload(rest, BUCKET_NAME, key);
     List<Part> partsList = new ArrayList<>();
-    partsList.add(uploadPart(rest, BUCKET_NAME, key, 1, uploadID, "part-one"));
-    partsList.add(uploadPart(rest, BUCKET_NAME, key, 3, uploadID, "part-three"));
+    partsList.add(uploadPart(rest, BUCKET_NAME, key, 1, uploadID, partOneContent));
+    partsList.add(uploadPart(rest, BUCKET_NAME, key, 3, uploadID, partThreeContent));
     completeMultipartUpload(rest, BUCKET_NAME, key, uploadID, partsList);
+
+    Response responseWithoutChecksum = getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts");
+
+    assertEquals(HTTP_OK, responseWithoutChecksum.getStatus());
+    GetObjectAttributesResponse.ObjectParts objectPartsWithoutChecksum =
+        ((GetObjectAttributesResponse) responseWithoutChecksum.getEntity()).getObjectParts();
+    assertEquals(2, objectPartsWithoutChecksum.getPartsCount().intValue());
+    assertFalse(objectPartsWithoutChecksum.isTruncated());
+    assertTrue(objectPartsWithoutChecksum.getParts().isEmpty());
+
+    ((OzoneBucketStub) bucket).putKeyMetadataForTest(key, "x-amz-checksum-crc32", "dummy");
 
     Response response = getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts");
 
@@ -266,7 +279,24 @@ public class TestObjectAttributesGet {
         ((GetObjectAttributesResponse) response.getEntity()).getObjectParts();
     assertEquals(2, objectParts.getPartsCount().intValue());
     assertFalse(objectParts.isTruncated());
-    assertTrue(objectParts.getParts().isEmpty());
+    assertEquals(2, objectParts.getParts().size());
+    assertEquals(1, objectParts.getParts().get(0).getPartNumber());
+    assertEquals(partOneContent.length(), objectParts.getParts().get(0).getSize());
+    assertEquals(3, objectParts.getParts().get(1).getPartNumber());
+    assertEquals(partThreeContent.length(), objectParts.getParts().get(1).getSize());
+
+    Response paginatedResponse = getObjectAttributes(rest, BUCKET_NAME, key, "ObjectParts", 1, 1);
+
+    assertEquals(HTTP_OK, paginatedResponse.getStatus());
+    GetObjectAttributesResponse.ObjectParts paginatedParts =
+        ((GetObjectAttributesResponse) paginatedResponse.getEntity()).getObjectParts();
+    assertEquals(2, paginatedParts.getPartsCount().intValue());
+    assertFalse(paginatedParts.isTruncated());
+    assertEquals(1, paginatedParts.getPartNumberMarker().intValue());
+    assertNull(paginatedParts.getNextPartNumberMarker());
+    assertEquals(1, paginatedParts.getParts().size());
+    assertEquals(3, paginatedParts.getParts().get(0).getPartNumber());
+    assertEquals(partThreeContent.length(), paginatedParts.getParts().get(0).getSize());
   }
 
   private void completeMultipartUploadWithParts(String key, String... partContents)

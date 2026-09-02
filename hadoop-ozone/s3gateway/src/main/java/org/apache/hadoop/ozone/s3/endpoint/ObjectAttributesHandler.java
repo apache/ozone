@@ -205,7 +205,7 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
         String partsCountStr = extractPartsCount(eTag);
         if (partsCountStr != null && completedPartSizes != null) {
           resp.setObjectParts(buildObjectParts(keyPath, Integer.parseInt(partsCountStr),
-              keyPath, completedPartSizes, key));
+              completedPartSizes, key));
         }
       }
     }
@@ -231,10 +231,10 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
    * summary and pagination fields are returned.
    */
   private GetObjectAttributesResponse.ObjectParts buildObjectParts(String keyPath,
-      int totalPartsCount, String resource, NavigableMap<Integer, Long> partSizes, OzoneKey key)
+      int totalPartsCount, NavigableMap<Integer, Long> partSizes, OzoneKey key)
       throws OS3Exception {
-    int maxParts = parseMaxPartsHeader(resource);
-    int marker = parsePartNumberMarkerHeader(resource);
+    int maxParts = parseMaxPartsHeader(keyPath);
+    int marker = parsePartNumberMarkerHeader(keyPath);
     boolean partNumberMarkerSet = isPartNumberMarkerHeaderSet();
 
     GetObjectAttributesResponse.ObjectParts parts = new GetObjectAttributesResponse.ObjectParts();
