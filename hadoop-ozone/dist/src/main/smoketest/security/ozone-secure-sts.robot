@@ -611,6 +611,14 @@ Assume Role Request With Oversized Payload Should Fail
     ${large_policy} =             Generate Oversized Session Policy
     Assume Role Should Fail       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  policy_json=${large_policy}  expected_error=PayloadTooLarge  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
 
+Doubled STS Session Token Must Fail
+    # Concatenating a valid session token with itself must be rejected as non-canonical.
+    Assume Role And Get Temporary Credentials                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${doubled_token} =            Catenate                      SEPARATOR=  ${STS_SESSION_TOKEN}  ${STS_SESSION_TOKEN}
+    Configure STS Profile                                       ${STS_ACCESS_KEY_ID}  ${STS_SECRET_KEY}  ${doubled_token}
+    Get Object Should Fail      ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+    Put Object Should Fail      ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
 Tampered STS Token Service, Policy, or Signature Must Fail
     # Taking valid STS session token and mutating different parts of it must render it unusable
     ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/*"}]}
