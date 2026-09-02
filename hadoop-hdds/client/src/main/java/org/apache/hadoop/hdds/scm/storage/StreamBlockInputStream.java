@@ -311,7 +311,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  protected synchronized void acquireClient() throws IOException {
+  protected synchronized XceiverClientSpi acquireClient() throws IOException {
     checkOpen();
     if (xceiverClient == null) {
       final Pipeline pipeline = pipelineRef.get();
@@ -330,8 +330,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         throw new IOException("Unexpected client class: " + client.getClass().getName() + ", " + pipeline);
       }
 
-      xceiverClient =  (XceiverClientGrpc) client;
+      xceiverClient = (XceiverClientGrpc) client;
     }
+    return xceiverClient;
   }
 
   private synchronized void initialize() throws IOException {
