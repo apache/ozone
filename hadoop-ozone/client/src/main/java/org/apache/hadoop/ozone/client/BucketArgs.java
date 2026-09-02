@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -46,10 +46,14 @@ public final class BucketArgs {
    */
   private final boolean versioning;
   /**
-   * Type of storage to be used for this bucket.
-   * [RAM_DISK, SSD, DISK, ARCHIVE]
+   * Storage policy to be used for this bucket.
    */
-  private final StorageType storageType;
+  private final StoragePolicy storagePolicy;
+  /**
+   * Whether creation is allowed to fall back to the policy's fallback tier
+   * when the primary tier is unavailable.
+   */
+  private final Boolean allowFallbackStoragePolicy;
 
   /**
    * Custom key/value metadata.
@@ -77,7 +81,8 @@ public final class BucketArgs {
   private BucketArgs(Builder b) {
     acls = b.acls == null ? ImmutableList.of() : ImmutableList.copyOf(b.acls);
     versioning = b.versioning;
-    storageType = b.storageType;
+    storagePolicy = b.storagePolicy;
+    allowFallbackStoragePolicy = b.allowFallbackStoragePolicy;
     metadata = b.metadata == null ? ImmutableMap.of() : ImmutableMap.copyOf(b.metadata);
     bucketEncryptionKey = b.bucketEncryptionKey;
     sourceVolume = b.sourceVolume;
@@ -98,11 +103,21 @@ public final class BucketArgs {
   }
 
   /**
-   * Returns the type of storage to be used.
-   * @return StorageType
+   * Returns the storage policy to be used.
+   * @return StoragePolicy
    */
-  public StorageType getStorageType() {
-    return storageType;
+  public StoragePolicy getStoragePolicy() {
+    return storagePolicy;
+  }
+
+  /**
+   * Returns whether creation is allowed to fall back to the policy's
+   * fallback tier when the primary tier is unavailable. Returns {@code null}
+   * when the flag was not explicitly set by the caller.
+   * @return allowFallbackStoragePolicy
+   */
+  public Boolean getAllowFallbackStoragePolicy() {
+    return allowFallbackStoragePolicy;
   }
 
   /**
@@ -190,7 +205,8 @@ public final class BucketArgs {
    */
   public static class Builder {
     private boolean versioning;
-    private StorageType storageType;
+    private StoragePolicy storagePolicy;
+    private Boolean allowFallbackStoragePolicy;
     private List<OzoneAcl> acls;
     private Map<String, String> metadata;
     private String bucketEncryptionKey;
@@ -212,8 +228,13 @@ public final class BucketArgs {
       return this;
     }
 
-    public BucketArgs.Builder setStorageType(StorageType storage) {
-      this.storageType = storage;
+    public BucketArgs.Builder setStoragePolicy(StoragePolicy storage) {
+      this.storagePolicy = storage;
+      return this;
+    }
+
+    public BucketArgs.Builder setAllowFallbackStoragePolicy(Boolean allowFallback) {
+      this.allowFallbackStoragePolicy = allowFallback;
       return this;
     }
 

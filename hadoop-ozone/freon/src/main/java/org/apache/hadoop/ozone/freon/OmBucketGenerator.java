@@ -21,7 +21,6 @@ import com.codahale.metrics.Timer;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -94,7 +93,6 @@ public class OmBucketGenerator extends BaseFreonGenerator
     OmBucketInfo bucketInfo = new OmBucketInfo.Builder()
         .setBucketName(generateBucketName(index))
         .setVolumeName(volumeName)
-        .setStorageType(StorageType.DISK)
         .build();
 
     bucketCreationTimer.time(() -> {

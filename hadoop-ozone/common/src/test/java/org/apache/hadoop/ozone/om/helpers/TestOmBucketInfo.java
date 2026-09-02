@@ -26,9 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Collections;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -47,7 +47,7 @@ public class TestOmBucketInfo {
         .setVolumeName("vol1")
         .setCreationTime(1L)
         .setIsVersionEnabled(false)
-        .setStorageType(StorageType.ARCHIVE)
+        .setStoragePolicy(OzoneStoragePolicy.COLD)
         .build();
 
     assertEquals(bucket,
@@ -74,7 +74,7 @@ public class TestOmBucketInfo {
         .setVolumeName("vol1")
         .setCreationTime(Time.now())
         .setIsVersionEnabled(false)
-        .setStorageType(StorageType.ARCHIVE)
+        .setStoragePolicy(OzoneStoragePolicy.COLD)
         .setAcls(Collections.singletonList(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             "defaultUser",
@@ -104,7 +104,7 @@ public class TestOmBucketInfo {
         .setVolumeName("vol1")
         .setBucketName("source")
         .setBucketLayout(BucketLayout.OBJECT_STORE)
-        .setStorageType(StorageType.SSD)
+        .setStoragePolicy(OzoneStoragePolicy.HOT)
         .setIsVersionEnabled(true)
         .setQuotaInBytes(1000)
         .setQuotaInNamespace(10)
@@ -135,7 +135,7 @@ public class TestOmBucketInfo {
     assertEquals(456L, resolvedLink.getModificationTime());
 
     assertEquals(BucketLayout.OBJECT_STORE, resolvedLink.getBucketLayout());
-    assertEquals(StorageType.SSD, resolvedLink.getStorageType());
+    assertEquals(OzoneStoragePolicy.HOT, resolvedLink.getStoragePolicy());
     assertTrue(resolvedLink.getIsVersionEnabled());
     assertEquals(1000, resolvedLink.getQuotaInBytes());
     assertEquals(10, resolvedLink.getQuotaInNamespace());
@@ -173,7 +173,7 @@ public class TestOmBucketInfo {
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setBucketName("bucket").setVolumeName("vol1")
             .setCreationTime(Time.now()).setIsVersionEnabled(false)
-            .setStorageType(StorageType.ARCHIVE).setAcls(Collections
+            .setStoragePolicy(OzoneStoragePolicy.COLD).setAcls(Collections
                 .singletonList(OzoneAcl.of(
                     IAccessAuthorizer.ACLIdentityType.USER,
                     "defaultUser", OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
@@ -192,7 +192,7 @@ public class TestOmBucketInfo {
         .setVolumeName("vol1")
         .setCreationTime(Time.now())
         .setIsVersionEnabled(false)
-        .setStorageType(StorageType.ARCHIVE)
+        .setStoragePolicy(OzoneStoragePolicy.COLD)
         .setAcls(Collections.singletonList(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             "defaultUser", OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL

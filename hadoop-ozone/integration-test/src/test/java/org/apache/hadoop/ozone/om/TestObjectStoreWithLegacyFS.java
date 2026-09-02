@@ -33,7 +33,6 @@ import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -172,7 +171,6 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
     // Test-1: Upload MPU to an OBS layout with Directory Exists
     String legacyBuckName = UUID.randomUUID().toString();
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.OBJECT_STORE);
     BucketArgs omBucketArgs = builder.build();
     volume.createBucket(legacyBuckName, omBucketArgs);
@@ -189,7 +187,6 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
     // Test-2: Upload MPU to an LEGACY layout with Directory Exists
     legacyBuckName = UUID.randomUUID().toString();
     builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     omBucketArgs = builder.build();
     volume.createBucket(legacyBuckName, omBucketArgs);

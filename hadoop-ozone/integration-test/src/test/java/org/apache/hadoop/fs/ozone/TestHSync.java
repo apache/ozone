@@ -84,7 +84,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ErrorInjector;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -1069,7 +1068,6 @@ public class TestHSync {
   public void testECStreamCapability() throws Exception {
     // create EC bucket to be used by OzoneFileSystem
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     builder.setDefaultReplicationConfig(
         new DefaultReplicationConfig(

@@ -42,7 +42,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.ozone.DataTestUtil;
@@ -93,7 +92,6 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
     // create EC bucket to be used by OzoneFileSystem
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     builder.setDefaultReplicationConfig(
         new DefaultReplicationConfig(

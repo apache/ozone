@@ -139,7 +139,7 @@ public abstract class OzoneObj implements IOzoneObj {
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.RESOURCE_TYPE, this.getResourceType().value);
-    auditMap.put(OzoneConsts.STORAGE_TYPE, this.getStoreType().value);
+    auditMap.put(OzoneConsts.STORE_TYPE, this.getStoreType().value);
     auditMap.put(OzoneConsts.VOLUME, this.getVolumeName());
     auditMap.put(OzoneConsts.BUCKET, this.getBucketName());
     auditMap.put(OzoneConsts.KEY, this.getKeyName());

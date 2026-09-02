@@ -42,8 +42,8 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -90,10 +90,15 @@ public class OzoneBucket extends WithMetadata {
   private ReplicationConfig defaultReplication;
 
   /**
-   * Type of storage to be used for this bucket.
-   * [RAM_DISK, SSD, DISK, ARCHIVE]
+   * Storage policy of the bucket.
    */
-  private StorageType storageType;
+  private StoragePolicy storagePolicy;
+
+  /**
+   * Whether fallback to the policy's fallback storage tier is allowed when
+   * the primary tier is unavailable.
+   */
+  private Boolean allowFallbackStoragePolicy;
 
   /**
    * Bucket Version flag.
@@ -169,7 +174,8 @@ public class OzoneBucket extends WithMetadata {
     // Bucket level replication is not configured by default.
     this.defaultReplication = builder.defaultReplicationConfig != null ?
         builder.defaultReplicationConfig.getReplicationConfig() : null;
-    this.storageType = builder.storageType;
+    this.storagePolicy = builder.storagePolicy;
+    this.allowFallbackStoragePolicy = builder.allowFallbackStoragePolicy;
     this.versioning = builder.versioning;
     if (builder.conf != null) {
       this.listCacheSize = HddsClientUtils.getListCacheSize(builder.conf);
@@ -233,12 +239,24 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
-   * Returns StorageType of the Bucket.
+   * Returns the StoragePolicy of the Bucket.
    *
-   * @return storageType
+   * @return storagePolicy (may be {@code null} for buckets read from records
+   *     that predate storage-policy support).
    */
-  public StorageType getStorageType() {
-    return storageType;
+  public StoragePolicy getStoragePolicy() {
+    return storagePolicy;
+  }
+
+  /**
+   * Returns whether the bucket allows creation to fall back to the storage
+   * policy's fallback tier when the primary tier is unavailable.
+   *
+   * @return allowFallbackStoragePolicy (may be {@code null} when the flag
+   *     was never set).
+   */
+  public Boolean getAllowFallbackStoragePolicy() {
+    return allowFallbackStoragePolicy;
   }
 
   /**
@@ -350,13 +368,13 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
-   * Sets/Changes the storage type of the bucket.
-   * @param newStorageType Storage type to be set
+   * Sets/Changes the storage policy of the bucket.
+   * @param newStoragePolicy Storage policy to be set
    * @throws IOException
    */
-  public void setStorageType(StorageType newStorageType) throws IOException {
-    proxy.setBucketStorageType(volumeName, name, newStorageType);
-    storageType = newStorageType;
+  public void setStoragePolicy(StoragePolicy newStoragePolicy) throws IOException {
+    proxy.setBucketStoragePolicy(volumeName, name, newStoragePolicy);
+    storagePolicy = newStoragePolicy;
   }
 
   /**
@@ -1387,7 +1405,8 @@ public class OzoneBucket extends WithMetadata {
     private String volumeName;
     private String name;
     private DefaultReplicationConfig defaultReplicationConfig;
-    private StorageType storageType;
+    private StoragePolicy storagePolicy;
+    private Boolean allowFallbackStoragePolicy;
     private Boolean versioning;
     private long usedBytes;
     private long usedNamespace;
@@ -1433,8 +1452,13 @@ public class OzoneBucket extends WithMetadata {
       return this;
     }
 
-    public Builder setStorageType(StorageType storageType) {
-      this.storageType = storageType;
+    public Builder setStoragePolicy(StoragePolicy storagePolicy) {
+      this.storagePolicy = storagePolicy;
+      return this;
+    }
+
+    public Builder setAllowFallbackStoragePolicy(Boolean allowFallbackStoragePolicy) {
+      this.allowFallbackStoragePolicy = allowFallbackStoragePolicy;
       return this;
     }
 

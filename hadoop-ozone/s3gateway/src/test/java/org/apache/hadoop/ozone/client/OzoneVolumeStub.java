@@ -27,8 +27,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -110,7 +110,7 @@ public final class OzoneVolumeStub extends OzoneVolume {
   @Override
   public void createBucket(String bucketName) throws OMException {
     createBucket(bucketName, new BucketArgs.Builder()
-        .setStorageType(StorageType.DEFAULT)
+        .setStoragePolicy(OzoneStoragePolicy.getDefaultPolicy())
         .setVersioning(false)
         .build());
   }
@@ -129,7 +129,8 @@ public final class OzoneVolumeStub extends OzoneVolume {
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.THREE)))
         .setBucketLayout(bucketArgs.getBucketLayout())
-        .setStorageType(bucketArgs.getStorageType())
+        .setStoragePolicy(bucketArgs.getStoragePolicy())
+        .setAllowFallbackStoragePolicy(bucketArgs.getAllowFallbackStoragePolicy())
         .setVersioning(bucketArgs.getVersioning())
         .setOwner(bucketArgs.getOwner())
         .setCreationTime(Time.now())
