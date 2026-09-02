@@ -56,6 +56,7 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.LifeCycle;
+import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -294,19 +295,27 @@ public class TestOzoneManagerRatisServer {
     OzoneConfiguration deprecatedKeyConf = new OzoneConfiguration();
     deprecatedKeyConf.set(DEPRECATED_RETRY_CACHE_KEY, "17s");
     assertEquals(17_000, retryCacheExpiryMillis(deprecatedKeyConf, ratisDir));
-    assertThat(logCapturer.getOutput()).contains(DEPRECATED_RETRY_CACHE_KEY + " is deprecated");
+    assertThat(logCapturer.getOutput()).contains(deprecationWarning(17_000));
 
     // A value without a unit suffix keeps the milliseconds the deprecated key was always read with,
-    // instead of falling back to the seconds Ratis would assume.
+    // instead of falling back to the seconds Ratis would assume. The warning must name that resolved
+    // value, so copying it to the current key does not silently reinterpret it as seconds.
+    logCapturer.clearOutput();
     OzoneConfiguration bareValueConf = new OzoneConfiguration();
     bareValueConf.set(DEPRECATED_RETRY_CACHE_KEY, "600000");
     assertEquals(600_000, retryCacheExpiryMillis(bareValueConf, ratisDir));
+    assertThat(logCapturer.getOutput()).contains(deprecationWarning(600_000));
 
     // The deprecated key is applied last, so it wins when both are set.
     OzoneConfiguration bothKeysConf = new OzoneConfiguration();
     bothKeysConf.set(CURRENT_RETRY_CACHE_KEY, "42s");
     bothKeysConf.set(DEPRECATED_RETRY_CACHE_KEY, "17s");
     assertEquals(17_000, retryCacheExpiryMillis(bothKeysConf, ratisDir));
+  }
+
+  private static String deprecationWarning(long expectedMillis) {
+    return DEPRECATED_RETRY_CACHE_KEY + " is deprecated. Instead, use " + CURRENT_RETRY_CACHE_KEY + " = "
+        + TimeDuration.valueOf(expectedMillis, TimeUnit.MILLISECONDS) + ".";
   }
 
   private static long retryCacheExpiryMillis(OzoneConfiguration conf, Path ratisDir) {
