@@ -2284,7 +2284,7 @@ public class KeyValueHandler extends Handler {
   public ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto request, Container kvContainer,
       RandomAccessFileChannel blockFile,
-      StreamObserver<ContainerCommandResponseProto> streamObserver) {
+      StreamObserver<ContainerCommandResponseProto> streamObserver, boolean testVariableChunks) {
 
     if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
       return ContainerUtils.logAndReturnError(LOG,
@@ -2300,7 +2300,7 @@ public class KeyValueHandler extends Handler {
     }
     try {
       final long startTime = Time.monotonicNow();
-      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver);
+      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver, testVariableChunks);
       KeyValueContainerData containerData = (KeyValueContainerData) kvContainer
           .getContainerData();
       HddsVolume volume = containerData.getVolume();
@@ -2324,7 +2324,7 @@ public class KeyValueHandler extends Handler {
   }
 
   private long readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
-      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver)
+      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean testVariableChunks)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
     int responseDataSize = readBlock.getResponseDataSize();
@@ -2368,7 +2368,7 @@ public class KeyValueHandler extends Handler {
     long adjustLength = checksumBoundaries.length;
     int chunkIndex = checksumBoundaries.startIndex;
 
-    ChecksumData checksumData = null;
+    ChecksumData checksumData = new ChecksumData(checksumType, bytesPerChecksum);
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
     blockFile.position(adjustedOffset);
     long totalDataLength = 0;
@@ -2401,10 +2401,13 @@ public class KeyValueHandler extends Handler {
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
 
-        // This is the old approach.
-        // It has some bugs, but we are keeping it for now due to backward compatibility.
-        checksumData = new ChecksumData(checksumType, bytesPerChecksum, getChecksums(adjustedOffset, readLength,
-            bytesPerChecksum, chunkInfos));
+        if (!testVariableChunks) {
+          // This is the old approach.
+          // It has some bugs, but we are keeping it for now due to backward compatibility.
+          checksumData = new ChecksumData(checksumType, bytesPerChecksum, getChecksums(adjustedOffset, readLength,
+              bytesPerChecksum, chunkInfos));
+        }
+
 
         if (validateChunkChecksumData) {
           Checksum.validateChecksums(buffer.duplicate(), adjustedOffset, chunkIndex, chunkInfos);

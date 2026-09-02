@@ -1123,7 +1123,7 @@ public class TestKeyValueHandler {
 
       blockFile = new RandomAccessFileChannel();
       ContainerCommandResponseProto response = kvHandler.readBlock(
-          readBlockRequest, container, blockFile, streamObserver);
+          readBlockRequest, container, blockFile, streamObserver, false);
 
       assertNull(response, "ReadBlock should return null on success");
       assertTrue(responseCount.get() > 0, "Should receive at least one response");
@@ -1201,7 +1201,7 @@ public class TestKeyValueHandler {
   }
 
   /**
-   * Reads a block of {@code blockSize} bytes from a real container through {@link KeyValueHandler#readBlock},
+   * Reads a block of {@code blockSize} bytes from a real container through {@link Handler#readBlock},
    * collecting the streamed responses and errors.
    */
   private ReadBlockResult readBlock(int blockSize, long offset, long length) throws Exception {
@@ -1247,7 +1247,7 @@ public class TestKeyValueHandler {
 
       ReadBlockResult result = new ReadBlockResult(blockID);
       blockFile = new RandomAccessFileChannel();
-      result.setResponse(kvHandler.readBlock(readBlockRequest, container, blockFile, result));
+      result.setResponse(kvHandler.readBlock(readBlockRequest, container, blockFile, result, false));
       return result;
     } finally {
       if (blockFile != null) {
@@ -1469,7 +1469,7 @@ public class TestKeyValueHandler {
 
   /**
    * Reads the block at the given offset/length via
-   * {@link KeyValueHandler#readBlock} and verifies that the response data
+   * {@link Handler#readBlock} and verifies that the response data
    * matches the original bytes written by {@link #writeBlock}.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -1497,7 +1497,7 @@ public class TestKeyValueHandler {
 
     try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
       ContainerCommandResponseProto response = handlerWithVolume.getHandler().readBlock(
-          readBlockRequest, container, blockFile, streamObserver);
+          readBlockRequest, container, blockFile, streamObserver, true);
 
       assertNull(response, "ReadBlock should return null on success");
     }
