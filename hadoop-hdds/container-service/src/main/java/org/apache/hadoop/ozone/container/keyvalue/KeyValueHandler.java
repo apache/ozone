@@ -2459,12 +2459,10 @@ public class KeyValueHandler extends Handler {
   }
 
   /**
-   * If Checksum type is not NONE then we have to align the read to checksum boundaries.
-   * Each chunk has its own checksum grid starting at byte 0 of that chunk, so the alignment
-   * must be relative to the containing chunk rather than a global multiple
-   * of bytesPerChecksum.
-   * Returns the offset of {@code blockOffset} relative to the start of the
-   * chunk that contains it.
+   * We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
+   * previous checksum boundary.
+   * eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
+   * Returns the checksum boundaries of {@code ChecksumBoundaries} relative to blockOffset and blockLength.
    */
   private static ChecksumBoundaries getChecksumBoundaries(long blockOffset, long blockLength,
       List<ContainerProtos.ChunkInfo> chunkInfos, long bytesPerChecksum) {
