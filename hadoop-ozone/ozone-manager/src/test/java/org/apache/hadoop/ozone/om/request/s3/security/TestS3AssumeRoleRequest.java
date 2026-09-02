@@ -669,8 +669,8 @@ public class TestS3AssumeRoleRequest {
             EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
 
     final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
-        grants, (volume, bucket) -> new ResolvedBucket(
-            volume, bucket, "s3v", "iceberg", "owner", BucketLayout.OBJECT_STORE));
+        grants, (volume, bucket) -> resolved(
+            volume, bucket, "s3v", "iceberg", Pair.of("s3v", "s3v-iceberg")));
 
     final IOzoneObj linkBucket = obj(OzoneObj.ResourceType.BUCKET, "s3v", "s3v-iceberg", null);
     final Set<IOzoneObj> allObjects = allObjectsIn(result);
@@ -697,8 +697,8 @@ public class TestS3AssumeRoleRequest {
             EnumSet.of(ACLType.READ, ACLType.LIST), Collections.singleton("ListBucket")));
 
     final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
-        grants, (volume, bucket) -> new ResolvedBucket(
-            volume, bucket, "s3v", "iceberg", "owner", BucketLayout.OBJECT_STORE));
+        grants, (volume, bucket) -> resolved(
+            volume, bucket, "s3v", "iceberg", Pair.of("s3v", "s3v-iceberg")));
 
     final IOzoneObj linkBucket = obj(OzoneObj.ResourceType.BUCKET, "s3v", "s3v-iceberg", null);
     final Set<IOzoneObj> allObjects = allObjectsIn(result);
@@ -722,8 +722,8 @@ public class TestS3AssumeRoleRequest {
             EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
 
     final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
-        grants, (volume, bucket) -> new ResolvedBucket(
-            volume, bucket, "tenantvol", "iceberg", "owner", BucketLayout.OBJECT_STORE));
+        grants, (volume, bucket) -> resolved(
+            volume, bucket, "tenantvol", "iceberg", Pair.of("s3v", "s3v-iceberg")));
 
     final IOzoneObj linkBucket = obj(OzoneObj.ResourceType.BUCKET, "s3v", "s3v-iceberg", null);
     final IOzoneObj sourceVolume = obj(OzoneObj.ResourceType.VOLUME, "tenantvol", null, null);
@@ -770,6 +770,52 @@ public class TestS3AssumeRoleRequest {
   }
 
   @Test
+  public void testResolveGrantsAgainstBucketLinksRewritesChainedSameVolumeLink() throws IOException {
+    final Set<OzoneGrant> grants = Collections.singleton(
+        new OzoneGrant(
+            objectsOf(
+                obj(OzoneObj.ResourceType.BUCKET, "s3v", "linkA", null),
+                obj(OzoneObj.ResourceType.KEY, "s3v", "linkA", "*")),
+            EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
+
+    final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
+        grants, (volume, bucket) -> resolved(
+            volume, bucket, "s3v", "source", Pair.of("s3v", "linkA"), Pair.of("s3v", "linkB")));
+
+    final IOzoneObj linkA = obj(OzoneObj.ResourceType.BUCKET, "s3v", "linkA", null);
+    final IOzoneObj linkB = obj(OzoneObj.ResourceType.BUCKET, "s3v", "linkB", null);
+    final Set<IOzoneObj> allObjects = allObjectsIn(result);
+    assertThat(allObjects).contains(obj(OzoneObj.ResourceType.KEY, "s3v", "source", "*"));
+    assertThat(allObjects).contains(linkA);
+    assertThat(allObjects).contains(linkB);
+    assertThat(allObjects).doesNotContain(obj(OzoneObj.ResourceType.VOLUME, "s3v", null, null));
+  }
+
+  @Test
+  public void testResolveGrantsAgainstBucketLinksAddsVolumeReadForChainedCrossVolumeHop() throws IOException {
+    final Set<OzoneGrant> grants = Collections.singleton(
+        new OzoneGrant(
+            objectsOf(
+                obj(OzoneObj.ResourceType.BUCKET, "s3v", "linkA", null),
+                obj(OzoneObj.ResourceType.KEY, "s3v", "linkA", "*")),
+            EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
+
+    final Set<OzoneGrant> result = S3AssumeRoleRequest.resolveGrantsAgainstBucketLinks(
+        grants, (volume, bucket) -> resolved(
+            volume, bucket, "tenant", "source", Pair.of("s3v", "linkA"), Pair.of("tenant", "linkB")));
+
+    final IOzoneObj linkA = obj(OzoneObj.ResourceType.BUCKET, "s3v", "linkA", null);
+    final IOzoneObj linkB = obj(OzoneObj.ResourceType.BUCKET, "tenant", "linkB", null);
+    final IOzoneObj tenantVolume = obj(OzoneObj.ResourceType.VOLUME, "tenant", null, null);
+    final Set<IOzoneObj> allObjects = allObjectsIn(result);
+    assertThat(allObjects).contains(obj(OzoneObj.ResourceType.KEY, "tenant", "source", "*"));
+    assertThat(allObjects).contains(linkA);
+    assertThat(allObjects).contains(linkB);
+    assertThat(allObjects).contains(tenantVolume);
+    assertThat(allObjects).doesNotContain(obj(OzoneObj.ResourceType.VOLUME, "s3v", null, null));
+  }
+
+  @Test
   public void testGetSessionPolicyRewritesLinkBucketGrantsToSource() throws Exception {
     when(ozoneManager.isS3MultiTenancyEnabled()).thenReturn(false);
 
@@ -782,7 +828,7 @@ public class TestS3AssumeRoleRequest {
             EnumSet.of(ACLType.READ), Collections.singleton("GetObject")));
 
     when(ozoneManager.resolveBucketLink(Pair.of("s3v", "s3v-iceberg"), true, false))
-        .thenReturn(new ResolvedBucket("s3v", "s3v-iceberg", "s3v", "iceberg", "owner", BucketLayout.OBJECT_STORE));
+        .thenReturn(resolved("s3v", "s3v-iceberg", "s3v", "iceberg", Pair.of("s3v", "s3v-iceberg")));
 
     try (MockedStatic<IamSessionPolicyResolver> resolverMock = mockStatic(IamSessionPolicyResolver.class)) {
       resolverMock.when(() -> IamSessionPolicyResolver.resolve(
@@ -810,6 +856,14 @@ public class TestS3AssumeRoleRequest {
     verify(ozoneManager).resolveBucketLink(Pair.of("s3v", "s3v-iceberg"), true, false);
   }
 
+  @SafeVarargs
+  private static ResolvedBucket resolved(String requestedVol, String requestedBucket, String realVol, String realBucket,
+      Pair<String, String>... linkChain) {
+    return new ResolvedBucket(
+        requestedVol, requestedBucket, realVol, realBucket, "owner",
+        BucketLayout.OBJECT_STORE, Arrays.asList(linkChain));
+  }
+
   private static IOzoneObj obj(OzoneObj.ResourceType type, String volume, String bucket, String key) {
     final OzoneObjInfo.Builder builder = OzoneObjInfo.Builder.newBuilder()
         .setResType(type)
@@ -824,6 +878,7 @@ public class TestS3AssumeRoleRequest {
     return builder.build();
   }
 
+  @SuppressWarnings("SameParameterValue")
   private static IOzoneObj prefixObj(String volume, String bucket, String prefix) {
     return OzoneObjInfo.Builder.newBuilder()
         .setResType(OzoneObj.ResourceType.PREFIX)

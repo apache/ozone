@@ -33,7 +33,6 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
@@ -311,9 +310,9 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   /**
    * Rewrites the resolved session-policy grants so that any bucket, key, or prefix resource that names a
    * bucket link is anchored to the link's source volume and bucket - the resource paths the OM authorizes
-   * against once the link is resolved at request time. Only the single READ needed to follow the link (and,
-   * for a cross-volume link, a READ on the source volume for the parent volume check) is retained on the link
-   * bucket, which keeps the generated token as small as possible.
+   * against once the link is resolved at request time. READ on each link bucket in the chain (and, when the
+   * chain crosses volumes, READ on each distinct volume except the requested one) is retained so OM can follow
+   * every hop at request time, which keeps the generated token as small as possible.
    * <p>
    * The link target is resolved when the token is generated, so the token grants access to whatever the link
    * points to at that moment. If the link is later re-pointed, the token no longer grants access to the new
@@ -343,7 +342,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       resolvedGrants.add(new OzoneGrant(resolvedObjects, grant.getPermissions(), grant.getS3Actions()));
     }
 
-    // Retain only the READ required to follow the link(s) at request time.
+    // Retain only the READ required to follow each link hop at request time.
     if (!linkFollowObjects.isEmpty()) {
       resolvedGrants.add(new OzoneGrant(linkFollowObjects, EnumSet.of(ACLType.READ)));
     }
@@ -353,9 +352,9 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
   /**
    * Resolves a single grant object against its bucket link. Bucket, key, and prefix objects that name a
-   * link bucket are rewritten to the link's source volume and bucket, and the READ needed to follow the link
-   * is collected in {@code linkFollowObjects}. All other objects (volume resources and wildcard buckets)
-   * are returned unchanged.
+   * link bucket are rewritten to the link's source volume and bucket, and the READ needed to follow each hop
+   * in the link chain is collected in {@code linkFollowObjects}. All other objects (volume resources and
+   * wildcard buckets) are returned unchanged.
    */
   private static IOzoneObj resolveObjectAgainstBucketLink(OzoneObj object, BucketLinkResolver linkResolver,
       Map<Pair<String, String>, ResolvedBucket> resolutionCache, Set<IOzoneObj> linkFollowObjects)
@@ -385,10 +384,15 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       return object;
     }
 
-    linkFollowObjects.add(newResourceObj(OzoneObj.ResourceType.BUCKET, volumeName, bucketName));
-    if (!Objects.equals(resolved.realVolume(), volumeName)) {
-      // Cross-volume link: the source volume also needs READ for the parent volume check.
-      linkFollowObjects.add(newResourceObj(OzoneObj.ResourceType.VOLUME, resolved.realVolume(), null));
+    final Set<String> chainVolumes = new LinkedHashSet<>();
+    for (Pair<String, String> link : resolved.linkChain()) {
+      linkFollowObjects.add(newResourceObj(OzoneObj.ResourceType.BUCKET, link.getLeft(), link.getRight()));
+      chainVolumes.add(link.getLeft());
+    }
+    chainVolumes.add(resolved.realVolume());
+    chainVolumes.remove(volumeName);
+    for (String vol : chainVolumes) {
+      linkFollowObjects.add(newResourceObj(OzoneObj.ResourceType.VOLUME, vol, null));
     }
 
     return OzoneObjInfo.Builder.fromOzoneObj(object)
