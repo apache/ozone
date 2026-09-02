@@ -53,31 +53,28 @@ public final class ClientCommandsUtils {
   }
 
   /**
-   * Returns the write pipeline (component) version the client asked the datanode
-   * to execute the write at, as set by the client from the SCM-provided pipeline
-   * version. When the request does not carry the field
-   * (a client predating zero downtime upgrade support), the datanode defaults to
-   * {@link HDDSVersion#STREAM_BLOCK_SUPPORT}, the last component version before ZDU,
-   * so the write keeps pre-ZDU behavior. This matches the value SCM advertises for
-   * pipelines while the cluster has not finalized ZDU.
+   * Returns the write pipeline (component) version the datanode should execute the write at,
+   * derived from the value the client forwarded from the SCM-provided pipeline version.
+   * {@link HDDSVersion#ZDU} is the lowest version write-path versioning can use, so it is the
+   * floor: any version below ZDU (including an absent field from a client predating zero downtime
+   * upgrade support, or a value this datanode cannot deserialize) is rounded up to ZDU. ZDU is the
+   * first value that is unambiguous across both the component-version and the (legacy)
+   * layout-feature domains, so any {@code isAllowed} comparison on a datanode that has not
+   * finalized ZDU is safe. No write-path versioning feature predates ZDU, so this loses no
+   * behavior. New clients may still forward a pre-ZDU current version (e.g. when HDDS is not yet
+   * finalized for ZDU); the datanode rounds it up here so there is no issue.
    */
   public static HDDSVersion getWritePipelineVersion(ContainerProtos.ContainerCommandRequestProto request) {
-    HDDSVersion defaultVersion = HDDSVersion.STREAM_BLOCK_SUPPORT;
-    if (request.hasWritePipelineVersion()) {
-      int serializedVersion = request.getWritePipelineVersion();
-      HDDSVersion writeVersion = HDDSVersion.deserialize(serializedVersion);
-      if (writeVersion.equals(HDDSVersion.UNKNOWN_VERSION)) {
-        // This case should never happen since SCM is aware of Datanodes' software and apparent versions and will
-        // choose a version for the pipeline accordingly. If a client somehow passes an invalid version, maybe one
-        // that did not come from SCM, fall back to the safe default.
-        LOG.error("Datanode was provided an invalid write version {} for software version {}. Falling back to {}",
-            serializedVersion, HDDSVersion.SOFTWARE_VERSION, defaultVersion);
-      } else {
-        return writeVersion;
-      }
-    } else {
-      LOG.trace("No write pipeline version was supplied by the client. Falling back to {}", defaultVersion);
+    // Absent, unrecognized (deserializes to UNKNOWN_VERSION == -1), and pre-ZDU versions all fall
+    // below the ZDU floor, so a single comparison rounds every one of them up to ZDU.
+    int serializedVersion = request.hasWritePipelineVersion()
+        ? request.getWritePipelineVersion() : HDDSVersion.ZDU.serialize();
+    HDDSVersion writeVersion = HDDSVersion.deserialize(serializedVersion);
+    if (writeVersion == HDDSVersion.UNKNOWN_VERSION) {
+      // Should not normally happen: the version originates from SCM's view of the datanodes.
+      LOG.error("Datanode was given an unrecognized write pipeline version {}; using {} instead.",
+          serializedVersion, HDDSVersion.ZDU);
     }
-    return defaultVersion;
+    return writeVersion.serialize() < HDDSVersion.ZDU.serialize() ? HDDSVersion.ZDU : writeVersion;
   }
 }

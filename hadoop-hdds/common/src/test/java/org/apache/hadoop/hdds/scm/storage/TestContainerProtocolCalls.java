@@ -53,7 +53,7 @@ import org.mockito.ArgumentCaptor;
 
 /**
  * Test that {@link ContainerProtocolCalls} stamps the pipeline write version on
- * outgoing write requests (HDDS-15718).
+ * outgoing write requests.
  */
 public class TestContainerProtocolCalls {
 
@@ -141,6 +141,32 @@ public class TestContainerProtocolCalls {
         DatanodeBlockID.newBuilder().setContainerID(1).setLocalID(1).build(), null);
 
     assertEquals(VERSION, sentRequest(client).getWritePipelineVersion());
+  }
+
+  @Test
+  void writeVersionPreservesOriginalSerializedValueFromWire() throws IOException {
+    // A datanode current version this (older) client cannot deserialize: it becomes
+    // UNKNOWN_VERSION locally, but the original serialized int must still be forwarded.
+    DatanodeDetails dn = DatanodeDetails.getFromProtoBuf(
+        randomDatanodeDetails().getProtoBufMessage().toBuilder()
+            .setCurrentVersion(Integer.MAX_VALUE).build());
+    assertEquals(HDDSVersion.UNKNOWN_VERSION, dn.getCurrentVersion());
+
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setState(Pipeline.PipelineState.OPEN)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setNodes(Arrays.asList(dn, randomDatanodeDetails(), randomDatanodeDetails()))
+        .build();
+    BlockData blockData = BlockData.newBuilder()
+        .setBlockID(DatanodeBlockID.newBuilder()
+            .setContainerID(1).setLocalID(1).build())
+        .build();
+
+    ContainerCommandRequestProto request =
+        ContainerProtocolCalls.getPutBlockRequest(pipeline, blockData, true, null);
+
+    assertEquals(Integer.MAX_VALUE, request.getWritePipelineVersion());
   }
 
   private static ContainerCommandResponseProto response(Type type) {

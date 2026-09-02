@@ -37,7 +37,7 @@ public class TestClientCommandsUtils {
   }
 
   @Test
-  void returnsWritePipelineVersionWhenPresent() {
+  void returnsWritePipelineVersionWhenAtLeastZdu() {
     ContainerCommandRequestProto request = baseRequest()
         .setWritePipelineVersion(HDDSVersion.ZDU.serialize())
         .build();
@@ -47,20 +47,31 @@ public class TestClientCommandsUtils {
   }
 
   @Test
-  void defaultsToStreamBlockSupportWhenAbsent() {
-    ContainerCommandRequestProto request = baseRequest().build();
+  void roundsUpToZduWhenBelowZdu() {
+    // A recognized pre-ZDU version must be rounded up to ZDU (the write-versioning floor).
+    ContainerCommandRequestProto request = baseRequest()
+        .setWritePipelineVersion(HDDSVersion.SHORT_CIRCUIT_READS.serialize())
+        .build();
 
-    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT,
+    assertEquals(HDDSVersion.ZDU,
         ClientCommandsUtils.getWritePipelineVersion(request));
   }
 
   @Test
-  void fallsBackToStreamBlockSupportForUnknownVersion() {
+  void defaultsToZduWhenAbsent() {
+    ContainerCommandRequestProto request = baseRequest().build();
+
+    assertEquals(HDDSVersion.ZDU,
+        ClientCommandsUtils.getWritePipelineVersion(request));
+  }
+
+  @Test
+  void fallsBackToZduForUnknownVersion() {
     ContainerCommandRequestProto request = baseRequest()
         .setWritePipelineVersion(HDDSVersion.UNKNOWN_VERSION.serialize())
         .build();
 
-    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT,
+    assertEquals(HDDSVersion.ZDU,
         ClientCommandsUtils.getWritePipelineVersion(request));
   }
 }

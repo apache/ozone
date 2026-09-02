@@ -366,7 +366,7 @@ public final class ContainerProtocolCalls  {
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
             .setFinalizeBlock(finalizeBlockRequest)
-            .setWritePipelineVersion(xceiverClient.getPipeline().getWriteVersion().serialize());
+            .setWritePipelineVersion(xceiverClient.getPipeline().getWriteVersion());
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
     }
@@ -398,7 +398,7 @@ public final class ContainerProtocolCalls  {
             .setContainerID(containerBlockData.getBlockID().getContainerID())
             .setDatanodeUuid(id)
             .setPutBlock(createBlockRequest)
-            .setWritePipelineVersion(pipeline.getWriteVersion().serialize());
+            .setWritePipelineVersion(pipeline.getWriteVersion());
     if (tokenString != null) {
       builder.setEncodedToken(tokenString);
     }
@@ -539,7 +539,7 @@ public final class ContainerProtocolCalls  {
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
             .setWriteChunk(writeChunkRequest)
-            .setWritePipelineVersion(xceiverClient.getPipeline().getWriteVersion().serialize());
+            .setWritePipelineVersion(xceiverClient.getPipeline().getWriteVersion());
 
     if (tokenString != null) {
       builder.setEncodedToken(tokenString);
@@ -598,7 +598,7 @@ public final class ContainerProtocolCalls  {
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
             .setPutSmallFile(putSmallFileRequest)
-            .setWritePipelineVersion(client.getPipeline().getWriteVersion().serialize());
+            .setWritePipelineVersion(client.getPipeline().getWriteVersion());
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
     }

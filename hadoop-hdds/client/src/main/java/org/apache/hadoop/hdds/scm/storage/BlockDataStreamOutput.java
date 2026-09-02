@@ -219,7 +219,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             .setCmdType(streamInitType)
             .setContainerID(blockID.get().getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest)
-            .setWritePipelineVersion(pipeline.getWriteVersion().serialize());
+            .setWritePipelineVersion(pipeline.getWriteVersion());
 
     if (tokenString != null) {
       builder.setEncodedToken(tokenString);

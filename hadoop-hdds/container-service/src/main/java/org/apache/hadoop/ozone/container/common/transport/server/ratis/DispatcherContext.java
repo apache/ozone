@@ -55,8 +55,7 @@ public final class DispatcherContext {
   private final Map<Long, Long> container2BCSIDMap;
 
   // the component version the client asked the datanode to execute this write at
-  // defaults to HDDSVersion.STREAM_BLOCK_SUPPORT (pre-ZDU behavior) when the client
-  // did not supply one
+  // defaults to HDDSVersion.ZDU (the safe cross-domain floor) when the client did not supply one
   private final HDDSVersion writeVersion;
 
   private final boolean releaseSupported;
@@ -169,9 +168,8 @@ public final class DispatcherContext {
   }
 
   /**
-   * @return the component version the client requested this write be executed at
-   *     Defaults to {@link HDDSVersion#STREAM_BLOCK_SUPPORT}, the last
-   *     component version before ZDU, when the client did not supply one.
+   * @return the component version the client requested this write be executed at.
+   *     Defaults to {@link HDDSVersion#ZDU}, the safe cross-domain floor, when the client did not supply one.
    */
   public HDDSVersion getWriteVersion() {
     return writeVersion;
@@ -214,7 +212,7 @@ public final class DispatcherContext {
     private long term;
     private long logIndex;
     private Map<Long, Long> container2BCSIDMap;
-    private HDDSVersion writeVersion = HDDSVersion.STREAM_BLOCK_SUPPORT;
+    private HDDSVersion writeVersion = HDDSVersion.ZDU;
     private boolean releaseSupported;
 
     private Builder(Op op) {

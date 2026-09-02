@@ -28,23 +28,24 @@ import org.junit.jupiter.api.Test;
 public class TestDispatcherContext {
 
   @Test
-  void writeVersionDefaultsToStreamBlockSupport() {
+  void writeVersionDefaultsToZdu() {
     DispatcherContext context = DispatcherContext
         .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
         .build();
 
-    assertEquals(HDDSVersion.STREAM_BLOCK_SUPPORT,
+    assertEquals(HDDSVersion.ZDU,
         context.getWriteVersion());
   }
 
   @Test
   void writeVersionIsCarried() {
+    // Use a non-default version so this exercises the setter, not the ZDU default.
     DispatcherContext context = DispatcherContext
         .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
-        .setWriteVersion(HDDSVersion.ZDU)
+        .setWriteVersion(HDDSVersion.SHORT_CIRCUIT_READS)
         .build();
 
-    assertEquals(HDDSVersion.ZDU,
+    assertEquals(HDDSVersion.SHORT_CIRCUIT_READS,
         context.getWriteVersion());
   }
 }

@@ -291,11 +291,17 @@ public final class Pipeline {
   }
 
   /**
-   * Returns the component version this pipeline should execute writes at. All nodes in a
-   * pipeline are expected to share the same version, so we use the first node's current version.
+   * Returns the serialized component version this pipeline should execute writes at. All nodes in
+   * a pipeline are expected to share the same version, so we use the first node's. The raw
+   * serialized value is returned (see {@link DatanodeDetails#getSerializedCurrentVersion()}) so a
+   * client that cannot deserialize a newer datanode version still forwards the original value
+   * rather than {@link HDDSVersion#UNKNOWN_VERSION}.
    */
-  public HDDSVersion getWriteVersion() {
-    return nodeStatus.keySet().iterator().next().getCurrentVersion();
+  public int getWriteVersion() throws IOException {
+    if (nodeStatus.isEmpty()) {
+      throw new IOException(String.format("Pipeline=%s is empty", id));
+    }
+    return nodeStatus.keySet().iterator().next().getSerializedCurrentVersion();
   }
 
   public DatanodeDetails getClosestNode() throws IOException {
