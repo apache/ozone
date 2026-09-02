@@ -56,6 +56,7 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -231,13 +232,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     final List<AllocatedBlock> allocatedBlocks;
     try {
+      // TODO Use the actually passed `allowFallbackStoragePolicy` instead of `true`
       allocatedBlocks = ozoneManager.getScmClient().getBlockClient().allocateBlock(
-          scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, scmClientMachine);
-    } catch (SCMException ex) {
+          scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, scmClientMachine,
+          OzoneStoragePolicy.getDefaultPolicy(), true);
+    } catch (IOException ex) {
       ozoneManager.getMetrics().incNumBlockAllocateCallFails();
-      if (ex.getResult() == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {
-        throw new OMException(ex.getMessage(),
-            OMException.ResultCodes.SCM_IN_SAFE_MODE);
+      if (ex instanceof SCMException) {
+        if (((SCMException)ex).getResult()
+            .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
+          throw new OMException(ex.getMessage(), OMException.ResultCodes.SCM_IN_SAFE_MODE);
+        }
       }
       throw ex;
     }
@@ -266,7 +271,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
           .setBlockID(blockID)
           .setLength(scmBlockSize)
           .setOffset(0)
-          .setPipeline(pipeline);
+          .setPipeline(pipeline)
+          .setStorageTier(allocatedBlock.getStorageTier())
+          .setIsFallBack(allocatedBlock.isFallBack());
       if (ozoneManager.isGrpcBlockTokenEnabled()) {
         final Token<OzoneBlockTokenIdentifier> token = ozoneManager.getBlockTokenSecretManager().generateToken(
             remoteUser, blockID, READ_WRITE, scmBlockSize);

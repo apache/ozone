@@ -4445,7 +4445,7 @@
   </property>
 
   <property>
-    <name>ozone.default.storageTier</name>
+    <name>ozone.scm.default.storage.tier</name>
     <value>DISK</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
@@ -4455,6 +4455,18 @@
       StorageTier is null; this value is used as the fallback so their
       write path is unchanged. Supported values are DISK, SSD, ARCHIVE,
       RAM_DISK.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.default.storage.policy</name>
+    <value>WARM</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Default StoragePolicy used for block allocation when a client does not
+      specify a StoragePolicy. Supported values are HOT, WARM, and COLD.
+      HOT allocates blocks on SSD and falls back to DISK, WARM allocates
+      blocks on DISK, and COLD allocates blocks on ARCHIVE.
     </description>
   </property>
 

@@ -32,6 +32,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -44,6 +45,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -188,7 +190,8 @@ public class SCMBlockProtocolServer implements
       long size, int num,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList,
-      String clientMachine
+      String clientMachine,
+      @Nonnull StoragePolicy storagePolicy, boolean allowFallbackStoragePolicy
   ) throws IOException {
     long startNanos = Time.monotonicNowNanos();
     Map<String, String> auditMap = Maps.newHashMap();
@@ -197,7 +200,10 @@ public class SCMBlockProtocolServer implements
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
     auditMap.put("client", clientMachine);
+    auditMap.put("storagePolicy", storagePolicy.toString());
+    auditMap.put("allowFallbackStoragePolicy", String.valueOf(allowFallbackStoragePolicy));
     List<AllocatedBlock> blocks = new ArrayList<>(num);
+    long fallbackBlockCount = 0;
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Allocating {} blocks of size {}, with {}",
@@ -206,7 +212,8 @@ public class SCMBlockProtocolServer implements
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(size, replicationConfig, owner, excludeList);
+            .allocateBlock(size, replicationConfig, owner, excludeList,
+                storagePolicy, allowFallbackStoragePolicy);
         if (block != null) {
           // Sort the datanodes if client machine is specified
           final Node client = getClientNode(clientMachine);
@@ -221,6 +228,9 @@ public class SCMBlockProtocolServer implements
             }
           }
           blocks.add(block);
+          if (block.isFallBack()) {
+            fallbackBlockCount++;
+          }
         }
       }
 
@@ -228,7 +238,12 @@ public class SCMBlockProtocolServer implements
       String blockIDs = blocks.stream().limit(10)
           .map(block -> block.getBlockID().toString())
           .collect(Collectors.joining(", ", "[", "]"));
+      String fallbackBlocks = blocks.stream().limit(10)
+          .map(block -> String.valueOf(block.isFallBack()))
+          .collect(Collectors.joining(", ", "[", "]"));
       auditMap.put("sampleBlocks", blockIDs);
+      auditMap.put("sampleIsFallBack", fallbackBlocks);
+      auditMap.put("fallbackBlockCount", String.valueOf(fallbackBlockCount));
 
       if (blocks.size() < num) {
         AUDIT.logWriteFailure(buildAuditMessageForFailure(

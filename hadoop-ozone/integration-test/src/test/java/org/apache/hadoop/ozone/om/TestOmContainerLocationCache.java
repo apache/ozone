@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -723,7 +724,7 @@ public class TestOmContainerLocationCache {
             any(ReplicationConfig.class),
             anyString(),
             any(ExcludeList.class),
-            anyString()))
+            anyString(), any(StoragePolicy.class), anyBoolean()))
         .thenReturn(Collections.singletonList(block));
   }
 
@@ -739,7 +740,7 @@ public class TestOmContainerLocationCache {
             any(ECReplicationConfig.class),
             anyString(),
             any(ExcludeList.class),
-            anyString()))
+            anyString(), any(StoragePolicy.class), anyBoolean()))
         .thenReturn(Collections.singletonList(block));
   }
 

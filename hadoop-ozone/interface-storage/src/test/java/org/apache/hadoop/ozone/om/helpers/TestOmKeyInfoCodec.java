@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -64,7 +65,7 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     return new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
   }
 
-  private OmKeyInfo getKeyInfo(int chunkNum) {
+  private OmKeyInfo getKeyInfo(int chunkNum, StorageTier storageTier, boolean isFallback) {
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
     Pipeline pipeline = HddsTestUtils.getRandomPipeline();
     for (int i = 0; i < chunkNum; i++) {
@@ -72,6 +73,8 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
       OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
           .setBlockID(blockID)
           .setPipeline(pipeline)
+          .setStorageTier(storageTier)
+          .setIsFallBack(isFallback)
           .build();
       omKeyLocationInfoList.add(keyLocationInfo);
     }
@@ -133,14 +136,17 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
 
   @Test
   public void test() throws IOException {
-    testOmKeyInfoCodecWithoutPipeline(1);
-    testOmKeyInfoCodecWithoutPipeline(2);
+    testOmKeyInfoCodecWithoutPipeline(1, StorageTier.SSD, true);
+    testOmKeyInfoCodecWithoutPipeline(2, StorageTier.ARCHIVE, false);
+    testOmKeyInfoCodecWithoutPipeline(2, StorageTier.DISK, false);
+    testOmKeyInfoCodecWithoutPipeline(2, null, false);
   }
 
-  public void testOmKeyInfoCodecWithoutPipeline(int chunkNum)
+  public void testOmKeyInfoCodecWithoutPipeline(int chunkNum, StorageTier storageTier,
+      boolean isFallback)
       throws IOException {
     final Codec<OmKeyInfo> codec = OmKeyInfo.getOpenKeyTableCodec();
-    OmKeyInfo originKey = getKeyInfo(chunkNum);
+    OmKeyInfo originKey = getKeyInfo(chunkNum, storageTier, isFallback);
     byte[] rawData = codec.toPersistedFormat(originKey);
     OmKeyInfo key = codec.fromPersistedFormat(rawData);
     System.out.println("Chunk number = " + chunkNum +
@@ -209,7 +215,7 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getOpenKeyTableCodec();
     final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getKeyTableCodec();
 
-    OmKeyInfo originKey = getKeyInfo(1);
+    OmKeyInfo originKey = getKeyInfo(1, StorageTier.getDefaultTier(), true);
     assertNull(originKey.getExpectedDataGeneration());
 
     byte[] openKeyData = openKeyCodec.toPersistedFormat(originKey);

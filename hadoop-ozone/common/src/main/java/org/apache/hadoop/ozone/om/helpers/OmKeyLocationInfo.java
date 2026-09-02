@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
@@ -83,6 +84,18 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
     }
 
     @Override
+    public Builder setStorageTier(StorageTier storageTier) {
+      super.setStorageTier(storageTier);
+      return this;
+    }
+
+    @Override
+    public Builder setIsFallBack(boolean fallBack) {
+      super.setIsFallBack(fallBack);
+      return this;
+    }
+
+    @Override
     public OmKeyLocationInfo build() {
       return new OmKeyLocationInfo(this);
     }
@@ -98,7 +111,11 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
         .setLength(getLength())
         .setOffset(getOffset())
         .setCreateVersion(getCreateVersion())
-        .setPartNumber(getPartNumber());
+        .setPartNumber(getPartNumber())
+        .setIsFallBack(getIsFallBack());
+    if (getStorageTier() != null) {
+      builder.setStorageTier(getStorageTier().toProto());
+    }
     if (!ignorePipeline) {
       Token<OzoneBlockTokenIdentifier> token = getToken();
       if (token != null) {
@@ -136,7 +153,10 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
         .setOffset(keyLocation.getOffset())
         .setPipeline(getPipeline(keyLocation))
         .setCreateVersion(keyLocation.getCreateVersion())
-        .setPartNumber(keyLocation.getPartNumber());
+        .setPartNumber(keyLocation.getPartNumber())
+        .setStorageTier(keyLocation.hasStorageTier() ?
+            StorageTier.fromProto(keyLocation.getStorageTier()) : null)
+        .setIsFallBack(keyLocation.getIsFallBack());
     if (keyLocation.hasToken()) {
       Token<OzoneBlockTokenIdentifier> token =
           OMPBHelper.tokenFromProto(keyLocation.getToken());

@@ -23,19 +23,24 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import io.opentelemetry.api.trace.Span;
+import jakarta.annotation.Nonnull;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -174,8 +179,9 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       long size, int num,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList,
-      String clientMachine
-  ) throws IOException {
+      String clientMachine, @Nonnull StoragePolicy storagePolicy,
+      boolean allowFallbackStoragePolicy) throws IOException {
+    Objects.requireNonNull(storagePolicy, "storagePolicy cannot be null");
     Preconditions.checkArgument(size > 0, "block size must be greater than 0");
 
     final AllocateScmBlockRequestProto.Builder requestBuilder =
@@ -184,7 +190,9 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
             .setNumBlocks(num)
             .setType(replicationConfig.getReplicationType())
             .setOwner(owner)
-            .setExcludeList(excludeList.getProtoBuf());
+            .setExcludeList(excludeList.getProtoBuf())
+            .setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy))
+            .setAllowFallBack(allowFallbackStoragePolicy);
 
     if (StringUtils.isNotEmpty(clientMachine)) {
       requestBuilder.setClient(clientMachine);
@@ -237,7 +245,9 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       AllocatedBlock.Builder builder = new AllocatedBlock.Builder()
           .setContainerBlockID(
               ContainerBlockID.getFromProtobuf(resp.getContainerBlockID()))
-          .setPipeline(Pipeline.getFromProtobuf(resp.getPipeline()));
+          .setPipeline(Pipeline.getFromProtobuf(resp.getPipeline()))
+          .setIsFallBack(resp.getIsFallBack())
+          .setStorageTier(StorageTier.fromProto(resp.getStorageTier()));
       blocks.add(builder.build());
     }
 

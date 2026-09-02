@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -44,6 +45,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -271,7 +273,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
-        any(), any(), clientMachine.capture());
+        any(), any(), clientMachine.capture(), any(StoragePolicy.class), anyBoolean());
     assertEquals("1.2.3.4", clientMachine.getValue());
     verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any());
   }
@@ -293,7 +295,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
-        any(), any(), clientMachine.capture());
+        any(), any(), clientMachine.capture(), any(StoragePolicy.class), anyBoolean());
     assertEquals("", clientMachine.getValue());
   }
 
@@ -309,7 +311,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
-        any(), any(), clientMachine.capture());
+        any(), any(), clientMachine.capture(), any(StoragePolicy.class), anyBoolean());
     assertEquals("1.2.3.4", clientMachine.getValue());
     verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any());
   }
@@ -332,7 +334,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     AllocatedBlock.Builder blockBuilder =
         new AllocatedBlock.Builder().setPipeline(pipeline);
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), anyString())).thenAnswer(inv -> {
+        anyString(), any(ExcludeList.class), anyString(), any(StoragePolicy.class), anyBoolean())).thenAnswer(inv -> {
           int num = inv.getArgument(1);
           List<AllocatedBlock> blocks = new ArrayList<>(num);
           for (int i = 0; i < num; i++) {
@@ -398,7 +400,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     AllocatedBlock block2 = new AllocatedBlock.Builder().setPipeline(pipeline2)
         .setContainerBlockID(new ContainerBlockID(CONTAINER_ID + 1, LOCAL_ID + 1)).build();
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), anyString()))
+        anyString(), any(ExcludeList.class), anyString(), any(StoragePolicy.class), anyBoolean()))
         .thenReturn(Arrays.asList(block1, block2));
 
     KeyManager mockKeyManager = mock(KeyManager.class);
@@ -443,7 +445,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), clientMachine.capture()))
+        anyString(), any(ExcludeList.class), clientMachine.capture(), any(StoragePolicy.class), anyBoolean()))
         .thenReturn(Collections.singletonList(block));
 
     KeyManager mockKeyManager = mock(KeyManager.class);
