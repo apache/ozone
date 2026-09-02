@@ -51,7 +51,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 public abstract class KerberosTests {
 
   private MiniKdc miniKdc;
-  private OzoneConfiguration conf;
+  private final OzoneConfiguration conf = new OzoneConfiguration();
 
   private File workDir;
 
@@ -68,10 +68,6 @@ public abstract class KerberosTests {
 
   protected OzoneConfiguration getConf() {
     return conf;
-  }
-
-  protected OzoneConfiguration createOzoneConfig() {
-    return new OzoneConfiguration();
   }
 
   protected File getOzoneKeytab() {
@@ -91,9 +87,6 @@ public abstract class KerberosTests {
   }
 
   protected void initKerberos() throws Exception {
-    if (conf == null) {
-      conf = createOzoneConfig();
-    }
     startMiniKdc();
     setSecureConfig();
     createCredentialsInKDC();
