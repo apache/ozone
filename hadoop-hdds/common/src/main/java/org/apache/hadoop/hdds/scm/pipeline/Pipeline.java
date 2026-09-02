@@ -350,10 +350,17 @@ public final class Pipeline {
     }
     for (Long reportedTime : nodeStatus.values()) {
       if (reportedTime < 0) {
+        LOG.info("---Pipeline {} reported time was negative {}", this, reportedTime);
         return false;
       }
     }
-    return leaderId != null;
+    if (leaderId == null) {
+      LOG.info("---Pipeline {} leader was null", this);
+      return false;
+    } else {
+      LOG.info("---Pipeline {} is healthy", this);
+      return true;
+    }
   }
 
   public boolean isEmpty() {

@@ -132,6 +132,8 @@ public class PipelineReportHandler implements
         LOGGER.info("Opened pipeline {}", pipelineID);
       }
     }
+    LOGGER.info("---Received pipeline {} report on {}", pipeline,
+        this.scmContext.getScm().getScmNodeDetails().getNodeId());
     if (pipeline.isHealthy()) {
       if (scmSafeModeManager.getInSafeMode()) {
         publisher.fireEvent(SCMEvents.OPEN_PIPELINE, pipeline);

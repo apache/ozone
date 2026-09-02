@@ -133,7 +133,10 @@ public final class HddsUpgradeTestUtils {
     try {
       dbKeyFlushed = scm.getScmMetadataStore().getMetaTable().get(OzoneConsts.APPARENT_VERSION_KEY) != null;
     } catch (RocksDatabaseException | CodecException e) {
-      throw new RuntimeException(e);
+      // The metadata RocksDB is briefly closed while a Ratis snapshot install reloads the checkpoint.
+      // Treat that as "not finalized yet" and let waitFor retry rather than failing the test.
+      LOG.info("SCM {} metadata DB not readable yet (snapshot install in progress?), will retry.",
+          scm.getSCMNodeId(), e);
     }
 
     LOG.info("Waiting for SCM {} (leader? {}) to finalize.\n" +
