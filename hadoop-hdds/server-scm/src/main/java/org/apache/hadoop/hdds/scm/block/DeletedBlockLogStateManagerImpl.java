@@ -157,14 +157,23 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void removeTransactionsFromDB(ArrayList<Long> txIDs, DeletedBlocksTransactionSummary summary)
       throws IOException {
-    if (deletingTxIDs != null) {
-      deletingTxIDs.addAll(txIDs);
-    }
-    for (Long txID : txIDs) {
-      transactionBuffer.removeFromBuffer(deletedTable, txID);
-    }
-    if (summary != null) {
-      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
+    // Hold the buffer lock across the whole mark-remove-summary sequence so that a concurrent flush()
+    // (checkpoint download or leader transfer) cannot land between marking these txIDs as hidden and their
+    // removal being durably flushed. Otherwise onFlush() would reset deletingTxIDs while the row is still
+    // present, re-exposing it to the deletion scanner and causing the summary to be double-decremented.
+    transactionBuffer.lock();
+    try {
+      if (deletingTxIDs != null) {
+        deletingTxIDs.addAll(txIDs);
+      }
+      for (Long txID : txIDs) {
+        transactionBuffer.removeFromBuffer(deletedTable, txID);
+      }
+      if (summary != null) {
+        transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
+      }
+    } finally {
+      transactionBuffer.unlock();
     }
   }
 

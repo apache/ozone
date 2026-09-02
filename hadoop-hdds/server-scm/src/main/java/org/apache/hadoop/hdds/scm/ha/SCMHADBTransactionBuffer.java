@@ -54,4 +54,8 @@ public interface SCMHADBTransactionBuffer
   void beginApplyingTransaction();
 
   void endApplyingTransaction();
+
+  void lock();
+
+  void unlock();
 }
