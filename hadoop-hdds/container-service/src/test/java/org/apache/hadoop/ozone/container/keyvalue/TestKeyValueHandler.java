@@ -1472,6 +1472,7 @@ public class TestKeyValueHandler {
    * {@link KeyValueHandler#readBlock} and verifies that the response data
    * matches the original bytes written by {@link #writeBlock}.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private void readBlockAndVerify(HandlerWithVolumeSet handlerWithVolume, KeyValueContainer container,
       BlockID blockID, byte[] rawData, long readOffset, long length, long readBackOffset, long readBackLength) {
     ContainerCommandRequestProto readBlockRequest =
