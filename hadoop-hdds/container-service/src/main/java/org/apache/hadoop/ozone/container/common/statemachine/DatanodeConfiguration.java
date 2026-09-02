@@ -52,6 +52,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(DatanodeConfiguration.class);
 
+  public static final String BLOCK_DELETING_SERVICE_INTERVAL_KEY = "hdds.datanode.block.deleting.service.interval";
   static final String CONTAINER_DELETE_THREADS_MAX_KEY = "hdds.datanode.container.delete.threads.max";
   static final String CONTAINER_CLOSE_THREADS_MAX_KEY = "hdds.datanode.container.close.threads.max";
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY = "hdds.datanode.periodic.disk.check.interval.minutes";
@@ -257,6 +258,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   @Config(key = "hdds.datanode.block.deleting.service.interval",
           defaultValue = "60s",
+          reconfigurable = true,
           type = ConfigType.TIME,
           tags = { ConfigTag.SCM, ConfigTag.DELETION },
           description =
