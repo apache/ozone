@@ -62,6 +62,7 @@ import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationCli
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getBlockMapKey;
+import static org.apache.ratis.util.Preconditions.assertSame;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -2367,6 +2368,7 @@ public class KeyValueHandler extends Handler {
     long adjustLength = checksumBoundaries.length;
     int chunkIndex = checksumBoundaries.startIndex;
 
+    ChecksumData checksumData = null;
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
     blockFile.position(adjustedOffset);
     long totalDataLength = 0;
@@ -2398,6 +2400,12 @@ public class KeyValueHandler extends Handler {
       assertTrue(readLength > 0, () -> "readLength = " + readLength + " <= 0");
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
+
+        // This is the old approach.
+        // It has some bugs, but we are keeping it for now due to backward compatibility.
+        checksumData = new ChecksumData(checksumType, bytesPerChecksum, getChecksums(adjustedOffset, readLength,
+            bytesPerChecksum, chunkInfos));
+
         if (validateChunkChecksumData) {
           Checksum.validateChecksums(buffer.duplicate(), adjustedOffset, chunkIndex, chunkInfos);
         }
@@ -2405,7 +2413,7 @@ public class KeyValueHandler extends Handler {
             readBlock, adjustedOffset, readLength, bytesPerChecksum);
       }
       final ContainerCommandResponseProto response = getReadBlockResponse(
-          request, new ChecksumData(checksumType, bytesPerChecksum), buffer, adjustedOffset);
+          request, checksumData, buffer, adjustedOffset);
       final int dataLength = response.getReadBlock().getData().size();
       LOG.debug("server onNext response {}: dataLength={}, numChecksums={}",
           numResponses, dataLength, response.getReadBlock().getChecksumData().getChecksumsList().size());
@@ -2418,6 +2426,37 @@ public class KeyValueHandler extends Handler {
       chunkIndex = searchChunkByOffset(adjustedOffset, chunkInfos);
     }
     return totalDataLength;
+  }
+
+  static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChecksum,
+      final List<ContainerProtos.ChunkInfo> chunks) {
+    final int bytesPerChunk = Math.toIntExact(chunks.get(0).getLen());
+    assertSame(0, blockOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
+    final int numChecksums = 1 + (readLength - 1) / bytesPerChecksum;
+    final List<ByteString> checksums = new ArrayList<>(numChecksums);
+    for (int i = 0; i < numChecksums; i++) {
+      // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from,
+      // and its offset to pull out the correct checksum bytes for each read.
+      final int n = i * bytesPerChecksum;
+      final long offset = blockOffset + n;
+      final int c = Math.toIntExact(offset / bytesPerChunk);
+      final int chunkOffset = Math.toIntExact(offset % bytesPerChunk);
+      final int csi = chunkOffset / bytesPerChecksum;
+
+      assertTrue(c < chunks.size(),
+          () -> "chunkIndex = " + c + " >= chunk.size()" + chunks.size());
+      final ContainerProtos.ChunkInfo chunk = chunks.get(c);
+      if (c < chunks.size() - 1) {
+        assertSame(bytesPerChunk, chunk.getLen(), "bytesPerChunk");
+      }
+      final ContainerProtos.ChecksumData checksumDataProto = chunks.get(c).getChecksumData();
+      assertSame(bytesPerChecksum, checksumDataProto.getBytesPerChecksum(), "bytesPerChecksum");
+      final List<ByteString> checksumsList = checksumDataProto.getChecksumsList();
+      assertTrue(csi < checksumsList.size(),
+          () -> "checksumIndex = " + csi + " >= checksumsList.size()" + checksumsList.size());
+      checksums.add(checksumsList.get(csi));
+    }
+    return checksums;
   }
 
   /**

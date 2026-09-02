@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -425,8 +426,8 @@ public class Checksum {
     checksumData.verifyChecksumDataMatches(startIndex, computed);
   }
 
-  public static int validateChecksums(ByteBuffer data, long blockOffset, int startIndex,
-      final List<ContainerProtos.ChunkInfo> chunks) throws OzoneChecksumException {
+  public static void validateChecksums(ByteBuffer data, long blockOffset, int startIndex,
+      final List<ChunkInfo> chunks) throws OzoneChecksumException {
 
     long firstChunkOffset = blockOffset - chunks.get(startIndex).getOffset();
     int bytesPerChecksum = chunks.get(startIndex).getChecksumData().getBytesPerChecksum();
@@ -434,7 +435,7 @@ public class Checksum {
     int dataOffset = data.position();
 
     if (readLength <= 0) {
-      return -1;
+      return;
     }
 
     assertSame(0, firstChunkOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
@@ -459,7 +460,6 @@ public class Checksum {
       startIndex++;
     }
 
-    return startIndex;
   }
 
   private static void verifySingleChunk(ByteBuffer data, int dataOffset, int dataLimit,
