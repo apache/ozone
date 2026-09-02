@@ -2400,7 +2400,7 @@ public class KeyValueHandler extends Handler {
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
         if (validateChunkChecksumData) {
-          validateChecksums(buffer.duplicate(), adjustedOffset, chunkIndex, chunkInfos);
+          Checksum.validateChecksums(buffer.duplicate(), adjustedOffset, chunkIndex, chunkInfos);
         }
         LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChecksum {}",
             readBlock, adjustedOffset, readLength, bytesPerChecksum);
@@ -2419,43 +2419,6 @@ public class KeyValueHandler extends Handler {
       chunkIndex = searchChunkByOffset(adjustedOffset, chunkInfos);
     }
     return totalDataLength;
-  }
-
-  private static int validateChecksums(ByteBuffer data, long blockOffset, int startIndex,
-      final List<ContainerProtos.ChunkInfo> chunks) throws OzoneChecksumException {
-
-    long firstChunkOffset = blockOffset - chunks.get(startIndex).getOffset();
-    int bytesPerChecksum = chunks.get(startIndex).getChecksumData().getBytesPerChecksum();
-    long readLength = data.remaining();
-    int dataOffset = data.position();
-
-    if (readLength <= 0) {
-      return -1;
-    }
-
-    assertSame(0, firstChunkOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
-    ContainerProtos.ChunkInfo firstChunk = chunks.get(startIndex);
-
-    // verify first chunk, only the first chunk is not start at zero.
-    int firstChunkIndex = (int) (firstChunkOffset / bytesPerChecksum);
-    int dataLimit = (int) Math.min(firstChunk.getLen() - firstChunkOffset, readLength);
-    Checksum.verifySingleChunk(data, dataOffset, dataLimit, firstChunk, firstChunkIndex);
-    dataOffset += dataLimit;
-    readLength -= dataLimit;
-    startIndex++;
-
-    while (readLength > 0) {
-      ContainerProtos.ChunkInfo chunkInfo = chunks.get(startIndex);
-      dataLimit = (int) Math.min(chunkInfo.getLen(), readLength);
-
-      Checksum.verifySingleChunk(data, dataOffset, dataLimit, chunkInfo, 0);
-
-      dataOffset += dataLimit;
-      readLength -= dataLimit;
-      startIndex++;
-    }
-
-    return startIndex;
   }
 
   /**

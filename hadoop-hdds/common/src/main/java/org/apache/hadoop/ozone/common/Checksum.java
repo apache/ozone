@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.common;
 
+import static org.apache.ratis.util.Preconditions.assertSame;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -423,8 +425,45 @@ public class Checksum {
     checksumData.verifyChecksumDataMatches(startIndex, computed);
   }
 
-  public static void verifySingleChunk(ByteBuffer data, int dataOffset, int dataLimit,
-      ContainerProtos.ChunkInfo chunkInfo, int chunkIndex) throws OzoneChecksumException {
+  public static int validateChecksums(ByteBuffer data, long blockOffset, int startIndex,
+      final List<ContainerProtos.ChunkInfo> chunks) throws OzoneChecksumException {
+
+    long firstChunkOffset = blockOffset - chunks.get(startIndex).getOffset();
+    int bytesPerChecksum = chunks.get(startIndex).getChecksumData().getBytesPerChecksum();
+    long readLength = data.remaining();
+    int dataOffset = data.position();
+
+    if (readLength <= 0) {
+      return -1;
+    }
+
+    assertSame(0, firstChunkOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
+    ContainerProtos.ChunkInfo firstChunk = chunks.get(startIndex);
+
+    // verify first chunk, only the first chunk is not start at zero.
+    int firstChunkIndex = (int) (firstChunkOffset / bytesPerChecksum);
+    int dataLimit = (int) Math.min(firstChunk.getLen() - firstChunkOffset, readLength);
+    Checksum.verifySingleChunk(data, dataOffset, dataLimit, firstChunk, firstChunkIndex);
+    dataOffset += dataLimit;
+    readLength -= dataLimit;
+    startIndex++;
+
+    while (readLength > 0) {
+      ContainerProtos.ChunkInfo chunkInfo = chunks.get(startIndex);
+      dataLimit = (int) Math.min(chunkInfo.getLen(), readLength);
+
+      Checksum.verifySingleChunk(data, dataOffset, dataLimit, chunkInfo, 0);
+
+      dataOffset += dataLimit;
+      readLength -= dataLimit;
+      startIndex++;
+    }
+
+    return startIndex;
+  }
+
+  private static void verifySingleChunk(ByteBuffer data, int dataOffset, int dataLimit,
+      ContainerProtos.ChunkInfo chunkInfo, int checksumIndex) throws OzoneChecksumException {
 
     ContainerProtos.ChecksumData protoChecksum = chunkInfo.getChecksumData();
     final ByteBuffer buffer = data.duplicate();
@@ -437,7 +476,7 @@ public class Checksum {
         protoChecksum.getChecksumsList()
     );
 
-    Checksum.verifyChecksum(buffer, checksum, chunkIndex);
+    Checksum.verifyChecksum(buffer, checksum, checksumIndex);
   }
 
   /**
