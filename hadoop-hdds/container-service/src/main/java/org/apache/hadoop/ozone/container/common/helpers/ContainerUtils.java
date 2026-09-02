@@ -298,10 +298,7 @@ public final class ContainerUtils {
   }
 
   /**
-   * Resolve and validate the chunk directory from the containerData. The
-   * directory's existence is checked on every call, so a chunk operation
-   * against a failed volume surfaces as a storage failure; write paths rely on
-   * this to mark the container unhealthy.
+   * Resolve and validate the chunk directory from the container data.
    *
    * @param containerData {@link ContainerData}
    * @return the file of chunk directory

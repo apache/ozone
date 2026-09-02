@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -287,6 +288,7 @@ public class FilePerChunkStrategy implements ChunkManager {
         }
       }
     }
+    ContainerUtils.getChunkDir(containerData);
     throw new StorageContainerException(
         "Chunk file can't be found " + possibleFiles.toString(),
         UNABLE_TO_FIND_CHUNK);

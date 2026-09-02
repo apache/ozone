@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -246,11 +247,16 @@ public class FilePerBlockStrategy implements ChunkManager {
     int bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
 
-    if (readNettyChunkedNioFile && dispatcherContext != null && dispatcherContext.isReleaseSupported()) {
-      return ChunkUtils.readData(chunkFile, bufferCapacity, offset, len, volume, dispatcherContext);
+    try {
+      if (readNettyChunkedNioFile && dispatcherContext != null && dispatcherContext.isReleaseSupported()) {
+        return ChunkUtils.readData(chunkFile, bufferCapacity, offset, len, volume, dispatcherContext);
+      }
+      return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
+          readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
+    } catch (StorageContainerException ex) {
+      ContainerUtils.getChunkDir(containerData);
+      throw ex;
     }
-    return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
-        readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
   }
 
   @Override

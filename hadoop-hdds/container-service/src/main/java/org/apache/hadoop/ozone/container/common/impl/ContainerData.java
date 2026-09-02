@@ -282,6 +282,7 @@ public abstract class ContainerData {
    * @return the resolved chunks directory
    * @throws StorageContainerException if the chunks directory cannot be resolved
    */
+  @JsonIgnore
   public File getChunksDirForRead() throws StorageContainerException {
     File dir = chunksDirFile;
     if (dir == null) {
