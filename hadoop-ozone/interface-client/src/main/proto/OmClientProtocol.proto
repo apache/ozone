@@ -2531,6 +2531,8 @@ message UpdateAssumeRoleRequest {
   required string tempAccessKeyId         = 6;
   required string secretAccessKey         = 7;
   required string roleId                  = 8;
+  optional string sessionToken            = 9;
+  optional uint64 expirationEpochSeconds  = 10;
 }
 
 message RevokeSTSTokenRequest {

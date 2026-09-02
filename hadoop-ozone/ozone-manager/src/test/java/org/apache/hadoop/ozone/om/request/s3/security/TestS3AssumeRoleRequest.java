@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.s3.security;
 
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
@@ -63,6 +65,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateAssumeRoleRequest;
 import org.apache.hadoop.ozone.security.STSTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.OzoneGrant;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -160,13 +163,11 @@ public class TestS3AssumeRoleRequest {
         ).build();
 
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
-    final OMResponse omResponse = response.getOMResponse();
+    final OMException exception = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
 
-    assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo(
+    assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
+    assertThat(exception.getMessage()).isEqualTo(
         "Invalid Value: DurationSeconds must be between 900 and 43200 seconds");
-    assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
     assertMarkForAuditCalled(request);
   }
 
@@ -182,13 +183,11 @@ public class TestS3AssumeRoleRequest {
         ).build();
 
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
-    final OMResponse omResponse = response.getOMResponse();
+    final OMException exception = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
 
-    assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo(
+    assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
+    assertThat(exception.getMessage()).isEqualTo(
         "Invalid Value: DurationSeconds must be between 900 and 43200 seconds");
-    assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
     assertMarkForAuditCalled(request);
   }
 
@@ -206,12 +205,17 @@ public class TestS3AssumeRoleRequest {
     // Call preExecute first to generate credentials
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
     final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+
+    assertLeaderGeneratedAssumeRoleFields(preExecutedRequest, 43200);
+
     final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
     final OMClientResponse response = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
     assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
+    verify(accessAuthorizer).generateAssumeRoleSessionPolicy(
+        any(org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class));
     assertMarkForAuditCalled(requestWithCredentials);
   }
 
@@ -229,12 +233,17 @@ public class TestS3AssumeRoleRequest {
     // Call preExecute first to generate credentials
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
     final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+
+    assertLeaderGeneratedAssumeRoleFields(preExecutedRequest, 900);
+
     final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
     final OMClientResponse response = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
     assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
+    verify(accessAuthorizer).generateAssumeRoleSessionPolicy(
+        any(org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class));
     assertMarkForAuditCalled(requestWithCredentials);
   }
 
@@ -252,12 +261,10 @@ public class TestS3AssumeRoleRequest {
         ).build();
 
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
-    final OMResponse omResponse = response.getOMResponse();
+    final OMException exception = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
 
-    assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo("S3AssumeRoleRequest does not have S3 authentication");
-    assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
+    assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
+    assertThat(exception.getMessage()).isEqualTo("S3AssumeRoleRequest does not have S3 authentication");
     assertMarkForAuditCalled(request);
   }
 
@@ -276,6 +283,9 @@ public class TestS3AssumeRoleRequest {
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
     // Call preExecute first to generate credentials
     final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+
+    assertLeaderGeneratedAssumeRoleFields(preExecutedRequest, durationSeconds);
+
     final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
     final OMClientResponse clientResponse = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = clientResponse.getOMResponse();
@@ -285,6 +295,8 @@ public class TestS3AssumeRoleRequest {
     assertThat(omResponse.getCmdType()).isEqualTo(Type.AssumeRole);
 
     final AssumeRoleResponse assumeRoleResponse = omResponse.getAssumeRoleResponse();
+    assertThat(assumeRoleResponse.getSessionToken()).isEqualTo(
+        preExecutedRequest.getUpdateAssumeRoleRequest().getSessionToken());
 
     // AccessKeyId: prefix ASIA + 20 chars
     assertThat(assumeRoleResponse.getAccessKeyId()).startsWith("ASIA");
@@ -370,6 +382,29 @@ public class TestS3AssumeRoleRequest {
   }
 
   @Test
+  public void testValidateAndUpdateCacheDoesNotCallAuthorizer() throws IOException {
+    final OMRequest omRequest = baseOmRequestBuilder()
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(3600)
+                .setRequestId(REQUEST_ID)
+        ).build();
+
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+    verify(accessAuthorizer).generateAssumeRoleSessionPolicy(
+        any(org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class));
+
+    final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
+    requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
+
+    verify(accessAuthorizer, times(1)).generateAssumeRoleSessionPolicy(
+        any(org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class));
+  }
+
+  @Test
   public void testAssumeRoleWithEmptySessionName() {
     final OMRequest omRequest = baseOmRequestBuilder()
         .setAssumeRoleRequest(
@@ -381,9 +416,9 @@ public class TestS3AssumeRoleRequest {
         ).build();
 
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
-    assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(response.getOMResponse().getMessage()).isEqualTo(
+    final OMException exception = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+    assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
+    assertThat(exception.getMessage()).isEqualTo(
         "Value null at 'roleSessionName' failed to satisfy constraint: Member must not be null");
     assertMarkForAuditCalled(request);
   }
@@ -399,14 +434,12 @@ public class TestS3AssumeRoleRequest {
         ).build();
 
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
-    final OMResponse omResponse = response.getOMResponse();
+    final OMException exception = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
 
-    assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo(
+    assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
+    assertThat(exception.getMessage()).isEqualTo(
         "Invalid RoleSessionName length 1: it must be 2-64 characters long and contain only alphanumeric " +
         "characters and +, =, ,, ., @, -");
-    assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
     assertMarkForAuditCalled(request);
   }
 
@@ -422,15 +455,13 @@ public class TestS3AssumeRoleRequest {
         ).build();
 
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
-    final OMResponse omResponse = response.getOMResponse();
+    final OMException exception = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
 
-    assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo(
+    assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
+    assertThat(exception.getMessage()).isEqualTo(
         "Invalid RoleSessionName length 70: it must be 2-64 characters long and contain only alphanumeric " +
         "characters and +, =, ,, ., @, -"
     );
-    assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
     assertMarkForAuditCalled(request);
   }
 
@@ -521,17 +552,13 @@ public class TestS3AssumeRoleRequest {
         ).build();
 
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
-    final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
-    final OMClientResponse response = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
-    final OMResponse omResponse = response.getOMResponse();
+    final OMException exception = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
 
-    assertThat(omResponse.getStatus()).isEqualTo(Status.MALFORMED_POLICY_DOCUMENT);
-    assertThat(omResponse.getMessage()).isEqualTo("IAM session policy: Duplicate field 'Action' in session policy");
-    assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
+    assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT);
+    assertThat(exception.getMessage()).isEqualTo("IAM session policy: Duplicate field 'Action' in session policy");
     verify(accessAuthorizer, never()).generateAssumeRoleSessionPolicy(
         any(org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class));
-    assertMarkForAuditCalled(requestWithCredentials);
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -857,6 +884,17 @@ public class TestS3AssumeRoleRequest {
             S3Authentication.newBuilder()
                 .setAccessId(ORIGINAL_ACCESS_KEY_ID)
         );
+  }
+
+  private void assertLeaderGeneratedAssumeRoleFields(OMRequest preExecutedRequest, int durationSeconds) {
+    assertThat(preExecutedRequest.hasUpdateAssumeRoleRequest()).isTrue();
+    final UpdateAssumeRoleRequest updateAssumeRoleRequest = preExecutedRequest.getUpdateAssumeRoleRequest();
+    assertThat(updateAssumeRoleRequest.getTempAccessKeyId()).startsWith("ASIA");
+    assertThat(updateAssumeRoleRequest.getSecretAccessKey()).isNotEmpty();
+    assertThat(updateAssumeRoleRequest.getRoleId()).startsWith("AROA");
+    assertThat(updateAssumeRoleRequest.getSessionToken()).isNotEmpty();
+    assertThat(updateAssumeRoleRequest.getExpirationEpochSeconds())
+        .isEqualTo(CLOCK.instant().getEpochSecond() + durationSeconds);
   }
 
   private void assertMarkForAuditCalled(S3AssumeRoleRequest request) {
