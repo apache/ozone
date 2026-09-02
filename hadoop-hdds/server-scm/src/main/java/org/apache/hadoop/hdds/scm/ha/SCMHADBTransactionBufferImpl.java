@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIO
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -38,6 +39,7 @@ import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -233,6 +235,16 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   @Override
   public void unlock() {
     rwLock.readLock().unlock();
+  }
+
+  @Override 
+  public void runWithBufferLock(CheckedRunnable<IOException> operation) throws IOException {
+    rwLock.readLock().lock();
+    try {
+      operation.run();
+    } finally {
+      rwLock.readLock().unlock();
+    }
   }
 
   @Override

@@ -146,12 +146,14 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
       DeletedBlocksTransactionSummary summary) throws IOException {
-    for (DeletedBlocksTransaction tx : txs) {
-      transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
-    }
-    if (summary != null) {
-      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
-    }
+    transactionBuffer.runWithBufferLock(() -> {
+      for (DeletedBlocksTransaction tx : txs) {
+        transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
+      }
+      if (summary != null) {
+        transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
+      }
+    });
   }
 
   @Override
@@ -163,7 +165,7 @@ public class DeletedBlockLogStateManagerImpl
     // present, re-exposing it to the deletion scanner and causing the summary to be double-decremented.
     transactionBuffer.lock();
     try {
-      if (deletingTxIDs != null) {
+    if (deletingTxIDs != null) {
         deletingTxIDs.addAll(txIDs);
       }
       for (Long txID : txIDs) {
