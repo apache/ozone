@@ -1312,6 +1312,30 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int containerSampleLimit = 100;
 
+    @Config(key = "hdds.scm.replication.decommission.ec.reconstruction.enabled",
+        type = ConfigType.BOOLEAN,
+        defaultValue = "false",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "Reserved for HDDS-15072. When implemented, if true, SCM " +
+            "will switch from 1-1 replication to multi-source reconstruction for " +
+            "EC containers on decommissioning nodes when the node's load exceeds " +
+            "the threshold. Not read by SCM in this release."
+    )
+    private boolean ecDecommissionReconstructionEnabled = false;
+
+    @Config(key = "hdds.scm.replication.decommission.ec.reconstruction.load.factor",
+        type = ConfigType.DOUBLE,
+        defaultValue = "0.9",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "Reserved for HDDS-15072. When implemented, the threshold " +
+            "factor (between 0 and 1) of a node's replication limit at which " +
+            "SCM switches to reconstruction for EC decommission. Not read by " +
+            "SCM in this release. Default is 0.9."
+    )
+    private double ecDecommissionReconstructionLoadFactor = 0.9;
+
     @Config(key = "hdds.scm.replication.reconstruction.global.limit",
         type = ConfigType.INT,
         defaultValue = "0",
@@ -1377,6 +1401,22 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public void setDatanodeReplicationLimit(int limit) {
       this.datanodeReplicationLimit = limit;
+    }
+
+    public boolean isEcDecommissionReconstructionEnabled() {
+      return ecDecommissionReconstructionEnabled;
+    }
+
+    public void setEcDecommissionReconstructionEnabled(boolean enabled) {
+      this.ecDecommissionReconstructionEnabled = enabled;
+    }
+
+    public double getEcDecommissionReconstructionLoadFactor() {
+      return ecDecommissionReconstructionLoadFactor;
+    }
+
+    public void setEcDecommissionReconstructionLoadFactor(double factor) {
+      this.ecDecommissionReconstructionLoadFactor = factor;
     }
 
     public int getReconstructionGlobalLimit() {
@@ -1490,6 +1530,17 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         throw new IllegalArgumentException(
             "inflight.limit.factor is set to " + inflightReplicationLimitFactor
                 + " and must be <= 1");
+      }
+      if (!Double.isFinite(ecDecommissionReconstructionLoadFactor)
+          || ecDecommissionReconstructionLoadFactor < 0) {
+        throw new IllegalArgumentException(
+            "decommission.ec.reconstruction.load.factor is set to "
+                + ecDecommissionReconstructionLoadFactor + " and must be >= 0");
+      }
+      if (ecDecommissionReconstructionLoadFactor > 1) {
+        throw new IllegalArgumentException(
+            "decommission.ec.reconstruction.load.factor is set to "
+                + ecDecommissionReconstructionLoadFactor + " and must be <= 1");
       }
       if (reconstructionGlobalLimit < 0) {
         throw new IllegalArgumentException(
