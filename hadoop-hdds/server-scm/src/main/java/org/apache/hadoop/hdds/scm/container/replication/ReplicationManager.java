@@ -567,6 +567,22 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     sendDatanodeCommand(cmd, containerInfo, source);
   }
 
+  /**
+   * Send a {@link ReconstructECContainersCommand} to a datanode with capacity,
+   * after reserving a cluster-wide reconstruction slot.
+   *
+   * <p>The command may encode multiple missing EC indexes (fragments). One
+   * global slot is reserved per command; {@link #opCompleted} releases it
+   * incrementally as each fragment's pending ADD op completes or expires.
+   *
+   * <p>If the global reconstruction limit is reached, or no target datanode
+   * has spare replication capacity, a {@link CommandTargetOverloadedException}
+   * is thrown and the command is not sent. Callers (e.g.
+   * {@code ECUnderReplicationHandler}) can fall back to 1-1 replication.
+   *
+   * @param containerInfo the container to reconstruct
+   * @param command the reconstruction command to send
+   */
   public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
       ReconstructECContainersCommand command)
       throws CommandTargetOverloadedException, NotLeaderException {
@@ -575,6 +591,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         command.getMissingContainerIndexes().size(),
         containerInfo.getContainerID(),
         () -> {
+          // Pick the least-loaded target datanode that can accept the command.
           List<DatanodeDetails> targets = command.getTargetDatanodes();
           List<Pair<Integer, DatanodeDetails>> targetWithCmds =
               getAvailableDatanodesForReplication(targets);
@@ -585,6 +602,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
           }
           DatanodeDetails target = selectAndOptionallyExcludeDatanode(
               rmConf.getReconstructionCommandWeight(), targetWithCmds);
+          // sendDatanodeCommand schedules one pending ADD per missing index and
+          // increments ecReconstructionCmdsSentTotal.
           sendDatanodeCommand(command, containerInfo, target);
         });
   }
