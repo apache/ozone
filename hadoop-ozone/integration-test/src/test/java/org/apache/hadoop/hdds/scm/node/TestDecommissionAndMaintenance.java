@@ -151,6 +151,9 @@ public class TestDecommissionAndMaintenance {
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(DATANODE_COUNT)
+        // Clusters overlap via MiniOzoneClusterProvider, so the metrics leak
+        // assertion would see a concurrent cluster's sources.
+        .setMetricsLeakAssertEnabled(false)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setLayoutVersion(maxLayoutVersion())
             .build());

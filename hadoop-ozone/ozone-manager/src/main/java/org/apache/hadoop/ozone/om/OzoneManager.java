@@ -716,7 +716,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMMultiTenantManager.checkAndEnableMultiTenancy(this, conf);
 
     metrics = OMMetrics.create(conf);
-    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
+    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create(getOMNodeId());
     perfMetrics = OMPerformanceMetrics.register();
     omDeletionMetrics = DeletingServiceMetrics.create();
     // Get admin list
@@ -2495,6 +2495,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       serviceManager.stop();
       DeletingServiceMetrics.unregister();
       OMPerformanceMetrics.unregister();
+      omSnapshotIntMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
       scmClient.close();
       if (certClient != null) {

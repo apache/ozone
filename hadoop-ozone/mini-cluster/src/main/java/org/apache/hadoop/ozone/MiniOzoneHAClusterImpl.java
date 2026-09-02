@@ -502,6 +502,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
           scmConfigurator, omService, scmService, hddsDatanodes, path, getServices());
+      cluster.setMetricsLeakAssertEnabled(metricsLeakAssertEnabled);
       try {
         cluster.startServices();
       } catch (Exception e) {
