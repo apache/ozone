@@ -1363,7 +1363,7 @@ public class TestKeyValueHandler {
       byte[] rawData = new byte[totalLen];
       ThreadLocalRandom.current().nextBytes(rawData);
       writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
-      readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2, 2);
+      readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2, 2, 2, 2);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
       ContainerMetrics.remove();
@@ -1391,7 +1391,7 @@ public class TestKeyValueHandler {
       byte[] rawData = new byte[totalLen];
       ThreadLocalRandom.current().nextBytes(rawData);
       writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
-      readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2048, 2048);
+      readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2048, 2048, 1044, 3072);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
       ContainerMetrics.remove();
@@ -1419,7 +1419,7 @@ public class TestKeyValueHandler {
       byte[] rawData = new byte[totalLen];
       ThreadLocalRandom.current().nextBytes(rawData);
       writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
-      readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 20, (1 << 20) + 10);
+      readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 20, (1 << 20) + 20, 0, (1 << 20) + 30 + 1024);
     } finally {
       FileUtils.deleteDirectory(testDir.toFile());
       ContainerMetrics.remove();
@@ -1473,7 +1473,7 @@ public class TestKeyValueHandler {
    * matches the original bytes written by {@link #writeBlock}.
    */
   private void readBlockAndVerify(HandlerWithVolumeSet handlerWithVolume, KeyValueContainer container,
-      BlockID blockID, byte[] rawData, long readOffset, long length) throws Exception {
+      BlockID blockID, byte[] rawData, long readOffset, long length, long readBackOffset, long readBackLength) {
     ContainerCommandRequestProto readBlockRequest =
         ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.ReadBlock)
@@ -1517,7 +1517,8 @@ public class TestKeyValueHandler {
       allData.put(resp.getReadBlock().getData().asReadOnlyByteBuffer());
     }
 
-    assertTrue(readOffset >= firstResponseOffset && returnedDataLen >= length);
+    assertEquals(readBackOffset, firstResponseOffset);
+    assertEquals(readBackLength, returnedDataLen);
 
     // Verify the returned data matches the expected slice of the original data
     allData.flip();
