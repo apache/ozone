@@ -124,7 +124,7 @@ public class TestStreamRead {
   }
 
   @Test
-  void testReadKey256k() throws Exception{
+  void testReadKey256k() throws Exception {
     final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("256k");
     runTestReadKey(KEY_SIZE, bytesPerChecksum);
   }

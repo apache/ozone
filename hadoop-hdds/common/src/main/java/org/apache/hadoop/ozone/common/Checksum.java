@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.common;
 
-import static org.apache.ratis.util.Preconditions.assertSame;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;

@@ -2351,7 +2351,8 @@ public class KeyValueHandler extends Handler {
 
     // TODO: Support client-side flag to toggle checksum verification.
     // If checksum is disabled, chunk offset adjustment can be skipped.
-    final ChecksumBoundaries checksumBoundaries = getChecksumBoundaries(readBlock.getOffset(), readBlock.getLength(), chunkInfos, bytesPerChecksum);
+    final ChecksumBoundaries checksumBoundaries = getChecksumBoundaries(readBlock.getOffset(),
+        readBlock.getLength(), chunkInfos, bytesPerChecksum);
     long adjustedOffset = checksumBoundaries.offset;
     long adjustLength = checksumBoundaries.length;
     int chunkIndex = checksumBoundaries.startIndex;
