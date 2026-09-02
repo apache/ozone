@@ -147,7 +147,6 @@ public class S3AssumeRoleRequest extends OMClientRequest {
           targetRoleName, omRequest, ozoneManager, assumeRoleRequest, secretAccessKey, tempAccessKeyId,
           creationInstant);
       final long expirationEpochSeconds = creationInstant.plusSeconds(durationSeconds).getEpochSecond();
-
       auditMap.put(OzoneConsts.S3_STS_TEMP_ACCESS_KEY_ID, tempAccessKeyId);
 
       // Build UpdateAssumeRoleRequest with leader-generated credentials and session token

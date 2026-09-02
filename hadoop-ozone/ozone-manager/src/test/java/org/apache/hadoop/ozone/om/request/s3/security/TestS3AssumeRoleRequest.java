@@ -855,7 +855,7 @@ public class TestS3AssumeRoleRequest {
 
     verify(ozoneManager).resolveBucketLink(Pair.of("s3v", "s3v-iceberg"), true, false);
   }
-  
+
   @SafeVarargs
   private static ResolvedBucket resolved(String requestedVol, String requestedBucket, String realVol, String realBucket,
       Pair<String, String>... linkChain) {
