@@ -496,6 +496,13 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
 
   Table<String, String> getSnapshotRenamedTable();
 
+  /**
+   * Returns the sharer count per shared block group, keyed by
+   * sharedBlockGroupId. A row is present only while more than one key shares
+   * the group's blocks.
+   */
+  Table<Long, Long> getSharedBlockGroupTable();
+
   Table<String, CompactionLogEntry> getCompactionLogTable();
 
   Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable();

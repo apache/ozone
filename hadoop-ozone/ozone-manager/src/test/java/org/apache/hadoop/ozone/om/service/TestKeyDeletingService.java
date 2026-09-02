@@ -277,7 +277,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           .addAllDeletedBlocks(new ArrayList<>()).build();
       Map<String, PurgedKey> blockGroups = Collections.singletonMap(
           blockGroup.getGroupID(), 
-          new PurgedKey("vol", "buck", 1, blockGroup, "key1", 0, true));
+          new PurgedKey("vol", "buck", 1, blockGroup, "key1", 0, true, 0L));
       // Process the key deletion
       testService.processKeyDeletes(blockGroups, new HashMap<>(), new ArrayList<>(), null, null);
       // Verify that SCM's deleteKeyBlocks was never called (empty keys are filtered out)
@@ -304,8 +304,8 @@ class TestKeyDeletingService extends OzoneTestBase {
           .addAllDeletedBlocks(deletedBlocks).build();
       Map<String, PurgedKey> blockGroups = new HashMap<>();
 
-      blockGroups.put(blockGroup1.getGroupID(), new PurgedKey("vol", "buck", 1, blockGroup1, "key1", 0, true));
-      blockGroups.put(blockGroup2.getGroupID(), new PurgedKey("vol", "buck", 1, blockGroup2, "key2", 0, true));
+      blockGroups.put(blockGroup1.getGroupID(), new PurgedKey("vol", "buck", 1, blockGroup1, "key1", 0, true, 0L));
+      blockGroups.put(blockGroup2.getGroupID(), new PurgedKey("vol", "buck", 1, blockGroup2, "key2", 0, true, 0L));
 
       // Process the key deletion
       testService.processKeyDeletes(blockGroups, new HashMap<>(), new ArrayList<>(), null, null);
@@ -1140,7 +1140,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             .addAllDeletedBlocks(Collections.singletonList(new DeletedBlock(
                 new BlockID(1, 1), 1, 3, 1))).build();
         Map<String, PurgedKey> blockGroups = Collections.singletonMap(blockGroup.getGroupID(), new PurgedKey("vol",
-            "buck", 1, blockGroup, "key1", 30, true));
+            "buck", 1, blockGroup, "key1", 30, true, 0L));
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
         OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
             .setBucketName("buck")

@@ -1296,6 +1296,15 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Copies a key within this bucket without moving any data, by creating a key
+   * that shares the source key's blocks.
+   */
+  public void copyKey(String sourceKeyName, String destinationKeyName,
+      Map<String, String> metadata) throws IOException {
+    proxy.copyKey(volumeName, name, sourceKeyName, destinationKeyName, metadata);
+  }
+
+  /**
    * Removes all the tags from an existing key.
    * @param keyName Key name
    * @throws IOException

@@ -46,7 +46,9 @@ public enum OMLayoutFeature implements LayoutFeature {
   DELEGATION_TOKEN_SYMMETRIC_SIGN(8, "Delegation token signed by symmetric key"),
   SNAPSHOT_DEFRAG(9, "Supporting defragmentation of snapshot"),
   S3_LIFECYCLE_SUPPORT(10, "S3 bucket lifecycle configuration support"),
-  MPU_PARTS_TABLE_SPLIT(11, "Split multipart table into separate table for parts and key");
+  MPU_PARTS_TABLE_SPLIT(11, "Split multipart table into separate table for parts and key"),
+  SERVER_SIDE_COPY(12, "Server side key copy, where the copy shares the source key's blocks and "
+      + "the sharedBlockGroupTable keeps them from being released while either key is alive");
 
   ///////////////////////////////  /////////////////////////////
 

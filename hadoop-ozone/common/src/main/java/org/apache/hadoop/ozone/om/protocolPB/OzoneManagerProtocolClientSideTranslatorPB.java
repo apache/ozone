@@ -110,6 +110,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelP
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CopyKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CopyKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
@@ -2759,6 +2761,31 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
+  }
+
+  @Override
+  public OmKeyInfo copyKey(OmKeyArgs sourceArgs, OmKeyArgs destinationArgs) throws IOException {
+    CopyKeyRequest req = CopyKeyRequest.newBuilder()
+        .setSourceKeyArgs(KeyArgs.newBuilder()
+            .setVolumeName(sourceArgs.getVolumeName())
+            .setBucketName(sourceArgs.getBucketName())
+            .setKeyName(sourceArgs.getKeyName())
+            .build())
+        .setDestinationKeyArgs(KeyArgs.newBuilder()
+            .setVolumeName(destinationArgs.getVolumeName())
+            .setBucketName(destinationArgs.getBucketName())
+            .setKeyName(destinationArgs.getKeyName())
+            .addAllMetadata(KeyValueUtil.toProtobuf(destinationArgs.getMetadata()))
+            .build())
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.CopyKey)
+        .setCopyKeyRequest(req)
+        .build();
+
+    CopyKeyResponse resp =
+        handleError(submitRequest(omRequest)).getCopyKeyResponse();
+    return OmKeyInfo.getFromProtobuf(resp.getKeyInfo());
   }
 
   @Override

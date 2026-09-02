@@ -42,6 +42,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SHARED_BLOCK_GROUP_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_ACCESS_ID_TABLE;
@@ -147,7 +148,8 @@ public class TestOmMetadataManager {
       SNAPSHOT_RENAMED_TABLE,
       COMPACTION_LOG_TABLE,
       LIFECYCLE_CONFIGURATION_TABLE,
-      LIFECYCLE_SCAN_STATE_TABLE
+      LIFECYCLE_SCAN_STATE_TABLE,
+      SHARED_BLOCK_GROUP_TABLE
   };
 
   private OMMetadataManager omMetadataManager;

@@ -888,6 +888,12 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void copyKey(String volumeName, String bucketName, String sourceKeyName,
+      String destinationKeyName, Map<String, String> metadata) throws IOException {
+    throw new UnsupportedOperationException("Server side copy is not stubbed");
+  }
+
+  @Override
   public void deleteObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
     getBucket(volumeName, bucketName).deleteObjectTagging(keyName);
   }

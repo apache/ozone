@@ -112,6 +112,12 @@ public final class OmKeyInfo extends WithParentObjectId
   // been modified.
   private final Long expectedDataGeneration;
 
+  // Non-zero when this key shares its block locations with other keys produced
+  // by a server side copy. The value is the objectID of the lineage root, and
+  // the sharedBlockGroupTable row for it counts the keys still sharing the
+  // blocks. Zero means this key exclusively owns its blocks.
+  private final long sharedBlockGroupId;
+
   private OmKeyInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -130,6 +136,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.sharedBlockGroupId = b.sharedBlockGroupId;
   }
 
   /**
@@ -206,6 +213,18 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
+  }
+
+  public long getSharedBlockGroupId() {
+    return sharedBlockGroupId;
+  }
+
+  /**
+   * @return true if this key shares its blocks with other keys, in which case
+   * its blocks must not be released until the last sharer is reclaimed.
+   */
+  public boolean hasSharedBlocks() {
+    return sharedBlockGroupId != 0;
   }
 
   public String getOwnerName() {
@@ -513,6 +532,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private long sharedBlockGroupId;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -535,6 +555,7 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
+      this.sharedBlockGroupId = obj.sharedBlockGroupId;
       this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
@@ -706,6 +727,11 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setSharedBlockGroupId(long groupId) {
+      this.sharedBlockGroupId = groupId;
+      return this;
+    }
+
     @Override
     protected void validate() {
       super.validate();
@@ -854,6 +880,9 @@ public final class OmKeyInfo extends WithParentObjectId
     if (isOpenKey && expectedDataGeneration != null) {
       kb.setExpectedDataGeneration(expectedDataGeneration);
     }
+    if (sharedBlockGroupId != 0) {
+      kb.setSharedBlockGroupId(sharedBlockGroupId);
+    }
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
@@ -906,6 +935,9 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     if (keyInfo.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
+    }
+    if (keyInfo.hasSharedBlockGroupId()) {
+      builder.setSharedBlockGroupId(keyInfo.getSharedBlockGroupId());
     }
 
     if (keyInfo.hasOwnerName()) {

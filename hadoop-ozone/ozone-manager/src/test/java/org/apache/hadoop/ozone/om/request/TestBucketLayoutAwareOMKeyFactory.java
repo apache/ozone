@@ -110,8 +110,10 @@ public class TestBucketLayoutAwareOMKeyFactory {
         });
 
     assertEquals(15, omKeyReqsFSO.size());
-    assertEquals(16, omKeyReqsLegacy.size());
-    assertEquals(16, omKeyReqsOBS.size());
+    // CopyKey is registered for OBJECT_STORE only, and the factory keys OBS and
+    // LEGACY the same, so both gain it while FSO stays as it was.
+    assertEquals(17, omKeyReqsLegacy.size());
+    assertEquals(17, omKeyReqsOBS.size());
     // Check if the number of instantiated OMKeyRequest classes is equal to
     // the number of keys in the mapping.
     assertEquals(
