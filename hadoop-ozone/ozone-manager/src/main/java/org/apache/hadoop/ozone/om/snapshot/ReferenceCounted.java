@@ -108,8 +108,8 @@ class ReferenceCounted<T> {
     Preconditions.checkState(threadMap.containsKey(tid),
         "Current thread have not holden reference before");
 
-    Preconditions.checkState(threadMap.get(tid) > 0L, "This thread " + tid +
-        " already have a reference count of zero.");
+    Preconditions.checkState(threadMap.get(tid) > 0L,
+        "This thread %s already have a reference count of zero.", tid);
 
     synchronized (refCountLock) {
       threadMap.computeIfPresent(tid, (k, v) -> {

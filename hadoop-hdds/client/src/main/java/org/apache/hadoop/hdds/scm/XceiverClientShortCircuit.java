@@ -80,11 +80,11 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   private final Pipeline pipeline;
   private final ConfigurationSource config;
   private final XceiverClientMetrics metrics;
-  private int readTimeoutMs;
-  private int writeTimeoutMs;
+  private final int readTimeoutMs;
+  private final int writeTimeoutMs;
   // Cache the stream of blocks
-  private final Map<String, FileInputStream> blockStreamCache;
-  private final Map<String, RequestEntry> sentRequests;
+  private final Map<BlockStreamKey, FileInputStream> blockStreamCache;
+  private final Map<RequestKey, RequestEntry> sentRequests;
   private final Daemon readDaemon;
   private Timer timer;
 
@@ -93,8 +93,8 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   private final InetSocketAddress dnAddr;
   private final DomainSocketFactory domainSocketFactory;
   private DomainSocket domainSocket;
-  private AtomicBoolean isDomainSocketOpen = new AtomicBoolean(false);
-  private Lock lock = new ReentrantLock();
+  private final AtomicBoolean isDomainSocketOpen = new AtomicBoolean(false);
+  private final Lock lock = new ReentrantLock();
   private final int bufferSize;
   private final ByteString clientId = ByteString.copyFrom(UUID.randomUUID().toString().getBytes(UTF_8));
   private final AtomicLong callId = new AtomicLong(0);
@@ -341,12 +341,8 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     return 0;
   }
 
-  public FileInputStream getFileInputStream(long id, DatanodeBlockID blockID) {
-    return blockStreamCache.remove(getFileInputStreamMapKey(id, blockID));
-  }
-
-  private String getFileInputStreamMapKey(long id, DatanodeBlockID blockID) {
-    return id + "-" + blockID.getLocalID();
+  public FileInputStream getFileInputStream(long id, long blockLocalId) {
+    return blockStreamCache.remove(new BlockStreamKey(id, blockLocalId));
   }
 
   @Override
@@ -363,24 +359,8 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     return LOG;
   }
 
-  public void setReadTimeout(int timeout) {
-    this.readTimeoutMs = timeout;
-  }
-
-  public int getReadTimeout() {
-    return this.readTimeoutMs;
-  }
-
-  String getRequestUniqueID(ContainerCommandRequestProto request) {
-    return request.getClientId().toStringUtf8() + request.getCallId();
-  }
-
-  String getRequestUniqueID(ContainerCommandResponseProto response) {
-    return response.getClientId().toStringUtf8() + response.getCallId();
-  }
-
-  void requestTimeout(String requestId) {
-    final RequestEntry entry = sentRequests.remove(requestId);
+  void requestTimeout(RequestKey requestKey) {
+    final RequestEntry entry = sentRequests.remove(requestKey);
     if (entry != null) {
       LOG.warn("Timeout to receive response for command {}", entry.getRequest());
       ContainerProtos.Type type = entry.getRequest().getCmdType();
@@ -389,10 +369,10 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     }
   }
 
-  public void sendRequest(RequestEntry entry) {
+  void sendRequest(RequestEntry entry) {
     ContainerCommandRequestProto request = entry.getRequest();
     try {
-      String key = getRequestUniqueID(request);
+      final RequestKey key = new RequestKey(request.getClientId(), request.getCallId());
       TimerTask task = new TimerTask() {
         @Override
         public void run() {
@@ -470,8 +450,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
           if (LOG.isDebugEnabled()) {
             LOG.debug("received response {} callId {}", type, responseProto.getCallId());
           }
-          String key = getRequestUniqueID(responseProto);
-          entry = sentRequests.remove(key);
+          entry = sentRequests.remove(new RequestKey(responseProto.getClientId(), responseProto.getCallId()));
           if (entry == null) {
             // This could be two cases
             // 1. there is bug in the code
@@ -516,7 +495,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
                       DATA_TRANSFER_MAGIC_CODE + ", Received: " + buf[0] + ")");
                 }
                 DatanodeBlockID blockID = getBlockResponse.getBlockData().getBlockID();
-                blockStreamCache.put(getFileInputStreamMapKey(responseProto.getCallId(), blockID), fis[0]);
+                blockStreamCache.put(new BlockStreamKey(responseProto.getCallId(), blockID.getLocalID()), fis[0]);
               } catch (IOException e) {
                 LOG.warn("Failed to handle short-circuit information exchange", e);
                 // disable docket socket for a while
@@ -570,13 +549,40 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     return new LimitInputStream(input, size);
   }
 
+  static class RequestKey {
+    private final ByteString clientId;
+    private final long callId;
+
+    RequestKey(ByteString clientId, long callId) {
+      this.clientId = clientId;
+      this.callId = callId;
+    }
+
+    @Override
+    public int hashCode() {
+      return Long.hashCode(callId);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      } else if (!(obj instanceof RequestKey)) {
+        return false;
+      }
+      final RequestKey that = (RequestKey) obj;
+      return this.callId == that.callId
+          && Objects.equals(this.clientId, that.clientId);
+    }
+  }
+
   /**
    * Class wraps a container command request.
    */
-  public static class RequestEntry {
-    private ContainerCommandRequestProto request;
-    private CompletableFuture<ContainerCommandResponseProto> future;
-    private long createTimeNs;
+  static class RequestEntry {
+    private final ContainerCommandRequestProto request;
+    private final CompletableFuture<ContainerCommandResponseProto> future;
+    private final long createTimeNs;
     private long sentTimeNs;
     private TimerTask timerTask;
 
@@ -618,6 +624,33 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     public void fail(Throwable e) {
       timerTask.cancel();
       future.completeExceptionally(e);
+    }
+  }
+
+  static final class BlockStreamKey {
+    private final long callId;
+    private final long blockLocalId;
+
+    BlockStreamKey(long callId, long blockLocalId) {
+      this.callId = callId;
+      this.blockLocalId = blockLocalId;
+    }
+
+    @Override
+    public int hashCode() {
+      return Long.hashCode(callId);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      } else if (!(obj instanceof BlockStreamKey)) {
+        return false;
+      }
+      final BlockStreamKey that = (BlockStreamKey) obj;
+      return this.callId == that.callId
+          && this.blockLocalId == that.blockLocalId;
     }
   }
 }

@@ -4955,6 +4955,16 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.diff.max.in.memory.entries.per.job</name>
+    <value>1000000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of diff-candidate object IDs a snapshot diff job may retain
+      in memory before spilling to a temporary RocksDB column family.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.secret.key.file.name</name>
     <value>secret_keys.json</value>
     <tag>SCM, SECURITY</tag>

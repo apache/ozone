@@ -175,6 +175,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
@@ -2342,6 +2343,16 @@ public class KeyValueHandler extends Handler {
     BlockUtils.verifyBCSId(kvContainer, blockID);
 
     final BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
+    if (readBlock.getOffset() >= blockData.getSize()) {
+      // An out of range offset is a client fault, so report it on the stream instead of throwing: throwing would be
+      // turned into a CONTAINER_INTERNAL_ERROR response by readBlock, and a non-null response makes the dispatcher
+      // scan the container as if the data were corrupt.
+      streamObserver.onError(Status.OUT_OF_RANGE
+          .withDescription("Requested offset " + readBlock.getOffset() + " is beyond the end of block " + blockID
+              + " with size " + blockData.getSize())
+          .asRuntimeException());
+      return 0;
+    }
     final List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
     final ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
     int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;

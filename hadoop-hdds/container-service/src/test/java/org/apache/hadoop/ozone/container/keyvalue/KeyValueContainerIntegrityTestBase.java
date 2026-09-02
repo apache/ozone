@@ -53,10 +53,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Base class for tests identifying issues with key value container contents.
  */
-public class TestKeyValueContainerIntegrityChecks {
+public class KeyValueContainerIntegrityTestBase {
 
   static final Logger LOG =
-      LoggerFactory.getLogger(TestKeyValueContainerIntegrityChecks.class);
+      LoggerFactory.getLogger(KeyValueContainerIntegrityTestBase.class);
 
   private ContainerLayoutTestInfo containerLayoutTestInfo;
   private MutableVolumeSet volumeSet;
