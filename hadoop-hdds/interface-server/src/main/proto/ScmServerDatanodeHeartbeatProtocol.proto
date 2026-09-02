@@ -461,6 +461,7 @@ message ReconstructECContainersCommandProto {
   required bytes missingContainerIndexes = 4;
   required ECReplicationConfig ecReplicationConfig = 5;
   required int64 cmdId = 6;
+  optional uint32 apparentVersion = 7;
 }
 
 message DatanodeDetailsAndReplicaIndexProto {
@@ -539,6 +540,7 @@ the container.
 message ReconcileContainerCommandProto {
   required int64 containerID = 1;
   repeated DatanodeDetailsProto peers = 2;
+  optional uint32 apparentVersion = 3;
 }
 
 /**
