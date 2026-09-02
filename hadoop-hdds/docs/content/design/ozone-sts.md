@@ -157,6 +157,8 @@ credential will have the permissions and actions comprising the intersection of 
 - creation time of the token (via `OMTokenProto#issueDate`, exposed as `STSTokenIdentifier#getCreationTime()`)
 - expiration time of the token (via `ShortLivedTokenIdentifier#getExpiry()`)
 - UUID of the OzoneManager secret key used to sign the sessionToken and encrypt the secretAccessKey (via `ShortLivedTokenIdentifier#getSecretKeyId()`)
+- assumedRoleId - the generated identifier of the role from the AssumeRole call response (this is used for GetCallerIdentity api)
+- assumedRoleUserArn - the arn from the AssumeRole call response (this is used for GetCallerIdentity api)
 
 ## 3.5 STS Token Revocation
 
