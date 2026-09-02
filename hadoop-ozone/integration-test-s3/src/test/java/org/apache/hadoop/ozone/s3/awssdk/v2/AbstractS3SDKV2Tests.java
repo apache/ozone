@@ -1822,8 +1822,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   public void testGetObjectAttributesNonContiguousMultipartObjectParts() throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
-    final String partOneContent = "part-one-content";
-    final String partThreeContent = "part-three-content-longer";
+    final int partOneSize = (int) (5 * MB);
+    final int partThreeSize = 4096;
+    byte[] partOneBytes = new byte[partOneSize];
+    byte[] partThreeBytes = new byte[partThreeSize];
 
     s3Client.createBucket(b -> b.bucket(bucketName));
 
@@ -1835,14 +1837,14 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         .key(keyName)
         .uploadId(uploadId)
         .partNumber(1)
-        .build(), RequestBody.fromString(partOneContent));
+        .build(), RequestBody.fromBytes(partOneBytes));
 
     UploadPartResponse partThreeResponse = s3Client.uploadPart(UploadPartRequest.builder()
         .bucket(bucketName)
         .key(keyName)
         .uploadId(uploadId)
         .partNumber(3)
-        .build(), RequestBody.fromString(partThreeContent));
+        .build(), RequestBody.fromBytes(partThreeBytes));
 
     completeMultipartUpload(bucketName, keyName, uploadId, Arrays.asList(
         CompletedPart.builder()
@@ -1865,7 +1867,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(2, attributesResponse.objectParts().totalPartsCount());
     assertFalse(attributesResponse.objectParts().isTruncated());
     assertTrue(attributesResponse.objectParts().parts().isEmpty());
-    assertEquals(partOneContent.length() + partThreeContent.length(), attributesResponse.objectSize());
+    assertEquals((long) partOneSize + partThreeSize, attributesResponse.objectSize());
 
     GetObjectAttributesResponse paginatedResponse = s3Client.getObjectAttributes(
         GetObjectAttributesRequest.builder()
