@@ -2375,8 +2375,7 @@ public class KeyValueHandler extends Handler {
       assertTrue(readLength > 0, () -> "readLength = " + readLength + " <= 0");
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
-        validateChecksums(buffer.duplicate(), adjustedOffset, checksumBoundaries.startIndex,
-            endChunkIndex, readLength, bytesPerChecksum, chunkInfos);
+        Checksum.validateChecksums(buffer.duplicate(), adjustedOffset, checksumBoundaries.startIndex, chunkInfos);
         LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChecksum {}",
             readBlock, adjustedOffset, readLength, bytesPerChecksum);
       }
@@ -2452,32 +2451,6 @@ public class KeyValueHandler extends Handler {
     }
 
     return high;
-  }
-
-  static void validateChecksums(ByteBuffer data, long blockOffset, int startIndex, int endIndex, int readLength, int bytesPerChecksum,
-      final List<ContainerProtos.ChunkInfo> chunks) throws OzoneChecksumException {
-
-    long chunkRelativeOffset = blockOffset - chunks.get(startIndex).getOffset();
-    assertSame(0, chunkRelativeOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
-    int dataOffset = 0;
-    int chunkIndex = Math.toIntExact(chunkRelativeOffset / bytesPerChecksum);
-    for (int i = startIndex; i <= endIndex; i++) {
-      ContainerProtos.ChunkInfo chunkInfo = chunks.get(i);
-      int dataLimit;
-      dataLimit = Math.toIntExact(Math.min(chunkInfo.getLen() - chunkRelativeOffset,
-          readLength - (chunkInfo.getOffset() - blockOffset)));
-
-      final ByteBuffer buffer = data.duplicate();
-      buffer.position(dataOffset);
-      buffer.limit(dataOffset + dataLimit);
-      final ChecksumData checksum = new ChecksumData(chunkInfo.getChecksumData().getType(),
-          bytesPerChecksum, chunkInfo.getChecksumData().getChecksumsList());
-      Checksum.verifyChecksum(buffer, checksum, chunkIndex);
-
-      chunkIndex = 0;
-      dataOffset += dataLimit;
-      chunkRelativeOffset = 0;
-    }
   }
 
   @Override
