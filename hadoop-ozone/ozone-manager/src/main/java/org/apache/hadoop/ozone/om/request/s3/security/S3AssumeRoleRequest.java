@@ -27,6 +27,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
@@ -133,15 +136,14 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       S3STSUtils.validateRoleSessionName(roleSessionName);
       final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
       
-      // Generate temporary AWS credentials using cryptographically strong SecureRandom
+      // Generate temporary AWS credentials using cryptographically strong SecureRandom, and a
+      // deterministic roleId derived from the role ARN.
       final String tempAccessKeyId = STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
           STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
           STS_ACCESS_KEY_ID_RANDOM_LENGTH);
       final String secretAccessKey = generateSecureRandomStringUsingChars(
           CHARS_FOR_SECRET_ACCESS_KEYS, CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH, STS_SECRET_ACCESS_KEY_LENGTH);
-      final String roleId = ASSUME_ROLE_ID_PREFIX + generateSecureRandomStringUsingChars(
-          STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
-          STS_ROLE_ID_LENGTH);
+      final String roleId = generateDeterministicRoleId(roleArn);
       final String assumedRoleId = roleId + ":" + roleSessionName;
       final String assumedRoleUserArn = S3STSUtils.toAssumedRoleUserArn(roleArn, roleSessionName);
 
@@ -573,6 +575,25 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   @FunctionalInterface
   interface BucketLinkResolver {
     ResolvedBucket resolve(String volumeName, String bucketName) throws IOException;
+  }
+
+  /**
+   * Generates a deterministic role ID from the role ARN so the same role returns the same ID on every
+   * AssumeRole invocation, matching AWS behavior where RoleId is stable for a given role.
+   */
+  @VisibleForTesting
+  static String generateDeterministicRoleId(String roleArn) {
+    try {
+      final MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      final byte[] hash = digest.digest(roleArn.getBytes(StandardCharsets.UTF_8));
+      final StringBuilder sb = new StringBuilder(STS_ROLE_ID_LENGTH);
+      for (int i = 0; i < STS_ROLE_ID_LENGTH; i++) {
+        sb.append(STS_ACCESS_KEY_ID_ALLOWED_CHARS.charAt((hash[i] & 0xFF) % STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH));
+      }
+      return ASSUME_ROLE_ID_PREFIX + sb;
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 not available", e);
+    }
   }
 
   /**
