@@ -1179,8 +1179,8 @@ public class TestKeyValueHandler {
    */
   @Test
   public void testReadBlockWithThreeVariableChunks() throws Exception {
-    int[] chunkLens = {1024, 10, 4096};
-    readBlockAndVerifyChecksums(chunkLens, 1024, 10);
+    int[] chunkLens = {(1 << 20) - 10, 20, 4096};
+    readBlockAndVerifyChecksums(chunkLens, 1024, 1 << 20);
   }
 
   /**
@@ -1193,7 +1193,6 @@ public class TestKeyValueHandler {
     Path testDir = Files.createTempDirectory("testReadBlock");
     RandomAccessFileChannel blockFile = null;
     try {
-      conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
       HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
       KeyValueHandler kvHandler = handlerWithVolume.getHandler();
       MutableVolumeSet volumeSet = handlerWithVolume.getVolumeSet();

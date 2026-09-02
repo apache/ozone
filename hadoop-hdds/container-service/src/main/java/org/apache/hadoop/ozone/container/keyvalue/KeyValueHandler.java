@@ -2354,17 +2354,29 @@ public class KeyValueHandler extends Handler {
     final ChecksumBoundaries checksumBoundaries = getChecksumBoundaries(readBlock.getOffset(), readBlock.getLength(), chunkInfos, bytesPerChecksum);
     long adjustedOffset = checksumBoundaries.offset;
     long adjustLength = checksumBoundaries.length;
+    int chunkIndex = checksumBoundaries.startIndex;
 
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
     blockFile.position(adjustedOffset);
     long totalDataLength = 0;
     int numResponses = 0;
     final long requiredLength = Math.min(adjustLength, blockData.getSize() - adjustedOffset);
-    final long blockEnd = adjustedOffset + requiredLength - 1;
-    final int endChunkIndex = searchChunkByOffset(blockEnd, chunkInfos);
     LOG.debug("adjustedOffset {}, requiredLength {}, blockSize {}",
         adjustedOffset, requiredLength, blockData.getSize());
     for (boolean shouldRead = true; totalDataLength < requiredLength && shouldRead;) {
+
+      int bufferLimit = (int) Math.min(responseDataSize, requiredLength - totalDataLength);
+      final ContainerProtos.ChunkInfo nextChunk = chunkInfos.get(
+          searchChunkByOffset(adjustedOffset + bufferLimit, chunkInfos));
+
+      if (bufferLimit < requiredLength - totalDataLength) {
+        // bytesPerChecksum must be a power of 2.
+        bufferLimit = (int) (((bufferLimit - (nextChunk.getOffset() - adjustedOffset)) & -((long) bytesPerChecksum))
+                + (nextChunk.getOffset() - adjustedOffset));
+      }
+
+      buffer.limit(bufferLimit);
+
       shouldRead = blockFile.read(buffer);
       buffer.flip();
       final int readLength = buffer.remaining();
@@ -2375,7 +2387,7 @@ public class KeyValueHandler extends Handler {
       assertTrue(readLength > 0, () -> "readLength = " + readLength + " <= 0");
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
-        Checksum.validateChecksums(buffer.duplicate(), adjustedOffset, checksumBoundaries.startIndex, chunkInfos);
+        validateChecksums(buffer.duplicate(), adjustedOffset, chunkIndex, chunkInfos);
         LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChecksum {}",
             readBlock, adjustedOffset, readLength, bytesPerChecksum);
       }
@@ -2390,8 +2402,46 @@ public class KeyValueHandler extends Handler {
       adjustedOffset += readLength;
       totalDataLength += dataLength;
       numResponses++;
+      chunkIndex = searchChunkByOffset(adjustedOffset + responseDataSize - 1, chunkInfos);
     }
     return totalDataLength;
+  }
+
+  private static int validateChecksums(ByteBuffer data, long blockOffset, int startIndex,
+      final List<ContainerProtos.ChunkInfo> chunks) throws OzoneChecksumException {
+
+    long firstChunkOffset = blockOffset - chunks.get(startIndex).getOffset();
+    int bytesPerChecksum = chunks.get(startIndex).getChecksumData().getBytesPerChecksum();
+    long readLength = data.remaining();
+    int dataOffset = data.position();
+
+    if (readLength <= 0) {
+      return -1;
+    }
+
+    assertSame(0, firstChunkOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
+    ContainerProtos.ChunkInfo firstChunk = chunks.get(startIndex);
+
+    // verify first chunk, only the first chunk is not start at zero.
+    int firstChunkIndex = (int) (firstChunkOffset / bytesPerChecksum);
+    int dataLimit = (int) Math.min(firstChunk.getLen() - firstChunkOffset, readLength);
+    Checksum.verifySingleChunk(data, dataOffset, dataLimit, firstChunk, firstChunkIndex);
+    dataOffset += dataLimit;
+    readLength -= dataLimit;
+    startIndex++;
+
+    while (readLength > 0) {
+      ContainerProtos.ChunkInfo chunkInfo = chunks.get(startIndex);
+      dataLimit = (int) Math.min(chunkInfo.getLen(), readLength);
+
+      Checksum.verifySingleChunk(data, dataOffset, dataLimit, chunkInfo, 0);
+
+      dataOffset += dataLimit;
+      readLength -= dataLimit;
+      startIndex++;
+    }
+
+    return startIndex;
   }
 
   /**

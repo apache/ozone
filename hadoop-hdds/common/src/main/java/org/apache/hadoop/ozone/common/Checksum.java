@@ -425,39 +425,21 @@ public class Checksum {
     checksumData.verifyChecksumDataMatches(startIndex, computed);
   }
 
-  public static void validateChecksums(ByteBuffer data, long blockOffset, int startIndex,
-      final List<ContainerProtos.ChunkInfo> chunks) throws OzoneChecksumException {
+  public static void verifySingleChunk(ByteBuffer data, int dataOffset, int dataLimit,
+      ContainerProtos.ChunkInfo chunkInfo, int chunkIndex) throws OzoneChecksumException {
 
-    long chunkRelativeOffset = blockOffset - chunks.get(startIndex).getOffset();
-    int bytesPerChecksum = chunks.get(0).getChecksumData().getBytesPerChecksum();
-    long readLength = data.remaining();
-    if (readLength <= 0) {
-      return;
-    }
+    ContainerProtos.ChecksumData protoChecksum = chunkInfo.getChecksumData();
+    final ByteBuffer buffer = data.duplicate();
+    buffer.position(dataOffset);
+    buffer.limit(dataOffset + dataLimit);
 
-    assertSame(0, chunkRelativeOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
-    int dataOffset = data.position();
-    int chunkIndex = Math.toIntExact(chunkRelativeOffset / bytesPerChecksum);
+    final ChecksumData checksum = new ChecksumData(
+        protoChecksum.getType(),
+        protoChecksum.getBytesPerChecksum(),
+        protoChecksum.getChecksumsList()
+    );
 
-    while (readLength > 0) {
-      ContainerProtos.ChunkInfo chunkInfo = chunks.get(startIndex);
-      int dataLimit;
-      dataLimit = (int) Math.min(chunkInfo.getLen() - chunkRelativeOffset,
-          readLength);
-
-      final ByteBuffer buffer = data.duplicate();
-      buffer.position(dataOffset);
-      buffer.limit(dataOffset + dataLimit);
-      final ChecksumData checksum = new ChecksumData(chunkInfo.getChecksumData().getType(),
-          bytesPerChecksum, chunkInfo.getChecksumData().getChecksumsList());
-      Checksum.verifyChecksum(buffer, checksum, chunkIndex);
-
-      chunkIndex = 0;
-      dataOffset += dataLimit;
-      readLength -= dataLimit;
-      chunkRelativeOffset = 0;
-      startIndex++;
-    }
+    Checksum.verifyChecksum(buffer, checksum, chunkIndex);
   }
 
   /**
