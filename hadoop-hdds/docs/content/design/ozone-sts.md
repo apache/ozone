@@ -117,6 +117,15 @@ team agreed that behavior is fine for actions, but does not work for Conditions,
 restrict calls by sourceIp, and if we silently ignore this, the client may incorrectly think the temporary credentials 
 are restricted for use by that IP address, so the consensus was to reject the request for that scenario.
 
+### 3.3.2 Additional Context on Linked Buckets
+
+In Ozone, one may configure a chain of bucket links.  In the scenario where one desires to call the AssumeRole api where the resource
+is a linked bucket, ensure the Ranger policies for the role have the proper permissions for each link in the chain as well 
+as the source bucket.  For example, if there is a source bucket S, that is linked to bucket A, which is linked to bucket B,
+and you want the token to be able to issue operations against linked bucket B, ensure that the role has read access to bucket B,
+read access to bucket A, and the requisite access for bucket S (such as read on keys for GetObject, create/write on keys for PutObject, etc.).
+The role must have at least read access to the volume(s) where these buckets live as well.
+
 ## 3.4 SessionToken Format
 
 As mentioned above, one of the return values from the AssumeRole call will be the sessionToken. To support not
