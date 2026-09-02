@@ -2388,7 +2388,9 @@ public class KeyValueHandler extends Handler {
       assertTrue(readLength > 0, () -> "readLength = " + readLength + " <= 0");
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
-        validateChecksums(buffer.duplicate(), adjustedOffset, chunkIndex, chunkInfos);
+        if (validateChunkChecksumData) {
+          validateChecksums(buffer.duplicate(), adjustedOffset, chunkIndex, chunkInfos);
+        }
         LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChecksum {}",
             readBlock, adjustedOffset, readLength, bytesPerChecksum);
       }
