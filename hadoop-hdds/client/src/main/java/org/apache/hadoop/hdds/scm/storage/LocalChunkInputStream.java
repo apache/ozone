@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.ShortCircuitValidator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -137,7 +138,14 @@ public class LocalChunkInputStream extends ChunkInputStream
    * Acquire short-circuit local read client.
    */
   @Override
-  protected synchronized void acquireClient() throws IOException {
-   // do nothing, read data doesn't need short-circuit client
+  protected synchronized XceiverClientSpi acquireClient() throws IOException {
+    // local reads use the FileChannel directly; no xceiver client needed
+    return null;
+  }
+
+  @Override
+  protected ByteBuffer[] readChunk(XceiverClientSpi client, ChunkInfo readChunkInfo) throws IOException {
+    // client is unused: local reads go through the FileChannel path
+    return readChunk(readChunkInfo);
   }
 }

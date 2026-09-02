@@ -306,13 +306,16 @@ public class ChunkInputStream extends InputStream
 
   /**
    * Acquire new client if previous one was released.
+   *
+   * @return the held client after ensuring it is acquired
    */
-  protected synchronized void acquireClient() throws IOException {
+  protected synchronized XceiverClientSpi acquireClient() throws IOException {
     if (xceiverClientFactory != null && xceiverClient == null) {
       Pipeline pipeline = pipelineSupplier.get();
       xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
       updateDatanodeBlockId(pipeline);
     }
+    return xceiverClient;
   }
 
   /**
@@ -475,8 +478,6 @@ public class ChunkInputStream extends InputStream
       return 0;
     }
 
-    acquireClient();
-
     final long adjustedOffset;
     final long adjustedLen;
     if (verifyChecksum) {
@@ -494,7 +495,11 @@ public class ChunkInputStream extends InputStream
         .setLen(adjustedLen)
         .build();
 
-    final ByteBuffer[] readBuffers = readChunk(readChunkInfo);
+    // Capture the client reference under the acquireClient() lock so that a concurrent
+    // releaseClient() (e.g. from the sequential read's handleReadError or unbuffer) cannot
+    // null the xceiverClient field between acquisition and use.
+    final XceiverClientSpi client = acquireClient();
+    final ByteBuffer[] readBuffers = readChunk(client, readChunkInfo);
     return copyRange(readBuffers, chunkRelativePosition - adjustedOffset,
         toRead, dst);
   }
@@ -533,14 +538,25 @@ public class ChunkInputStream extends InputStream
   }
 
   /**
-   * Send RPC call to get the chunk from the container.
+   * Send RPC call to get the chunk from the container using the sequential-read client held in
+   * {@link #xceiverClient}. Called by the buffered sequential read path via
+   * {@link #readChunkDataIntoBuffers}.
    */
   @VisibleForTesting
-  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo)
-      throws IOException {
+  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) throws IOException {
+    return readChunk(xceiverClient, readChunkInfo);
+  }
 
+  /**
+   * Send RPC call to get the chunk from the container using an explicitly provided client.
+   * Used by the positioned-read path so callers hold a local reference to the client
+   * rather than re-reading the shared {@link #xceiverClient} field after the lock is
+   * released.
+   */
+  protected ByteBuffer[] readChunk(XceiverClientSpi client, ChunkInfo readChunkInfo)
+      throws IOException {
     ReadChunkResponseProto readChunkResponse =
-        ContainerProtocolCalls.readChunk(xceiverClient, readChunkInfo, datanodeBlockID, validators,
+        ContainerProtocolCalls.readChunk(client, readChunkInfo, datanodeBlockID, validators,
             tokenSupplier.get());
 
     if (readChunkResponse.hasData()) {
