@@ -2402,7 +2402,7 @@ public class KeyValueHandler extends Handler {
       adjustedOffset += readLength;
       totalDataLength += dataLength;
       numResponses++;
-      chunkIndex = searchChunkByOffset(adjustedOffset + responseDataSize - 1, chunkInfos);
+      chunkIndex = searchChunkByOffset(adjustedOffset, chunkInfos);
     }
     return totalDataLength;
   }
@@ -2458,10 +2458,11 @@ public class KeyValueHandler extends Handler {
     final long offsetAlignment = (blockOffset - chunkInfos.get(offsetChunkIndex).getOffset()) % bytesPerChecksum;
     final long adjustedOffset = blockOffset - offsetAlignment;
     final long blockEnd = blockOffset + blockLength - 1;
-    final int lengthChunkIndex = searchChunkByOffset(blockEnd, chunkInfos);
+    final ContainerProtos.ChunkInfo lastChunk = chunkInfos.get(searchChunkByOffset(blockEnd, chunkInfos));
 
-    final long chunkOffset = chunkInfos.get(lengthChunkIndex).getOffset();
-    final long chunkLength = (getEndChecksumIndex(blockEnd, chunkOffset, bytesPerChecksum) + 1) * bytesPerChecksum;
+    final long chunkOffset = lastChunk.getOffset();
+    final long chunkLength = Math.min(
+        (getEndChecksumIndex(blockEnd, chunkOffset, bytesPerChecksum) + 1) * bytesPerChecksum, lastChunk.getLen());
     return new ChecksumBoundaries(offsetChunkIndex, adjustedOffset,
         chunkOffset + chunkLength - adjustedOffset);
   }

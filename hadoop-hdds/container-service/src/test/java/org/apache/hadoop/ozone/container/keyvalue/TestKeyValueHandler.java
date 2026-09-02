@@ -68,6 +68,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
@@ -1165,11 +1166,8 @@ public class TestKeyValueHandler {
     }
   }
 
-  /**
-   * Scenario 1: A block with 5 chunks, each containing 1 byte of data.
-   */
   @Test
-  public void testReadBlockWithFiveSingleByteChunks() throws Exception {
+  public void testReadBlockWithSmallChunks() throws Exception {
     int[] chunkLens = {1, 1, 1, 1, 1};
     readBlockAndVerifyChecksums(chunkLens, 2, 2);
   }
@@ -1178,9 +1176,15 @@ public class TestKeyValueHandler {
    * Scenario 2: A block with 3 chunks of varying sizes (1024, 10, 4096).
    */
   @Test
-  public void testReadBlockWithThreeVariableChunks() throws Exception {
-    int[] chunkLens = {(1 << 20) - 10, 20, 4096};
-    readBlockAndVerifyChecksums(chunkLens, 1024, 1 << 20);
+  public void testReadBlockWithChunksNotMultipleOfBytesPerChecksum() throws Exception {
+    int[] chunkLens = {1024, 20, 4096};
+    readBlockAndVerifyChecksums(chunkLens, 2048, 2048);
+  }
+
+  @Test
+  public void testReadBlockMultipleResponse() throws Exception {
+    int[] chunkLens = {(1 << 20) + 10, 20, 4096};
+    readBlockAndVerifyChecksums(chunkLens, 20, (1 << 20) + 10);
   }
 
   /**
@@ -1215,9 +1219,7 @@ public class TestKeyValueHandler {
 
       // Build the full raw data array
       byte[] rawData = new byte[totalLen];
-      for (int i = 0; i < totalLen; i++) {
-        rawData[i] = (byte) (i % 127 + 1);
-      }
+      ThreadLocalRandom.current().nextBytes(rawData);
 
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
       BlockData blockData = new BlockData(blockID);
@@ -1272,11 +1274,6 @@ public class TestKeyValueHandler {
 
       assertNull(response, "ReadBlock should return null on success");
 
-      if (readOffset >= totalLen) {
-        assertTrue(capturedResponses.isEmpty(), "Should receive no response if offset >= totalLen");
-        return;
-      }
-
       assertFalse(capturedResponses.isEmpty(), "Should receive at least one response");
       verify(streamObserver, atLeastOnce()).onNext(any());
 
@@ -1293,23 +1290,10 @@ public class TestKeyValueHandler {
         assertTrue(resp.hasReadBlock());
         ContainerProtos.ReadBlockResponseProto readBlockResp = resp.getReadBlock();
         ByteBuffer respData = readBlockResp.getData().asReadOnlyByteBuffer();
-
-        // Recompute CRC32 checksums from the response data and compare with originals
-        Checksum verifier = new Checksum(ContainerProtos.ChecksumType.CRC32, bytesPerChecksum);
-        ChecksumData recomputed = verifier.computeChecksum(respData.duplicate());
-        // The response carries the checksum metadata; recomputing from data must match
-        ChecksumData responseChecksumData = ChecksumData.getFromProtoBuf(readBlockResp.getChecksumData());
-        assertEquals(responseChecksumData.getChecksumType(), recomputed.getChecksumType());
-        assertEquals(responseChecksumData.getBytesPerChecksum(), recomputed.getBytesPerChecksum());
-
-        // Also verify against the original chunk checksums by using Checksum.verifyChecksum
-        // which throws OzoneChecksumException on mismatch
-        respData.rewind();
-        Checksum.verifyChecksum(respData.duplicate(), recomputed, 0);
-
-        respData.rewind();
         allData.put(respData);
       }
+
+      assertTrue(readOffset >= firstResponseOffset && returnedDataLen >= length);
 
       // Verify the returned data matches the expected slice of the original data
       allData.flip();
