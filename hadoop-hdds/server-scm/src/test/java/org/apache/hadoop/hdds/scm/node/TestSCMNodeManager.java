@@ -72,6 +72,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -91,6 +92,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -211,6 +213,25 @@ public class TestSCMNodeManager {
         (PipelineManagerImpl) scm.getPipelineManager();
     pipelineManager.setScmContext(scmContext);
     return (SCMNodeManager) scm.getScmNodeManager();
+  }
+
+  @Test
+  public void testAddContainerRemovesPendingAllocation() throws Exception {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      DatanodeDetails datanodeDetails =
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
+      ContainerID containerID = ContainerID.valueOf(1);
+
+      DatanodeInfo datanodeInfo = nodeManager.getNode(datanodeDetails.getID());
+      assertNotNull(datanodeInfo);
+      nodeManager.recordAllocationForDatanode(
+          datanodeInfo, containerID, StorageType.DEFAULT);
+      assertEquals(1, datanodeInfo.getPendingContainerAllocations().getCount());
+
+      nodeManager.addContainer(datanodeDetails, containerID);
+
+      assertEquals(0, datanodeInfo.getPendingContainerAllocations().getCount());
+    }
   }
 
   /**

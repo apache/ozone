@@ -125,7 +125,7 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
           // Add the pending op, so we exclude the node for subsequent origins
           mutablePendingOps.add(new ContainerReplicaOp(
               ContainerReplicaOp.PendingOpType.ADD, target, 0,
-              null, System.currentTimeMillis(), 0));
+              null, System.currentTimeMillis(), 0, null));
           totalCommandsSent++;
         } catch (CommandTargetOverloadedException e) {
           LOG.warn("Cannot replicate container {} because all sources are overloaded.", containerInfo);
