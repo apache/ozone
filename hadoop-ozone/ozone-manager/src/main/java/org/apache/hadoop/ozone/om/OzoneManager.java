@@ -145,6 +145,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -5119,19 +5120,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
       OMClientRequest omClientRequest)
       throws IOException {
+    final Set<Pair<String, String>> linkChain = new LinkedHashSet<>();
     OmBucketInfo resolved;
     if (getAclsEnabled()) {
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-              omClientRequest.createUGIForApi(),
-              omClientRequest.getRemoteAddress(),
-              omClientRequest.getHostName(),
-              false);
+      resolved = resolveBucketLink(
+          requested, linkChain, omClientRequest.createUGIForApi(), omClientRequest.getRemoteAddress(),
+          omClientRequest.getHostName(), false);
     } else {
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-          null, null, null, false);
+      resolved = resolveBucketLink(requested, linkChain, null, null, null, false);
     }
-    return new ResolvedBucket(requested.getLeft(), requested.getRight(),
-        resolved);
+    return new ResolvedBucket(requested.getLeft(), requested.getRight(), resolved, linkChain);
   }
 
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
@@ -5143,6 +5141,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                           boolean allowDanglingBuckets,
                                           boolean aclEnabled)
       throws IOException {
+    final Set<Pair<String, String>> linkChain = new LinkedHashSet<>();
     OmBucketInfo resolved;
     if (aclEnabled) {
       UserGroupInformation ugi = getRemoteUser();
@@ -5151,17 +5150,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ugi = UserGroupInformation.createRemoteUser(principal);
       }
       InetAddress remoteIp = Server.getRemoteIp();
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-          ugi,
-          remoteIp != null ? remoteIp : omRpcAddress.getAddress(),
-          remoteIp != null ? remoteIp.getHostName() :
-              omRpcAddress.getHostName(), allowDanglingBuckets, aclEnabled);
+      resolved = resolveBucketLink(
+          requested, linkChain, ugi, remoteIp != null ? remoteIp : omRpcAddress.getAddress(),
+          remoteIp != null ? remoteIp.getHostName() : omRpcAddress.getHostName(), allowDanglingBuckets, aclEnabled);
     } else {
-      resolved = resolveBucketLink(requested, new HashSet<>(),
-          null, null, null, allowDanglingBuckets, aclEnabled);
+      resolved = resolveBucketLink(requested, linkChain, null, null, null, allowDanglingBuckets, aclEnabled);
     }
-    return new ResolvedBucket(requested.getLeft(), requested.getRight(),
-        resolved);
+    return new ResolvedBucket(requested.getLeft(), requested.getRight(), resolved, linkChain);
   }
 
   private OmBucketInfo resolveBucketLink(
