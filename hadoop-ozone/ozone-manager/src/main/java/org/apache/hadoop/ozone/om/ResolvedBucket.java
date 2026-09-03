@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -57,7 +58,7 @@ public class ResolvedBucket {
       OmBucketInfo resolved, Collection<Pair<String, String>> linkChain) {
     this.requestedVolume = requestedVolume;
     this.requestedBucket = requestedBucket;
-    this.linkChain = linkChain == null ? Collections.emptyList() : linkChain;
+    this.linkChain = unmodifiableLinkChain(linkChain);
     if (resolved != null) {
       this.realVolume = resolved.getVolumeName();
       this.realBucket = resolved.getBucketName();
@@ -87,7 +88,15 @@ public class ResolvedBucket {
     this.realBucket = realBucket;
     this.bucketOwner = bucketOwner;
     this.bucketLayout = bucketLayout;
-    this.linkChain = linkChain == null ? Collections.emptyList() : linkChain;
+    this.linkChain = unmodifiableLinkChain(linkChain);
+  }
+
+  private static Collection<Pair<String, String>> unmodifiableLinkChain(
+      Collection<Pair<String, String>> linkChain) {
+    if (linkChain == null || linkChain.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return Collections.unmodifiableList(new ArrayList<>(linkChain));
   }
 
   public ResolvedBucket(Pair<String, String> requested,
