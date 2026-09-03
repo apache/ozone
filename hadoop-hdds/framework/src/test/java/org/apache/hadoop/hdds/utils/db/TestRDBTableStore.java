@@ -27,13 +27,21 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.google.protobuf.ByteString;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -50,9 +58,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.rocksdb.ByteBufferGetStatus;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.rocksdb.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,6 +146,7 @@ public class TestRDBTableStore {
       options.close();
     }
     CodecTestUtil.gc();
+    CodecBuffer.assertNoLeaks();
   }
 
   @Test
@@ -156,6 +167,94 @@ public class TestRDBTableStore {
     assertArrayEquals(value, readValue);
     Table<byte[], byte[]> secondTable = rdbStore.getTable("Second");
     assertTrue(secondTable.isEmpty());
+  }
+
+  @Test
+  public void multiGetSkipCache() throws Exception {
+    Table<byte[], byte[]> testTable = rdbStore.getTable("First");
+    byte[] key1 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] key2 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] missingKey = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] value1 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] value2 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    testTable.put(key1, value1);
+    testTable.put(key2, value2);
+
+    List<byte[]> values = testTable.multiGetSkipCache(Arrays.asList(key1, missingKey, key2));
+    assertEquals(3, values.size());
+    assertArrayEquals(value1, values.get(0));
+    assertNull(values.get(1));
+    assertArrayEquals(value2, values.get(2));
+    assertTrue(testTable.multiGetSkipCache(Collections.emptyList()).isEmpty());
+    assertTrue(testTable.multiGetSkipCache(null).isEmpty());
+  }
+
+  @Test
+  public void multiGetSkipCacheWithTypedTable() throws Exception {
+    byte[] smallKey = "small-key".getBytes(StandardCharsets.UTF_8);
+    byte[] largeKey1 = "large-key-1".getBytes(StandardCharsets.UTF_8);
+    byte[] largeKey2 = "large-key-2".getBytes(StandardCharsets.UTF_8);
+    byte[] emptyKey = "empty-key".getBytes(StandardCharsets.UTF_8);
+    byte[] smallValue = "small".getBytes(StandardCharsets.UTF_8);
+    byte[] largeValue1 = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 100];
+    byte[] largeValue2 = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 200];
+    Arrays.fill(largeValue1, (byte) 'a');
+    Arrays.fill(largeValue2, (byte) 'b');
+    Table<byte[], byte[]> writeTable = rdbStore.getTable("Second");
+    writeTable.put(smallKey, smallValue);
+    writeTable.put(largeKey1, largeValue1);
+    writeTable.put(largeKey2, largeValue2);
+    writeTable.put(emptyKey, new byte[0]);
+
+    Table<String, String> readTable = rdbStore.getTable("Second", StringCodec.get(), StringCodec.get());
+    List<String> values = readTable.multiGetSkipCache(
+        Arrays.asList("small-key", "large-key-1", "missing-key", "large-key-2", "empty-key"));
+    assertEquals(5, values.size());
+    assertEquals(new String(smallValue, StandardCharsets.UTF_8), values.get(0));
+    assertEquals(new String(largeValue1, StandardCharsets.UTF_8), values.get(1));
+    assertNull(values.get(2));
+    assertEquals(new String(largeValue2, StandardCharsets.UTF_8), values.get(3));
+    assertEquals("", values.get(4));
+  }
+
+  @Test
+  public void multiGetSkipCacheWarmsBufferCapacityHint() throws Exception {
+    byte[] largeKey = "warmup-large-key".getBytes(StandardCharsets.UTF_8);
+    byte[] largeValue = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 100];
+    Arrays.fill(largeValue, (byte) 'x');
+    rdbStore.getTable("Second").put(largeKey, largeValue);
+
+    RDBTable spyTable = spy(rdbStore.getTable("Second"));
+    TypedTable<String, String> readTable = new TypedTable<>(spyTable, StringCodec.get(),
+        StringCodec.get(), CacheType.PARTIAL_CACHE);
+
+    readTable.multiGetSkipCache(Collections.singletonList("warmup-large-key"));
+    verify(spyTable, times(2)).multiGetSkipCache(anyList(), anyList());
+
+    clearInvocations(spyTable);
+    readTable.multiGetSkipCache(Collections.singletonList("warmup-large-key"));
+    verify(spyTable, times(1)).multiGetSkipCache(anyList(), anyList());
+  }
+
+  @Test
+  public void validateMultiGetStatusThrowsOnBadStatus() throws Exception {
+    ByteBuffer value = ByteBuffer.allocate(4);
+    ByteBufferGetStatus nonOk = newByteBufferGetStatus(
+        new Status(Status.Code.Corruption, Status.SubCode.None, "bad"), 10, value);
+    assertThrows(IllegalStateException.class, () -> TypedTable.validateMultiGetStatus(nonOk, null));
+
+    ByteBufferGetStatus negativeSize = newByteBufferGetStatus(
+        new Status(Status.Code.Incomplete, Status.SubCode.None, "too large"), -1, value);
+    assertThrows(IllegalStateException.class,
+        () -> TypedTable.validateMultiGetStatus(negativeSize, null));
+  }
+
+  private static ByteBufferGetStatus newByteBufferGetStatus(Status status, int requiredSize,
+      ByteBuffer value) throws Exception {
+    Constructor<ByteBufferGetStatus> constructor =
+        ByteBufferGetStatus.class.getDeclaredConstructor(Status.class, int.class, ByteBuffer.class);
+    constructor.setAccessible(true);
+    return constructor.newInstance(status, requiredSize, value);
   }
 
   @Test
