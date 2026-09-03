@@ -96,4 +96,3 @@ EOF
   [ "$(< "${OUTPUT_DIR}/summary.txt")" = "Unknown failure, check output.log" ]
   [ "$(< "${OUTPUT_DIR}/failures")" -eq 1 ]
 }
-}
