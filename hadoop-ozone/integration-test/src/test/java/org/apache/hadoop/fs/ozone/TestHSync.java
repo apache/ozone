@@ -501,7 +501,7 @@ public class TestHSync {
           // Verify hsync openKey gets committed eventually
           // Key without hsync is deleted
           GenericTestUtils.waitFor(() ->
-              getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
+              filterByKeyName(getOpenKeyInfo(BUCKET_LAYOUT), key1.getName(), key2.getName()).isEmpty(), 1000, 12000);
           // Verify only one key is still present in fileTable
           assertEquals(1, filterByKeyName(getKeyInfo(BUCKET_LAYOUT), key1.getName(), key2.getName()).size());
 
@@ -578,14 +578,14 @@ public class TestHSync {
         os.write(1);
         os.hsync();
         // There should be 1 key in openFileTable
-        assertEquals(1, getOpenKeyInfo(BUCKET_LAYOUT).size());
+        assertEquals(1, filterByKeyName(getOpenKeyInfo(BUCKET_LAYOUT), key1.getName()).size());
         // Delete directory recursively
         fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
             bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);
 
         // Verify if DELETED_HSYNC_KEY metadata is added to openKey
         GenericTestUtils.waitFor(() -> {
-          List<OmKeyInfo> omKeyInfo = getOpenKeyInfo(BUCKET_LAYOUT);
+          List<OmKeyInfo> omKeyInfo = filterByKeyName(getOpenKeyInfo(BUCKET_LAYOUT), key1.getName());
           return !omKeyInfo.isEmpty() && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
         }, 1000, 12000);
 
@@ -594,7 +594,7 @@ public class TestHSync {
 
         // Verify entry from openKey gets deleted eventually
         GenericTestUtils.waitFor(() ->
-            getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
+            filterByKeyName(getOpenKeyInfo(BUCKET_LAYOUT), key1.getName()).isEmpty(), 1000, 12000);
       } catch (OMException ex) {
         assertEquals(OMException.ResultCodes.DIRECTORY_NOT_FOUND, ex.getResult());
       } finally {
@@ -621,10 +621,10 @@ public class TestHSync {
   private List<OmKeyInfo> getKeyInfo(BucketLayout bucketLayout) {
     List<OmKeyInfo> omKeyInfo = new ArrayList<>();
 
-    Table<String, OmKeyInfo> openFileTable =
+    Table<String, OmKeyInfo> fileTable =
         cluster.getOzoneManager().getMetadataManager().getKeyTable(bucketLayout);
     try (Table.KeyValueIterator<String, OmKeyInfo>
-             iterator = openFileTable.iterator()) {
+             iterator = fileTable.iterator()) {
       while (iterator.hasNext()) {
         omKeyInfo.add(iterator.next().getValue());
       }
@@ -641,7 +641,7 @@ public class TestHSync {
     List<OmKeyInfo> filtered = new ArrayList<>();
     for (OmKeyInfo omKeyInfo : omKeyInfos) {
       for (String keyName : keyNames) {
-        if (keyName.equals(omKeyInfo.getKeyName())) {
+        if (keyName.equals(omKeyInfo.getFileName())) {
           filtered.add(omKeyInfo);
           break;
         }
