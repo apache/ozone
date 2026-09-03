@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -224,8 +225,10 @@ public class FilePerChunkStrategy implements ChunkManager {
     HddsVolume volume = containerData.getVolume();
 
     // In version1, we verify checksum if it is available and return data
-    // of the chunk file.
-    File finalChunkFile = getChunkFile(kvContainer, blockID, info);
+    // of the chunk file. Reads use the cached chunks directory to skip the
+    // per-read stat; writes keep validating so a missing directory is detected.
+    File finalChunkFile = FILE_PER_CHUNK.getChunkFile(
+        containerData.getChunksDirForRead(), blockID, info.getChunkName());
 
     List<File> possibleFiles = new ArrayList<>();
     possibleFiles.add(finalChunkFile);
@@ -285,6 +288,7 @@ public class FilePerChunkStrategy implements ChunkManager {
         }
       }
     }
+    ContainerUtils.getChunkDir(containerData);
     throw new StorageContainerException(
         "Chunk file can't be found " + possibleFiles.toString(),
         UNABLE_TO_FIND_CHUNK);
