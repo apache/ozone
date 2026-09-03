@@ -36,7 +36,10 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -267,6 +270,82 @@ public class TestStreamBlockInputStream {
       // After the fix: all 4 bytes are returned successfully.
       assertDoesNotThrow(() -> sbis.read(buf), "should not NPE when onCompleted fires before poll");
       assertEquals(data.length, buf.position(), "all bytes should be read");
+    }
+  }
+
+  /**
+   * The pre-read window must be refilled in bulk once it drains below half, not after every response.
+   */
+  @Test
+  public void testPreReadWindowIsRefilledInBulk() throws Exception {
+    final int responseSize = 4096;
+    final int preReadSize = 4 * responseSize;
+    final int blockLength = 16 * responseSize;
+
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setStreamReadResponseDataSize(responseSize);
+    clientConfig.setStreamReadPreReadSize(preReadSize);
+
+    BlockID blockID = new BlockID(1L, 21L);
+    byte[] data = new byte[blockLength];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = new StreamingReadResponse(
+        MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    List<Long> requestLengths = Collections.synchronizedList(new ArrayList<>());
+
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    doAnswer(inv -> {
+      ContainerCommandRequestProto request = inv.getArgument(0);
+      final long offset = request.getReadBlock().getOffset();
+      final long length = request.getReadBlock().getLength();
+      requestLengths.add(length);
+      for (long sent = 0; sent < length; sent += responseSize) {
+        final int from = Math.toIntExact(offset + sent);
+        final int to = Math.toIntExact(Math.min((long) from + responseSize, blockLength));
+        readerRef.get().onNext(buildResponseProto(Arrays.copyOfRange(data, from, to), from));
+      }
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    final long refillThreshold;
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, blockLength, mockStandalonePipeline(), null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      refillThreshold = sbis.getPreReadRefillThreshold();
+      // Read one small buffer at a time, as KeyInputStream does, so every response reaches readBlock again.
+      byte[] all = new byte[blockLength];
+      for (int off = 0; off < blockLength; off += responseSize) {
+        ByteBuffer chunk = ByteBuffer.allocate(responseSize);
+        assertEquals(responseSize, sbis.read(chunk));
+        System.arraycopy(chunk.array(), 0, all, off, responseSize);
+      }
+      assertArrayEquals(data, all);
+    }
+
+    // One request per refill threshold plus the initial one; without the gate it is one per response.
+    assertThat(requestLengths)
+        .withFailMessage("expected bulk refills, got %s requests for %s responses: %s",
+            requestLengths.size(), blockLength / responseSize, requestLengths)
+        .hasSizeLessThanOrEqualTo(Math.toIntExact(1 + blockLength / refillThreshold));
+    // Each request carries at least the refill threshold (the last one may be clamped by the block end).
+    for (long requested : requestLengths) {
+      assertThat(requested).isGreaterThanOrEqualTo(refillThreshold);
     }
   }
 
