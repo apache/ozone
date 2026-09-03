@@ -124,6 +124,9 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
         <configuration>
+          <ignoredUsedUndeclaredDependencies>
+            <ignoredUsedUndeclaredDependency>org.apache.ratis:ratis-server-api</ignoredUsedUndeclaredDependency>
+          </ignoredUsedUndeclaredDependencies>
           <ignoredUnusedDeclaredDependencies>
             <ignoredUnusedDeclaredDependency>org.assertj:*</ignoredUnusedDeclaredDependency>
             <ignoredUnusedDeclaredDependency>org.junit.jupiter:*</ignoredUnusedDeclaredDependency>
