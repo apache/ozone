@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.security;
 
 import java.io.IOException;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
