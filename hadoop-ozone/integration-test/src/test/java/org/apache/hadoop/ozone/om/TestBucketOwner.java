@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.UUID;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -74,7 +73,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       ObjectStore objectStore = client.getObjectStore();
       OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
       BucketArgs omBucketArgs = BucketArgs.newBuilder()
-          .setStorageType(StorageType.DISK).setOwner(user1.getShortUserName()).build();
+          .setOwner(user1.getShortUserName()).build();
       volume.createBucket("bucket1", omBucketArgs);
       volume.createBucket("bucket2", omBucketArgs);
       volume.createBucket("bucket3", omBucketArgs);

@@ -46,7 +46,6 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -132,7 +131,6 @@ public class TestOzoneFileChecksum {
     client.getObjectStore().createVolume(volumeName);
 
     BucketArgs.Builder bucketArgs = BucketArgs.newBuilder()
-        .setStorageType(StorageType.DISK)
         .setBucketLayout(BucketLayout.LEGACY);
 
     createBucket(client, volumeName, bucketArgs.build(), legacyBucket);

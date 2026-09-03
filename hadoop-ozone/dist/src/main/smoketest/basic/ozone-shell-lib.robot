@@ -48,8 +48,8 @@ Test ozone shell
     ${result} =     Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1 --space-quota 10TB --namespace-quota 100
                     Should Be Empty     ${result}
                     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > ${TMP_JSON}
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .storageType' ${TMP_JSON}
-                    Should Be Equal     ${result}       DISK
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .storagePolicy' ${TMP_JSON}
+                    Should Be Equal     ${result}       WARM
     ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' ${TMP_JSON}
                     Should Be Equal     ${result}       10995116277760
     ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' ${TMP_JSON}

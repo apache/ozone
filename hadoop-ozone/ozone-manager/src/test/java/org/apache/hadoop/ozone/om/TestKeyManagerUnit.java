@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -437,7 +436,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volume)
         .setBucketName(bucket)
-        .setStorageType(StorageType.DISK)
         .setIsVersionEnabled(false)
         .build();
     OMRequestTestUtils.addBucketToOM(omMetadataManager, omBucketInfo);

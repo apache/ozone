@@ -26,8 +26,8 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
@@ -283,14 +283,14 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
-   * Sets the Storage Class of a Bucket.
+   * Sets the Storage Policy of a Bucket.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
-   * @param storageType StorageType to be set
+   * @param storagePolicy StoragePolicy to be set
    * @throws IOException
    */
-  void setBucketStorageType(String volumeName, String bucketName,
-                            StorageType storageType)
+  void setBucketStoragePolicy(String volumeName, String bucketName,
+                              StoragePolicy storagePolicy)
       throws IOException;
 
   /**

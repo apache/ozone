@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -138,7 +137,6 @@ public class TestOMDirectoryCreateResponseWithFSO {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setObjectID(System.currentTimeMillis())
-            .setStorageType(StorageType.DISK)
             .setIsVersionEnabled(false)
             .build();
 

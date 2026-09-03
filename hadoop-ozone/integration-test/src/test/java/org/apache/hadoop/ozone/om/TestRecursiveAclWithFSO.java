@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -80,7 +79,7 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       ObjectStore objectStore = client.getObjectStore();
       OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
       BucketArgs omBucketArgs =
-          BucketArgs.newBuilder().setStorageType(StorageType.DISK).build();
+          BucketArgs.newBuilder().build();
 
       // create bucket with user1
       volume.createBucket("bucket1", omBucketArgs);
@@ -225,7 +224,7 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       ObjectStore objectStore = client.getObjectStore();
       OzoneVolume volume = objectStore.getVolume(volumeName);
       BucketArgs omBucketArgs =
-          BucketArgs.newBuilder().setStorageType(StorageType.DISK).build();
+          BucketArgs.newBuilder().build();
       String bucketName = "bucket";
       volume.createBucket(bucketName, omBucketArgs);
       OzoneBucket ozoneBucket = volume.getBucket(bucketName);

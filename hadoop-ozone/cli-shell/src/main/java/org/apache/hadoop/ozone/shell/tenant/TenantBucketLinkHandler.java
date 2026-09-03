@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.shell.tenant;
 
 import java.io.IOException;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -54,7 +53,6 @@ public class TenantBucketLinkHandler extends TenantHandler {
       throws IOException {
 
     BucketArgs.Builder bb = new BucketArgs.Builder()
-        .setStorageType(StorageType.DEFAULT)
         .setVersioning(false)
         .setSourceVolume(source.getVolumeName())
         .setSourceBucket(source.getBucketName());

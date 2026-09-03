@@ -799,7 +799,11 @@ message BucketInfo {
     required string bucketName = 2;
     repeated OzoneAclInfo acls = 3;
     required bool isVersionEnabled = 4 [default = false];
-    required hadoop.hdds.StorageTypeProto storageType = 5 [deprecated = true, default = DISK];
+    // Legacy field kept for wire compatibility with older peers whose schema
+    // still has `required storageType = 5`. New OM emits DISK on write via
+    // OmBucketInfo.getProtobuf(); new OM ignores it on read. Storage policy
+    // lives in `storagePolicy` (field 24).
+    optional hadoop.hdds.StorageTypeProto storageType = 5 [deprecated = true, default = DISK];
     optional uint64 creationTime = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional BucketEncryptionInfoProto beinfo = 8;
@@ -818,6 +822,8 @@ message BucketInfo {
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
     repeated hadoop.hdds.KeyValue tags = 23;
+    optional hadoop.hdds.StoragePolicyProto storagePolicy = 24;
+    optional bool allowFallbackStoragePolicy = 25;
 }
 
 enum BucketLayoutProto {
@@ -884,7 +890,8 @@ message BucketArgs {
     required string volumeName = 1;
     required string bucketName = 2;
     optional bool isVersionEnabled = 5;
-    optional hadoop.hdds.StorageTypeProto storageType = 6;
+    // Legacy field kept for wire compatibility. Same rationale as BucketInfo.storageType.
+    optional hadoop.hdds.StorageTypeProto storageType = 6 [deprecated = true];
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional uint64 quotaInBytes = 8;
     optional uint64 quotaInNamespace = 9;
@@ -892,6 +899,8 @@ message BucketArgs {
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
     optional BucketEncryptionInfoProto bekInfo = 12;
     repeated hadoop.hdds.KeyValue tags = 13;
+    optional hadoop.hdds.StoragePolicyProto storagePolicy = 14;
+    optional bool allowFallbackStoragePolicy = 15;
 }
 
 message PrefixInfo {

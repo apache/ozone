@@ -32,7 +32,6 @@ import java.util.Comparator;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -427,8 +426,6 @@ public class FlatNSSummaryScenario extends NSSummaryTestScenario {
     assertEquals(numKeys, bucket.getCountStats().getNumTotalKey());
     assertEquals(volName,
         ((BucketObjectDBInfo) bucket.getObjectDBInfo()).getVolumeName());
-    assertEquals(StorageType.DISK,
-        ((BucketObjectDBInfo) bucket.getObjectDBInfo()).getStorageType());
     assertEquals(layout,
         ((BucketObjectDBInfo) bucket.getObjectDBInfo()).getBucketLayout());
     assertEquals(bucketName,

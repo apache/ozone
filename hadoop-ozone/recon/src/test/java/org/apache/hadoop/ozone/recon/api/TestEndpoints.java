@@ -66,10 +66,10 @@ import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
@@ -518,7 +518,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .setQuotaInBytes(OzoneConsts.GB)
         .setUsedBytes(OzoneConsts.MB)
         .setQuotaInNamespace(5)
-        .setStorageType(StorageType.DISK)
+        .setStoragePolicy(OzoneStoragePolicy.WARM)
         .setUsedNamespace(3)
         .setBucketLayout(BucketLayout.LEGACY)
         .setOwner("TestUser2")
@@ -541,7 +541,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .setQuotaInBytes(OzoneConsts.GB)
         .setUsedBytes(100 * OzoneConsts.MB)
         .setQuotaInNamespace(5)
-        .setStorageType(StorageType.SSD)
+        .setStoragePolicy(OzoneStoragePolicy.HOT)
         .setUsedNamespace(3)
         .setBucketLayout(BucketLayout.OBJECT_STORE)
         .setOwner("TestUser2")
@@ -1106,7 +1106,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     switch (bucketName) {
     case "bucketOne":
       assertEquals("sampleVol2", bucketMetadata.getVolumeName());
-      assertEquals(StorageType.DISK, bucketMetadata.getStorageType());
+      assertEquals(OzoneStoragePolicy.WARM, bucketMetadata.getStoragePolicy());
       assertNull(bucketMetadata.getSourceVolume());
       assertNull(bucketMetadata.getSourceBucket());
       assertEquals(OzoneConsts.GB, bucketMetadata.getQuotaInBytes());
@@ -1128,7 +1128,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       break;
     case "bucketTwo":
       assertEquals("sampleVol2", bucketMetadata.getVolumeName());
-      assertEquals(StorageType.SSD, bucketMetadata.getStorageType());
+      assertEquals(OzoneStoragePolicy.HOT, bucketMetadata.getStoragePolicy());
       assertNull(bucketMetadata.getSourceVolume());
       assertNull(bucketMetadata.getSourceBucket());
       assertEquals(OzoneConsts.GB, bucketMetadata.getQuotaInBytes());

@@ -28,8 +28,8 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
@@ -193,8 +193,8 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public void setBucketStorageType(String volumeName, String bucketName,
-                                   StorageType storageType) throws IOException {
+  public void setBucketStoragePolicy(String volumeName, String bucketName,
+                                     StoragePolicy storagePolicy) throws IOException {
 
   }
 
