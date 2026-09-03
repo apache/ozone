@@ -315,8 +315,8 @@ public class JMXJsonServlet extends HttpServlet {
         writeAttribute(jg, attribute, attributeinfo);
       } else {
         MBeanAttributeInfo[] attrs = minfo.getAttributes();
-        for (int i = 0; i < attrs.length; i++) {
-          writeAttribute(jg, oname, attrs[i]);
+        for (MBeanAttributeInfo attr : attrs) {
+          writeAttribute(jg, oname, attr);
         }
       }
       jg.writeEndObject();
@@ -332,8 +332,8 @@ public class JMXJsonServlet extends HttpServlet {
     if ("modelerType".equals(attName)) {
       return;
     }
-    if (attName.indexOf("=") >= 0 || attName.indexOf(":") >= 0
-        || attName.indexOf(" ") >= 0) {
+    if (attName.indexOf('=') >= 0 || attName.indexOf(':') >= 0
+        || attName.indexOf(' ') >= 0) {
       return;
     }
     Object value = null;
