@@ -65,16 +65,28 @@ public final class ClientCommandsUtils {
    * finalized for ZDU); the datanode rounds it up here so there is no issue.
    */
   public static HDDSVersion getWritePipelineVersion(ContainerProtos.ContainerCommandRequestProto request) {
-    // Absent, unrecognized (deserializes to UNKNOWN_VERSION == -1), and pre-ZDU versions all fall
-    // below the ZDU floor, so a single comparison rounds every one of them up to ZDU.
-    int serializedVersion = request.hasWritePipelineVersion()
-        ? request.getWritePipelineVersion() : HDDSVersion.ZDU.serialize();
+    final HDDSVersion defaultWriteVersion = HDDSVersion.ZDU;
+    // If no write version is provided, fall back to the default.
+    if (!request.hasWritePipelineVersion()) {
+      return defaultWriteVersion;
+    }
+
+    // If the write version does not deserialize to any known version, fall back to the default.
+    int serializedVersion = request.getWritePipelineVersion();
     HDDSVersion writeVersion = HDDSVersion.deserialize(serializedVersion);
     if (writeVersion == HDDSVersion.UNKNOWN_VERSION) {
       // Should not normally happen: the version originates from SCM's view of the datanodes.
       LOG.error("Datanode was given an unrecognized write pipeline version {}; using {} instead.",
-          serializedVersion, HDDSVersion.ZDU);
+          serializedVersion, defaultWriteVersion);
+      return defaultWriteVersion;
     }
-    return writeVersion.serialize() < HDDSVersion.ZDU.serialize() ? HDDSVersion.ZDU : writeVersion;
+
+    // ZDU is the first version that supports write path versioning.
+    // A lower version should be replaced with the default.
+    if (!defaultWriteVersion.isSupportedBy(writeVersion)) {
+      return defaultWriteVersion;
+    }
+
+    return writeVersion;
   }
 }
