@@ -683,6 +683,8 @@ public class TestRDBTableStore {
     assertEquals(2, rangeKVs.size());
     assertArrayEquals(present, rangeKVs.get(0).getKey());
     assertEquals(0, testTable.getRangeKVs(absentMiddle, 10, null).size());
+    // Absent start key past every key with no prefix: seek lands on nothing.
+    assertEquals(0, testTable.getRangeKVs(absentPastEnd, 10, null).size());
   }
 
   @Test
