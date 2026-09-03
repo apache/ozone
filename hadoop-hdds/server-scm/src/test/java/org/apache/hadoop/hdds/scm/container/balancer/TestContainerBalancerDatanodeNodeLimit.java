@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -56,6 +58,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
@@ -94,6 +97,72 @@ public class TestContainerBalancerDatanodeNodeLimit {
         Arguments.of(getMockedSCM(19)),
         Arguments.of(getMockedSCM(20)),
         Arguments.of(getMockedSCM(30)));
+  }
+
+  @ParameterizedTest(name = "MockedSCM #{index}: {0}")
+  @MethodSource("createMockedSCMs")
+  void analyzerMatchesTaskAfterInitializeIteration(@Nonnull MockedSCM mockedSCM) {
+    ContainerBalancerConfiguration config =
+        new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
+
+    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
+
+    List<DatanodeUsageInfo> eligible = mockedSCM.getNodeManager().getMostOrLeastUsedDatanodes(true)
+        .stream()
+        .filter(n -> !ContainerBalancerClusterAnalyzer.shouldExcludeDatanode(
+            n.getDatanodeDetails(), config.getExcludeNodes(), config.getIncludeNodes()))
+        .collect(Collectors.toList());
+    List<DatanodeUsageInfoProto> protos = eligible.stream()
+        .map(n -> n.toProto(ClientVersion.DEFAULT_VERSION.toProtoValue()))
+        .collect(Collectors.toList());
+
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        protos, config.getThresholdAsRatio(), config.getIncludeNodes(), config.getExcludeNodes());
+
+    double taskAvg = ContainerBalancerTask.calculateAvgUtilization(eligible);
+    double upperLimit = taskAvg + config.getThresholdAsRatio();
+    double lowerLimit = taskAvg - config.getThresholdAsRatio();
+
+    assertEquals(eligible.size(), snapshot.getTotalEligibleDatanodes());
+    assertEquals(task.getOverUtilizedNodes().size(), snapshot.getSourceCount());
+    assertEquals(task.getUnderUtilizedNodes().size(), snapshot.getTargetCount());
+    assertEquals(taskAvg, snapshot.getClusterAvgUtilization(), 0.0001);
+    assertEquals(upperLimit, snapshot.getUpperLimit(), 0.0001);
+    assertEquals(lowerLimit, snapshot.getLowerLimit(), 0.0001);
+
+    long expectedOverBytes = task.getOverUtilizedNodes().stream()
+        .mapToLong(n -> {
+          long capacity = n.getScmNodeStat().getCapacity().get();
+          double utilization = n.calculateUtilization();
+          return (long) (capacity * utilization) - (long) (capacity * upperLimit);
+        })
+        .sum();
+    long expectedUnderBytes = task.getUnderUtilizedNodes().stream()
+        .mapToLong(n -> {
+          long capacity = n.getScmNodeStat().getCapacity().get();
+          double utilization = n.calculateUtilization();
+          return (long) (capacity * lowerLimit) - (long) (capacity * utilization);
+        })
+        .sum();
+    assertEquals(expectedOverBytes, snapshot.getTotalOverUtilizedBytes());
+    assertEquals(expectedUnderBytes, snapshot.getTotalUnderUtilizedBytes());
+    assertEquals(expectedOverBytes, snapshot.getBytesToMove());
+    assertEquals(
+        Math.max(snapshot.getTotalOverUtilizedBytes(), snapshot.getTotalUnderUtilizedBytes()) / OzoneConsts.GB,
+        task.getMetrics().getDataSizeUnbalancedGB());
+
+    List<String> expectedTopSources = task.getOverUtilizedNodes().stream()
+        .sorted(Comparator.comparingDouble((DatanodeUsageInfo n) -> n.calculateUtilization()).reversed())
+        .limit(5)
+        .map(n -> n.getDatanodeDetails().getHostName())
+        .collect(Collectors.toList());
+    List<String> expectedBottomTargets = task.getUnderUtilizedNodes().stream()
+        .sorted(Comparator.comparingDouble((DatanodeUsageInfo n) -> n.calculateUtilization()))
+        .limit(5)
+        .map(n -> n.getDatanodeDetails().getHostName())
+        .collect(Collectors.toList());
+    assertEquals(expectedTopSources, snapshot.getTopSourceNodeHostnames());
+    assertEquals(expectedBottomTargets, snapshot.getBottomTargetNodeHostnames());
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
