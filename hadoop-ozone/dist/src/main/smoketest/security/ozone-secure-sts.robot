@@ -66,6 +66,15 @@ ${ACTION_MATCHES_PUTOBJECT_CREATE_WRITE_ROLE_ARN}  arn:aws:iam::123456789012:rol
 ${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE_ARN}  arn:aws:iam::123456789012:role/${ACTION_MATCHES_GETOBJECT_PUTOBJECT_ROLE}
 ${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE_ARN}  arn:aws:iam::123456789012:role/${ACTION_MATCHES_UPLOADPARTCOPY_EXPECTED_OWNER_ROLE}
 ${ACTION_MATCHES_GET_STAR_READ_ROLE_ARN}        arn:aws:iam::123456789012:role/${ACTION_MATCHES_GET_STAR_READ_ROLE}
+${STS_LINK_BUCKET_ROLE}                 sts-link-bucket-role
+${STS_LINK_BUCKET_ROLE_ARN}             arn:aws:iam::123456789012:role/${STS_LINK_BUCKET_ROLE}
+${STS_LINK_BUCKET_SOURCE}               sts-link-bucket-source
+${STS_LINK_BUCKET_LINKED}               s3v-sts-link-bucket-source
+${STS_LINK_BUCKET_TESTFILE}             link-bucket-testfile.txt
+${STS_LINK_BUCKET_CHAIN_SOURCE}         sts-chain-source
+${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}   s3v-sts-chain-intermediate
+${STS_LINK_BUCKET_CHAIN_FINAL}          s3v-sts-chain-final
+${STS_LINK_BUCKET_CHAIN_TESTFILE}       chain-link-testfile.txt
 ${TEST_USER_ADMIN}                      testuser
 ${TEST_USER_NON_ADMIN}                  testuser2
 @{ICEBERG_OBJECT_KEYS}                  file1.txt    file1again.txt    folder/pepper.txt    folder/salt.txt    userA/userA.txt    userB/userB.txt    userAfile.txt
@@ -93,6 +102,27 @@ Populate Iceberg Bucket
     # Upload an explicit folder marker object to match AWS semantics.
     Create File                   ${TEMP_DIR}/zero-byte-marker
     Execute                       ozone sh key put /s3v/${bucket}/zeroByteFolder/ ${TEMP_DIR}/zero-byte-marker
+
+Setup Same Volume Link Bucket
+    # Create a source bucket and a same-volume linked bucket (s3v/source -> s3v/s3v-source).
+    Kinit test user               hdfs                          hdfs.keytab
+    Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_SOURCE}
+    Create File                   ${TEMP_DIR}/${STS_LINK_BUCKET_TESTFILE}    link bucket test content
+    Execute                       ozone sh key put /s3v/${STS_LINK_BUCKET_SOURCE}/${STS_LINK_BUCKET_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_TESTFILE}
+    Execute                       ozone sh bucket link /s3v/${STS_LINK_BUCKET_SOURCE} /s3v/${STS_LINK_BUCKET_LINKED}
+
+Setup Chained Same Volume Link Buckets
+    # Create source <- intermediate <- final chained links in s3v.
+    Kinit test user               hdfs                          hdfs.keytab
+    Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_OBS} /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}
+    Create File                   ${TEMP_DIR}/${STS_LINK_BUCKET_CHAIN_TESTFILE}    chained link test content
+    Execute                       ozone sh key put /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE}/${STS_LINK_BUCKET_CHAIN_TESTFILE} ${TEMP_DIR}/${STS_LINK_BUCKET_CHAIN_TESTFILE}
+    Execute                       ozone sh bucket link /s3v/${STS_LINK_BUCKET_CHAIN_SOURCE} /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}
+    Execute                       ozone sh bucket link /s3v/${STS_LINK_BUCKET_CHAIN_INTERMEDIATE} /s3v/${STS_LINK_BUCKET_CHAIN_FINAL}
+
+Head Bucket Should Succeed
+    [Arguments]                   ${bucket}  ${profile}=sts
+    Execute and checkrc           aws s3api --endpoint-url ${S3G_ENDPOINT_URL} head-bucket --bucket ${bucket} --profile ${profile}  0
 
 Run List Prefix And Delimiter Policy Matrix For Bucket And Api
     [Arguments]                   ${bucket}  ${role_arn}  ${api}
@@ -337,6 +367,31 @@ Create Iceberg Multi-Bucket Role Policies
     ${key_policy} =               Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "iceberg multi table access", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "s3v" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "${ICEBERG_BUCKET_OBS}", "${ICEBERG_BUCKET_FSO}" ], "isExcludes": false, "isRecursive": false }, "key": { "values": [ "*" ], "isExcludes": false, "isRecursive": true } }, "policyItems": [ { "accesses": [ { "type": "all", "isAllowed": true } ], "roles": [ "${ICEBERG_MULTI_BUCKET_ROLE}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
     Create Ranger Policy          ${key_policy}
 
+Create STS Link Bucket Role in Ranger
+    ${role_json} =                Set Variable                  { "name": "${STS_LINK_BUCKET_ROLE}", "description": "STS linked bucket authorization regression role" }
+    Create Ranger Role            ${role_json}
+    Create Ranger Assume Role Policy  ${STS_LINK_BUCKET_ROLE}   ${ICEBERG_SVC_CATALOG_USER}
+
+Create STS Link Bucket Access Policies
+    # Grant volume access and linked-bucket bucket/key policies for session-policy scoping.
+    # Also grant source-bucket key access on the role so Ranger allows the resolved key path; the STS
+    # session policy (linked bucket only) is what this regression exercises.
+    ${policy_items} =             Set Variable                  [ { "accesses": [ { "type": "read", "isAllowed": true }, { "type": "list", "isAllowed": true } ], "roles": [ "${STS_LINK_BUCKET_ROLE}" ], "delegateAdmin": false } ]
+    Update Ranger Policy Items    iceberg volume access         ${policy_items}
+    ${bucket_policy} =            Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "sts linked bucket access", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "s3v" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "${STS_LINK_BUCKET_LINKED}" ], "isExcludes": false, "isRecursive": false } }, "policyItems": [ { "accesses": [ { "type": "all", "isAllowed": true } ], "roles": [ "${STS_LINK_BUCKET_ROLE}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
+    Create Ranger Policy          ${bucket_policy}
+    ${key_policy} =               Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "sts linked bucket table access", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "s3v" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "${STS_LINK_BUCKET_LINKED}" ], "isExcludes": false, "isRecursive": false }, "key": { "values": [ "*" ], "isExcludes": false, "isRecursive": true } }, "policyItems": [ { "accesses": [ { "type": "all", "isAllowed": true } ], "roles": [ "${STS_LINK_BUCKET_ROLE}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
+    Create Ranger Policy          ${key_policy}
+    ${source_key_policy} =        Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "sts linked bucket source table access", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "s3v" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "${STS_LINK_BUCKET_SOURCE}" ], "isExcludes": false, "isRecursive": false }, "key": { "values": [ "*" ], "isExcludes": false, "isRecursive": true } }, "policyItems": [ { "accesses": [ { "type": "all", "isAllowed": true } ], "roles": [ "${STS_LINK_BUCKET_ROLE}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
+    Create Ranger Policy          ${source_key_policy}
+    ${chain_bucket_policy} =      Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "sts chained link bucket access", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "s3v" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "${STS_LINK_BUCKET_CHAIN_FINAL}", "${STS_LINK_BUCKET_CHAIN_INTERMEDIATE}" ], "isExcludes": false, "isRecursive": false } }, "policyItems": [ { "accesses": [ { "type": "all", "isAllowed": true } ], "roles": [ "${STS_LINK_BUCKET_ROLE}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
+    Create Ranger Policy          ${chain_bucket_policy}
+    ${chain_key_policy} =         Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "sts chained link bucket table access", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "s3v" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "${STS_LINK_BUCKET_CHAIN_FINAL}" ], "isExcludes": false, "isRecursive": false }, "key": { "values": [ "*" ], "isExcludes": false, "isRecursive": true } }, "policyItems": [ { "accesses": [ { "type": "all", "isAllowed": true } ], "roles": [ "${STS_LINK_BUCKET_ROLE}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
+    Create Ranger Policy          ${chain_key_policy}
+    ${chain_source_key_policy} =  Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "sts chained link bucket source table access", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "s3v" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "${STS_LINK_BUCKET_CHAIN_SOURCE}" ], "isExcludes": false, "isRecursive": false }, "key": { "values": [ "*" ], "isExcludes": false, "isRecursive": true } }, "policyItems": [ { "accesses": [ { "type": "all", "isAllowed": true } ], "roles": [ "${STS_LINK_BUCKET_ROLE}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
+    Create Ranger Policy          ${chain_source_key_policy}
+    Refresh Ranger Policy Cache
+
 Create Partial Access Roles in Ranger
     FOR    ${role}    IN    ${PARTIAL_LIST_ALL_BUCKETS_VOL_READ_ROLE}    ${PARTIAL_LIST_ALL_BUCKETS_VOL_LIST_ROLE}    ${PARTIAL_BUCKET_READ_ROLE}    ${PARTIAL_BUCKET_READ_UPLOAD_PREFIX_ROLE}    ${PARTIAL_BUCKET_LIST_ROLE}    ${PARTIAL_BUCKET_READ_ACL_ROLE}    ${PARTIAL_PUT_OBJECT_KEY_CREATE_ROLE}    ${PARTIAL_PUT_OBJECT_KEY_WRITE_ROLE}
         ${role_json} =            Set Variable                  { "name": "${role}", "description": "Partial access role" }
@@ -416,6 +471,8 @@ Get S3 Credentials for Service Catalog Principal, Create Iceberg Buckets, and Up
     Execute                       ozone sh bucket create --layout ${ICEBERG_LAYOUT_FSO} /s3v/${ICEBERG_BUCKET_FSO}
     Populate Iceberg Bucket       ${ICEBERG_BUCKET_OBS}
     Populate Iceberg Bucket       ${ICEBERG_BUCKET_FSO}
+    Setup Same Volume Link Bucket
+    Setup Chained Same Volume Link Buckets
 
     # Switch back to the service catalog principal for running S3/STS requests.
     Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
@@ -1275,6 +1332,40 @@ STS session policy containing only GetObject must deny DeleteObjects
     Should Not Contain           ${output}                      AccessDenied
     ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${bucket} --profile sts
     Should Not Contain           ${output}                      AccessDenied
+
+STS Session Policy On Linked Bucket Grants GetObject On Source Bucket
+    # Same-volume linked buckets (e.g. s3v/s3v-iceberg -> s3v/iceberg): session policy scoped to the linked
+    # bucket must also authorize ListBucket and GetObject on the source bucket.
+    Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
+    ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:ListBucket","s3:GetObject"],"Resource":["arn:aws:s3:::${STS_LINK_BUCKET_LINKED}","arn:aws:s3:::${STS_LINK_BUCKET_LINKED}/*"]}]}
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${STS_LINK_BUCKET_ROLE_ARN}
+    Head Bucket Should Succeed    ${STS_LINK_BUCKET_LINKED}
+    Get Object Should Succeed     ${STS_LINK_BUCKET_LINKED}     ${STS_LINK_BUCKET_TESTFILE}
+
+STS Role On Linked Bucket Grants GetObject On Source Bucket
+    # Same-volume linked buckets: role permissions on the linked bucket must authorize
+    # key access on the source bucket when no inline session policy is supplied.
+    Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${STS_LINK_BUCKET_ROLE_ARN}
+    Head Bucket Should Succeed    ${STS_LINK_BUCKET_LINKED}
+    Get Object Should Succeed     ${STS_LINK_BUCKET_LINKED}     ${STS_LINK_BUCKET_TESTFILE}
+
+STS Session Policy On Chained Linked Bucket Grants GetObject On Source Bucket
+    # Chained linked buckets (source <- intermediate <- final): session policy scoped to the final
+    # linked bucket must also authorize ListBucket and GetObject on the source bucket.
+    Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
+    ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:ListBucket","s3:GetObject"],"Resource":["arn:aws:s3:::${STS_LINK_BUCKET_CHAIN_FINAL}","arn:aws:s3:::${STS_LINK_BUCKET_CHAIN_FINAL}/*"]}]}
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${STS_LINK_BUCKET_ROLE_ARN}
+    Head Bucket Should Succeed    ${STS_LINK_BUCKET_CHAIN_FINAL}
+    Get Object Should Succeed     ${STS_LINK_BUCKET_CHAIN_FINAL}            ${STS_LINK_BUCKET_CHAIN_TESTFILE}
+
+STS Role On Chained Linked Bucket Grants GetObject On Source Bucket
+    # Chained linked buckets: role permissions on the final linked bucket must authorize
+    # key access on the source bucket when no inline session policy is supplied.
+    Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
+    Assume Role And Configure STS Profile                       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${STS_LINK_BUCKET_ROLE_ARN}
+    Head Bucket Should Succeed    ${STS_LINK_BUCKET_CHAIN_FINAL}
+    Get Object Should Succeed     ${STS_LINK_BUCKET_CHAIN_FINAL}            ${STS_LINK_BUCKET_CHAIN_TESTFILE}
 
 Expired STS temporary credentials must return ExpiredToken on S3 APIs
     # Increase timeout to account for 15 minute STS token expiration plus the time to execute the api calls

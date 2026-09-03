@@ -117,6 +117,15 @@ team agreed that behavior is fine for actions, but does not work for Conditions,
 restrict calls by sourceIp, and if we silently ignore this, the client may incorrectly think the temporary credentials 
 are restricted for use by that IP address, so the consensus was to reject the request for that scenario.
 
+### 3.3.2 Additional Context on Linked Buckets
+
+In Ozone, one may configure a chain of bucket links.  In the scenario where one desires to call the AssumeRole API where the resource
+is a linked bucket, ensure the Ranger policies for the role have the proper permissions for each link in the chain as well 
+as the source bucket.  For example, if there is a source bucket S, that is linked to bucket A, which is linked to bucket B,
+and you want the token to be able to issue operations against linked bucket B, ensure that the role has read access to bucket B,
+read access to bucket A, and the requisite access for bucket S (such as read on keys for GetObject, create/write on keys for PutObject, etc.).
+The role must have at least read access to the volume(s) where these buckets live as well.
+
 ## 3.4 SessionToken Format
 
 As mentioned above, one of the return values from the AssumeRole call will be the sessionToken. To support not
@@ -203,14 +212,14 @@ The format of this String is entirely up to the Ranger team.  What is required f
 subsequent S3 API calls are made that use STS tokens.  In order to achieve this, the sessionPolicy String from Ranger will 
 be included in the sessionToken response to the AssumeRole API call (as mentioned above), and Ozone will supply this String
 to Ranger whenever STS tokens are used on S3 API calls via a new `RequestContext.sessionPolicy` field in the 
-`IAccessAuthorizer#checkAccess(IOzoneObj, RequestContext)` call.  Another requirement from the Ozone side is to pass the action (without the s3: prefix) corresponding to the S3 api call into the `RequestContext.s3Action` field.
+`IAccessAuthorizer#checkAccess(IOzoneObj, RequestContext)` call.  Another requirement from the Ozone side is to pass the action (without the s3: prefix) corresponding to the S3 API call into the `RequestContext.s3Action` field.
 
 ### 3.6.2 Additional Context on Permissions and Actions
 
 In a prior iteration of this design, only permissions corresponding to Ozone `ACLType` (i.e. read, write, create, read_acl, etc.) were included in Ranger roles and session policies.
-However, after testing against AWS, it was found that ACLs used by Ozone and Ranger are not granular enough. For example, read on volume, read on bucket, and write on key can be used by either the S3 PutObjectTagging api (requiring `s3:PutObjectTagging` action) or the S3 DeleteObjectTagging api (requiring `s3:DeleteObjectTagging` action). 
-Similarly, because the S3 PutObject api (`s3:PutObject` action) requires read on volume, read on bucket, and create and write on key, someone with `s3:PutObject` access could previously also call the S3 PutObjectTagging api, even though they did not have access to the `s3:PutObjectTagging` action (as an example). 
-AWS does not allow an STS token that is restricted for one action to issue calls to an api that is associated with a different action.  To prevent having more access than requested (or different access than requested), ACL permissions can be constrained further by S3 actions.
+However, after testing against AWS, it was found that ACLs used by Ozone and Ranger are not granular enough. For example, read on volume, read on bucket, and write on key can be used by either the S3 PutObjectTagging API (requiring `s3:PutObjectTagging` action) or the S3 DeleteObjectTagging API (requiring `s3:DeleteObjectTagging` action). 
+Similarly, because the S3 PutObject API (`s3:PutObject` action) requires read on volume, read on bucket, and create and write on key, someone with `s3:PutObject` access could previously also call the S3 PutObjectTagging API, even though they did not have access to the `s3:PutObjectTagging` action (as an example). 
+AWS does not allow an STS token that is restricted for one action to issue calls to an API that is associated with a different action.  To prevent having more access than requested (or different access than requested), ACL permissions can be constrained further by S3 actions.
 
 To do this constraining, the `RequestContext.s3Action` field is introduced so that if populated, the RangerOzoneAuthorizer would further restrict the permissions according to the action.
 Additionally, the OzoneGrant would contain a Set<String> representing the S3 actions that are allowed for an inline policy. If all actions are allowed, then the Set<String> would be empty or null.
@@ -224,7 +233,7 @@ created in Ranger as per the Prerequisites above.
 - This authorized user (having permanent S3 credentials) makes the AssumeRole STS call to Ozone.
 - If successful, Ozone responds with the temporary credentials.
 - A client makes S3 API calls with the temporary credentials for up to as long as the credentials last.  
-- When Ozone receives an S3 api call using temporary credentials, it will use the Kerberos identity associated with the 
+- When Ozone receives an S3 API call using temporary credentials, it will use the Kerberos identity associated with the 
 originalAccessKeyId in the session token and perform the following checks:
   - Ensure that if the accessKeyId starts with "ASIA", that a sessionToken was included in the `x-amz-security-token` header
   - Ensure the sessionToken is not expired

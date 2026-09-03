@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.security;
 
 import java.io.IOException;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -83,12 +82,11 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
    * @param secretAccessKey     the secret access key associated with the temporary access key ID
    * @param sessionPolicy       an optional opaque identifier that further limits the scope of
    *                            the permissions granted by the role
-   * @param clock               the system clock
+   * @param creationTime        token creation time
    * @return base64 encoded token string
    */
   public String createSTSTokenString(String tempAccessKeyId, String originalAccessKeyId, String roleArn,
-      int durationSeconds, String secretAccessKey, String sessionPolicy, Clock clock) throws IOException {
-    final Instant creationTime = clock.instant();
+      int durationSeconds, String secretAccessKey, String sessionPolicy, Instant creationTime) throws IOException {
     final Instant expiration = creationTime.plusSeconds(durationSeconds);
 
     final STSTokenIdentifier identifier = new STSTokenIdentifier(STSTokenIdentifier.Params.newBuilder()

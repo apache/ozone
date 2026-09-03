@@ -17,7 +17,6 @@
 Suite Setup         Skip If    '${RANGER_ENDPOINT_URL}' == ''    No Ranger
 Documentation       Smoke test for S3 STS AssumeRole + Temp Creds (Multi-Tenant Scenario)
 Resource            ./ozone-secure-sts.resource
-Resource            ../admincli/lib.resource
 Test Timeout        10 minutes
 
 *** Variables ***
@@ -137,11 +136,7 @@ Create Iceberg Bucket and Another Bucket Table Access policies
     ${policy_json} =              Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "${TENANT_TWO} ${TENANT_TWO_ANOTHER_BUCKET} table access", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "${TENANT_TWO}" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "${TENANT_TWO_ANOTHER_BUCKET}" ], "isExcludes": false, "isRecursive": false }, "key": { "values": [ "*" ], "isExcludes": false, "isRecursive": true } }, "policyItems": [ { "accesses": [ { "type": "all", "isAllowed": true } ], "roles": [ "${TENANT_ONE_ROLE}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
     Create Ranger Policy          ${policy_json}
 
-    # Update Ranger policy cache
-    Kinit test user               ${OM_ADMIN_USER}              ${OM_ADMIN_USER}.keytab
-    ${om_param} =                 Get OM Service Param
-    ${output} =                   Execute                       ozone admin om updateranger ${om_param}
-    Should contain                ${output}                     Operation completed successfully
+    Refresh Ranger Policy Cache
 
 Get S3 Credentials for Principals, Create Buckets, and Upload Files to Buckets
     Kinit test user               ${USER_A}                     ${USER_A}.keytab

@@ -29,10 +29,15 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Instant;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -40,6 +45,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.AwsRoleArnValidator;
@@ -53,6 +59,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateAssumeRoleRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -94,42 +104,81 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     final OMRequest omRequest = super.preExecute(ozoneManager);
     final AssumeRoleRequest assumeRoleRequest = omRequest.getAssumeRoleRequest();
 
-    // Brief overview of flow:
-    // The STS Endpoint makes the AssumeRole call, which when received by OM leader (via this method),
-    // it will generate the temporary credentials (tempAccessKeyId, secretAccessKey) and roleId.
-    // The original AssumeRole request is converted to an UpdateAssumeRoleRequest with the generated
-    // credentials. This update request will be submitted to Ratis and the credentials
-    // created by the leader will be replicated across all OMs.  All OMs in
-    // HA mode therefore will have identical audit logs with the same tempAccessKeyId.
+    final int durationSeconds = assumeRoleRequest.getDurationSeconds();
+    final String roleSessionName = assumeRoleRequest.getRoleSessionName();
+    final String roleArn = assumeRoleRequest.getRoleArn();
+    final String awsIamSessionPolicy = assumeRoleRequest.getAwsIamSessionPolicy();
+    final String requestId = assumeRoleRequest.getRequestId();
+    final OzoneManagerProtocolProtos.UserInfo userInfo = omRequest.getUserInfo();
+    final AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    final Map<String, String> auditMap = new HashMap<>();
+    S3STSUtils.addAssumeRoleAuditParams(
+        auditMap, roleArn, roleSessionName, awsIamSessionPolicy, durationSeconds, requestId);
 
-    // Generate temporary AWS credentials using cryptographically strong SecureRandom
-    final String tempAccessKeyId = STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
-        STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
-        STS_ACCESS_KEY_ID_RANDOM_LENGTH);
-    final String secretAccessKey = generateSecureRandomStringUsingChars(
-        CHARS_FOR_SECRET_ACCESS_KEYS, CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH, STS_SECRET_ACCESS_KEY_LENGTH);
-    final String roleId = ASSUME_ROLE_ID_PREFIX + generateSecureRandomStringUsingChars(
-        STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
-        STS_ROLE_ID_LENGTH);
+    try {
+      if (!omRequest.hasS3Authentication()) {
+        throw new OMException(
+            "S3AssumeRoleRequest does not have S3 authentication", OMException.ResultCodes.INVALID_REQUEST);
+      }
 
-    // Build UpdateAssumeRoleRequest with leader-generated credentials
-    final UpdateAssumeRoleRequest.Builder updateAssumeRoleRequestBuilder =
-        UpdateAssumeRoleRequest.newBuilder()
-            .setRoleArn(assumeRoleRequest.getRoleArn())
-            .setRoleSessionName(assumeRoleRequest.getRoleSessionName())
-            .setDurationSeconds(assumeRoleRequest.getDurationSeconds())
-            .setRequestId(assumeRoleRequest.getRequestId())
-            .setTempAccessKeyId(tempAccessKeyId)
-            .setSecretAccessKey(secretAccessKey)
-            .setRoleId(roleId);
+      // Brief overview of flow:
+      // The STS Endpoint makes the AssumeRole call, which when received by OM leader (via this method),
+      // it will validate the request, authorize via Ranger, generate temporary credentials
+      // (tempAccessKeyId, secretAccessKey), roleId, and the signed session token.
+      // The original AssumeRole request is converted to an UpdateAssumeRoleRequest with the generated
+      // values. This update request will be submitted to Ratis and replicated across all OMs.
+      // All OMs in HA mode therefore will have identical audit logs with the same tempAccessKeyId.
+      S3STSUtils.validateDuration(durationSeconds);
+      S3STSUtils.validateRoleSessionName(roleSessionName);
+      final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
+      
+      // Generate temporary AWS credentials using cryptographically strong SecureRandom
+      final String tempAccessKeyId = STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
+          STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
+          STS_ACCESS_KEY_ID_RANDOM_LENGTH);
+      final String secretAccessKey = generateSecureRandomStringUsingChars(
+          CHARS_FOR_SECRET_ACCESS_KEYS, CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH, STS_SECRET_ACCESS_KEY_LENGTH);
+      final String roleId = ASSUME_ROLE_ID_PREFIX + generateSecureRandomStringUsingChars(
+          STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
+          STS_ROLE_ID_LENGTH);
 
-    if (assumeRoleRequest.hasAwsIamSessionPolicy()) {
-      updateAssumeRoleRequestBuilder.setAwsIamSessionPolicy(assumeRoleRequest.getAwsIamSessionPolicy());
+      final Instant creationInstant = clock.instant();
+      final String sessionToken = generateSessionToken(
+          targetRoleName, omRequest, ozoneManager, assumeRoleRequest, secretAccessKey, tempAccessKeyId,
+          creationInstant);
+      final long expirationEpochSeconds = creationInstant.plusSeconds(durationSeconds).getEpochSecond();
+
+      auditMap.put(OzoneConsts.S3_STS_TEMP_ACCESS_KEY_ID, tempAccessKeyId);
+
+      // Build UpdateAssumeRoleRequest with leader-generated credentials and session token
+      final UpdateAssumeRoleRequest.Builder updateAssumeRoleRequestBuilder =
+          UpdateAssumeRoleRequest.newBuilder()
+              .setRoleArn(roleArn)
+              .setRoleSessionName(roleSessionName)
+              .setDurationSeconds(durationSeconds)
+              .setRequestId(requestId)
+              .setTempAccessKeyId(tempAccessKeyId)
+              .setSecretAccessKey(secretAccessKey)
+              .setRoleId(roleId)
+              .setSessionToken(sessionToken)
+              .setExpirationEpochSeconds(expirationEpochSeconds);
+
+      if (assumeRoleRequest.hasAwsIamSessionPolicy()) {
+        updateAssumeRoleRequestBuilder.setAwsIamSessionPolicy(awsIamSessionPolicy);
+      }
+
+      return omRequest.toBuilder()
+          .setUpdateAssumeRoleRequest(updateAssumeRoleRequestBuilder.build())
+          .build();
+    } catch (OMException e) {
+      markForAudit(auditLogger, buildAuditMessage(OMAction.S3_ASSUME_ROLE, auditMap, e, userInfo));
+      throw e;
+    } catch (IOException e) {
+      final OMException omException = new OMException(
+          "Failed to generate STS token for role: " + roleArn, e, OMException.ResultCodes.INTERNAL_ERROR);
+      markForAudit(auditLogger, buildAuditMessage(OMAction.S3_ASSUME_ROLE, auditMap, omException, userInfo));
+      throw omException;
     }
-
-    return omRequest.toBuilder()
-        .setUpdateAssumeRoleRequest(updateAssumeRoleRequestBuilder.build())
-        .build();
   }
 
   @Override
@@ -148,6 +197,8 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     final String tempAccessKeyId = updateAssumeRoleRequest.getTempAccessKeyId();
     final String secretAccessKey = updateAssumeRoleRequest.getSecretAccessKey();
     final String roleId = updateAssumeRoleRequest.getRoleId();
+    final String sessionToken = updateAssumeRoleRequest.getSessionToken();
+    final long expirationEpochSeconds = updateAssumeRoleRequest.getExpirationEpochSeconds();
 
     final Map<String, String> auditMap = new HashMap<>();
     final AuditLogger auditLogger = ozoneManager.getAuditLogger();
@@ -158,33 +209,15 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     Exception exception = null;
     OMClientResponse omClientResponse;
     try {
-      // Validate duration
-      S3STSUtils.validateDuration(durationSeconds);
-
-      // Validate role session name
-      S3STSUtils.validateRoleSessionName(roleSessionName);
-
-      // Validate role ARN and extract role
-      final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
-
-      // Note: The IamSessionPolicyResolver validates the awsIamPolicy length internally
-
-      if (!omRequest.hasS3Authentication()) {
+      if (Strings.isNullOrEmpty(tempAccessKeyId) || Strings.isNullOrEmpty(secretAccessKey) ||
+          Strings.isNullOrEmpty(roleId) || Strings.isNullOrEmpty(sessionToken) || expirationEpochSeconds <= 0) {
         throw new OMException(
-            "S3AssumeRoleRequest does not have S3 authentication", OMException.ResultCodes.INVALID_REQUEST);
+            "UpdateAssumeRoleRequest is missing leader-generated AssumeRole fields",
+            OMException.ResultCodes.INVALID_REQUEST);
       }
 
-      // Generate session token using leader-generated credentials
-      final String sessionToken = generateSessionToken(
-          targetRoleName, omRequest, ozoneManager, assumeRoleRequest, secretAccessKey, tempAccessKeyId);
-
-      // Generate AssumedRoleId for response using leader-generated roleId
       final String assumedRoleId = roleId + ":" + roleSessionName;
 
-      // Calculate expiration of session token
-      final long expirationEpochSeconds = clock.instant().plusSeconds(durationSeconds).getEpochSecond();
-
-      // Add tempAccessKeyId to the log so it can be determined which permanent user created the tempAccessKeyId
       auditMap.put(OzoneConsts.S3_STS_TEMP_ACCESS_KEY_ID, tempAccessKeyId);
 
       final AssumeRoleResponse.Builder responseBuilder = AssumeRoleResponse.newBuilder()
@@ -202,15 +235,8 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       exception = e;
       omClientResponse = new S3AssumeRoleResponse(
           createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), e));
-    } catch (IOException e) {
-      final OMException omException = new OMException(
-          "Failed to generate STS token for role: " + roleArn, e, OMException.ResultCodes.INTERNAL_ERROR);
-      exception = omException;
-      omClientResponse = new S3AssumeRoleResponse(
-          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
     }
 
-    // Audit log
     markForAudit(auditLogger, buildAuditMessage(OMAction.S3_ASSUME_ROLE, auditMap, exception, userInfo));
 
     return omClientResponse;
@@ -221,7 +247,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
    */
   private String generateSessionToken(String targetRoleName, OMRequest omRequest,
       OzoneManager ozoneManager, AssumeRoleRequest assumeRoleRequest, String secretAccessKey,
-      String tempAccessKeyId) throws IOException {
+      String tempAccessKeyId, Instant creationInstant) throws IOException {
 
     InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
     if (remoteIp == null) {
@@ -246,7 +272,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
     return ozoneManager.getSTSTokenSecretManager().createSTSTokenString(
         tempAccessKeyId, originalAccessKeyId, roleArn, assumeRoleRequest.getDurationSeconds(), secretAccessKey,
-        sessionPolicy, clock);
+        sessionPolicy, creationInstant);
   }
 
   /**
@@ -274,11 +300,132 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
     final Set<OzoneGrant> grants = Strings.isNullOrEmpty(awsIamPolicy) ?
         null :
-        IamSessionPolicyResolver.resolve(awsIamPolicy, volumeName, IamSessionPolicyResolver.AuthorizerType.RANGER);
+        resolveGrantsAgainstBucketLinks(
+            IamSessionPolicyResolver.resolve(awsIamPolicy, volumeName, IamSessionPolicyResolver.AuthorizerType.RANGER),
+            (linkVolume, linkBucket) -> ozoneManager.resolveBucketLink(Pair.of(linkVolume, linkBucket), true, false));
 
     return ozoneManager.getAccessAuthorizer().generateAssumeRoleSessionPolicy(
         new org.apache.hadoop.ozone.security.acl.AssumeRoleRequest(
             hostName, remoteIp, ugi, targetRoleName, grants));
+  }
+
+  /**
+   * Rewrites the resolved session-policy grants so that any bucket, key, or prefix resource that names a
+   * bucket link is anchored to the link's source volume and bucket - the resource paths the OM authorizes
+   * against once the link is resolved at request time. READ on each link bucket in the chain (and, when the
+   * chain crosses volumes, READ on each distinct volume except the requested one) is retained so OM can follow
+   * every hop at request time, which keeps the generated token as small as possible.
+   * <p>
+   * The link target is resolved when the token is generated, so the token grants access to whatever the link
+   * points to at that moment. If the link is later re-pointed, the token no longer grants access to the new
+   * target.
+   *
+   * @param grants       the grants produced by {@link IamSessionPolicyResolver}, possibly {@code null}
+   * @param linkResolver resolves a (volume, bucket) pair to its link target
+   * @return the link-aware grants, or the input unchanged when there is nothing to resolve
+   */
+  @VisibleForTesting
+  static Set<OzoneGrant> resolveGrantsAgainstBucketLinks(Set<OzoneGrant> grants,
+      BucketLinkResolver linkResolver) throws IOException {
+    if (grants == null || grants.isEmpty()) {
+      return grants;
+    }
+
+    final Map<Pair<String, String>, ResolvedBucket> resolutionCache = new HashMap<>();
+    final Set<IOzoneObj> linkFollowObjects = new LinkedHashSet<>();
+    final Set<OzoneGrant> resolvedGrants = new LinkedHashSet<>();
+
+    for (OzoneGrant grant : grants) {
+      final Set<IOzoneObj> resolvedObjects = new LinkedHashSet<>();
+      for (IOzoneObj object : grant.getObjects()) {
+        resolvedObjects.add(
+            resolveObjectAgainstBucketLink((OzoneObj) object, linkResolver, resolutionCache, linkFollowObjects));
+      }
+      resolvedGrants.add(new OzoneGrant(resolvedObjects, grant.getPermissions(), grant.getS3Actions()));
+    }
+
+    // Retain only the READ required to follow each link hop at request time.
+    if (!linkFollowObjects.isEmpty()) {
+      resolvedGrants.add(new OzoneGrant(linkFollowObjects, EnumSet.of(ACLType.READ)));
+    }
+
+    return resolvedGrants;
+  }
+
+  /**
+   * Resolves a single grant object against its bucket link. Bucket, key, and prefix objects that name a
+   * link bucket are rewritten to the link's source volume and bucket, and the READ needed to follow each hop
+   * in the link chain is collected in {@code linkFollowObjects}. All other objects (volume resources and
+   * wildcard buckets) are returned unchanged.
+   */
+  private static IOzoneObj resolveObjectAgainstBucketLink(OzoneObj object, BucketLinkResolver linkResolver,
+      Map<Pair<String, String>, ResolvedBucket> resolutionCache, Set<IOzoneObj> linkFollowObjects)
+      throws IOException {
+    final OzoneObj.ResourceType resourceType = object.getResourceType();
+    if (resourceType != OzoneObj.ResourceType.BUCKET
+        && resourceType != OzoneObj.ResourceType.KEY
+        && resourceType != OzoneObj.ResourceType.PREFIX) {
+      return object;
+    }
+
+    final String volumeName = object.getVolumeName();
+    final String bucketName = object.getBucketName();
+    // Wildcard or unspecified names cannot correspond to a concrete link bucket.
+    if (StringUtils.isBlank(volumeName) || StringUtils.isBlank(bucketName) || hasWildcard(volumeName) ||
+        hasWildcard(bucketName)) {
+      return object;
+    }
+
+    final Pair<String, String> requested = Pair.of(volumeName, bucketName);
+    ResolvedBucket resolved = resolutionCache.get(requested);
+    if (resolved == null) {
+      resolved = linkResolver.resolve(volumeName, bucketName);
+      resolutionCache.put(requested, resolved);
+    }
+    if (resolved == null || resolved.isDangling() || !resolved.isLink()) {
+      return object;
+    }
+
+    final Set<String> chainVolumes = new LinkedHashSet<>();
+    for (Pair<String, String> link : resolved.linkChain()) {
+      linkFollowObjects.add(newResourceObj(OzoneObj.ResourceType.BUCKET, link.getLeft(), link.getRight()));
+      chainVolumes.add(link.getLeft());
+    }
+    chainVolumes.add(resolved.realVolume());
+    chainVolumes.remove(volumeName);
+    for (String vol : chainVolumes) {
+      linkFollowObjects.add(newResourceObj(OzoneObj.ResourceType.VOLUME, vol, null));
+    }
+
+    return OzoneObjInfo.Builder.fromOzoneObj(object)
+        .setVolumeName(resolved.realVolume())
+        .setBucketName(resolved.realBucket())
+        .build();
+  }
+
+  private static IOzoneObj newResourceObj(OzoneObj.ResourceType resourceType, String volumeName, String bucketName) {
+    final OzoneObjInfo.Builder builder = OzoneObjInfo.Builder.newBuilder()
+        .setResType(resourceType)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName);
+    if (bucketName != null) {
+      builder.setBucketName(bucketName);
+    }
+    return builder.build();
+  }
+
+  private static boolean hasWildcard(String name) {
+    return name.indexOf('*') >= 0 || name.indexOf('?') >= 0;
+  }
+
+  /**
+   * Resolves a (volume, bucket) pair to its link target, following bucket links. Implementations must not
+   * enforce ACLs, so that session-policy generation stays deterministic across OMs and does not depend on
+   * the external authorizer.
+   */
+  @FunctionalInterface
+  interface BucketLinkResolver {
+    ResolvedBucket resolve(String volumeName, String bucketName) throws IOException;
   }
 
   /**

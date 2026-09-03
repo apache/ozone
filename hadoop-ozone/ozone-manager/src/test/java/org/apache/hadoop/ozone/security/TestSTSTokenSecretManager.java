@@ -84,8 +84,8 @@ public class TestSTSTokenSecretManager {
 
   @Test
   public void testCreateSTSTokenStringContainsCorrectFields() throws IOException {
-    final String tokenString = secretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
+    final String tokenString = secretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
+        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
 
     // Decode the token
     final Token<STSTokenIdentifier> token = new Token<>();
@@ -114,7 +114,7 @@ public class TestSTSTokenSecretManager {
   @Test
   public void testCreateSTSTokenStringWithNullSessionPolicy() throws IOException {
     final String tokenString = secretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, null, clock);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, null, clock.instant());
 
     // Decode the token
     final Token<STSTokenIdentifier> token = new Token<>();
@@ -150,8 +150,8 @@ public class TestSTSTokenSecretManager {
         encryptionKey, signingKey);
     final STSTokenSecretManager rotatingSecretManager = new STSTokenSecretManager(rotatingSecretKeyClient);
 
-    final String tokenString = rotatingSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
+    final String tokenString = rotatingSecretManager.createSTSTokenString(TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY,
+        ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
 
     final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(
         tokenString, rotatingSecretKeyClient, clock);
