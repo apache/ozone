@@ -105,7 +105,7 @@ class TestSecretGenerate {
 
     assertEquals(BAD_REQUEST.getStatusCode(), response.getStatus());
     assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS.toString(),
-        response.getStatusInfo().getReasonPhrase());
+        response.getEntity());
   }
 
   @Test
