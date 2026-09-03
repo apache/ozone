@@ -147,4 +147,16 @@ public class TestPipeline {
     Pipeline subject = MockPipeline.createRatisPipeline();
     assertThrows(IllegalStateException.class, () -> subject.copyForReadFromNode(randomDatanodeDetails()));
   }
+
+  @Test
+  void testEqualsAndHashCodeIgnoreNodeStatusValues() throws IOException {
+    Pipeline pipeline = MockPipeline.createRatisPipeline();
+    Pipeline copy = pipeline.toBuilder().setNodes(pipeline.getNodes()).build();
+
+    pipeline.reportDatanode(pipeline.getNodes().get(0));
+
+    assertEquals(pipeline, copy);
+    assertEquals(pipeline.hashCode(), copy.hashCode());
+    assertEquals(pipeline.getId().hashCode(), pipeline.hashCode());
+  }
 }

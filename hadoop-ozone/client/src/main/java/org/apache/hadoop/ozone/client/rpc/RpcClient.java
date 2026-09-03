@@ -49,7 +49,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
@@ -109,6 +111,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.S3HeadObjectAttributes;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
@@ -1936,6 +1939,24 @@ public class RpcClient implements ClientProtocol {
                                int partNumber) throws IOException {
     return OzoneKey.fromKeyInfo(
         getS3PartOmKeyInfo(bucketName, keyName, partNumber, true));
+  }
+
+  @Override
+  public S3HeadObjectAttributes headS3ObjectAttributes(String bucketName, String keyName)
+      throws IOException {
+    OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, true);
+    OmKeyLocationInfoGroup locationGroup = keyInfo.getLatestVersionLocations();
+    NavigableMap<Integer, Long> partSizes = Collections.emptyNavigableMap();
+    if (locationGroup != null && locationGroup.isMultipartKey()) {
+      partSizes = new TreeMap<>();
+      for (OmKeyLocationInfo location : locationGroup.getBlocksLatestVersionOnly()) {
+        int partNumber = location.getPartNumber();
+        if (partNumber > 0) {
+          partSizes.merge(partNumber, location.getLength(), Long::sum);
+        }
+      }
+    }
+    return new S3HeadObjectAttributes(OzoneKey.fromKeyInfo(keyInfo), partSizes);
   }
 
   private OmKeyInfo getS3PartOmKeyInfo(String bucketName, String keyName,
