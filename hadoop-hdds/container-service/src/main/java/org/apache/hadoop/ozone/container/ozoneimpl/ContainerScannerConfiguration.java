@@ -55,9 +55,12 @@ public class ContainerScannerConfiguration {
       "hdds.container.scrub.on.demand.volume.bytes.per.second";
   public static final String CONTAINER_SCAN_MIN_GAP =
       "hdds.container.scrub.min.gap";
+  public static final String DATA_SCAN_MAX_RETRIES_KEY =
+      "hdds.container.scrub.max.retries";
 
   static final long CONTAINER_SCAN_MIN_GAP_DEFAULT =
       Duration.ofMinutes(15).toMillis();
+  public static final int DATA_SCAN_MAX_RETRIES_DEFAULT = 2;
 
   public static final long METADATA_SCAN_INTERVAL_DEFAULT =
       Duration.ofHours(3).toMillis();
@@ -127,6 +130,16 @@ public class ContainerScannerConfiguration {
   private long onDemandBandwidthPerVolume
       = ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
 
+  @Config(key = "hdds.container.scrub.max.retries",
+      defaultValue = "2",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The maximum number of times to retry scanning a container"
+          + " if its data checksum changes during the scan (for example, due"
+          + " to concurrent reconciliation)."
+  )
+  private int dataScanMaxRetries = DATA_SCAN_MAX_RETRIES_DEFAULT;
+
   @Config(key = "hdds.container.scrub.min.gap",
       defaultValue = "15m",
       type = ConfigType.TIME,
@@ -171,6 +184,13 @@ public class ContainerScannerConfiguration {
               " must be >= 0 and was set to {}. Defaulting to {}",
           onDemandBandwidthPerVolume, ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT);
       onDemandBandwidthPerVolume = ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
+    }
+
+    if (dataScanMaxRetries < 0) {
+      LOG.warn("{} must be >= 0 and was set to {}. Defaulting to {}",
+          DATA_SCAN_MAX_RETRIES_KEY, dataScanMaxRetries,
+          DATA_SCAN_MAX_RETRIES_DEFAULT);
+      dataScanMaxRetries = DATA_SCAN_MAX_RETRIES_DEFAULT;
     }
   }
 
@@ -220,5 +240,13 @@ public class ContainerScannerConfiguration {
 
   public void setContainerScanMinGap(long scanGap) {
     containerScanMinGap = scanGap;
+  }
+
+  public int getDataScanMaxRetries() {
+    return dataScanMaxRetries;
+  }
+
+  public void setDataScanMaxRetries(int dataScanMaxRetries) {
+    this.dataScanMaxRetries = dataScanMaxRetries;
   }
 }

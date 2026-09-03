@@ -38,23 +38,26 @@ public final class ContainerScanHelper {
   private final ContainerController controller;
   private final AbstractContainerScannerMetrics metrics;
   private final long minScanGap;
+  private final int maxRetries;
 
   public static ContainerScanHelper withoutScanGap(Logger log, ContainerController controller,
-      AbstractContainerScannerMetrics metrics) {
-    return new ContainerScanHelper(log, controller, metrics, 0);
+      AbstractContainerScannerMetrics metrics, ContainerScannerConfiguration conf) {
+    return new ContainerScanHelper(log, controller, metrics, 0, conf.getDataScanMaxRetries());
   }
 
   public static ContainerScanHelper withScanGap(Logger log, ContainerController controller,
       AbstractContainerScannerMetrics metrics, ContainerScannerConfiguration conf) {
-    return new ContainerScanHelper(log, controller, metrics, conf.getContainerScanMinGap());
+    return new ContainerScanHelper(log, controller, metrics, conf.getContainerScanMinGap(),
+        conf.getDataScanMaxRetries());
   }
 
   private ContainerScanHelper(Logger log, ContainerController controller,
-                             AbstractContainerScannerMetrics metrics, long minScanGap) {
+                             AbstractContainerScannerMetrics metrics, long minScanGap, int maxRetries) {
     this.log = log;
     this.controller = controller;
     this.metrics = metrics;
     this.minScanGap = minScanGap;
+    this.maxRetries = maxRetries;
   }
 
   public void scanData(Container<?> container, DataTransferThrottler throttler, Canceler canceler)
@@ -65,9 +68,43 @@ public final class ContainerScanHelper {
     ContainerData containerData = container.getContainerData();
     long containerId = containerData.getContainerID();
     logScanStart(containerData, "data");
-    DataScanResult result = container.scanData(throttler, canceler);
+
+    DataScanResult result = null;
+    int retryCount = 0;
+    boolean scanCompleted = false;
+
+    // Container reconciliation can update a container and its checksum in the background during the scan.
+    // If this happens, rescan the container.
+    while (retryCount <= maxRetries && !scanCompleted) {
+      long initialChecksum = containerData.getDataChecksum();
+
+      result = container.scanData(throttler, canceler);
+
+      if (result.isDeleted() || initialChecksum == containerData.getDataChecksum()) {
+        scanCompleted = true;
+      } else {
+        if (retryCount >= maxRetries) {
+          // Exit the scan loop with no result once the maximum number of scans have been detected.
+          result = null;
+          scanCompleted = true;
+        } else {
+          retryCount++;
+          log.info("Container [{}] data checksum changed during the scan. Rescanning. Retry count: {}/{}",
+              containerId, retryCount, maxRetries);
+        }
+      }
+    }
+
     Instant now = Instant.now();
-    
+
+    if (result == null) {
+      // No result was produced after the max allowed retries.
+      log.warn("Container [{}] data checksum changed during the scan. Maximum retries ({}) exceeded. " +
+          "Skipping this scan.", containerId, maxRetries);
+      logScanCompleted(containerData, now);
+      return;
+    }
+
     if (result.isDeleted()) {
       log.debug("Container [{}] has been deleted during the data scan.", containerId);
       logScanCompleted(containerData, now);
@@ -75,7 +112,6 @@ public final class ContainerScanHelper {
     }
 
     boolean isTransientFailure = ScanTransientIOUtil.scanErrorsAreOnlyTooManyOpenFiles(result);
-
     if (!isTransientFailure) {
       try {
         controller.updateContainerChecksum(containerId, result.getDataTree());
