@@ -300,7 +300,7 @@ public class TestXceiverClientGrpc {
   /** streamRead() calls onNext() immediately when isReady() is true from the start. */
   @Test
   public void testStreamReadSendsImmediatelyWhenReady() throws Exception {
-    TrackingStreamObserver obs = new TrackingStreamObserver(0);
+    TrackingStreamObserver obs = new TrackingStreamObserver(true);
     StreamingReadResponse response = new StreamingReadResponse(
         MockDatanodeDetails.randomDatanodeDetails(), obs);
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
@@ -315,21 +315,37 @@ public class TestXceiverClientGrpc {
         "isReady() must be checked exactly once when stream is immediately ready");
   }
 
-  /** streamRead() spin-waits until isReady() becomes true, then calls onNext(). */
+  /** streamRead() blocks until the onReadyHandler fires and isReady() becomes true, then calls onNext(). */
   @Test
   public void testStreamReadWaitsUntilReadyThenSends() throws Exception {
-    TrackingStreamObserver obs = new TrackingStreamObserver(3);
+    TrackingStreamObserver obs = new TrackingStreamObserver(false);
     StreamingReadResponse response = new StreamingReadResponse(
         MockDatanodeDetails.randomDatanodeDetails(), obs);
+    // mirrors what ReadyAwareResponseObserver.beforeStart() registers on a real call
+    obs.setOnReadyHandler(response::signalReady);
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
 
+    Thread readySignaller = new Thread(() -> {
+      try {
+        Thread.sleep(200);
+      } catch (InterruptedException ignored) {
+        return;
+      }
+      obs.markReady();
+    });
+    long start;
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
+      start = System.currentTimeMillis();
+      readySignaller.start();
       client.streamRead(request, response);
     }
+    long elapsed = System.currentTimeMillis() - start;
+    readySignaller.join();
 
     assertEquals(1, obs.getSent().size(), "onNext must be called exactly once");
     assertEquals(request, obs.getSent().get(0));
-    assertThat(obs.getReadyCalls().get()).isGreaterThanOrEqualTo(4);
+    assertThat(elapsed).isGreaterThanOrEqualTo(200L);
+    assertThat(obs.getReadyCalls().get()).isGreaterThanOrEqualTo(2);
   }
 
   /**
@@ -340,7 +356,7 @@ public class TestXceiverClientGrpc {
     OzoneConfiguration timeoutConf = new OzoneConfiguration();
     timeoutConf.set("ozone.client.stream.read.timeout", "1s");
 
-    TrackingStreamObserver obs = new TrackingStreamObserver(Integer.MAX_VALUE);
+    TrackingStreamObserver obs = new TrackingStreamObserver(false);
     StreamingReadResponse response = new StreamingReadResponse(
         MockDatanodeDetails.randomDatanodeDetails(), obs);
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
@@ -357,10 +373,10 @@ public class TestXceiverClientGrpc {
     assertThat(elapsed).isLessThan(10_000L);
   }
 
-  /** streamRead() exits the spin-wait immediately on interrupt and restores the interrupt flag. */
+  /** streamRead() exits the ready wait immediately on interrupt and restores the interrupt flag. */
   @Test
   public void testStreamReadRestoresInterruptFlagOnInterruption() throws Exception {
-    TrackingStreamObserver obs = new TrackingStreamObserver(Integer.MAX_VALUE);
+    TrackingStreamObserver obs = new TrackingStreamObserver(false);
     StreamingReadResponse response = new StreamingReadResponse(
         MockDatanodeDetails.randomDatanodeDetails(), obs);
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
@@ -390,16 +406,28 @@ public class TestXceiverClientGrpc {
     }
   }
 
-  /** Records onNext() calls and controls when isReady() starts returning true. */
+  /**
+   * Records onNext() calls and models gRPC flow control: isReady() reflects a flag that {@link #markReady()} flips,
+   * after which the registered onReadyHandler is invoked, as gRPC does when the transport becomes writable.
+   */
   private static final class TrackingStreamObserver
       extends ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> {
 
     private final List<ContainerProtos.ContainerCommandRequestProto> sent = new ArrayList<>();
     private final AtomicInteger readyCalls = new AtomicInteger();
-    private final int readyAfter;
+    private volatile boolean ready;
+    private volatile Runnable onReadyHandler;
 
-    TrackingStreamObserver(int readyAfter) {
-      this.readyAfter = readyAfter;
+    TrackingStreamObserver(boolean ready) {
+      this.ready = ready;
+    }
+
+    void markReady() {
+      ready = true;
+      final Runnable handler = onReadyHandler;
+      if (handler != null) {
+        handler.run();
+      }
     }
 
     List<ContainerProtos.ContainerCommandRequestProto> getSent() {
@@ -412,7 +440,8 @@ public class TestXceiverClientGrpc {
 
     @Override
     public boolean isReady() {
-      return readyCalls.incrementAndGet() > readyAfter;
+      readyCalls.incrementAndGet();
+      return ready;
     }
 
     @Override
@@ -426,6 +455,7 @@ public class TestXceiverClientGrpc {
 
     @Override
     public void setOnReadyHandler(Runnable r) {
+      onReadyHandler = r;
     }
 
     @Override
