@@ -30,7 +30,11 @@ import java.util.List;
 import org.eclipse.jetty.ee10.proxy.ProxyServlet;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee10.servlet.ServletHolder;
+import org.eclipse.jetty.http.UriCompliance;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,9 +61,19 @@ public class ProxyServer {
     this.host = host;
     this.port = proxyPort;
 
-    server = new Server(proxyPort);
+    // Match the S3 Gateway's lenient URI handling so that object keys
+    // containing "//" or percent-encoded characters are forwarded rather than
+    // rejected with 400 by Jetty 12's default (strict) URI compliance.
+    HttpConfiguration httpConfig = new HttpConfiguration();
+    httpConfig.setUriCompliance(UriCompliance.LEGACY);
+    server = new Server();
+    ServerConnector connector = new ServerConnector(server, new HttpConnectionFactory(httpConfig));
+    connector.setPort(proxyPort);
+    server.addConnector(connector);
+
     ServletContextHandler context = new ServletContextHandler();
     context.setContextPath("/");
+    context.getServletHandler().setDecodeAmbiguousURIs(true);
 
     ProxyHandler proxyHandler = new ProxyHandler();
     ServletHolder proxyHolder = new ServletHolder(proxyHandler);
