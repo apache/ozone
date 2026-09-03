@@ -38,7 +38,11 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Allo
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteKeyBlocksResultProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.FinalizeUpgradeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.FinalizeUpgradeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.QueryUpgradeStatusRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.QueryUpgradeStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesRequestProto;
@@ -171,6 +175,14 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       case GetClusterTree:
         response.setGetClusterTreeResponse(
             getClusterTree(clientVersion));
+        break;
+      case FinalizeUpgrade:
+        response.setFinalizeUpgradeResponse(
+            finalizeUpgrade(request.getFinalizeUpgradeRequest()));
+        break;
+      case QueryUpgradeStatus:
+        response.setQueryUpgradeStatusResponse(
+            queryUpgradeStatus(request.getQueryUpgradeStatusRequest()));
         break;
       default:
         // Should never happen
@@ -327,5 +339,22 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     InnerNode clusterTree = impl.getNetworkTopology();
     resp.setClusterTree(clusterTree.toProtobuf(clientVersion).getInnerNode());
     return resp.build();
+  }
+
+  public FinalizeUpgradeResponseProto finalizeUpgrade(
+      FinalizeUpgradeRequestProto request) throws IOException {
+    if (request.getForce()) {
+      impl.forceFinalizeUpgrade();
+    } else {
+      impl.finalizeUpgrade();
+    }
+    return FinalizeUpgradeResponseProto.newBuilder().build();
+  }
+
+  public QueryUpgradeStatusResponseProto queryUpgradeStatus(
+      QueryUpgradeStatusRequestProto request) throws IOException {
+    return QueryUpgradeStatusResponseProto.newBuilder()
+        .setStatus(impl.queryUpgradeStatus())
+        .build();
   }
 }

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -145,4 +146,27 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @throws IOException
    */
   InnerNode getNetworkTopology() throws IOException;
+
+  /**
+   * Triggers HDDS finalization on SCM. Called by OM when it orchestrates cluster finalization.
+   *
+   * @throws IOException If any error occurs.
+   */
+  void finalizeUpgrade() throws IOException;
+
+  /**
+   * Same as {@link #finalizeUpgrade()}, but SCM skips the peer SCM and datanode software version
+   * checks before finalizing. Use this to finalize when a peer or datanode is intentionally down.
+   *
+   * @throws IOException If any error occurs.
+   */
+  void forceFinalizeUpgrade() throws IOException;
+
+  /**
+   * Queries the current HDDS finalization status from SCM.
+   *
+   * @return the upgrade status of SCM and the datanodes.
+   * @throws IOException If any error occurs.
+   */
+  HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException;
 }

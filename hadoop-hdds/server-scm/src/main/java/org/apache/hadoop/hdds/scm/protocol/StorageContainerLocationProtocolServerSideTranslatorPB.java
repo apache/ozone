@@ -771,22 +771,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setSuppressContainerResponse(suppressContainer(request.getSuppressContainerRequest()))
             .build();
-      case QueryUpgradeStatus:
-        return ScmContainerLocationResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setQueryUpgradeStatusResponse(getQueryUpgradeStatus(request.getQueryUpgradeStatusRequest()))
-            .build();
-      case FinalizeUpgrade:
-        if (request.getFinalizeUpgradeRequest().getForce()) {
-          impl.forceFinalizeUpgrade();
-        } else {
-          impl.finalizeUpgrade();
-        }
-        return ScmContainerLocationResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .build();
       case GetPeerUpgradeStatus:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -1146,16 +1130,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .build();
 
     return QueryUpgradeFinalizationProgressResponseProto.newBuilder()
-        .setStatus(response)
-        .build();
-  }
-
-  public StorageContainerLocationProtocolProtos.QueryUpgradeStatusResponseProto getQueryUpgradeStatus(
-      StorageContainerLocationProtocolProtos.QueryUpgradeStatusRequestProto request) throws IOException {
-
-    HddsProtos.UpgradeStatus response = impl.queryUpgradeStatus();
-    return StorageContainerLocationProtocolProtos.QueryUpgradeStatusResponseProto
-        .newBuilder()
         .setStatus(response)
         .build();
   }

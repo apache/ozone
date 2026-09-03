@@ -56,13 +56,13 @@ public class TestOMStartFinalizeUpgradeRequest extends TestOMStartFinalizeUpgrad
     request.preExecute(ozoneManager);
 
     // A forced request must route to SCM's force path so SCM skips its own version checks.
-    verify(scmContainerLocationProtocol).forceFinalizeUpgrade();
-    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
+    verify(scmBlockLocationProtocol).forceFinalizeUpgrade();
+    verify(scmBlockLocationProtocol, never()).finalizeUpgrade();
   }
 
   @Test
   public void testAuditMapRecordsForceFlag() throws IOException {
-    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    doNothing().when(scmBlockLocationProtocol).finalizeUpgrade();
     ExecutionContext context = ExecutionContext.of(1, TermIndex.INITIAL_VALUE);
 
     OMStartFinalizeUpgradeRequest forced = new OMStartFinalizeUpgradeRequest(buildRequest(true));
@@ -78,7 +78,7 @@ public class TestOMStartFinalizeUpgradeRequest extends TestOMStartFinalizeUpgrad
 
   @Test
   public void testForceSkipsPeerVersionCheckForUnreachablePeer() throws IOException {
-    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    doNothing().when(scmBlockLocationProtocol).finalizeUpgrade();
     when(ozoneManager.getPeerNodes()).thenReturn(Collections.singletonList(buildPeer("om2")));
     OMAdminProtocolClientSideImpl unreachableClient = mock(OMAdminProtocolClientSideImpl.class);
     when(unreachableClient.getPeerUpgradeStatus()).thenThrow(new IOException("connection refused"));
@@ -94,13 +94,13 @@ public class TestOMStartFinalizeUpgradeRequest extends TestOMStartFinalizeUpgrad
     }
 
     verify(unreachableClient, never()).getPeerUpgradeStatus();
-    verify(scmContainerLocationProtocol).forceFinalizeUpgrade();
-    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
+    verify(scmBlockLocationProtocol).forceFinalizeUpgrade();
+    verify(scmBlockLocationProtocol, never()).finalizeUpgrade();
   }
 
   @Test
   public void testForceSkipsPeerVersionCheckForMismatchedPeer() throws IOException {
-    doNothing().when(scmContainerLocationProtocol).finalizeUpgrade();
+    doNothing().when(scmBlockLocationProtocol).finalizeUpgrade();
     when(ozoneManager.getPeerNodes()).thenReturn(Collections.singletonList(buildPeer("om2")));
     OMAdminProtocolClientSideImpl olderClient = peerClientWithVersion(OzoneManagerVersion.HBASE_SUPPORT);
 
@@ -115,8 +115,8 @@ public class TestOMStartFinalizeUpgradeRequest extends TestOMStartFinalizeUpgrad
     }
 
     verify(olderClient, never()).getPeerUpgradeStatus();
-    verify(scmContainerLocationProtocol).forceFinalizeUpgrade();
-    verify(scmContainerLocationProtocol, never()).finalizeUpgrade();
+    verify(scmBlockLocationProtocol).forceFinalizeUpgrade();
+    verify(scmBlockLocationProtocol, never()).finalizeUpgrade();
   }
 
   private OzoneManagerProtocolProtos.OMRequest buildRequest(boolean force) {

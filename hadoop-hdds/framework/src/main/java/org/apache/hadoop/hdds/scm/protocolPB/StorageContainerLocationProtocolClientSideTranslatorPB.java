@@ -71,7 +71,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
@@ -1198,22 +1197,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void finalizeUpgrade() throws IOException {
-    finalizeUpgrade(false);
-  }
-
-  @Override
-  public void forceFinalizeUpgrade() throws IOException {
-    finalizeUpgrade(true);
-  }
-
-  private void finalizeUpgrade(boolean force) throws IOException {
-    FinalizeUpgradeRequestProto req = FinalizeUpgradeRequestProto.newBuilder()
-        .setForce(force).build();
-    submitRequest(Type.FinalizeUpgrade, builder -> builder.setFinalizeUpgradeRequest(req));
-  }
-
-  @Override
   @Deprecated
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
@@ -1235,19 +1218,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     return new StatusAndMessages(
         UpgradeFinalization.Status.valueOf(status.getStatus().name()),
         status.getMessagesList());
-  }
-
-  @Override
-  public HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException {
-    StorageContainerLocationProtocolProtos.QueryUpgradeStatusRequestProto req =
-        StorageContainerLocationProtocolProtos.QueryUpgradeStatusRequestProto
-            .newBuilder()
-            .build();
-
-    StorageContainerLocationProtocolProtos.QueryUpgradeStatusResponseProto response =
-        submitRequest(Type.QueryUpgradeStatus, builder -> builder.setQueryUpgradeStatusRequest(req))
-            .getQueryUpgradeStatusResponse();
-    return response.getStatus();
   }
 
   @Override

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -215,6 +216,19 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
    */
   public int getNumberOfDeletedBlocks() {
     return numBlocksDeleted;
+  }
+
+  @Override
+  public void finalizeUpgrade() throws IOException {
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+  }
+
+  @Override
+  public HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException {
+    return HddsProtos.UpgradeStatus.getDefaultInstance();
   }
 
   @Override

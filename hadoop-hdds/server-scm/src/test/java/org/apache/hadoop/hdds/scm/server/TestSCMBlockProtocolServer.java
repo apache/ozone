@@ -24,13 +24,23 @@ import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -38,12 +48,15 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -53,23 +66,34 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Test class for @{@link SCMBlockProtocolServer}.
@@ -336,6 +360,249 @@ public class TestSCMBlockProtocolServer {
         }
       }
     }
+  }
+
+  @Test
+  public void testFinalizeProceedsWhenNoPeers() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    try (SCMBlockProtocolServer testServer =
+        buildTestServer(finalizationManager, Collections.emptyList())) {
+      testServer.finalizeUpgrade();
+      verify(finalizationManager).finalizeUpgrade();
+    }
+  }
+
+  @Test
+  public void testFinalizeProceedsWhenAllPeersMatch() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
+
+    try (SCMBlockProtocolServer testServer =
+             buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
+         MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
+      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any())).thenReturn(matching);
+      testServer.finalizeUpgrade();
+    }
+    verify(finalizationManager).finalizeUpgrade();
+  }
+
+  @Test
+  public void testFinalizeRejectsOlderPeerUnlessForced() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
+    StorageContainerLocationProtocol older = peerClient(HDDSVersion.DEFAULT_VERSION);
+
+    try (SCMBlockProtocolServer testServer =
+             buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
+         MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
+      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any())).thenReturn(matching, older);
+      // A peer on an older version is rejected without force.
+      assertThrows(SCMException.class, testServer::finalizeUpgrade);
+      verify(finalizationManager, never()).finalizeUpgrade();
+      // With force the peer version check is skipped and finalization proceeds.
+      testServer.forceFinalizeUpgrade();
+    }
+    verify(finalizationManager).finalizeUpgrade();
+  }
+
+  @Test
+  public void testFinalizeRejectsUnknownFuturePeerUnlessForced() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
+    // A version not recognized by this binary deserializes to UNKNOWN_VERSION in the client translator.
+    StorageContainerLocationProtocol unknown = peerClient(HDDSVersion.UNKNOWN_VERSION);
+
+    try (SCMBlockProtocolServer testServer =
+             buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
+         MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
+      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any()))
+          .thenReturn(matching, unknown);
+      // A peer on an unrecognized future version is rejected without force.
+      assertThrows(SCMException.class, testServer::finalizeUpgrade);
+      verify(finalizationManager, never()).finalizeUpgrade();
+      // With force the peer version check is skipped and finalization proceeds.
+      testServer.forceFinalizeUpgrade();
+    }
+    verify(finalizationManager).finalizeUpgrade();
+  }
+
+  @Test
+  public void testFinalizeRejectsUnreachablePeerUnlessForced() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    StorageContainerLocationProtocol unreachable = mock(StorageContainerLocationProtocol.class);
+    when(unreachable.getPeerUpgradeStatus()).thenThrow(new IOException("connection refused"));
+
+    try (SCMBlockProtocolServer testServer =
+             buildTestServer(finalizationManager, Collections.singletonList(peerNode("scm2")));
+         MockedStatic<HAUtils> haUtils = mockStatic(HAUtils.class)) {
+      haUtils.when(() -> HAUtils.getScmContainerClientForNode(any(), any(), any())).thenReturn(unreachable);
+      // An unreachable peer is rejected without force.
+      assertThrows(SCMException.class, testServer::finalizeUpgrade);
+      verify(finalizationManager, never()).finalizeUpgrade();
+      // With force the peer version check is skipped and finalization proceeds.
+      testServer.forceFinalizeUpgrade();
+    }
+    verify(finalizationManager).finalizeUpgrade();
+  }
+
+  @Test
+  public void testFinalizeProceedsWhenAllDatanodesMatchScmVersion() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(3)
+        .setTotalHealthyDatanodes(3)
+        .setMinApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+        .setMaxApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+        .setAllSoftwareVersionsMatchScm(true)
+        .build();
+    try (SCMBlockProtocolServer testServer = buildTestServer(finalizationManager,
+        Collections.emptyList(), datanodeCounts)) {
+      testServer.finalizeUpgrade();
+      verify(finalizationManager).finalizeUpgrade();
+    }
+  }
+
+  @Test
+  public void testFinalizeRejectsDatanodeWithMismatchedVersionUnlessForced() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(3)
+        .setTotalHealthyDatanodes(3)
+        .setMinApparentVersion(HDDSVersion.DEFAULT_VERSION.serialize())
+        .setMaxApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+        .setAllSoftwareVersionsMatchScm(false)
+        .build();
+    try (SCMBlockProtocolServer testServer = buildTestServer(finalizationManager,
+        Collections.emptyList(), datanodeCounts)) {
+      // A datanode on a mismatched version is rejected without force.
+      assertThrows(SCMException.class, testServer::finalizeUpgrade);
+      verify(finalizationManager, never()).finalizeUpgrade();
+      // With force the datanode version check is skipped and finalization proceeds.
+      testServer.forceFinalizeUpgrade();
+      verify(finalizationManager).finalizeUpgrade();
+    }
+  }
+
+  @Test
+  public void testForceFinalizeAuditRecordsForceFlag() throws IOException {
+    FinalizationManager finalizationManager = mock(FinalizationManager.class);
+    // Drive the failure audit path (logged at ERROR, captured by the default log4j2 config) so the
+    // recorded audit map can be inspected.
+    doThrow(new RuntimeException("test")).when(finalizationManager).finalizeUpgrade();
+
+    LogCapturer auditLog = LogCapturer.log4j2("SCMAudit");
+    try (SCMBlockProtocolServer testServer = buildTestServer(finalizationManager, Collections.emptyList())) {
+      assertThrows(RuntimeException.class, testServer::forceFinalizeUpgrade);
+    } finally {
+      auditLog.stopCapturing();
+    }
+
+    String output = auditLog.getOutput();
+    assertTrue(output.contains(SCMAction.FINALIZE_SCM_UPGRADE.getAction()),
+        "audit log should record the finalize action: " + output);
+    assertTrue(output.contains("\"force\":\"true\""),
+        "audit log should record that force was passed: " + output);
+  }
+
+  @Test
+  public void testQueryUpgradeStatus() throws Exception {
+    // SCM starts already finalized in tests.
+    HddsProtos.UpgradeStatus status = server.queryUpgradeStatus();
+    assertEquals(NODE_COUNT, status.getNumDatanodesFinalized());
+    assertEquals(NODE_COUNT, status.getNumDatanodesTotal());
+    assertEquals(HddsProtos.FinalizationStatus.FINALIZED, status.getScmFinalizationStatus());
+  }
+
+  @Test
+  public void testQueryUpgradeStatusHddsInProgress() throws Exception {
+    // SCM is finalized but not all datanodes are, so HDDS finalization is still in progress.
+    ScmVersionManager mockVersionManager = mock(ScmVersionManager.class);
+    when(mockVersionManager.needsFinalization()).thenReturn(false);
+    ComponentVersion apparentVersion = mock(ComponentVersion.class);
+    when(apparentVersion.serialize()).thenReturn(0);
+    when(mockVersionManager.getApparentVersion()).thenReturn(apparentVersion);
+
+    NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(1)
+        .setTotalHealthyDatanodes(3)
+        .build();
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.getDatanodeFinalizationCounts()).thenReturn(datanodeCounts);
+
+    StorageContainerManager mockScm = mockScmForBlockServer();
+    when(mockScm.getVersionManager()).thenReturn(mockVersionManager);
+    when(mockScm.getScmNodeManager()).thenReturn(mockNodeManager);
+    when(mockScm.getScmContext()).thenReturn(SCMContext.emptyContext());
+
+    try (SCMBlockProtocolServer testServer = new SCMBlockProtocolServer(new OzoneConfiguration(), mockScm)) {
+      HddsProtos.UpgradeStatus status = testServer.queryUpgradeStatus();
+      assertEquals(HddsProtos.FinalizationStatus.FINALIZED, status.getScmFinalizationStatus());
+      assertEquals(HddsProtos.FinalizationStatus.IN_PROGRESS, status.getHddsFinalizationStatus());
+      assertEquals(1, status.getNumDatanodesFinalized());
+      assertEquals(3, status.getNumDatanodesTotal());
+    }
+  }
+
+  @Test
+  public void testQueryUpgradeStatusInSafemode() {
+    // Put SCM into safe mode via the context the server consults.
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.INITIAL);
+    assertTrue(scm.getScmContext().isInSafeMode());
+
+    // Querying upgrade status is blocked while SCM is in safe mode.
+    SCMException ex = assertThrows(SCMException.class, () -> server.queryUpgradeStatus());
+    assertEquals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION, ex.getResult());
+  }
+
+  private SCMBlockProtocolServer buildTestServer(
+      FinalizationManager finalizationManager, List<SCMNodeDetails> peers) throws IOException {
+    // Default to all datanode versions matching SCM so the SCM peer checks are exercised in isolation.
+    NodeManager.DatanodeFinalizationCounts datanodeCounts = NodeManager.DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(0)
+        .setTotalHealthyDatanodes(0)
+        .setMinApparentVersion(0)
+        .setMaxApparentVersion(0)
+        .setAllSoftwareVersionsMatchScm(true)
+        .build();
+    return buildTestServer(finalizationManager, peers, datanodeCounts);
+  }
+
+  private SCMBlockProtocolServer buildTestServer(
+      FinalizationManager finalizationManager, List<SCMNodeDetails> peers,
+      NodeManager.DatanodeFinalizationCounts datanodeCounts) throws IOException {
+    StorageContainerManager mockScm = mockScmForBlockServer();
+    when(mockScm.getFinalizationManager()).thenReturn(finalizationManager);
+    when(mockScm.getConfiguration()).thenReturn(new OzoneConfiguration());
+
+    SCMHANodeDetails haNodeDetails = mock(SCMHANodeDetails.class);
+    when(haNodeDetails.getPeerNodeDetails()).thenReturn(peers);
+    when(mockScm.getSCMHANodeDetails()).thenReturn(haNodeDetails);
+
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.getDatanodeFinalizationCounts()).thenReturn(datanodeCounts);
+    when(mockScm.getScmNodeManager()).thenReturn(mockNodeManager);
+    return new SCMBlockProtocolServer(new OzoneConfiguration(), mockScm);
+  }
+
+  private StorageContainerManager mockScmForBlockServer() {
+    StorageContainerManager mockScm = mock(StorageContainerManager.class);
+    SCMNodeDetails scmNodeDetails = mock(SCMNodeDetails.class);
+    when(scmNodeDetails.getBlockProtocolServerAddress()).thenReturn(new InetSocketAddress("localhost", 0));
+    when(scmNodeDetails.getBlockProtocolServerAddressKey()).thenReturn("test");
+    when(mockScm.getScmNodeDetails()).thenReturn(scmNodeDetails);
+    return mockScm;
+  }
+
+  private StorageContainerLocationProtocol peerClient(HDDSVersion version) throws IOException {
+    StorageContainerLocationProtocol client = mock(StorageContainerLocationProtocol.class);
+    when(client.getPeerUpgradeStatus()).thenReturn(version);
+    return client;
+  }
+
+  private SCMNodeDetails peerNode(String nodeId) {
+    SCMNodeDetails node = mock(SCMNodeDetails.class);
+    when(node.getNodeId()).thenReturn(nodeId);
+    return node;
   }
 
   private List<String> getNetworkNames() {

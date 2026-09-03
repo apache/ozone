@@ -89,9 +89,7 @@ message ScmContainerLocationRequest {
   optional GetDeletedBlocksTxnSummaryRequestProto getDeletedBlocksTxnSummaryRequest = 50;
   optional SCMListContainerIDsRequestProto scmListContainerIDsRequest = 51;
   optional SuppressContainerRequestProto suppressContainerRequest = 52;
-  optional QueryUpgradeStatusRequestProto queryUpgradeStatusRequest = 53;
-  optional FinalizeUpgradeRequestProto finalizeUpgradeRequest = 54;
-  optional GetPeerUpgradeStatusRequestProto getPeerUpgradeStatusRequest = 55;
+  optional GetPeerUpgradeStatusRequestProto getPeerUpgradeStatusRequest = 53;
 }
 
 message ScmContainerLocationResponse {
@@ -152,9 +150,7 @@ message ScmContainerLocationResponse {
   optional GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummaryResponse = 50;
   optional SCMListContainerIDsResponseProto scmListContainerIDsResponse = 51;
   optional SuppressContainerResponseProto suppressContainerResponse = 52;
-  optional QueryUpgradeStatusResponseProto queryUpgradeStatusResponse = 53;
-  optional FinalizeUpgradeResponseProto finalizeUpgradeResponse = 54;
-  optional GetPeerUpgradeStatusResponseProto getPeerUpgradeStatusResponse = 55;
+  optional GetPeerUpgradeStatusResponseProto getPeerUpgradeStatusResponse = 53;
 
   enum Status {
     OK = 1;
@@ -214,9 +210,7 @@ enum Type {
   GetDeletedBlocksTransactionSummary = 46;
   ListContainerIDs = 47;
   SuppressContainer = 48;
-  QueryUpgradeStatus = 49;
-  FinalizeUpgrade = 50;
-  GetPeerUpgradeStatus = 51;
+  GetPeerUpgradeStatus = 49;
 }
 
 /**
@@ -596,20 +590,6 @@ message QueryUpgradeFinalizationProgressRequestProto {
 }
 message QueryUpgradeFinalizationProgressResponseProto {
   required hadoop.hdds.UpgradeFinalizationStatus status = 1;
-}
-
-message QueryUpgradeStatusRequestProto {
-}
-
-message QueryUpgradeStatusResponseProto {
-  required hadoop.hdds.UpgradeStatus status = 1;
-}
-
-message FinalizeUpgradeRequestProto {
-  optional bool force = 1 [default = false];
-}
-
-message FinalizeUpgradeResponseProto {
 }
 
 // Request from an SCM leader to a peer SCM to read its local upgrade status.

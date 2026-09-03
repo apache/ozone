@@ -25,7 +25,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -47,7 +47,7 @@ public final class HddsUpgradeTestUtils {
 
   private HddsUpgradeTestUtils() { }
 
-  public static void waitForFinalizationFromClient(StorageContainerLocationProtocol scmClient) throws Exception {
+  public static void waitForFinalizationFromClient(ScmBlockLocationProtocol scmClient) throws Exception {
     LambdaTestUtils.await(60_000, 1_000, () -> {
       HddsProtos.UpgradeStatus status = scmClient.queryUpgradeStatus();
       LOG.info("Waiting for upgrade finalization to complete from client. Current status is:\n{}", status);
