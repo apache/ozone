@@ -2487,6 +2487,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metadataManager.stop();
       omSnapshotManager.close();
       metrics.unRegister();
+      OmSnapshotInternalMetrics.unregister();
       omClientProtocolMetrics.unregister();
       unregisterMXBean();
       if (omRatisSnapshotProvider != null) {

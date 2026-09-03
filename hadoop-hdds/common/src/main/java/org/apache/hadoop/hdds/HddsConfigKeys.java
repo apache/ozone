@@ -442,6 +442,17 @@ public final class HddsConfigKeys {
   public static final String HDDS_METRICS_SESSION_ID_KEY =
       "hdds.metrics.session-id";
 
+  /**
+   * Internal key, not meant for cluster configuration: when true, services qualify
+   * metrics-source and JMX names with a per-instance component so several of them can share one
+   * JVM, as in ozone local. Without it the second registration fails, and differently in each
+   * system: DefaultMetricsSystem.newSourceName throws MetricsException, while MBeans.register
+   * logs InstanceAlreadyExistsException and drops the bean.
+   */
+  public static final String HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED =
+      "hdds.metrics.source.disambiguation.enabled";
+  public static final boolean HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED_DEFAULT = false;
+
   public static final String HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY =
       "hdds.datanode.kerberos.principal";
   public static final String HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY =

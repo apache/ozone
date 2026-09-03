@@ -113,6 +113,7 @@ import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -920,7 +921,8 @@ public class TestBlockDeletingService {
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
-        10, conf, "", mock(ContainerChecksumTreeManager.class), mock(ReconfigurationHandler.class));
+        10, conf, "", null, mock(ContainerChecksumTreeManager.class),
+        mock(ReconfigurationHandler.class));
     svc.start();
 
     // get container meta data
@@ -1267,6 +1269,18 @@ public class TestBlockDeletingService {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  /**
+   * Recon's DataNodeMetricsCollectionTask resolves per-datanode JMX beans from these names, so a
+   * change to how they are built makes Recon report -1 pending deletion bytes for every datanode
+   * rather than fail outright.
+   */
+  @Test
+  public void testMetricsSourceNameContract() {
+    assertEquals("BlockDeletingService", BlockDeletingServiceMetrics.SOURCE_NAME);
+    assertEquals("BlockDeletingService", BlockDeletingServiceMetrics.getSourceName(null));
+    assertEquals("BlockDeletingService.abc123", BlockDeletingServiceMetrics.getSourceName("abc-123"));
   }
 
   private void assertDeletionsInChecksumFile(ContainerData data, int expectedNumBlocks) {

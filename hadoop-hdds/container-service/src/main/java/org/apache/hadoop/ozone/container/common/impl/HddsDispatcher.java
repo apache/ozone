@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
@@ -126,6 +127,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       VolumeSet volumes, Map<ContainerType, Handler> handlers,
       StateContext context, ContainerMetrics metrics,
       TokenVerifier tokenVerifier) {
+    this(config, contSet, volumes, handlers, context, metrics, tokenVerifier,
+        null);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public HddsDispatcher(ConfigurationSource config, ContainerSet contSet,
+      VolumeSet volumes, Map<ContainerType, Handler> handlers,
+      StateContext context, ContainerMetrics metrics,
+      TokenVerifier tokenVerifier, String metricsSourceComponent) {
     this.conf = config;
     this.containerSet = contSet;
     this.context = context;
@@ -140,7 +150,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     protocolMetrics =
         new ProtocolMessageMetrics<>(
-            "HddsDispatcher",
+            getMetricsName(metricsSourceComponent),
             "HDDS dispatcher metrics",
             Type.class);
 
@@ -150,6 +160,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             LOG,
             HddsUtils::processForDebug,
             HddsUtils::processForDebug);
+  }
+
+  private static String getMetricsName(String metricsSourceComponent) {
+    return MetricUtil.qualifySourceName("HddsDispatcher", metricsSourceComponent);
   }
 
   @Override
