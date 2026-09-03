@@ -169,6 +169,12 @@ final class ObjectEndpointStreaming {
         keyMetadata, tags);
   }
 
+  /**
+   * Writes the copy source stream to the destination key. When {@code reusedETag} is null the MD5
+   * digest {@code body} computes during the copy becomes the destination ETag; otherwise
+   * {@code reusedETag} is stored as-is and {@code body} has digesting switched off, so the content
+   * is not re-hashed.
+   */
   @SuppressWarnings("checkstyle:ParameterNumber")
   public static long copyKeyWithStream(
       OzoneBucket bucket,
@@ -177,7 +183,7 @@ final class ObjectEndpointStreaming {
       int bufferSize,
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
-      DigestInputStream body, PerformanceStringBuilder perf, long startNanos,
+      DigestInputStream body, String reusedETag, PerformanceStringBuilder perf, long startNanos,
       Map<String, String> tags,
       S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException {
@@ -189,8 +195,8 @@ final class ObjectEndpointStreaming {
       long metadataLatencyNs =
           METRICS.updateCopyKeyMetadataStats(startNanos);
       writeLen = writeGuard.copyFrom(body, bufferSize);
-      String eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
-          .toLowerCase();
+      String eTag = reusedETag != null ? reusedETag
+          : DatatypeConverter.printHexBinary(body.getMessageDigest().digest()).toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       writeGuard.getMetadata().put(OzoneConsts.ETAG, eTag);
     }

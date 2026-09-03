@@ -58,10 +58,12 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.ws.rs.HttpMethod;
@@ -69,6 +71,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -87,6 +90,7 @@ import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -105,6 +109,7 @@ class TestObjectPut {
   private static final String DEST_BUCKET_NAME = "b2";
   private static final String DEST_KEY = "key=value/2";
   private static final String NONEXISTENT_BUCKET = "nonexist";
+  private static final String MULTIPART_ETAG = "9b2cf535f27731c974343645a3985328-2";
 
   private ObjectEndpoint objectEndpoint;
   private HttpHeaders headers;
@@ -507,11 +512,8 @@ class TestObjectPut {
 
   @Test
   public void testCopyObjectMessageDigestResetDuringException() throws Exception {
-    assertSucceeds(() -> putObject(CONTENT));
-
-    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
-    assertNotNull(keyDetails.getMetadata());
-    assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+    // A multipart-style "-N" source ETag keeps the copy on the digesting path
+    createSourceKeyWithETag(KEY_NAME, MULTIPART_ETAG);
 
     MessageDigest messageDigest = mock(MessageDigest.class);
     try (MockedStatic<EndpointBase> endpoint =
@@ -533,6 +535,58 @@ class TestObjectPut {
       // next request in the same thread
       verify(messageDigest, times(1)).reset();
     }
+  }
+
+  @Test
+  void testCopyObjectReusesSourceETagWithoutRehashing() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+    String sourceETag = bucket.getKey(KEY_NAME).getMetadata().get(OzoneConsts.ETAG);
+    assertThat(sourceETag).isNotEmpty();
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+
+    MessageDigest messageDigest = mock(MessageDigest.class);
+    try (MockedStatic<EndpointBase> endpoint =
+        mockStatic(EndpointBase.class, CALLS_REAL_METHODS)) {
+      // The copy must reuse the source's plain MD5 ETag: fail loudly if it re-hashes the content
+      endpoint.when(EndpointBase::getMD5DigestInstance).thenReturn(messageDigest);
+      doThrow(new RuntimeException("digest should not be used"))
+          .when(messageDigest).update(any(byte[].class), anyInt(), anyInt());
+
+      Response response = put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT);
+      assertEquals(HttpStatus.SC_OK, response.getStatus());
+      CopyObjectResponse copyObjectResponse = (CopyObjectResponse) response.getEntity();
+      assertEquals("\"" + sourceETag + "\"", copyObjectResponse.getETag());
+    }
+
+    OzoneKeyDetails destKeyDetails = assertKeyContent(destBucket, DEST_KEY, CONTENT);
+    assertEquals(sourceETag, destKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+  }
+
+  @Test
+  void testCopyObjectRecomputesETagForMultipartSource() throws Exception {
+    createSourceKeyWithETag(KEY_NAME, MULTIPART_ETAG);
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+
+    // The aggregate "-N" ETag is not a content MD5, so the destination gets a fresh digest
+    OzoneKeyDetails destKeyDetails = assertKeyContent(destBucket, DEST_KEY, CONTENT);
+    assertEquals(contentMd5Hex(), destKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+  }
+
+  @Test
+  void testCopyObjectComputesETagWhenSourceHasNoETag() throws Exception {
+    createSourceKeyWithETag(KEY_NAME, null);
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+
+    OzoneKeyDetails destKeyDetails = assertKeyContent(destBucket, DEST_KEY, CONTENT);
+    assertEquals(contentMd5Hex(), destKeyDetails.getMetadata().get(OzoneConsts.ETAG));
   }
 
   @Test
@@ -930,6 +984,26 @@ class TestObjectPut {
     assertEquals("abc123", parseETag("abc123"));
     assertEquals("abc123", parseETag("  \"abc123\"  "));
     assertEquals(null, parseETag(null));
+  }
+
+  /**
+   * Create {@code keyName} with pre-defined {@link #CONTENT} directly through the client stub,
+   * with the given ETag stored in the key metadata ({@code null} for no ETag).
+   */
+  private void createSourceKeyWithETag(String keyName, String eTag) throws IOException {
+    Map<String, String> metadata = new HashMap<>();
+    if (eTag != null) {
+      metadata.put(OzoneConsts.ETAG, eTag);
+    }
+    try (OutputStream out = bucket.createKey(keyName, CONTENT.length(),
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), metadata)) {
+      out.write(CONTENT.getBytes(StandardCharsets.UTF_8));
+    }
+  }
+
+  private static String contentMd5Hex() throws NoSuchAlgorithmException {
+    return DatatypeConverter.printHexBinary(
+        MessageDigest.getInstance("MD5").digest(CONTENT.getBytes(StandardCharsets.UTF_8))).toLowerCase();
   }
 
   /** Put object at {@code bucketName}/{@code keyName} with pre-defined {@link #CONTENT}. */
