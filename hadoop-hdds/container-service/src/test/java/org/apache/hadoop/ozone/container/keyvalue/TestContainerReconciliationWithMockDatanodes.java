@@ -34,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doThrow;
 import  static org.mockito.Mockito.spy;
 
@@ -390,7 +389,7 @@ public class TestContainerReconciliationWithMockDatanodes {
         });
 
     // Mock getBlock
-    containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(any(), any(), any(), any(), anyMap()))
+    containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(any(), any(), any(), any(), any()))
         .thenAnswer(inv -> {
           XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
           BlockID blockID = inv.getArgument(2);

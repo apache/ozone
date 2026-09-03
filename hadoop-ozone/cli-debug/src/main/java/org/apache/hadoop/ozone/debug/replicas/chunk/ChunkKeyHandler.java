@@ -131,7 +131,7 @@ public class ChunkKeyHandler extends KeyHandler {
                         keyLocation.getBlockID(),
                         keyLocation.getToken(),
                         datanodeDetails,
-                        pipeline.getReplicaIndexes());
+                        pipeline);
 
                 if (blockResponse == null || !blockResponse.hasBlockData()) {
                   System.err.printf("GetBlock call failed on %s datanode and %s block.%n",
