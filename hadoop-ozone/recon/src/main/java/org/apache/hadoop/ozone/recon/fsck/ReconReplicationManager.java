@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.scm.container.ContainerReplicaChecksumMismatch.hasMismatch;
+
 import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -24,7 +28,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -227,43 +230,6 @@ public class ReconReplicationManager extends ReplicationManager {
   }
 
   /**
-   * Checks if container replicas have mismatched data checksums.
-   * This is a Recon-specific check not done by SCM's ReplicationManager.
-   *
-   * <p>REPLICA_MISMATCH detection is crucial for identifying:
-   * <ul>
-   *   <li>Bit rot (silent data corruption)</li>
-   *   <li>Failed writes to some replicas</li>
-   *   <li>Storage corruption on specific datanodes</li>
-   *   <li>Network corruption during replication</li>
-   * </ul>
-   * </p>
-   *
-   * <p>This uses checksum mismatch logic:
-   * {@code replicas.stream().map(ContainerReplica::getDataChecksum).distinct().count() != 1}
-   * </p>
-   *
-   * @param replicas Set of container replicas to check
-   * @return true if replicas have different data checksums
-   */
-  private boolean hasDataChecksumMismatch(Set<ContainerReplica> replicas) {
-    if (replicas == null || replicas.isEmpty()) {
-      return false;
-    }
-
-    // Count distinct checksums (filter out nulls)
-    long distinctChecksums = replicas.stream()
-        .map(ContainerReplica::getDataChecksum)
-        .filter(Objects::nonNull)
-        .distinct()
-        .count();
-
-    // More than 1 distinct checksum = data mismatch
-    // 0 distinct checksums = all nulls, no mismatch
-    return distinctChecksums > 1;
-  }
-
-  /**
    * Override processAll() to capture ALL per-container health states,
    * not just aggregate counts and 100 samples.
    *
@@ -271,7 +237,7 @@ public class ReconReplicationManager extends ReplicationManager {
    * <ol>
    *   <li>Get all containers from ContainerManager</li>
    *   <li>Process each container using inherited health check chain (SCM logic)</li>
-   *   <li>Additionally check for REPLICA_MISMATCH (Recon-specific)</li>
+   *   <li>Persist checksum mismatches as Recon REPLICA_MISMATCH records</li>
    *   <li>Capture ALL unhealthy container IDs per health state (no sampling limit)</li>
    *   <li>Store results in Recon's UNHEALTHY_CONTAINERS table</li>
    * </ol>
@@ -280,7 +246,7 @@ public class ReconReplicationManager extends ReplicationManager {
    * <ul>
    *   <li>Uses ReconReplicationManagerReport (captures all containers)</li>
    *   <li>Uses MonitoringReplicationQueue (doesn't enqueue commands)</li>
-   *   <li>Adds REPLICA_MISMATCH detection (not done by SCM)</li>
+   *   <li>Persists REPLICA_MISMATCH health records</li>
    *   <li>Stores results in database instead of just keeping in-memory report</li>
    * </ul>
    */
@@ -313,8 +279,11 @@ public class ReconReplicationManager extends ReplicationManager {
         // readOnly=true ensures no commands are generated
         processContainer(container, replicas, pendingOps, nullQueue, report, true);
 
-        // ADDITIONAL CHECK: Detect REPLICA_MISMATCH (Recon-specific, not in SCM)
-        if (hasDataChecksumMismatch(replicas)) {
+        // Persist checksum mismatches in Recon's REPLICA_MISMATCH state.
+        if (container.getState() == CLOSED &&
+            container.getReplicationType() == RATIS &&
+            hasMismatch(replicas, ContainerReplica::getSequenceId,
+                ContainerReplica::getDataChecksum)) {
           report.addReplicaMismatchContainer(cid);
           LOG.debug("Container {} has data checksum mismatch across replicas", cid);
         }

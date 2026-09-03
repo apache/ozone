@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.DATA_CHECKSUM_MISMATCH;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
@@ -64,6 +65,7 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -77,6 +79,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -85,6 +88,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.container.replication.health.DataChecksumMismatchCheckHandler;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -101,6 +105,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.MockClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.AfterEach;
@@ -1085,6 +1090,66 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void testDataChecksumMismatchIsDebouncedAndWarnedOnce()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisReplicationConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisReplicationConfig, 10,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> mismatch = createReplicasWithChecksums(container,
+        new long[]{10, 10, 10}, new long[]{100, 200, 100});
+    containerInfoSet.add(container);
+    containerReplicaMap.put(container.containerID(), mismatch);
+    enableProcessAll();
+
+    LogCapturer logs =
+        LogCapturer.captureLogs(DataChecksumMismatchCheckHandler.class);
+    String warning = "same BCSID but different data checksums";
+    clearInvocations(containerManager);
+    replicationManager.processAll();
+    verify(containerManager, times(1))
+        .getContainerReplicas(container.containerID());
+    assertEquals(0, replicationManager.getContainerReport()
+        .getStat(DATA_CHECKSUM_MISMATCH));
+    assertFalse(replicationManager.hasContainerChecksumMismatch(
+        container.containerID()));
+    assertEquals(0, StringUtils.countMatches(logs.getOutput(), warning));
+
+    replicationManager.processAll();
+    assertEquals(1, replicationManager.getContainerReport()
+        .getStat(DATA_CHECKSUM_MISMATCH));
+    assertThat(replicationManager.getContainerReport()
+        .getSample(DATA_CHECKSUM_MISMATCH))
+        .containsExactly(container.containerID());
+    assertTrue(replicationManager.hasContainerChecksumMismatch(
+        container.containerID()));
+    assertEquals(1, StringUtils.countMatches(logs.getOutput(), warning));
+
+    replicationManager.processAll();
+    assertEquals(1, replicationManager.getContainerReport()
+        .getStat(DATA_CHECKSUM_MISMATCH));
+    assertEquals(1, StringUtils.countMatches(logs.getOutput(), warning));
+
+    containerReplicaMap.put(container.containerID(),
+        createReplicasWithChecksums(container, new long[]{10, 10, 10},
+            new long[]{100, 100, 100}));
+    replicationManager.processAll();
+    assertEquals(0, replicationManager.getContainerReport()
+        .getStat(DATA_CHECKSUM_MISMATCH));
+    assertFalse(replicationManager.hasContainerChecksumMismatch(
+        container.containerID()));
+
+    containerReplicaMap.put(container.containerID(), mismatch);
+    replicationManager.processAll();
+    assertEquals(0, replicationManager.getContainerReport()
+        .getStat(DATA_CHECKSUM_MISMATCH));
+    replicationManager.processAll();
+    assertEquals(1, replicationManager.getContainerReport()
+        .getStat(DATA_CHECKSUM_MISMATCH));
+    assertEquals(2, StringUtils.countMatches(logs.getOutput(), warning));
+  }
+
+  @Test
   public void testSendDatanodeDeleteCommand() throws NotLeaderException {
     ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
     ContainerInfo containerInfo =
@@ -1695,6 +1760,21 @@ public class TestReplicationManager {
         "Second report should have sample limit of 50");
     assertEquals(newLimit, sample2.size(),
         "Second report should have 50 samples after reconfiguration");
+  }
+
+  private static Set<ContainerReplica> createReplicasWithChecksums(
+      ContainerInfo container, long[] sequenceIds, long[] dataChecksums) {
+    assertEquals(sequenceIds.length, dataChecksums.length);
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (int i = 0; i < sequenceIds.length; i++) {
+      ContainerReplica replica = createContainerReplica(container.containerID(),
+          0, IN_SERVICE, ContainerReplicaProto.State.CLOSED,
+          sequenceIds[i]).toBuilder()
+          .setChecksums(ContainerChecksums.of(dataChecksums[i]))
+          .build();
+      replicas.add(replica);
+    }
+    return replicas;
   }
 
   @SafeVarargs

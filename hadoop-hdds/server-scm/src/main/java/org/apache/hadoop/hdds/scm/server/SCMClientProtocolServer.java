@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
@@ -385,6 +386,16 @@ public class SCMClientProtocolServer implements
           auditMap, ex));
       throw ex;
     }
+  }
+
+  @Override
+  public GetContainerReplicasResponseProto getContainerReplicasResponse(
+      long containerId, int clientVersion) throws IOException {
+    return GetContainerReplicasResponseProto.newBuilder()
+        .addAllContainerReplica(getContainerReplicas(containerId, clientVersion))
+        .setDataChecksumMismatch(getScm().getReplicationManager()
+            .hasContainerChecksumMismatch(ContainerID.valueOf(containerId)))
+        .build();
   }
 
   @Override
