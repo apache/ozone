@@ -309,6 +309,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
                 commitKeyArgs.getMetadataList()))
           .setUpdateID(trxnLogIndex)
+          .setSeqNumMin(resolveSeqNumMin(ozoneManager, keyToDelete, omKeyInfo, trxnLogIndex))
           .setDataSize(commitKeyArgs.getDataSize())
           .build();
 
