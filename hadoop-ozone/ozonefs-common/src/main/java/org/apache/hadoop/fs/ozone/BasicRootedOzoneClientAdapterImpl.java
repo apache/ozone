@@ -29,6 +29,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,6 +43,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -132,6 +136,10 @@ public class BasicRootedOzoneClientAdapterImpl
   private BucketLayout defaultOFSBucketLayout;
   private final OzoneConfiguration config;
   private final OzoneClientConfig clientConfig;
+  // Caches resolved bucket layouts by "volume/bucket" so getFileStatus can skip
+  // the InfoBucket RPC. Bucket layout is immutable for a bucket's lifetime;
+  // OBJECT_STORE layouts are cached too and re-rejected from the cache.
+  private final Cache<String, BucketLayout> bucketLayoutCache;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -220,6 +228,12 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
 
       clientConfig = conf.getObject(OzoneClientConfig.class);
+      bucketLayoutCache = CacheBuilder.newBuilder()
+          .expireAfterWrite(
+              clientConfig.getFsBucketLayoutCacheExpiry().toMillis(),
+              TimeUnit.MILLISECONDS)
+          .maximumSize(clientConfig.getFsBucketLayoutCacheSize())
+          .build();
       // Fetches the bucket layout to be used by OFS.
       try {
         initDefaultFsBucketLayout(conf);
@@ -351,6 +365,39 @@ public class BasicRootedOzoneClientAdapterImpl
     }
 
     return bucket;
+  }
+
+  /**
+   * Returns the resolved bucket layout for the given path, caching it so that
+   * repeated getFileStatus calls on the same bucket avoid the InfoBucket RPC.
+   * On a cache miss the layout is fetched via {@link ClientProtocol
+   * #getBucketDetails} and, for link buckets, resolved to the source bucket's
+   * layout. OBJECT_STORE layouts are cached like any other; the caller is
+   * responsible for validating the returned layout.
+   */
+  private BucketLayout getResolvedBucketLayout(OFSPath ofsPath)
+      throws IOException {
+    String volumeStr = ofsPath.getVolumeName();
+    String bucketStr = ofsPath.getBucketName();
+    String cacheKey = volumeStr + OZONE_URI_DELIMITER + bucketStr;
+    try {
+      // Atomic get-or-load: a single thread resolves the layout for a given
+      // bucket on a miss while others wait, so concurrent getFileStatus calls
+      // do not each issue a redundant InfoBucket RPC.
+      return bucketLayoutCache.get(cacheKey, () -> {
+        OzoneBucket bucket = proxy.getBucketDetails(volumeStr, bucketStr);
+        return OzoneClientUtils.resolveLinkBucketLayout(
+            bucket, objectStore, new HashSet<>());
+      });
+    } catch (ExecutionException e) {
+      // Preserve the original IOException (e.g. OMException with BUCKET_NOT_FOUND)
+      // so the caller's result-code handling is unchanged.
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      throw new IOException("Failed to resolve bucket layout for " + cacheKey,
+          e.getCause());
+    }
   }
 
   /**
@@ -696,13 +743,19 @@ public class BasicRootedOzoneClientAdapterImpl
       boolean headOp) throws IOException {
     String key = ofsPath.getKeyName();
     try {
-      OzoneBucket bucket = getBucket(ofsPath, false);
       if (ofsPath.isSnapshotPath()) {
+        OzoneBucket bucket = getBucket(ofsPath, false);
         OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
         return getFileStatusAdapterWithSnapshotIndicator(
             volume, bucket, uri);
       } else {
-        OzoneFileStatus status = bucket.getFileStatus(key, headOp);
+        // Validate the bucket layout (rejecting OBJECT_STORE) from the cached
+        // resolved layout, so the InfoBucket RPC is skipped on a cache hit
+        // while preserving the same rejection behavior as getBucket.
+        OzoneFSUtils.validateBucketLayout(ofsPath.getBucketName(),
+            getResolvedBucketLayout(ofsPath));
+        OzoneFileStatus status = proxy.getOzoneFileStatus(
+            ofsPath.getVolumeName(), ofsPath.getBucketName(), key, headOp);
         return toFileStatusAdapter(status, userName, uri, qualifiedPath,
             ofsPath.getNonKeyPath());
       }
