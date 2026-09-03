@@ -110,6 +110,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
       throws SCMSecurityException {
     if (resp.getStatus() != SCMSecurityProtocolProtos.Status.OK) {
       throw new SCMSecurityException(resp.getMessage(),
+          // The protocol status was introduced with a longer name than the existing error code.
           resp.getStatus() == SCMSecurityProtocolProtos.Status.GET_ROOT_CA_CERTIFICATE_FAILED
               ? SCMSecurityException.ErrorCode.GET_ROOT_CA_CERT_FAILED
               : SCMSecurityException.ErrorCode.valueOf(resp.getStatus().name()));

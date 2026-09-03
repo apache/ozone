@@ -47,17 +47,16 @@ teardown() {
   run hadoop-ozone/dev-support/checks/errorprone.sh
 
   [ "$status" -eq 1 ]
-  [ "$(wc -l < "${OUTPUT_DIR}/summary.txt")" -eq 5 ]
-  grep -q '^\[WARNING\].*\[JdkObsolete\]' "${OUTPUT_DIR}/summary.txt"
+  [ "$(wc -l < "${OUTPUT_DIR}/diagnostics.txt")" -eq 5 ]
+  grep -q '^\[WARNING\].*\[JdkObsolete\]' "${OUTPUT_DIR}/diagnostics.txt"
+  grep -q '^\[ERROR\].*\[FormatString\]' "${OUTPUT_DIR}/diagnostics.txt"
+  grep -q '^\[WARNING\].*\[Custom-Rule_1\]' "${OUTPUT_DIR}/diagnostics.txt"
+  grep -q '^/src/Raw.java:4: warning: \[RawWarning\]' "${OUTPUT_DIR}/diagnostics.txt"
+  grep -q '^/src/Raw.java:5: error: \[RawError\]' "${OUTPUT_DIR}/diagnostics.txt"
+  ! grep -q 'Failed to execute goal' "${OUTPUT_DIR}/diagnostics.txt"
+  [ "$(wc -l < "${OUTPUT_DIR}/summary.txt")" -eq 2 ]
   grep -q '^\[ERROR\].*\[FormatString\]' "${OUTPUT_DIR}/summary.txt"
-  grep -q '^\[WARNING\].*\[Custom-Rule_1\]' "${OUTPUT_DIR}/summary.txt"
-  grep -q '^/src/Raw.java:4: warning: \[RawWarning\]' "${OUTPUT_DIR}/summary.txt"
   grep -q '^/src/Raw.java:5: error: \[RawError\]' "${OUTPUT_DIR}/summary.txt"
-  ! grep -q 'Failed to execute goal' "${OUTPUT_DIR}/summary.txt"
-  grep -q '^### Error Prone errors$' "${OUTPUT_DIR}/summary.md"
-  [ "$(grep -c '^\[ERROR\].*\[FormatString\]' "${OUTPUT_DIR}/summary.md")" -eq 1 ]
-  grep -q '^/src/Raw.java:5: error: \[RawError\]' "${OUTPUT_DIR}/summary.md"
-  ! grep -q '^\[WARNING\]' "${OUTPUT_DIR}/summary.md"
   [ "$(< "${OUTPUT_DIR}/failures")" -eq 2 ]
 }
 
@@ -76,7 +75,25 @@ EOF
   run hadoop-ozone/dev-support/checks/errorprone.sh
 
   [ "$status" -eq 0 ]
-  [ "$(wc -l < "${OUTPUT_DIR}/summary.txt")" -eq 2 ]
+  [ "$(wc -l < "${OUTPUT_DIR}/diagnostics.txt")" -eq 2 ]
   [ "$(< "${OUTPUT_DIR}/failures")" -eq 0 ]
-  [ ! -e "${OUTPUT_DIR}/summary.md" ]
+  [ ! -s "${OUTPUT_DIR}/summary.txt" ]
+}
+
+@test "Error Prone reports an unknown Maven failure" {
+  cat > "${TEST_TMPDIR}/bin/mvn" <<'EOF'
+#!/usr/bin/env bash
+rm -rf "${OUTPUT_DIR}"
+echo "[ERROR] Failed to execute goal example:example: failed"
+exit "${MAVEN_EXIT_CODE}"
+EOF
+  chmod +x "${TEST_TMPDIR}/bin/mvn"
+
+  run hadoop-ozone/dev-support/checks/errorprone.sh
+
+  [ "$status" -eq 1 ]
+  [ ! -s "${OUTPUT_DIR}/diagnostics.txt" ]
+  [ "$(< "${OUTPUT_DIR}/summary.txt")" = "Unknown failure, check output.log" ]
+  [ "$(< "${OUTPUT_DIR}/failures")" -eq 1 ]
+}
 }

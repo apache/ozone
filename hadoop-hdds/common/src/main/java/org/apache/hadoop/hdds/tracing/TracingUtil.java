@@ -522,6 +522,7 @@ public final class TracingUtil {
   public static TraceCloseable createActivatedSpan(String spanName, SpanKind spanKind) {
     Span span = buildSpan(spanName, spanKind);
     Scope scope = span.makeCurrent();
+    // The returned TraceCloseable closes the Scope and ends the Span.
     return () -> {
       scope.close();
       span.end();
@@ -641,6 +642,7 @@ public final class TracingUtil {
 
     Scope scope = span.makeCurrent();
 
+    // The returned TraceCloseable closes the Scope and ends the Span.
     return () -> {
       scope.close();
       span.end();

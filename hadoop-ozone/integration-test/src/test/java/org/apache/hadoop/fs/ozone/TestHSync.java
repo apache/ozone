@@ -493,7 +493,9 @@ public class TestHSync {
         try (FSDataOutputStream os1 = fs.create(key2, true)) {
           os1.write(1);
           // There should be 2 key in openFileTable
-          assertThat(getOpenKeyInfo(BUCKET_LAYOUT)).hasSize(2);
+          assertThat(getOpenKeyInfo(BUCKET_LAYOUT))
+              .extracting(OmKeyInfo::getKeyName)
+              .contains(key1.getName(), key2.getName());
           // key1 will be in fileTable as hsynced, but key2 will not.
           assertThat(getKeyInfo(BUCKET_LAYOUT))
               .extracting(OmKeyInfo::getKeyName)
@@ -585,7 +587,9 @@ public class TestHSync {
         os.write(1);
         os.hsync();
         // There should be 1 key in openFileTable
-        assertThat(getOpenKeyInfo(BUCKET_LAYOUT)).hasSize(1);
+        assertThat(getOpenKeyInfo(BUCKET_LAYOUT))
+            .extracting(OmKeyInfo::getKeyName)
+            .contains(key1.getName());
         // Delete directory recursively
         fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
             bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);

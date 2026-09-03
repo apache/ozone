@@ -23,6 +23,7 @@ cd "$DIR/../../.." || exit 1
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/errorprone"}
 REPORT_FILE="$REPORT_DIR/summary.txt"
+DIAGNOSTIC_FILE="$REPORT_DIR/diagnostics.txt"
 OUTPUT_LOG=$(mktemp)
 
 MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipDocs -DskipRecon -DskipShade'
@@ -30,7 +31,8 @@ MAVEN_DIAGNOSTIC_PATTERN='^\[(ERROR|WARNING)\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
 JAVAC_DIAGNOSTIC_PATTERN='^.*:[0-9]+: (error|warning): \[[^]]+\]'
 MAVEN_ERROR_PATTERN='^\[ERROR\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
 JAVAC_ERROR_PATTERN='^.*:[0-9]+: error: \[[^]]+\]'
-ERROR_PATTERN="${MAVEN_ERROR_PATTERN}|${JAVAC_ERROR_PATTERN}"
+ERROR_DIAGNOSTIC_PATTERN="${MAVEN_ERROR_PATTERN}|${JAVAC_ERROR_PATTERN}"
+ERROR_PATTERN='^\(\[ERROR\] .*:\[[0-9][0-9]*,[0-9][0-9]*\] \[[^]]*\]\|.*:[0-9][0-9]*: error: \[[^]]*\]\)'
 
 declare -i rc
 
@@ -45,18 +47,8 @@ mv "$OUTPUT_LOG" "${REPORT_DIR}/output.log"
 trap - EXIT
 
 grep -E "${MAVEN_DIAGNOSTIC_PATTERN}|${JAVAC_DIAGNOSTIC_PATTERN}" "${REPORT_DIR}/output.log" \
-  | awk '!seen[$0]++' > "$REPORT_FILE"
+  | awk '!seen[$0]++' > "$DIAGNOSTIC_FILE"
 
-grep -E -c "$ERROR_PATTERN" "$REPORT_FILE" > "$REPORT_DIR/failures" || true
+grep -E "$ERROR_DIAGNOSTIC_PATTERN" "$DIAGNOSTIC_FILE" > "$REPORT_FILE" || true
 
-if grep -q -E "$ERROR_PATTERN" "$REPORT_FILE"; then
-  {
-    printf '### Error Prone errors\n\n```text\n'
-    grep -E "$ERROR_PATTERN" "$REPORT_FILE"
-    printf '```\n'
-  } > "$REPORT_DIR/summary.md"
-else
-  rm -f "$REPORT_DIR/summary.md"
-fi
-
-exit ${rc}
+source "${DIR}/_post_process.sh"
