@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.common;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
@@ -212,13 +211,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
 
   @Override
   public ChunkBuffer put(ByteBuffer that) {
-    if (that.remaining() > this.remaining()) {
-      final BufferOverflowException boe = new BufferOverflowException();
-      boe.initCause(new IllegalArgumentException(
-          "Failed to put since that.remaining() = " + that.remaining()
-              + " > this.remaining() = " + this.remaining()));
-      throw boe;
-    }
+    checkArgument(that);
 
     final int thatLimit = that.limit();
     for (int p = position(); that.position() < thatLimit;) {
@@ -229,6 +222,26 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
       p += min;
     }
     return this;
+  }
+
+  @Override
+  public ChunkBuffer put(byte[] b, int offset, int length) {
+    checkArgument(b, offset, length);
+
+    final int end = offset + length;
+    for (int p = position(); offset < end;) {
+      final ByteBuffer buf = getAndAllocateAtPosition(p);
+      final int min = Math.min(buf.remaining(), end - offset);
+      buf.put(b, offset, min);
+      offset += min;
+      p += min;
+    }
+    return this;
+  }
+
+  @Override
+  public ChunkBuffer put(byte[] b) {
+    return put(b, 0, b.length);
   }
 
   @Override
