@@ -18,9 +18,14 @@
 package org.apache.hadoop.hdds.server.http;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.eclipse.jetty.http.UriCompliance;
+import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.ServerConnector;
 import org.junit.jupiter.api.Test;
 
@@ -49,5 +54,47 @@ public class TestHttpServer2 {
       // Check default value in ozone-default.xml
       assertEquals(60000, server.getIdleTimeout());
     }
+  }
+
+  /**
+   * By default ambiguous URIs (e.g. empty path segments from "//") are rejected
+   * with a 400: the connector uses Jetty's strict URI compliance and the
+   * servlet layer does not decode ambiguous URIs.
+   */
+  @Test
+  public void testUriComplianceStrictByDefault() throws Exception {
+    HttpServer2 srv = buildServer(false);
+    assertSame(UriCompliance.DEFAULT, uriComplianceOf(srv));
+    assertFalse(srv.getWebAppContext().getServletHandler()
+        .isDecodeAmbiguousURIs());
+  }
+
+  /**
+   * With allowAmbiguousUri the connector uses the LEGACY compliance mode and
+   * the servlet layer decodes ambiguous URIs, accepting empty path segments as
+   * Jetty 9.4 did. The S3 Gateway needs this for object keys containing "//".
+   */
+  @Test
+  public void testUriComplianceLegacyWhenAmbiguousAllowed() throws Exception {
+    HttpServer2 srv = buildServer(true);
+    assertSame(UriCompliance.LEGACY, uriComplianceOf(srv));
+    assertTrue(srv.getWebAppContext().getServletHandler()
+        .isDecodeAmbiguousURIs());
+  }
+
+  private static HttpServer2 buildServer(boolean allowAmbiguousUri)
+      throws Exception {
+    return new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://example.com/"))
+        .allowAmbiguousUri(allowAmbiguousUri)
+        .build();
+  }
+
+  private static UriCompliance uriComplianceOf(HttpServer2 srv) {
+    ServerConnector connector = srv.getListeners().get(0);
+    return connector.getConnectionFactory(HttpConnectionFactory.class)
+        .getHttpConfiguration().getUriCompliance();
   }
 }

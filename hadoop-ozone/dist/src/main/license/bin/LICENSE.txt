@@ -221,11 +221,12 @@ EPL 2.0
 
    com.github.jnr:jnr-posix
    jakarta.annotation:jakarta.annotation-api
+   jakarta.el:jakarta.el-api
+   jakarta.interceptor:jakarta.interceptor-api
+   jakarta.servlet:jakarta.servlet-api
    jakarta.ws.rs:jakarta.ws.rs-api
    org.aspectj:aspectjrt
    org.glassfish.hk2.external:aopalliance-repackaged
-   org.glassfish.hk2.external:jakarta.inject
-   org.glassfish.hk2.external:javax.inject
    org.glassfish.hk2:guice-bridge
    org.glassfish.hk2:hk2-api
    org.glassfish.hk2:hk2-locator
@@ -253,8 +254,6 @@ CDDL 1.1 + GPLv2 with classpath exception
    com.sun.jersey:jersey-client
    com.sun.jersey:jersey-core
    javax.annotation:javax.annotation-api
-   javax.el:javax.el-api
-   javax.interceptor:javax.interceptor-api
    javax.servlet:javax.servlet-api
    javax.servlet.jsp:jsp-api
    javax.ws.rs:jsr311-api
@@ -279,6 +278,7 @@ Apache License 2.0
    com.fasterxml.jackson.datatype:jackson-datatype-jsr310
    com.fasterxml.jackson.jaxrs:jackson-jaxrs-base
    com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider
+   com.fasterxml.jackson.module:jackson-module-jakarta-xmlbind-annotations
    com.fasterxml.jackson.module:jackson-module-jaxb-annotations
    com.fasterxml.woodstox:woodstox-core
    com.github.ben-manes.caffeine:caffeine
@@ -368,10 +368,10 @@ Apache License 2.0
    io.prometheus:simpleclient_common
    io.prometheus:simpleclient_dropwizard
    joda-time:joda-time
+   jakarta.enterprise:jakarta.enterprise.cdi-api
+   jakarta.enterprise:jakarta.enterprise.lang-model
    jakarta.inject:jakarta.inject-api
    jakarta.validation:jakarta.validation-api
-   javax.enterprise:cdi-api
-   javax.inject:javax.inject
    log4j:apache-log4j-extras
    org.apache.avro:avro
    org.apache.commons:commons-compress
@@ -447,15 +447,17 @@ Apache License 2.0
    org.apache.ratis:ratis-tools
    org.apache.zookeeper:zookeeper
    org.apache.zookeeper:zookeeper-jute
+   org.eclipse.jetty:jetty-ee
    org.eclipse.jetty:jetty-http
    org.eclipse.jetty:jetty-io
    org.eclipse.jetty:jetty-security
    org.eclipse.jetty:jetty-server
-   org.eclipse.jetty:jetty-servlet
+   org.eclipse.jetty:jetty-session
    org.eclipse.jetty:jetty-util
    org.eclipse.jetty:jetty-util-ajax
-   org.eclipse.jetty:jetty-webapp
    org.eclipse.jetty:jetty-xml
+   org.eclipse.jetty.ee10:jetty-ee10-servlet
+   org.eclipse.jetty.ee10:jetty-ee10-webapp
    org.javassist:javassist
    org.jboss.weld.servlet:weld-servlet-shaded
    org.jetbrains:annotations

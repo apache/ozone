@@ -43,6 +43,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import com.google.common.cache.Cache;
+import jakarta.xml.bind.DatatypeConverter;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -59,13 +60,10 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.function.BooleanSupplier;
-import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
-import org.apache.hadoop.crypto.key.kms.LoadBalancingKMSClientProvider;
-import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
+import org.apache.hadoop.crypto.key.KeyProviderFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -77,7 +75,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
@@ -99,7 +96,6 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -123,7 +119,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 class TestOzoneAtRestEncryption {
 
   private static MiniOzoneCluster cluster = null;
-  private static MiniKMS miniKMS;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
   private static OzoneManager ozoneManager;
@@ -147,14 +142,15 @@ class TestOzoneAtRestEncryption {
   static void init() throws Exception {
     File kmsDir = new File(testDir, UUID.randomUUID().toString());
     assertTrue(kmsDir.mkdirs());
-    MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
-    miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
-    miniKMS.start();
 
     OzoneManager.setTestSecureOmFlag(true);
     conf = new OzoneConfiguration();
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
-        getKeyProviderURI(miniKMS));
+        getKeyProviderURI(kmsDir));
+    // Seed the encryption key into the jceks store before the OM starts, so
+    // it is present when the OM constructs its KeyProvider at startup.
+    createKey(TEST_KEY,
+        KeyProviderFactory.get(new URI(getKeyProviderURI(kmsDir)), conf), conf);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -180,8 +176,6 @@ class TestOzoneAtRestEncryption {
     ozoneManager = cluster.getOzoneManager();
     ozoneManager.setMinMultipartUploadPartSize(MPU_PART_MIN_SIZE);
 
-    // create test key
-    createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
     eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
 
     final String rootPath = String.format("%s://%s/",
@@ -203,43 +197,11 @@ class TestOzoneAtRestEncryption {
     if (cluster != null) {
       cluster.shutdown();
     }
-
-    if (miniKMS != null) {
-      miniKMS.stop();
-    }
   }
 
   static void reInitClient() throws IOException {
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
-  }
-
-  @Test
-  public void testWarmupEDEKCacheOnStartup() throws Exception {
-
-    createVolumeAndBucket("vol", "buck", BucketLayout.OBJECT_STORE);
-
-    @SuppressWarnings("unchecked") KMSClientProvider spy = getKMSClientProvider();
-    assertTrue(spy.getEncKeyQueueSize(TEST_KEY) > 0);
-
-    conf.setInt(OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, 0);
-    cluster.restartOzoneManager();
-
-    GenericTestUtils.waitFor(new BooleanSupplier() {
-      @Override
-      public boolean getAsBoolean() {
-        final KMSClientProvider kspy = getKMSClientProvider();
-        return kspy.getEncKeyQueueSize(TEST_KEY) > 0;
-      }
-    }, 1000, 60000);
-  }
-
-  private KMSClientProvider getKMSClientProvider() {
-    LoadBalancingKMSClientProvider lbkmscp =
-        (LoadBalancingKMSClientProvider) HddsWhiteboxTestUtils.getInternalState(
-            cluster.getOzoneManager().getKmsProvider(), "extension");
-    assert lbkmscp.getProviders().length == 1;
-    return lbkmscp.getProviders()[0];
   }
 
   @ParameterizedTest
@@ -503,9 +465,9 @@ class TestOzoneAtRestEncryption {
     return true;
   }
 
-  private static String getKeyProviderURI(MiniKMS kms) {
-    return KMSClientProvider.SCHEME_NAME + "://" +
-        kms.getKMSUrl().toExternalForm().replace("://", "@");
+  private static String getKeyProviderURI(File dir) {
+    File jks = new File(dir, "kms.jks");
+    return JavaKeyStoreProvider.SCHEME_NAME + "://file" + jks.toURI().getPath();
   }
 
   private static void createKey(String keyName, KeyProvider

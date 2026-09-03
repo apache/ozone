@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.inject.Singleton;
+import jakarta.ws.rs.core.Response;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.ArrayList;
@@ -25,8 +27,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import javax.inject.Singleton;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;

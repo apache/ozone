@@ -17,12 +17,12 @@
 
 package org.apache.ozone.lib.servlet;
 
+import jakarta.servlet.ServletContextEvent;
+import jakarta.servlet.ServletContextListener;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.text.MessageFormat;
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.lib.server.Server;
 import org.apache.ozone.lib.server.ServerException;

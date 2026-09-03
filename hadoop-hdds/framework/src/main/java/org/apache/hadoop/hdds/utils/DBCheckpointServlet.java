@@ -23,6 +23,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 import com.google.common.annotations.VisibleForTesting;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -38,10 +42,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.fileupload.FileItemIterator;
 import org.apache.commons.fileupload.FileItemStream;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
@@ -49,6 +49,7 @@ import org.apache.commons.fileupload.util.Streams;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
+import org.apache.hadoop.hdds.server.http.servletbridge.JakartaToJavaxRequest;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
@@ -313,7 +314,8 @@ public class DBCheckpointServlet extends HttpServlet
     List<String> sstParam = new ArrayList<>();
 
     try {
-      FileItemIterator iter = upload.getItemIterator(request);
+      FileItemIterator iter =
+          upload.getItemIterator(new JakartaToJavaxRequest(request));
       while (iter.hasNext()) {
         FileItemStream item = iter.next();
         if (!item.isFormField() || !FIELD_NAME.equals(item.getFieldName())) {
@@ -352,7 +354,8 @@ public class DBCheckpointServlet extends HttpServlet
   public void doPost(HttpServletRequest request, HttpServletResponse response) {
     LOG.info("Received POST request to obtain DB checkpoint snapshot");
 
-    if (!ServletFileUpload.isMultipartContent(request)) {
+    if (!ServletFileUpload.isMultipartContent(
+        new JakartaToJavaxRequest(request))) {
       response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
       return;
     }

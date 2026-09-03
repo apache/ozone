@@ -42,7 +42,10 @@ public abstract class TestCpuMetrics implements NonHATests.TestCase {
   @Test
   public void testCpuMetrics() throws IOException {
     // given
-    String scmHttpServerUrl = "http://localhost:" +
+    // Use the IPv4 loopback literal rather than "localhost": the SCM HTTP
+    // server binds to the IPv4 wildcard 0.0.0.0, but on macOS "localhost"
+    // resolves to IPv6 ::1 first, which the server does not accept.
+    String scmHttpServerUrl = "http://127.0.0.1:" +
         HddsUtils.getPortNumberFromConfigKeys(cluster().getConf(),
                 OZONE_SCM_HTTP_ADDRESS_KEY).getAsInt();
     Request prometheusMetricsRequest = new Request.Builder()

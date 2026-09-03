@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import org.apache.hadoop.ozone.recon.metrics.ContainerHealthTaskMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
