@@ -178,13 +178,13 @@ Assume Role And Configure STS Profile
     Configure STS Profile         ${STS_ACCESS_KEY_ID}  ${STS_SECRET_KEY}  ${STS_SESSION_TOKEN}
 
 Assume Role Should Fail
-    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied  ${expected_http_code}=${EMPTY}  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900  ${extra_cli_args}=${EMPTY}
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied  ${expected_http_code}=${EMPTY}  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900  ${extra_cli_args}=${EMPTY}  ${sts_endpoint_url}=${STS_ENDPOINT_URL}
     Configure AWS Profile         permanent  ${perm_access_key_id}  ${perm_secret_key}
 
     IF                            '${expected_http_code}' != '${EMPTY}'
         # Note: curl in the s3g container doesn't reliably support --aws-sigv4,
         # so use awscli debug output to capture the HTTP response code.
-        ${cmd} =                  Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${role_arn} --role-session-name ${role_session_name} --profile permanent --debug 2>&1
+        ${cmd} =                  Set Variable                  aws sts assume-role --endpoint-url ${sts_endpoint_url} --role-arn ${role_arn} --role-session-name ${role_session_name} --profile permanent --debug 2>&1
         ${cmd} =                  Set Variable If               '${duration_seconds}' != '${EMPTY}'    ${cmd} --duration-seconds ${duration_seconds}    ${cmd}
         ${cmd} =                  Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --policy '${policy_json}'    ${cmd}
         ${cmd} =                  Set Variable If               '${extra_cli_args}' != '${EMPTY}'    ${cmd} ${extra_cli_args}    ${cmd}
@@ -198,7 +198,7 @@ Assume Role Should Fail
         ${http_code} =            Get From List                 ${http_codes}    -1
         Should Be Equal As Strings  ${http_code}                ${expected_http_code}
     ELSE
-        ${cmd} =                  Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${role_arn} --role-session-name ${role_session_name} --output json --profile permanent
+        ${cmd} =                  Set Variable                  aws sts assume-role --endpoint-url ${sts_endpoint_url} --role-arn ${role_arn} --role-session-name ${role_session_name} --output json --profile permanent
         ${cmd} =                  Set Variable If               '${duration_seconds}' != '${EMPTY}'    ${cmd} --duration-seconds ${duration_seconds}    ${cmd}
         ${cmd} =                  Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --policy '${policy_json}'    ${cmd}
 

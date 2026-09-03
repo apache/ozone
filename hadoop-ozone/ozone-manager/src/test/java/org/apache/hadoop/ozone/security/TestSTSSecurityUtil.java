@@ -304,6 +304,32 @@ public class TestSTSSecurityUtil {
   }
 
   @Test
+  public void testConstructValidateAndDecryptSTSTokenRejectsDoubledToken() throws Exception {
+    final String tokenString = tokenSecretManager.createSTSTokenString(
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS,
+        SECRET_ACCESS_KEY, SESSION_POLICY, clock);
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString + tokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(INVALID_TOKEN))
+        .hasMessageContaining("non-canonical token encoding");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenRejectsTokenWithSuffix() throws Exception {
+    final String tokenString = tokenSecretManager.createSTSTokenString(
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS,
+        SECRET_ACCESS_KEY, SESSION_POLICY, clock);
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString + "garbage", secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(INVALID_TOKEN))
+        .hasMessageContaining("non-canonical token encoding");
+  }
+
+  @Test
   public void testConstructValidateAndDecryptSTSTokenEmptyString() {
     // Try to decrypt an empty token string
     assertThatThrownBy(() ->

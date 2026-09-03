@@ -160,6 +160,10 @@ public final class STSSecurityUtil {
     // instead of failing the OM request.
     try {
       token.decodeFromUrlString(encodedToken);
+      final String canonical = token.encodeToUrlString();
+      if (!canonical.equals(encodedToken)) {
+        throw new SecretManager.InvalidToken("Failed to decode STS token string: non-canonical token encoding");
+      }
       return token;
     } catch (IOException | RuntimeException e) {
       throw new SecretManager.InvalidToken("Failed to decode STS token string: " + e);
