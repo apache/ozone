@@ -108,7 +108,8 @@ public class ChunksValidator {
       throw newError(SIGNATURE_DOES_NOT_MATCH, resource);
     }
     // The chain feeds this chunk's signature, in hex, into the next chunk's string-to-sign.
-    previousSignature = hex(expected);
+    // chunkSignature equals expected (verified above), so reuse it normalized to lower-case.
+    previousSignature = chunkSignature.toLowerCase(Locale.ROOT);
   }
 
   private byte[] hmacSha256(String msg) {
@@ -119,9 +120,5 @@ public class ChunksValidator {
     } catch (InvalidKeyException e) {
       throw new IllegalStateException("Failed to compute " + HMAC_SHA256, e);
     }
-  }
-
-  private static String hex(byte[] bytes) {
-    return DatatypeConverter.printHexBinary(bytes).toLowerCase(Locale.ROOT);
   }
 }
