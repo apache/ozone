@@ -439,7 +439,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   static void validateMultiGetStatus(ByteBufferGetStatus status, Integer expectedSize) {
     if (status.requiredSize < 0 || status.status.getCode() != org.rocksdb.Status.Code.Ok) {
       throw new IllegalStateException("status = " + status.status.getCode()
-          + "; required = " + status.requiredSize + " < 0");
+          + "; requiredSize = " + status.requiredSize);
     }
     if (expectedSize != null && expectedSize.intValue() != status.requiredSize) {
       throw new IllegalStateException("status = " + status.status.getCode()

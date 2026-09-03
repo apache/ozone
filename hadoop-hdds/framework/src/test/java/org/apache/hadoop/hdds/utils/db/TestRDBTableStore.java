@@ -27,10 +27,17 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.google.protobuf.ByteString;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,9 +58,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.rocksdb.ByteBufferGetStatus;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.rocksdb.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -206,6 +215,46 @@ public class TestRDBTableStore {
     assertNull(values.get(2));
     assertEquals(new String(largeValue2, StandardCharsets.UTF_8), values.get(3));
     assertEquals("", values.get(4));
+  }
+
+  @Test
+  public void multiGetSkipCacheWarmsBufferCapacityHint() throws Exception {
+    byte[] largeKey = "warmup-large-key".getBytes(StandardCharsets.UTF_8);
+    byte[] largeValue = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 100];
+    Arrays.fill(largeValue, (byte) 'x');
+    rdbStore.getTable("Second").put(largeKey, largeValue);
+
+    RDBTable spyTable = spy(rdbStore.getTable("Second"));
+    TypedTable<String, String> readTable = new TypedTable<>(spyTable, StringCodec.get(),
+        StringCodec.get(), CacheType.PARTIAL_CACHE);
+
+    readTable.multiGetSkipCache(Collections.singletonList("warmup-large-key"));
+    verify(spyTable, times(2)).multiGetSkipCache(anyList(), anyList());
+
+    clearInvocations(spyTable);
+    readTable.multiGetSkipCache(Collections.singletonList("warmup-large-key"));
+    verify(spyTable, times(1)).multiGetSkipCache(anyList(), anyList());
+  }
+
+  @Test
+  public void validateMultiGetStatusThrowsOnBadStatus() throws Exception {
+    ByteBuffer value = ByteBuffer.allocate(4);
+    ByteBufferGetStatus nonOk = newByteBufferGetStatus(
+        new Status(Status.Code.Corruption, Status.SubCode.None, "bad"), 10, value);
+    assertThrows(IllegalStateException.class, () -> TypedTable.validateMultiGetStatus(nonOk, null));
+
+    ByteBufferGetStatus negativeSize = newByteBufferGetStatus(
+        new Status(Status.Code.Incomplete, Status.SubCode.None, "too large"), -1, value);
+    assertThrows(IllegalStateException.class,
+        () -> TypedTable.validateMultiGetStatus(negativeSize, null));
+  }
+
+  private static ByteBufferGetStatus newByteBufferGetStatus(Status status, int requiredSize,
+      ByteBuffer value) throws Exception {
+    Constructor<ByteBufferGetStatus> constructor =
+        ByteBufferGetStatus.class.getDeclaredConstructor(Status.class, int.class, ByteBuffer.class);
+    constructor.setAccessible(true);
+    return constructor.newInstance(status, requiredSize, value);
   }
 
   @Test
