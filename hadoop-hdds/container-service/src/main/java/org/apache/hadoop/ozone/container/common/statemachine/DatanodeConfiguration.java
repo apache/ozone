@@ -150,6 +150,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
       "hdds.datanode.block.delete.command.worker.interval";
   public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT = Duration.ofSeconds(2);
+  public static final String STREAM_READ_FILE_IDLE_TIMEOUT_KEY = "hdds.datanode.stream.read.file.idle.timeout";
+  public static final Duration STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT = Duration.ofMinutes(1);
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -161,6 +163,16 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       description = "Number of threads per volume that Datanode will use for reading replicated chunks."
   )
   private int numReadThreadPerVolume = 10;
+
+  @Config(key = STREAM_READ_FILE_IDLE_TIMEOUT_KEY,
+      type = ConfigType.TIME,
+      defaultValue = "1m",
+      tags = {DATANODE},
+      description = "How long a streaming ReadBlock stream may stay idle before the datanode closes the block file "
+          + "held open for it. The stream itself stays open and the file is reopened by the next request, so this "
+          + "only bounds the file descriptors pinned by idle streams."
+  )
+  private Duration streamReadFileIdleTimeout = STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT;
 
   /**
    * SO_BACKLOG value for the gRPC server socket.
@@ -836,6 +848,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
     }
 
+    if (streamReadFileIdleTimeout.isNegative() || streamReadFileIdleTimeout.isZero()) {
+      LOG.warn(STREAM_READ_FILE_IDLE_TIMEOUT_KEY + " must be greater than zero and was set to {}. Defaulting to {}",
+          streamReadFileIdleTimeout, STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT);
+      streamReadFileIdleTimeout = STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT;
+    }
+
     if (rocksdbLogMaxFileSize < 0) {
       LOG.warn(ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY +
               " must be no less than zero and was set to {}. Defaulting to {}",
@@ -1182,6 +1200,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public int getNumReadThreadPerVolume() {
     return numReadThreadPerVolume;
+  }
+
+  public Duration getStreamReadFileIdleTimeout() {
+    return streamReadFileIdleTimeout;
   }
 
   public void setNumReadThreadPerVolume(int threads) {
