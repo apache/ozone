@@ -91,6 +91,10 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   private volatile long persistedOpStateExpiryEpochSec;
   private HDDSVersion initialVersion;
   private volatile HDDSVersion currentVersion;
+  // The raw serialized currentVersion as it arrived off the wire. Kept separate from
+  // currentVersion so that a reader which deserializes an unknown newer version to
+  // UNKNOWN_VERSION still forwards the original value to datanodes instead of -1.
+  private volatile int serializedCurrentVersion;
 
   private DatanodeDetails(Builder b) {
     super(b.hostName, b.networkLocation, NetConstants.NODE_COST_DEFAULT);
@@ -107,6 +111,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     persistedOpStateExpiryEpochSec = b.persistedOpStateExpiryEpochSec;
     initialVersion = b.initialVersion;
     currentVersion = b.currentVersion;
+    serializedCurrentVersion = b.serializedCurrentVersion;
     if (b.networkName != null) {
       setNetworkName(b.networkName);
     }
@@ -135,6 +140,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
         datanodeDetails.getPersistedOpStateExpiryEpochSec();
     this.initialVersion = datanodeDetails.getInitialVersion();
     this.currentVersion = datanodeDetails.getCurrentVersion();
+    this.serializedCurrentVersion = datanodeDetails.getSerializedCurrentVersion();
   }
 
   public static Codec<DatanodeDetails> getCodec() {
@@ -476,7 +482,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
           datanodeDetailsProto.getPersistedOpStateExpiry());
     }
     if (datanodeDetailsProto.hasCurrentVersion()) {
-      builder.setCurrentVersion(HDDSVersion.deserialize(datanodeDetailsProto.getCurrentVersion()));
+      builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
     }
     return builder;
   }
@@ -613,7 +619,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       }
     }
 
-    builder.setCurrentVersion(versionOverride != null ? versionOverride.serialize() : currentVersion.serialize());
+    builder.setCurrentVersion(versionOverride != null ? versionOverride.serialize() : serializedCurrentVersion);
 
     return builder;
   }
@@ -660,8 +666,19 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     return currentVersion;
   }
 
+  /**
+   * @return the raw serialized currentVersion as it arrived off the wire. Unlike
+   *     {@link #getCurrentVersion()} this preserves the original value even when it cannot be
+   *     deserialized by this component. Use this when forwarding the version to another
+   *     component, e.g. the write pipeline version sent to datanodes.
+   */
+  public int getSerializedCurrentVersion() {
+    return serializedCurrentVersion;
+  }
+
   public void setCurrentVersion(HDDSVersion currentVersion) {
     this.currentVersion = currentVersion;
+    this.serializedCurrentVersion = currentVersion.serialize();
   }
 
   @Override
@@ -746,6 +763,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     private long persistedOpStateExpiryEpochSec = 0;
     private HDDSVersion initialVersion = HDDSVersion.DEFAULT_VERSION;
     private HDDSVersion currentVersion = HDDSVersion.DEFAULT_VERSION;
+    private int serializedCurrentVersion = HDDSVersion.DEFAULT_VERSION.serialize();
 
     /**
      * Default private constructor. To create Builder instance use
@@ -969,6 +987,18 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
 
     public Builder setCurrentVersion(HDDSVersion v) {
       this.currentVersion = v;
+      this.serializedCurrentVersion = v.serialize();
+      return this;
+    }
+
+    /**
+     * Sets the currentVersion from its raw serialized value, preserving the original even if it
+     * cannot be deserialized (in which case {@link #getCurrentVersion()} is
+     * {@link HDDSVersion#UNKNOWN_VERSION} while {@link #getSerializedCurrentVersion()} keeps it).
+     */
+    public Builder setCurrentVersion(int serialized) {
+      this.serializedCurrentVersion = serialized;
+      this.currentVersion = HDDSVersion.deserialize(serialized);
       return this;
     }
 
