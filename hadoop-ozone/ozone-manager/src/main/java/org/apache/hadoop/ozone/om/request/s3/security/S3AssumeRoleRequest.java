@@ -135,7 +135,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       S3STSUtils.validateDuration(durationSeconds);
       S3STSUtils.validateRoleSessionName(roleSessionName);
       final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
-      
+
       // Generate temporary AWS credentials using cryptographically strong SecureRandom, and a
       // deterministic roleId derived from the role ARN.
       final String tempAccessKeyId = STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
@@ -293,7 +293,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
             .setSessionPolicy(sessionPolicy)
             .setAssumedRoleId(params.getAssumedRoleId())
             .setAssumedRoleUserArn(params.getAssumedRoleUserArn())
-            .setCreationTime(params)
+            .setCreationTime(params.getCreationTime())
             .build());
   }
 
@@ -414,8 +414,9 @@ public class S3AssumeRoleRequest extends OMClientRequest {
         return this;
       }
 
-      public void setCreationTime(Instant creationInstant) {
-        this.creationInstant = creationInstant;
+      Builder setCreationTime(Instant instant) {
+        this.creationInstant = instant;
+        return this;
       }
 
       GenerateSessionTokenParams build() {

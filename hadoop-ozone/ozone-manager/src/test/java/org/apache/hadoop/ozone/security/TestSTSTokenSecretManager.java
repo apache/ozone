@@ -172,7 +172,7 @@ public class TestSTSTokenSecretManager {
         .setSessionPolicy(SESSION_POLICY)
         .setAssumedRoleId(ASSUMED_ROLE_ID)
         .setAssumedRoleUserArn(ASSUMED_ROLE_USER_ARN)
-        .setClock(clock);
+        .setCreationTime(clock.instant());
   }
 
   private static ManagedSecretKey createManagedSecretKey(UUID id, byte[] keyBytes, Instant creationTime) {
