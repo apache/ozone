@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,6 +69,7 @@ import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -756,8 +759,71 @@ public class TestStateContext {
     assertNull(subject.getNextCommand());
   }
 
-  private static StateContext createSubject() throws IOException {
+  @Test
+  public void staleTermCommandIsReportedFailed() throws IOException {
+    StateContext subject = createSubject(statusReportingEnabledConf());
+    SCMCommand<?> staleCommand = someCommand();
+    subject.setTermOfLeaderSCM(2);
+    staleCommand.setTerm(1);
+
+    subject.addCommand(staleCommand);
+
+    assertNull(subject.getNextCommand());
+    assertEquals(FAILED, subject.getCommandStatusMap().get(staleCommand.getId()).getStatus());
+  }
+
+  @Test
+  public void addCmdStatusRegistersPendingForReplication() throws IOException {
+    StateContext ctx = createSubject(statusReportingEnabledConf());
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(1L, MockDatanodeDetails.randomDatanodeDetails());
+    ctx.addCmdStatus(cmd);
+    CommandStatus status = ctx.getCommandStatusMap().get(cmd.getId());
+    assertNotNull(status);
+    assertEquals(SCMCommandProto.Type.replicateContainerCommand, status.getType());
+    assertEquals(PENDING, status.getStatus());
+  }
+
+  @Test
+  public void commandQueueFullReportsReplicationFailure() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeConfiguration dnConf = new DatanodeConfiguration();
+    dnConf.setCommandQueueLimit(1);
+    dnConf.setReplicationCommandStatusReportEnabled(true);
+    conf.setFromObject(dnConf);
+    StateContext ctx = createSubject(conf);
+    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
+
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(1L, MockDatanodeDetails.randomDatanodeDetails());
+    ctx.addCommand(cmd);
+
+    assertEquals(0, ctx.getCommandQueueSummary().get(SCMCommandProto.Type.replicateContainerCommand));
+    assertEquals(FAILED, ctx.getCommandStatusMap().get(cmd.getId()).getStatus());
+  }
+
+  @Test
+  public void addCmdStatusSkipsReplicationWhenReportingDisabled() throws IOException {
+    StateContext ctx = createSubject(new OzoneConfiguration());
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(1L, MockDatanodeDetails.randomDatanodeDetails());
+    ctx.addCmdStatus(cmd);
+    assertTrue(ctx.getCommandStatusMap().isEmpty());
+  }
+
+  private static StateContext createSubject() throws IOException {
+    return createSubject(new OzoneConfiguration());
+  }
+
+  private static OzoneConfiguration statusReportingEnabledConf() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeConfiguration dnConf = new DatanodeConfiguration();
+    dnConf.setReplicationCommandStatusReportEnabled(true);
+    conf.setFromObject(dnConf);
+    return conf;
+  }
+
+  private static StateContext createSubject(OzoneConfiguration conf) throws IOException {
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
     OzoneContainer o = mock(OzoneContainer.class);

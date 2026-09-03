@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeStat
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus.CommandStatusBuilder;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
@@ -157,6 +158,7 @@ public class StateContext {
   private final AtomicLong reconHeartbeatFrequency;
 
   private final int maxCommandQueueLimit;
+  private final boolean replicationCommandStatusReportEnabled;
 
   private final String threadNamePrefix;
 
@@ -176,6 +178,7 @@ public class StateContext {
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
     maxCommandQueueLimit = dnConf.getCommandQueueLimit();
+    replicationCommandStatusReportEnabled = dnConf.isReplicationCommandStatusReportEnabled();
     this.state = state;
     this.parentDatanodeStateMachine = parent;
     commandQueue = new LinkedList<>();
@@ -767,6 +770,9 @@ public class StateContext {
         LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
             " stale term {}, latest term {}.",
             command, command.getTerm(), currentTerm);
+        if (isReplicationCommand(command.getType())) {
+          updateCommandStatus(command.getId(), CommandStatus::markAsFailed);
+        }
       }
     } finally {
       lock.unlock();
@@ -784,14 +790,18 @@ public class StateContext {
       if (commandQueue.size() >= maxCommandQueueLimit) {
         LOG.warn("Ignore command as command queue crosses max limit {}.",
             maxCommandQueueLimit);
+        if (isReplicationCommand(command.getType())) {
+          addCmdStatus(command);
+          updateCommandStatus(command.getId(), CommandStatus::markAsFailed);
+        }
         return;
       }
       updateTermOfLeaderSCM(command);
       commandQueue.add(command);
+      addCmdStatus(command);
     } finally {
       lock.unlock();
     }
-    this.addCmdStatus(command);
   }
 
   public EnumCounters<SCMCommandProto.Type> getCommandQueueSummary() {
@@ -839,6 +849,12 @@ public class StateContext {
     cmdStatusMap.put(key, status);
   }
 
+  /** Command types whose status is tracked as PENDING until the replication supervisor reports an outcome. */
+  public static boolean isReplicationCommand(SCMCommandProto.Type type) {
+    return type == SCMCommandProto.Type.replicateContainerCommand
+        || type == SCMCommandProto.Type.reconstructECContainersCommand;
+  }
+
   /**
    * Adds a {@link CommandStatus} to the State Machine for given SCMCommand.
    *
@@ -848,6 +864,13 @@ public class StateContext {
     if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
       addCmdStatus(cmd.getId(),
           DeleteBlockCommandStatusBuilder.newBuilder()
+              .setCmdId(cmd.getId())
+              .setStatus(Status.PENDING)
+              .setType(cmd.getType())
+              .build());
+    } else if (replicationCommandStatusReportEnabled && isReplicationCommand(cmd.getType())) {
+      addCmdStatus(cmd.getId(),
+          CommandStatusBuilder.newBuilder()
               .setCmdId(cmd.getId())
               .setStatus(Status.PENDING)
               .setType(cmd.getType())
