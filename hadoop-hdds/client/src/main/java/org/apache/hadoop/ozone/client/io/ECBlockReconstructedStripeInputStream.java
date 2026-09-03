@@ -727,6 +727,11 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   public synchronized void close() {
     super.close();
     freeBuffers();
+    if (decoder != null) {
+      // Release the decoder's native resources (e.g. ISA-L coder context)
+      // that were allocated lazily in init().
+      decoder.release();
+    }
   }
 
   @Override
