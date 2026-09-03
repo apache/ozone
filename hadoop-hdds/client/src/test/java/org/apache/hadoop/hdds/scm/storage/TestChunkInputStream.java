@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.BUFFER_SIZE;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -154,6 +156,75 @@ public class TestChunkInputStream {
     // buffers. Since checksum boundary is at every 20 bytes, there should be
     // 60/20 number of buffers.
     matchWithInputData(chunkStream.getReadByteBuffers(), 0, 60);
+  }
+
+  @Test
+  public void testPositionedReadIsStateless() throws Exception {
+    // Advance the stream's own cursor with a normal sequential read.
+    byte[] seq = new byte[10];
+    assertEquals(10, chunkStream.read(seq, 0, 10));
+    matchWithInputData(seq, 0, 10);
+    long posBeforePositionedRead = chunkStream.getPos();
+
+    // A positioned read at an unrelated offset returns the right bytes ...
+    ByteBuffer dst = ByteBuffer.allocate(15);
+    int read = chunkStream.readPositioned(50, dst);
+    assertEquals(15, read);
+    dst.flip();
+    byte[] positioned = new byte[15];
+    dst.get(positioned);
+    matchWithInputData(positioned, 50, 15);
+
+    // ... without disturbing the stream's own position ...
+    assertEquals(posBeforePositionedRead, chunkStream.getPos());
+
+    // ... so the sequential read continues where it left off.
+    byte[] seq2 = new byte[10];
+    assertEquals(10, chunkStream.read(seq2, 0, 10));
+    matchWithInputData(seq2, 10, 10);
+  }
+
+  @Test
+  public void testPositionedReadAtEof() throws Exception {
+    ByteBuffer dst = ByteBuffer.allocate(10);
+    assertEquals(-1, chunkStream.readPositioned(CHUNK_SIZE, dst));
+    assertEquals(-1, chunkStream.readPositioned(CHUNK_SIZE + 1, dst));
+  }
+
+  @Test
+  public void testPositionedReadTruncatedAtChunkEnd() throws Exception {
+    // Request more than remains in the chunk; only the remainder is returned.
+    ByteBuffer dst = ByteBuffer.allocate(50);
+    int read = chunkStream.readPositioned(CHUNK_SIZE - 20, dst);
+    assertEquals(20, read);
+    dst.flip();
+    byte[] tail = new byte[20];
+    dst.get(tail);
+    matchWithInputData(tail, CHUNK_SIZE - 20, 20);
+  }
+
+  @Test
+  public void testConcurrentPositionedRead() throws Exception {
+    Checksum checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
+    byte[] largeChunkData = generateRandomData(SOURCE_SIZE);
+    ChunkInfo largeChunkInfo = ChunkInfo.newBuilder()
+        .setChunkName("large-chunk")
+        .setOffset(0)
+        .setLen(SOURCE_SIZE)
+        .setChecksumData(checksum.computeChecksum(
+            largeChunkData, 0, SOURCE_SIZE).getProtoBufMessage())
+        .build();
+    try (DummyChunkInputStream largeStream = new DummyChunkInputStream(
+        largeChunkInfo, blockID, null, false, largeChunkData.clone(), null)) {
+      PositionedReadTestHelper.runConcurrentPositionedReads(largeChunkData,
+          (offset, buf) -> {
+            int read = largeStream.readPositioned(offset, buf);
+            if (read != BUFFER_SIZE) {
+              throw new AssertionError("expected " + BUFFER_SIZE + " bytes at " + offset
+                  + " but read " + read);
+            }
+          });
+    }
   }
 
   @Test

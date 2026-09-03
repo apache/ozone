@@ -23,6 +23,7 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -76,7 +77,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private XceiverClientShortCircuit xceiverClientShortCircuit;
   private final AtomicBoolean fallbackToGrpc = new AtomicBoolean(false);
   private volatile FileInputStream blockFileInputStream;
-  private boolean initialized = false;
+  private volatile boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy;
 
@@ -487,6 +488,116 @@ public class BlockInputStream extends BlockExtendedInputStream {
    *    2. chunkStream[2] will be seeked to position 10
    *       (= 90 - chunkOffset[2] (= 80)).
    */
+  /**
+   * Stateless positioned read across this block's chunks. Fills up to
+   * {@code dst.remaining()} bytes starting from {@code blockRelativePosition}
+   * without mutating this stream's cursor ({@code chunkIndex},
+   * {@code blockPosition}) or the sequential chunk streams' buffered state.
+   * Each covering chunk is read through an ephemeral {@link ChunkInputStream}
+   * closed as soon as its bytes have been copied.
+   *
+   * @return bytes copied into {@code dst}, or {@link #EOF} at EOF
+   */
+  int readPositioned(long blockRelativePosition, ByteBuffer dst)
+      throws IOException {
+    if (!initialized) {
+      initialize();
+    }
+    final long[] offsets;
+    final BlockData currentBlockData;
+    final long blockLength;
+    synchronized (this) {
+      checkOpen();
+      offsets = chunkOffsets;
+      currentBlockData = blockData;
+      blockLength = length;
+    }
+    if (offsets == null || currentBlockData == null
+        || blockRelativePosition < 0 || blockRelativePosition >= blockLength) {
+      return EOF;
+    }
+
+    final List<ChunkInfo> chunkInfos = currentBlockData.getChunksList();
+    int index = Arrays.binarySearch(offsets, blockRelativePosition);
+    if (index < 0) {
+      index = -index - 2;
+    }
+
+    long pos = blockRelativePosition;
+    int totalReadLen = 0;
+    while (dst.hasRemaining() && pos < blockLength && index < chunkInfos.size()) {
+      final ChunkInfo chunkInfo = chunkInfos.get(index);
+      final long chunkOffset = pos - offsets[index];
+      final long numBytesToRead = Math.min(
+          Math.min(dst.remaining(), chunkInfo.getLen() - chunkOffset), blockLength - pos);
+      if (numBytesToRead <= 0) {
+        index++;
+        continue;
+      }
+      final int numBytesRead =
+          readChunkAt(chunkInfo, chunkOffset, (int) numBytesToRead, dst);
+      totalReadLen += numBytesRead;
+      pos += numBytesRead;
+      index++;
+    }
+    return totalReadLen == 0 ? EOF : totalReadLen;
+  }
+
+  /**
+   * Read {@code numBytesToRead} bytes starting at {@code chunkOffset} of the given chunk into {@code dst}
+   * through an ephemeral {@link ChunkInputStream}, retrying like {@link #readWithStrategy(ByteReaderStrategy)}
+   * but with a retry counter local to this call.
+   */
+  private int readChunkAt(ChunkInfo chunkInfo, long chunkOffset, int numBytesToRead, ByteBuffer dst)
+      throws IOException {
+    final int startPosition = dst.position();
+    int preadRetries = 0;
+    while (true) {
+      final ChunkInputStream chunkStream;
+      synchronized (this) {
+        checkOpen();
+        chunkStream = createChunkInputStream(chunkInfo);
+      }
+      final int numBytesRead;
+      try {
+        final int oldLimit = dst.limit();
+        try {
+          dst.limit(startPosition + numBytesToRead);
+          numBytesRead = chunkStream.readPositioned(chunkOffset, dst);
+        } finally {
+          dst.limit(oldLimit);
+        }
+      } catch (SCMSecurityException ex) {
+        throw ex;
+      } catch (StorageContainerException ex) {
+        if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
+          throw ex;
+        }
+        handleReadError(ex);
+        dst.position(startPosition);
+        continue;
+      } catch (IOException ex) {
+        if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
+          throw ex;
+        }
+        if (isConnectivityIssue(ex)) {
+          handleReadError(ex);
+        }
+        dst.position(startPosition);
+        continue;
+      } finally {
+        chunkStream.close();
+      }
+
+      if (numBytesRead != numBytesToRead) {
+        throw new IOException(String.format(
+            "Inconsistent read for chunkName=%s length=%d numBytesToRead=%d numBytesRead=%d",
+            chunkInfo.getChunkName(), chunkInfo.getLen(), numBytesToRead, numBytesRead));
+      }
+      return numBytesRead;
+    }
+  }
+
   @Override
   public synchronized void seek(long pos) throws IOException {
     if (!initialized) {
@@ -639,7 +750,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     blockPosition = getPos();
   }
 
-  private void handleReadError(IOException cause) throws IOException {
+  private synchronized void handleReadError(IOException cause) throws IOException {
     releaseClient();
     final List<ChunkInputStream> inputStreams = this.chunkStreams;
     if (inputStreams != null) {

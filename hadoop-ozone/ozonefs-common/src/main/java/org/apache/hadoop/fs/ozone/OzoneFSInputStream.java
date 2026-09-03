@@ -37,7 +37,9 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
  * The input stream for Ozone file system.
  *
  * TODO: Make inputStream generic for both rest and rpc clients
- * This class is not thread safe.
+ * Sequential reads are not thread safe. Positioned reads use a native
+ * stateless path when the underlying {@link ExtendedInputStream} supports it;
+ * otherwise they fall back to a synchronized seek-read-restore sequence.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -46,6 +48,7 @@ public class OzoneFSInputStream extends FSInputStream
 
   private final InputStream inputStream;
   private final Statistics statistics;
+  private final Object positionedReadLock = new Object();
 
   public OzoneFSInputStream(InputStream inputStream, Statistics statistics) {
     this.inputStream = inputStream;
@@ -169,6 +172,11 @@ public class OzoneFSInputStream extends FSInputStream
     if (!buf.hasRemaining()) {
       return 0;
     }
+    // Prefer the native positioned read. For the replicated (Ratis) path this
+    // is stateless and thread-safe by construction, so it runs without any
+    // lock and lets concurrent positioned reads proceed in parallel. The
+    // StreamBlock path serializes internally. Streams that do not support a
+    // native positioned read (e.g. erasure coded) return false here.
     if (inputStream instanceof ExtendedInputStream) {
       final int remainingBeforeRead = buf.remaining();
       try {
@@ -180,6 +188,16 @@ public class OzoneFSInputStream extends FSInputStream
       }
     }
 
+    // Fallback: stateful seek-read-restore on the shared cursor. Synchronize the
+    // full sequence so concurrent positioned reads remain thread-safe when the
+    // native stateless path is unavailable (e.g. erasure coded keys).
+    synchronized (positionedReadLock) {
+      return readAtPositionSeekRestore(position, buf);
+    }
+  }
+
+  private int readAtPositionSeekRestore(long position, ByteBuffer buf)
+      throws IOException {
     long oldPos = this.getPos();
     int bytesRead;
     try {
