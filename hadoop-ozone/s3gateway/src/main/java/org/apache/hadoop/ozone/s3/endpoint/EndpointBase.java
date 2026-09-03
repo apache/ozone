@@ -42,6 +42,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PR
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
@@ -58,6 +59,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -87,6 +89,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -110,6 +113,7 @@ import org.apache.hadoop.ozone.s3.commontypes.RequestParameters;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
@@ -755,7 +759,7 @@ public abstract class EndpointBase {
       if (hasUnsignedPayload(amzContentSha256Header)) {
         chunkInputStream = new UnsignedChunksInputStream(body);
       } else {
-        chunkInputStream = new SignedChunksInputStream(body);
+        chunkInputStream = new SignedChunksInputStream(body, keyPath);
       }
       effectiveLength = Long.parseLong(amzDecodedLength);
     } else {
@@ -776,7 +780,57 @@ public abstract class EndpointBase {
     }
     MultiDigestInputStream multiDigestInputStream =
         new MultiDigestInputStream(chunkInputStream, digests);
-    return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength);
+    // Header auth only: for a presigned (query) request the payload hash is not part of the signed
+    // canonical request, so its seed signature cannot start the chunk signature chain.
+    boolean verifyChunkSignature = signatureInfo.isSignPayload()
+        && STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header);
+    return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength, verifyChunkSignature);
+  }
+
+  /**
+   * Enable chunk-signature verification on a signed multi-chunk payload, using
+   * the signing key OM derived (HDDS-15140). Called after the key is opened
+   * (when the derived key is available) and before the payload is read.
+   *
+   * <p>In secure mode OM always returns the derived key for a signed upload, so
+   * a missing key is treated as a server-side anomaly and the request is
+   * rejected rather than stored unverified. In non-secure mode there is no
+   * secret to verify against, so verification is skipped.
+   */
+  protected void attachChunkValidator(S3ChunkInputStreamInfo info, String keyPath, ByteBuffer derivedKey)
+      throws OS3Exception {
+    if (!info.isChunkSignatureVerificationRequired()) {
+      return;
+    }
+    SignedChunksInputStream signed = SignedChunksInputStream.unwrap(info.getMultiDigestInputStream());
+    if (signed == null) {
+      // Unreachable today: verification is only required for a payload that getS3ChunkInputStreamInfo
+      // wrapped in a SignedChunksInputStream. Fail rather than store the payload unverified.
+      throw internalError(keyPath,
+          "chunk-signature verification requested but the body is not a signed chunked stream");
+    }
+    if (derivedKey == null) {
+      if (OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())) {
+        throw internalError(keyPath,
+            "chunk-signature verification requested but no derived key was returned");
+      }
+      return;
+    }
+    ByteBuffer key = derivedKey.duplicate();
+    byte[] signingKey = new byte[key.remaining()];
+    key.get(signingKey);
+    signed.attachValidator(new ChunksValidator(signingKey,
+        signatureInfo.getDateTime(), signatureInfo.getCredentialScope(),
+        signatureInfo.getSignature(), keyPath));
+  }
+
+  private static OS3Exception internalError(String keyPath, String message) {
+    // OS3Exception logs itself from its constructor, before setErrorMessage can replace the generic
+    // enum text, so the specific reason has to be logged here to reach the operator.
+    LOG.error("Internal Error for {}: {}", keyPath, message);
+    OS3Exception ex = newError(S3ErrorTable.INTERNAL_ERROR, keyPath);
+    ex.setErrorMessage(message);
+    return ex;
   }
 
   public boolean isDatastreamEnabled() {
@@ -856,10 +910,13 @@ public abstract class EndpointBase {
   protected static final class S3ChunkInputStreamInfo {
     private final MultiDigestInputStream multiDigestInputStream;
     private final long effectiveLength;
+    private final boolean chunkSignatureVerificationRequired;
 
-    S3ChunkInputStreamInfo(MultiDigestInputStream multiDigestInputStream, long effectiveLength) {
+    S3ChunkInputStreamInfo(MultiDigestInputStream multiDigestInputStream, long effectiveLength,
+        boolean chunkSignatureVerificationRequired) {
       this.multiDigestInputStream = multiDigestInputStream;
       this.effectiveLength = effectiveLength;
+      this.chunkSignatureVerificationRequired = chunkSignatureVerificationRequired;
     }
 
     public MultiDigestInputStream getMultiDigestInputStream() {
@@ -868,6 +925,10 @@ public abstract class EndpointBase {
 
     public long getEffectiveLength() {
       return effectiveLength;
+    }
+
+    public boolean isChunkSignatureVerificationRequired() {
+      return chunkSignatureVerificationRequired;
     }
   }
 }
