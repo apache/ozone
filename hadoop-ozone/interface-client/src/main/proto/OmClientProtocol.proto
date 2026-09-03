@@ -166,6 +166,7 @@ enum Type {
   GetLifecycleServiceStatus    = 150;
   SetLifecycleServiceStatus    = 151;
   SaveLifecycleScanState       = 152;
+  SetObjectMetadata = 153;
 }
 
 enum SafeMode {
@@ -326,6 +327,7 @@ message OMRequest {
   optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 151;
   optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 152;
   optional SaveLifecycleScanStateRequest saveLifecycleScanStateRequest = 153;
+  optional SetObjectMetadataRequest         setObjectMetadataRequest       = 154;
 }
 
 message OMResponse {
@@ -471,6 +473,7 @@ message OMResponse {
   optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 150;
   optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 151;
   optional SaveLifecycleScanStateResponse saveLifecycleScanStateResponse = 152;
+  optional SetObjectMetadataResponse         setObjectMetadataResponse     = 153;
 }
 
 enum Status {
@@ -2460,6 +2463,16 @@ message DeleteObjectTaggingRequest {
 }
 
 message DeleteObjectTaggingResponse {
+}
+
+// Replaces the custom metadata (and tags) of an existing key without
+// rewriting its data. System-managed metadata entries (such as ETag and
+// GDPR info) are preserved by the OM.
+message SetObjectMetadataRequest {
+  required KeyArgs keyArgs = 1;
+}
+
+message SetObjectMetadataResponse {
 }
 
 enum ReadConsistencyProto {

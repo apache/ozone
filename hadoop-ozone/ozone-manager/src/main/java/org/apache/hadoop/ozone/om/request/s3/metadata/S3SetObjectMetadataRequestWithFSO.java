@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.request.s3.tagging;
+package org.apache.hadoop.ozone.om.request.s3.metadata;
 
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -26,15 +26,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles put object tagging request for FSO bucket.
+ * Handles set object metadata request for FSO bucket.
  */
-public class S3PutObjectTaggingRequestWithFSO extends S3PutObjectTaggingRequest {
+public class S3SetObjectMetadataRequestWithFSO extends S3SetObjectMetadataRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(S3PutObjectTaggingRequestWithFSO.class);
+      LoggerFactory.getLogger(S3SetObjectMetadataRequestWithFSO.class);
 
-  public S3PutObjectTaggingRequestWithFSO(OMRequest omRequest,
-                                          BucketLayout bucketLayout) {
+  public S3SetObjectMetadataRequestWithFSO(OMRequest omRequest,
+                                           BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
   }
 

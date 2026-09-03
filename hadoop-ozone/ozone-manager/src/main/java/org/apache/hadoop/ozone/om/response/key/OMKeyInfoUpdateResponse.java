@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.response.s3.tagging;
+package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
@@ -26,29 +26,29 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Response for put object tagging request.
+ * Response for requests that update an existing key in place, without changing
+ * its data (object tagging, object metadata).
  */
 @CleanupTableInfo(cleanupTables = {KEY_TABLE})
-public class S3PutObjectTaggingResponse extends OmKeyResponse {
+public class OMKeyInfoUpdateResponse extends OmKeyResponse {
 
   private OmKeyInfo omKeyInfo;
 
-  public S3PutObjectTaggingResponse(@Nonnull OMResponse omResponse,
-                                    @Nonnull OmKeyInfo omKeyinfo) {
+  public OMKeyInfoUpdateResponse(@Nonnull OMResponse omResponse,
+                                 @Nonnull OmKeyInfo omKeyInfo) {
     super(omResponse);
-    this.omKeyInfo = omKeyinfo;
+    this.omKeyInfo = omKeyInfo;
   }
 
   /**
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public S3PutObjectTaggingResponse(@Nonnull OMResponse omResponse,
-                                    @Nonnull BucketLayout bucketLayout) {
+  public OMKeyInfoUpdateResponse(@Nonnull OMResponse omResponse,
+                                 @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
     checkStatusNotOK();
   }

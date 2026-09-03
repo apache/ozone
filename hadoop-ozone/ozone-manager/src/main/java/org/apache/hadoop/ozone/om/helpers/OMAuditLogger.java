@@ -94,6 +94,7 @@ public final class OMAuditLogger {
     CMD_AUDIT_ACTION_MAP.put(Type.FinalizeUpgrade, OMAction.UPGRADE_FINALIZE);
     CMD_AUDIT_ACTION_MAP.put(Type.GetObjectTagging, OMAction.GET_OBJECT_TAGGING);
     CMD_AUDIT_ACTION_MAP.put(Type.PutObjectTagging, OMAction.PUT_OBJECT_TAGGING);
+    CMD_AUDIT_ACTION_MAP.put(Type.SetObjectMetadata, OMAction.SET_OBJECT_METADATA);
     CMD_AUDIT_ACTION_MAP.put(Type.DeleteObjectTagging, OMAction.DELETE_OBJECT_TAGGING);
     CMD_AUDIT_ACTION_MAP.put(Type.GetBucketTagging, OMAction.GET_BUCKET_TAGGING);
     CMD_AUDIT_ACTION_MAP.put(Type.PutBucketTagging, OMAction.PUT_BUCKET_TAGGING);

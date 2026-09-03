@@ -904,6 +904,12 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void setObjectMetadata(String volumeName, String bucketName, String keyName,
+      Map<String, String> metadata, Map<String, String> tags) throws IOException {
+    getBucket(volumeName, bucketName).setObjectMetadata(keyName, metadata, tags);
+  }
+
+  @Override
   public OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
       throws IOException {
     return getBucket(volumeName, bucketName).getLifecycleConfiguration();

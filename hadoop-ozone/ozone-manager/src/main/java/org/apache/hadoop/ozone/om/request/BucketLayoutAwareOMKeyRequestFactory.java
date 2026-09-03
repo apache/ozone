@@ -48,6 +48,8 @@ import org.apache.hadoop.ozone.om.request.key.OMKeySetTimesRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
 import org.apache.hadoop.ozone.om.request.key.OmKeysDeleteRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.s3.metadata.S3SetObjectMetadataRequest;
+import org.apache.hadoop.ozone.om.request.s3.metadata.S3SetObjectMetadataRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
@@ -208,6 +210,14 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
         BucketLayout.OBJECT_STORE);
     addRequestClass(Type.DeleteObjectTagging,
         S3DeleteObjectTaggingRequestWithFSO.class,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    // SetObjectMetadata
+    addRequestClass(Type.SetObjectMetadata,
+        S3SetObjectMetadataRequest.class,
+        BucketLayout.OBJECT_STORE);
+    addRequestClass(Type.SetObjectMetadata,
+        S3SetObjectMetadataRequestWithFSO.class,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
   }
