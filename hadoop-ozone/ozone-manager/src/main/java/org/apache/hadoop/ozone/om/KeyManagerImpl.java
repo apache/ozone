@@ -176,7 +176,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
@@ -894,6 +893,8 @@ public class KeyManagerImpl implements KeyManager {
                           QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()),
                           QuotaUtil.getSizePerReplica(b.getLength(), info.getReplicationConfig())
                       ))).collect(Collectors.toList());
+              // Reuse the replicated sizes computed above.
+              long purgedBytes = deletedBlocks.stream().mapToLong(DeletedBlock::getReplicatedSize).sum();
               String blockGroupName = kv.getKey() + "/" + reclaimableKeyCount++;
 
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(blockGroupName)
@@ -901,7 +902,7 @@ public class KeyManagerImpl implements KeyManager {
                   .build();
               reclaimableKeys.put(blockGroupName,
                   new PurgedKey(info.getVolumeName(), info.getBucketName(), bucketId,
-                  keyBlocks, kv.getKey(), OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
+                  keyBlocks, kv.getKey(), purgedBytes, info.isDeletedKeyCommitted()));
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);

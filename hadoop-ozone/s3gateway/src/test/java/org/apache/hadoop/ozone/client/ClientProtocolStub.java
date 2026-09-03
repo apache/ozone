@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -124,12 +125,22 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public OzoneKey headS3Object(String bucketName, String keyName,
                                int partNumber) throws IOException {
-    // The stub does not model individual multipart parts, so it returns
-    // whole-object metadata (consistent with getS3KeyDetails). Real part-number
-    // semantics (InvalidPart, per-part size) are covered by the SDK-based
-    // integration tests against a live cluster.
-    return objectStoreStub.getS3Volume().getBucket(bucketName)
-        .headObject(keyName);
+    OzoneBucket bucket = objectStoreStub.getS3Volume().getBucket(bucketName);
+    if (bucket instanceof OzoneBucketStub) {
+      return ((OzoneBucketStub) bucket).headObject(keyName, partNumber);
+    }
+    return bucket.headObject(keyName);
+  }
+
+  @Override
+  public S3HeadObjectAttributes headS3ObjectAttributes(String bucketName, String keyName)
+      throws IOException {
+    OzoneBucket bucket = objectStoreStub.getS3Volume().getBucket(bucketName);
+    OzoneKey key = bucket.headObject(keyName);
+    NavigableMap<Integer, Long> partSizes = bucket instanceof OzoneBucketStub
+        ? ((OzoneBucketStub) bucket).getCompletedMultipartPartSizes(keyName)
+        : Collections.emptyNavigableMap();
+    return new S3HeadObjectAttributes(key, partSizes);
   }
 
   @Override
