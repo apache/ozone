@@ -37,7 +37,6 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1800,7 +1799,8 @@ public final class HttpServer2 implements FilterContainer {
 
   /**
    * Utility method to initialize config key ozone.http.basedir and create a
-   * temporary directory under the current working directory if not set.
+   * temporary directory under the system temporary directory
+   * ({@code java.io.tmpdir}) if not set.
    *
    * @param ozoneConfiguration current configuration.
    * @throws IOException if unable to create a temp directory.
@@ -1809,9 +1809,10 @@ public final class HttpServer2 implements FilterContainer {
           throws IOException {
     if (org.apache.commons.lang3.StringUtils.isEmpty(ozoneConfiguration.get(
             OzoneConfigKeys.OZONE_HTTP_BASEDIR))) {
-      // Setting ozone.http.basedir to cwd if not set so that server setup
-      // doesn't fail.
-      File tmpMetaDir = Files.createTempDirectory(Paths.get(""),
+      // Create the base dir under java.io.tmpdir (not the process working
+      // directory) so server setup does not fail when the CWD is not
+      // writable, e.g. S3 Gateway running in a Kubernetes container.
+      File tmpMetaDir = Files.createTempDirectory(
               "ozone_http_tmp_base_dir").toFile();
       ShutdownHookManager.get().addShutdownHook(() -> {
         try {
