@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
@@ -43,6 +44,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -788,6 +790,52 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .getFile())
     );
     verify(outputStreamMock).write(fileBytes, 0, fileBytes.length);
+  }
+
+  @Test
+  public void testGetMetricsResponseWithNonEnumStatusCode() throws Exception {
+    HttpServletResponse responseMock = mock(HttpServletResponse.class);
+    ServletOutputStream outputStreamMock = mock(ServletOutputStream.class);
+    when(responseMock.getOutputStream()).thenReturn(outputStreamMock);
+    UriInfo uriInfoMock = mock(UriInfo.class);
+    URI uriMock = mock(URI.class);
+    when(uriMock.getQuery()).thenReturn("");
+    when(uriInfoMock.getRequestUri()).thenReturn(uriMock);
+
+    // 422 has no Response.Status enum constant; the error body must still be proxied back.
+    byte[] errorBody = "{\"status\":\"error\",\"errorType\":\"bad_data\"}".getBytes(UTF_8);
+    HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
+    when(urlConnectionMock.getResponseCode()).thenReturn(422);
+    when(urlConnectionMock.getErrorStream())
+        .thenReturn(new ByteArrayInputStream(errorBody));
+    when(reconUtilsMock.makeHttpCall(any(URLConnectionFactory.class),
+        anyString(), anyBoolean())).thenReturn(urlConnectionMock);
+
+    metricsProxyEndpoint.getMetricsResponse(PROMETHEUS_INSTANT_QUERY_API,
+        uriInfoMock, responseMock);
+
+    verify(responseMock).setStatus(HttpServletResponse.SC_BAD_GATEWAY);
+    verify(outputStreamMock).write(errorBody, 0, errorBody.length);
+  }
+
+  @Test
+  public void testGetMetricsResponseWithNullErrorStream() throws Exception {
+    HttpServletResponse responseMock = mock(HttpServletResponse.class);
+    UriInfo uriInfoMock = mock(UriInfo.class);
+    URI uriMock = mock(URI.class);
+    when(uriMock.getQuery()).thenReturn("");
+    when(uriInfoMock.getRequestUri()).thenReturn(uriMock);
+
+    HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
+    when(urlConnectionMock.getResponseCode()).thenReturn(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+    when(urlConnectionMock.getErrorStream()).thenReturn(null);
+    when(reconUtilsMock.makeHttpCall(any(URLConnectionFactory.class),
+        anyString(), anyBoolean())).thenReturn(urlConnectionMock);
+
+    assertDoesNotThrow(() -> metricsProxyEndpoint.getMetricsResponse(PROMETHEUS_INSTANT_QUERY_API,
+        uriInfoMock, responseMock));
+
+    verify(responseMock).setStatus(HttpServletResponse.SC_BAD_GATEWAY);
   }
 
   @Test
