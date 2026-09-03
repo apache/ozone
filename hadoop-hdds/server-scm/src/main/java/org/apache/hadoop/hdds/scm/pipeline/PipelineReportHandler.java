@@ -85,9 +85,6 @@ public class PipelineReportHandler implements
         if (!isNotLeaderException(e)) {
           LOGGER.error("Could not process pipeline report={} from dn={}.",
               report, dn, e);
-        } else {
-          LOGGER.info("NLE prevented pipeline from being processed on {}",
-              scmContext.getScm().getScmNodeDetails().getNodeId(), e);
         }
       }
     }
@@ -131,10 +128,8 @@ public class PipelineReportHandler implements
             dn);
       }
       if (pipeline.isHealthy()) {
-        String nodeID = scmContext.getScm().getScmNodeDetails().getNodeId();
-        LOGGER.info("Attempting to open pipeline {} on {}", pipeline, nodeID);
         pipelineManager.openPipeline(pipelineID);
-        LOGGER.info("Opened pipeline {} on {}", pipeline, nodeID);
+        LOGGER.info("Opened pipeline {}", pipelineID);
       }
     }
     if (pipeline.isHealthy()) {
