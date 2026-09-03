@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.local;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
@@ -29,6 +31,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,10 +45,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Properties;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -350,6 +359,255 @@ class TestLocalOzoneCluster {
   }
 
   @Test
+  void zeroDatanodesIsRejected() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            tempDir.resolve("local-ozone"))
+        .setDatanodes(0)
+        .build();
+
+    IOException error = assertPrepareFails(config);
+
+    assertMessageContains(error, "Datanode count 0");
+  }
+
+  /** Configuration#unset() keeps the source, so the key must read as unconfigured, not as a conflict. */
+  @Test
+  void keyUnsetAfterBeingConfiguredIsNotRejected() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_REPLICATION, ReplicationFactor.THREE.name(), "test-ozone-site.xml");
+    seed.unset(OZONE_REPLICATION);
+
+    assertEquals(ReplicationFactor.ONE.name(), prepared(seed).get(OZONE_REPLICATION));
+  }
+
+  @Test
+  void configuredMetadataDirIsReplacedByTheLocalDataDir() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_METADATA_DIRS, "/real/cluster/metadata", "test-ozone-site.xml");
+
+    assertEquals(metadataDir(tempDir.resolve("local-ozone")).toString(),
+        prepared(seed).get(OZONE_METADATA_DIRS));
+  }
+
+  @Test
+  void defaultsFileNamedByPathCountsAsUserConfig() {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_REPLICATION, ReplicationFactor.THREE.name(), "/home/me/ozone-default.xml");
+
+    IOException error = assertPrepareFails(seed);
+
+    assertMessageContains(error, OZONE_REPLICATION);
+  }
+
+  @Test
+  void tooManyDatanodesIsRejectedBeforeFormatDeletesDataDir() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    Path marker = writeMarker(dataDir, "keep me");
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setFormatMode(LocalOzoneClusterConfig.FormatMode.ALWAYS)
+        .setDatanodes(LocalOzoneCluster.MAX_DATANODES + 1)
+        .build();
+
+    assertPrepareFails(config);
+
+    assertTrue(Files.exists(marker),
+        "format ALWAYS must not delete the data dir for a run that cannot start");
+  }
+
+  @Test
+  void conflictingUserConfigIsRejected() {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_REPLICATION, ReplicationFactor.THREE.name(), "test-ozone-site.xml");
+
+    IOException error = assertPrepareFails(seed);
+
+    assertMessageContains(error, OZONE_REPLICATION);
+    assertMessageContains(error, ReplicationFactor.ONE.name());
+    assertMessageContains(error, ReplicationFactor.THREE.name());
+    assertMessageContains(error, "test-ozone-site.xml");
+  }
+
+  @Test
+  void userConfigMatchingTheLocalRequirementIsAccepted() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_REPLICATION, ReplicationFactor.ONE.name(), "test-ozone-site.xml");
+
+    assertEquals(ReplicationFactor.ONE.name(), prepared(seed).get(OZONE_REPLICATION));
+  }
+
+  @Test
+  void conflictingUserConfigIsRejectedBeforeFormatDeletesDataDir() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    Path marker = writeMarker(dataDir, "keep me");
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_REPLICATION, ReplicationFactor.THREE.name(), "test-ozone-site.xml");
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setFormatMode(LocalOzoneClusterConfig.FormatMode.ALWAYS)
+        .build();
+
+    assertPrepareFails(config, seed);
+
+    assertTrue(Files.exists(marker),
+        "format ALWAYS must not delete the data dir for a run that cannot start");
+  }
+
+  @Test
+  void duplicateConfiguredPortsAreRejectedBeforeFormatDeletesDataDir() throws Exception {
+    Path dataDir = tempDir.resolve("local-ozone");
+    Path marker = writeMarker(dataDir, "keep me");
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
+        .setFormatMode(LocalOzoneClusterConfig.FormatMode.ALWAYS)
+        .setScmPort(9860)
+        .setOmPort(9860)
+        .build();
+
+    IOException error = assertPrepareFails(config);
+
+    assertMessageContains(error, "more than once");
+    assertTrue(Files.exists(marker),
+        "format ALWAYS must not delete the data dir for a run that cannot start");
+  }
+
+  /** Hadoop keeps XML whitespace, so padding around the required value is not a conflict. */
+  @Test
+  void paddedValueMatchingTheLocalRequirementIsAccepted() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_REPLICATION_TYPE, "\n  STAND_ALONE\n", "test-ozone-site.xml");
+
+    assertEquals(ReplicationType.STAND_ALONE.name(), prepared(seed).get(OZONE_REPLICATION_TYPE));
+  }
+
+  /** Duration#toNanos throws ArithmeticException for this timeout, so the wait must not call it. */
+  @Test
+  void readinessAcceptsTimeoutBeyondNanoTimeRange() throws Exception {
+    LocalOzoneCluster.waitForReadiness(() -> null, "Ozone cluster",
+        Duration.ofDays(999_999_999L));
+  }
+
+  @Test
+  void equivalentDurationSpellingIsAccepted() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(HDDS_HEARTBEAT_INTERVAL, "1000ms", "test-ozone-site.xml");
+    seed.set(OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY, "1000ms", "test-ozone-site.xml");
+    seed.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "3000ms", "test-ozone-site.xml");
+
+    OzoneConfiguration conf = prepared(seed);
+
+    assertEquals("1s", conf.get(HDDS_HEARTBEAT_INTERVAL));
+    assertEquals("1s", conf.get(OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY));
+    assertEquals("3s", conf.get(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT));
+  }
+
+  @Test
+  void unitlessConfigurationDurationsAreRejected() {
+    assertUnitlessDurationRejected(HDDS_HEARTBEAT_INTERVAL, "1000");
+    assertUnitlessDurationRejected(OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY, "1");
+    assertUnitlessDurationRejected(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "3000");
+  }
+
+  @Test
+  void equivalentBooleanSpellingIsAccepted() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(HDDS_CONTAINER_RATIS_ENABLED_KEY, "FALSE", "test-ozone-site.xml");
+
+    assertFalse(prepared(seed).getBoolean(HDDS_CONTAINER_RATIS_ENABLED_KEY, true));
+  }
+
+  @Test
+  void numericReplicationIsAccepted() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_SERVER_DEFAULT_REPLICATION_KEY, "1", "test-ozone-site.xml");
+
+    assertEquals(ReplicationFactor.ONE.name(),
+        prepared(seed).get(OZONE_SERVER_DEFAULT_REPLICATION_KEY));
+  }
+
+  @Test
+  void conflictingDurationIsRejected() {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(HDDS_HEARTBEAT_INTERVAL, "30s", "test-ozone-site.xml");
+
+    IOException error = assertPrepareFails(seed);
+
+    assertMessageContains(error, HDDS_HEARTBEAT_INTERVAL);
+    assertMessageContains(error, "30s");
+  }
+
+  @Test
+  void unparseableValueIsRejected() {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(HDDS_HEARTBEAT_INTERVAL, "banana", "test-ozone-site.xml");
+
+    IOException error = assertPrepareFails(seed);
+
+    assertMessageContains(error, HDDS_HEARTBEAT_INTERVAL);
+    assertMessageContains(error, "banana");
+  }
+
+  /**
+   * Regression guard: ozone-default.xml ships hdds.heartbeat.interval=30s, so a shipped default read as a
+   * user choice would reject every run.
+   */
+  @Test
+  void shippedDefaultIsNotTreatedAsUserConfig() throws Exception {
+    assertEquals("1s", prepared(new OzoneConfiguration()).get(HDDS_HEARTBEAT_INTERVAL));
+    assertNotEquals("1s", new OzoneConfiguration().get(HDDS_HEARTBEAT_INTERVAL),
+        "the shipped default must differ from the local value, or this guards nothing");
+  }
+
+  @Test
+  void generatedShippedDefaultIsNotTreatedAsUserConfig() throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_REPLICATION, ReplicationFactor.THREE.name(), "hdds-server-scm-default.xml");
+
+    assertEquals(ReplicationFactor.ONE.name(), prepared(seed).get(OZONE_REPLICATION));
+  }
+
+  @Test
+  void safeModeRuleBlockerListsOnlyUnmetRules() {
+    String blocker = LocalOzoneCluster.formatSafeModeRuleBlocker(Arrays.asList(
+        safeModeRule("registered datanodes", true, "registered"),
+        safeModeRule("healthy containers", false, "1 of 3 reported")));
+
+    assertEquals("healthy containers: 1 of 3 reported", blocker);
+  }
+
+  @Test
+  void safeModeRuleBlockerFallsBackToSatisfiedRuleStatuses() {
+    String blocker = LocalOzoneCluster.formatSafeModeRuleBlocker(Collections.singletonList(
+        safeModeRule("registered datanodes", true, "registered")));
+
+    assertEquals("all rules currently report satisfied: registered datanodes: registered", blocker);
+  }
+
+  @Test
+  void safeModeRuleBlockerExplainsUnavailableRuleStatus() {
+    assertEquals("safe-mode rule status is not available yet",
+        LocalOzoneCluster.formatSafeModeRuleBlocker(Collections.emptyList()));
+  }
+
+  @Test
+  void readinessTimeoutNamesTheUnmetCondition() {
+    TimeoutException error = assertThrows(TimeoutException.class,
+        () -> LocalOzoneCluster.waitForReadiness(() -> "only 1 of 3 datanodes have registered",
+            "Ozone cluster", Duration.ZERO));
+
+    assertMessageContains(error, "only 1 of 3 datanodes have registered");
+    assertMessageContains(error, "Ozone cluster");
+  }
+
+  @Test
+  void readinessReturnsOnceBlockerReportsReady() throws Exception {
+    AtomicInteger attempts = new AtomicInteger();
+
+    LocalOzoneCluster.waitForReadiness(
+        () -> attempts.incrementAndGet() < 2 ? "not yet" : null, "Ozone cluster",
+        Duration.ofSeconds(30));
+
+    assertEquals(2, attempts.get());
+  }
+
+  @Test
   void persistedPortFileContainsDatanodePorts() throws Exception {
     Path dataDir = tempDir.resolve("local-ozone");
     LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(dataDir)
@@ -425,15 +683,46 @@ class TestLocalOzoneCluster {
     return new LocalOzoneCluster(config, new OzoneConfiguration());
   }
 
+  private OzoneConfiguration prepared(OzoneConfiguration seed) throws IOException {
+    LocalOzoneClusterConfig config = defaultConfig();
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, seed)) {
+      return cluster.prepareConfiguration().getConfiguration();
+    }
+  }
+
+  private LocalOzoneClusterConfig defaultConfig() {
+    return LocalOzoneClusterConfig.builder(tempDir.resolve("local-ozone")).build();
+  }
+
   private IOException assertPrepareFails(LocalOzoneClusterConfig config) {
+    return assertPrepareFails(config, new OzoneConfiguration());
+  }
+
+  private IOException assertPrepareFails(OzoneConfiguration seed) {
+    return assertPrepareFails(defaultConfig(), seed);
+  }
+
+  private IOException assertPrepareFails(LocalOzoneClusterConfig config,
+      OzoneConfiguration seed) {
     return assertThrows(IOException.class, () -> {
-      try (LocalOzoneCluster cluster = newCluster(config)) {
+      try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, seed)) {
         cluster.prepareConfiguration();
       }
     });
   }
 
-  private void assertMessageContains(IOException error, String expectedText) {
+  private void assertUnitlessDurationRejected(String key, String value) {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(key, value, "test-ozone-site.xml");
+
+    IOException error = assertPrepareFails(seed);
+
+    assertMessageContains(error, key);
+    assertMessageContains(error, value);
+    assertMessageContains(error, "test-ozone-site.xml");
+  }
+
+  private void assertMessageContains(Exception error, String expectedText) {
     assertTrue(error.getMessage().contains(expectedText), error.getMessage());
   }
 
@@ -454,6 +743,14 @@ class TestLocalOzoneCluster {
 
   private void assertPositivePort(Properties properties, String key) {
     assertTrue(Integer.parseInt(properties.getProperty(key)) > 0, key);
+  }
+
+  private static SafeModeRuleStatusProto safeModeRule(String name, boolean validated, String status) {
+    return SafeModeRuleStatusProto.newBuilder()
+        .setRuleName(name)
+        .setValidate(validated)
+        .setStatusText(status)
+        .build();
   }
 
   private Path metadataDir(Path dataDir) {
