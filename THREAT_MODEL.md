@@ -176,6 +176,20 @@ stock install and must be explicitly enabled:
   `hdds.secret.key.rotate.check.duration=10m`, and `HmacSHA256`.
 - **gRPC TLS** is off by default (`hdds.grpc.tls.enabled=false`) and protects
   gRPC traffic when enabled.
+- **Service-level authorization (internal RPC-protocol ACLs)** is off by default
+  (`hadoop.security.authorization=false`). When enabled, each internal SCM/OM/DN
+  RPC protocol is gated by a Hadoop service ACL — e.g.
+  `hdds.security.client.scm.block.protocol.acl`,
+  `hdds.security.client.scm.container.protocol.acl`,
+  `ozone.om.security.client.protocol.acl` — **each defaulting to `*`** (any
+  authenticated principal). The correct value is the set of *service* principals
+  that legitimately call the protocol, and it is **not knowable at build time**
+  (it depends on realm, `_HOST`/hostnames, `auth_to_local`, and the HA member
+  set), so `*` is the only universal default and tightening it is operator config
+  (§10). An internal protocol may serve more than one service: the SCM **block**
+  protocol is OM↔SCM — OM calls `allocateBlock`/`deleteKeyBlocks`/`finalizeUpgrade`
+  while SCM peers call `addSCM`/`getScmInfo` during bootstrap — so its ACL is OM
+  **and** SCM, not OM alone. *(inferred — `SCMPolicyProvider`, `ozone-default.xml`.)*
 - **TDE/KMS** is optional and protects data at rest only for encrypted buckets;
   it requires a configured KMS, for example via `hadoop.security.key.provider.path`.
 
@@ -265,6 +279,16 @@ Per-boundary input trust (grouped by family):
 - **It does not author your authorization policy.** Ozone enforces ACLs/Ranger
   *as configured*; an over-broad Ranger policy or world-readable ACL is an
   operator decision, not an Ozone flaw (§10).
+- **It does not restrict its internal RPC protocols for you.** Service-level
+  authorization (`hadoop.security.authorization` + the per-protocol
+  `hdds.security.client.*.protocol.acl` / `ozone.om.security.client.protocol.acl`
+  ACLs) is what confines an OM↔SCM↔DN service protocol to its intended service
+  principals; these default to `*`, and tightening them is an operator decision
+  just like the object ACL above. An internal RPC that relies solely on this ACL,
+  with no extra in-code per-method admin check (e.g. the SCM block protocol's
+  `deleteKeyBlocks` and `finalizeUpgrade`), is **by design** — the ACL is the
+  gate, and a per-method `checkAdminAccess` is an optional extra, not a
+  requirement (§11a).
 - **It does not protect its dependencies.** KDC/Ranger/KMS/SCM-CA-key/network
   security are the operator's (§3/§10).
 - **No defence against a Byzantine majority** of a Ratis ring, and **no full
@@ -287,6 +311,12 @@ Per-boundary input trust (grouped by family):
 - **Secure the dependencies:** harden/operate the KDC, author least-privilege
   Ranger/ACL policies, protect the **SCM CA private key**, manage KMS keys,
   network-isolate datanode/Ratis/admin ports.
+- **Restrict internal RPC protocols to service principals:** enable
+  `hadoop.security.authorization` and set each `hdds.security.client.*.protocol.acl`
+  / `ozone.om.security.client.protocol.acl` from its `*` default to the service
+  principals that use it (the SCM block protocol → OM **and** SCM). Leaving them
+  `*` lets any authenticated principal invoke OM↔SCM service RPCs such as block
+  deletion or upgrade finalization.
 - **Protect tokens and secrets:** enable the relevant transport encryption
   (Hadoop RPC privacy, gRPC TLS, and/or HTTPS) so block/delegation tokens and S3
   secrets aren't sniffable; rotate S3 secrets; review token lifetimes for the
@@ -322,6 +352,16 @@ list. *(requested by jojochuang, 2026-06-25.)*
   scoped (§6/§8).
 - **Ranger policy too permissive** — operator policy decision, not Ozone code
   (§9/§10). `OUT-OF-MODEL: trusted-input`.
+- **Internal service RPC protocol relies on a default-`*` service ACL, or drops
+  a per-method admin check in favor of the ACL** — non-finding. The
+  `hdds.security.client.*.protocol.acl` / `ozone.om.security.client.protocol.acl`
+  service ACLs are the operator's gate for confining OM↔SCM↔DN protocols to
+  service principals; their `*` default, and relying on them without a redundant
+  in-code admin check (as `deleteKeyBlocks` and `finalizeUpgrade` do), are
+  operator config and by-design, not Ozone flaws (§9/§10). `OUT-OF-MODEL:
+  trusted-input` — **unless** the *user-facing* entry point that reaches it
+  (OM/S3G/CLI request handler) also lacks its own authorization check, which
+  would be `VALID`.
 - **Findings in `ozone-thirdparty`, `integration-test-*`, `*TestImpl`** —
   `OUT-OF-MODEL: unsupported-component` (§3).
 - **KDC/KMS/Ranger/SCM-CA-key compromise scenarios** — out of layer (§3/§7).
@@ -343,7 +383,7 @@ list. *(requested by jojochuang, 2026-06-25.)*
 | --- | --- | --- |
 | `VALID` | A §8 property breaks in secure mode, via an in-scope actor. | §8, §6, §7 |
 | `VALID-HARDENING` | No §8 break, but a §11 misuse is too easy to fall into. | §11 |
-| `OUT-OF-MODEL: trusted-input` | Requires control of operator config (Ranger/ACL/keys). | §6/§10 |
+| `OUT-OF-MODEL: trusted-input` | Requires control of operator config (Ranger/object ACL, service-protocol ACLs, keys). | §6/§10 |
 | `OUT-OF-MODEL: adversary-not-in-scope` | Needs KDC/CA-key/Byzantine-majority. | §7 |
 | `OUT-OF-MODEL: non-default-build` | Only in non-secure mode (or a discouraged knob). | §5a |
 | `OUT-OF-MODEL: unsupported-component` | thirdparty / test / infra Ozone doesn't own. | §3 |
@@ -384,6 +424,13 @@ list. *(requested by jojochuang, 2026-06-25.)*
   Folded into §5a.)* (§8.)
 - **Q-token.** Block/delegation token lifetimes, signing-key rotation, and the
   bearer-token caveat in §9 — confirm. (§8/§9.)
+- **Q-svcacl.** *(inferred — pending maintainer confirmation.)* Confirm that
+  Hadoop service-level authorization (`hadoop.security.authorization` + the
+  `hdds.security.client.*.protocol.acl` / `ozone.om.security.client.protocol.acl`
+  ACLs) is the intended in-cluster gate for internal OM↔SCM↔DN RPC protocols; that
+  its `*` default is operator-tightened like object ACLs; and that internal
+  protocols (e.g. SCM block: `deleteKeyBlocks`, `finalizeUpgrade`) intentionally
+  rely on it without a per-method admin check. (§5a/§9/§10/§11a.)
 - **Q-tde / Q-net / Q-infra.** TDE/KMS production expectations, the
   network-isolation assumptions, and which dependencies (KDC/Ranger/KMS) you want
   explicitly named as operator-owned in §3/§10. (§5/§3/§10.)
