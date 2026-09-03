@@ -146,26 +146,30 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
       DeletedBlocksTransactionSummary summary) throws IOException {
-    for (DeletedBlocksTransaction tx : txs) {
-      transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
-    }
-    if (summary != null) {
-      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
-    }
+    transactionBuffer.runWithBufferLock(() -> {
+      for (DeletedBlocksTransaction tx : txs) {
+        transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
+      }
+      if (summary != null) {
+        transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
+      }
+    });
   }
 
   @Override
   public void removeTransactionsFromDB(ArrayList<Long> txIDs, DeletedBlocksTransactionSummary summary)
       throws IOException {
-    if (deletingTxIDs != null) {
-      deletingTxIDs.addAll(txIDs);
-    }
-    for (Long txID : txIDs) {
-      transactionBuffer.removeFromBuffer(deletedTable, txID);
-    }
-    if (summary != null) {
-      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
-    }
+    transactionBuffer.runWithBufferLock(() -> {
+      if (deletingTxIDs != null) {
+        deletingTxIDs.addAll(txIDs);
+      }
+      for (Long txID : txIDs) {
+        transactionBuffer.removeFromBuffer(deletedTable, txID);
+      }
+      if (summary != null) {
+        transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
+      }
+    });
   }
 
   @Override
