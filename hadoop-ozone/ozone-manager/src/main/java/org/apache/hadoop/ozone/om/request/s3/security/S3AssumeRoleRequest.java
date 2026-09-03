@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -115,6 +116,11 @@ public class S3AssumeRoleRequest extends OMClientRequest {
         auditMap, roleArn, roleSessionName, awsIamSessionPolicy, durationSeconds, requestId);
 
     try {
+      if (!omRequest.hasS3Authentication()) {
+        throw new OMException(
+            "S3AssumeRoleRequest does not have S3 authentication", OMException.ResultCodes.INVALID_REQUEST);
+      }
+
       // Brief overview of flow:
       // The STS Endpoint makes the AssumeRole call, which when received by OM leader (via this method),
       // it will validate the request, authorize via Ranger, generate temporary credentials
@@ -122,16 +128,10 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       // The original AssumeRole request is converted to an UpdateAssumeRoleRequest with the generated
       // values. This update request will be submitted to Ratis and replicated across all OMs.
       // All OMs in HA mode therefore will have identical audit logs with the same tempAccessKeyId.
-
       S3STSUtils.validateDuration(durationSeconds);
       S3STSUtils.validateRoleSessionName(roleSessionName);
       final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
-
-      if (!omRequest.hasS3Authentication()) {
-        throw new OMException(
-            "S3AssumeRoleRequest does not have S3 authentication", OMException.ResultCodes.INVALID_REQUEST);
-      }
-
+      
       // Generate temporary AWS credentials using cryptographically strong SecureRandom
       final String tempAccessKeyId = STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
           STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
@@ -142,9 +142,11 @@ public class S3AssumeRoleRequest extends OMClientRequest {
           STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
           STS_ROLE_ID_LENGTH);
 
+      final Instant creationInstant = clock.instant();
       final String sessionToken = generateSessionToken(
-          targetRoleName, omRequest, ozoneManager, assumeRoleRequest, secretAccessKey, tempAccessKeyId);
-      final long expirationEpochSeconds = clock.instant().plusSeconds(durationSeconds).getEpochSecond();
+          targetRoleName, omRequest, ozoneManager, assumeRoleRequest, secretAccessKey, tempAccessKeyId,
+          creationInstant);
+      final long expirationEpochSeconds = creationInstant.plusSeconds(durationSeconds).getEpochSecond();
 
       auditMap.put(OzoneConsts.S3_STS_TEMP_ACCESS_KEY_ID, tempAccessKeyId);
 
@@ -245,7 +247,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
    */
   private String generateSessionToken(String targetRoleName, OMRequest omRequest,
       OzoneManager ozoneManager, AssumeRoleRequest assumeRoleRequest, String secretAccessKey,
-      String tempAccessKeyId) throws IOException {
+      String tempAccessKeyId, Instant creationInstant) throws IOException {
 
     InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
     if (remoteIp == null) {
@@ -270,7 +272,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
     return ozoneManager.getSTSTokenSecretManager().createSTSTokenString(
         tempAccessKeyId, originalAccessKeyId, roleArn, assumeRoleRequest.getDurationSeconds(), secretAccessKey,
-        sessionPolicy, clock);
+        sessionPolicy, creationInstant);
   }
 
   /**
