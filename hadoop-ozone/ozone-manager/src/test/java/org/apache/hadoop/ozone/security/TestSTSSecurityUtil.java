@@ -307,7 +307,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenRejectsDoubledToken() throws Exception {
     final String tokenString = tokenSecretManager.createSTSTokenString(
         TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS,
-        SECRET_ACCESS_KEY, SESSION_POLICY, clock);
+        SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
 
     assertThatThrownBy(() ->
         STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString + tokenString, secretKeyClient, clock))
@@ -320,7 +320,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenRejectsTokenWithSuffix() throws Exception {
     final String tokenString = tokenSecretManager.createSTSTokenString(
         TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS,
-        SECRET_ACCESS_KEY, SESSION_POLICY, clock);
+        SECRET_ACCESS_KEY, SESSION_POLICY, clock.instant());
 
     assertThatThrownBy(() ->
         STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString + "garbage", secretKeyClient, clock))
