@@ -166,6 +166,7 @@ enum Type {
   GetLifecycleServiceStatus    = 150;
   SetLifecycleServiceStatus    = 151;
   SaveLifecycleScanState       = 152;
+  GetBucketDeletedBytes        = 153;
 }
 
 enum SafeMode {
@@ -326,6 +327,7 @@ message OMRequest {
   optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 151;
   optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 152;
   optional SaveLifecycleScanStateRequest saveLifecycleScanStateRequest = 153;
+  optional GetBucketDeletedBytesRequest getBucketDeletedBytesRequest = 154;
 }
 
 message OMResponse {
@@ -471,6 +473,7 @@ message OMResponse {
   optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 150;
   optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 151;
   optional SaveLifecycleScanStateResponse saveLifecycleScanStateResponse = 152;
+  optional GetBucketDeletedBytesResponse getBucketDeletedBytesResponse = 153;
 }
 
 enum Status {
@@ -1734,6 +1737,19 @@ message ListOpenFilesResponse {
   // result
   repeated uint64 clientID = 4;
   repeated KeyInfo keyInfo = 5;
+}
+
+message GetBucketDeletedBytesRequest {
+  required string bucketPath = 1;
+}
+
+message GetBucketDeletedBytesResponse {
+  required uint64 snapshotTrappedBytes = 1;
+  required uint64 purgeableBytes = 2;
+  optional uint64 snapshotTrappedKeys = 3;
+  optional uint64 purgeableKeys = 4;
+  optional uint64 snapshotTrappedDirs = 5;
+  optional uint64 purgeableDirs = 6;
 }
 
 message ServicePort {
