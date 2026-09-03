@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.StoragePolicy;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -654,6 +655,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setBucketName(bucketName)
         .addAllAcls(OzoneAclUtil.toProtobuf(acls))
         .setIsVersionEnabled(isVersionEnabled)
+        // Emit legacy `storageType = DISK` so pre-storage-policy peers whose
+        // BucketInfo proto still has `required storageType = 5` can deserialize
+        // messages produced by this OM. The field is deprecated on our side;
+        // storage policy lives in `storagePolicy` (field 24). Do not read this
+        // field back into OmBucketInfo.
+        .setStorageType(HddsProtos.StorageTypeProto.DISK)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .setObjectID(getObjectID())
