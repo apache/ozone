@@ -17,12 +17,11 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETING_SERVICE_INTERVAL_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -115,7 +114,7 @@ public class BlockDeletingService extends BackgroundService {
 
   public void registerReconfigCallbacks(ReconfigurationHandler handler) {
     handler.registerCompleteCallback((changedKeys, newConf) -> {
-      if (changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_INTERVAL) ||
+      if (changedKeys.containsKey(BLOCK_DELETING_SERVICE_INTERVAL_KEY) ||
           changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT) ||
           changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_WORKERS)) {
         updateAndRestart((OzoneConfiguration) newConf);
@@ -124,21 +123,21 @@ public class BlockDeletingService extends BackgroundService {
   }
 
   public void updateAndRestart(OzoneConfiguration ozoneConf) {
-    long newInterval = ozoneConf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-        OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+    long newInterval = ozoneConf.getObject(DatanodeConfiguration.class)
+        .getBlockDeletionInterval().toMillis();
     int newCorePoolSize = ozoneConf.getInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
         OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT);
     long newTimeout = ozoneConf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
         OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT, TimeUnit.NANOSECONDS);
     LOG.info("Updating and restarting BlockDeletingService with interval {} {}" +
             ", core pool size {} and timeout {} {}",
-        newInterval, TimeUnit.SECONDS.name().toLowerCase(), newCorePoolSize, newTimeout,
+        newInterval, TimeUnit.MILLISECONDS.name().toLowerCase(), newCorePoolSize, newTimeout,
         TimeUnit.NANOSECONDS.name().toLowerCase());
     // shutdown() awaits the executor; do not hold this monitor (same object as
     // BackgroundService.PeriodicalTask) or the pool thread can deadlock.
     shutdown();
     synchronized (this) {
-      setInterval(newInterval, TimeUnit.SECONDS);
+      setInterval(newInterval, TimeUnit.MILLISECONDS);
       setPoolSize(newCorePoolSize);
       setServiceTimeoutInNanos(newTimeout);
       start();
