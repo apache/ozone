@@ -751,6 +751,46 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   }
 
   @Test
+  public void testProcessForSplitSchemaMPU() throws Exception {
+    String uploadID = UUID.randomUUID().toString();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    OmMultipartKeyInfo splitMpu = new OmMultipartKeyInfo.Builder()
+        .setObjectID(1L)
+        .setUploadID(uploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    String multipartKey = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
+
+    putSplitSchemaPart(uploadID, volumeName, bucketName, keyName, 1, 100L);
+    putSplitSchemaPart(uploadID, volumeName, bucketName, keyName, 2, 100L);
+    putSplitSchemaPart(uploadID, volumeName, bucketName, keyName, 3, 100L);
+
+    ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
+    putEvents.add(getOMUpdateEvent(multipartKey, splitMpu, MULTIPART_INFO_TABLE, PUT, null));
+    OMUpdateEventBatch putBatch = new OMUpdateEventBatch(putEvents, 0L);
+    omTableInsightTask.process(putBatch, Collections.emptyMap());
+
+    assertEquals(1L, getCountForTable(MULTIPART_INFO_TABLE));
+    assertEquals(300L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(900L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+
+    ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
+    deleteEvents.add(getOMUpdateEvent(multipartKey, splitMpu, MULTIPART_INFO_TABLE, DELETE, null));
+    OMUpdateEventBatch deleteBatch = new OMUpdateEventBatch(deleteEvents, 0L);
+    omTableInsightTask.process(deleteBatch, Collections.emptyMap());
+
+    assertEquals(0L, getCountForTable(MULTIPART_INFO_TABLE));
+    assertEquals(0L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(0L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+  }
+
+  @Test
   public void testReprocessForMultipartInfoTable() throws Exception {
     String uploadID = UUID.randomUUID().toString();
     OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()

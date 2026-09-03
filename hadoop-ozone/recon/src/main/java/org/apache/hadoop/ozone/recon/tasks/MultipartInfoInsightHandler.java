@@ -78,13 +78,16 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
    */
   @Override
   public void handlePutEvent(OMDBUpdateEvent<String, Object> event, String tableName, Map<String, Long> objectCountMap,
-      Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
+      Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap,
+      org.apache.hadoop.ozone.om.OMMetadataManager omMetadataManager) {
 
     if (event.getValue() != null) {
       OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count + 1L);
       applyLegacyPartSizes(multipartKeyInfo, tableName, unReplicatedSizeMap, replicatedSizeMap, true);
+      applySplitSchemaPartSizes(multipartKeyInfo, event.getKey(), tableName, unReplicatedSizeMap,
+          replicatedSizeMap, true, omMetadataManager);
     } else {
       LOG.warn("Put event does not have the Multipart Key Info for {}.", event.getKey());
     }
@@ -96,13 +99,16 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
    */
   @Override
   public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event, String tableName,
-      Map<String, Long> objectCountMap, Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
+      Map<String, Long> objectCountMap, Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap,
+      org.apache.hadoop.ozone.om.OMMetadataManager omMetadataManager) {
 
     if (event.getValue() != null) {
       OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count > 0 ? count - 1L : 0L);
       applyLegacyPartSizes(multipartKeyInfo, tableName, unReplicatedSizeMap, replicatedSizeMap, false);
+      applySplitSchemaPartSizes(multipartKeyInfo, event.getKey(), tableName, unReplicatedSizeMap,
+          replicatedSizeMap, false, omMetadataManager);
     } else {
       LOG.warn("Delete event does not have the Multipart Key Info for {}.", event.getKey());
     }
@@ -114,7 +120,8 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
    */
   @Override
   public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event, String tableName,
-      Map<String, Long> objectCountMap, Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
+      Map<String, Long> objectCountMap, Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap,
+      org.apache.hadoop.ozone.om.OMMetadataManager omMetadataManager) {
 
     if (event.getValue() != null) {
       if (event.getOldValue() == null) {
@@ -128,7 +135,11 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       OmMultipartKeyInfo oldMultipartKeyInfo = (OmMultipartKeyInfo) event.getOldValue();
       OmMultipartKeyInfo newMultipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
       applyLegacyPartSizes(oldMultipartKeyInfo, tableName, unReplicatedSizeMap, replicatedSizeMap, false);
+      applySplitSchemaPartSizes(oldMultipartKeyInfo, event.getKey(), tableName, unReplicatedSizeMap,
+          replicatedSizeMap, false, omMetadataManager);
       applyLegacyPartSizes(newMultipartKeyInfo, tableName, unReplicatedSizeMap, replicatedSizeMap, true);
+      applySplitSchemaPartSizes(newMultipartKeyInfo, event.getKey(), tableName, unReplicatedSizeMap,
+          replicatedSizeMap, true, omMetadataManager);
     } else {
       LOG.warn("Update event does not have the Multipart Key Info for {}.", event.getKey());
     }
@@ -226,6 +237,60 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       updateSize(unReplicatedSizeMap, getUnReplicatedSizeKeyFromTable(tableName), dataSize, add, "unreplicated");
       updateSize(replicatedSizeMap, getReplicatedSizeKeyFromTable(tableName), replicatedSize, add, "replicated");
     });
+  }
+
+  /**
+   * Adds (or subtracts) the sizes of a split-schema MPU's parts from the size maps by querying
+   * the multipartPartsTable. For legacy-schema MPUs, this method does nothing (their parts are
+   * embedded and handled by applyLegacyPartSizes).
+   *
+   * @param multipartKeyInfo The MPU metadata.
+   * @param multipartKey The MPU key (used to extract uploadId).
+   * @param tableName The table name.
+   * @param unReplicatedSizeMap Map to update with unreplicated sizes.
+   * @param replicatedSizeMap Map to update with replicated sizes.
+   * @param add {@code true} to add sizes, {@code false} to subtract.
+   * @param omMetadataManager OM metadata manager for accessing multipartPartsTable.
+   */
+  private void applySplitSchemaPartSizes(OmMultipartKeyInfo multipartKeyInfo, String multipartKey, String tableName,
+      Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap, boolean add,
+      org.apache.hadoop.ozone.om.OMMetadataManager omMetadataManager) {
+    if (isLegacySchema(multipartKeyInfo)) {
+      return;
+    }
+    try {
+      String uploadId = getUploadIdFromMultipartKey(multipartKey);
+      Table<OmMultipartPartKey, OmMultipartPartInfo> partsTable = omMetadataManager.getMultipartPartsTable();
+      if (partsTable == null) {
+        return;
+      }
+      try (TableIterator<OmMultipartPartKey, Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo>> iter =
+               partsTable.iterator()) {
+        iter.seek(OmMultipartPartKey.prefix(uploadId));
+        while (iter.hasNext()) {
+          Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo> kv = iter.next();
+          if (kv == null || kv.getKey() == null) {
+            break;
+          }
+          OmMultipartPartKey partKey = kv.getKey();
+          if (!partKey.getUploadId().equals(uploadId)) {
+            break;
+          }
+          OmMultipartPartInfo partInfo = kv.getValue();
+          if (partInfo != null) {
+            long partDataSize = partInfo.getDataSize();
+            long partReplicatedSize = QuotaUtil.getReplicatedSize(partDataSize,
+                multipartKeyInfo.getReplicationConfig());
+            updateSize(unReplicatedSizeMap, getUnReplicatedSizeKeyFromTable(tableName), partDataSize, add,
+                "unreplicated");
+            updateSize(replicatedSizeMap, getReplicatedSizeKeyFromTable(tableName), partReplicatedSize, add,
+                "replicated");
+          }
+        }
+      }
+    } catch (IOException e) {
+      LOG.warn("Error reading split-schema MPU parts for key: {}", multipartKey, e);
+    }
   }
 
   /**
