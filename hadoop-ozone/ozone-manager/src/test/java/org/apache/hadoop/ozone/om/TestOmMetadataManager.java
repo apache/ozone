@@ -173,7 +173,7 @@ public class TestOmMetadataManager {
       assertEquals(ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND, ex.getResult());
       // A bucket without a lifecycle configuration is an expected outcome, so the
       // catch-all must not report it with an error and a stack trace.
-      assertFalse(logCapturer.getOutput().contains("Exception while getting lifecycle configuration"));
+      assertThat(logCapturer.getOutput()).doesNotContain("Exception while getting lifecycle configuration");
     }
   }
 
