@@ -137,7 +137,7 @@ on:
 env:
   HADOOP_IMAGE: ghcr.io/apache/hadoop
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Daether.connector.http.retryHandler.count=10
   OZONE_IMAGE: ghcr.io/apache/ozone
   OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
   OZONE_VOLUME_OWNER: 1000
