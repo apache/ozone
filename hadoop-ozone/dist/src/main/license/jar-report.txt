@@ -1,5 +1,6 @@
 share/ozone/lib/aircompressor.jar
 share/ozone/lib/aircompressor.jar
+share/ozone/lib/angus-activation.jar
 share/ozone/lib/animal-sniffer-annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/annotations.jar

@@ -213,6 +213,7 @@ EDL 1.0
    com.sun.activation:jakarta.activation
    jakarta.activation:jakarta.activation-api
    jakarta.xml.bind:jakarta.xml.bind-api
+   org.eclipse.angus:angus-activation
    org.locationtech.jts:jts-core
 
 
