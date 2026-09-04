@@ -915,6 +915,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(2L, rocksCount3.longValue(), "Expected RocksDB bin 1024 to have count 2 for vol2/bucket1");
 
     // --- Now test the query endpoints of the utilization service ---
+    verifyFileCountQueries();
+  }
+
+  /**
+   * Verify the filtering behaviour of the fileCount endpoint against the
+   * bins written by {@link #testGetFileCounts()}: vol1/bucket1:1024,
+   * vol1/bucket1:131072 and vol2/bucket1:1024, each with count 2.
+   */
+  private void verifyFileCountQueries() {
     Response response = utilizationEndpoint.getFileCounts(null, null, 0);
     List<FileCountBySize> resultSet =
         (List<FileCountBySize>) response.getEntity();
