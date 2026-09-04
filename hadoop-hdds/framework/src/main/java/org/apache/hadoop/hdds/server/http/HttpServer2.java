@@ -837,21 +837,47 @@ public final class HttpServer2 implements FilterContainer {
       defaultContexts.put(logContext, true);
     }
     // set up the context for "/static/*"
-    ServletContextHandler staticContext =
-        new ServletContextHandler("/static");
-    parent.addHandler(staticContext);
-    staticContext.setBaseResourceAsString(appDir + "/static");
-    staticContext.addServlet(DefaultServlet.class, "/*");
-    staticContext.setDisplayName("static");
-    Map<String, String> params = staticContext.getInitParams();
-    params.put("org.eclipse.jetty.servlet.Default.dirAllowed", "false");
-    params.put("org.eclipse.jetty.servlet.Default.gzip", "true");
-    SessionHandler handler = new SessionHandler();
-    handler.setHttpOnly(true);
-    handler.getSessionCookieConfig().setSecure(true);
-    staticContext.setSessionHandler(handler);
-    setContextAttributes(staticContext, conf);
-    defaultContexts.put(staticContext, true);
+    // Jetty 12 refuses to start a context whose base resource does not exist.
+    // The shared static assets are unpacked into the module's webapps
+    // directory at package time, so they are present in the packaged jar/dist
+    // but may be absent while unit tests run; serve "/static" only when the
+    // base resource exists (Jetty 9 silently tolerated a missing base).
+    String staticBase = appDir + "/static";
+    if (baseResourceExists(staticBase)) {
+      ServletContextHandler staticContext =
+          new ServletContextHandler("/static");
+      parent.addHandler(staticContext);
+      staticContext.setBaseResourceAsString(staticBase);
+      staticContext.addServlet(DefaultServlet.class, "/*");
+      staticContext.setDisplayName("static");
+      Map<String, String> params = staticContext.getInitParams();
+      params.put("org.eclipse.jetty.servlet.Default.dirAllowed", "false");
+      params.put("org.eclipse.jetty.servlet.Default.gzip", "true");
+      SessionHandler handler = new SessionHandler();
+      handler.setHttpOnly(true);
+      handler.getSessionCookieConfig().setSecure(true);
+      staticContext.setSessionHandler(handler);
+      setContextAttributes(staticContext, conf);
+      defaultContexts.put(staticContext, true);
+    }
+  }
+
+  /**
+   * Return whether a context base resource URL points to something that
+   * exists. Non-file resources (e.g. inside a packaged jar) are assumed
+   * present, matching the distribution layout; this only filters out the
+   * file-system case where the shared static assets have not been unpacked.
+   */
+  private static boolean baseResourceExists(String resourceUrl) {
+    try {
+      URI uri = URI.create(resourceUrl);
+      if ("file".equals(uri.getScheme())) {
+        return Files.exists(Paths.get(uri));
+      }
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   private void setContextAttributes(ServletContextHandler context,
