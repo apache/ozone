@@ -57,7 +57,6 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
-import static org.apache.hadoop.hdds.utils.IOUtils.roundUp;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
@@ -2285,7 +2284,7 @@ public class KeyValueHandler extends Handler {
   public ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto request, Container kvContainer,
       RandomAccessFileChannel blockFile,
-      StreamObserver<ContainerCommandResponseProto> streamObserver) {
+      StreamObserver<ContainerCommandResponseProto> streamObserver, boolean testVariableChunks) {
 
     if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
       return ContainerUtils.logAndReturnError(LOG,
@@ -2301,7 +2300,7 @@ public class KeyValueHandler extends Handler {
     }
     try {
       final long startTime = Time.monotonicNow();
-      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
+      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver, testVariableChunks);
       KeyValueContainerData containerData = (KeyValueContainerData) kvContainer
           .getContainerData();
       HddsVolume volume = containerData.getVolume();
@@ -2325,7 +2324,7 @@ public class KeyValueHandler extends Handler {
   }
 
   private long readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
-      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean verifyChecksum)
+      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean testVariableChunks)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
     int responseDataSize = readBlock.getResponseDataSize();
@@ -2355,32 +2354,42 @@ public class KeyValueHandler extends Handler {
       return 0;
     }
     final List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
-    final int bytesPerChunk = Math.toIntExact(chunkInfos.get(0).getLen());
     final ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
-    ChecksumData checksumData = null;
     int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;
-    if (checksumType == ContainerProtos.ChecksumType.NONE) {
-      checksumData = new ChecksumData(checksumType, 0);
-    } else {
+    if (checksumType != ContainerProtos.ChecksumType.NONE) {
       bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
     }
-    // We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
-    // previous checksum boundary.
-    // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
-    // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
-    // it simplifies the code to always do this.
-    final long offsetAlignment = readBlock.getOffset() % bytesPerChecksum;
-    long adjustedOffset = readBlock.getOffset() - offsetAlignment;
 
+    // TODO: Support client-side flag to toggle checksum verification.
+    // If checksum is disabled, chunk offset adjustment can be skipped.
+    final ChecksumBoundaries checksumBoundaries = getChecksumBoundaries(readBlock.getOffset(),
+        readBlock.getLength(), chunkInfos, bytesPerChecksum);
+    long adjustedOffset = checksumBoundaries.offset;
+    long adjustLength = checksumBoundaries.length;
+    int chunkIndex = checksumBoundaries.startIndex;
+
+    ChecksumData checksumData = new ChecksumData(checksumType, bytesPerChecksum);
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
     blockFile.position(adjustedOffset);
     long totalDataLength = 0;
     int numResponses = 0;
-    final long rounded = roundUp(readBlock.getLength() + offsetAlignment, bytesPerChecksum);
-    final long requiredLength = Math.min(rounded, blockData.getSize() - adjustedOffset);
+    final long requiredLength = Math.min(adjustLength, blockData.getSize() - adjustedOffset);
     LOG.debug("adjustedOffset {}, requiredLength {}, blockSize {}",
         adjustedOffset, requiredLength, blockData.getSize());
     for (boolean shouldRead = true; totalDataLength < requiredLength && shouldRead;) {
+
+      int bufferLimit = (int) Math.min(responseDataSize, requiredLength - totalDataLength);
+      final ContainerProtos.ChunkInfo nextChunk = chunkInfos.get(
+          searchChunkByOffset(adjustedOffset + bufferLimit, chunkInfos));
+
+      if (bufferLimit < requiredLength - totalDataLength) {
+        // bytesPerChecksum must be a power of 2.
+        bufferLimit = (int) (((bufferLimit - (nextChunk.getOffset() - adjustedOffset)) & -((long) bytesPerChecksum))
+                + (nextChunk.getOffset() - adjustedOffset));
+      }
+
+      buffer.limit(bufferLimit);
+
       shouldRead = blockFile.read(buffer);
       buffer.flip();
       final int readLength = buffer.remaining();
@@ -2391,14 +2400,20 @@ public class KeyValueHandler extends Handler {
       assertTrue(readLength > 0, () -> "readLength = " + readLength + " <= 0");
 
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
-        final List<ByteString> checksums = getChecksums(adjustedOffset, readLength,
-            bytesPerChunk, bytesPerChecksum, chunkInfos);
-        LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChunk {}, bytesPerChecksum {}",
-            readBlock, adjustedOffset, readLength, bytesPerChunk, bytesPerChecksum);
-        checksumData = new ChecksumData(checksumType, bytesPerChecksum, checksums);
-        if (verifyChecksum) {
-          Checksum.verifyChecksum(buffer.duplicate(), checksumData, 0);
+
+        if (!testVariableChunks) {
+          // This is the old approach.
+          // It has some bugs, but we are keeping it for now due to backward compatibility.
+          checksumData = new ChecksumData(checksumType, bytesPerChecksum, getChecksums(adjustedOffset, readLength,
+              bytesPerChecksum, chunkInfos));
         }
+
+
+        if (validateChunkChecksumData) {
+          Checksum.validateChecksums(buffer.duplicate(), adjustedOffset, chunkIndex, chunkInfos);
+        }
+        LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChecksum {}",
+            readBlock, adjustedOffset, readLength, bytesPerChecksum);
       }
       final ContainerCommandResponseProto response = getReadBlockResponse(
           request, checksumData, buffer, adjustedOffset);
@@ -2411,12 +2426,14 @@ public class KeyValueHandler extends Handler {
       adjustedOffset += readLength;
       totalDataLength += dataLength;
       numResponses++;
+      chunkIndex = searchChunkByOffset(adjustedOffset, chunkInfos);
     }
     return totalDataLength;
   }
 
-  static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChunk, int bytesPerChecksum,
+  static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChecksum,
       final List<ContainerProtos.ChunkInfo> chunks) {
+    final int bytesPerChunk = Math.toIntExact(chunks.get(0).getLen());
     assertSame(0, blockOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
     final int numChecksums = 1 + (readLength - 1) / bytesPerChecksum;
     final List<ByteString> checksums = new ArrayList<>(numChecksums);
@@ -2443,6 +2460,64 @@ public class KeyValueHandler extends Handler {
       checksums.add(checksumsList.get(csi));
     }
     return checksums;
+  }
+
+  /**
+   * We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
+   * previous checksum boundary.
+   * eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
+   * Returns the checksum boundaries of {@code ChecksumBoundaries} relative to blockOffset and blockLength.
+   */
+  private static ChecksumBoundaries getChecksumBoundaries(long blockOffset, long blockLength,
+      List<ContainerProtos.ChunkInfo> chunkInfos, long bytesPerChecksum) {
+    final int offsetChunkIndex = searchChunkByOffset(blockOffset, chunkInfos);
+    final long offsetAlignment = (blockOffset - chunkInfos.get(offsetChunkIndex).getOffset()) % bytesPerChecksum;
+    final long adjustedOffset = blockOffset - offsetAlignment;
+    final long blockEnd = blockOffset + blockLength - 1;
+    final ContainerProtos.ChunkInfo lastChunk = chunkInfos.get(searchChunkByOffset(blockEnd, chunkInfos));
+
+    final long chunkOffset = lastChunk.getOffset();
+    final long chunkLength = Math.min(
+        (getEndChecksumIndex(blockEnd, chunkOffset, bytesPerChecksum) + 1) * bytesPerChecksum, lastChunk.getLen());
+    return new ChecksumBoundaries(offsetChunkIndex, adjustedOffset,
+        chunkOffset + chunkLength - adjustedOffset);
+  }
+
+  private static int getEndChecksumIndex(long blockEnd, long chunkOffset, long bytesPerChecksum) {
+    return (int) ((blockEnd - chunkOffset) / bytesPerChecksum);
+  }
+
+  private static final class ChecksumBoundaries {
+    private final int startIndex;
+    private final long offset;
+    private final long length;
+
+    private ChecksumBoundaries(int startIndex, long offset, long length) {
+      this.startIndex = startIndex;
+      this.offset = offset;
+      this.length = length;
+    }
+  }
+
+  private static int searchChunkByOffset(
+      long targetOffset,
+      List<ContainerProtos.ChunkInfo> chunkInfoList) {
+
+    int low = 0;
+    int high = chunkInfoList.size() - 1;
+
+    while (low <= high) {
+      int mid = (low + high) >>> 1;
+      long midVal = chunkInfoList.get(mid).getOffset();
+
+      if (midVal <= targetOffset) {
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    return high;
   }
 
   @Override
