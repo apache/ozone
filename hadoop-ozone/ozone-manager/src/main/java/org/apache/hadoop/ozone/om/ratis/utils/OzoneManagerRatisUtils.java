@@ -109,6 +109,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -526,7 +527,12 @@ public final class OzoneManagerRatisUtils {
 
   public static OzoneManagerProtocolProtos.OMResponse submitRequest(
       OzoneManager om, OMRequest omRequest, ClientId clientId, long callId) throws ServiceException {
-    return om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
+    // Internally-submitted requests (e.g. PurgeKeys) bypass the RPC endpoint dispatcher, so measure
+    // them here to populate the same OmClientProtocol per-type metrics that client requests get.
+    try (UncheckedAutoCloseable ignored =
+        om.getOmClientProtocolMetrics().measure(omRequest.getCmdType())) {
+      return om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
+    }
   }
 
   public static OzoneManagerProtocolProtos.OMResponse createErrorResponse(
