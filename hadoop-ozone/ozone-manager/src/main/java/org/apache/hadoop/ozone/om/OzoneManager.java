@@ -200,7 +200,7 @@ import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
@@ -650,7 +650,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Honor property 'hadoop.security.token.service.use_ip'
     omRpcAddressTxt = new Text(SecurityUtil.buildTokenService(omNodeRpcAddr));
 
-    final StorageContainerLocationProtocol scmContainerClient = getScmContainerClient(configuration);
+    final StorageContainerLocationInternalInterface scmContainerClient = getScmContainerClient(configuration);
     // verifies that the SCM info in the OM Version file is correct.
     final ScmBlockLocationProtocol scmBlockClient = getScmBlockClient(configuration);
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
@@ -1422,9 +1422,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Returns a scm container client.
    *
-   * @return {@link StorageContainerLocationProtocol}
+   * @return {@link StorageContainerLocationInternalInterface}
    */
-  private static StorageContainerLocationProtocol getScmContainerClient(
+  private static StorageContainerLocationInternalInterface getScmContainerClient(
       OzoneConfiguration conf) {
     return HAUtils.getScmContainerClient(conf);
   }
