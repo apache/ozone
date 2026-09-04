@@ -32,7 +32,6 @@ JAVAC_DIAGNOSTIC_PATTERN='^.*:[0-9]+: (error|warning): \[[^]]+\]'
 MAVEN_ERROR_PATTERN='^\[ERROR\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
 JAVAC_ERROR_PATTERN='^.*:[0-9]+: error: \[[^]]+\]'
 ERROR_DIAGNOSTIC_PATTERN="${MAVEN_ERROR_PATTERN}|${JAVAC_ERROR_PATTERN}"
-ERROR_PATTERN='^\(\[ERROR\] .*:\[[0-9][0-9]*,[0-9][0-9]*\] \[[^]]*\]\|.*:[0-9][0-9]*: error: \[[^]]*\]\)'
 
 declare -i rc
 

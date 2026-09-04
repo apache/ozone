@@ -589,7 +589,7 @@ public class TestHSync {
         // There should be 1 key in openFileTable
         assertThat(getOpenKeyInfo(BUCKET_LAYOUT))
             .extracting(OmKeyInfo::getKeyName)
-            .contains(key1.getName());
+            .contains("dir1/dir2/hsync-key");
         // Delete directory recursively
         fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
             bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);
