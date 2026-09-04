@@ -18,6 +18,10 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -25,14 +29,11 @@ import java.io.PrintWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.Calendar;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -42,7 +43,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
 import org.apache.hadoop.security.authentication.client.KerberosAuthenticator;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.util.GenericOptionsParser;
-import org.apache.hadoop.util.ServletUtil;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Level;
@@ -66,6 +66,11 @@ public final class LogLevel {
 
   private static final String MARKER = "<!-- OUTPUT -->";
   private static final Pattern TAG = Pattern.compile("<[^>]*>");
+
+  private static final String HTML_TAIL = "<hr />\n"
+      + "<a href='http://hadoop.apache.org'>Hadoop</a>, "
+      + Calendar.getInstance().get(Calendar.YEAR) + ".\n"
+      + "</body></html>";
 
   /**
    * Set to false only if log4j adapter class is not found in the classpath. Once set to false,
@@ -369,9 +374,9 @@ public final class LogLevel {
         return;
       }
 
-      PrintWriter out = ServletUtil.initHTML(response, "Log Level");
-      String logName = ServletUtil.getParameter(request, "log");
-      String level = ServletUtil.getParameter(request, "level");
+      PrintWriter out = initHTML(response, "Log Level");
+      String logName = getParameter(request, "log");
+      String level = getParameter(request, "level");
 
       if (logName != null) {
         out.println("<br /><hr /><h3>Results</h3>");
@@ -393,7 +398,27 @@ public final class LogLevel {
       }
 
       out.println(FORMS);
-      out.println(ServletUtil.HTML_TAIL);
+      out.println(HTML_TAIL);
+    }
+
+    private static PrintWriter initHTML(HttpServletResponse response, String title) throws IOException {
+      response.setContentType("text/html");
+      PrintWriter out = response.getWriter();
+      out.println("<html>\n"
+          + "<link rel='stylesheet' type='text/css' href='/static/hadoop.css'>\n"
+          + "<title>" + title + "</title>\n"
+          + "<body>\n"
+          + "<h1>" + title + "</h1>\n");
+      return out;
+    }
+
+    private static String getParameter(HttpServletRequest request, String name) {
+      String s = request.getParameter(name);
+      if (s == null) {
+        return null;
+      }
+      s = s.trim();
+      return s.isEmpty() ? null : s;
     }
 
     private static void process(Logger log, String level,

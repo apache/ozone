@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.s3.commontypes;
 
+import jakarta.xml.bind.annotation.adapters.XmlAdapter;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import javax.xml.bind.annotation.adapters.XmlAdapter;
 
 /**
  * A converter to convert Instant to standard date string.

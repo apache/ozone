@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.s3secret;
 
+import jakarta.ws.rs.NameBinding;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import javax.ws.rs.NameBinding;
 
 /**
  * Annotation to disable S3 Secure Endpoint.

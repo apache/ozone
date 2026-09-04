@@ -64,9 +64,13 @@
       <artifactId>spring-tx</artifactId>
     </dependency>
     <dependency>
-      <!-- for javadoc with Java9+; check if can be removed with HDDS-11142 -->
+      <!-- for javadoc with Java9+; check if can be removed with HDDS-11142.
+           Pinned to the 2.3.x line, which still ships the javax.xml.bind.* classes,
+           because jOOQ 3.11.10's org.jooq.meta.jaxb.* config classes are annotated
+           with javax JAXB; the 4.0.x api used elsewhere carries only jakarta.xml.bind.*. -->
       <groupId>jakarta.xml.bind</groupId>
       <artifactId>jakarta.xml.bind-api</artifactId>
+      <version>2.3.3</version>
       <scope>provided</scope>
     </dependency>
   </dependencies>

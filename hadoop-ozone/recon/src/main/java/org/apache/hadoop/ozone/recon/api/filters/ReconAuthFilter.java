@@ -22,27 +22,32 @@ import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilt
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import jakarta.servlet.Filter;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.FilterConfig;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Map;
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
+import org.apache.hadoop.hdds.server.http.servletbridge.JavaxFilterBridge;
 import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilter;
-import org.eclipse.jetty.servlet.FilterHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Filter that can be applied to paths to only allow access by authenticated
  * kerberos users.
+ *
+ * <p>The authentication itself is performed by hadoop's
+ * {@code javax.servlet}-based {@link ProxyUserAuthenticationFilter}. This
+ * jakarta filter runs it through {@link JavaxFilterBridge} so it can be
+ * registered on Recon's Guice/Jetty EE10 (jakarta) servlet chain.
  */
 @Singleton
 public class ReconAuthFilter implements Filter {
@@ -51,7 +56,7 @@ public class ReconAuthFilter implements Filter {
       LoggerFactory.getLogger(ReconAuthFilter.class);
 
   private final OzoneConfiguration conf;
-  private ProxyUserAuthenticationFilter hadoopAuthFilter;
+  private JavaxFilterBridge authFilterBridge;
 
   @Inject
   ReconAuthFilter(OzoneConfiguration conf) {
@@ -60,17 +65,13 @@ public class ReconAuthFilter implements Filter {
 
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {
-    hadoopAuthFilter = new ProxyUserAuthenticationFilter();
-
     Map<String, String> parameters = getFilterConfigMap(conf,
         OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX);
-    FilterHolder filterHolder = getFilterHolder("authentication",
-        AuthenticationFilter.class.getName(),
-        parameters);
-    hadoopAuthFilter.init(new FilterConfig() {
+    authFilterBridge = new JavaxFilterBridge(new ProxyUserAuthenticationFilter());
+    authFilterBridge.init(new FilterConfig() {
       @Override
       public String getFilterName() {
-        return filterHolder.getName();
+        return "authentication";
       }
 
       @Override
@@ -80,12 +81,12 @@ public class ReconAuthFilter implements Filter {
 
       @Override
       public String getInitParameter(String s) {
-        return filterHolder.getInitParameter(s);
+        return parameters.get(s);
       }
 
       @Override
       public Enumeration<String> getInitParameterNames() {
-        return filterHolder.getInitParameterNames();
+        return Collections.enumeration(parameters.keySet());
       }
     });
   }
@@ -99,20 +100,13 @@ public class ReconAuthFilter implements Filter {
           ((HttpServletRequest) servletRequest).getRequestURL());
     }
 
-    hadoopAuthFilter.doFilter(servletRequest, servletResponse, filterChain);
-  }
-
-  private static FilterHolder getFilterHolder(String name, String classname,
-                                              Map<String, String> parameters) {
-    FilterHolder holder = new FilterHolder();
-    holder.setName(name);
-    holder.setClassName(classname);
-    if (parameters != null) {
-      holder.setInitParameters(parameters);
-    }
-    return holder;
+    authFilterBridge.doFilter(servletRequest, servletResponse, filterChain);
   }
 
   @Override
-  public void destroy() { }
+  public void destroy() {
+    if (authFilterBridge != null) {
+      authFilterBridge.destroy();
+    }
+  }
 }

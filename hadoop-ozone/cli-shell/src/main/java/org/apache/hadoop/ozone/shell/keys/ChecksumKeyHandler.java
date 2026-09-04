@@ -91,7 +91,7 @@ public class ChecksumKeyHandler extends KeyHandler {
           name, dataSize, client.getObjectStore().getClientProxy());
 
       this.algorithm = fileChecksum.getAlgorithmName();
-      this.checksum = javax.xml.bind.DatatypeConverter.printHexBinary(
+      this.checksum = jakarta.xml.bind.DatatypeConverter.printHexBinary(
           fileChecksum.getBytes());
     }
   }

@@ -18,8 +18,9 @@
 package org.apache.hadoop.hdds.server.http;
 
 import java.util.Map;
-import org.eclipse.jetty.servlet.FilterHolder;
-import org.eclipse.jetty.servlet.FilterMapping;
+import org.apache.hadoop.hdds.server.http.servletbridge.JavaxFilterBridge;
+import org.eclipse.jetty.ee10.servlet.FilterHolder;
+import org.eclipse.jetty.ee10.servlet.FilterMapping;
 
 /**
  * Factory class which helps to create different types of servlet elements.
@@ -43,10 +44,35 @@ public final class ServletElementsFactory {
       String classname, Map<String, String> parameters) {
     FilterHolder holder = new FilterHolder();
     holder.setName(filterName);
-    holder.setClassName(classname);
+    Class<?> filterClass = loadFilterClass(classname);
+    if (javax.servlet.Filter.class.isAssignableFrom(filterClass)) {
+      // hadoop-auth based filters still implement javax.servlet.Filter; run
+      // them through the bridge so they work inside Jetty EE10 (jakarta).
+      holder.setFilter(new JavaxFilterBridge(newJavaxFilter(filterClass)));
+    } else {
+      holder.setClassName(classname);
+    }
     if (parameters != null) {
       holder.setInitParameters(parameters);
     }
     return holder;
+  }
+
+  private static Class<?> loadFilterClass(String classname) {
+    try {
+      return Class.forName(classname, false,
+          Thread.currentThread().getContextClassLoader());
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException("Filter class not found: " + classname, e);
+    }
+  }
+
+  private static javax.servlet.Filter newJavaxFilter(Class<?> filterClass) {
+    try {
+      return (javax.servlet.Filter) filterClass.getDeclaredConstructor().newInstance();
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalArgumentException(
+          "Unable to instantiate filter: " + filterClass.getName(), e);
+    }
   }
 }

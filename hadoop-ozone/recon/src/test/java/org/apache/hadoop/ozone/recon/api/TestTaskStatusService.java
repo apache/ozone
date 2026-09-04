@@ -21,9 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Injector;
+import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.List;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;

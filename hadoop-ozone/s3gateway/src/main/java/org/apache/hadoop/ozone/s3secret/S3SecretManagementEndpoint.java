@@ -17,17 +17,17 @@
 
 package org.apache.hadoop.ozone.s3secret;
 
-import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
-import static javax.ws.rs.core.Response.Status.NOT_FOUND;
+import static jakarta.ws.rs.core.Response.Status.BAD_REQUEST;
+import static jakarta.ws.rs.core.Response.Status.NOT_FOUND;
 
 import jakarta.annotation.Nullable;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
-import javax.inject.Inject;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -76,7 +76,9 @@ public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           S3GAction.GENERATE_SECRET, getAuditParameters(), e));
       if (e.getResult() == OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS) {
-        return Response.status(BAD_REQUEST.getStatusCode(), e.getResult().toString()).build();
+        // Jetty 12 no longer emits custom HTTP reason phrases, so convey the
+        // error code in the response body instead of the status line.
+        return Response.status(BAD_REQUEST).entity(e.getResult().toString()).build();
       } else {
         LOG.error("Can't execute get secret request: ", e);
         return Response.serverError().build();
@@ -113,8 +115,10 @@ public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           S3GAction.REVOKE_SECRET, getAuditParameters(), e));
       if (e.getResult() == OMException.ResultCodes.S3_SECRET_NOT_FOUND) {
-        return Response.status(NOT_FOUND.getStatusCode(),
-            OMException.ResultCodes.S3_SECRET_NOT_FOUND.toString())
+        // Jetty 12 no longer emits custom HTTP reason phrases, so convey the
+        // error code in the response body instead of the status line.
+        return Response.status(NOT_FOUND)
+            .entity(OMException.ResultCodes.S3_SECRET_NOT_FOUND.toString())
             .build();
       } else {
         LOG.error("Can't execute revoke secret request: ", e);

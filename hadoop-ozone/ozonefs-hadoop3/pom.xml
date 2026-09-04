@@ -64,6 +64,7 @@
         <configuration>
           <ignoredUsedUndeclaredDependencies>
             <ignoredUsedUndeclaredDependency>org.apache.ratis:ratis-thirdparty-misc</ignoredUsedUndeclaredDependency>
+            <ignoredUsedUndeclaredDependency>org.apache.ratis:ratis-server-api</ignoredUsedUndeclaredDependency>
           </ignoredUsedUndeclaredDependencies>
           <ignoredUnusedDeclaredDependencies>
             <ignoredUnusedDeclaredDependency>org.assertj:*</ignoredUnusedDeclaredDependency>

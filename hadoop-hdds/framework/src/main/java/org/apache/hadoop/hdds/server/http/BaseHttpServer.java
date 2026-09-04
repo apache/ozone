@@ -35,13 +35,14 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTOR
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
+import jakarta.servlet.http.HttpServlet;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import javax.servlet.http.HttpServlet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -57,7 +58,7 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.ssl.SSLFactory;
-import org.eclipse.jetty.webapp.WebAppContext;
+import org.eclipse.jetty.ee10.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,8 +70,6 @@ public abstract class BaseHttpServer implements AutoCloseable {
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseHttpServer.class);
   static final String PROMETHEUS_SINK = "PROMETHEUS_SINK";
-  private static final String JETTY_BASETMPDIR =
-      "org.eclipse.jetty.webapp.basetempdir";
   public static final String SERVER_DIR = "/webserver";
 
   private HttpServer2 httpServer;
@@ -85,6 +84,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
   private PrometheusMetricsSink prometheusMetricsSink;
 
   private boolean prometheusSupport;
+  private String jettyBaseTmpDir;
 
   public BaseHttpServer(MutableConfigurationSource conf, String name)
       throws IOException {
@@ -140,6 +140,8 @@ public abstract class BaseHttpServer implements AutoCloseable {
         builder.withoutDefaultApps();
       }
 
+      builder.allowAmbiguousUri(shouldAllowAmbiguousUri());
+
       httpServer = builder.build();
 
       // TODO move these to HttpServer2.addDefaultApps
@@ -190,15 +192,20 @@ public abstract class BaseHttpServer implements AutoCloseable {
         baseDir = getOzoneMetaDirPath(conf) + SERVER_DIR;
       }
       createDir(baseDir);
-      httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
+      WebAppContext webAppContext = httpServer.getWebAppContext();
+      webAppContext.setTempDirectory(new File(baseDir));
+      // Jetty 12 deletes a non-persistent temp directory on stop. baseDir lives
+      // under the Ozone metadata directory, so keep it persistent to avoid
+      // deleting operator data.
+      webAppContext.setTempDirectoryPersistent(true);
+      jettyBaseTmpDir = baseDir;
       LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
     }
   }
 
   @VisibleForTesting
   public String getJettyBaseTmpDir() {
-    return httpServer.getWebAppContext().getAttribute(JETTY_BASETMPDIR)
-        .toString();
+    return jettyBaseTmpDir;
   }
 
   /**
@@ -494,6 +501,15 @@ public abstract class BaseHttpServer implements AutoCloseable {
   /** Override to disable the default servlets. */
   protected boolean shouldAddDefaultApps() {
     return true;
+  }
+
+  /**
+   * Override to accept ambiguous URIs (e.g. empty path segments from "//").
+   * Needed by the S3 Gateway, whose object keys can contain such sequences
+   * that Jetty 12 rejects with 400 by default.
+   */
+  protected boolean shouldAllowAmbiguousUri() {
+    return false;
   }
 
 }
