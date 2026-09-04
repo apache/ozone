@@ -44,10 +44,12 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
@@ -61,8 +63,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -1739,4 +1746,399 @@ public class TestReplicationManager {
         });
   }
 
+  @Test
+  public void testReconstructionGlobalLimitDisabledByDefault()
+      throws IOException, NodeNotFoundException {
+    assertEquals(0, rmConf.getReconstructionGlobalLimit());
+    ReplicationManager rm = createReplicationManager();
+    assertEquals(0, rm.getReconstructionInFlightLimit());
+    assertFalse(rm.isReconstructionLimitReached());
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
+        (ECReplicationConfig) repConfig);
+    rm.sendThrottledReconstructionCommand(container, cmd);
+    assertEquals(1, rm.getInflightReconstructionCount());
+    assertFalse(rm.isReconstructionLimitReached());
+  }
+
+  @Test
+  public void testInflightReconstructionLimit() throws IOException, NodeNotFoundException {
+    rmConf.setReconstructionGlobalLimit(2);
+    ReplicationManager rm = createReplicationManager();
+    assertEquals(2, rm.getReconstructionInFlightLimit());
+    assertEquals(0, rm.getInflightReconstructionCount());
+    assertFalse(rm.isReconstructionLimitReached());
+
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+
+    // Send one reconstruction command with 2 fragments
+    ReconstructECContainersCommand cmd1 = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)),
+        (ECReplicationConfig) repConfig);
+
+    rm.sendThrottledReconstructionCommand(container, cmd1);
+    assertEquals(1, rm.getInflightReconstructionCount());
+    assertFalse(rm.isReconstructionLimitReached());
+
+    // Send another reconstruction command with 1 fragment
+    ReconstructECContainersCommand cmd2 = new ReconstructECContainersCommand(
+        2L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(3)),
+        (ECReplicationConfig) repConfig);
+    rm.sendThrottledReconstructionCommand(container, cmd2);
+    assertEquals(2, rm.getInflightReconstructionCount());
+    assertTrue(rm.isReconstructionLimitReached());
+
+    // Complete one fragment of cmd1
+    ContainerReplicaOp op1 = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        cmd1.getTargetDatanodes().get(0), 1, cmd1, Long.MAX_VALUE, 0);
+    rm.opCompleted(op1, container.containerID(), false);
+    // Still 2 because cmd1 is not fully finished
+    assertEquals(2, rm.getInflightReconstructionCount());
+
+    // Complete second fragment of cmd1
+    ContainerReplicaOp op2 = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        cmd1.getTargetDatanodes().get(1), 2, cmd1, Long.MAX_VALUE, 0);
+    rm.opCompleted(op2, container.containerID(), false);
+    // Now 1
+    assertEquals(1, rm.getInflightReconstructionCount());
+    assertFalse(rm.isReconstructionLimitReached());
+
+    // Complete cmd2
+    ContainerReplicaOp op3 = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        cmd2.getTargetDatanodes().get(0), 3, cmd2, Long.MAX_VALUE, 0);
+    rm.opCompleted(op3, container.containerID(), false);
+    assertEquals(0, rm.getInflightReconstructionCount());
+  }
+
+  @Test
+  public void testSendReconstructionCommandRejectedWhenGlobalLimitReached()
+      throws IOException, NodeNotFoundException {
+    rmConf.setReconstructionGlobalLimit(2);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+
+    ReconstructECContainersCommand cmd1 = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
+        (ECReplicationConfig) repConfig);
+    ReconstructECContainersCommand cmd2 = new ReconstructECContainersCommand(
+        2L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(2)),
+        (ECReplicationConfig) repConfig);
+    ReconstructECContainersCommand cmd3 = new ReconstructECContainersCommand(
+        3L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(3)),
+        (ECReplicationConfig) repConfig);
+
+    rm.sendThrottledReconstructionCommand(container, cmd1);
+    rm.sendThrottledReconstructionCommand(container, cmd2);
+    assertEquals(2, rm.getInflightReconstructionCount());
+
+    assertThrows(CommandTargetOverloadedException.class,
+        () -> rm.sendThrottledReconstructionCommand(container, cmd3));
+    assertEquals(2, rm.getInflightReconstructionCount());
+  }
+
+  @Test
+  public void testNotifyStatusChangedClearsReconstructionCounters()
+      throws IOException, NodeNotFoundException {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+    enableProcessAll();
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
+        (ECReplicationConfig) repConfig);
+    rm.sendThrottledReconstructionCommand(container, cmd);
+    assertEquals(1, rm.getInflightReconstructionCount());
+
+    when(scmContext.isLeaderReady()).thenReturn(false);
+    rm.notifyStatusChanged();
+    when(scmContext.isLeaderReady()).thenReturn(true);
+    when(scmContext.isInSafeMode()).thenReturn(false);
+    rm.notifyStatusChanged();
+
+    assertEquals(0, rm.getInflightReconstructionCount());
+  }
+
+  @Test
+  public void testInflightReconstructionCountNotNegativeAfterFailoverClear()
+      throws IOException, NodeNotFoundException {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+    enableProcessAll();
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)),
+        (ECReplicationConfig) repConfig);
+    rm.sendThrottledReconstructionCommand(container, cmd);
+    assertEquals(1, rm.getInflightReconstructionCount());
+
+    when(scmContext.isLeaderReady()).thenReturn(false);
+    rm.notifyStatusChanged();
+    when(scmContext.isLeaderReady()).thenReturn(true);
+    when(scmContext.isInSafeMode()).thenReturn(false);
+    rm.notifyStatusChanged();
+    assertEquals(0, rm.getInflightReconstructionCount());
+
+    ContainerReplicaOp op1 = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        cmd.getTargetDatanodes().get(0), 1, cmd, Long.MAX_VALUE, 0);
+    ContainerReplicaOp op2 = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        cmd.getTargetDatanodes().get(1), 2, cmd, Long.MAX_VALUE, 0);
+
+    rm.opCompleted(op1, container.containerID(), false);
+    assertEquals(0, rm.getInflightReconstructionCount());
+    rm.opCompleted(op2, container.containerID(), false);
+    assertEquals(0, rm.getInflightReconstructionCount());
+    rm.opCompleted(op1, container.containerID(), false);
+    assertEquals(0, rm.getInflightReconstructionCount());
+  }
+
+  @Test
+  public void testReconstructionConfigValidation() {
+    ReplicationManager.ReplicationManagerConfiguration config =
+        new ReplicationManager.ReplicationManagerConfiguration();
+
+    config.setEcDecommissionReconstructionLoadFactor(-0.1);
+    assertThrows(IllegalArgumentException.class, config::validate);
+
+    config.setEcDecommissionReconstructionLoadFactor(Double.NaN);
+    assertThrows(IllegalArgumentException.class, config::validate);
+
+    config.setEcDecommissionReconstructionLoadFactor(1.1);
+    assertThrows(IllegalArgumentException.class, config::validate);
+
+    config.setEcDecommissionReconstructionLoadFactor(0.9);
+    config.setReconstructionGlobalLimit(-1);
+    assertThrows(IllegalArgumentException.class, config::validate);
+
+    config.setReconstructionGlobalLimit(0);
+    config.setInflightReplicationLimitFactor(Double.NaN);
+    assertThrows(IllegalArgumentException.class, config::validate);
+
+    config.setInflightReplicationLimitFactor(0.75);
+    config.validate();
+  }
+
+  @Test
+  public void testReconstructionGlobalLimitEnforcedConcurrently()
+      throws InterruptedException, NodeNotFoundException, IOException {
+    rmConf.setReconstructionGlobalLimit(2);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    int threadCount = 8;
+    int attemptsPerThread = 10;
+    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch doneLatch = new CountDownLatch(threadCount);
+    AtomicInteger accepted = new AtomicInteger();
+    AtomicInteger rejected = new AtomicInteger();
+
+    for (int t = 0; t < threadCount; t++) {
+      final long commandIdBase = t + 100;
+      executor.submit(() -> {
+        try {
+          startLatch.await();
+          for (int i = 0; i < attemptsPerThread; i++) {
+            ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+                commandIdBase + i, Collections.emptyList(),
+                ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+                ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
+                (ECReplicationConfig) repConfig);
+            try {
+              rm.sendThrottledReconstructionCommand(container, cmd);
+              accepted.incrementAndGet();
+            } catch (CommandTargetOverloadedException | NotLeaderException e) {
+              rejected.incrementAndGet();
+            }
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        } finally {
+          doneLatch.countDown();
+        }
+      });
+    }
+
+    try {
+      startLatch.countDown();
+      assertTrue(doneLatch.await(30, TimeUnit.SECONDS));
+      assertEquals(2, rm.getInflightReconstructionCount());
+      assertEquals(2, accepted.get());
+      assertTrue(rejected.get() > 0);
+    } finally {
+      executor.shutdown();
+    }
+  }
+
+  @Test
+  public void testReconstructionMapRegisteredBeforePendingOpsScheduled()
+      throws IOException, NodeNotFoundException {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)),
+        (ECReplicationConfig) repConfig);
+
+    rm.sendThrottledReconstructionCommand(container, cmd);
+    assertEquals(2, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+    assertEquals(1, rm.getInflightReconstructionCount());
+
+    ContainerReplicaOp op = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        cmd.getTargetDatanodes().get(0), 1, cmd, Long.MAX_VALUE, 0);
+    rm.opCompleted(op, container.containerID(), false);
+    assertEquals(1, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+    assertEquals(1, rm.getInflightReconstructionCount());
+  }
+
+  @Test
+  public void testReconstructionWithNoFragmentsDoesNotReserveSlot()
+      throws NodeNotFoundException, IOException {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        Collections.emptyList(),
+        ECUnderReplicationHandler.integers2ByteString(Collections.emptyList()),
+        (ECReplicationConfig) repConfig);
+
+    assertThrows(IllegalArgumentException.class,
+        () -> rm.sendThrottledReconstructionCommand(container, cmd));
+    assertEquals(0, rm.getInflightReconstructionCount());
+    assertEquals(0, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+    verify(nodeManager, never()).addDatanodeCommand(any(), any());
+  }
+
+  @Test
+  public void testReconstructionSlotReleasedAndMapClearedOnSendFailure()
+      throws NodeNotFoundException, IOException {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+
+    int limit = rm.getConfig().getDatanodeReplicationLimit();
+    int reconstructionWeight = rm.getConfig().getReconstructionCommandWeight();
+    int reconstructionCount = 2;
+    int replicationCount = limit - reconstructionCount * reconstructionWeight;
+    mockReplicationCommandCounts(any -> replicationCount, any -> reconstructionCount);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = createReconstructionCommand(
+        container, MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+
+    assertThrows(CommandTargetOverloadedException.class,
+        () -> rm.sendThrottledReconstructionCommand(container, cmd));
+    assertEquals(0, rm.getInflightReconstructionCount());
+    assertEquals(0, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+  }
+
+  @Test
+  public void testNotifyStatusChangedBlocksUntilReconstructionSendCompletes()
+      throws Exception {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+    enableProcessAll();
+
+    CountDownLatch sendReachedAddCommand = new CountDownLatch(1);
+    CountDownLatch releaseSend = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      sendReachedAddCommand.countDown();
+      try {
+        releaseSend.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
+      }
+      return null;
+    }).when(nodeManager).addDatanodeCommand(any(), any());
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1)),
+        (ECReplicationConfig) repConfig);
+
+    Thread sender = new Thread(() -> {
+      try {
+        rm.sendThrottledReconstructionCommand(container, cmd);
+      } catch (CommandTargetOverloadedException | NotLeaderException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    sender.start();
+    assertTrue(sendReachedAddCommand.await(30, TimeUnit.SECONDS));
+    assertEquals(1, rm.getInflightReconstructionCount());
+    assertEquals(1, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+
+    AtomicBoolean notifyCompleted = new AtomicBoolean(false);
+    Thread notifyThread = new Thread(() -> {
+      rm.notifyStatusChanged();
+      notifyCompleted.set(true);
+    });
+    notifyThread.start();
+    notifyThread.join(500);
+    assertFalse(notifyCompleted.get(),
+        "notifyStatusChanged must wait for in-flight reconstruction send");
+    assertEquals(1, rm.getInflightReconstructionCount());
+
+    releaseSend.countDown();
+    sender.join(TimeUnit.SECONDS.toMillis(30));
+    notifyThread.join(TimeUnit.SECONDS.toMillis(30));
+    assertTrue(notifyCompleted.get());
+  }
 }
