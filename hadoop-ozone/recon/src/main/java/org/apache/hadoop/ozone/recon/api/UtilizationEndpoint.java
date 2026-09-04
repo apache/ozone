@@ -116,7 +116,10 @@ public class UtilizationEndpoint {
             if (bucket != null && !bucket.equals(key.getBucket())) {
               matches = false;
             }
-            
+            if (fileSize > 0 && !Long.valueOf(fileSize).equals(key.getFileSizeUpperBound())) {
+              matches = false;
+            }
+
             if (matches && count != null && count > 0) {
               FileCountBySize record = new FileCountBySize();
               record.setVolume(key.getVolume());
