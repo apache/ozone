@@ -115,6 +115,7 @@ import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
 import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.BucketsResponse;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeDiskInfo;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
@@ -381,6 +382,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setFsCapacity(40000)
             .setFsAvailable(15000)
             .setStorageUuid(UUID.randomUUID().toString())
+            .setOpenContainerCount(3)
             .setFailed(false).build();
     StorageReportProto storageReportProto2 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
@@ -616,6 +618,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       assertEquals(pipeline.getLeaderNode().getHostName(),
           datanodeMetadata.getPipelines().get(0).getLeaderNode());
       assertEquals(1, datanodeMetadata.getLeaderCount());
+      assertEquals(2, datanodeMetadata.getDisks().size());
+      DatanodeDiskInfo disk1 = datanodeMetadata.getDisks().stream()
+          .filter(d -> "/disk1".equals(d.getStorageLocation()))
+          .findFirst().orElse(null);
+      assertNotNull(disk1);
+      assertEquals(3L, disk1.getOpenContainerCount());
+      DatanodeDiskInfo disk2 = datanodeMetadata.getDisks().stream()
+          .filter(d -> "/disk2".equals(d.getStorageLocation()))
+          .findFirst().orElse(null);
+      assertNotNull(disk2);
+      assertNull(disk2.getOpenContainerCount());
       break;
     case HOST2:
       assertEquals(130000,
