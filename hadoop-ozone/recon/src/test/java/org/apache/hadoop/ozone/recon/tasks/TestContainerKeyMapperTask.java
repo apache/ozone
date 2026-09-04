@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -312,11 +313,8 @@ public class TestContainerKeyMapperTask {
         .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
         .build();
 
-    OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(new
-        ArrayList<OMDBUpdateEvent>() {{
-          add(keyEvent1);
-          add(keyEvent2);
-        }}, 0L);
+    OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(
+        new ArrayList<>(Arrays.asList(keyEvent1, keyEvent2)), 0L);
 
     ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
         new ContainerKeyMapperTaskOBS(reconContainerMetadataManager,
@@ -423,12 +421,7 @@ public class TestContainerKeyMapperTask {
         .build();
 
     OMUpdateEventBatch omUpdateEventBatch =
-        new OMUpdateEventBatch(new ArrayList<OMDBUpdateEvent>() {
-          {
-            add(keyEvent1);
-            add(keyEvent2);
-          }
-        }, 0L);
+        new OMUpdateEventBatch(new ArrayList<>(Arrays.asList(keyEvent1, keyEvent2)), 0L);
 
     // Process PUT event for both the keys
     containerKeyMapperTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
@@ -457,11 +450,7 @@ public class TestContainerKeyMapperTask {
                 .getName())
         .build();
     OMUpdateEventBatch omUpdateEventBatch2 =
-        new OMUpdateEventBatch(new ArrayList<OMDBUpdateEvent>() {
-          {
-            add(keyEvent3);
-          }
-        }, 0L);
+        new OMUpdateEventBatch(new ArrayList<>(Collections.singletonList(keyEvent3)), 0L);
 
     // Process DELETE event for key2
     containerKeyMapperTaskFSO.process(omUpdateEventBatch2, Collections.emptyMap());

@@ -191,7 +191,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get();
     if (remoteAddress != null) {
       userInfo.setHostName(remoteAddress.getHostName());
-      userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
+      userInfo.setRemoteAddress(remoteAddress.getHostAddress());
     } else if (grpcContextClientHostname != null
         && grpcContextClientIpAddress != null) {
       userInfo.setHostName(grpcContextClientHostname);
