@@ -173,6 +173,8 @@ public abstract class ContainerKeyMapperHelper {
                    StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, perWorkerThreshold)) {
         keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
       } finally {
+        // The small-table fallback runs the per-key operation on this (reused
+        // Recon pool) thread, so clear the per-worker ThreadLocal here.
         workerMaps.remove();
       }
 

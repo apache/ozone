@@ -191,6 +191,8 @@ public abstract class FileSizeCountTaskHelper {
       LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ex);
       return false;
     } finally {
+      // The small-table fallback runs the per-key operation on this (reused
+      // Recon pool) thread, so clear the per-worker ThreadLocal here.
       workerMaps.remove();
     }
     

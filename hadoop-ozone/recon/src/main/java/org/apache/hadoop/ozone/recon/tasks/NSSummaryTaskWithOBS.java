@@ -172,6 +172,9 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       LOG.error("Unable to process keyTable in parallel", ex);
       return false;
     } finally {
+      // The small-table fallback in ParallelTableIteratorOperation runs the
+      // per-key operation on this (reused Recon pool) thread, so clear the
+      // per-worker ThreadLocals here.
       workerMaps.remove();
       bucketCaches.remove();
     }

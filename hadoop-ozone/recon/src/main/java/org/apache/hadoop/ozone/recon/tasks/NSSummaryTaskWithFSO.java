@@ -318,6 +318,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       LOG.error("Unable to process dirTable in parallel", ex);
       return false;
     } finally {
+      // The small-table fallback runs the per-key operation on this (reused
+      // Recon pool) thread, so clear the per-worker ThreadLocal here.
       workerMaps.remove();
     }
 
@@ -397,6 +399,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       LOG.error("Unable to process fileTable in parallel", ex);
       return false;
     } finally {
+      // The small-table fallback runs the per-key operation on this (reused
+      // Recon pool) thread, so clear the per-worker ThreadLocal here.
       workerMaps.remove();
     }
 
