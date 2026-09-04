@@ -38,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -68,9 +69,13 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
@@ -86,12 +91,19 @@ public class QuotaRepairTask {
       QuotaRepairTask.class);
   @VisibleForTesting
   static final int BATCH_SIZE = 5000;
+  /**
+   * A legacy schema multipart upload holds every committed part inline, so its rows are far
+   * larger than a key or file row: measured at roughly 320 bytes per part, a 1000 part upload
+   * decodes to about 320KB. Batch fewer of them to keep the in-flight batches bounded.
+   */
+  @VisibleForTesting
+  static final int MPU_BATCH_SIZE = 100;
   private static final int TASK_THREAD_CNT = 3;
   /**
    * Parallel full-table scans: OBS keys, FSO files, dirs, active deleted keys/dirs,
-   * snapshot DB deleted keys/dirs.
+   * snapshot DB deleted keys/dirs, multipart upload parts.
    */
-  private static final int QUOTA_REPAIR_SCAN_TASKS = 6;
+  private static final int QUOTA_REPAIR_SCAN_TASKS = 7;
   private static final AtomicBoolean IN_PROGRESS = new AtomicBoolean(false);
   private static final RepairStatus REPAIR_STATUS = new RepairStatus();
   private static final AtomicLong RUN_CNT = new AtomicLong(0);
@@ -328,6 +340,7 @@ public class QuotaRepairTask {
     Map<String, CountPair> directoryCountMap = new ConcurrentHashMap<>();
     Map<String, CountPair> snapshotDeletedKeyMap = new ConcurrentHashMap<>();
     Map<String, CountPair> snapshotDeletedDirMap = new ConcurrentHashMap<>();
+    Map<String, CountPair> mpuCountMap = new ConcurrentHashMap<>();
     try {
       nameBucketInfoMap.keySet().stream().forEach(e -> keyCountMap.put(e,
           new CountPair()));
@@ -337,6 +350,7 @@ public class QuotaRepairTask {
           new CountPair()));
       nameBucketInfoMap.keySet().forEach(k -> snapshotDeletedKeyMap.put(k, new CountPair()));
       idBucketInfoMap.keySet().forEach(k -> snapshotDeletedDirMap.put(k, new CountPair()));
+      nameBucketInfoMap.keySet().forEach(k -> mpuCountMap.put(k, new CountPair()));
 
       List<Future<?>> tasks = new ArrayList<>();
       tasks.add(executor.submit(() -> recalculateUsages(
@@ -365,6 +379,7 @@ public class QuotaRepairTask {
           throw new UncheckedIOException(ex);
         }
       }));
+      tasks.add(executor.submit(() -> recalculateMultipartUsages(metadataManager, mpuCountMap)));
 
       // await every scan before propagating a failure, so no scan outlives the checkpoint
       Exception scanFailure = awaitAll(tasks, null);
@@ -383,6 +398,7 @@ public class QuotaRepairTask {
     updateCountToBucketInfo(nameBucketInfoMap, keyCountMap);
     updateCountToBucketInfo(idBucketInfoMap, fileCountMap);
     updateCountToBucketInfo(idBucketInfoMap, directoryCountMap);
+    updateCountToBucketInfo(nameBucketInfoMap, mpuCountMap);
     mergeSnapshotDeletedTableCounts(nameBucketInfoMap, snapshotDeletedKeyMap);
     mergeDeletedDirSnapshotNamespace(idBucketInfoMap, snapshotDeletedDirMap);
     LOG.info("Completed quota repair counting for all keys, files and directories");
@@ -554,6 +570,50 @@ public class QuotaRepairTask {
     }
   }
 
+  /**
+   * Counts committed parts of incomplete multipart uploads from the active DB checkpoint.
+   * Parts of a snapshot's incomplete uploads stay charged to that snapshot's own bucket,
+   * so only the active multipartInfoTable is scanned here.
+   */
+  private void recalculateMultipartUsages(
+      OMMetadataManager metadataManager, Map<String, CountPair> mpuCountMap)
+      throws UncheckedIOException, UncheckedExecutionException {
+    try (Table.KeyValueIterator<String, OmMultipartKeyInfo> keyIter
+        = metadataManager.getMultipartInfoTable().iterator()) {
+      scanTableInBatches(executor, keyIter, "Multipart upload usages", MPU_BATCH_SIZE,
+          kv -> extractMultipartCount(kv, mpuCountMap, metadataManager));
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  private static void extractMultipartCount(
+      Table.KeyValue<String, OmMultipartKeyInfo> kv, Map<String, CountPair> mpuCountMap,
+      OMMetadataManager metadataManager) throws UncheckedIOException {
+    try {
+      CountPair usage = mpuCountMap.get(getVolumeBucketPrefix(kv.getKey()));
+      if (usage == null) {
+        return;
+      }
+      OmMultipartKeyInfo multipartKeyInfo = kv.getValue();
+      long replicatedSize = 0;
+      if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
+        for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
+          replicatedSize += QuotaUtil.getReplicatedSize(
+              partKeyInfo.getPartKeyInfo().getDataSize(), multipartKeyInfo.getReplicationConfig());
+        }
+      } else {
+        SortedMap<Integer, OmMultipartPartInfo> parts =
+            OMMultipartUploadUtils.scanParts(metadataManager, multipartKeyInfo.getUploadID());
+        replicatedSize = OMMultipartUploadUtils.getReplicatedSize(
+            parts, multipartKeyInfo.getReplicationConfig());
+      }
+      usage.incrSpace(replicatedSize);
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
   private static synchronized void mergeSnapshotDeletedTableCounts(
       Map<String, OmBucketInfo> nameBucketInfoMap,
       Map<String, CountPair> counts) {
@@ -596,9 +656,18 @@ public class QuotaRepairTask {
       Table.KeyValueIterator<String, VALUE> keyIter, String strType,
       Consumer<Table.KeyValue<String, VALUE>> kvConsumer)
       throws UncheckedIOException, UncheckedExecutionException {
+    scanTableInBatches(executor, keyIter, strType, BATCH_SIZE, kvConsumer);
+  }
+
+  @VisibleForTesting
+  static <VALUE> void scanTableInBatches(
+      ExecutorService executor,
+      Table.KeyValueIterator<String, VALUE> keyIter, String strType, int batchSize,
+      Consumer<Table.KeyValue<String, VALUE>> kvConsumer)
+      throws UncheckedIOException, UncheckedExecutionException {
     LOG.info("Starting recalculate {}", strType);
 
-    List<Table.KeyValue<String, VALUE>> kvList = new ArrayList<>(BATCH_SIZE);
+    List<Table.KeyValue<String, VALUE>> kvList = new ArrayList<>(batchSize);
     BlockingQueue<List<Table.KeyValue<String, VALUE>>> q
         = new ArrayBlockingQueue<>(TASK_THREAD_CNT);
     List<Future<?>> tasks = new ArrayList<>();
@@ -613,9 +682,9 @@ public class QuotaRepairTask {
       while (keyIter.hasNext()) {
         count++;
         kvList.add(keyIter.next());
-        if (kvList.size() == BATCH_SIZE) {
+        if (kvList.size() == batchSize) {
           putBatch(q, kvList, tasks);
-          kvList = new ArrayList<>(BATCH_SIZE);
+          kvList = new ArrayList<>(batchSize);
         }
       }
       if (!kvList.isEmpty()) {
