@@ -116,7 +116,7 @@ public class UtilizationEndpoint {
             if (bucket != null && !bucket.equals(key.getBucket())) {
               matches = false;
             }
-            if (fileSize > 0 && !Long.valueOf(fileSize).equals(key.getFileSizeUpperBound())) {
+            if (fileSize > 0 && fileSize != key.getFileSizeUpperBound()) {
               matches = false;
             }
 
