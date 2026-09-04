@@ -375,9 +375,14 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // Verify that scan state was updated through the DeleteKeysRequest
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-      OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
-      assertNotNull(scanState);
-      assertNotNull(scanState.getScanEndTime());
+      GenericTestUtils.waitFor(() -> {
+        try {
+          OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+          return scanState != null && scanState.getScanEndTime() != null;
+        } catch (IOException e) {
+          return false;
+        }
+      }, WAIT_CHECK_INTERVAL, 10000);
 
       deleteLifecyclePolicy(volumeName, bucketName);
     }
@@ -2594,6 +2599,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         LOG.info("Dir {} refreshes its modification time", dirName);
         KeyInfoWithVolumeContext keyInfo2 = getDirectory(volumeName, bucketName, dirName);
         assertNotEquals(keyInfo.getKeyInfo().getModificationTime(), keyInfo2.getKeyInfo().getModificationTime());
+        awaitDirCacheDrained(volumeName, bucketName);
       }
 
       // resume KeyLifecycleService bucket scan
