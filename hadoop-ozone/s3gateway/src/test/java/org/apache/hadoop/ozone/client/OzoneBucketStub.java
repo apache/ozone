@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -400,22 +401,81 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OzoneKey headObject(String key) throws IOException {
-    if (keyDetails.containsKey(key)) {
-      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(key);
-      return new OzoneKey(ozoneKeyDetails.getVolumeName(),
-          ozoneKeyDetails.getBucketName(),
-          ozoneKeyDetails.getName(),
-          ozoneKeyDetails.getDataSize(),
-          ozoneKeyDetails.getCreationTime().toEpochMilli(),
-          ozoneKeyDetails.getModificationTime().toEpochMilli(),
-          ozoneKeyDetails.getReplicationConfig(),
-          ozoneKeyDetails.getMetadata(),
-          ozoneKeyDetails.isFile(),
-          ozoneKeyDetails.getOwner(),
-          ozoneKeyDetails.getTags());
-    } else {
-      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    return headObject(key, 0);
+  }
+
+  /**
+   * Returns metadata for a completed multipart part when {@code partNumber > 0}.
+   */
+  public OzoneKey headObject(String key, int partNumber) throws IOException {
+    OzoneKeyDetails ozoneKeyDetails = getKey(key);
+    if (partNumber <= 0) {
+      return toHeadOzoneKey(ozoneKeyDetails, ozoneKeyDetails.getDataSize());
     }
+
+    Map<Integer, Part> parts = partList.get(key);
+    if (parts == null || !parts.containsKey(partNumber)) {
+      throw new OMException("Invalid part number " + partNumber,
+          ResultCodes.INVALID_PART);
+    }
+    return toHeadOzoneKey(ozoneKeyDetails, parts.get(partNumber).getContent().length);
+  }
+
+  /**
+   * Returns part numbers and sizes for a completed multipart object from stub state.
+   */
+  public NavigableMap<Integer, Long> getCompletedMultipartPartSizes(String key)
+      throws IOException {
+    getKey(key);
+    Map<Integer, Part> parts = partList.get(key);
+    if (parts == null || parts.isEmpty()) {
+      return Collections.emptyNavigableMap();
+    }
+    NavigableMap<Integer, Long> partSizes = new TreeMap<>();
+    for (Map.Entry<Integer, Part> partEntry : parts.entrySet()) {
+      partSizes.put(partEntry.getKey(), (long) partEntry.getValue().getContent().length);
+    }
+    return partSizes;
+  }
+
+  /**
+   * Test-only helper to add key metadata for compatibility tests.
+   */
+  public void putKeyMetadataForTest(String key, String metadataKey, String metadataValue)
+      throws IOException {
+    OzoneKeyDetails details = getKey(key);
+    Map<String, String> metadata = new HashMap<>(details.getMetadata());
+    metadata.put(metadataKey, metadataValue);
+    keyDetails.put(key, new OzoneKeyDetails(
+        details.getVolumeName(),
+        details.getBucketName(),
+        details.getName(),
+        details.getDataSize(),
+        details.getCreationTime().toEpochMilli(),
+        details.getModificationTime().toEpochMilli(),
+        details.getOzoneKeyLocations(),
+        details.getReplicationConfig(),
+        metadata,
+        details.getFileEncryptionInfo(),
+        () -> readKey(key),
+        details.isFile(),
+        details.getOwner(),
+        details.getTags(),
+        details.getGeneration()));
+  }
+
+  private static OzoneKey toHeadOzoneKey(OzoneKeyDetails details, long dataSize) {
+    return new OzoneKey(details.getVolumeName(),
+        details.getBucketName(),
+        details.getName(),
+        dataSize,
+        details.getCreationTime().toEpochMilli(),
+        details.getModificationTime().toEpochMilli(),
+        details.getReplicationConfig(),
+        details.getMetadata(),
+        details.isFile(),
+        details.getOwner(),
+        details.getTags());
   }
 
   @Override
@@ -609,6 +669,9 @@ public final class OzoneBucketStub extends OzoneBucket {
         keyContents.put(key, output.toByteArray());
       }
 
+      Map<String, String> metadata = new HashMap<>(keyToMultipartUpload.get(key).getMetadata());
+      metadata.put(ETAG, DigestUtils.sha256Hex(output.toByteArray()) + "-" + partsMap.size());
+
       keyDetails.put(key, new OzoneKeyDetails(
           getVolumeName(),
           getName(),
@@ -617,7 +680,7 @@ public final class OzoneBucketStub extends OzoneBucket {
           System.currentTimeMillis(),
           System.currentTimeMillis(),
           new ArrayList<>(), getReplicationConfig(),
-          keyToMultipartUpload.get(key).getMetadata(), null,
+          metadata, null,
           () -> readKey(key), true,
           UserGroupInformation.getCurrentUser().getShortUserName(),
           keyToMultipartUpload.get(key).getTags()

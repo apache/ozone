@@ -36,8 +36,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -519,20 +517,14 @@ public final class Pipeline {
 
     Pipeline that = (Pipeline) o;
 
-    return new EqualsBuilder()
-        .append(id, that.id)
-        .append(replicationConfig, that.replicationConfig)
-        .append(nodeStatus.keySet(), that.nodeStatus.keySet())
-        .isEquals();
+    return id.equals(that.id)
+        && replicationConfig.equals(that.replicationConfig)
+        && nodeStatus.keySet().equals(that.nodeStatus.keySet());
   }
 
   @Override
   public int hashCode() {
-    return new HashCodeBuilder()
-        .append(id)
-        .append(replicationConfig.getReplicationType())
-        .append(nodeStatus)
-        .toHashCode();
+    return id.hashCode();
   }
 
   @Override

@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.S3HeadObjectAttributes;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
@@ -170,6 +171,18 @@ public interface ClientProtocol {
    * @throws IOException
    */
   OzoneKey headS3Object(String bucketName, String keyName, int partNumber)
+      throws IOException;
+
+  /**
+   * Returns S3 head metadata and completed multipart part sizes from a single
+   * {@code GetKeyInfo} OM call.
+   *
+   * @param bucketName Name of the Bucket
+   * @param keyName Key name
+   * @return head key metadata and sorted part-number to size map (empty when not MPU)
+   * @throws IOException
+   */
+  S3HeadObjectAttributes headS3ObjectAttributes(String bucketName, String keyName)
       throws IOException;
 
   /**

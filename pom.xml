@@ -43,14 +43,14 @@
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.85</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
-    <byte-buddy.version>1.18.11</byte-buddy.version>
+    <byte-buddy.version>1.18.12</byte-buddy.version>
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
     <com.nimbusds.nimbus-jose-jwt.version>10.9.1</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
     <commons-codec.version>1.22.1</commons-codec.version>
-    <commons-collections.version>4.5.0</commons-collections.version>
+    <commons-collections.version>4.6.0</commons-collections.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <commons-configuration2.version>2.15.1</commons-configuration2.version>
     <commons-csv.version>1.14.1</commons-csv.version>
@@ -59,7 +59,7 @@
     <commons-lang3.version>3.20.0</commons-lang3.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-text.version>1.15.0</commons-text.version>
-    <commons-validator.version>1.10.1</commons-validator.version>
+    <commons-validator.version>1.11.0</commons-validator.version>
     <compile-testing.version>0.23.0</compile-testing.version>
     <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
@@ -96,7 +96,7 @@
     <httpcore.version>4.4.16</httpcore.version>
     <iceberg.version>1.10.2</iceberg.version>
     <io.grpc.version>1.77.1</io.grpc.version>
-    <jackson2-bom.version>2.21.5</jackson2-bom.version>
+    <jackson2-bom.version>2.21.6</jackson2-bom.version>
     <jacoco.version>0.8.15</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
@@ -116,7 +116,7 @@
     <jgraphx.version>3.9.12</jgraphx.version>
     <jline.version>3.30.16</jline.version>
     <jnr-constants.version>0.11.0</jnr-constants.version>
-    <jnr-posix.version>3.2.1</jnr-posix.version>
+    <jnr-posix.version>3.2.2</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.11.10</jooq.version>
     <jsch.version>0.1.55</jsch.version>
@@ -153,7 +153,7 @@
     <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven.compiler.createMissingPackageInfoClass>false</maven.compiler.createMissingPackageInfoClass>
-    <maven.compiler.release>8</maven.compiler.release>
+    <maven.compiler.release>${ozone.java.version.server}</maven.compiler.release>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
@@ -162,8 +162,10 @@
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>24.17.0</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <opentelemetry.version>1.64.0</opentelemetry.version>
+    <opentelemetry.version>1.65.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
+    <ozone.java.version.client>8</ozone.java.version.client>
+    <ozone.java.version.server>17</ozone.java.version.server>
     <ozone.release>Kenai Fjords</ozone.release>
     <ozone.shaded.native.prefix>org_apache_ozone_shaded</ozone.shaded.native.prefix>
     <ozone.shaded.prefix>org.apache.ozone.shaded</ozone.shaded.prefix>
@@ -194,7 +196,7 @@
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
-    <restrict-imports.enforcer.version>3.0.0</restrict-imports.enforcer.version>
+    <restrict-imports.enforcer.version>3.0.1</restrict-imports.enforcer.version>
     <rocksdb.version>10.10.1.1</rocksdb.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
@@ -223,7 +225,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.6</zookeeper.version>
-    <zstd-jni.version>1.5.7-12</zstd-jni.version>
+    <zstd-jni.version>1.5.7-15</zstd-jni.version>
   </properties>
 
   <dependencyManagement>

@@ -294,7 +294,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(xceiverClientShortCircuit,
         VALIDATORS, builder, xceiverClientShortCircuit.getDn());
 
-    blockFileInputStream = xceiverClientShortCircuit.getFileInputStream(builder.getCallId(), datanodeBlockID);
+    blockFileInputStream = xceiverClientShortCircuit.getFileInputStream(
+        builder.getCallId(), datanodeBlockID.getLocalID());
     if (blockFileInputStream == null) {
       throw new IOException("Failed to get file InputStream for block " + datanodeBlockID);
     } else {
