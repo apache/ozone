@@ -48,6 +48,8 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   private String originalAccessKeyId;
   private String secretAccessKey;
   private String sessionPolicy;
+  private String assumedRoleId;
+  private String assumedRoleUserArn;
   private Instant creationTime;
 
   // SCM secret key used for encrypting sensitive fields and signing this token
@@ -85,6 +87,8 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
         throw new IllegalArgumentException("ManagedSecretKey is not set");
       }
     }
+    this.assumedRoleId = params.getAssumedRoleId();
+    this.assumedRoleUserArn = params.getAssumedRoleUserArn();
   }
 
   /**
@@ -99,6 +103,8 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     private final String secretAccessKey;
     private final String sessionPolicy;
     private final ManagedSecretKey managedSecretKey;
+    private final String assumedRoleId;
+    private final String assumedRoleUserArn;
 
     private Params(Builder builder) {
       this.tempAccessKeyId = builder.tempAccessKeyId;
@@ -109,6 +115,8 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
       this.secretAccessKey = builder.secretAccessKey;
       this.sessionPolicy = builder.sessionPolicy;
       this.managedSecretKey = builder.managedSecretKey;
+      this.assumedRoleId = builder.assumedRoleId;
+      this.assumedRoleUserArn = builder.assumedRoleUserArn;
     }
 
     public static Builder newBuilder() {
@@ -147,6 +155,14 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
       return managedSecretKey;
     }
 
+    public String getAssumedRoleId() {
+      return assumedRoleId;
+    }
+
+    public String getAssumedRoleUserArn() {
+      return assumedRoleUserArn;
+    }
+
     /**
      * Builder for {@link Params}.
      */
@@ -159,6 +175,8 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
       private String secretAccessKey;
       private String sessionPolicy;
       private ManagedSecretKey managedSecretKey;
+      private String assumedRoleId;
+      private String assumedRoleUserArn;
 
       public Builder setTempAccessKeyId(String value) {
         this.tempAccessKeyId = value;
@@ -197,6 +215,16 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
 
       public Builder setManagedSecretKey(ManagedSecretKey value) {
         this.managedSecretKey = value;
+        return this;
+      }
+
+      public Builder setAssumedRoleId(String value) {
+        this.assumedRoleId = value;
+        return this;
+      }
+
+      public Builder setAssumedRoleUserArn(String value) {
+        this.assumedRoleUserArn = value;
         return this;
       }
 
@@ -249,7 +277,9 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
         .setRoleArn(roleArn != null ? roleArn : "")
         .setSecretAccessKey(secretAccessKey != null ? encryptSensitiveField(secretAccessKey) : "")
         .setSecretKeyId(managedSecretKey.getId().toString())
-        .setSessionPolicy(sessionPolicy != null ? sessionPolicy : "");
+        .setSessionPolicy(sessionPolicy != null ? sessionPolicy : "")
+        .setAssumedRoleId(assumedRoleId != null ? assumedRoleId : "")
+        .setAssumedRoleUserArn(assumedRoleUserArn != null ? assumedRoleUserArn : "");
 
     return builder.build();
   }
@@ -291,6 +321,12 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
 
     if (token.hasSessionPolicy()) {
       this.sessionPolicy = token.getSessionPolicy();
+    }
+    if (token.hasAssumedRoleId()) {
+      this.assumedRoleId = token.getAssumedRoleId();
+    }
+    if (token.hasAssumedRoleUserArn()) {
+      this.assumedRoleUserArn = token.getAssumedRoleUserArn();
     }
   }
 
@@ -359,6 +395,14 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     return sessionPolicy;
   }
 
+  public String getAssumedRoleId() {
+    return assumedRoleId;
+  }
+
+  public String getAssumedRoleUserArn() {
+    return assumedRoleUserArn;
+  }
+
   public Instant getCreationTime() {
     return creationTime;
   }
@@ -415,13 +459,15 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     final STSTokenIdentifier that = (STSTokenIdentifier) o;
     return Objects.equals(roleArn, that.roleArn) && Objects.equals(secretAccessKey, that.secretAccessKey) &&
         Objects.equals(originalAccessKeyId, that.originalAccessKeyId) &&
-        Objects.equals(sessionPolicy, that.sessionPolicy) && Objects.equals(creationTime, that.creationTime);
+        Objects.equals(sessionPolicy, that.sessionPolicy) && Objects.equals(assumedRoleId, that.assumedRoleId) &&
+        Objects.equals(assumedRoleUserArn, that.assumedRoleUserArn) && Objects.equals(creationTime, that.creationTime);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-        super.hashCode(), roleArn, secretAccessKey, originalAccessKeyId, sessionPolicy, creationTime);
+        super.hashCode(), roleArn, secretAccessKey, originalAccessKeyId, sessionPolicy, assumedRoleId,
+        assumedRoleUserArn, creationTime);
   }
 
   @Override
@@ -429,6 +475,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     // Intentionally left off secretAccessKey
     return "STSTokenIdentifier{" + "tempAccessKeyId='" + getOwnerId() + "'" +
         ", originalAccessKeyId='" + originalAccessKeyId + "', roleArn='" + roleArn + "'" +
+        ", assumedRoleId='" + assumedRoleId + "', assumedRoleUserArn='" + assumedRoleUserArn + "'" +
         ", creationTime='" + creationTime + "', expiry='" + getExpiry() + "', secretKeyId='" + getSecretKeyId() +
         "', sessionPolicy='" + sessionPolicy + "'}";
   }

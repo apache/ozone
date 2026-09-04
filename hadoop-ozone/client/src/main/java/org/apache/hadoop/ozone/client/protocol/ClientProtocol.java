@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
@@ -1646,6 +1647,13 @@ public interface ClientProtocol {
    */
   AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
       String awsIamSessionPolicy, String requestId) throws IOException;
+
+  /**
+   * Returns the caller identity for the current S3-authenticated request.
+   * @return CallerIdentityInfo containing account, arn, and userId
+   * @throws IOException if an error occurs during the GetCallerIdentity operation
+   */
+  CallerIdentityInfo getCallerIdentity() throws IOException;
 
   /**
    * Revokes STS tokens for the given original access key ID.

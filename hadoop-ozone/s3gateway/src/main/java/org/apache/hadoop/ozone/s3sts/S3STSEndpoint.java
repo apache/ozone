@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.AwsRoleArnValidator;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -73,8 +74,8 @@ import org.slf4j.LoggerFactory;
  * This endpoint provides temporary security credentials compatible with
  * AWS STS API, exposed on port 9880 or 9881 at the root path ({@code /}).
  * <p>
- * Currently supports only AssumeRole operation. Other STS operations will
- * return appropriate error responses.
+ * Currently supports AssumeRole and GetCallerIdentity operations. Other STS
+ * operations will return appropriate error responses.
  *
  * @see <a href="https://docs.aws.amazon.com/STS/latest/APIReference/">AWS STS API Reference</a>
  */
@@ -113,7 +114,8 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 
   static {
     try {
-      JAXB_CONTEXT = JAXBContext.newInstance(S3AssumeRoleResponseXml.class);
+      JAXB_CONTEXT = JAXBContext.newInstance(
+          S3AssumeRoleResponseXml.class, S3GetCallerIdentityResponseXml.class, S3STSResponseMetadata.class);
     } catch (JAXBException e) {
       throw new RuntimeException("Failed to initialize JAXBContext: " + e, e);
     }
@@ -193,11 +195,12 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       case ASSUME_ROLE_ACTION:
         return handleAssumeRole(
             paramNamesToValidate, roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy, version, requestId);
+      case GET_CALLER_IDENTITY_ACTION:
+        return handleGetCallerIdentity(version, requestId);
       // These operations are not supported yet
       case GET_SESSION_TOKEN_ACTION:
       case ASSUME_ROLE_WITH_SAML_ACTION:
       case ASSUME_ROLE_WITH_WEB_IDENTITY_ACTION:
-      case GET_CALLER_IDENTITY_ACTION:
       case DECODE_AUTHORIZATION_MESSAGE_ACTION:
       case GET_ACCESS_KEY_INFO_ACTION:
         throw new OSTSException(STS_INVALID_ACTION_NOT_IMPLEMENTED)
@@ -307,37 +310,74 @@ public class S3STSEndpoint extends S3STSEndpointBase {
           .header("Content-Type", "text/xml")
           .build();
     } catch (IOException e) {
-      LOG.error("Error during AssumeRole processing", e);
-
-      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, e));
-
-      if (e instanceof OMException) {
-        final OMException omException = (OMException) e;
-        if (omException.getResult() == OMException.ResultCodes.ACCESS_DENIED ||
-            omException.getResult() == OMException.ResultCodes.PERMISSION_DENIED ||
-            omException.getResult() == OMException.ResultCodes.TOKEN_EXPIRED) {
-          throw new OSTSException(ACCESS_DENIED)
-              .withMessage("User is not authorized to perform: sts:AssumeRole on resource: " + roleArn);
-        }
-        if (omException.getResult() == OMException.ResultCodes.INVALID_TOKEN) {
-          throw new OSTSException(STS_INVALID_CLIENT_TOKEN_ID);
-        }
-        if (omException.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION ||
-            omException.getResult() == OMException.ResultCodes.FEATURE_NOT_ENABLED) {
-          throw new OSTSException(STS_UNSUPPORTED_OPERATION).withMessage(omException.getMessage());
-        }
-        if (omException.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
-          throw new OSTSException(STS_VALIDATION_ERROR).withMessage(omException.getMessage());
-        }
-        if (omException.getResult() == OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT) {
-          throw new OSTSException(STS_MALFORMED_POLICY_DOCUMENT).withMessage(omException.getMessage());
-        }
-      }
-      throw new OSTSException(STS_INTERNAL_FAILURE, e).withType("Receiver");
+      throw toStsProcessingException(
+          S3GAction.ASSUME_ROLE, auditParams, e, action, "User is not authorized to perform: sts:AssumeRole on " +
+              "resource: " + roleArn);
     } catch (Exception e) {
       getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, e));
       throw e;
     }
+  }
+
+  private Response handleGetCallerIdentity(String version, String requestId) throws OSTSException {
+    final String action = GET_CALLER_IDENTITY_ACTION;
+    final Map<String, String> auditParams = getAuditParameters();
+    auditParams.put("action", action);
+    auditParams.put("requestId", requestId);
+
+    if (version == null || !version.equals(EXPECTED_VERSION)) {
+      final OSTSException exception = new OSTSException(STS_INVALID_ACTION)
+          .withMessage("Could not find operation " + action + " for version " +
+              (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: " + EXPECTED_VERSION : version));
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(
+          S3GAction.GET_CALLER_IDENTITY, auditParams, exception));
+      throw exception;
+    }
+
+    try {
+      final CallerIdentityInfo identityInfo = getClient().getObjectStore().getCallerIdentity();
+      final String responseXml = generateGetCallerIdentityResponse(identityInfo, requestId);
+      getAuditLogger().logWriteSuccess(buildAuditMessageForSuccess(S3GAction.GET_CALLER_IDENTITY, auditParams));
+      return Response.ok(responseXml)
+          .header("Content-Type", "text/xml")
+          .build();
+    } catch (IOException e) {
+      throw toStsProcessingException(
+          S3GAction.GET_CALLER_IDENTITY, auditParams, e, action, "User is not authorized to perform: " +
+              "sts:GetCallerIdentity");
+    } catch (Exception e) {
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.GET_CALLER_IDENTITY, auditParams, e));
+      throw e;
+    }
+  }
+
+  private OSTSException toStsProcessingException(S3GAction auditAction, Map<String, String> auditParams, IOException e,
+      String operationName, String accessDeniedMessage) {
+    LOG.error("Error during {} processing", operationName, e);
+    getAuditLogger().logWriteFailure(buildAuditMessageForFailure(auditAction, auditParams, e));
+
+    if (e instanceof OMException) {
+      final OMException omException = (OMException) e;
+      if (omException.getResult() == OMException.ResultCodes.ACCESS_DENIED ||
+          omException.getResult() == OMException.ResultCodes.PERMISSION_DENIED ||
+          omException.getResult() == OMException.ResultCodes.TOKEN_EXPIRED) {
+        return new OSTSException(ACCESS_DENIED).withMessage(accessDeniedMessage);
+      }
+      if (omException.getResult() == OMException.ResultCodes.INVALID_TOKEN) {
+        return new OSTSException(STS_INVALID_CLIENT_TOKEN_ID);
+      }
+      if (omException.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION ||
+          omException.getResult() == OMException.ResultCodes.FEATURE_NOT_ENABLED) {
+        return new OSTSException(STS_UNSUPPORTED_OPERATION).withMessage(omException.getMessage());
+      }
+      if (omException.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
+        return new OSTSException(STS_VALIDATION_ERROR).withMessage(omException.getMessage());
+      }
+      if (omException.getResult() == OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT) {
+        return new OSTSException(STS_MALFORMED_POLICY_DOCUMENT).withMessage(omException.getMessage());
+      }
+    }
+    return new OSTSException(STS_INTERNAL_FAILURE, e).withType("Receiver");
   }
 
   private AssumeRoleParamValidationResult validateAssumeRoleParameters(Set<String> paramNamesToValidate) {
@@ -450,7 +490,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       user.setArn(assumedRoleUserArn);
       result.setAssumedRoleUser(user);
       response.setAssumeRoleResult(result);
-      final S3AssumeRoleResponseXml.ResponseMetadata meta = new S3AssumeRoleResponseXml.ResponseMetadata();
+      final S3STSResponseMetadata meta = new S3STSResponseMetadata();
       meta.setRequestId(requestId);
       response.setResponseMetadata(meta);
 
@@ -461,6 +501,30 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       return stringWriter.toString();
     } catch (JAXBException e) {
       throw new IOException("Failed to marshal AssumeRole response", e);
+    }
+  }
+
+  private String generateGetCallerIdentityResponse(CallerIdentityInfo identityInfo, String requestId)
+      throws IOException {
+    try {
+      final S3GetCallerIdentityResponseXml response = new S3GetCallerIdentityResponseXml();
+      final S3GetCallerIdentityResponseXml.GetCallerIdentityResult result =
+          new S3GetCallerIdentityResponseXml.GetCallerIdentityResult();
+      result.setAccount(identityInfo.getAccount());
+      result.setArn(identityInfo.getArn());
+      result.setUserId(identityInfo.getUserId());
+      response.setGetCallerIdentityResult(result);
+      final S3STSResponseMetadata meta = new S3STSResponseMetadata();
+      meta.setRequestId(requestId);
+      response.setResponseMetadata(meta);
+
+      final Marshaller marshaller = JAXB_CONTEXT.createMarshaller();
+      marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+      final StringWriter stringWriter = new StringWriter();
+      marshaller.marshal(response, stringWriter);
+      return stringWriter.toString();
+    } catch (JAXBException e) {
+      throw new IOException("Failed to marshal GetCallerIdentity response", e);
     }
   }
 }

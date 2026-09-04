@@ -238,6 +238,7 @@ public final class OmUtils {
     case FinalizeUpgradeProgress:
     case PrepareStatus:
     case GetS3VolumeContext:
+    case GetCallerIdentity:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
@@ -383,6 +384,7 @@ public final class OmUtils {
     case FinalizeUpgradeProgress:
     case PrepareStatus:
     case GetS3VolumeContext:
+    case GetCallerIdentity:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:

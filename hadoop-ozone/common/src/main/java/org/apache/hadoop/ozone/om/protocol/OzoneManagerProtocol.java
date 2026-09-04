@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -1332,6 +1333,15 @@ public interface OzoneManagerProtocol
    */
   default AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
       String awsIamSessionPolicy, String requestId) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require this to be implemented");
+  }
+
+  /**
+   * Returns the caller identity for the current S3-authenticated request.
+   * @return CallerIdentityInfo containing account, arn, and userId
+   * @throws IOException if an error occurs during the GetCallerIdentity operation
+   */
+  default CallerIdentityInfo getCallerIdentity() throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require this to be implemented");
   }
 

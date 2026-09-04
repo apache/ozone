@@ -62,6 +62,7 @@ public class TestS3GActionIamMapper {
   @Test
   public void nonIamActionsReturnNull() {
     assertNull(S3GActionIamMapper.toS3ActionString(S3GAction.ASSUME_ROLE));
+    assertNull(S3GActionIamMapper.toS3ActionString(S3GAction.GET_CALLER_IDENTITY));
     assertNull(S3GActionIamMapper.toS3ActionString(S3GAction.GENERATE_SECRET));
     assertNull(S3GActionIamMapper.toS3ActionString(S3GAction.REVOKE_SECRET));
   }

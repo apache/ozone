@@ -27,6 +27,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
@@ -59,6 +62,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateAssumeRoleRequest;
+import org.apache.hadoop.ozone.security.STSTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -131,23 +135,31 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       S3STSUtils.validateDuration(durationSeconds);
       S3STSUtils.validateRoleSessionName(roleSessionName);
       final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
-      
-      // Generate temporary AWS credentials using cryptographically strong SecureRandom
+
+      // Generate temporary AWS credentials using cryptographically strong SecureRandom, and a
+      // deterministic roleId derived from the role ARN.
       final String tempAccessKeyId = STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
           STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
           STS_ACCESS_KEY_ID_RANDOM_LENGTH);
       final String secretAccessKey = generateSecureRandomStringUsingChars(
           CHARS_FOR_SECRET_ACCESS_KEYS, CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH, STS_SECRET_ACCESS_KEY_LENGTH);
-      final String roleId = ASSUME_ROLE_ID_PREFIX + generateSecureRandomStringUsingChars(
-          STS_ACCESS_KEY_ID_ALLOWED_CHARS, STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH,
-          STS_ROLE_ID_LENGTH);
+      final String roleId = generateDeterministicRoleId(roleArn);
+      final String assumedRoleId = roleId + ":" + roleSessionName;
+      final String assumedRoleUserArn = S3STSUtils.toAssumedRoleUserArn(roleArn, roleSessionName);
 
       final Instant creationInstant = clock.instant();
-      final String sessionToken = generateSessionToken(
-          targetRoleName, omRequest, ozoneManager, assumeRoleRequest, secretAccessKey, tempAccessKeyId,
-          creationInstant);
+      final String sessionToken = generateSessionToken(GenerateSessionTokenParams.newBuilder()
+          .setTargetRoleName(targetRoleName)
+          .setOmRequest(omRequest)
+          .setOzoneManager(ozoneManager)
+          .setAssumeRoleRequest(assumeRoleRequest)
+          .setSecretAccessKey(secretAccessKey)
+          .setTempAccessKeyId(tempAccessKeyId)
+          .setAssumedRoleId(assumedRoleId)
+          .setAssumedRoleUserArn(assumedRoleUserArn)
+          .setCreationTime(creationInstant)
+          .build());
       final long expirationEpochSeconds = creationInstant.plusSeconds(durationSeconds).getEpochSecond();
-
       auditMap.put(OzoneConsts.S3_STS_TEMP_ACCESS_KEY_ID, tempAccessKeyId);
 
       // Build UpdateAssumeRoleRequest with leader-generated credentials and session token
@@ -245,9 +257,10 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   /**
    * Generates session token using components from the AssumeRoleRequest.
    */
-  private String generateSessionToken(String targetRoleName, OMRequest omRequest,
-      OzoneManager ozoneManager, AssumeRoleRequest assumeRoleRequest, String secretAccessKey,
-      String tempAccessKeyId, Instant creationInstant) throws IOException {
+  private String generateSessionToken(GenerateSessionTokenParams params) throws IOException {
+    final OzoneManager ozoneManager = params.getOzoneManager();
+    final OMRequest omRequest = params.getOmRequest();
+    final AssumeRoleRequest assumeRoleRequest = params.getAssumeRoleRequest();
 
     InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
     if (remoteIp == null) {
@@ -268,11 +281,148 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     final String roleArn = assumeRoleRequest.getRoleArn();
     final String sessionPolicy = getSessionPolicy(
         ozoneManager, originalAccessKeyId, assumeRoleRequest.getAwsIamSessionPolicy(), hostName, remoteIp, ugi,
-        targetRoleName);
+        params.getTargetRoleName());
 
     return ozoneManager.getSTSTokenSecretManager().createSTSTokenString(
-        tempAccessKeyId, originalAccessKeyId, roleArn, assumeRoleRequest.getDurationSeconds(), secretAccessKey,
-        sessionPolicy, creationInstant);
+        STSTokenSecretManager.CreateSTSTokenParams.newBuilder()
+            .setTempAccessKeyId(params.getTempAccessKeyId())
+            .setOriginalAccessKeyId(originalAccessKeyId)
+            .setRoleArn(roleArn)
+            .setDurationSeconds(assumeRoleRequest.getDurationSeconds())
+            .setSecretAccessKey(params.getSecretAccessKey())
+            .setSessionPolicy(sessionPolicy)
+            .setAssumedRoleId(params.getAssumedRoleId())
+            .setAssumedRoleUserArn(params.getAssumedRoleUserArn())
+            .setCreationTime(params.getCreationTime())
+            .build());
+  }
+
+  /**
+   * Parameters for {@link #generateSessionToken(GenerateSessionTokenParams)}.
+   */
+  private static final class GenerateSessionTokenParams {
+    private final String targetRoleName;
+    private final OMRequest omRequest;
+    private final OzoneManager ozoneManager;
+    private final AssumeRoleRequest assumeRoleRequest;
+    private final String secretAccessKey;
+    private final String tempAccessKeyId;
+    private final String assumedRoleId;
+    private final String assumedRoleUserArn;
+    private final Instant creationInstant;
+
+    private GenerateSessionTokenParams(Builder builder) {
+      this.targetRoleName = builder.targetRoleName;
+      this.omRequest = builder.omRequest;
+      this.ozoneManager = builder.ozoneManager;
+      this.assumeRoleRequest = builder.assumeRoleRequest;
+      this.secretAccessKey = builder.secretAccessKey;
+      this.tempAccessKeyId = builder.tempAccessKeyId;
+      this.assumedRoleId = builder.assumedRoleId;
+      this.assumedRoleUserArn = builder.assumedRoleUserArn;
+      this.creationInstant = builder.creationInstant;
+    }
+
+    static Builder newBuilder() {
+      return new Builder();
+    }
+
+    String getTargetRoleName() {
+      return targetRoleName;
+    }
+
+    OMRequest getOmRequest() {
+      return omRequest;
+    }
+
+    OzoneManager getOzoneManager() {
+      return ozoneManager;
+    }
+
+    AssumeRoleRequest getAssumeRoleRequest() {
+      return assumeRoleRequest;
+    }
+
+    String getSecretAccessKey() {
+      return secretAccessKey;
+    }
+
+    String getTempAccessKeyId() {
+      return tempAccessKeyId;
+    }
+
+    String getAssumedRoleId() {
+      return assumedRoleId;
+    }
+
+    String getAssumedRoleUserArn() {
+      return assumedRoleUserArn;
+    }
+
+    Instant getCreationTime() {
+      return creationInstant;
+    }
+
+    private static final class Builder {
+      private String targetRoleName;
+      private OMRequest omRequest;
+      private OzoneManager ozoneManager;
+      private AssumeRoleRequest assumeRoleRequest;
+      private String secretAccessKey;
+      private String tempAccessKeyId;
+      private String assumedRoleId;
+      private String assumedRoleUserArn;
+      private Instant creationInstant;
+
+      Builder setTargetRoleName(String value) {
+        this.targetRoleName = value;
+        return this;
+      }
+
+      Builder setOmRequest(OMRequest value) {
+        this.omRequest = value;
+        return this;
+      }
+
+      Builder setOzoneManager(OzoneManager value) {
+        this.ozoneManager = value;
+        return this;
+      }
+
+      Builder setAssumeRoleRequest(AssumeRoleRequest value) {
+        this.assumeRoleRequest = value;
+        return this;
+      }
+
+      Builder setSecretAccessKey(String value) {
+        this.secretAccessKey = value;
+        return this;
+      }
+
+      Builder setTempAccessKeyId(String value) {
+        this.tempAccessKeyId = value;
+        return this;
+      }
+
+      Builder setAssumedRoleId(String value) {
+        this.assumedRoleId = value;
+        return this;
+      }
+
+      Builder setAssumedRoleUserArn(String value) {
+        this.assumedRoleUserArn = value;
+        return this;
+      }
+
+      Builder setCreationTime(Instant instant) {
+        this.creationInstant = instant;
+        return this;
+      }
+
+      GenerateSessionTokenParams build() {
+        return new GenerateSessionTokenParams(this);
+      }
+    }
   }
 
   /**
@@ -426,6 +576,25 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   @FunctionalInterface
   interface BucketLinkResolver {
     ResolvedBucket resolve(String volumeName, String bucketName) throws IOException;
+  }
+
+  /**
+   * Generates a deterministic role ID from the role ARN so the same role returns the same ID on every
+   * AssumeRole invocation, matching AWS behavior where RoleId is stable for a given role.
+   */
+  @VisibleForTesting
+  static String generateDeterministicRoleId(String roleArn) {
+    try {
+      final MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      final byte[] hash = digest.digest(roleArn.getBytes(StandardCharsets.UTF_8));
+      final StringBuilder sb = new StringBuilder(STS_ROLE_ID_LENGTH);
+      for (int i = 0; i < STS_ROLE_ID_LENGTH; i++) {
+        sb.append(STS_ACCESS_KEY_ID_ALLOWED_CHARS.charAt((hash[i] & 0xFF) % STS_ACCESS_KEY_ID_ALLOWED_CHARS_LENGTH));
+      }
+      return ASSUME_ROLE_ID_PREFIX + sb;
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 not available", e);
+    }
   }
 
   /**

@@ -77,6 +77,8 @@ public class TestSTSTokenIdentifier {
         .setSecretAccessKey("secretKey")
         .setSessionPolicy("sessionPolicy")
         .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .setAssumedRoleId("AROATEST123456789:testsess")
+        .setAssumedRoleUserArn("arn:aws:sts::123456789012:assumed-role/RoleY/testsess")
         .build());
     final UUID secretKeyId = MANAGED_SECRET_KEY.getId();
 
@@ -89,6 +91,9 @@ public class TestSTSTokenIdentifier {
     assertThat(proto.getRoleArn()).isEqualTo("arn:aws:iam::123456789012:role/RoleY");
     assertThat(proto.getSecretAccessKey()).isNotEqualTo("secretKey");   // must be encrypted
     assertThat(proto.getSessionPolicy()).isEqualTo("sessionPolicy");
+    assertThat(proto.getAssumedRoleId()).isEqualTo("AROATEST123456789:testsess");
+    assertThat(proto.getAssumedRoleUserArn())
+        .isEqualTo("arn:aws:sts::123456789012:assumed-role/RoleY/testsess");
     assertThat(proto.getSecretKeyId()).isEqualTo(secretKeyId.toString());
 
     final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
@@ -103,6 +108,9 @@ public class TestSTSTokenIdentifier {
     assertThat(parsedTokenIdentifier.getSecretAccessKey()).isEqualTo("secretKey");
     assertThat(parsedTokenIdentifier.getSecretKeyId()).isEqualTo(secretKeyId);
     assertThat(parsedTokenIdentifier.getSessionPolicy()).isEqualTo("sessionPolicy");
+    assertThat(parsedTokenIdentifier.getAssumedRoleId()).isEqualTo("AROATEST123456789:testsess");
+    assertThat(parsedTokenIdentifier.getAssumedRoleUserArn())
+        .isEqualTo("arn:aws:sts::123456789012:assumed-role/RoleY/testsess");
     assertThat(parsedTokenIdentifier).isEqualTo(originalTokenIdentifier);
     assertThat(parsedTokenIdentifier.hashCode()).isEqualTo(originalTokenIdentifier.hashCode());
   }
@@ -211,6 +219,8 @@ public class TestSTSTokenIdentifier {
         .setSecretAccessKey("secretAccessKey")
         .setSessionPolicy("sessionPolicy")
         .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .setAssumedRoleId("AROATEST123456789:testsess")
+        .setAssumedRoleUserArn("arn:aws:sts::123456789012:assumed-role/test-role/testsess")
         .build());
 
     final ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -541,12 +551,16 @@ public class TestSTSTokenIdentifier {
         .setExpiry(expiry)
         .setSecretAccessKey("secretAccessKey")
         .setSessionPolicy("sessionPolicy")
+        .setAssumedRoleId("AROATEST123456789:testsess")
+        .setAssumedRoleUserArn("arn:aws:sts::123456789012:assumed-role/test-role/testsess")
         .build());
     stsTokenIdentifier.setSecretKeyId(uuid);
 
     final String stsTokenIdentifierStr = stsTokenIdentifier.toString();
     final String expectedString = "STSTokenIdentifier{" + "tempAccessKeyId='tempAccessKeyId'" +
         ", originalAccessKeyId='originalAccessKeyId'" + ", roleArn='roleArn'" +
+        ", assumedRoleId='AROATEST123456789:testsess'" +
+        ", assumedRoleUserArn='arn:aws:sts::123456789012:assumed-role/test-role/testsess'" +
         ", creationTime='" + CREATION_TIME + "', expiry='" + expiry +
         "', secretKeyId='" + uuid + "', sessionPolicy='sessionPolicy'" + '}';
 

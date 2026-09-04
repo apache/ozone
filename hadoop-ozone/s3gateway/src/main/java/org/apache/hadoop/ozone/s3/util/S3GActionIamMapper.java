@@ -85,6 +85,7 @@ public final class S3GActionIamMapper {
     case GENERATE_SECRET:
     case REVOKE_SECRET:
     case ASSUME_ROLE:
+    case GET_CALLER_IDENTITY:
     default:
       return null;
     }

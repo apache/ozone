@@ -88,6 +88,7 @@ import org.mockito.MockedStatic;
 public class TestS3AssumeRoleRequest {
 
   private static final String ROLE_ARN_1 = "arn:aws:iam::123456789012:role/MyRole1";
+  private static final String ROLE_ARN_2 = "arn:aws:iam::123456789012:role/MyRole2";
   private static final String SESSION_NAME = "testSessionName";
   private static final String ORIGINAL_ACCESS_KEY_ID = "origAccessKeyId";
   private static final String TARGET_ROLE_NAME = "targetRole";
@@ -306,16 +307,25 @@ public class TestS3AssumeRoleRequest {
     assertThat(assumeRoleResponse.getSecretAccessKey().length()).isEqualTo(40);
 
     // AssumedRoleId: prefix AROA + 16 chars, followed by ":" and sessionName
+    final String expectedRoleId = S3AssumeRoleRequest.generateDeterministicRoleId(ROLE_ARN_1);
     assertThat(assumeRoleResponse.getAssumedRoleId())
-        .startsWith("AROA")
-        .contains(":" + SESSION_NAME);
-    final int expectedAssumedRoleIdLength = 4 + 16 + 1 + SESSION_NAME.length(); // 4 for AROA, 16 chars, 1 for ":"
-    assertThat(assumeRoleResponse.getAssumedRoleId().length()).isEqualTo(expectedAssumedRoleIdLength);
+        .isEqualTo(expectedRoleId + ":" + SESSION_NAME);
 
     // Verify expiration added durationSeconds
     final long expirationEpochSeconds = assumeRoleResponse.getExpirationEpochSeconds();
     assertThat(expirationEpochSeconds).isEqualTo(CLOCK.instant().getEpochSecond() + durationSeconds);
     assertMarkForAuditCalled(requestWithCredentials);
+  }
+
+  @Test
+  public void testGenerateDeterministicRoleId() {
+    final String roleId1 = S3AssumeRoleRequest.generateDeterministicRoleId(ROLE_ARN_1);
+    final String roleId2 = S3AssumeRoleRequest.generateDeterministicRoleId(ROLE_ARN_1);
+    final String roleId3 = S3AssumeRoleRequest.generateDeterministicRoleId(ROLE_ARN_2);
+
+    assertThat(roleId1).startsWith("AROA").hasSize(4 + 16);
+    assertThat(roleId1).isEqualTo(roleId2);
+    assertThat(roleId1).isNotEqualTo(roleId3);
   }
 
   @Test
@@ -373,12 +383,29 @@ public class TestS3AssumeRoleRequest {
     // Different session tokens
     assertThat(assumeRoleResponse1.getSessionToken()).isNotEqualTo(assumeRoleResponse2.getSessionToken());
 
-    // Different assumed role IDs
-    assertThat(assumeRoleResponse1.getAssumedRoleId()).isNotEqualTo(assumeRoleResponse2.getAssumedRoleId());
+    // Same assumed role ID for the same role and session name
+    assertThat(assumeRoleResponse1.getAssumedRoleId()).isEqualTo(assumeRoleResponse2.getAssumedRoleId());
+
+    // Different role ARN yields a different assumed role ID
+    final OMRequest omRequestDifferentRole = baseOmRequestBuilder()
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_2)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(3600)
+                .setRequestId(REQUEST_ID)
+        ).build();
+    final S3AssumeRoleRequest request3 = new S3AssumeRoleRequest(omRequestDifferentRole, CLOCK);
+    final OMRequest preExecutedRequest3 = request3.preExecute(ozoneManager);
+    final S3AssumeRoleRequest requestWithCredentials3 = new S3AssumeRoleRequest(preExecutedRequest3, CLOCK);
+    final OMClientResponse response3 = requestWithCredentials3.validateAndUpdateCache(ozoneManager, context);
+    final AssumeRoleResponse assumeRoleResponse3 = response3.getOMResponse().getAssumeRoleResponse();
+    assertThat(assumeRoleResponse1.getAssumedRoleId()).isNotEqualTo(assumeRoleResponse3.getAssumedRoleId());
 
     OMAuditLogger.log(requestWithCredentials1.getAuditBuilder());
     OMAuditLogger.log(requestWithCredentials2.getAuditBuilder());
-    verify(auditLogger, times(2)).logWrite(any(AuditMessage.class));
+    OMAuditLogger.log(requestWithCredentials3.getAuditBuilder());
+    verify(auditLogger, times(3)).logWrite(any(AuditMessage.class));
   }
 
   @Test

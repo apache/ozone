@@ -41,8 +41,9 @@ solutions that want to aggregate data across multiple cloud providers.
 
 # 3. How Ozone STS Works
 
-The initial implementation of Ozone STS supports only the [AssumeRole](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html)
-API from the AWS specification.  A new STS endpoint on port `9880` (port `9881` for https) will be created to service STS requests in the S3 Gateway at the root path (`/`).
+The initial implementation of Ozone STS supports the [AssumeRole](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html)
+and [GetCallerIdentity](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html)
+APIs from the AWS specification.  A new STS endpoint on port `9880` (port `9881` for https) will be created to service STS requests in the S3 Gateway at the root path (`/`).
 We use a separate port for STS to align with AWS so we don't have conflicts at a later time.  This means we have:
 - Admin port for Ozone specific S3 admin operations
 - STS port for STS APIs, analogous to AWS' separate STS endpoint
@@ -66,6 +67,11 @@ return value of the AssumeRole call will be temporary credentials consisting of 
 an IAM policy is specified, the temporary credential will have the permissions comprising the intersection of the role permissions
 and the IAM policy permissions. **Note:** If the IAM policy is specified and does not grant any permissions, then
 the generated temporary credentials won't have any permissions and will essentially be useless.
+- [GetCallerIdentity](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html) returns the account, 
+ARN, and user ID for the caller credentials used to sign the request. Ozone uses a static account ID of `123456789012`. 
+For permanent S3 credentials, `UserId` is the resolved Kerberos principal and `Arn` is `arn:aws:iam::123456789012:user/<kerberosShortName>` 
+where `<kerberosShortName>` is the short username of the Kerberos principal. For STS temporary credentials, `UserId` is 
+the `AssumedRoleId` and `Arn` is the assumed-role user ARN from the session token.
 
 ## 3.2 Limitations in AssumeRole API Support
 
@@ -151,6 +157,8 @@ credential will have the permissions and actions comprising the intersection of 
 - creation time of the token (via `OMTokenProto#issueDate`, exposed as `STSTokenIdentifier#getCreationTime()`)
 - expiration time of the token (via `ShortLivedTokenIdentifier#getExpiry()`)
 - UUID of the OzoneManager secret key used to sign the sessionToken and encrypt the secretAccessKey (via `ShortLivedTokenIdentifier#getSecretKeyId()`)
+- assumedRoleId - the generated identifier of the role from the AssumeRole call response (this is used for GetCallerIdentity api)
+- assumedRoleUserArn - the arn from the AssumeRole call response (this is used for GetCallerIdentity api)
 
 ## 3.5 STS Token Revocation
 

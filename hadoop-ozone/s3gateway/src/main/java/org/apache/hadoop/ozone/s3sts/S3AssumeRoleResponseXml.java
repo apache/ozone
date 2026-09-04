@@ -33,7 +33,7 @@ public class S3AssumeRoleResponseXml {
   private AssumeRoleResult assumeRoleResult;
 
   @XmlElement(name = "ResponseMetadata")
-  private ResponseMetadata responseMetadata;
+  private S3STSResponseMetadata responseMetadata;
 
   public AssumeRoleResult getAssumeRoleResult() {
     return assumeRoleResult;
@@ -43,11 +43,11 @@ public class S3AssumeRoleResponseXml {
     this.assumeRoleResult = assumeRoleResult;
   }
 
-  public ResponseMetadata getResponseMetadata() {
+  public S3STSResponseMetadata getResponseMetadata() {
     return responseMetadata;
   }
 
-  public void setResponseMetadata(ResponseMetadata responseMetadata) {
+  public void setResponseMetadata(S3STSResponseMetadata responseMetadata) {
     this.responseMetadata = responseMetadata;
   }
 
@@ -155,23 +155,6 @@ public class S3AssumeRoleResponseXml {
 
     public void setArn(String arn) {
       this.arn = arn;
-    }
-  }
-
-  /**
-   * ResponseMetadata element.
-   */
-  @XmlAccessorType(XmlAccessType.FIELD)
-  public static class ResponseMetadata {
-    @XmlElement(name = "RequestId")
-    private String requestId;
-
-    public String getRequestId() {
-      return requestId;
-    }
-
-    public void setRequestId(String requestId) {
-      this.requestId = requestId;
     }
   }
 }
