@@ -629,11 +629,15 @@ status and timestamps.
 count", "object-count analytics".
 **Do not use when.** They want to *list* files (`api_v1_keys_listKeys`) or total disk usage
 (`api_v1_namespace_usage`).
-**Parameters.** `volume`, `bucket`, `fileSize` (all optional; set volume/bucket to scope).
-**Select examples.** "file size distribution"; "how many files are under 1MB"; "small vs large file
-counts in bucket b1"; "histogram of file sizes"; "object count by size tier".
+**Parameters.** `volume`, `bucket`, `fileSize` (all optional and independent; set volume/bucket to
+scope). `fileSize` is an exact histogram-bin upper bound in bytes, not an arbitrary file size or a
+cumulative less-than-or-equal threshold. A positive value that is not a bin upper bound returns an
+empty result.
+**Select examples.** "file size distribution"; "how many files are in the bin ending at 1MiB";
+"small vs large file counts in bucket b1"; "histogram of file sizes"; "object count by size tier".
 **Do-not-select examples.** "list large files" → `api_v1_keys_listKeys` with `keySize`.
-**Answering guidance.** Present as a distribution; don't imply it lists files.
+**Answering guidance.** Present as a distribution; don't imply it lists files or returns a
+cumulative count.
 
 ### `api_v1_utilization_containerCount`
 **Purpose.** Container-count distribution across size tiers.

@@ -1397,12 +1397,15 @@ Returns the status of all the Recon tasks.
    
 * fileSize (optional)
 
-   Filters the results based on the given fileSize.
+   Filters the results by the exact upper bound of a file-size histogram bin, in bytes. It is not an arbitrary file
+   size or a cumulative less-than-or-equal threshold. A positive value that is not a bin upper bound returns an empty
+   result. This filter can be used independently or together with volume and/or bucket.
 
 **Returns**
 
-Returns the file counts within different file ranges with `fileSize` in the
-response object being the upper cap for file size range. 
+Returns the file counts within different file ranges with `fileSize` in the response object being the upper bound of
+the corresponding histogram bin. Each count is for that bin only, not the cumulative count of files whose size is less
+than or equal to `fileSize`.
 
 ```json
      [{
