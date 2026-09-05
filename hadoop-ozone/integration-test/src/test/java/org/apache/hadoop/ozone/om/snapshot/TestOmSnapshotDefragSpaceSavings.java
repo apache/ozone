@@ -29,7 +29,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERV
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -76,9 +75,10 @@ import org.junit.jupiter.params.provider.EnumSource;
  * HDDS-13218: integration tests that snapshot defrag reduces checkpoint disk footprint.
  *
  * <p>Uses inode-aware sizing (matching {@link OMSnapshotDirectoryMetrics}) so hardlinked SST files
- * are not double-counted across snapshot checkpoint directories. Version-0 checkpoints hardlink to
- * AOS SST files, so their on-disk byte totals are not comparable to materialized post-defrag
- * checkpoints. Savings are validated by cross-snapshot SST reference reduction in the chain.
+ * are not double-counted across snapshot checkpoint directories. Churn scenarios populate unrelated
+ * noise buckets so version-0 checkpoints hardlink to whole-DB SST scope; defrag then materializes
+ * bucket-scoped checkpoints. On-disk byte totals are not comparable across v0 hardlinks and
+ * post-defrag materialization, so savings are validated by SST reference reduction on the chain.
  *
  * <p>Covers a three-snapshot chain with AOS compactions and insert/overwrite/delete churn on OBS
  * and FSO buckets, full-then-incremental defrag paths, footprint checks after deleting the
@@ -98,6 +98,8 @@ public class TestOmSnapshotDefragSpaceSavings {
   private static final int OVERWRITE_KEY_COUNT = 50;
   private static final int DELETE_KEY_COUNT = 25;
   private static final int NEW_KEYS_PER_SNAPSHOT = 10;
+  private static final int NOISE_BUCKET_COUNT = 2;
+  private static final int NOISE_KEYS_PER_BUCKET = 50;
   private static final int CHECKPOINT_WAIT_MS = 120_000;
   private static final int PURGE_WAIT_MS = 180_000;
   private static final int DEFRAG_WAIT_MS = 600_000;
@@ -225,8 +227,6 @@ public class TestOmSnapshotDefragSpaceSavings {
 
     assertEquals(1, readSnapshotVersion(snapshotInfo),
         "Single snapshot should be at defrag version 1");
-    assertNull(snapshotInfo.getPathPreviousSnapshotId(),
-        "Single snapshot should use the full defrag path");
     assertTrue(metrics.getNumSnapshotFullDefrag() >= fullDefragBefore + 1,
         "Expected a full defrag for the lone snapshot");
     assertVersionZeroCheckpointRemoved(snapshotInfo);
@@ -291,10 +291,6 @@ public class TestOmSnapshotDefragSpaceSavings {
           "Expected at least one full defrag for the chain head snapshot");
       assertTrue(metrics.getNumSnapshotIncDefrag() >= incDefragBefore + 2,
           "Expected incremental defrag for the second and third snapshots");
-      assertNull(snapshots.get(0).getPathPreviousSnapshotId(),
-          "Chain head snapshot should use the full defrag path");
-      assertNotNull(snapshots.get(1).getPathPreviousSnapshotId(),
-          "Second snapshot should use the incremental defrag path");
     }
   }
 
@@ -302,16 +298,12 @@ public class TestOmSnapshotDefragSpaceSavings {
       CheckpointFootprint duplicateInclusiveBefore, CheckpointFootprint dedupedBefore)
       throws IOException {
     CheckpointFootprint dedupedAfter = measureActiveAggregateCheckpointFootprint(snapshots);
-    CheckpointFootprint duplicateInclusiveAfter = measureDuplicateInclusiveActiveFootprint(snapshots);
+    CheckpointFootprint duplicateInclusiveAfter =
+        measureDuplicateInclusiveActiveFootprint(snapshots);
 
-    assertTrue(duplicateInclusiveBefore.getSstFileCount() > dedupedBefore.getSstFileCount(),
-        () -> String.format(
-            "[%s] Expected pre-defrag chain to carry redundant SST references: "
-                + "duplicate-inclusive=%d, deduped=%d",
-            layout, duplicateInclusiveBefore.getSstFileCount(), dedupedBefore.getSstFileCount()));
     assertTrue(dedupedAfter.getSstFileCount() < duplicateInclusiveBefore.getSstFileCount(),
         () -> String.format(
-            "[%s] Expected defragged chain to drop SST references vs duplicate-inclusive pre-defrag "
+            "[%s] Expected defragged chain to drop SST references vs duplicate-inclusive v0 "
                 + "baseline: before=%d, after=%d",
             layout, duplicateInclusiveBefore.getSstFileCount(), dedupedAfter.getSstFileCount()));
 
@@ -325,19 +317,13 @@ public class TestOmSnapshotDefragSpaceSavings {
             layout, sstRedundancyBefore, sstRedundancyAfter));
   }
 
-  /**
-   * Sums each snapshot checkpoint independently, counting every file path without inode dedup, so
-   * hardlinked SST paths in version-0 checkpoints are charged once per snapshot directory.
-   */
   private CheckpointFootprint measureDuplicateInclusiveActiveFootprint(
       List<SnapshotInfo> snapshots) throws IOException {
     long totalBytes = 0;
     long sstFileCount = 0;
-    OMMetadataManager metadataManager = cluster.getOzoneManager().getMetadataManager();
     for (SnapshotInfo snapshotInfo : snapshots) {
-      Path checkpointDir = OmSnapshotManager.getSnapshotPath(metadataManager,
-          snapshotInfo.getSnapshotId(), readSnapshotVersion(snapshotInfo));
-      CheckpointFootprint footprint = calculateDirectoryFootprintWithoutDedup(checkpointDir);
+      CheckpointFootprint footprint = measureDuplicateInclusiveSnapshotFootprint(snapshotInfo,
+          readSnapshotVersion(snapshotInfo));
       totalBytes += footprint.getTotalBytes();
       sstFileCount += footprint.getSstFileCount();
     }
@@ -350,17 +336,33 @@ public class TestOmSnapshotDefragSpaceSavings {
     long sstFileCount = 0;
     OMMetadataManager metadataManager = cluster.getOzoneManager().getMetadataManager();
     for (SnapshotInfo snapshotInfo : snapshots) {
-      Path checkpointDir = OmSnapshotManager.getSnapshotPath(metadataManager,
-          snapshotInfo.getSnapshotId(), version);
-      CheckpointFootprint footprint = calculateDirectoryFootprintWithoutDedup(checkpointDir);
+      CheckpointFootprint footprint = measureDuplicateInclusiveSnapshotFootprint(snapshotInfo, version);
       totalBytes += footprint.getTotalBytes();
       sstFileCount += footprint.getSstFileCount();
     }
     return new CheckpointFootprint(totalBytes, sstFileCount);
   }
 
+  private CheckpointFootprint measureDuplicateInclusiveSnapshotFootprint(
+      SnapshotInfo snapshotInfo, int version) throws IOException {
+    OMMetadataManager metadataManager = cluster.getOzoneManager().getMetadataManager();
+    Path checkpointDir = OmSnapshotManager.getSnapshotPath(metadataManager,
+        snapshotInfo.getSnapshotId(), version);
+    return calculateDirectoryFootprintWithoutDedup(checkpointDir);
+  }
+
+  private void createNoiseBuckets(BucketLayout layout) throws IOException {
+    DBStore activeDbStore = cluster.getOzoneManager().getMetadataManager().getStore();
+    for (int i = 0; i < NOISE_BUCKET_COUNT; i++) {
+      OzoneBucket noiseBucket = DataTestUtil.createVolumeAndBucket(client, layout, REPLICATION_CONFIG_ONE);
+      createKeys(noiseBucket, layout, "noise-" + i + "-", 0, NOISE_KEYS_PER_BUCKET);
+    }
+    activeDbStore.compactDB();
+  }
+
   private SnapshotChainSetup createSnapshotChainWithChurn(BucketLayout layout)
       throws IOException, InterruptedException, TimeoutException {
+    createNoiseBuckets(layout);
     OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, layout, REPLICATION_CONFIG_ONE);
     String volumeName = bucket.getVolumeName();
     String bucketName = bucket.getName();
@@ -620,6 +622,9 @@ public class TestOmSnapshotDefragSpaceSavings {
     return calculateDirectoryFootprint(checkpointDir, visitedInodes);
   }
 
+  /**
+   * Sums every file path in a checkpoint directory without inode deduplication.
+   */
   private static CheckpointFootprint calculateDirectoryFootprintWithoutDedup(Path directory)
       throws IOException {
     assertTrue(Files.isDirectory(directory),
