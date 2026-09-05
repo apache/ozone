@@ -355,6 +355,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     OzoneBucket bucket = getVolume().getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
     List<String> deleteKeys = new ArrayList<>();
+    List<String> failedDeletes = new ArrayList<>();
 
     if (request.getObjects() != null) {
       Map<String, ErrorInfo> undeletedKeyResultMap;
@@ -371,11 +372,11 @@ public class BucketEndpoint extends BucketOperationHandler {
               // if the key is not found, it is assumed to be successfully deleted
               ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
           if (deleted) {
-            deleteKeys.remove(d.getKey());
             if (!request.isQuiet()) {
               result.addDeleted(new DeletedObject(d.getKey()));
             }
           } else {
+            failedDeletes.add(d.getKey());
             result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
           }
         }
@@ -383,6 +384,8 @@ public class BucketEndpoint extends BucketOperationHandler {
       } catch (IOException ex) {
         LOG.error("Delete key failed: {}", ex.getMessage());
         getMetrics().updateDeleteKeyFailureStats(startNanos);
+        // the batch delete failed as a whole, so no key is reported as deleted
+        failedDeletes.addAll(deleteKeys);
         result.addError(
             new Error("ALL", "InternalError",
                 ex.getMessage()));
@@ -390,7 +393,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     }
 
     AuditMessage.Builder message = auditMessageFor(s3GAction);
-    message.getParams().put("failedDeletes", deleteKeys.toString());
+    message.getParams().put("failedDeletes", failedDeletes.toString());
 
     if (!result.getErrors().isEmpty()) {
       AUDIT.logWriteFailure(message.withResult(AuditEventStatus.FAILURE)
