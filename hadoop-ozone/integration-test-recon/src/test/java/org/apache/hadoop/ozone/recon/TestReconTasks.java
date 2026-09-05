@@ -670,13 +670,11 @@ public class TestReconTasks {
    * when replicas of a CLOSED RF3 container report different data checksums, and
    * that the state clears once the checksums are made uniform again.
    *
-   * <p>Strategy: after writing data and closing the RF3 container, one replica's
-   * checksum is replaced with a non-zero value via {@link ContainerReplica#toBuilder()}.
-   * Because {@link ContainerReplica} is immutable,
-   * {@code reconCm.updateContainerReplica()} replaces the existing replica entry
-   * (keyed by {@code containerID + datanodeDetails}) with the modified copy.
-   * This makes the set have distinct checksums (e.g. {0, 0, 12345}), which triggers
-   * {@code hasDataChecksumMismatch()}'s {@code distinctChecksums > 1} check.</p>
+   * <p>Strategy: after writing data and closing the RF3 container, all replicas
+   * are given the same non-zero sequence ID and checksum, then one replica's
+   * checksum is changed via {@link ContainerReplica#toBuilder()}. Because
+   * {@link ContainerReplica} is immutable, {@code reconCm.updateContainerReplica()}
+   * replaces the existing replica entry keyed by container ID and datanode.</p>
    *
    * <p>Note: {@code REPLICA_MISMATCH} records are now properly cleaned up by
    * {@code batchDeleteSCMStatesForContainers} on each scan cycle (previously they
@@ -729,14 +727,22 @@ public class TestReconTasks {
     reconCm.updateContainerState(
         containerInfo.containerID(), HddsProtos.LifeCycleEvent.CLOSE);
 
-    // Inject a checksum mismatch: replace one replica with an identical copy
-    // that has a non-zero dataChecksum. The other two replicas have checksum=0
-    // (ContainerChecksums.unknown()), giving distinct checksums {0, 12345} and
-    // triggering distinctChecksums > 1.
+    // Give every replica a known checksum first. A zero checksum means it has
+    // not been reported yet and must not be treated as a mismatch.
     Set<ContainerReplica> currentReplicas = reconCm.getContainerReplicas(cid);
-    ContainerReplica originalReplica = currentReplicas.iterator().next();
-    ContainerReplica mismatchedReplica = originalReplica.toBuilder()
+    for (ContainerReplica replica : currentReplicas) {
+      reconCm.updateContainerReplica(cid, replica.toBuilder()
+          .setSequenceId(1L)
+          .setChecksums(ContainerChecksums.of(12345L))
+          .build());
+    }
+
+    ContainerReplica matchingReplica = currentReplicas.iterator().next().toBuilder()
+        .setSequenceId(1L)
         .setChecksums(ContainerChecksums.of(12345L))
+        .build();
+    ContainerReplica mismatchedReplica = matchingReplica.toBuilder()
+        .setChecksums(ContainerChecksums.of(54321L))
         .build();
     reconCm.updateContainerReplica(cid, mismatchedReplica);
 
@@ -749,8 +755,8 @@ public class TestReconTasks {
     assertTrue(containsContainerId(replicaMismatch, containerID),
         "Container with differing replica checksums should be REPLICA_MISMATCH");
 
-    // Recovery: restore the original replica (uniform checksums → no mismatch).
-    reconCm.updateContainerReplica(cid, originalReplica);
+    // Recovery: restore the matching checksum.
+    reconCm.updateContainerReplica(cid, matchingReplica);
     forceContainerHealthScan(reconScm);
 
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> replicaMismatchAfterRecovery =
