@@ -88,12 +88,12 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
         if (!status.isHealthy()) {
           continue;
         }
-        // Transitioning nodes remain peers so other replicas can recover any unique data before the node leaves.
-        if (!status.isDecommissioned() && !status.isInMaintenance()) {
-          peers.add(datanode);
-        }
         if (status.isInService()) {
           targets.add(datanode);
+          peers.add(datanode);
+        } else if (status.isDecommissioning() || status.isEnteringMaintenance()) {
+          // Transitioning nodes remain peers so other replicas can recover any unique data before the node leaves.
+          peers.add(datanode);
         }
       }
 
