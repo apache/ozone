@@ -264,6 +264,7 @@ message GetContainerReplicasRequestProto {
 
 message GetContainerReplicasResponseProto {
   repeated SCMContainerReplicaProto containerReplica = 1;
+  optional bool dataChecksumMismatch = 2;
 }
 
 message GetContainerWithPipelineBatchRequestProto {

@@ -1066,6 +1066,12 @@
                 "name": "containerReplica",
                 "type": "SCMContainerReplicaProto",
                 "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "dataChecksumMismatch",
+                "type": "bool",
+                "optional": true
               }
             ]
           },

@@ -419,6 +419,8 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     when(containerInfo.getNumberOfKeys()).thenReturn(numberOfKeys);
     when(containerInfo.getUsedBytes()).thenReturn(usedBytes);
     when(containerInfo.getReplicationConfig()).thenReturn(replicationConfig);
+    when(containerInfo.getReplicationType()).thenReturn(
+        HddsProtos.ReplicationType.RATIS);
     when(containerInfo.getState()).thenReturn(HddsProtos.LifeCycleState.CLOSED);
     when(containerInfo.getHealthState()).thenAnswer(invocation -> healthStateRef.get());
     doAnswer(invocation -> {
@@ -427,6 +429,8 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     }).when(containerInfo).setHealthState(
         org.mockito.ArgumentMatchers.any(ContainerHealthState.class));
     when(replicationConfig.getRequiredNodes()).thenReturn(requiredNodes);
+    when(replicationConfig.getReplicationType()).thenReturn(
+        HddsProtos.ReplicationType.RATIS);
     return containerInfo;
   }
 
@@ -502,6 +506,7 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     for (Long checksum : checksums) {
       ContainerReplica replica = mock(ContainerReplica.class);
       when(replica.getDataChecksum()).thenReturn(checksum);
+      when(replica.getSequenceId()).thenReturn(1L);
       replicas.add(replica);
     }
     return replicas;

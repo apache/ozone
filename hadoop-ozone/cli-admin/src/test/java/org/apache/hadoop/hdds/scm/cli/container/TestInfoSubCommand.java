@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +45,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -50,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfoResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -81,6 +85,9 @@ public class TestInfoSubCommand {
     scmClient = mock(ScmClient.class);
     datanodes = createDatanodeDetails(3);
     when(scmClient.getContainerWithPipeline(anyLong())).then(i -> getContainerWithPipeline(i.getArgument(0)));
+    doAnswer(invocation -> new ContainerReplicaInfoResult(
+        scmClient.getContainerReplicas(invocation.getArgument(0)), false))
+        .when(scmClient).getContainerReplicasWithStatus(anyLong());
     when(scmClient.getPipeline(any())).thenThrow(new PipelineNotFoundException("Pipeline not found."));
 
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
@@ -102,6 +109,50 @@ public class TestInfoSubCommand {
   @Test
   public void testReplicaIndexInOutput() throws Exception {
     testReplicaIncludedInOutput(true);
+  }
+
+  @Test
+  public void testDataChecksumMismatchInOutput() throws Exception {
+    doReturn(new ContainerReplicaInfoResult(
+        getReplicas(false, new long[]{10, 10, 10},
+            new long[]{100, 200, 100}), true))
+        .when(scmClient).getContainerReplicasWithStatus(anyLong());
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1");
+    cmd.execute(scmClient);
+
+    assertThat(outContent.toString(DEFAULT_ENCODING))
+        .contains("Data checksum mismatch: true")
+        .contains("DataChecksum: " + HddsUtils.checksumToString(100));
+  }
+
+  @Test
+  public void testUnconfirmedDataChecksumMismatchIsNotInOutput()
+      throws Exception {
+    doReturn(new ContainerReplicaInfoResult(
+        getReplicas(false, new long[]{10, 10, 10},
+            new long[]{100, 200, 100}), false))
+        .when(scmClient).getContainerReplicasWithStatus(anyLong());
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1");
+    cmd.execute(scmClient);
+
+    assertThat(outContent.toString(DEFAULT_ENCODING))
+        .doesNotContain("Data checksum mismatch: true");
+  }
+
+  @Test
+  public void testDataChecksumMismatchInJsonOutput() throws Exception {
+    doReturn(new ContainerReplicaInfoResult(
+        getReplicas(false, new long[]{10, 10, 10},
+            new long[]{100, 200, 100}), true))
+        .when(scmClient).getContainerReplicasWithStatus(anyLong());
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1", "--json");
+    cmd.execute(scmClient);
+
+    assertThat(outContent.toString(DEFAULT_ENCODING))
+        .contains("\"dataChecksumMismatch\" : true");
   }
 
   @Test
@@ -332,9 +383,18 @@ public class TestInfoSubCommand {
   }
 
   private List<ContainerReplicaInfo> getReplicas(boolean includeIndex) {
+    return getReplicas(includeIndex, new long[]{1, 1, 1},
+        new long[]{0, 0, 0});
+  }
+
+  private List<ContainerReplicaInfo> getReplicas(boolean includeIndex,
+      long[] sequenceIds, long[] dataChecksums) {
+    assertEquals(datanodes.size(), sequenceIds.length);
+    assertEquals(datanodes.size(), dataChecksums.length);
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
     int index = 1;
-    for (DatanodeDetails dn : datanodes) {
+    for (int i = 0; i < datanodes.size(); i++) {
+      DatanodeDetails dn = datanodes.get(i);
       ContainerReplicaInfo.Builder container
           = new ContainerReplicaInfo.Builder()
           .setContainerID(1)
@@ -343,7 +403,8 @@ public class TestInfoSubCommand {
           .setPlaceOfBirth(dn.getID())
           .setDatanodeDetails(dn)
           .setKeyCount(1)
-          .setSequenceId(1);
+          .setSequenceId(sequenceIds[i])
+          .setDataChecksum(dataChecksums[i]);
       if (includeIndex) {
         container.setReplicaIndex(index++);
       }
