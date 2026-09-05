@@ -36,6 +36,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPIRATION_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.MP_PARTS_COUNT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_MATCH_PATTERN;
@@ -57,10 +58,12 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
+import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -88,6 +91,7 @@ import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -98,6 +102,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.s3.BucketLifecycleAbsenceCache;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -131,6 +136,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
   private ObjectOperationHandler handler;
 
+  @Inject
+  private BucketLifecycleAbsenceCache lifecycleAbsenceCache;
+
   /*FOR the feature Overriding Response Header
   https://docs.aws.amazon.com/de_de/AmazonS3/latest/API/API_GetObject.html */
   private final Map<String, String> overrideQueryParameter;
@@ -148,6 +156,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   @Override
   protected void init() {
     super.init();
+    if (lifecycleAbsenceCache == null) {
+      // Constructed directly rather than by CDI; the cache is then per instance,
+      // which still behaves correctly, only without sharing between requests.
+      lifecycleAbsenceCache = new BucketLifecycleAbsenceCache(getOzoneConfiguration());
+    }
     ObjectOperationHandler chain = ObjectOperationHandlerChain.newBuilder(this)
         .add(new ObjectGetTorrentHandler())
         .add(new ObjectAclHandler())
@@ -515,6 +528,91 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   }
 
   /**
+   * Adds the {@code x-amz-expiration} header when an enabled lifecycle
+   * expiration rule covers the key, as S3 does: the value names the date the
+   * object is scheduled for deletion and the rule that schedules it. When more
+   * than one rule covers the key, the earliest expiry is reported.
+   * <p>
+   * The header is advisory, so a bucket without a lifecycle configuration, a
+   * caller who may not read it, or any other lookup failure only leaves the
+   * header out; the HEAD itself still succeeds.
+   */
+  private void addExpirationHeader(ResponseBuilder responseBuilder,
+      String bucketName, String keyPath, OzoneKey key) {
+    if (lifecycleAbsenceCache.isKnownAbsent(bucketName)) {
+      return;
+    }
+    try {
+      OzoneLifecycleConfiguration lifecycleConfiguration = getClientProtocol()
+          .getLifecycleConfiguration(key.getVolumeName(), bucketName);
+
+      ZonedDateTime earliest = null;
+      String ruleId = null;
+      for (OzoneLifecycleConfiguration.OzoneLCRule rule : lifecycleConfiguration.getRules()) {
+        if (!rule.isEnabled() || rule.getExpiration() == null
+            || !rule.matches(keyPath, key.getTags())) {
+          continue;
+        }
+        ZonedDateTime expiryDate = expiryDateOf(rule.getExpiration(), key.getModificationTime());
+        if (expiryDate != null && (earliest == null || expiryDate.isBefore(earliest))) {
+          earliest = expiryDate;
+          ruleId = rule.getId();
+        }
+      }
+
+      String quotedRuleId = earliest == null ? null : quoteRuleId(ruleId);
+      if (quotedRuleId != null) {
+        responseBuilder.header(EXPIRATION_HEADER,
+            String.format("expiry-date=\"%s\", rule-id=%s", RFC1123Util.FORMAT.format(earliest), quotedRuleId));
+      }
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND) {
+        lifecycleAbsenceCache.markAbsent(bucketName);
+      } else {
+        LOG.debug("Omitting {} header for {}/{}", EXPIRATION_HEADER, bucketName, keyPath, ex);
+      }
+    } catch (IOException | RuntimeException ex) {
+      LOG.debug("Omitting {} header for {}/{}", EXPIRATION_HEADER, bucketName, keyPath, ex);
+    }
+  }
+
+  /**
+   * Renders a lifecycle rule id as an RFC 7230 quoted-string. Rule ids are
+   * supplied by the client and only validated for length, so a quote or a
+   * backslash is escaped here. An id carrying a control character cannot be
+   * represented in a header value at all; that yields null so the caller drops
+   * the header rather than emitting a malformed one.
+   */
+  private static String quoteRuleId(String ruleId) {
+    for (int i = 0; i < ruleId.length(); i++) {
+      char c = ruleId.charAt(i);
+      if ((c < 0x20 && c != '\t') || c == 0x7f) {
+        return null;
+      }
+    }
+    return '"' + ruleId.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
+  }
+
+  /**
+   * S3 reports a {@code Days} expiry as the object's modification time plus the
+   * configured days, rounded up to the next midnight UTC. A {@code Date} expiry
+   * is already validated to be midnight UTC, so it is reported as is.
+   */
+  private static ZonedDateTime expiryDateOf(
+      OzoneLifecycleConfiguration.OzoneLCExpiration expiration, Instant modificationTime) {
+    ZoneId gmt = ZoneId.of(OzoneConsts.OZONE_TIME_ZONE);
+    if (expiration.getDays() != null) {
+      return modificationTime.atZone(gmt).plusDays(expiration.getDays())
+          .toLocalDate().plusDays(1).atStartOfDay(gmt);
+    }
+    if (expiration.getDate() != null) {
+      return ZonedDateTime.parse(expiration.getDate(), DateTimeFormatter.ISO_DATE_TIME)
+          .withZoneSameInstant(gmt);
+    }
+    return null;
+  }
+
+  /**
    * Store the request's Content-Type (preserved by {@link HeaderPreprocessor}
    * as {@code X-Ozone-Original-Content-Type}) in the key metadata.
    */
@@ -685,6 +783,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     addLastModifiedDate(response, key);
     addTagCountIfAny(response, key);
     addCustomMetadataHeaders(response, key);
+    addExpirationHeader(response, bucketName, keyPath, key);
     getMetrics().updateHeadKeySuccessStats(startNanos);
     auditReadSuccess(s3GAction);
     return response.build();

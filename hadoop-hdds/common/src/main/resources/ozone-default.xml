@@ -3831,6 +3831,18 @@
     </description>
   </property>
   <property>
+    <name>ozone.s3g.lifecycle.missing-configuration.cache.ttl</name>
+    <tag>OZONE, S3GATEWAY</tag>
+    <value>30s</value>
+    <description>
+      How long S3 Gateway remembers that a bucket carries no lifecycle
+      configuration. While an entry is cached, object requests that report
+      lifecycle expiration skip the lookup against Ozone Manager instead of
+      asking again for a result that is not there. Setting this to zero disables
+      the cache, at the cost of one Ozone Manager lookup per request.
+    </description>
+  </property>
+  <property>
     <name>ozone.s3g.client.buffer.size</name>
     <tag>OZONE, S3GATEWAY</tag>
     <value>4MB</value>

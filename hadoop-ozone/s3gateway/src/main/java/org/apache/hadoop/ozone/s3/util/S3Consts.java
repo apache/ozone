@@ -101,6 +101,8 @@ public final class S3Consts {
   public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
 
+  public static final String EXPIRATION_HEADER = "x-amz-expiration";
+
   /** AWS S3 maximum number of keys per DeleteObjects request. */
   public static final int S3_DELETE_OBJECTS_MAX_KEYS = 1000;
 

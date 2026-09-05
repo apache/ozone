@@ -97,6 +97,22 @@ public class OzoneLifecycleConfiguration {
       return prefix;
     }
 
+    /**
+     * The key must carry every tag of the operator, and start with the prefix
+     * when one is set.
+     */
+    boolean matches(String keyPath, Map<String, String> keyTags) {
+      if (prefix != null && !keyPath.startsWith(prefix)) {
+        return false;
+      }
+      for (Map.Entry<String, String> tag : tags.entrySet()) {
+        if (!tag.getValue().equals(keyTags.get(tag.getKey()))) {
+          return false;
+        }
+      }
+      return true;
+    }
+
   }
 
   /**
@@ -124,6 +140,21 @@ public class OzoneLifecycleConfiguration {
 
     public LifecycleAndOperator getAndOperator() {
       return andOperator;
+    }
+
+    /**
+     * A filter without prefix, tag and AND operator covers every key in the
+     * bucket.
+     */
+    boolean matches(String keyPath, Map<String, String> keyTags) {
+      if (prefix != null) {
+        return keyPath.startsWith(prefix);
+      } else if (tag != null) {
+        return tag.getValue().equals(keyTags.get(tag.getKey()));
+      } else if (andOperator != null) {
+        return andOperator.matches(keyPath, keyTags);
+      }
+      return true;
     }
   }
 
@@ -171,6 +202,27 @@ public class OzoneLifecycleConfiguration {
 
     public OzoneLCFilter getFilter() {
       return filter;
+    }
+
+    public boolean isEnabled() {
+      return "Enabled".equals(status);
+    }
+
+    /**
+     * Matches this rule's prefix or filter against a key. Unlike the
+     * server-side OmLCRule#match, which the lifecycle service uses to pick keys
+     * that are already due for deletion, this only answers whether the rule
+     * covers the key, so callers can report a future expiry date for it.
+     * <p>
+     * OM rejects a rule that sets both prefix and filter, and one that sets
+     * neither, so exactly one of the two is present here. The order below picks
+     * whichever is set; it is not a precedence rule.
+     */
+    public boolean matches(String keyPath, Map<String, String> keyTags) {
+      if (prefix != null) {
+        return keyPath.startsWith(prefix);
+      }
+      return filter == null || filter.matches(keyPath, keyTags);
     }
   }
 
