@@ -534,7 +534,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new ReplicationManagerEventHandler(replicationManager, scmContext);
 
     ReconcileContainerEventHandler reconcileContainerEventHandler =
-        new ReconcileContainerEventHandler(containerManager, scmContext);
+        new ReconcileContainerEventHandler(containerManager, scmContext, scmNodeManager);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
