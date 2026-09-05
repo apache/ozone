@@ -1399,7 +1399,9 @@ Returns the status of all the Recon tasks.
 
    Filters the results by the exact upper bound of a file-size histogram bin, in bytes. It is not an arbitrary file
    size or a cumulative less-than-or-equal threshold. A positive value that is not a bin upper bound returns an empty
-   result. This filter can be used independently or together with volume and/or bucket.
+   result. The first bin has an upper bound of 1024 bytes; for example, the bin with upper bound 2048 contains files
+   larger than 1024 bytes and up to 2048 bytes. This filter can be used independently or together with volume and/or
+   bucket.
 
 **Returns**
 

@@ -632,7 +632,8 @@ count", "object-count analytics".
 **Parameters.** `volume`, `bucket`, `fileSize` (all optional and independent; set volume/bucket to
 scope). `fileSize` is an exact histogram-bin upper bound in bytes, not an arbitrary file size or a
 cumulative less-than-or-equal threshold. A positive value that is not a bin upper bound returns an
-empty result.
+empty result. The first bin has upper bound 1024; for example, upper bound 2048 represents files
+larger than 1024 bytes and up to 2048 bytes.
 **Select examples.** "file size distribution"; "how many files are in the bin ending at 1MiB";
 "small vs large file counts in bucket b1"; "histogram of file sizes"; "object count by size tier".
 **Do-not-select examples.** "list large files" → `api_v1_keys_listKeys` with `keySize`.

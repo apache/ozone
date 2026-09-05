@@ -238,7 +238,8 @@ public class LlmToolSpecFactory {
         "Distribution of file counts by size tier (optionally per volume/bucket). Use for "
             + "histogram-style 'how many small vs large files' questions. fileSize selects a single "
             + "bin by its exact upper bound in bytes, not an arbitrary size or cumulative threshold; "
-            + "a positive non-bin value returns no results. Not for listing individual files "
+            + "for example, upper bound 2048 represents files over 1024 and up to 2048 bytes. A "
+            + "positive non-bin value returns no results. Not for listing individual files "
             + "(api_v1_keys_listKeys).",
         paramMap(RECON_QUERY_VOLUME, "string", RECON_QUERY_BUCKET, "string",
             RECON_QUERY_FILE_SIZE, "integer")));
