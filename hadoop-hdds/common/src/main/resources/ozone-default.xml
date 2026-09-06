@@ -2413,7 +2413,8 @@
     <value>10737418240</value>
     <tag>OZONE, OM, RATIS</tag>
     <description>
-      Max size of SST files in OM Ratis Snapshot tarball.
+      Max size of SST files in OM Ratis Snapshot tarball. A single file larger than this limit is
+      still sent, so that the transfer always makes progress.
     </description>
   </property>
   <property>

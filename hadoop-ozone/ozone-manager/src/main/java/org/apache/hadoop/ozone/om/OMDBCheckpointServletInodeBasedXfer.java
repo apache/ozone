@@ -563,13 +563,24 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         if (!sstFilesToExclude.contains(fileId)) {
           try {
             long fileSize = Files.size(dbFile);
-            if (maxTotalSstSize.get() - fileSize <= 0) {
-              return false;
+            boolean overBudget = maxTotalSstSize.get() - fileSize < 0;
+            if (overBudget) {
+              if (!omdbArchiver.getFilesToWriteIntoTarball().isEmpty()) {
+                return false;
+              }
+              // Nothing has been collected for this request yet. Returning here would send an empty tarball,
+              // and the follower would come back asking for the same files, so send this one on its own.
+              LOG.warn("File {} of size {} bytes exceeds {} ({} bytes). Transferring it in a tarball of its own.",
+                  dbFile, fileSize, OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, maxTotalSstSize.get());
             }
             bytesRecorded += omdbArchiver.recordFileEntry(dbFile.toFile(), fileId);
             filesWritten++;
             maxTotalSstSize.addAndGet(-fileSize);
             sstFilesToExclude.add(fileId);
+            if (overBudget) {
+              // End the part here so the oversized file really is the tarball's only entry.
+              return false;
+            }
           } catch (NoSuchFileException e) {
             if (ignoreNoSuchFileException) {
               logFileNoLongerExists(dbFile);
