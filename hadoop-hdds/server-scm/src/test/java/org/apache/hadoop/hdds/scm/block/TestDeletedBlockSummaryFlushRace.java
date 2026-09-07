@@ -21,11 +21,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
 import java.io.File;
+import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -264,6 +267,147 @@ public class TestDeletedBlockSummaryFlushRace {
         "After onBecomeLeader with a consistent DB, in-memory must be S1 (txCount=2)");
   }
 
+  /**
+   * Regression test for the reviewer-flagged gap: {@code addTransactions()} evaluates
+   * {@code getSummary()} before entering {@code runWithBufferLock()}, so a concurrent
+   * {@code onBecomeLeader()} could reload the old DB summary between the counter update and
+   * the snapshot, and that stale snapshot would then be the one persisted. Verifies the
+   * summary handed to {@code addTransactionsToDB} (i.e. what actually gets persisted) always
+   * reflects the just-applied increment, even when {@code onBecomeLeader} races to interleave
+   * exactly in that window.
+   */
+  @Test
+  public void testOnBecomeLeaderCannotInterleaveDuringAddTransactionsSnapshot() throws Throwable {
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    AtomicReference<DeletedBlocksTransactionSummary> persistedSummary = new AtomicReference<>();
+    doAnswer(inv -> {
+      persistedSummary.set(inv.getArgument(1));
+      return null;
+    }).when(mockStateManager).addTransactionsToDB(any(ArrayList.class), any());
+
+    // Seed the DB with a baseline summary (as if Tx1 was already durably committed) without
+    // going through the mock, which does not itself write anything.
+    DeletedBlocksTransactionSummary baseline = DeletedBlocksTransactionSummary.newBuilder()
+        .setTotalTransactionCount(1).setTotalBlockCount(5).setTotalBlockSize(50)
+        .setTotalBlockReplicatedSize(0).build();
+    metadataStore.getStatefulServiceConfigTable().put(
+        DeletedBlockLogStateManagerImpl.SERVICE_DEFINITION.getServiceName(), baseline.toByteString());
+
+    CountDownLatch afterUpdate = new CountDownLatch(1);
+    CountDownLatch beforeSnapshot = new CountDownLatch(1);
+    PausingStatusManager statusManager = new PausingStatusManager(mockStateManager,
+        metadataStore.getStatefulServiceConfigTable(), mock(ContainerManager.class), metrics, Long.MAX_VALUE);
+    assertEquals(1, statusManager.getSummary().getTotalTransactionCount(),
+        "baseline: in-memory must be initialized from the seeded DB summary");
+
+    statusManager.armPause(afterUpdate, beforeSnapshot);
+
+    AtomicReference<Throwable> applyError = new AtomicReference<>();
+    Thread applyThread = new Thread(() -> {
+      try {
+        statusManager.addTransactions(toList(buildTx(TX_ID_2, 5)));
+      } catch (Throwable t) {
+        applyError.set(t);
+      }
+    });
+    applyThread.start();
+
+    assertTrue(afterUpdate.await(10, TimeUnit.SECONDS),
+        "Timed out waiting for the apply thread to update the in-memory summary");
+
+    // Simulate a concurrent SCM leader change trying to reload the (still stale) DB summary
+    // right in the update-to-snapshot window.
+    Thread leaderThread = new Thread(statusManager::onBecomeLeader);
+    leaderThread.start();
+
+    leaderThread.join(300);
+    assertTrue(leaderThread.isAlive(),
+        "onBecomeLeader must block until the apply thread finishes update+snapshot as one unit; "
+            + "if it proceeded here, the update-to-snapshot race is unguarded.");
+
+    beforeSnapshot.countDown();
+
+    applyThread.join(15_000);
+    if (applyError.get() != null) {
+      throw applyError.get();
+    }
+    leaderThread.join(15_000);
+
+    assertNotNull(persistedSummary.get(), "addTransactionsToDB must have been called");
+    assertEquals(2, persistedSummary.get().getTotalTransactionCount(),
+        "The summary handed to addTransactionsToDB (what gets durably persisted) must reflect "
+            + "Tx2's increment. BUG: a concurrent onBecomeLeader reset landed between the "
+            + "counter update and getSummary(), so a stale summary would have been persisted.");
+  }
+
+  /**
+   * Analogous regression test for the remove path, per the reviewer's explicit request to
+   * also cover {@code removeTransactions()}.
+   */
+  @Test
+  public void testOnBecomeLeaderCannotInterleaveDuringRemoveTransactionsSnapshot() throws Throwable {
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    AtomicReference<DeletedBlocksTransactionSummary> persistedSummary = new AtomicReference<>();
+    doAnswer(inv -> {
+      persistedSummary.set(inv.getArgument(1));
+      return null;
+    }).when(mockStateManager).removeTransactionsFromDB(any(ArrayList.class), any());
+
+    // Seed the DB with a baseline summary as if Tx1 and Tx2 were both already durable.
+    DeletedBlocksTransactionSummary baseline = DeletedBlocksTransactionSummary.newBuilder()
+        .setTotalTransactionCount(2).setTotalBlockCount(10).setTotalBlockSize(100)
+        .setTotalBlockReplicatedSize(0).build();
+    metadataStore.getStatefulServiceConfigTable().put(
+        DeletedBlockLogStateManagerImpl.SERVICE_DEFINITION.getServiceName(), baseline.toByteString());
+
+    CountDownLatch afterUpdate = new CountDownLatch(1);
+    CountDownLatch beforeSnapshot = new CountDownLatch(1);
+    PausingStatusManager statusManager = new PausingStatusManager(mockStateManager,
+        metadataStore.getStatefulServiceConfigTable(), mock(ContainerManager.class), metrics, Long.MAX_VALUE);
+    assertEquals(2, statusManager.getSummary().getTotalTransactionCount(),
+        "baseline: in-memory must be initialized from the seeded DB summary");
+    // Tx2 must be tracked in txSizeMap for removeTransactions to decrement the summary for it.
+    statusManager.getTxSizeMap().put(TX_ID_2,
+        new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(TX_ID_2, CONTAINER_ID, 5, 50, 0));
+
+    statusManager.armPause(afterUpdate, beforeSnapshot);
+
+    AtomicReference<Throwable> applyError = new AtomicReference<>();
+    Thread applyThread = new Thread(() -> {
+      try {
+        statusManager.removeTransactions(toLongList(TX_ID_2));
+      } catch (Throwable t) {
+        applyError.set(t);
+      }
+    });
+    applyThread.start();
+
+    assertTrue(afterUpdate.await(10, TimeUnit.SECONDS),
+        "Timed out waiting for the apply thread to update the in-memory summary");
+
+    Thread leaderThread = new Thread(statusManager::onBecomeLeader);
+    leaderThread.start();
+
+    leaderThread.join(300);
+    assertTrue(leaderThread.isAlive(),
+        "onBecomeLeader must block until the apply thread finishes update+snapshot as one unit; "
+            + "if it proceeded here, the update-to-snapshot race is unguarded.");
+
+    beforeSnapshot.countDown();
+
+    applyThread.join(15_000);
+    if (applyError.get() != null) {
+      throw applyError.get();
+    }
+    leaderThread.join(15_000);
+
+    assertNotNull(persistedSummary.get(), "removeTransactionsFromDB must have been called");
+    assertEquals(1, persistedSummary.get().getTotalTransactionCount(),
+        "The summary handed to removeTransactionsFromDB (what gets durably persisted) must "
+            + "reflect Tx2's removal. BUG: a concurrent onBecomeLeader reset landed between the "
+            + "counter update and getSummary(), so a stale summary would have been persisted.");
+  }
+
   // -------------------------------------------------------------------------
 
   private StorageContainerManager buildMockScm() {
@@ -291,6 +435,10 @@ public class TestDeletedBlockSummaryFlushRace {
 
   private static ArrayList<DeletedBlocksTransaction> toList(DeletedBlocksTransaction... txs) {
     return new ArrayList<>(Arrays.asList(txs));
+  }
+
+  private static ArrayList<Long> toLongList(Long... ids) {
+    return new ArrayList<>(Arrays.asList(ids));
   }
 
   /**
@@ -329,6 +477,45 @@ public class TestDeletedBlockSummaryFlushRace {
         afterFirstAdd.countDown();
         try {
           beforeSecondAdd.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
+  }
+
+  /**
+   * A {@link SCMDeletedBlockTransactionStatusManager} subclass that, once armed, pauses
+   * inside the {@code summaryLock}-guarded window: after the summary counters are updated
+   * and before they are snapshotted via {@code getSummary()}. This lets a test deterministically
+   * race a concurrent {@code onBecomeLeader()} against exactly that window.
+   */
+  static class PausingStatusManager extends SCMDeletedBlockTransactionStatusManager {
+
+    private volatile CountDownLatch afterUpdate;
+    private volatile CountDownLatch beforeSnapshot;
+    private volatile boolean armed = false;
+
+    PausingStatusManager(DeletedBlockLogStateManager deletedBlockLogStateManager,
+        Table<String, ByteString> statefulServiceConfigTable, ContainerManager containerManager,
+        ScmBlockDeletingServiceMetrics metrics, long scmCommandTimeoutMs) throws IOException {
+      super(deletedBlockLogStateManager, statefulServiceConfigTable, containerManager, metrics,
+          scmCommandTimeoutMs);
+    }
+
+    void armPause(CountDownLatch afterUpdateLatch, CountDownLatch beforeSnapshotLatch) {
+      this.afterUpdate = afterUpdateLatch;
+      this.beforeSnapshot = beforeSnapshotLatch;
+      this.armed = true;
+    }
+
+    @Override
+    protected void onSummaryUpdatedForTest() {
+      if (armed) {
+        armed = false;
+        afterUpdate.countDown();
+        try {
+          beforeSnapshot.await(10, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
