@@ -236,7 +236,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
 
       OmBucketInfo omBucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
+          getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
       // Mark all keys which can be deleted, in cache as deleted.
@@ -259,6 +259,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
+
+      // A partial delete still persists the accepted keys and the bucket row, so publish here
+      // rather than only when every key was deleted.
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
       omClientResponse =
           getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
               unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap, state);
