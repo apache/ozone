@@ -53,9 +53,16 @@ public final class OMRatisHelper {
     return OMRequest.parseFrom(new ByteBufferInputStream(buffer));
   }
 
-  /** Convert the given proto 2 response to a proto 3 {@link ByteString}. */
+  /**
+   * Convert the given proto 2 response to a proto 3 {@link ByteString}.
+   * <p>
+   * The response is serialized eagerly so that the returned {@link Message} holds only the serialized bytes.
+   * Ratis keeps the reply {@link Message} in its retry cache (on the leader and on every follower) for
+   * {@code ozone.om.ratis.server.retry.cache.timeout}, so a lazily serializing {@link Message} would retain
+   * the whole parsed {@link OMResponse} tree for that long, which dominates OM heap under a write burst.
+   */
   public static Message convertResponseToMessage(OMResponse response) {
-    return () -> UnsafeByteOperations.unsafeWrap(response.toByteString().asReadOnlyByteBuffer());
+    return Message.valueOf(UnsafeByteOperations.unsafeWrap(response.toByteArray()));
   }
 
   /** Convert the given proto 3 {@link ByteString} to a proto 2 response. */
