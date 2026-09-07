@@ -21,7 +21,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -30,12 +35,15 @@ import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -45,11 +53,21 @@ import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.server.RetryCache;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.util.ExitUtils;
@@ -143,6 +161,97 @@ public class TestOzoneManagerRatisServer {
     assertEquals(LifeCycle.State.RUNNING,
         omRatisServer.getServerState(),
         "Ratis Server should be in running state");
+  }
+
+  /**
+   * HDDS-13621: a failed Raft reply in RetryCache must not be converted via
+   * getOMResponse (no response message), so checkRetryCache returns null.
+   */
+  @Test
+  public void checkRetryCacheReturnsNullWhenCachedReplyFailed() throws Exception {
+    when(ozoneManager.isTestSecureOmFlag()).thenReturn(true);
+    ClientId ratisClientId = ClientId.randomId();
+    int callId = 42;
+    RaftGroupMemberId memberId = RaftGroupMemberId.valueOf(
+        omRatisServer.getRaftPeerId(), omRatisServer.getRaftGroup().getGroupId());
+    RaftClientReply failedReply = RaftClientReply.newBuilder()
+        .setClientId(ratisClientId)
+        .setServerId(memberId)
+        .setGroupId(omRatisServer.getRaftGroup().getGroupId())
+        .setCallId(callId)
+        .setSuccess(false)
+        .setMessage(Message.EMPTY)
+        .setException(new NotLeaderException(memberId, null, Collections.emptyList()))
+        .build();
+
+    OzoneManagerRatisServer spyServer = spy(omRatisServer);
+    injectRetryCacheEntry(spyServer, ratisClientId, callId, failedReply);
+
+    Server.Call previousCall = Server.getCurCall().get();
+    try {
+      Server.getCurCall().set(new Server.Call(callId, 0, null, null,
+          RPC.RpcKind.RPC_BUILTIN, ratisClientId.toByteString().toByteArray()));
+      assertNull(spyServer.checkRetryCache());
+    } finally {
+      Server.getCurCall().set(previousCall);
+    }
+  }
+
+  /**
+   * HDDS-13621: successful RetryCache hits must still return the cached OMResponse.
+   */
+  @Test
+  public void checkRetryCacheReturnsOmResponseWhenCachedReplySucceeded()
+      throws Exception {
+    when(ozoneManager.isTestSecureOmFlag()).thenReturn(true);
+    ClientId ratisClientId = ClientId.randomId();
+    int callId = 43;
+    OMResponse expected = OMResponse.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+    RaftGroupMemberId memberId = RaftGroupMemberId.valueOf(
+        omRatisServer.getRaftPeerId(), omRatisServer.getRaftGroup().getGroupId());
+    RaftClientReply successReply = RaftClientReply.newBuilder()
+        .setClientId(ratisClientId)
+        .setServerId(memberId)
+        .setGroupId(omRatisServer.getRaftGroup().getGroupId())
+        .setCallId(callId)
+        .setSuccess(true)
+        .setMessage(OMRatisHelper.convertResponseToMessage(expected))
+        .build();
+
+    OzoneManagerRatisServer spyServer = spy(omRatisServer);
+    injectRetryCacheEntry(spyServer, ratisClientId, callId, successReply);
+    doReturn(omRatisServer.getRaftPeerId()).when(spyServer).getLeaderId();
+
+    Server.Call previousCall = Server.getCurCall().get();
+    try {
+      Server.getCurCall().set(new Server.Call(callId, 0, null, null,
+          RPC.RpcKind.RPC_BUILTIN, ratisClientId.toByteString().toByteArray()));
+      OMResponse cached = spyServer.checkRetryCache();
+      assertTrue(cached.getSuccess());
+      assertEquals(Status.OK, cached.getStatus());
+      assertEquals(OzoneManagerProtocolProtos.Type.CreateVolume, cached.getCmdType());
+    } finally {
+      Server.getCurCall().set(previousCall);
+    }
+  }
+
+  private static void injectRetryCacheEntry(OzoneManagerRatisServer spyServer,
+      ClientId clientId, int callId, RaftClientReply reply) throws Exception {
+    RetryCache.Entry cacheEntry = mock(RetryCache.Entry.class);
+    when(cacheEntry.getReplyFuture())
+        .thenReturn(CompletableFuture.completedFuture(reply));
+
+    RetryCache retryCache = mock(RetryCache.class);
+    when(retryCache.getIfPresent(any())).thenReturn(cacheEntry);
+
+    RaftServer.Division division = mock(RaftServer.Division.class);
+    when(division.getRetryCache()).thenReturn(retryCache);
+
+    doReturn(division).when(spyServer).getServerDivision();
   }
 
   /**
