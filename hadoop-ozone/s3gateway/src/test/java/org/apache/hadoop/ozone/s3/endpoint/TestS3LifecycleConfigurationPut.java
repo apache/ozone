@@ -241,9 +241,11 @@ public class TestS3LifecycleConfigurationPut {
       throws Exception {
     // An unexpected internal OM failure must be reported as InternalError (HTTP 500),
     // not swallowed into a false HTTP 200 success.
-    assertUnhandledOMExceptionPropagated(
-        new OMException("boom", OMException.ResultCodes.INTERNAL_ERROR),
-        HTTP_INTERNAL_ERROR, INTERNAL_ERROR.getCode());
+    OMException omException = new OMException("boom", OMException.ResultCodes.INTERNAL_ERROR);
+    OS3Exception ex = putLifecycleConfigurationThrowingOm(omException);
+    assertEquals(HTTP_INTERNAL_ERROR, ex.getHttpCode());
+    assertEquals(INTERNAL_ERROR.getCode(), ex.getCode());
+    assertEquals(INTERNAL_ERROR.getErrorMessage(), ex.getErrorMessage());
   }
 
   private void assertUnhandledOMExceptionPropagated(OMException omException,
