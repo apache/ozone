@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,26 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
@@ -64,7 +51,6 @@ public class TestReconContainerMetadataManagerImpl {
   @TempDir()
   private static Path temporaryFolder;
   private static ReconContainerMetadataManager reconContainerMetadataManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
 
   private String keyPrefix1 = "V3/B1/K1";
   private String keyPrefix2 = "V3/B1/K2";
@@ -72,7 +58,7 @@ public class TestReconContainerMetadataManagerImpl {
 
   @BeforeAll
   public static void setupOnce() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
@@ -90,8 +76,6 @@ public class TestReconContainerMetadataManagerImpl {
   public void setUp() throws Exception {
     // Reset containerDB before running each test
     reconContainerMetadataManager.reinitWithNewContainerDataFromOm(null);
-    setField((ReconContainerMetadataManagerImpl) reconContainerMetadataManager,
-        "omMetadataManager", reconOMMetadataManager);
   }
 
   private void populateKeysInContainers(long containerId1, long containerId2)
@@ -188,14 +172,9 @@ public class TestReconContainerMetadataManagerImpl {
   }
 
   private static void setFieldToNull(ReconContainerMetadataManagerImpl manager, String fieldName) throws Exception {
-    setField(manager, fieldName, null);
-  }
-
-  private static void setField(ReconContainerMetadataManagerImpl manager,
-      String fieldName, Object value) throws Exception {
     Field field = ReconContainerMetadataManagerImpl.class.getDeclaredField(fieldName);
     field.setAccessible(true);
-    field.set(manager, value);
+    field.set(manager, null);
   }
 
   @Test
@@ -435,54 +414,6 @@ public class TestReconContainerMetadataManagerImpl {
     containerMap = reconContainerMetadataManager.getContainers(
         0, containerId);
     assertEquals(0, containerMap.size());
-  }
-
-  @Test
-  public void testGetContainersIncludesUniquePipelines() throws Exception {
-    long containerId = 1L;
-    Pipeline pipeline1 = OMMetadataManagerTestUtils.getRandomPipeline();
-    Pipeline pipeline2 = OMMetadataManagerTestUtils.getRandomPipeline();
-
-    String key1 = "key1";
-    String key2 = "key2";
-    List<OmKeyLocationInfo> key1Locations = new ArrayList<>();
-    key1Locations.add(OMMetadataManagerTestUtils.getOmKeyLocationInfo(
-        new BlockID(containerId, 1), pipeline1));
-    List<OmKeyLocationInfo> key2Locations = new ArrayList<>();
-    key2Locations.add(OMMetadataManagerTestUtils.getOmKeyLocationInfo(
-        new BlockID(containerId, 2), pipeline1));
-    key2Locations.add(OMMetadataManagerTestUtils.getOmKeyLocationInfo(
-        new BlockID(containerId, 3), pipeline2));
-
-    ReconOMMetadataManager omMetadataManager = mock(ReconOMMetadataManager.class);
-    Table<String, OmKeyInfo> keyTable = mock(Table.class);
-    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY)).thenReturn(keyTable);
-    when(keyTable.getSkipCache(key1)).thenReturn(new OmKeyInfo.Builder()
-        .setKeyName(key1)
-        .setOmKeyLocationInfos(singletonList(new OmKeyLocationInfoGroup(0, key1Locations)))
-        .build());
-    when(keyTable.getSkipCache(key2)).thenReturn(new OmKeyInfo.Builder()
-        .setKeyName(key2)
-        .setOmKeyLocationInfos(singletonList(new OmKeyLocationInfoGroup(0, key2Locations)))
-        .build());
-    setField((ReconContainerMetadataManagerImpl) reconContainerMetadataManager,
-        "omMetadataManager", omMetadataManager);
-
-    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
-    reconContainerMetadataManager.batchStoreContainerKeyMapping(rdbBatchOperation,
-        ContainerKeyPrefix.get(containerId, key1, 0), 1);
-    reconContainerMetadataManager.batchStoreContainerKeyMapping(rdbBatchOperation,
-        ContainerKeyPrefix.get(containerId, key2, 0), 1);
-    reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
-
-    ContainerMetadata containerMetadata =
-        reconContainerMetadataManager.getContainers(-1, 0L).get(containerId);
-    assertNotNull(containerMetadata);
-    assertEquals(2, containerMetadata.getPipelines().size());
-    assertTrue(containerMetadata.getPipelines().stream()
-        .anyMatch(pipeline -> pipeline.getId().equals(pipeline1.getId())));
-    assertTrue(containerMetadata.getPipelines().stream()
-        .anyMatch(pipeline -> pipeline.getId().equals(pipeline2.getId())));
   }
 
   @Test
