@@ -260,7 +260,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheKey<>(openKey),
           CacheValue.get(trxnLogIndex));
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       // This map should contain maximum of two entries
       // 1. Overwritten part
@@ -313,6 +313,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         commitResponseBuilder.setETag(eTag);
       }
       omResponse.setCommitMultiPartUploadResponse(commitResponseBuilder);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
       omClientResponse =
           getOmClientResponse(ozoneManager, keyVersionsToDeleteMap, openKey,
               omKeyInfo, multipartKey, multipartKeyInfo, multipartPartKey,
