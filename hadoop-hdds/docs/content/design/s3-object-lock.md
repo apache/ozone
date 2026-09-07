@@ -128,9 +128,28 @@ Two new fields: retentionConfig & legalHold.
 
 ### Ranger Access Control
 
-* **Legal Hold**: Introduces three new Access Types—GET_LEGAL_HOLD, PUT_LEGAL_HOLD, and CLEAR_LEGAL_HOLD—and adds them to accessTypeRestrictions for Keys.
-* **Retention**: Introduces the BYPASS_GOVERNANCE Access Type and adds it to accessTypeRestrictions for Volumes. 
+Ozone Object Lock enforces a dual-gate mechanism combining **Ranger authorization checks** and **underlying WORM state validation**:
 
+* **Standard Data Operations (Put / Delete)**: Even if a user is granted Ranger `WRITE` or `DELETE` permissions, the operation is immediately denied with a `403 Access Denied` (`WORMProtectionException`) if the target object is actively locked by an unexpired retention period or an active Legal Hold.
+* **Lock Management and Bypass Authorization**: To adhere to the Principle of The Least Privilege, dedicated Ranger Access Types are introduced to govern Legal Hold state transitions and Governance Mode bypass privileges:
+
+#### 1. Legal Hold Access Control
+
+Three dedicated Access Types are added to `accessTypeRestrictions` at the Key level to govern Legal Hold states:
+
+* **`GET_LEGAL_HOLD`**: Allows querying the current Legal Hold status of an object (maps to the `GetObjectLegalHold` API).
+* **`PUT_LEGAL_HOLD`**: Grants permission to apply a Legal Hold to an object (maps to `PutObjectLegalHold` with status ON). Once applied, the object is locked indefinitely, blocking all overwrite and delete operations.
+* **`CLEAR_LEGAL_HOLD`**: Grants permission to remove a Legal Hold from an object (maps to `PutObjectLegalHold` with status OFF). Because this clears immutability protection, it is treated as a high-privilege action restricted only to authorized users.
+
+#### 2. Retention Access Control and Governance Mode Bypass
+
+For object retention, the interaction with Ranger policies depends on the configured Retention Mode:
+
+* **Compliance Mode**: Serves as the strictest compliance tier. Until the retention period expires, **no role or Ranger permission can bypass or overwrite the lock**, including cluster administrators.
+* **Governance Mode and `BYPASS_GOVERNANCE`**:
+  * **Mechanism**: Governance Mode allows authorized users to overwrite, delete, or alter the retention duration of a locked object before its expiration date.
+  * **Authorization Binding**: Introduces the **`BYPASS_GOVERNANCE`** Access Type, configured under `accessTypeRestrictions` at the **Volume level**.
+  * **Enforcement Flow**: While regular users are strictly blocked from mutating locked objects in Governance Mode, any request attempting to overwrite or delete such objects requires explicit `BYPASS_GOVERNANCE` entitlement granted in the Ranger policy for that Volume. Without this explicit permission, even administrators using standard client tools cannot modify or remove the locked object.
 ### New Ozone APIs
 
 **ObjectStore**
@@ -143,8 +162,7 @@ Two new fields: retentionConfig & legalHold.
 **OzoneBucket**
 
 ```java
-public void enableObjectLock(boolean enableObjectLock);
-public void setRetentionConfig(RetentionArgs retentionArgs);
+public void setRetentionConfig(@Nullable RetentionArgs retentionArgs);
 ```
 
 ### Supported S3 APIs
@@ -153,7 +171,7 @@ To ensure seamless integration with existing S3 clients (e.g., AWS CLI, Boto3) a
 
 **Bucket-Level APIs:**
 * `GetBucketObjectLockConfiguration`: Retrieves the Object Lock status and the default retention configuration (if any) for a specified OBS bucket.
-* `PutBucketObjectLockConfiguration`: Maps to the new Ozone API to enable Object Lock and configure default retention rules for an existing bucket.
+* `PutBucketObjectLockConfiguration`: Maps to the new Ozone API to enable Object Lock for an existing bucket. Configuring default retention rules (DefaultRetention) is optional.
 
 **Object-Level APIs:**
 * `PutObjectRetention`: Places a retention configuration on an object, specifying the retention mode (COMPLIANCE or GOVERNANCE) and the `RetainUntilDate`.
@@ -167,12 +185,13 @@ Standard data mutating APIs will intercept the Object Lock state and return the 
 * `DeleteObject` / `DeleteObjects` (Deletions will be rejected)
 * `CreateMultipartUpload` / `CompleteMultipartUpload` / `UploadPart` (Uploads will be rejected if the object is locked)
 
-
-
 > _**Note**:
-> AWS S3 supports enabling Object Lock and configuring RetentionConfig directly during bucket creation. 
-> In Apache Ozone's current design, these settings must be configured via dedicated API calls after the bucket has been created.
-
+> * **Object Lock Immutability & Future Versioning Binding**:
+>   - **Current State (No Versioning)**: Once Object Lock is enabled on a bucket (`objectLockEnabled = true`), it cannot be disabled.
+>   - **Future Evolution (With Versioning)**: When S3 Versioning is supported, Object Lock and Versioning will be tightly coupled following AWS S3 semantics: once Object Lock is enabled, Versioning cannot be suspended or disabled.
+> * **Bucket Creation Semantics**:
+>   AWS S3 supports enabling Object Lock and configuring RetentionConfig directly during bucket creation.
+>   In Apache Ozone's current design, these settings must be configured via dedicated API calls after the bucket has been created.
 
 ### Impact on Write and Delete Flows
 
@@ -232,10 +251,41 @@ To achieve strict regulatory compliance (e.g., SEC 17a-4 or FINRA WORM requireme
 
 Because this design alters the schemas of Bucket Table and Key Table, OM (Ozone Manager) version leveling will be introduced to maintain forward and backward compatibility across rolling upgrades.
 
-## Testing
+## Alternatives
+
+### 1. Why Not Use Native ACLs for Object Lock Management?
+
+* **Proposal**:
+  Support Native ACLs alongside or instead of Ranger to configure and manage Object Lock states (e.g., using Ozone native ACLs or POSIX-like ACLs at the Volume/Bucket/Key level).
+
+* **Why Rejected**:
+  1. **Conflicting Security & Authorization Philosophies**:
+     Native ACLs in Ozone are primarily designed for granular, resource-centric permissions (often granting permissions directly to specific objects/buckets or inherited via path hierarchies). In contrast, Object Lock is an enterprise compliance feature that requires strict, role-based access governance (RBAC/ABAC). Compliance controls like WORM and Legal Holds are inherently tied to compliance officers, security auditors, or legal teams—not individual data owners.
+  2. **Risk of Decentralized & Inconsistent Governance**:
+     Native ACLs allow object creators or bucket owners to adjust permissions. If lock controls were exposed through Native ACLs, standard bucket administrators or key owners could modify or override lock-related ACLs locally. Centralizing lock authorization exclusively in **Apache Ranger** ensures that compliance policies are managed from a unified pane of glass, preventing local policy drift or accidental misconfigurations.
+  3. **Operational Complexity**:
+     Supporting dual authorization models (Ranger + Native ACLs) for critical compliance features introduces unnecessary complexity, potential security loopholes, and ambiguous resolution hierarchies during audits. Excluding Native ACLs ensures clean boundary enforcement.
+
+### 2. Why Introduce New Access Types in Ranger Instead of Reusing Existing Permissions (e.g., WRITE / DELETE)?
+
+* **Proposal**:
+  Reuse standard data mutating permissions—such as granting users with `WRITE` or `ALL` the right to put/clear Legal Holds and configure Retention, or allowing users with `DELETE` to bypass Governance mode.
+
+* **Why Rejected**:
+  1. **Violation of Separation of Duties (SoD)**:
+     Object Lock is fundamentally an identity- and role-bound compliance mechanism, not merely a flag toggled on an object. Its primary objective is to protect critical data against accidental deletion, ransomware, or malicious overwrites—**specifically from actors who already possess standard `WRITE` or `DELETE` permissions** (e.g., operational scripts, ETL pipelines, compromised credentials, or everyday developers).
+  2. **Renders Lock Protection Ineffective (Self-Unlock & Delete)**:
+     If lock management is trivially bound to existing `WRITE` or `DELETE` permissions, any user authorized to modify the data could simply unlock the object (or clear the Legal Hold) and proceed to delete or overwrite it. In such a design, the lock mechanism loses its entire defensive value.
+  3. **Enforcing Independent Privileged Roles**:
+     To achieve true tamper-proofing, we must be able to block users who have `WRITE` permissions from modifying locked data, while reserving lock overrides exclusively for independent roles:
+    - **Decoupled Lifecycle Actions**: Clearing a Legal Hold (`CLEAR_LEGAL_HOLD`) or bypassing retention (`BYPASS_GOVERNANCE`) is a high-privilege administrative action that must be granted separately from routine data operations.
+    - **Dual-Gate WORM Enforcement**: Routine data writers operate with standard `WRITE`/`DELETE`, but once a lock is active, they are completely blocked. Only security or compliance personas holding the dedicated Ranger access types can intervene.
+
+
+## Plan
 
 All Ranger integration capabilities are currently verified via Smoke Tests. We plan to add dedicated test suites under the Smoke Test framework to validate S3 WORM functionality across diverse permission scenarios.
 
-## Future Work
-
 Once S3 Versioning support matures, future efforts will focus on ensuring compatibility with S3 multi-version object locking.
+
+## References
