@@ -22,11 +22,9 @@ import com.google.protobuf.MessageLite;
 import com.google.protobuf.Parser;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ratis.util.function.CheckedFunction;
 
 /**
@@ -89,13 +87,12 @@ public final class Proto2Codec<M extends MessageLite> implements Codec<M> {
   @Override
   public M fromCodecBuffer(@Nonnull CodecBuffer buffer)
       throws CodecException {
-    final InputStream in = buffer.getInputStream();
+    // Parse the buffer directly, as Proto3Codec does: parsing through an InputStream makes protobuf
+    // allocate a 4 KB decoding buffer per call, on values which are typically a few hundred bytes.
     try {
-      return parser.parseFrom(in);
+      return parser.parseFrom(buffer.asReadOnlyByteBuffer());
     } catch (InvalidProtocolBufferException e) {
       throw new CodecException("Failed to parse " + buffer + " for " + getTypeClass(), e);
-    } finally {
-      IOUtils.closeQuietly(in);
     }
   }
 
