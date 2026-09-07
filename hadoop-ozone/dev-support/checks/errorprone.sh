@@ -26,7 +26,7 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 DIAGNOSTIC_FILE="$REPORT_DIR/diagnostics.txt"
 OUTPUT_LOG=$(mktemp)
 
-MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipDocs -DskipRecon'
+MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipDocs -DskipRecon -DskipTests'
 MAVEN_DIAGNOSTIC_PATTERN='^\[(ERROR|WARNING)\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
 JAVAC_DIAGNOSTIC_PATTERN='^.*:[0-9]+: (error|warning): \[[^]]+\]'
 MAVEN_ERROR_PATTERN='^\[ERROR\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
@@ -38,7 +38,7 @@ declare -i rc
 trap 'rm -f "$OUTPUT_LOG"' EXIT
 
 #shellcheck disable=SC2086
-mvn $MAVEN_OPTIONS clean test-compile "$@" 2>&1 | tee "$OUTPUT_LOG"
+mvn $MAVEN_OPTIONS clean package "$@" 2>&1 | tee "$OUTPUT_LOG"
 rc=$?
 
 mkdir -p "$REPORT_DIR"

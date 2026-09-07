@@ -21,9 +21,10 @@ setup() {
   mkdir -p "${TEST_TMPDIR}/bin" "${OUTPUT_DIR}"
   echo 9 > "${OUTPUT_DIR}/failures"
   export MAVEN_EXIT_CODE=1
-  cat > "${TEST_TMPDIR}/bin/mvn" <<'EOF'
+cat > "${TEST_TMPDIR}/bin/mvn" <<'EOF'
 #!/usr/bin/env bash
 rm -rf "${OUTPUT_DIR}"
+printf '%s\n' "$*" > "${TEST_TMPDIR}/mvn-args"
 printf '%s\n' \
   "[WARNING] The following options were not recognized by any processor: '[artifactId]'" \
   "[WARNING] /src/Legacy.java:[1,1] [JdkObsolete] legacy finding" \
@@ -47,6 +48,8 @@ teardown() {
   run hadoop-ozone/dev-support/checks/errorprone.sh
 
   [ "$status" -eq 1 ]
+  grep -q -- '-DskipTests clean package' "${TEST_TMPDIR}/mvn-args"
+  ! grep -q -- '-DskipShade' "${TEST_TMPDIR}/mvn-args"
   [ "$(wc -l < "${OUTPUT_DIR}/diagnostics.txt")" -eq 5 ]
   grep -q '^\[WARNING\].*\[JdkObsolete\]' "${OUTPUT_DIR}/diagnostics.txt"
   grep -q '^\[ERROR\].*\[FormatString\]' "${OUTPUT_DIR}/diagnostics.txt"
