@@ -94,6 +94,10 @@ public class SCMDeletedBlockTransactionStatusManager {
   private final AtomicLong totalBlockCount = new AtomicLong(0);
   private final AtomicLong totalBlocksSize = new AtomicLong(0);
   private final AtomicLong totalReplicatedBlocksSize = new AtomicLong(0);
+  // Guards the window between mutating the summary counters and snapshotting them with
+  // getSummary(), so a concurrent initDataDistributionData() reset cannot land in between
+  // and discard the just-applied update.
+  private final Object summaryLock = new Object();
   private static boolean disableDataDistributionForTest;
 
   /**
@@ -461,13 +465,18 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
-      for (DeletedBlocksTransaction tx: txList) {
-        if (tx.hasTotalBlockSize()) {
-          incrDeletedBlocksSummary(tx);
+      DeletedBlocksTransactionSummary summary;
+      synchronized (summaryLock) {
+        for (DeletedBlocksTransaction tx: txList) {
+          if (tx.hasTotalBlockSize()) {
+            incrDeletedBlocksSummary(tx);
+          }
         }
+        onSummaryUpdatedForTest();
+        summary = getSummary();
       }
       try {
-        deletedBlockLogStateManager.addTransactionsToDB(txList, getSummary());
+        deletedBlockLogStateManager.addTransactionsToDB(txList, summary);
       } catch (IOException e) {
         if (isRatisTimeout(e)) {
           throw e;
@@ -525,15 +534,20 @@ public class SCMDeletedBlockTransactionStatusManager {
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
       List<TxBlockInfo> removedTxBlockInfos = new ArrayList<>();
-      for (Long txID: txIDs) {
-        TxBlockInfo txBlockInfo = txSizeMap.remove(txID);
-        if (txBlockInfo != null) {
-          descDeletedBlocksSummary(txBlockInfo);
-          removedTxBlockInfos.add(txBlockInfo);
+      DeletedBlocksTransactionSummary summary;
+      synchronized (summaryLock) {
+        for (Long txID: txIDs) {
+          TxBlockInfo txBlockInfo = txSizeMap.remove(txID);
+          if (txBlockInfo != null) {
+            descDeletedBlocksSummary(txBlockInfo);
+            removedTxBlockInfos.add(txBlockInfo);
+          }
         }
+        onSummaryUpdatedForTest();
+        summary = getSummary();
       }
       try {
-        deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, getSummary());
+        deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, summary);
       } catch (IOException e) {
         if (isRatisTimeout(e)) {
           throw e;
@@ -637,6 +651,16 @@ public class SCMDeletedBlockTransactionStatusManager {
         .build();
   }
 
+  /**
+   * No-op in production. Invoked, while still holding {@link #summaryLock}, right after the
+   * summary counters are mutated and right before they are snapshotted via {@link #getSummary()}.
+   * Tests override this to force a concurrent {@link #initDataDistributionData()} reset to
+   * attempt to interleave in this window, proving {@link #summaryLock} blocks it.
+   */
+  @VisibleForTesting
+  protected void onSummaryUpdatedForTest() {
+  }
+
   private void descDeletedBlocksSummary(TxBlockInfo txBlockInfo) {
     totalTxCount.addAndGet(-1);
     totalBlockCount.addAndGet(-txBlockInfo.getTotalBlockCount());
@@ -737,13 +761,15 @@ public class SCMDeletedBlockTransactionStatusManager {
   private void initDataDistributionData() throws IOException {
     DeletedBlocksTransactionSummary newSummary = loadDeletedBlocksSummary();
     if (newSummary != null) {
-      DeletedBlocksTransactionSummary currentSummary = getSummary();
-      totalTxCount.set(newSummary.getTotalTransactionCount());
-      totalBlockCount.set(newSummary.getTotalBlockCount());
-      totalBlocksSize.set(newSummary.getTotalBlockSize());
-      totalReplicatedBlocksSize.set(newSummary.getTotalBlockReplicatedSize());
-      if (!isSummaryEqual(currentSummary, newSummary)) {
-        LOG.info("Old summary {} is replaced.", summaryToString(currentSummary));
+      synchronized (summaryLock) {
+        DeletedBlocksTransactionSummary currentSummary = getSummary();
+        totalTxCount.set(newSummary.getTotalTransactionCount());
+        totalBlockCount.set(newSummary.getTotalBlockCount());
+        totalBlocksSize.set(newSummary.getTotalBlockSize());
+        totalReplicatedBlocksSize.set(newSummary.getTotalBlockReplicatedSize());
+        if (!isSummaryEqual(currentSummary, newSummary)) {
+          LOG.info("Old summary {} is replaced.", summaryToString(currentSummary));
+        }
       }
     }
     LOG.info("Storage space distribution is initialized with {}", summaryToString(getSummary()));
