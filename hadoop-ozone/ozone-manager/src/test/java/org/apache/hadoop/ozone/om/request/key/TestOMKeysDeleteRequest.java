@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -153,6 +154,10 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
     createPreRequisites();
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    // createPreRequisites adds the keys straight to the table cache, so charge the bucket for
+    // them here; without it the released namespace would drive the counter negative.
+    omMetadataManager.getBucketTable().getCacheValue(new CacheKey<>(bucketKey))
+        .getCacheValue().incrUsedNamespace(KEY_COUNT);
     long usedNamespaceBefore = omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
 
     // One key does not exist, so the request succeeds partially.

@@ -352,7 +352,8 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
   public void testFailedCommitDoesNotLeakBucketUsage() throws Exception {
     // Uncommitted blocks make the request build a pseudo key for deletion, which derives an
     // object id from the transaction index. An index above MAX_TRXN_ID makes that step throw
-    // after the bucket counters have already been changed.
+    // after incrUsedNamespace but before incrUsedBytes, so only the namespace charge is at
+    // risk of leaking here.
     List<KeyLocation> allocatedKeyLocationList = getKeyLocation(5);
     List<OmKeyLocationInfo> allocatedBlockList = allocatedKeyLocationList
         .stream().map(OmKeyLocationInfo::getFromProtobuf)
@@ -368,9 +369,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     addKeyToOpenKeyTable(allocatedBlockList);
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo cachedBefore = omMetadataManager.getBucketTable().get(bucketKey);
-    long usedNamespaceBefore = cachedBefore.getUsedNamespace();
-    long usedBytesBefore = cachedBefore.getUsedBytes();
+    long usedNamespaceBefore = omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
 
     // The mock returns 0 by default, so let it run the real check the OM performs.
     when(ozoneManager.getObjectIdFromTxId(anyLong())).thenAnswer(invocation -> OmUtils
@@ -379,9 +378,8 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     assertThrows(IllegalArgumentException.class, () -> omKeyCommitRequest
         .validateAndUpdateCache(ozoneManager, OmUtils.MAX_TRXN_ID + 1));
 
-    OmBucketInfo cachedAfter = omMetadataManager.getBucketTable().get(bucketKey);
-    assertEquals(usedNamespaceBefore, cachedAfter.getUsedNamespace());
-    assertEquals(usedBytesBefore, cachedAfter.getUsedBytes());
+    assertEquals(usedNamespaceBefore,
+        omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
   }
 
   @Test
