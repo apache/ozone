@@ -349,6 +349,42 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
   }
 
   @Test
+  public void testFailedCommitDoesNotLeakBucketUsage() throws Exception {
+    // Uncommitted blocks make the request build a pseudo key for deletion, which derives an
+    // object id from the transaction index. An index above MAX_TRXN_ID makes that step throw
+    // after the bucket counters have already been changed.
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(5);
+    List<OmKeyLocationInfo> allocatedBlockList = allocatedKeyLocationList
+        .stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(
+        allocatedKeyLocationList.subList(0, 3), false));
+    OMKeyCommitRequest omKeyCommitRequest =
+        getOmKeyCommitRequest(modifiedOmRequest);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, omKeyCommitRequest.getBucketLayout());
+    addKeyToOpenKeyTable(allocatedBlockList);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo cachedBefore = omMetadataManager.getBucketTable().get(bucketKey);
+    long usedNamespaceBefore = cachedBefore.getUsedNamespace();
+    long usedBytesBefore = cachedBefore.getUsedBytes();
+
+    // The mock returns 0 by default, so let it run the real check the OM performs.
+    when(ozoneManager.getObjectIdFromTxId(anyLong())).thenAnswer(invocation -> OmUtils
+        .getObjectIdFromTxId(omMetadataManager.getOmEpoch(), invocation.getArgument(0)));
+
+    assertThrows(IllegalArgumentException.class, () -> omKeyCommitRequest
+        .validateAndUpdateCache(ozoneManager, OmUtils.MAX_TRXN_ID + 1));
+
+    OmBucketInfo cachedAfter = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(usedNamespaceBefore, cachedAfter.getUsedNamespace());
+    assertEquals(usedBytesBefore, cachedAfter.getUsedBytes());
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithUncommittedBlocks()
       throws Exception {
 

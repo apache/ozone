@@ -129,7 +129,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       bucketLockAcquired = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       String errMsg = "Cannot create file : " + keyName
               + " as parent directory doesn't exist";
@@ -349,6 +349,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               omKeyInfo, fileName, trxnLogIndex);
 
       omBucketInfo.incrUsedBytes(correctedSpace);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
           omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
