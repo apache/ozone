@@ -945,13 +945,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Return bucket info for the specified bucket.
+   * Return bucket info for the specified bucket, for read-only use.
    * <p>
    * The returned {@link OmBucketInfo} is the cached instance, returned by
-   * reference. A caller that mutates it (for example quota accounting) before a
-   * point where the request may still fail must first take a
-   * {@link OmBucketInfo#copyObject()} and publish that copy only on success,
-   * otherwise a failed request leaks the mutation into the cache.
+   * reference. Callers that mutate it must use
+   * {@link #getBucketInfoForUpdate(OMMetadataManager, String, String)} instead.
    */
   @Nullable
   public static OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
@@ -962,6 +960,23 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .getCacheValue(new CacheKey<>(bucketKey));
 
     return value != null ? value.getCacheValue() : null;
+  }
+
+  /**
+   * Return a copy of the cached bucket info for callers that mutate it.
+   * <p>
+   * Mutations stay invisible until the caller publishes the copy with
+   * {@code getBucketTable().addCacheEntry(...)}, after all fallible work and
+   * only on the path that persists the response. Hold the bucket write lock for
+   * the whole read-modify-publish, not just the publish, or a concurrent writer
+   * can be lost.
+   */
+  @Nullable
+  public static OmBucketInfo getBucketInfoForUpdate(OMMetadataManager omMetadataManager,
+      String volume, String bucket) {
+    OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volume, bucket);
+
+    return omBucketInfo != null ? omBucketInfo.copyObject() : null;
   }
 
   /**
