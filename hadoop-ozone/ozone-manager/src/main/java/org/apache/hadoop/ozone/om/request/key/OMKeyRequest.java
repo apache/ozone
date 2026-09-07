@@ -967,9 +967,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * <p>
    * Mutations stay invisible until the caller publishes the copy with
    * {@code getBucketTable().addCacheEntry(...)}, after all fallible work and
-   * only on the path that persists the response. Hold the bucket write lock for
-   * the whole read-modify-publish, not just the publish, or a concurrent writer
-   * can be lost.
+   * only on the path that persists the response. A caller that publishes must
+   * hold the bucket write lock for the whole read-modify-publish, not just the
+   * publish, or a concurrent writer can be lost. A caller under key path
+   * locking holds only the bucket read lock, so it must not publish.
    */
   @Nullable
   public static OmBucketInfo getBucketInfoForUpdate(OMMetadataManager omMetadataManager,

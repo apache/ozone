@@ -61,8 +61,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Handles requests to move both MPU open keys from the open key/file table and
- * MPU part keys to delete table. Modifies the open key/file table cache only,
- * and no underlying databases.
+ * MPU part keys to delete table. Modifies the open key/file, multipart info and
+ * bucket table caches, and no underlying databases.
  * The delete table cache does not need to be modified since it is not used
  * for client response validation.
  */
