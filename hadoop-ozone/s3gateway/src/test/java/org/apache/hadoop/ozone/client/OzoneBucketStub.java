@@ -835,6 +835,30 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  public void setObjectMetadata(String keyName, Map<String, String> metadata, Map<String, String> tags)
+      throws IOException {
+    OzoneKeyDetails ozoneKeyDetails = keyDetails.get(keyName);
+    if (ozoneKeyDetails == null) {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+    // Copy the arguments before mutating the key: this stub hands out the live
+    // maps, so a self-copy passes in the key's own metadata or tags (e.g. the
+    // COPY tagging directive), which clearing in place would wipe.
+    Map<String, String> newMetadata = new HashMap<>(metadata);
+    Map<String, String> newTags = new HashMap<>(tags);
+    // Mimics the OM: replace the custom metadata but preserve the stored ETag,
+    // and replace the tag set.
+    String eTag = ozoneKeyDetails.getMetadata().get(ETAG);
+    if (eTag != null) {
+      newMetadata.put(ETAG, eTag);
+    }
+    ozoneKeyDetails.getMetadata().clear();
+    ozoneKeyDetails.getMetadata().putAll(newMetadata);
+    ozoneKeyDetails.getTags().clear();
+    ozoneKeyDetails.getTags().putAll(newTags);
+  }
+
+  @Override
   public Map<String, String> getBucketTagging() throws IOException {
     return Collections.unmodifiableMap(bucketTags);
   }

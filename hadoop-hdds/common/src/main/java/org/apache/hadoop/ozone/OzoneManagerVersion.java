@@ -61,7 +61,11 @@ public enum OzoneManagerVersion implements ComponentVersion {
   S3_BUCKET_TAGGING_API(13,
       "OzoneManager version that supports S3 bucket tagging APIs, such as "
           + "PutBucketTagging, GetBucketTagging, and DeleteBucketTagging"),
-    
+
+  SET_OBJECT_METADATA(14,
+      "OzoneManager version that supports replacing the custom metadata of an existing key "
+          + "without rewriting its data via SetObjectMetadata"),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 

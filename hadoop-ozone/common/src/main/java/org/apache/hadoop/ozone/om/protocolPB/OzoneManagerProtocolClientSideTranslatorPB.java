@@ -228,6 +228,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetObjectMetadataRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
@@ -2755,6 +2756,29 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.PutObjectTagging)
         .setPutObjectTaggingRequest(req)
+        .build();
+
+    OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+  }
+
+  @Override
+  public void setObjectMetadata(OmKeyArgs args) throws IOException {
+    KeyArgs keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .setKeyName(args.getKeyName())
+        .addAllMetadata(KeyValueUtil.toProtobuf(args.getMetadata()))
+        .addAllTags(KeyValueUtil.toProtobuf(args.getTags()))
+        .build();
+
+    SetObjectMetadataRequest req =
+        SetObjectMetadataRequest.newBuilder()
+            .setKeyArgs(keyArgs)
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.SetObjectMetadata)
+        .setSetObjectMetadataRequest(req)
         .build();
 
     OMResponse omResponse = submitRequest(omRequest);

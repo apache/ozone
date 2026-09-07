@@ -100,6 +100,20 @@ Copy Object Where both source and dest are same with change to storageclass
      ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.CopyObjectResult.ETag'  0
                          Should Be Equal            ${eTag}           \"${file_checksum}\"
 
+Copy Object Where both source and dest are same with metadata directive REPLACE
+     ${file_checksum} =  Execute                    md5sum /tmp/copyfile | awk '{print $1}'
+     ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${DESTBUCKET}/${PREFIX}/copyobject/key=value/f1 --metadata="custom-key5=custom-value5" --metadata-directive REPLACE
+     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.CopyObjectResult.ETag'  0
+                         Should Be Equal            ${eTag}           \"${file_checksum}\"
+     #the metadata was replaced in place without rewriting the object data
+     ${result} =         Execute AWSS3ApiCli        head-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1
+                         Should contain             ${result}    \"custom-key5\": \"custom-value5\"
+                         Should Not contain         ${result}    \"custom-key3\": \"custom-value3\"
+                         Should Not contain         ${result}    \"custom-key4\": \"custom-value4\"
+     ${result} =         Execute AWSS3APICli        get-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 /tmp/copyfile.selfcopy.result
+     ${sum_after} =      Execute                    md5sum /tmp/copyfile.selfcopy.result | awk '{print $1}'
+                         Should Be Equal            ${sum_after}      ${file_checksum}
+
 Copy Object Where Key not available
     ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/nonnonexistentkey       255
                         Should contain             ${result}        NoSuchKey

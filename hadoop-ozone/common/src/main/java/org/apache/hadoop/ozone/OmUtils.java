@@ -333,6 +333,7 @@ public final class OmUtils {
     case DeleteLifecycleConfiguration:
     case SetLifecycleServiceStatus:
     case SaveLifecycleScanState:
+    case SetObjectMetadata:
       return false;
     case UnknownCommand:
       return false;
@@ -474,6 +475,7 @@ public final class OmUtils {
     case DeleteLifecycleConfiguration:
     case SetLifecycleServiceStatus:
     case SaveLifecycleScanState:
+    case SetObjectMetadata:
     case UnknownCommand:
       return false;
     case EchoRPC:

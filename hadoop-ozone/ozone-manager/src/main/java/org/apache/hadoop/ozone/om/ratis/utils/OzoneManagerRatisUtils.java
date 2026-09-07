@@ -348,6 +348,11 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
+    case SetObjectMetadata:
+      keyArgs = omRequest.getSetObjectMetadataRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case SetLifecycleConfiguration:
       return new OMLifecycleConfigurationSetRequest(omRequest);
     case DeleteLifecycleConfiguration:

@@ -16,6 +16,6 @@
  */
 
 /**
- * Package contains classes related to S3 tagging responses.
+ * Package contains classes related to S3 object metadata requests.
  */
-package org.apache.hadoop.ozone.om.response.s3.tagging;
+package org.apache.hadoop.ozone.om.request.s3.metadata;

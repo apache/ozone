@@ -60,6 +60,7 @@ import java.time.ZonedDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -1221,6 +1222,20 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         throw ex;
       }
 
+      // Metadata-only self-copy (x-amz-metadata-directive: REPLACE): replace the
+      // key metadata in OM without rewriting the object data. Skipped when the
+      // request also changes replication via storage class, or carries write
+      // preconditions, in which case the regular copy path below applies.
+      if (sourceBucket.equals(destBucket) && sourceKey.equals(destkey) && replacingMetadata
+          && (storageTypeDefault || Objects.equals(replicationConfig, sourceKeyDetails.getReplicationConfig()))
+          && !writeConditions.hasIfMatch() && !writeConditions.hasIfNoneMatch()) {
+        CopyObjectResponse metadataOnlyResponse = replaceObjectMetadata(
+            volume, destBucket, destkey, customMetadata, tags, startNanos);
+        if (metadataOnlyResponse != null) {
+          return metadataOnlyResponse;
+        }
+      }
+
       try (OzoneInputStream src = getClientProtocol().getKey(volume.getName(),
           sourceBucket, sourceKey)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
@@ -1259,6 +1274,35 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         sourceDigestInputStream.getMessageDigest().reset();
       }
     }
+  }
+
+  /**
+   * Serves a self-copy with metadata directive REPLACE as a metadata-only
+   * update in OM, without rewriting the object data. Returns null when the OM
+   * does not support the operation, in which case the caller should fall back
+   * to the regular copy path.
+   */
+  private CopyObjectResponse replaceObjectMetadata(OzoneVolume volume, String bucket, String key,
+      Map<String, String> customMetadata, Map<String, String> tags, long startNanos) throws IOException {
+    try {
+      getClientProtocol().setObjectMetadata(volume.getName(), bucket, key, customMetadata, tags);
+    } catch (OMException ex) {
+      if (ex.getResult() != ResultCodes.NOT_SUPPORTED_OPERATION
+          && ex.getResult() != ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION) {
+        throw ex;
+      }
+      // The OM does not support SetObjectMetadata yet (or the key is an FSO
+      // directory): fall back to the full copy.
+      LOG.debug("Metadata-only self-copy is not supported by OM, falling back to full copy for {}/{}",
+          bucket, key, ex);
+      return null;
+    }
+    final OzoneKeyDetails updatedKeyDetails = getClientProtocol().getKeyDetails(volume.getName(), bucket, key);
+    getMetrics().updateCopyObjectSuccessStats(startNanos);
+    CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
+    copyObjectResponse.setETag(wrapInQuotes(updatedKeyDetails.getMetadata().get(OzoneConsts.ETAG)));
+    copyObjectResponse.setLastModified(updatedKeyDetails.getModificationTime());
+    return copyObjectResponse;
   }
 
   /**

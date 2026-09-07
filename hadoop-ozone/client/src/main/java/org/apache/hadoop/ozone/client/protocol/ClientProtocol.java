@@ -1621,6 +1621,21 @@ public interface ClientProtocol {
   void putObjectTagging(String volumeName, String bucketName, String keyName,
                         Map<String, String> tags) throws IOException;
 
+  /**
+   * Replaces the custom metadata and tags of an existing key without rewriting
+   * its data. System-managed metadata entries (such as ETag and GDPR info) are
+   * preserved by the OzoneManager. The given tags replace the existing tag set;
+   * pass the current tags to keep them.
+   * @param volumeName Volume name.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @param metadata Custom metadata to set on the key.
+   * @param tags Tags to set on the key.
+   * @throws IOException
+   */
+  void setObjectMetadata(String volumeName, String bucketName, String keyName,
+                         Map<String, String> metadata, Map<String, String> tags) throws IOException;
+
 
   /**
    * Removes all the tags from the specified key.

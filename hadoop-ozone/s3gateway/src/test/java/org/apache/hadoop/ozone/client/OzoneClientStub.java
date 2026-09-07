@@ -29,7 +29,12 @@ public class OzoneClientStub extends OzoneClient {
   }
 
   public OzoneClientStub(ObjectStoreStub objectStoreStub) {
-    super(objectStoreStub, new ClientProtocolStub(objectStoreStub));
+    this(objectStoreStub, new ClientProtocolStub(objectStoreStub));
+  }
+
+  public OzoneClientStub(ObjectStoreStub objectStoreStub,
+      ClientProtocolStub clientProtocolStub) {
+    super(objectStoreStub, clientProtocolStub);
     S3GatewayMetrics.create(new OzoneConfiguration());
   }
 

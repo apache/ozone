@@ -1333,7 +1333,8 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     final String key = getKeyName();
     final String content = "bar";
     s3Client.createBucket(b -> b.bucket(bucketName));
-    s3Client.putObject(b -> b.bucket(bucketName).key(key).metadata(Collections.singletonMap("meta1", "v1")),
+    PutObjectResponse putObjectResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(key).metadata(Collections.singletonMap("meta1", "v1")),
         RequestBody.fromString(content));
 
     // Copying an object onto itself is allowed when the metadata is replaced.
@@ -1347,7 +1348,8 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         .build();
 
     CopyObjectResponse copyObjectResponse = assertDoesNotThrow(() -> s3Client.copyObject(copyReq));
-    assertNotNull(copyObjectResponse.copyObjectResult().eTag());
+    // The metadata-only update keeps the content ETag.
+    assertEquals(putObjectResponse.eTag(), copyObjectResponse.copyObjectResult().eTag());
 
     // The metadata was replaced in place: the new entry is present and the old one is gone.
     HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(key));
