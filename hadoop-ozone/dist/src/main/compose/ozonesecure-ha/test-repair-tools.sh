@@ -114,7 +114,7 @@ get_cf_entry_count() {
 }
 
 wait_for_bucket_deletion_complete() {
-  local timeout=300 n cf
+  local timeout=180 n cf
   local cfs=(fileTable directoryTable deletedTable deletedDirectoryTable)
   SECONDS=0
   while [[ $SECONDS -lt $timeout ]]; do
@@ -123,14 +123,13 @@ wait_for_bucket_deletion_complete() {
       [[ "${n:-1}" -eq 0 ]] || continue 2
     done
     return 0
-    sleep 3
   done
   echo "Timed out waiting for bucket deletion to complete"
   return 1
 }
 
 wait_for_om_db_size_stable() {
-  local timeout=180
+  local timeout=60
   local stable_reads=0
   local required_stable_reads=3
   local prev=-1
