@@ -47,7 +47,11 @@ public class HDDSLayoutVersionManager extends
       new Reflections(HDDS_CLASS_UPGRADE_PACKAGES);
 
   public HDDSLayoutVersionManager(int layoutVersion) throws IOException {
-    init(layoutVersion, HDDSLayoutFeature.values());
+    this(layoutVersion, null);
+  }
+
+  public HDDSLayoutVersionManager(int layoutVersion, String component) throws IOException {
+    init(layoutVersion, HDDSLayoutFeature.values(), component);
     registerUpgradeActions(getAnnotatedTypes(HDDS_UPGRADE_REFLECTIONS));
   }
 

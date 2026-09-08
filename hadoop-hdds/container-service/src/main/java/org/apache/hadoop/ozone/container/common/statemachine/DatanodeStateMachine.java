@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -157,6 +158,8 @@ public class DatanodeStateMachine implements Closeable {
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
+    String metricsSourceComponent =
+        MetricUtil.metricsSourceComponent(conf, datanodeDetails.getUuidString());
 
     Clock clock = Clock.system(ZoneId.systemDefault());
     // Expected to be initialized already.
@@ -164,7 +167,7 @@ public class DatanodeStateMachine implements Closeable {
         datanodeDetails.getUuidString());
 
     layoutVersionManager = new HDDSLayoutVersionManager(
-        layoutStorage.getLayoutVersion());
+        layoutStorage.getLayoutVersion(), metricsSourceComponent);
     upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager);
     VersionedDatanodeFeatures.initialize(layoutVersionManager);
 
@@ -175,7 +178,7 @@ public class DatanodeStateMachine implements Closeable {
             .setNameFormat(threadNamePrefix +
                 "DatanodeStateMachineTaskThread-%d")
             .build());
-    connectionManager = new SCMConnectionManager(conf);
+    connectionManager = new SCMConnectionManager(conf, metricsSourceComponent);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this,
         threadNamePrefix);
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
@@ -196,7 +199,7 @@ public class DatanodeStateMachine implements Closeable {
         new GrpcContainerUploader(conf, certClient, container.getController())
     );
 
-    pushReplicatorWithMetrics = new MeasuredReplicator(pushReplicator, "push");
+    pushReplicatorWithMetrics = new MeasuredReplicator(pushReplicator, "push", metricsSourceComponent);
 
     ReplicationConfig replicationConfig =
         conf.getObject(ReplicationConfig.class);
@@ -214,10 +217,9 @@ public class DatanodeStateMachine implements Closeable {
       supervisor.shutdownFailedVolumePools(container.getVolumeSet());
     });
 
-    replicationSupervisorMetrics =
-        ReplicationSupervisorMetrics.create(supervisor);
+    replicationSupervisorMetrics = ReplicationSupervisorMetrics.create(supervisor, metricsSourceComponent);
 
-    ecReconstructionMetrics = ECReconstructionMetrics.create();
+    ecReconstructionMetrics = ECReconstructionMetrics.create(metricsSourceComponent);
     ecReconstructionCoordinator = new ECReconstructionCoordinator(
         conf, certClient, secretKeyClient, context, ecReconstructionMetrics,
         threadNamePrefix);
@@ -258,7 +260,7 @@ public class DatanodeStateMachine implements Closeable {
             dnConf.getContainerCloseThreads(),
             dnConf.getCommandQueueLimit(), threadNamePrefix))
         .addHandler(new DeleteBlocksCommandHandler(getContainer(),
-            conf, dnConf, threadNamePrefix))
+            conf, dnConf, threadNamePrefix, metricsSourceComponent))
         .addHandler(new ReplicateContainerCommandHandler(supervisor, pushReplicatorWithMetrics))
         .addHandler(reconstructECContainersCommandHandler)
         .addHandler(new DeleteContainerCommandHandler(
@@ -284,7 +286,8 @@ public class DatanodeStateMachine implements Closeable {
     dispatcherBuilder
         .setConnectionManager(connectionManager)
         .setContainer(container)
-        .setContext(context);
+        .setContext(context)
+        .setMetricsSourceComponent(metricsSourceComponent);
 
     commandDispatcher = dispatcherBuilder.build();
 
@@ -297,8 +300,8 @@ public class DatanodeStateMachine implements Closeable {
         .addThreadNamePrefix(threadNamePrefix)
         .build();
 
-    queueMetrics = DatanodeQueueMetrics.create(this);
-    nettyMetrics = NettyMetrics.create();
+    queueMetrics = DatanodeQueueMetrics.create(this, metricsSourceComponent);
+    nettyMetrics = NettyMetrics.create(metricsSourceComponent);
   }
 
   @VisibleForTesting
@@ -469,7 +472,7 @@ public class DatanodeStateMachine implements Closeable {
     }
 
     if (queueMetrics != null) {
-      DatanodeQueueMetrics.unRegister();
+      queueMetrics.unRegister();
     }
 
     if (nettyMetrics != null) {

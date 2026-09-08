@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.management.ObjectName;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status;
 import org.slf4j.Logger;
@@ -59,6 +60,10 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   private ObjectName mBean;
 
   protected void init(int version, T[] lfs) throws IOException {
+    init(version, lfs, null);
+  }
+
+  protected void init(int version, T[] lfs, String component) throws IOException {
     lock.writeLock().lock();
     try {
       metadataLayoutVersion = version;
@@ -82,8 +87,15 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
           mlvFeature, mlvFeature.layoutVersion(),
           slvFeature, slvFeature.layoutVersion());
 
-      mBean = MBeans.register("LayoutVersionManager",
-          getClass().getSimpleName(), this);
+      if (component == null || component.isEmpty()) {
+        mBean = MBeans.register("LayoutVersionManager",
+            getClass().getSimpleName(), this);
+      } else {
+        Map<String, String> jmxProperties = new HashMap<>();
+        jmxProperties.put("component", component);
+        mBean = HddsUtils.registerWithJmxProperties("LayoutVersionManager",
+            getClass().getSimpleName(), jmxProperties, this);
+      }
     } finally {
       lock.writeLock().unlock();
     }

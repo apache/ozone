@@ -99,6 +99,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -451,6 +452,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private void registerMXBean() {
     Map<String, String> jmxProperties = new HashMap<>();
     jmxProperties.put("component", "ServerRuntime");
+    String jmxComponent =
+        MetricUtil.metricsSourceComponent(conf, datanodeDetails.getUuidString());
+    if (jmxComponent != null) {
+      jmxProperties.put("datanode", jmxComponent);
+    }
     this.dnInfoBeanName = HddsUtils.registerWithJmxProperties(
         "HddsDatanodeService",
         "HddsDatanodeServiceInfo", jmxProperties, this.serviceRuntimeInfo);

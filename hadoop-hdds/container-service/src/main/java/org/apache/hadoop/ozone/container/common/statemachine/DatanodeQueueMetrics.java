@@ -35,6 +35,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,9 +63,9 @@ public final class DatanodeQueueMetrics implements MetricsSource {
       "PipelineActionQueue";
 
   private MetricsRegistry registry;
+  private final String sourceName;
 
   private DatanodeStateMachine datanodeStateMachine;
-  private static DatanodeQueueMetrics instance;
 
   private Map<SCMCommandProto.Type, MetricsInfo> stateContextCommandQueueMap;
   private Map<SCMCommandProto.Type, MetricsInfo> commandDispatcherQueueMap;
@@ -72,8 +73,9 @@ public final class DatanodeQueueMetrics implements MetricsSource {
   private Map<HostAndPort, MetricsInfo> containerActionQueueMap;
   private Map<HostAndPort, MetricsInfo> pipelineActionQueueMap;
 
-  public DatanodeQueueMetrics(DatanodeStateMachine datanodeStateMachine) {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
+  private DatanodeQueueMetrics(DatanodeStateMachine datanodeStateMachine, String sourceName) {
+    this.sourceName = sourceName;
+    this.registry = new MetricsRegistry(sourceName);
     this.datanodeStateMachine = datanodeStateMachine;
 
     initializeQueues();
@@ -81,13 +83,14 @@ public final class DatanodeQueueMetrics implements MetricsSource {
 
   public static synchronized DatanodeQueueMetrics create(DatanodeStateMachine
       datanodeStateMachine) {
-    if (instance != null) {
-      return instance;
-    }
-    instance = DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+    return create(datanodeStateMachine, null);
+  }
+
+  public static synchronized DatanodeQueueMetrics create(DatanodeStateMachine datanodeStateMachine, String component) {
+    String sourceName = MetricUtil.qualifySourceName(METRICS_SOURCE_NAME, component);
+    return DefaultMetricsSystem.instance().register(sourceName,
         "Queue metrics in Datanode",
-        new DatanodeQueueMetrics(datanodeStateMachine));
-    return instance;
+        new DatanodeQueueMetrics(datanodeStateMachine, sourceName));
   }
 
   private void initializeQueues() {
@@ -114,7 +117,7 @@ public final class DatanodeQueueMetrics implements MetricsSource {
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean b) {
-    MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME);
+    MetricsRecordBuilder builder = collector.addRecord(sourceName);
 
     EnumCounters<SCMCommandProto.Type> tmpEnum =
         datanodeStateMachine.getContext().getCommandQueueSummary();
@@ -152,9 +155,8 @@ public final class DatanodeQueueMetrics implements MetricsSource {
     }
   }
 
-  public static synchronized void unRegister() {
-    instance = null;
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+  public synchronized void unRegister() {
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   public void addEndpoint(HostAndPort endpoint) {

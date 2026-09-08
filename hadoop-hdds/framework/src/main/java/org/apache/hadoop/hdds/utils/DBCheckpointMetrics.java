@@ -25,15 +25,17 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This interface is for maintaining DB checkpoint statistics.
  */
 @InterfaceAudience.Private
 @Metrics(about = "DB checkpoint Metrics", context = "dfs")
-public class DBCheckpointMetrics {
+public final class DBCheckpointMetrics {
   private static final String SOURCE_NAME =
       DBCheckpointMetrics.class.getSimpleName();
+  private final String sourceName;
 
   // Metrics to track checkpoint statistics from last run.
   private @Metric MutableGaugeLong lastCheckpointCreationTimeTaken;
@@ -44,19 +46,25 @@ public class DBCheckpointMetrics {
   private @Metric MutableCounterLong numCheckpointFails;
   private @Metric MutableCounterLong numIncrementalCheckpoints;
 
-  public DBCheckpointMetrics() {
+  private DBCheckpointMetrics(String sourceName) {
+    this.sourceName = sourceName;
   }
 
   public static DBCheckpointMetrics create(String parent) {
+    return create(parent, null);
+  }
+
+  public static DBCheckpointMetrics create(String parent, String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
+    String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME, component);
+    return ms.register(sourceName,
         parent,
-        new DBCheckpointMetrics());
+        new DBCheckpointMetrics(sourceName));
   }
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 
   @VisibleForTesting

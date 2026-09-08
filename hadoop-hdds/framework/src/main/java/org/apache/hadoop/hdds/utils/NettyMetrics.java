@@ -26,6 +26,7 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class emits Netty metrics.
@@ -33,16 +34,26 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 public final class NettyMetrics implements MetricsSource {
 
   public static final String SOURCE_NAME = NettyMetrics.class.getSimpleName();
+  private final String sourceName;
+
+  private NettyMetrics(String sourceName) {
+    this.sourceName = sourceName;
+  }
 
   public static NettyMetrics create() {
+    return create(null);
+  }
+
+  public static NettyMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    NettyMetrics metrics = new NettyMetrics();
-    return ms.register(SOURCE_NAME, "Netty metrics", metrics);
+    String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME, component);
+    NettyMetrics metrics = new NettyMetrics(sourceName);
+    return ms.register(sourceName, "Netty metrics", metrics);
   }
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME)
+    MetricsRecordBuilder recordBuilder = collector.addRecord(sourceName)
         .setContext("Netty metrics");
     recordBuilder
         .addGauge(MetricsInfos.USED_DIRECT_MEM, usedDirectMemory())
@@ -51,7 +62,7 @@ public final class NettyMetrics implements MetricsSource {
 
   public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 
   private enum MetricsInfos implements MetricsInfo {

@@ -17,18 +17,19 @@
 
 package org.apache.hadoop.ozone.container.checksum;
 
-import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Class to collect metrics related to container merkle tree.
  */
-public class ContainerMerkleTreeMetrics {
+public final class ContainerMerkleTreeMetrics {
   private static final String METRICS_SOURCE_NAME = ContainerMerkleTreeMetrics.class.getSimpleName();
+  private final String sourceName;
 
   @Metric(about = "Number of Merkle tree write failure")
   private MutableCounterLong numMerkleTreeWriteFailure;
@@ -69,19 +70,28 @@ public class ContainerMerkleTreeMetrics {
   @Metric(about = "Merkle tree diff latency")
   private MutableRate merkleTreeDiffLatencyNS;
 
-  public static ContainerMerkleTreeMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    MetricsSource source = ms.getSource(METRICS_SOURCE_NAME);
-    if (source != null) {
-      ms.unregisterSource(METRICS_SOURCE_NAME);
-    }
-    return ms.register(METRICS_SOURCE_NAME, "Container Merkle Tree Metrics",
-        new ContainerMerkleTreeMetrics());
+  private ContainerMerkleTreeMetrics(String sourceName) {
+    this.sourceName = sourceName;
   }
 
-  public static void unregister() {
+  public static ContainerMerkleTreeMetrics create() {
+    return create(null);
+  }
+
+  public static ContainerMerkleTreeMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(METRICS_SOURCE_NAME);
+    String sourceName = MetricUtil.qualifySourceName(METRICS_SOURCE_NAME, component);
+    // The unqualified name is a singleton, so a repeat create() replaces it rather than throwing.
+    // A qualified name identifies one datanode, where a collision is a bug and must not be hidden.
+    if (component == null && ms.getSource(sourceName) != null) {
+      ms.unregisterSource(sourceName);
+    }
+    return ms.register(sourceName, "Container Merkle Tree Metrics", new ContainerMerkleTreeMetrics(sourceName));
+  }
+
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(sourceName);
   }
 
   public void incrementMerkleTreeWriteFailures() {

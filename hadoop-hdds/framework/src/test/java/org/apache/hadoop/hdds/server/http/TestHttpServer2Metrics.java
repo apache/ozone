@@ -22,6 +22,9 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2M
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadQueueWaitingTaskCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.SERVER_NAME;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyString;
@@ -33,6 +36,8 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,15 +82,59 @@ public class TestHttpServer2Metrics {
     // get metrics
     HttpServer2Metrics server2Metrics =
         HttpServer2Metrics.create(threadPool, name);
-    server2Metrics.getMetrics(metricsCollector, true);
+    try {
+      server2Metrics.getMetrics(metricsCollector, true);
 
-    // verify
-    verify(recorder).tag(SERVER_NAME, name);
-    verify(metricsCollector).addRecord(HttpServer2Metrics.SOURCE_NAME);
-    verify(recorder).addGauge(HttpServerThreadCount, threadCount);
-    verify(recorder).addGauge(HttpServerMaxThreadCount, maxThreadCount);
-    verify(recorder).addGauge(HttpServerIdleThreadCount, idleThreadCount);
-    verify(recorder).addGauge(HttpServerThreadQueueWaitingTaskCount,
-        threadQueueWaitingTaskCount);
+      verify(recorder).tag(SERVER_NAME, name);
+      verify(metricsCollector).addRecord(HttpServer2Metrics.SOURCE_NAME);
+      verify(recorder).addGauge(HttpServerThreadCount, threadCount);
+      verify(recorder).addGauge(HttpServerMaxThreadCount, maxThreadCount);
+      verify(recorder).addGauge(HttpServerIdleThreadCount, idleThreadCount);
+      verify(recorder).addGauge(HttpServerThreadQueueWaitingTaskCount,
+          threadQueueWaitingTaskCount);
+    } finally {
+      server2Metrics.unRegister();
+    }
+  }
+
+  /**
+   * All datanodes of a same-JVM cluster name their HTTP server the same. A second create() with
+   * that component used to fail the registration as a duplicate source; it now takes a counter
+   * suffix, deterministic in start order.
+   */
+  @Test
+  public void testDuplicateComponentsGetDistinctSourceNames() {
+    QueuedThreadPool firstPool = mock(QueuedThreadPool.class);
+    QueuedThreadPool secondPool = mock(QueuedThreadPool.class);
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+
+    HttpServer2Metrics firstMetrics =
+        HttpServer2Metrics.create(firstPool, "hddsDatanode", "hddsDatanode");
+    try {
+      HttpServer2Metrics secondMetrics = assertDoesNotThrow(
+          () -> HttpServer2Metrics.create(secondPool, "hddsDatanode", "hddsDatanode"));
+      try {
+        assertNotNull(ms.getSource(HttpServer2Metrics.SOURCE_NAME + ".hddsDatanode"));
+        assertNotNull(ms.getSource(HttpServer2Metrics.SOURCE_NAME + ".hddsDatanode1"));
+      } finally {
+        secondMetrics.unRegister();
+      }
+      assertNull(ms.getSource(HttpServer2Metrics.SOURCE_NAME + ".hddsDatanode1"));
+    } finally {
+      firstMetrics.unRegister();
+    }
+    assertNull(ms.getSource(HttpServer2Metrics.SOURCE_NAME + ".hddsDatanode"));
+  }
+
+  @Test
+  public void testNullComponentKeepsStandaloneSourceName() {
+    HttpServer2Metrics metrics =
+        HttpServer2Metrics.create(threadPool, "s3g", null);
+    try {
+      assertNotNull(DefaultMetricsSystem.instance()
+          .getSource(HttpServer2Metrics.SOURCE_NAME));
+    } finally {
+      metrics.unRegister();
+    }
   }
 }

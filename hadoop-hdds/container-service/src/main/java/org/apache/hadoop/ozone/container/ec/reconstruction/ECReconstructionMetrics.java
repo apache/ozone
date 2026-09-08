@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics class for EC Reconstruction.
@@ -34,24 +35,31 @@ import org.apache.hadoop.ozone.OzoneConsts;
 public final class ECReconstructionMetrics {
   private static final String SOURCE =
       ECReconstructionMetrics.class.getSimpleName();
+  private final String sourceName;
 
   private @Metric MutableCounterLong blockGroupReconstructionTotal;
   private @Metric MutableCounterLong blockGroupReconstructionFailsTotal;
   private @Metric MutableCounterLong reconstructionTotal;
   private @Metric MutableCounterLong reconstructionFailsTotal;
 
-  private ECReconstructionMetrics() {
+  private ECReconstructionMetrics(String sourceName) {
+    this.sourceName = sourceName;
   }
 
   public static ECReconstructionMetrics create() {
+    return create(null);
+  }
+
+  public static ECReconstructionMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE, "EC Reconstruction Coordinator Metrics",
-        new ECReconstructionMetrics());
+    String sourceName = MetricUtil.qualifySourceName(SOURCE, component);
+    return ms.register(sourceName, "EC Reconstruction Coordinator Metrics",
+        new ECReconstructionMetrics(sourceName));
   }
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE);
+    ms.unregisterSource(sourceName);
   }
 
   public void incBlockGroupReconstructionTotal(long count) {

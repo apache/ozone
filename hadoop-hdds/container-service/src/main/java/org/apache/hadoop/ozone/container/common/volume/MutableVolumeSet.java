@@ -38,6 +38,7 @@ import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
@@ -119,7 +120,8 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     // Ensure metrics are unregistered if the volume set initialization fails.
-    this.volumeHealthMetrics = VolumeHealthMetrics.create(volumeType);
+    this.volumeHealthMetrics = VolumeHealthMetrics.create(
+        MetricUtil.metricsSourceComponent(conf, datanodeUuid), volumeType);
     try {
       initializeVolumeSet();
     } catch (Exception e) {

@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics source to report number of replication tasks.
@@ -38,28 +39,36 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
 
   public static final String SOURCE =
       ReplicationSupervisorMetrics.class.getSimpleName();
+  private final String sourceName;
   private final ReplicationSupervisor supervisor;
 
   public ReplicationSupervisorMetrics(ReplicationSupervisor
-      replicationSupervisor) {
+      replicationSupervisor, String sourceName) {
+    this.sourceName = sourceName;
     this.supervisor = replicationSupervisor;
   }
 
   public static ReplicationSupervisorMetrics create(ReplicationSupervisor
       supervisor) {
+    return create(supervisor, null);
+  }
+
+  public static ReplicationSupervisorMetrics create(ReplicationSupervisor
+      supervisor, String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE, "Container Replication Supervisor Metrics",
-        new ReplicationSupervisorMetrics(supervisor));
+    String sourceName = MetricUtil.qualifySourceName(SOURCE, component);
+    return ms.register(sourceName, "Container Replication Supervisor Metrics",
+        new ReplicationSupervisorMetrics(supervisor, sourceName));
   }
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE);
+    ms.unregisterSource(sourceName);
   }
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    MetricsRecordBuilder builder = collector.addRecord(SOURCE);
+    MetricsRecordBuilder builder = collector.addRecord(sourceName);
     builder.addGauge(Interns.info("numInFlightReplications",
         "Total number of pending replications and reconstructions both low "
             + "and normal priority"),
