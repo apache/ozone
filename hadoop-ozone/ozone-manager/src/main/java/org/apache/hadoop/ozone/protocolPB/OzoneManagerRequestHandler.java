@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -111,6 +112,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPC
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
@@ -259,6 +262,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListOpenFilesResponse listOpenFilesResponse = listOpenFiles(
             request.getListOpenFilesRequest(), request.getVersion());
         responseBuilder.setListOpenFilesResponse(listOpenFilesResponse);
+        break;
+      case GetBucketDeletedBytes:
+        GetBucketDeletedBytesResponse getBucketDeletedBytesResponse =
+            getBucketDeletedBytes(request.getGetBucketDeletedBytesRequest());
+        responseBuilder.setGetBucketDeletedBytesResponse(
+            getBucketDeletedBytesResponse);
         break;
       case ServiceList:
         ServiceListResponse serviceListResponse = getServiceList(
@@ -971,6 +980,20 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
 
     return resp.build();
+  }
+
+  private GetBucketDeletedBytesResponse getBucketDeletedBytes(
+      GetBucketDeletedBytesRequest request) throws IOException {
+    BucketDeletedBytes bytes = impl.getBucketDeletedBytes(
+        request.getBucketPath());
+    return GetBucketDeletedBytesResponse.newBuilder()
+        .setSnapshotTrappedBytes(bytes.getSnapshotTrappedBytes())
+        .setPurgeableBytes(bytes.getPurgeableBytes())
+        .setSnapshotTrappedKeys(bytes.getSnapshotTrappedKeys())
+        .setPurgeableKeys(bytes.getPurgeableKeys())
+        .setSnapshotTrappedDirs(bytes.getSnapshotTrappedDirs())
+        .setPurgeableDirs(bytes.getPurgeableDirs())
+        .build();
   }
 
   private ServiceListResponse getServiceList(ServiceListRequest request)

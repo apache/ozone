@@ -259,6 +259,7 @@ import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -308,6 +309,7 @@ import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
+import org.apache.hadoop.ozone.om.snapshot.trapped.BucketDeletedDataCalculator;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
@@ -1817,6 +1819,46 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public OmSnapshotManager getOmSnapshotManager() {
     return omSnapshotManager;
+  }
+
+  /**
+   * Compute deleted bytes split for a bucket.
+   *
+   * @return stats containing snapshot-trapped bytes and purgeable bytes.
+   */
+  public BucketDeletedDataCalculator.BucketDeletedBytesStats
+      calculateDeletedBytesForBucket(String volume, String bucket)
+      throws IOException {
+    return new BucketDeletedDataCalculator(this).calculate(volume, bucket);
+  }
+
+  /**
+   * Compute deleted bytes split for a bucket path in {@code volume/bucket}
+   * format.
+   */
+  public BucketDeletedDataCalculator.BucketDeletedBytesStats
+      calculateDeletedBytesForBucket(String bucketPath)
+      throws IOException {
+    String[] tokens = bucketPath.split("/", 2);
+    if (tokens.length != 2 || tokens[0].isEmpty() || tokens[1].isEmpty()) {
+      throw new IllegalArgumentException(
+          "bucketPath must be in volume/bucket format: " + bucketPath);
+    }
+    return calculateDeletedBytesForBucket(tokens[0], tokens[1]);
+  }
+
+  @Override
+  public BucketDeletedBytes getBucketDeletedBytes(String bucketPath)
+      throws IOException {
+    BucketDeletedDataCalculator.BucketDeletedBytesStats stats =
+        calculateDeletedBytesForBucket(bucketPath);
+    return new BucketDeletedBytes(
+        stats.getSnapshotTrappedBytes(),
+        stats.getPurgeableBytes(),
+        stats.getSnapshotTrappedKeys(),
+        stats.getPurgeableKeys(),
+        stats.getSnapshotTrappedDirs(),
+        stats.getPurgeableDirs());
   }
 
   /**
