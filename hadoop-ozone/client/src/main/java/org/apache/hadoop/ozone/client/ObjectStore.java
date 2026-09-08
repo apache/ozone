@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -618,6 +619,16 @@ public class ObjectStore {
                                               String snapshotPrefix,
                                               String prevSnapshot) throws IOException {
     return new SnapshotIterator(volumeName, bucketName, snapshotPrefix, prevSnapshot);
+  }
+
+  /**
+   * Get bucket-wise snapshot count distribution from snapshotInfo table.
+   * @param bucketFilter optional filter, accepts either bucket or volume/bucket
+   * @return snapshot counts aggregated by bucket
+   * @throws IOException
+   */
+  public SnapshotCountResponse snapshotCount(String bucketFilter) throws IOException {
+    return proxy.snapshotCount(bucketFilter);
   }
 
   /**

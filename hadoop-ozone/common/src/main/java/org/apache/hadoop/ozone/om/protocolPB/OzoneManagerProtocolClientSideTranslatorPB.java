@@ -256,6 +256,8 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationToke
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotBucketCount;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -1400,6 +1402,29 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
 
     return new ListSnapshotResponse(snapshotInfos, lastSnapshot);
+  }
+
+  @Override
+  public SnapshotCountResponse snapshotCount(String bucketFilter)
+      throws IOException {
+    final OzoneManagerProtocolProtos.SnapshotCountRequest.Builder requestBuilder =
+        OzoneManagerProtocolProtos.SnapshotCountRequest.newBuilder();
+    if (bucketFilter != null) {
+      requestBuilder.setBucketFilter(bucketFilter);
+    }
+    final OMRequest omRequest = createOMRequest(Type.SnapshotCount)
+        .setSnapshotCountRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+
+    OzoneManagerProtocolProtos.SnapshotCountResponse response = omResponse.getSnapshotCountResponse();
+    List<SnapshotBucketCount> bucketCounts = response.getBucketsList().stream()
+        .map(count -> new SnapshotBucketCount(count.getVolumeName(), count.getBucketName(),
+            count.getActive(), count.getDeleted(), count.getTotal()))
+        .collect(Collectors.toList());
+
+    return new SnapshotCountResponse(response.getActive(), response.getDeleted(), response.getTotal(), bucketCounts);
   }
 
   /**

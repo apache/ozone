@@ -242,6 +242,7 @@ public final class OmUtils {
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
+    case SnapshotCount:
     case RefetchSecretKey:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
@@ -384,6 +385,7 @@ public final class OmUtils {
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
+    case SnapshotCount:
     case RefetchSecretKey:
     case GetKeyInfo:
     case GetSnapshotInfo:
