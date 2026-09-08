@@ -233,7 +233,7 @@ public class TestReconContainerManager
     for (State replicaState : new State[] {
         State.UNHEALTHY, State.INVALID, State.DELETED}) {
       ContainerWithPipeline containerWithPipeline =
-          getTestContainer(120L + replicaState.ordinal(), LifeCycleState.OPEN);
+          getTestContainer(120L + replicaState.getNumber(), LifeCycleState.OPEN);
       ContainerID containerID =
           containerWithPipeline.getContainerInfo().containerID();
       getContainerManager().addNewContainer(containerWithPipeline);

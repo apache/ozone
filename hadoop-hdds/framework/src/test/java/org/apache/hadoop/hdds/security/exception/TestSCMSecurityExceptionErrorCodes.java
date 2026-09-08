@@ -15,34 +15,31 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.exceptions;
+package org.apache.hadoop.hdds.security.exception;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode;
 import org.junit.jupiter.api.Test;
 
 /**
- * Test Result code mappping between SCMException and the protobuf definitions.
+ * Test error code mapping between SCM security protocol and exception definitions.
  */
-public class TestSCMExceptionResultCodes {
+public class TestSCMSecurityExceptionErrorCodes {
 
   @Test
   public void codeMapping() {
-    // ResultCode = SCMException definition
-    // Status = protobuf definition
-    assertEquals(ResultCodes.values().length,
-        Status.values().length);
-    for (int i = 0; i < ResultCodes.values().length; i++) {
-      ResultCodes codeValue = ResultCodes.values()[i];
-      Status protoBufValue = Status.values()[i];
-      assertEquals(codeValue.name(), protoBufValue.name(),
-          String.format("Protobuf/Enum constant name mismatch %s %s",
-              codeValue, protoBufValue));
-      ResultCodes converted = ResultCodes.valueOf(protoBufValue.name());
-      assertEquals(codeValue, converted);
+    for (Status status : Status.values()) {
+      if (status != Status.GET_ROOT_CA_CERTIFICATE_FAILED
+          && status != Status.REVOKE_CERTIFICATE_FAILED) {
+        assertEquals(status.name(), ErrorCode.valueOf(status.name()).name());
+      }
     }
+    assertEquals(ErrorCode.GET_ROOT_CA_CERT_FAILED,
+        ErrorCode.valueOf("GET_ROOT_CA_CERT_FAILED"));
+    assertThrows(IllegalArgumentException.class,
+        () -> ErrorCode.valueOf(Status.REVOKE_CERTIFICATE_FAILED.name()));
   }
-
 }

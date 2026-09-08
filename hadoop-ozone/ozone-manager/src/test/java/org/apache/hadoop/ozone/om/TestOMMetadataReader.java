@@ -33,6 +33,7 @@ import org.mockito.MockedStatic;
 public class TestOMMetadataReader {
 
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testGetClientAddress() {
     try (
         MockedStatic<Server> ipcServerStaticMock = mockStatic(Server.class);

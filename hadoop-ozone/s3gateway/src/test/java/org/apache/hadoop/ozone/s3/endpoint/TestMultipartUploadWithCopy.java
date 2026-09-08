@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -94,9 +95,8 @@ public class TestMultipartUploadWithCopy {
         .createKey(EXISTING_KEY, keyContent.length,
             ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
             ReplicationFactor.THREE),
-            new HashMap<String, String>() {{
-              put(OzoneConsts.ETAG, DigestUtils.md5Hex(EXISTING_KEY_CONTENT));
-            }}
+            ImmutableMap.of(OzoneConsts.ETAG,
+                DigestUtils.md5Hex(EXISTING_KEY_CONTENT))
         )) {
       stream.write(keyContent);
     }

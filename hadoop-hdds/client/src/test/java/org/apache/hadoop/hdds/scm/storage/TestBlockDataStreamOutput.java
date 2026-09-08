@@ -219,7 +219,7 @@ class TestBlockDataStreamOutput {
       }
       assertTrue(foundExpectedCause);
     } else {
-      assertThat(e.getMessage().contains("chunk write failed due to injected failure"));
+      assertThat(e.getMessage()).contains("chunk write failed due to injected failure");
     }
   }
 

@@ -283,7 +283,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       omResponse.setDeleteKeysResponse(
           DeleteKeysResponse.newBuilder().setStatus(false)
-              .setUnDeletedKeys(unDeletedKeys).build()).build();
+              .setUnDeletedKeys(unDeletedKeys).build());
       omClientResponse =
           new OMKeysDeleteResponse(omResponse.build(), getBucketLayout());
       long endNanosDeleteKeyFailureLatencyNs = Time.monotonicNowNanos();
