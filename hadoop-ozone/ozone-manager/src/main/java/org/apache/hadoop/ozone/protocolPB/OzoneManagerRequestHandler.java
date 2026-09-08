@@ -173,6 +173,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
@@ -342,6 +343,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerProtocolProtos.ListSnapshotResponse listSnapshotResponse =
             getSnapshots(request.getListSnapshotRequest());
         responseBuilder.setListSnapshotResponse(listSnapshotResponse);
+        break;
+      case SnapshotCount:
+        OzoneManagerProtocolProtos.SnapshotCountResponse snapshotCountResponse =
+            getSnapshotCount(request.getSnapshotCountRequest());
+        responseBuilder.setSnapshotCountResponse(snapshotCountResponse);
         break;
       case SnapshotDiff:
         SnapshotDiffResponse snapshotDiffReport = snapshotDiff(
@@ -1615,6 +1621,29 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       builder.setLastSnapshot(implResponse.getLastSnapshot());
     }
     return builder.build();
+  }
+
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  private OzoneManagerProtocolProtos.SnapshotCountResponse getSnapshotCount(
+      OzoneManagerProtocolProtos.SnapshotCountRequest request) throws IOException {
+    SnapshotCountResponse implResponse = impl.snapshotCount(
+        request.hasBucketFilter() ? request.getBucketFilter() : null);
+    List<OzoneManagerProtocolProtos.SnapshotBucketCount> bucketCountList = implResponse.getBuckets().stream()
+        .map(bucketCount -> OzoneManagerProtocolProtos.SnapshotBucketCount.newBuilder()
+            .setVolumeName(bucketCount.getVolumeName())
+            .setBucketName(bucketCount.getBucketName())
+            .setActive(bucketCount.getActive())
+            .setDeleted(bucketCount.getDeleted())
+            .setTotal(bucketCount.getTotal())
+            .build())
+        .collect(Collectors.toList());
+
+    return OzoneManagerProtocolProtos.SnapshotCountResponse.newBuilder()
+        .setActive(implResponse.getActive())
+        .setDeleted(implResponse.getDeleted())
+        .setTotal(implResponse.getTotal())
+        .addAllBuckets(bucketCountList)
+        .build();
   }
 
   private TransferLeadershipResponseProto transferLeadership(

@@ -341,6 +341,8 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotBucketCount;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -3265,6 +3267,144 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_SNAPSHOT,
           auditMap, ex));
       throw ex;
+    }
+  }
+
+  @Override
+  public SnapshotCountResponse snapshotCount(String bucketFilter)
+      throws IOException {
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put("bucketFilter", StringUtils.defaultString(bucketFilter));
+
+    try {
+      BucketFilter parsedFilter = BucketFilter.parse(bucketFilter);
+      Map<String, BucketSnapshotCount> bucketCounts = new LinkedHashMap<>();
+      Map<String, Boolean> bucketAclCache = new LinkedHashMap<>();
+
+      try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> keyIter =
+               metadataManager.getSnapshotInfoTable().iterator()) {
+        while (keyIter.hasNext()) {
+          SnapshotInfo snapshotInfo = keyIter.next().getValue();
+          String volumeName = snapshotInfo.getVolumeName();
+          String bucketName = snapshotInfo.getBucketName();
+          if (!parsedFilter.matches(volumeName, bucketName)) {
+            continue;
+          }
+
+          if (getAclsEnabled() && !hasListAccess(volumeName, bucketName, bucketAclCache)) {
+            continue;
+          }
+
+          String bucketKey = volumeName + "/" + bucketName;
+          BucketSnapshotCount bucketCount =
+              bucketCounts.computeIfAbsent(bucketKey, unused -> new BucketSnapshotCount(volumeName, bucketName));
+          bucketCount.increment(snapshotInfo.getSnapshotStatus());
+        }
+      }
+
+      long totalActive = 0;
+      long totalDeleted = 0;
+      long total = 0;
+      List<SnapshotBucketCount> bucketCountList = new ArrayList<>(bucketCounts.size());
+      for (BucketSnapshotCount bucketCount : bucketCounts.values()) {
+        bucketCountList.add(bucketCount.toResponse());
+        totalActive += bucketCount.active;
+        totalDeleted += bucketCount.deleted;
+        total += bucketCount.total;
+      }
+
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_SNAPSHOT, auditMap));
+      return new SnapshotCountResponse(totalActive, totalDeleted, total, bucketCountList);
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_SNAPSHOT, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  private boolean hasListAccess(String volumeName, String bucketName, Map<String, Boolean> bucketAclCache)
+      throws IOException {
+    String bucketKey = volumeName + "/" + bucketName;
+    Boolean hasAccess = bucketAclCache.get(bucketKey);
+    if (hasAccess != null) {
+      return hasAccess;
+    }
+
+    try {
+      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, volumeName, bucketName, null);
+      bucketAclCache.put(bucketKey, true);
+      return true;
+    } catch (OMException ex) {
+      if (ex.getResult() == OMException.ResultCodes.ACCESS_DENIED) {
+        bucketAclCache.put(bucketKey, false);
+        return false;
+      }
+      throw ex;
+    }
+  }
+
+  private static final class BucketFilter {
+    private final String volumeName;
+    private final String bucketName;
+
+    private BucketFilter(String volumeName, String bucketName) {
+      this.volumeName = volumeName;
+      this.bucketName = bucketName;
+    }
+
+    static BucketFilter parse(String filter) throws OMException {
+      if (StringUtils.isBlank(filter)) {
+        return new BucketFilter(null, null);
+      }
+
+      String normalized = StringUtils.strip(filter, "/");
+      int slashIndex = normalized.indexOf('/');
+      if (slashIndex < 0) {
+        return new BucketFilter(null, normalized);
+      }
+
+      String volume = normalized.substring(0, slashIndex);
+      String bucket = normalized.substring(slashIndex + 1);
+      if (StringUtils.isBlank(volume) || StringUtils.isBlank(bucket)) {
+        throw new OMException("Invalid --bucket filter. Use either <bucket> or <volume>/<bucket>.",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+      return new BucketFilter(volume, bucket);
+    }
+
+    boolean matches(String volume, String bucket) {
+      if (bucketName == null) {
+        return true;
+      }
+      if (volumeName == null) {
+        return bucketName.equals(bucket);
+      }
+      return volumeName.equals(volume) && bucketName.equals(bucket);
+    }
+  }
+
+  private static final class BucketSnapshotCount {
+    private final String volumeName;
+    private final String bucketName;
+    private long active;
+    private long deleted;
+    private long total;
+
+    private BucketSnapshotCount(String volumeName, String bucketName) {
+      this.volumeName = volumeName;
+      this.bucketName = bucketName;
+    }
+
+    private void increment(SnapshotInfo.SnapshotStatus status) {
+      if (status == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
+        deleted++;
+      } else if (status == SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
+        active++;
+      }
+      total++;
+    }
+
+    private SnapshotBucketCount toResponse() {
+      return new SnapshotBucketCount(volumeName, bucketName, active, deleted, total);
     }
   }
 
