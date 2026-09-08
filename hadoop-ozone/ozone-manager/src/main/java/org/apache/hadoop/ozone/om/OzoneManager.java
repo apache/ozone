@@ -99,6 +99,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_PATH;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
@@ -3297,9 +3298,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return metadataManager.getLifecycleConfiguration(
           resolvedBucket.realVolume(), resolvedBucket.realBucket());
     } catch (Exception ex) {
-      auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap, ex));
+      // A bucket without a lifecycle configuration is an expected outcome, so it
+      // is audited as a completed read rather than a failure.
+      if (!(ex instanceof OMException && ((OMException) ex).getResult() == LIFECYCLE_CONFIGURATION_NOT_FOUND)) {
+        auditSuccess = false;
+        AUDIT.logReadFailure(buildAuditMessageForFailure(
+            OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap, ex));
+      }
       throw ex;
     } finally {
       if (lockAcquired) {
