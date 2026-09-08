@@ -63,6 +63,50 @@ public final class ContainerBalancerClusterAnalyzer {
   }
 
   /**
+   * Returns true if utilization is above the upper limit (source candidate).
+   */
+  public static boolean isOverUtilized(double utilization, double upperLimit) {
+    return Double.compare(utilization, upperLimit) > 0;
+  }
+
+  /**
+   * Returns true if utilization is below the lower limit (target candidate).
+   */
+  public static boolean isUnderUtilized(double utilization, double lowerLimit) {
+    return Double.compare(utilization, lowerLimit) < 0;
+  }
+
+  /**
+   * Bytes above the upper limit on an over-utilized node.
+   */
+  public static long overUtilizedBytes(long capacity, double utilization, double upperLimit) {
+    return ratioToBytes(capacity, utilization) - ratioToBytes(capacity, upperLimit);
+  }
+
+  /**
+   * Bytes below the lower limit on an under-utilized node.
+   */
+  public static long underUtilizedBytes(long capacity, double utilization, double lowerLimit) {
+    return ratioToBytes(capacity, lowerLimit) - ratioToBytes(capacity, utilization);
+  }
+
+  /**
+   * Upper utilization band: cluster average plus threshold.
+   * Nodes above this are candidates to be source nodes.
+   */
+  public static double computeUpperLimit(double clusterAvgUtilization, double thresholdRatio) {
+    return clusterAvgUtilization + thresholdRatio;
+  }
+
+  /**
+   * Lower utilization band: cluster average minus threshold.
+   * Nodes below this are candidates to be target nodes.
+   */
+  public static double computeLowerLimit(double clusterAvgUtilization, double thresholdRatio) {
+    return clusterAvgUtilization - thresholdRatio;
+  }
+
+  /**
    * Builds a cluster snapshot after applying include/exclude filters.
    *
    * @param nodes all nodes from getDatanodeUsageInfo (typically healthy IN_SERVICE)
@@ -82,8 +126,8 @@ public final class ContainerBalancerClusterAnalyzer {
     }
 
     double clusterAvgUtilization = calculateAvgUtilization(eligible);
-    double upperLimit = clusterAvgUtilization + thresholdRatio;
-    double lowerLimit = clusterAvgUtilization - thresholdRatio;
+    double upperLimit = computeUpperLimit(clusterAvgUtilization, thresholdRatio);
+    double lowerLimit = computeLowerLimit(clusterAvgUtilization, thresholdRatio);
 
     List<NodeClassification> sources = new ArrayList<>();
     List<NodeClassification> targets = new ArrayList<>();
@@ -102,15 +146,11 @@ public final class ContainerBalancerClusterAnalyzer {
       minUtilization = Math.min(minUtilization, utilization);
 
       String hostname = getDisplayHostname(node);
-      if (Double.compare(utilization, upperLimit) > 0) {
-        long overBytes = ratioToBytes(capacity, utilization)
-            - ratioToBytes(capacity, upperLimit);
-        totalOverUtilizedBytes += overBytes;
+      if (isOverUtilized(utilization, upperLimit)) {
+        totalOverUtilizedBytes += overUtilizedBytes(capacity, utilization, upperLimit);
         sources.add(new NodeClassification(hostname, utilization));
-      } else if (Double.compare(utilization, lowerLimit) < 0) {
-        long underBytes = ratioToBytes(capacity, lowerLimit)
-            - ratioToBytes(capacity, utilization);
-        totalUnderUtilizedBytes += underBytes;
+      } else if (isUnderUtilized(utilization, lowerLimit)) {
+        totalUnderUtilizedBytes += underUtilizedBytes(capacity, utilization, lowerLimit);
         targets.add(new NodeClassification(hostname, utilization));
       }
     }
@@ -145,7 +185,7 @@ public final class ContainerBalancerClusterAnalyzer {
    * by hostname or IP address.
    */
   public static boolean shouldExcludeDatanode(DatanodeDetails datanode,
-                                       Set<String> excludeNodes, Set<String> includeNodes) {
+                                              Set<String> excludeNodes, Set<String> includeNodes) {
     if (excludeNodes.contains(datanode.getHostName()) ||
         excludeNodes.contains(datanode.getIpAddress())) {
       return true;
@@ -217,8 +257,8 @@ public final class ContainerBalancerClusterAnalyzer {
         .setClusterCapacityBytes(0)
         .setMaxUtilization(0)
         .setMinUtilization(0)
-        .setUpperLimit(thresholdRatio)
-        .setLowerLimit(-thresholdRatio)
+        .setUpperLimit(computeUpperLimit(0, thresholdRatio))
+        .setLowerLimit(computeLowerLimit(0, thresholdRatio))
         .setSourceCount(0)
         .setTargetCount(0)
         .setTotalOverUtilizedBytes(0)

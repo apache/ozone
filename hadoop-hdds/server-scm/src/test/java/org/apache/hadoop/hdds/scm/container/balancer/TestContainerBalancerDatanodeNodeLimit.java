@@ -120,8 +120,10 @@ public class TestContainerBalancerDatanodeNodeLimit {
         protos, config.getThresholdAsRatio(), config.getIncludeNodes(), config.getExcludeNodes());
 
     double taskAvg = ContainerBalancerTask.calculateAvgUtilization(eligible);
-    double upperLimit = taskAvg + config.getThresholdAsRatio();
-    double lowerLimit = taskAvg - config.getThresholdAsRatio();
+    double upperLimit = ContainerBalancerClusterAnalyzer.computeUpperLimit(
+        taskAvg, config.getThresholdAsRatio());
+    double lowerLimit = ContainerBalancerClusterAnalyzer.computeLowerLimit(
+        taskAvg, config.getThresholdAsRatio());
 
     assertEquals(eligible.size(), snapshot.getTotalEligibleDatanodes());
     assertEquals(task.getOverUtilizedNodes().size(), snapshot.getSourceCount());
@@ -134,14 +136,16 @@ public class TestContainerBalancerDatanodeNodeLimit {
         .mapToLong(n -> {
           long capacity = n.getScmNodeStat().getCapacity().get();
           double utilization = n.calculateUtilization();
-          return (long) (capacity * utilization) - (long) (capacity * upperLimit);
+          return ContainerBalancerClusterAnalyzer.overUtilizedBytes(
+              capacity, utilization, upperLimit);
         })
         .sum();
     long expectedUnderBytes = task.getUnderUtilizedNodes().stream()
         .mapToLong(n -> {
           long capacity = n.getScmNodeStat().getCapacity().get();
           double utilization = n.calculateUtilization();
-          return (long) (capacity * lowerLimit) - (long) (capacity * utilization);
+          return ContainerBalancerClusterAnalyzer.underUtilizedBytes(
+              capacity, utilization, lowerLimit);
         })
         .sum();
     assertEquals(expectedOverBytes, snapshot.getTotalOverUtilizedBytes());
