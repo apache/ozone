@@ -43,6 +43,12 @@ public class TestHostAndPort {
   }
 
   @Test
+  public void ipv6HostAndPortString() {
+    HostAndPort address = new HostAndPort("2001:db8::1", 9894);
+    assertEquals("[2001:db8::1]:9894", address.getHostAndPortString());
+  }
+
+  @Test
   public void setAddressDoesNotChangeIdentity() throws Exception {
     HostAndPort address = new HostAndPort("127.0.0.1", 9861);
     InetSocketAddress refreshed =

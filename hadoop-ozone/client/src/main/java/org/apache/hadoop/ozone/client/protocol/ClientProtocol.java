@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.S3HeadObjectAttributes;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
@@ -170,6 +171,18 @@ public interface ClientProtocol {
    * @throws IOException
    */
   OzoneKey headS3Object(String bucketName, String keyName, int partNumber)
+      throws IOException;
+
+  /**
+   * Returns S3 head metadata and completed multipart part sizes from a single
+   * {@code GetKeyInfo} OM call.
+   *
+   * @param bucketName Name of the Bucket
+   * @param keyName Key name
+   * @return head key metadata and sorted part-number to size map (empty when not MPU)
+   * @throws IOException
+   */
+  S3HeadObjectAttributes headS3ObjectAttributes(String bucketName, String keyName)
       throws IOException;
 
   /**
@@ -520,6 +533,82 @@ public interface ClientProtocol {
       String bucketName, String keyName, long size, String expectedETag,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags) throws IOException;
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream createKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return createKey(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream createKeyIfNotExists(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return createKeyIfNotExists(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName,
+      String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return rewriteKeyIfMatch(volumeName, bucketName, keyName, size, expectedETag,
+        replicationConfig, metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream createMultipartKey(String volumeName, String bucketName,
+                                       String keyName, long size,
+                                       int partNumber, String uploadID,
+                                       boolean derivedKeyPiggyBacking)
+      throws IOException {
+    return createMultipartKey(volumeName, bucketName, keyName, size, partNumber,
+        uploadID);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput createStreamKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return createStreamKey(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput createStreamKeyIfNotExists(String volumeName,
+      String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return createStreamKeyIfNotExists(volumeName, bucketName, keyName, size,
+        replicationConfig, metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput rewriteStreamKeyIfMatch(String volumeName,
+      String bucketName, String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return rewriteStreamKeyIfMatch(volumeName, bucketName, keyName, size, expectedETag,
+        replicationConfig, metadata, tags);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneDataStreamOutput createMultipartStreamKey(String volumeName,
+                                                 String bucketName,
+                                                 String keyName, long size,
+                                                 int partNumber,
+                                                 String uploadID,
+                                                 boolean derivedKeyPiggyBacking)
+      throws IOException {
+    return createMultipartStreamKey(volumeName, bucketName, keyName, size,
+        partNumber, uploadID);
+  }
 
   /**
    * Reads a key from an existing bucket.

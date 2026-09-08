@@ -25,11 +25,19 @@ export interface ChatbotModelsResponse {
   models: string[];
 }
 
+export interface ChatbotHistoryTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface ChatbotChatRequest {
   query: string;
   model?: string;
   provider?: string;
   userId?: string;
+  // Recent prior turns resent for context (V1 client-side memory). The server
+  // trims/validates these; they are a disambiguation hint only.
+  history?: ChatbotHistoryTurn[];
 }
 
 export interface ChatbotChatResponse {

@@ -86,7 +86,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.validator.routines.InetAddressValidator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -143,10 +142,6 @@ public final class HddsServerUtil {
   public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
       "OZONE_RATIS_SNAPSHOT_COMPLETE";
 
-  // List of ip's not recommended to be added to CSR.
-  private static final Set<String> INVALID_IPS = new HashSet<>(Arrays.asList(
-      "0.0.0.0", "127.0.0.1"));
-
   private HddsServerUtil() {
   }
 
@@ -164,8 +159,9 @@ public final class HddsServerUtil {
   }
 
   /**
-   * Iterates through network interfaces and return all valid ip's not
-   * listed in {@link #INVALID_IPS}.
+   * Iterates through network interfaces and returns all IP addresses that are valid to
+   * add to a certificate's SAN extension, as determined by
+   * {@link #isValidInetForCsr(InetAddress)}.
    *
    * @return List<InetAddress>
    * @throws IOException if no network interface are found or if an error
@@ -174,7 +170,6 @@ public final class HddsServerUtil {
   public static List<InetAddress> getValidInetsForCurrentHost()
       throws IOException {
     List<InetAddress> hostIps = new ArrayList<>();
-    InetAddressValidator ipValidator = InetAddressValidator.getInstance();
 
     Enumeration<NetworkInterface> enumNI =
         NetworkInterface.getNetworkInterfaces();
@@ -189,19 +184,35 @@ public final class HddsServerUtil {
         while (enumAdds.hasMoreElements()) {
           InetAddress addr = enumAdds.nextElement();
 
-          String hostAddress = addr.getHostAddress();
-          if (!INVALID_IPS.contains(hostAddress) && ipValidator.isValid(hostAddress)
-              && !isScopedOrMaskingIPv6Address(addr)) {
-            LOG.info("Adding ip:{},host:{}", hostAddress, addr.getHostName());
+          if (isValidInetForCsr(addr)) {
+            LOG.info("Adding ip:{},host:{}", addr.getHostAddress(), addr.getHostName());
             hostIps.add(addr);
           } else {
-            LOG.info("ip:{} not returned.", hostAddress);
+            LOG.info("ip:{} not returned.", addr.getHostAddress());
           }
         }
       }
     }
 
     return hostIps;
+  }
+
+  /**
+   * Determines whether the supplied address is valid to add to a certificate's
+   * SAN extension. Wildcard/unspecified (0.0.0.0, ::) and loopback
+   * (127.0.0.0/8, ::1) addresses are excluded for both IPv4 and IPv6, along
+   * with scoped or masked IPv6 addresses (see
+   * {@link #isScopedOrMaskingIPv6Address(InetAddress)}). Using the
+   * {@link InetAddress} predicates rather than a fixed set of address strings
+   * ensures the IPv6 forms are excluded, not just their IPv4 equivalents.
+   *
+   * @param addr the InetAddress to check
+   * @return true if the address should be added to the CSR
+   */
+  public static boolean isValidInetForCsr(InetAddress addr) {
+    return !addr.isAnyLocalAddress()
+        && !addr.isLoopbackAddress()
+        && !isScopedOrMaskingIPv6Address(addr);
   }
 
   /**

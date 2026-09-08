@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Stream;
+import javax.ws.rs.core.MediaType;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -152,6 +153,14 @@ public class TestS3Utils {
   @Test
   public void testGenerateCanonicalUserId() {
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, S3Utils.generateCanonicalUserId("ozone"));
+  }
+
+  @Test
+  public void testWrapOS3ExceptionContentType() {
+    OS3Exception exception = S3ErrorTable.newError(
+        S3ErrorTable.ACCESS_DENIED, "bucket");
+    assertEquals(MediaType.APPLICATION_XML_TYPE,
+        S3Utils.wrapOS3Exception(exception).getResponse().getMediaType());
   }
 
   static Stream<Arguments> wrongContentMD5Provider() throws Exception {

@@ -830,7 +830,7 @@ public class HttpFSServer {
         uploadOperation)
         .queryParam(DataParam.NAME, Boolean.TRUE)
         .replaceQueryParam(NoRedirectParam.NAME, (Object[]) null);
-    return uriBuilder.build(null);
+    return uriBuilder.build();
   }
 
   /**

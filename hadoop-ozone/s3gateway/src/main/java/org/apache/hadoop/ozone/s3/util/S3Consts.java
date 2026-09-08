@@ -128,6 +128,16 @@ public final class S3Consts {
   // tag limit for bucket
   public static final int TAG_BUCKET_NUM_LIMIT = 50;
 
+  // Request header carrying the list of object attributes to return.
+  public static final String OBJECT_ATTRIBUTES_HEADER = "x-amz-object-attributes";
+
+  // Pagination headers for GetObjectAttributes ObjectParts.
+  public static final String MAX_PARTS_HEADER = "x-amz-max-parts";
+  public static final String PART_NUMBER_MARKER_HEADER = "x-amz-part-number-marker";
+
+  // Maximum number of parts returned in one GetObjectAttributes response.
+  public static final int GET_OBJECT_ATTRIBUTES_MAX_PARTS_LIMIT = 1000;
+
   //Never Constructed
   private S3Consts() {
 
@@ -164,10 +174,13 @@ public final class S3Consts {
     public static final String PREFIX = "prefix";
     public static final String START_AFTER = "start-after";
     public static final String TAGGING = "tagging";
+    // GetObjectTorrent is not implemented
+    public static final String TORRENT = "torrent";
     public static final String UPLOAD_ID = "uploadId";
     public static final String UPLOAD_ID_MARKER = "upload-id-marker";
     public static final String UPLOADS = "uploads";
     public static final String LIFECYCLE = "lifecycle";
+    public static final String ATTRIBUTES = "attributes";
 
     private QueryParams() {
       // no instances

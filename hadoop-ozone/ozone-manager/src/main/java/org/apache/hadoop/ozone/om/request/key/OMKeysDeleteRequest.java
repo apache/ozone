@@ -100,7 +100,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     Objects.requireNonNull(deleteKeysRequest, "deleteKeysRequest == null");
 
     if (deleteKeysRequest.getSourceType() == RequestSource.LIFECYCLE && deleteKeysRequest.hasScanState()) {
-      if (ozoneManager.getAclsEnabled()) {
+      if (ozoneManager.isAdminAuthorizationEnabled()) {
         UserGroupInformation ugi = createUGIForApi();
         if (!ozoneManager.isAdmin(ugi)) {
           throw new OMException("Access denied for user " + ugi + ". "

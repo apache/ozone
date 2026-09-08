@@ -18,12 +18,18 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,14 +38,19 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleScanState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -153,6 +164,48 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
     OMKeysDeleteRequest omKeysDeleteRequest =
         new OMKeysDeleteRequest(omRequest, getBucketLayout());
     checkDeleteKeysResponseForFailure(omKeysDeleteRequest, Status.INVALID_REQUEST);
+  }
+
+  @Test
+  public void testPreExecuteAdminCheckForPiggybackedScanState() throws Exception {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
+
+    when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(true);
+    when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
+
+    omRequest = OMRequest.newBuilder()
+        .setCmdType(DeleteKeys)
+        .setClientId(UUID.randomUUID().toString())
+        .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
+            .setSourceType(RequestSource.LIFECYCLE)
+            .setScanState(LifecycleScanState.newBuilder()
+                .setBucketKey("vol/bucket")
+                .setScanStartTime(1L)
+                .build())
+            .setDeleteKeys(DeleteKeyArgs.newBuilder()
+                .setVolumeName("vol")
+                .setBucketName("bucket")
+                .addKeys("key1")
+                .build())
+            .build())
+        .build();
+
+    OMKeysDeleteRequest request = new OMKeysDeleteRequest(omRequest, getBucketLayout());
+    request.setUGI(UserGroupInformation.getCurrentUser());
+
+    OMException exception = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.ACCESS_DENIED, exception.getResult());
+    assertTrue(exception.getMessage().contains("Superuser privilege is required"));
+
+    when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(true);
+    assertDoesNotThrow(() -> request.preExecute(ozoneManager));
+
+    when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(false);
+    when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
+    assertDoesNotThrow(() -> request.preExecute(ozoneManager));
   }
 
   @Test

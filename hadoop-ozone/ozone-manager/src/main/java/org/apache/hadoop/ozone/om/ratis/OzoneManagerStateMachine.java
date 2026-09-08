@@ -104,6 +104,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
   private final String threadPrefix;
 
+  /**
+   * Guards updates to notified, skipped and applied term-index state.
+   * When both locks are needed, acquire the state-machine monitor first.
+   */
+  private final Object termIndexLock = new Object();
+
   /** The last {@link TermIndex} received from {@link #notifyTermIndexUpdated(long, long)}. */
   private volatile TermIndex lastNotifiedTermIndex = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
   /** The last index skipped by {@link #notifyTermIndexUpdated(long, long)}. */
@@ -238,18 +244,20 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   /** Notified by Ratis for non-StateMachine term-index update. */
   @Override
-  public synchronized void notifyTermIndexUpdated(long currentTerm, long newIndex) {
-    // lastSkippedIndex is start of sequence (one less) of continuous notification from ratis
-    // if there is any applyTransaction (double buffer index), then this gap is handled during double buffer
-    // notification and lastSkippedIndex will be the start of last continuous sequence.
-    final long oldIndex = lastNotifiedTermIndex.getIndex();
-    if (newIndex - oldIndex > 1) {
-      lastSkippedIndex = newIndex - 1;
-    }
-    final TermIndex newTermIndex = TermIndex.valueOf(currentTerm, newIndex);
-    lastNotifiedTermIndex = assertUpdateIncreasingly("lastNotified", lastNotifiedTermIndex, newTermIndex);
-    if (lastNotifiedTermIndex.getIndex() - getLastAppliedTermIndex().getIndex() == 1) {
-      updateLastAppliedTermIndex(lastNotifiedTermIndex);
+  public void notifyTermIndexUpdated(long currentTerm, long newIndex) {
+    synchronized (termIndexLock) {
+      // lastSkippedIndex is start of sequence (one less) of continuous notification from ratis
+      // if there is any applyTransaction (double buffer index), then this gap is handled during double buffer
+      // notification and lastSkippedIndex will be the start of last continuous sequence.
+      final long oldIndex = lastNotifiedTermIndex.getIndex();
+      if (newIndex - oldIndex > 1) {
+        lastSkippedIndex = newIndex - 1;
+      }
+      final TermIndex newTermIndex = TermIndex.valueOf(currentTerm, newIndex);
+      lastNotifiedTermIndex = assertUpdateIncreasingly("lastNotified", lastNotifiedTermIndex, newTermIndex);
+      if (lastNotifiedTermIndex.getIndex() - getLastAppliedTermIndex().getIndex() == 1) {
+        updateLastAppliedTermIndex(lastNotifiedTermIndex);
+      }
     }
   }
 
@@ -258,17 +266,26 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  protected synchronized boolean updateLastAppliedTermIndex(TermIndex newTermIndex) {
-    TermIndex lastApplied = getLastAppliedTermIndex();
-    assertUpdateIncreasingly("lastApplied", lastApplied, newTermIndex);
-    // if newTermIndex getting updated is within sequence of notifiedTermIndex (i.e. from lastSkippedIndex and
-    // notifiedTermIndex), then can update directly to lastNotifiedTermIndex as it ensure previous double buffer's
-    // Index is notified or getting notified matching lastSkippedIndex
-    if (newTermIndex.getIndex() < getLastNotifiedTermIndex().getIndex()
-        && newTermIndex.getIndex() >= lastSkippedIndex) {
-      newTermIndex = getLastNotifiedTermIndex();
+  protected boolean updateLastAppliedTermIndex(TermIndex newTermIndex) {
+    synchronized (termIndexLock) {
+      TermIndex lastApplied = getLastAppliedTermIndex();
+      assertUpdateIncreasingly("lastApplied", lastApplied, newTermIndex);
+      // if newTermIndex getting updated is within sequence of notifiedTermIndex (i.e. from lastSkippedIndex and
+      // notifiedTermIndex), then can update directly to lastNotifiedTermIndex as it ensure previous double buffer's
+      // Index is notified or getting notified matching lastSkippedIndex
+      if (newTermIndex.getIndex() < getLastNotifiedTermIndex().getIndex()
+          && newTermIndex.getIndex() >= lastSkippedIndex) {
+        newTermIndex = getLastNotifiedTermIndex();
+      }
+      return super.updateLastAppliedTermIndex(newTermIndex);
     }
-    return super.updateLastAppliedTermIndex(newTermIndex);
+  }
+
+  /** Restore the applied term index when loading persisted state. */
+  private void restoreLastAppliedTermIndex(TermIndex termIndex) {
+    synchronized (termIndexLock) {
+      setLastAppliedTermIndex(termIndex);
+    }
   }
 
   /** Assert if the given {@link TermIndex} is updated increasingly. */
@@ -543,7 +560,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     if (statePausedCount.decrementAndGet() == 0) {
       getLifeCycle().startAndTransition(() -> {
         this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-        this.setLastAppliedTermIndex(TermIndex.valueOf(
+        restoreLastAppliedTermIndex(TermIndex.valueOf(
             newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
         LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
             "newLastAppliedSnapshotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
@@ -592,25 +609,33 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return takeSnapshotImpl();
   }
 
+  /**
+   * Keep this synchronized on the state-machine monitor so an in-progress
+   * snapshot finishes before checkpoint pause returns and installation can
+   * replace the metadata store. The nested term-index lock provides a
+   * consistent index to persist.
+   */
   private synchronized long takeSnapshotImpl() throws IOException {
-    final TermIndex applied = getLastAppliedTermIndex();
-    final TermIndex notified = getLastNotifiedTermIndex();
-    final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
+    synchronized (termIndexLock) {
+      final TermIndex applied = getLastAppliedTermIndex();
+      final TermIndex notified = getLastNotifiedTermIndex();
+      final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
 
-    long startTime = Time.monotonicNow();
-    // The double buffer may have committed transactions past the index computed above, since it
-    // advances lastAppliedTermIndex only after its batch commit returns. Persisting through it
-    // keeps the stored index from moving backwards over that data, and yields whichever value is
-    // actually stored so the in-memory copy Ratis reads cannot disagree with the DB.
-    final TransactionInfo transactionInfo =
-        ozoneManagerDoubleBuffer.persistIfNewer(TransactionInfo.valueOf(snapshot));
-    ozoneManager.setTransactionInfo(transactionInfo);
-    ozoneManager.getMetadataManager().getStore().flushDB();
-    LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
-        "notified = {}, current snapshot index = {}, took {} ms",
-            getId(), applied, lastSkippedIndex, notified, transactionInfo.getTermIndex(),
-            Time.monotonicNow() - startTime);
-    return transactionInfo.getTermIndex().getIndex();
+      long startTime = Time.monotonicNow();
+      // The double buffer may have committed transactions past the index computed above, since it
+      // advances lastAppliedTermIndex only after its batch commit returns. Persisting through it
+      // keeps the stored index from moving backwards over that data, and yields whichever value is
+      // actually stored so the in-memory copy Ratis reads cannot disagree with the DB.
+      final TransactionInfo transactionInfo =
+          ozoneManagerDoubleBuffer.persistIfNewer(TransactionInfo.valueOf(snapshot));
+      ozoneManager.setTransactionInfo(transactionInfo);
+      ozoneManager.getMetadataManager().getStore().flushDB();
+      LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
+          "notified = {}, current snapshot index = {}, took {} ms",
+              getId(), applied, lastSkippedIndex, notified, transactionInfo.getTermIndex(),
+              Time.monotonicNow() - startTime);
+      return transactionInfo.getTermIndex().getIndex();
+    }
   }
 
   /**
@@ -719,7 +744,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             ozoneManager.getMetadataManager());
     if (transactionInfo != null) {
       final TermIndex ti =  transactionInfo.getTermIndex();
-      setLastAppliedTermIndex(ti);
+      restoreLastAppliedTermIndex(ti);
       ozoneManager.setTransactionInfo(transactionInfo);
       LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}", ti);
     } else {

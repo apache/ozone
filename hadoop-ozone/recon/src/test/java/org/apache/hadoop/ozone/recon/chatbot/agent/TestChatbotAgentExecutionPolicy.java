@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.chatbot.agent;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +36,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
@@ -44,6 +47,7 @@ import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -203,7 +207,65 @@ public class TestChatbotAgentExecutionPolicy {
         "Blocked-tool response must not leak internal config key names");
   }
 
+  // ── Conversation memory: history reaches the summarization (Stage 3) prompt ──
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testHistoryIsInjectedIntoSummarizationPrompt() throws Exception {
+    // Selection returns a valid tool (non-null tools); summarization is the isNull-tools call.
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(toolCall("api_v1_clusterState", "{}"));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(text("SUMMARY"));
+
+    List<ChatHistoryBuilder.HistoryTurn> history = Arrays.asList(
+        new ChatHistoryBuilder.HistoryTurn("user", "how many unhealthy containers?"),
+        new ChatHistoryBuilder.HistoryTurn("assistant",
+            "There are 12 unhealthy containers in vol1/bucket1."));
+
+    String result = agent.processQuery("show me the cluster state", null, null, history);
+    assertEquals("SUMMARY", result);
+
+    ArgumentCaptor<List<LLMClient.ChatMessage>> captor = ArgumentCaptor.forClass(List.class);
+    verify(mockLlmClient).chatCompletion(captor.capture(), any(), any(), any(), isNull());
+    String summaryUserPrompt = userContent(captor.getValue());
+    assertTrue(summaryUserPrompt.contains("Earlier in this conversation"),
+        "Summarization prompt should carry the history lead-in");
+    assertTrue(summaryUserPrompt.contains("12 unhealthy containers in vol1/bucket1"),
+        "Summarization prompt should include the prior assistant answer so the report can reference it");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testNoHistoryOmitsSummarizationLeadIn() throws Exception {
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(toolCall("api_v1_clusterState", "{}"));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(text("SUMMARY"));
+
+    // 3-arg overload → history is null.
+    agent.processQuery("show me the cluster state", null, null);
+
+    ArgumentCaptor<List<LLMClient.ChatMessage>> captor = ArgumentCaptor.forClass(List.class);
+    verify(mockLlmClient).chatCompletion(captor.capture(), any(), any(), any(), isNull());
+    assertFalse(userContent(captor.getValue()).contains("Earlier in this conversation"),
+        "Without history the summarization prompt must not carry the history lead-in");
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  private static String userContent(List<LLMClient.ChatMessage> messages) {
+    for (LLMClient.ChatMessage msg : messages) {
+      if ("user".equals(msg.getRole())) {
+        return msg.getContent();
+      }
+    }
+    return "";
+  }
+
+  private LLMClient.LLMResponse text(String content) {
+    return new LLMClient.LLMResponse(content, "test-model", 10, 20, null);
+  }
 
   private LLMClient.LLMResponse toolCall(String toolName, String argumentsJson) {
     return new LLMClient.LLMResponse("", "test-model", 10, 20,

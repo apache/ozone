@@ -118,6 +118,7 @@ public class SCMUpgradeFinalizer extends
       createPipelinesAfterFinalization(context);
       stateManager.removeFinalizingMark();
     }
+    logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE);
   }
 
   private void closePipelinesBeforeFinalization(PipelineManager pipelineManager)

@@ -18,14 +18,29 @@
 package org.apache.hadoop.ozone.s3.exception;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
 
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * This class tests OS3Exception class.
+ * This class tests OS3Exception and OS3ExceptionMapper.
  */
+@ExtendWith(MockitoExtension.class)
 public class TestOS3Exceptions {
+
+  @Mock
+  private RequestIdentifier requestIdentifier;
+
+  @InjectMocks
+  private OS3ExceptionMapper exceptionMapper;
 
   @Test
   public void testOS3Exceptions() {
@@ -43,5 +58,16 @@ public class TestOS3Exceptions {
         ex.getErrorMessage(), ex.getResource(),
         ex.getRequestId());
     assertEquals(expected, val);
+  }
+
+  @Test
+  public void testResponseContentType() {
+    when(requestIdentifier.getRequestId()).thenReturn("request-id");
+    OS3Exception exception = S3ErrorTable.newError(
+        S3ErrorTable.ACCESS_DENIED, "bucket");
+
+    Response response = exceptionMapper.toResponse(exception);
+
+    assertEquals(MediaType.APPLICATION_XML_TYPE, response.getMediaType());
   }
 }

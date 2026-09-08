@@ -384,4 +384,23 @@ public class TestOmUtils {
       }
     }
   }
+
+  @Test
+  public void testResolveOmHostAcceptsIpv6Literal() {
+    // A bracketed or bare IPv6 literal must parse into a host:port authority.
+    // Before HDDS-15775 the bare form made createSocketAddr throw
+    // IllegalArgumentException ("not a valid host:port authority"). Reachability
+    // is environment-dependent, so an IOException here is acceptable; only the
+    // parse failure must not happen.
+    for (String host : new String[] {"::1", "[::1]"}) {
+      try {
+        OmUtils.resolveOmHost(host, 9862);
+      } catch (IllegalArgumentException e) {
+        fail("IPv6 literal '" + host + "' should parse into an address: "
+            + e.getMessage());
+      } catch (IOException ignored) {
+        // Unresolved or unreachable in the test environment is acceptable.
+      }
+    }
+  }
 }

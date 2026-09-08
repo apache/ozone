@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -88,6 +89,7 @@ public final class OzoneBucketStub extends OzoneBucket {
   private ArrayList<OzoneAcl> aclList = new ArrayList<>();
   private ReplicationConfig replicationConfig;
   private Map<String, OzoneLifecycleConfiguration> lifecyclesMap = new HashMap<>();
+  private byte[] derivedKey;
 
   public static Builder newBuilder() {
     return new Builder();
@@ -114,6 +116,24 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   boolean isEmpty() {
     return keyDetails.isEmpty();
+  }
+
+  public void setDerivedKey(byte[] key) {
+    derivedKey = key == null ? null : key.clone();
+  }
+
+  private OzoneOutputStream addDerivedKey(OzoneOutputStream output, boolean requested) {
+    if (requested && derivedKey != null) {
+      output.setDerivedKey(ByteBuffer.wrap(derivedKey.clone()));
+    }
+    return output;
+  }
+
+  private OzoneDataStreamOutput addDerivedKey(OzoneDataStreamOutput output, boolean requested) {
+    if (requested && derivedKey != null) {
+      output.setDerivedKey(ByteBuffer.wrap(derivedKey.clone()));
+    }
+    return output;
   }
 
   @Override
@@ -173,6 +193,13 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKey(String key, long size, ReplicationConfig rConfig,
+      Map<String, String> metadata, Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createKey(key, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKey(String keyName, long size, long existingKeyGeneration,
       ReplicationConfig rConfig, Map<String, String> metadata) throws IOException {
     final ReplicationConfig repConfig;
@@ -217,6 +244,13 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKeyIfNotExists(String keyName, long size, ReplicationConfig rConfig,
+      Map<String, String> metadata, Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createKeyIfNotExists(keyName, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size,
       String expectedETag, ReplicationConfig rConfig,
       Map<String, String> metadata, Map<String, String> tags)
@@ -235,6 +269,15 @@ public final class OzoneBucketStub extends OzoneBucket {
           ResultCodes.ETAG_MISMATCH);
     }
     return createKey(keyName, size, rConfig, metadata, tags);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size, String expectedETag,
+      ReplicationConfig rConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(rewriteKeyIfMatch(keyName, size, expectedETag, rConfig, metadata, tags),
+        derivedKeyPiggyBacking);
   }
 
   @Override
@@ -290,6 +333,37 @@ public final class OzoneBucketStub extends OzoneBucket {
         };
 
     return new OzoneDataStreamOutputStub(byteBufferStreamOutput, key + size);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createStreamKey(key, size, rConfig, keyMetadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createStreamKeyIfNotExists(key, size, rConfig, keyMetadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(rewriteStreamKeyIfMatch(key, size, expectedETag, rConfig, keyMetadata, tags),
+        derivedKeyPiggyBacking);
+  }
+
+  @Override
+  public OzoneDataStreamOutput createMultipartStreamKey(String key, long size,
+      int partNumber, String uploadID, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createMultipartStreamKey(key, size, partNumber, uploadID), derivedKeyPiggyBacking);
   }
 
   @Override
@@ -400,22 +474,81 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OzoneKey headObject(String key) throws IOException {
-    if (keyDetails.containsKey(key)) {
-      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(key);
-      return new OzoneKey(ozoneKeyDetails.getVolumeName(),
-          ozoneKeyDetails.getBucketName(),
-          ozoneKeyDetails.getName(),
-          ozoneKeyDetails.getDataSize(),
-          ozoneKeyDetails.getCreationTime().toEpochMilli(),
-          ozoneKeyDetails.getModificationTime().toEpochMilli(),
-          ozoneKeyDetails.getReplicationConfig(),
-          ozoneKeyDetails.getMetadata(),
-          ozoneKeyDetails.isFile(),
-          ozoneKeyDetails.getOwner(),
-          ozoneKeyDetails.getTags());
-    } else {
-      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    return headObject(key, 0);
+  }
+
+  /**
+   * Returns metadata for a completed multipart part when {@code partNumber > 0}.
+   */
+  public OzoneKey headObject(String key, int partNumber) throws IOException {
+    OzoneKeyDetails ozoneKeyDetails = getKey(key);
+    if (partNumber <= 0) {
+      return toHeadOzoneKey(ozoneKeyDetails, ozoneKeyDetails.getDataSize());
     }
+
+    Map<Integer, Part> parts = partList.get(key);
+    if (parts == null || !parts.containsKey(partNumber)) {
+      throw new OMException("Invalid part number " + partNumber,
+          ResultCodes.INVALID_PART);
+    }
+    return toHeadOzoneKey(ozoneKeyDetails, parts.get(partNumber).getContent().length);
+  }
+
+  /**
+   * Returns part numbers and sizes for a completed multipart object from stub state.
+   */
+  public NavigableMap<Integer, Long> getCompletedMultipartPartSizes(String key)
+      throws IOException {
+    getKey(key);
+    Map<Integer, Part> parts = partList.get(key);
+    if (parts == null || parts.isEmpty()) {
+      return Collections.emptyNavigableMap();
+    }
+    NavigableMap<Integer, Long> partSizes = new TreeMap<>();
+    for (Map.Entry<Integer, Part> partEntry : parts.entrySet()) {
+      partSizes.put(partEntry.getKey(), (long) partEntry.getValue().getContent().length);
+    }
+    return partSizes;
+  }
+
+  /**
+   * Test-only helper to add key metadata for compatibility tests.
+   */
+  public void putKeyMetadataForTest(String key, String metadataKey, String metadataValue)
+      throws IOException {
+    OzoneKeyDetails details = getKey(key);
+    Map<String, String> metadata = new HashMap<>(details.getMetadata());
+    metadata.put(metadataKey, metadataValue);
+    keyDetails.put(key, new OzoneKeyDetails(
+        details.getVolumeName(),
+        details.getBucketName(),
+        details.getName(),
+        details.getDataSize(),
+        details.getCreationTime().toEpochMilli(),
+        details.getModificationTime().toEpochMilli(),
+        details.getOzoneKeyLocations(),
+        details.getReplicationConfig(),
+        metadata,
+        details.getFileEncryptionInfo(),
+        () -> readKey(key),
+        details.isFile(),
+        details.getOwner(),
+        details.getTags(),
+        details.getGeneration()));
+  }
+
+  private static OzoneKey toHeadOzoneKey(OzoneKeyDetails details, long dataSize) {
+    return new OzoneKey(details.getVolumeName(),
+        details.getBucketName(),
+        details.getName(),
+        dataSize,
+        details.getCreationTime().toEpochMilli(),
+        details.getModificationTime().toEpochMilli(),
+        details.getReplicationConfig(),
+        details.getMetadata(),
+        details.isFile(),
+        details.getOwner(),
+        details.getTags());
   }
 
   @Override
@@ -580,6 +713,12 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  public OzoneOutputStream createMultipartKey(String key, long size, int partNumber, String uploadID,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createMultipartKey(key, size, partNumber, uploadID), derivedKeyPiggyBacking);
+  }
+
+  @Override
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String key,
       String uploadID, Map<Integer, String> partsMap) throws IOException {
 
@@ -609,6 +748,9 @@ public final class OzoneBucketStub extends OzoneBucket {
         keyContents.put(key, output.toByteArray());
       }
 
+      Map<String, String> metadata = new HashMap<>(keyToMultipartUpload.get(key).getMetadata());
+      metadata.put(ETAG, DigestUtils.sha256Hex(output.toByteArray()) + "-" + partsMap.size());
+
       keyDetails.put(key, new OzoneKeyDetails(
           getVolumeName(),
           getName(),
@@ -617,7 +759,7 @@ public final class OzoneBucketStub extends OzoneBucket {
           System.currentTimeMillis(),
           System.currentTimeMillis(),
           new ArrayList<>(), getReplicationConfig(),
-          keyToMultipartUpload.get(key).getMetadata(), null,
+          metadata, null,
           () -> readKey(key), true,
           UserGroupInformation.getCurrentUser().getShortUserName(),
           keyToMultipartUpload.get(key).getTags()

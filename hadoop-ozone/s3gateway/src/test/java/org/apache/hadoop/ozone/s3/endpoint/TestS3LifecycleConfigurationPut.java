@@ -24,6 +24,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
@@ -56,6 +57,8 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 /**
@@ -107,22 +110,39 @@ public class TestS3LifecycleConfigurationPut {
   @Test
   public void testPutInvalidLifecycleConfiguration() throws Exception {
     testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withoutAction,
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
     testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withoutFilter,
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
     testInvalidLifecycleConfiguration(this::useDuplicateTagInAndOperator,
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
     testInvalidLifecycleConfiguration(this::usePrefixTagWithoutAndOperatorInFilter,
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
     testInvalidLifecycleConfiguration(this::usePrefixAndOperatorCoExistInFilter,
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
     testInvalidLifecycleConfiguration(this::usePrefixFilterCoExist,
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
     testInvalidLifecycleConfiguration(this::useAndOperatorOnlyOnePrefix,
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
     testInvalidLifecycleConfiguration(this::useAndOperatorOnlyOneTag,
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
     testInvalidLifecycleConfiguration(this::useEmptyAndOperator,
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
+    testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withExpirationZeroDays,
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
+    testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withExpirationDaysAndDate,
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
+    testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withEmptyFilterAndInvalidDate,
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationPropagatesOmInvalidRequest()
+      throws Exception {
+    // OM also raises INVALID_REQUEST for conditions that are not rejected rule values, such as the
+    // bucket layout mismatch in OMLifecycleConfigurationSetRequest. Those keep reporting
+    // InvalidRequest instead of being remapped to InvalidArgument.
+    assertUnhandledOMExceptionPropagated(
+        new OMException("Bucket layout mismatch", OMException.ResultCodes.INVALID_REQUEST),
         HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
   }
 
@@ -135,6 +155,16 @@ public class TestS3LifecycleConfigurationPut {
       assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
       assertEquals(MALFORMED_XML.getCode(), ex.getCode());
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"enabled", "disabled", "invalid"})
+  public void testPutLifecycleConfigurationWithInvalidStatus(String status)
+      throws Exception {
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.put("bucket1", withStatus(status)));
+    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+    assertEquals(MALFORMED_XML.getCode(), ex.getCode());
   }
 
   private void testInvalidLifecycleConfiguration(Supplier<InputStream> inputStream,
@@ -164,13 +194,14 @@ public class TestS3LifecycleConfigurationPut {
       fail();
     } catch (OS3Exception ex) {
       assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
-      assertEquals(INVALID_REQUEST.getCode(), ex.getCode());
+      assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
     }
   }
 
   @Test
   public void testPutValidLifecycleConfiguration() throws Exception {
-    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", onePrefix()).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", withStatus("Enabled")).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", withStatus("Disabled")).getStatus());
     assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", emptyPrefix()).getStatus());
     assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", oneTag()).getStatus());
     assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", twoTagsInAndOperator()).getStatus());
@@ -256,12 +287,12 @@ public class TestS3LifecycleConfigurationPut {
     // Test with zero days - should fail
     testInvalidLifecycleConfiguration(
         TestS3LifecycleConfigurationPut::withAbortZeroDays,
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
 
     // Test with negative days - should fail
     testInvalidLifecycleConfiguration(
         TestS3LifecycleConfigurationPut::withAbortNegativeDays,
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
   }
 
   private static InputStream onePrefix() {
@@ -291,6 +322,48 @@ public class TestS3LifecycleConfigurationPut {
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
 
+  private static InputStream withExpirationZeroDays() {
+    String xml = (
+        "<LifecycleConfiguration xmlns=\"http://s3.amazonaws" +
+        ".com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>zero-days</ID>" +
+        "<Prefix>prefix/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration><Days>0</Days></Expiration>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>");
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withExpirationDaysAndDate() {
+    String xml = (
+        "<LifecycleConfiguration xmlns=\"http://s3.amazonaws" +
+        ".com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>days-and-date</ID>" +
+        "<Prefix>prefix/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration><Days>30</Days><Date>2044-01-19T00:00:00+00:00</Date></Expiration>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>");
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withEmptyFilterAndInvalidDate() {
+    String xml = (
+        "<LifecycleConfiguration xmlns=\"http://s3.amazonaws" +
+        ".com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>empty-filter-invalid-date</ID>" +
+        "<Filter></Filter>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration><Date>2023-03-03</Date></Expiration>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>");
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
   private static InputStream withoutStatus() {
     String xml = (
         "<LifecycleConfiguration xmlns=\"http://s3.amazonaws" +
@@ -301,6 +374,19 @@ public class TestS3LifecycleConfigurationPut {
         "<Expiration><Days>30</Days></Expiration>" +
         "</Rule>" +
         "</LifecycleConfiguration>");
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withStatus(String status) {
+    String xml =
+        "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+            "<Rule>" +
+            "<ID>remove logs after 30 days</ID>" +
+            "<Prefix>prefix/</Prefix>" +
+            "<Status>" + status + "</Status>" +
+            "<Expiration><Days>30</Days></Expiration>" +
+            "</Rule>" +
+            "</LifecycleConfiguration>";
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
 

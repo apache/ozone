@@ -79,7 +79,7 @@ public final class S3SecurityUtil {
   /**
    * Construct and return {@link OzoneTokenIdentifier} from {@link OMRequest}.
    */
-  private static OzoneTokenIdentifier constructS3Token(OMRequest omRequest) {
+  public static OzoneTokenIdentifier constructS3Token(OMRequest omRequest) {
     S3Authentication auth = omRequest.getS3Authentication();
     OzoneTokenIdentifier s3Token = new OzoneTokenIdentifier();
     s3Token.setTokenType(S3AUTHINFO);

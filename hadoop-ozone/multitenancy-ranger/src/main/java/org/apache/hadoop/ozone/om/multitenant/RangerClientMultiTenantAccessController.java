@@ -32,6 +32,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -61,6 +62,7 @@ public class RangerClientMultiTenantAccessController implements
 
   private static final int HTTP_STATUS_CODE_UNAUTHORIZED = 401;
   private static final int HTTP_STATUS_CODE_BAD_REQUEST = 400;
+  private static final int HTTP_STATUS_CODE_NOT_FOUND = 404;
 
   private final RangerClient client;
   private final String rangerServiceName;
@@ -137,13 +139,6 @@ public class RangerClientMultiTenantAccessController implements
       // set back the expected login user
       UserGroupInformation.setLoginUser(loginUser);
     }
-
-    // Whether or not the Ranger credentials are valid is unknown right after
-    // RangerClient initialization here. Because RangerClient does not perform
-    // any authentication at this point just yet.
-    //
-    // If the credentials are invalid, RangerClient later throws 401 in every
-    // single request to Ranger.
   }
 
   /**
@@ -170,6 +165,40 @@ public class RangerClientMultiTenantAccessController implements
       }
     }
   }
+
+  /**
+   * Returns true if the RangerServiceException indicates a not-found condition
+   * (HTTP 404). Used to implement tolerant delete operations.
+   */
+  private static boolean isNotFoundException(RangerServiceException e) {
+    return e.getStatus() != null
+        && e.getStatus().getStatusCode() == HTTP_STATUS_CODE_NOT_FOUND;
+  }
+
+  /**
+   * Returns true if the RangerServiceException indicates the role did not
+   * exist at delete time, handling the Ranger 2.8 compatibility quirk.
+   */
+  private static boolean isRoleNotFoundException(RangerServiceException e) {
+    if (isNotFoundException(e)) {
+      return true;
+    }
+    if (e.getStatus() == null
+        || e.getStatus().getStatusCode() != HTTP_STATUS_CODE_BAD_REQUEST) {
+      return false;
+    }
+    String message = e.getMessage();
+    if (message == null) {
+      return false;
+    }
+    String lowerMessage = message.toLowerCase(Locale.ROOT);
+    return lowerMessage.contains("role with name")
+        && lowerMessage.contains("does not exist");
+  }
+
+  // =========================================================================
+  // Policy operations
+  // =========================================================================
 
   @Override
   public Policy createPolicy(Policy policy) throws IOException {
@@ -248,10 +277,19 @@ public class RangerClientMultiTenantAccessController implements
     try {
       client.deletePolicy(rangerServiceName, policyName);
     } catch (RangerServiceException e) {
+      if (isNotFoundException(e)) {
+        LOG.warn("Policy {} not found in Ranger during delete - assuming already deleted.",
+            policyName);
+        return;
+      }
       decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
   }
+
+  // =========================================================================
+  // Role operations
+  // =========================================================================
 
   @Override
   public Role createRole(Role role) throws IOException {
@@ -292,8 +330,6 @@ public class RangerClientMultiTenantAccessController implements
       LOG.debug("Sending update request for role ID {} to Ranger.",
           roleId);
     }
-    // TODO: Check if createdByUser is even needed for updateRole request.
-    //  If not, remove the createdByUser param and set it after.
     final RangerRole rangerRole;
     try {
       rangerRole = client.updateRole(roleId, toRangerRole(role, shortName));
@@ -313,6 +349,11 @@ public class RangerClientMultiTenantAccessController implements
     try {
       client.deleteRole(roleName, shortName, rangerServiceName);
     } catch (RangerServiceException e) {
+      if (isRoleNotFoundException(e)) {
+        LOG.warn("Role {} not found in Ranger during delete - assuming already deleted.",
+            roleName);
+        return;
+      }
       decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
@@ -327,11 +368,14 @@ public class RangerClientMultiTenantAccessController implements
       decodeRSEStatusCodes(e);
       throw new IOException(e);
     }
-    // If the login user doesn't have sufficient privilege, policyVersion
-    // field could be null in RangerService.
+    // If the login user doesn't have sufficient privilege, policyVersion field could be null in RangerService.
     final Long policyVersion = rangerOzoneService.getPolicyVersion();
     return policyVersion == null ? -1L : policyVersion;
   }
+
+  // =========================================================================
+  // Private conversion helpers
+  // =========================================================================
 
   private static List<RangerRole.RoleMember> toRangerRoleMembers(
       Map<String, Boolean> members) {
@@ -433,23 +477,20 @@ public class RangerClientMultiTenantAccessController implements
     rangerPolicy.setService(rangerServiceName);
     rangerPolicy.setPolicyLabels(new ArrayList<>(policy.getLabels()));
 
-    // Add resources.
+    // Add resources — always use new ArrayList to ensure mutability.
     Map<String, RangerPolicy.RangerPolicyResource> resource = new HashMap<>();
-    // Add volumes.
     if (!policy.getVolumes().isEmpty()) {
       RangerPolicy.RangerPolicyResource volumeResources =
           new RangerPolicy.RangerPolicyResource();
       volumeResources.setValues(new ArrayList<>(policy.getVolumes()));
       resource.put("volume", volumeResources);
     }
-    // Add buckets.
     if (!policy.getBuckets().isEmpty()) {
       RangerPolicy.RangerPolicyResource bucketResources =
           new RangerPolicy.RangerPolicyResource();
       bucketResources.setValues(new ArrayList<>(policy.getBuckets()));
       resource.put("bucket", bucketResources);
     }
-    // Add keys.
     if (!policy.getKeys().isEmpty()) {
       RangerPolicy.RangerPolicyResource keyResources =
           new RangerPolicy.RangerPolicyResource();
@@ -462,39 +503,50 @@ public class RangerClientMultiTenantAccessController implements
       rangerPolicy.setDescription(policy.getDescription().get());
     }
 
+    // Use an explicit mutable ArrayList for policy items to prevent
+    // UnsupportedOperationException when Ranger model returns unmodifiable list.
+    List<RangerPolicy.RangerPolicyItem> policyItems = new ArrayList<>();
+
     // Add users to the policy.
     for (Map.Entry<String, Collection<Acl>> userAcls:
         policy.getUserAcls().entrySet()) {
       RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
-      item.setUsers(Collections.singletonList(userAcls.getKey()));
+      item.setUsers(new ArrayList<>(Collections.singletonList(userAcls.getKey())));
 
+      // Use mutable ArrayList for accesses.
+      List<RangerPolicy.RangerPolicyItemAccess> accesses = new ArrayList<>();
       for (Acl acl: userAcls.getValue()) {
         RangerPolicy.RangerPolicyItemAccess access =
             new RangerPolicy.RangerPolicyItemAccess();
         access.setIsAllowed(acl.isAllowed());
         access.setType(aclToString.get(acl.getAclType()));
-        item.getAccesses().add(access);
+        accesses.add(access);
       }
-
-      rangerPolicy.getPolicyItems().add(item);
+      item.setAccesses(accesses);
+      policyItems.add(item);
     }
 
     // Add roles to the policy.
     for (Map.Entry<String, Collection<Acl>> roleAcls:
         policy.getRoleAcls().entrySet()) {
       RangerPolicy.RangerPolicyItem item = new RangerPolicy.RangerPolicyItem();
-      item.setRoles(Collections.singletonList(roleAcls.getKey()));
+      item.setRoles(new ArrayList<>(Collections.singletonList(roleAcls.getKey())));
 
+      // Use mutable ArrayList for accesses.
+      List<RangerPolicy.RangerPolicyItemAccess> accesses = new ArrayList<>();
       for (Acl acl: roleAcls.getValue()) {
         RangerPolicy.RangerPolicyItemAccess access =
             new RangerPolicy.RangerPolicyItemAccess();
         access.setIsAllowed(acl.isAllowed());
         access.setType(aclToString.get(acl.getAclType()));
-        item.getAccesses().add(access);
+        accesses.add(access);
       }
-
-      rangerPolicy.getPolicyItems().add(item);
+      item.setAccesses(accesses);
+      policyItems.add(item);
     }
+
+    // Set the fully populated mutable list on rangerPolicy.
+    rangerPolicy.setPolicyItems(policyItems);
 
     return rangerPolicy;
   }

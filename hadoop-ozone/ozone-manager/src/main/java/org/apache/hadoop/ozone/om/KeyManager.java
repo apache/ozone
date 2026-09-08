@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
@@ -89,6 +90,33 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   OmKeyInfo getKeyInfo(OmKeyArgs args, ResolvedBucket buctket,
       String clientAddress) throws IOException;
+
+  /**
+   * List the status for a file or a directory and its contents.
+   * Optionally skips pipeline refresh for callers that only need metadata.
+   *
+   * @param args       Key args
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @param clientAddress a hint to key manager, order the datanode in returned
+   *                      pipeline by distance between client and datanode.
+   * @param allowPartialPrefixes if partial prefixes should be allowed,
+   *                             this is needed in context of ListKeys
+   * @param refreshPipelineInfo if true, update pipeline location information
+   *                            using SCM-backed cache; if false, skip it
+   * @return list of file status
+   * @throws IOException if file or bucket or volume does not exist
+   */
+  default List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
+      String startKey, long numEntries, String clientAddress,
+      boolean allowPartialPrefixes, boolean refreshPipelineInfo)
+      throws IOException {
+    return listStatus(args, recursive, startKey, numEntries, clientAddress,
+        allowPartialPrefixes);
+  }
 
   /**
    * Returns a list of keys represented by {@link OmKeyInfo}

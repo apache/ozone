@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.admin.scm.GetScmRatisRolesSubcommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,70 @@ public class TestGetScmRatisRolesSubcommand {
           "bigdata-ozone-online32 |    9894    |  LEADER  | e428ca07-b2a3-4756-bf9b-a4abb033c7d1");
       assertThat(capture.getOutput()).contains(
           "bigdata-ozone-online30 |    9894    | FOLLOWER | 41f90734-b3ee-4284-ad96-40a286654952");
+    }
+  }
+
+  @Test
+  public void testGetScmRolesNonRatisShortStringTable() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--table");
+
+    List<String> result = new ArrayList<>();
+    result.add("host:9894");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      assertThat(capture.getOutput())
+          .containsPattern("\\|\\s+host\\s+\\|\\s+9894\\s+\\|");
+    }
+  }
+
+  @Test
+  public void testGetScmRolesNonRatisShortStringJson() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+
+    List<String> result = new ArrayList<>();
+    result.add("host:9894");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      assertThat(JsonUtils.readTree(capture.getOutput())).isEqualTo(
+          JsonUtils.readTree("{\"host\":{\"address\":\"host:9894\"}}"));
+    }
+  }
+
+  @Test
+  public void testGetScmHARatisRolesIPv6() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--table");
+
+    List<String> result = new ArrayList<>();
+    result.add("[2001:db8::1]:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:[2001:db8:0:0:0:0:0:1]");
+    result.add("[2001:db8::2]:9894:FOLLOWER:61b1c8e5-da40-4567-8a17-96a0234ba14e:[2001:db8:0:0:0:0:0:2]");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      assertThat(capture.getOutput()).contains("2001:db8::1");
+      assertThat(capture.getOutput()).contains("9894");
+      assertThat(capture.getOutput()).contains("LEADER");
+      assertThat(capture.getOutput()).contains("e428ca07-b2a3-4756-bf9b-a4abb033c7d1");
+      assertThat(capture.getOutput()).contains("FOLLOWER");
     }
   }
 

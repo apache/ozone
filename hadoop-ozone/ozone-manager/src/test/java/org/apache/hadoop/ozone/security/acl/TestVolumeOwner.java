@@ -143,7 +143,7 @@ public class TestVolumeOwner {
               false);
           keyArgs.setLocationInfoList(
               keySession.getKeyInfo().getLatestVersionLocations()
-                  .getLocationList());
+                  .createLocationList());
           writeClient.commitKey(keyArgs, keySession.getId());
         }
       }

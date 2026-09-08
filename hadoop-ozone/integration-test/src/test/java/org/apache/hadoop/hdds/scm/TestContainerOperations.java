@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -54,11 +55,14 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class tests container operations (TODO currently only supports create)
@@ -67,6 +71,7 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class TestContainerOperations implements NonHATests.TestCase {
 
+  private static final Logger LOG = LoggerFactory.getLogger(TestContainerOperations.class);
   private static final int CONTAINER_LIST_LIMIT = 1;
 
   private ScmClient storageClient;
@@ -87,9 +92,8 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
 
   @Test
   void testContainerStateMachineIdempotency() throws Exception {
-    ContainerWithPipeline container = storageClient.createContainer(HddsProtos
-        .ReplicationType.RATIS, HddsProtos.ReplicationFactor
-        .ONE, OzoneConsts.OZONE);
+    ContainerWithPipeline container = storageClient.createContainer(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);
@@ -126,9 +130,8 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
    */
   @Test
   public void testCreate() throws Exception {
-    ContainerWithPipeline container = storageClient.createContainer(HddsProtos
-        .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
-        .ONE, OzoneConsts.OZONE);
+    ContainerWithPipeline container = storageClient.createContainer(
+        StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
     assertEquals(container.getContainerInfo().getContainerID(), storageClient
         .getContainer(container.getContainerInfo().getContainerID())
         .getContainerID());
@@ -141,9 +144,8 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
   public void testListContainerExceedMaxAllowedCountOperations() throws Exception {
     // create n+1 containers
     for (int i = 0; i < CONTAINER_LIST_LIMIT + 1; i++) {
-      storageClient.createContainer(HddsProtos
-          .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
-          .ONE, OzoneConsts.OZONE);
+      storageClient.createContainer(
+          StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
     }
 
     int count = storageClient.listContainer(0, CONTAINER_LIST_LIMIT + 1)
@@ -195,12 +197,23 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     List<? extends DatanodeDetails> dnList = nodeManager.getAllNodes();
 
     for (DatanodeDetails dn : dnList) {
-      List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
-              storageClient.getDatanodeUsageInfo(
-                      dn.getIpAddress(), dn.getUuidString());
+      GenericTestUtils.waitFor(() -> {
+        try {
+          List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
+              storageClient.getDatanodeUsageInfo(dn.getIpAddress(), dn.getUuidString());
 
-      assertEquals(1, usageInfoList.size());
-      assertEquals(nodeManager.getContainers(dn).size(), usageInfoList.get(0).getContainerCount());
+          assertEquals(1, usageInfoList.size());
+
+          long expected = nodeManager.getContainers(dn).size();
+          long actual = usageInfoList.get(0).getContainerCount();
+          LOG.info("Container count expected: {}, actual: {}, dn: {}", expected, actual, dn.getUuidString());
+
+          return expected == actual;
+        } catch (Exception e) {
+          LOG.info("Failed to get container count", e);
+          return false;
+        }
+      }, 1000, 30_000);
     }
   }
 

@@ -149,8 +149,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   protected void init() {
     super.init();
     ObjectOperationHandler chain = ObjectOperationHandlerChain.newBuilder(this)
+        .add(new ObjectGetTorrentHandler())
         .add(new ObjectAclHandler())
         .add(new ObjectTaggingHandler())
+        .add(new ObjectAttributesHandler())
         .add(new MultipartKeyHandler())
         .add(this)
         .build();
@@ -269,6 +271,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           length, amzDecodedLength, keyPath);
       multiDigestInputStream = chunkInputStreamInfo.getMultiDigestInputStream();
       length = chunkInputStreamInfo.getEffectiveLength();
+      final boolean wantDerivedKey = chunkInputStreamInfo.isChunkSignatureVerificationRequired();
 
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
@@ -283,7 +286,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, getChunkSize(),
                 customMetadata, tags, multiDigestInputStream, getHeaders(),
-                signatureInfo.isSignPayload(), perf, writeConditions);
+                signatureInfo.isSignPayload(), perf, writeConditions,
+                wantDerivedKey,
+                derivedKey -> attachChunkValidator(chunkInputStreamInfo, keyPath, derivedKey));
         md5Hash = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
@@ -293,11 +298,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         try (S3ObjectWriteGuard output =
             new S3ObjectWriteGuard(openKeyForPut(
                 volume.getName(), bucketName, keyPath, expectedLength,
-                replicationConfig, customMetadata, tags, writeConditions),
+                replicationConfig, customMetadata, tags, writeConditions, wantDerivedKey),
                 expectedLength, keyPath)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
+          output.onKeyOpened(derivedKey -> attachChunkValidator(chunkInputStreamInfo, keyPath, derivedKey));
           putLength = output.copyFrom(multiDigestInputStream, getIOBufferSize(expectedLength));
           md5Hash = DatatypeConverter.printHexBinary(
                   multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
@@ -395,7 +401,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
           getClientProtocol().getS3KeyDetails(bucketName, keyPath);
 
-      isFile(keyPath, keyDetails);
+      validateFileKey(keyPath, keyDetails);
 
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
           getHeaders(), keyPath, keyDetails, S3ConditionalRequest.PreconditionContext.READ);
@@ -646,7 +652,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getClientProtocol().headS3Object(bucketName, keyPath, partNumber) :
           getClientProtocol().headS3Object(bucketName, keyPath);
 
-      isFile(keyPath, key);
+      validateFileKey(keyPath, key);
       Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
           getHeaders(), keyPath, key, S3ConditionalRequest.PreconditionContext.READ);
       if (conditionalResponse != null) {
@@ -686,22 +692,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     getMetrics().updateHeadKeySuccessStats(startNanos);
     auditReadSuccess(s3GAction);
     return response.build();
-  }
-
-  private void isFile(String keyPath, OzoneKey key) throws OMException {
-    /*
-      Necessary for directories in buckets with FSO layout.
-      Intended for apps which use Hadoop S3A.
-      Example of such app is Trino (through Hive connector).
-     */
-    boolean isFsoDirCreationEnabled = getOzoneConfiguration()
-        .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-            OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT);
-    if (isFsoDirCreationEnabled &&
-        !key.isFile() &&
-        !keyPath.endsWith("/")) {
-      throw new OMException(ResultCodes.KEY_NOT_FOUND);
-    }
   }
 
   /**
@@ -930,6 +920,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           body, length, amzDecodedLength, key);
       multiDigestInputStream = chunkInputStreamInfo.getMultiDigestInputStream();
       length = chunkInputStreamInfo.getEffectiveLength();
+      final boolean wantDerivedKey = chunkInputStreamInfo.isChunkSignatureVerificationRequired();
 
       copyHeader = getHeaders().getHeaderString(COPY_SOURCE_HEADER);
       ReplicationConfig replicationConfig = getReplicationConfig(ozoneBucket);
@@ -945,7 +936,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         perf.appendStreamMode();
         return ObjectEndpointStreaming
             .createMultipartKey(ozoneBucket, key, length, partNumber,
-                uploadID, getChunkSize(), multiDigestInputStream, perf, getHeaders());
+                uploadID, getChunkSize(), multiDigestInputStream, perf, getHeaders(),
+                wantDerivedKey,
+                derivedKey -> attachChunkValidator(chunkInputStreamInfo, key, derivedKey));
       }
       // OmMultipartCommitUploadPartInfo can only be gotten after the
       // OzoneOutputStream is closed, so we need to save the OzoneOutputStream
@@ -1033,11 +1026,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       } else {
         long putLength;
         final long expectedLength = length;
-        OzoneOutputStream ozoneOutputStream = getClientProtocol()
-            .createMultipartKey(volume.getName(), bucketName, key, expectedLength, partNumber, uploadID);
+        OzoneOutputStream ozoneOutputStream = getClientProtocol().createMultipartKey(
+            volume.getName(), bucketName, key, expectedLength, partNumber, uploadID, wantDerivedKey);
         try (S3ObjectWriteGuard writeGuard = new S3ObjectWriteGuard(ozoneOutputStream, expectedLength, key)) {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
+          writeGuard.onKeyOpened(derivedKey -> attachChunkValidator(chunkInputStreamInfo, key, derivedKey));
           putLength = writeGuard.copyFrom(multiDigestInputStream, getIOBufferSize(expectedLength));
           byte[] digest = multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest();
           String md5Hash = DatatypeConverter.printHexBinary(digest).toLowerCase();
@@ -1124,7 +1118,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       final long expectedLength = srcKeyLen;
       try (S3ObjectWriteGuard dest = new S3ObjectWriteGuard(openKeyForPut(
           volume.getName(), destBucket, destKey, expectedLength,
-          replication, metadata, tags, writeConditions), expectedLength, destKey)) {
+          replication, metadata, tags, writeConditions, false), expectedLength, destKey)) {
         long metadataLatencyNs =
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -1160,13 +1154,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);
+      // Metadata directive is read up front: a self-copy is legal when metadata
+      // is being replaced (x-amz-metadata-directive: REPLACE).
+      String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
+      boolean replacingMetadata = CopyDirective.REPLACE.name().equals(metadataCopyDirective);
+
       // Checking whether we trying to copying to it self.
-      if (sourceBucket.equals(destBucket) && sourceKey
-          .equals(destkey)) {
-        // When copying to same storage type when storage type is provided,
-        // we should not throw exception, as aws cli checks if any of the
-        // options like storage type are provided or not when source and
-        // dest are given same
+      if (sourceBucket.equals(destBucket) && sourceKey.equals(destkey)
+          && !replacingMetadata) {
+        // Self-copy without a metadata replacement. AWS still allows it
+        // when a storage class is provided (aws cli passes storage type), so
+        // only the default-storage-type case is rejected.
         if (storageTypeDefault) {
           OS3Exception ex = newError(S3ErrorTable.INVALID_REQUEST, copyHeader);
           ex.setErrorMessage("This copy request is illegal because it is " +
@@ -1214,7 +1212,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       // Custom metadata in copyObject with metadata directive
       Map<String, String> customMetadata;
-      String metadataCopyDirective = getHeaders().getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
       if (StringUtils.isEmpty(metadataCopyDirective) || metadataCopyDirective.equals(CopyDirective.COPY.name())) {
         // The custom metadata will be copied from the source key
         customMetadata = sourceKeyDetails.getMetadata();
@@ -1274,27 +1271,28 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
   /**
    * Opens a key for put, applying conditional write logic based on
-   * If-None-Match and If-Match headers.
+   * If-None-Match and If-Match headers. Only signed multi-chunk uploads ask OM to piggyback
+   * the derived signing key (HDDS-15140); every other PUT passes false.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OzoneOutputStream openKeyForPut(String volumeName, String bucketName, String keyPath, long length,
       ReplicationConfig replicationConfig, Map<String, String> customMetadata,
       Map<String, String> tags,
-      S3ConditionalRequest.WriteConditions writeConditions)
+      S3ConditionalRequest.WriteConditions writeConditions, boolean derivedKeyPiggyBacking)
       throws IOException {
     if (writeConditions.hasIfNoneMatch()) {
       return getClientProtocol().createKeyIfNotExists(
           volumeName, bucketName, keyPath, length, replicationConfig,
-          customMetadata, tags);
+          customMetadata, tags, derivedKeyPiggyBacking);
     } else if (writeConditions.hasIfMatch()) {
       return getClientProtocol().rewriteKeyIfMatch(
           volumeName, bucketName, keyPath, length,
           writeConditions.getExpectedETag(),
-          replicationConfig, customMetadata, tags);
+          replicationConfig, customMetadata, tags, derivedKeyPiggyBacking);
     } else {
       return getClientProtocol().createKey(
           volumeName, bucketName, keyPath, length, replicationConfig,
-          customMetadata, tags);
+          customMetadata, tags, derivedKeyPiggyBacking);
     }
   }
 

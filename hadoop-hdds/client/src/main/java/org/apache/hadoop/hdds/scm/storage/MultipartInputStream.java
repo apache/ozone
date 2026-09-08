@@ -174,7 +174,9 @@ public class MultipartInputStream extends ExtendedInputStream {
     }
 
     // Reset the previous partStream's position
-    partStreams.get(prevPartIndex).seek(0);
+    if (prevPartIndex != partIndex) {
+      partStreams.get(prevPartIndex).seek(0);
+    }
 
     // Reset all the partStreams above the partIndex. We do this to reset
     // any previous reads which might have updated the higher part

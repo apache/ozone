@@ -54,8 +54,8 @@ public class TestOMLifecycleSaveScanStateRequest {
     when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
     when(ozoneManager.getVersionManager()).thenReturn(versionManager);
     
-    // Test when ACLs are enabled but user is not admin
-    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    // Test when admin authorization is enabled but user is not admin
+    when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(true);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
 
     OMRequest omRequest = OMRequest.newBuilder()
@@ -80,8 +80,8 @@ public class TestOMLifecycleSaveScanStateRequest {
     when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(true);
     assertDoesNotThrow(() -> request.preExecute(ozoneManager));
 
-    // Test when ACLs are disabled
-    when(ozoneManager.getAclsEnabled()).thenReturn(false);
+    // Test when admin authorization is disabled
+    when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(false);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
     assertDoesNotThrow(() -> request.preExecute(ozoneManager));
   }

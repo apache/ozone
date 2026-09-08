@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.security;
+package org.apache.hadoop.ozone.om;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
  * documentation https://docs.aws.amazon.com/general/latest/gr/
  * sigv4-create-canonical-request.html.
  **/
-final class AWSV4AuthValidator {
+public final class AWSV4AuthValidator {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AWSV4AuthValidator.class);
@@ -75,22 +75,13 @@ final class AWSV4AuthValidator {
     }
   }
 
-  /**
-   * Returns signing key.
-   *
-   * @param key
-   * @param strToSign
-   *
-   * SignatureKey = HMAC-SHA256(HMAC-SHA256(HMAC-SHA256(HMAC-SHA256("AWS4" +
-   * "<YourSecretAccessKey>","20130524"),"us-east-1"),"s3"),"aws4_request")
-   *
-   * For more details refer to AWS documentation: https://docs.aws.amazon
-   * .com/AmazonS3/latest/API/sig-v4-header-based-auth.html
-   *
-   * */
-  private static byte[] getSigningKey(String key, String strToSign) {
-    String[] signData = StringUtils.split(StringUtils.split(strToSign,
-        '\n')[2], '/');
+  public static byte[] getSigningKey(String key, String strToSign) {
+    String credentialScope = StringUtils.split(strToSign, '\n')[2];
+    return getSigningKeyFromCredentialScope(key, credentialScope);
+  }
+
+  private static byte[] getSigningKeyFromCredentialScope(String key, String credentialScope) {
+    String[] signData = StringUtils.split(credentialScope, '/');
     String dateStamp = signData[0];
     String regionName = signData[1];
     String serviceName = signData[2];
@@ -105,14 +96,6 @@ final class AWSV4AuthValidator {
     return kSigning;
   }
 
-  /**
-   * Validate request by comparing Signature from request. Returns true if
-   * aws request is legit else returns false.
-   * Signature = HEX(HMAC_SHA256(key, String to Sign))
-   *
-   * For more details refer to AWS documentation: https://docs.aws.amazon.com
-   * /AmazonS3/latest/API/sigv4-streaming.html
-   */
   public static boolean validateRequest(String strToSign, String signature,
       String userKey) {
     String expectedSignature = Hex.encode(sign(getSigningKey(userKey,

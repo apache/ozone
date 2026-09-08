@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.sdk.trace.ReadableSpan;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
@@ -54,6 +56,8 @@ public class TestTraceAllMethod {
       return otherMethod("default");
     }
 
+    String localMethod();
+
     String skippedMethod();
 
     void throwingMethod() throws IOException;
@@ -69,6 +73,11 @@ public class TestTraceAllMethod {
   public static class ServiceImpl implements Service {
 
     private boolean spanActive = false;
+    private SpanKind spanKind;
+
+    public SpanKind lastSpanKind() {
+      return spanKind;
+    }
 
     @Override
     public String otherMethod(String name) {
@@ -93,6 +102,17 @@ public class TestTraceAllMethod {
     public String normalMethod() {
       this.spanActive = Span.current().getSpanContext().isValid();
       return "normal";
+    }
+
+    @Override
+    @InternalSpanKind
+    public String localMethod() {
+      Span span = Span.current();
+      this.spanActive = span.getSpanContext().isValid();
+      if (spanActive) {
+        this.spanKind = ((ReadableSpan) span).getKind();
+      }
+      return "local";
     }
 
     public boolean wasSpanActive() {
