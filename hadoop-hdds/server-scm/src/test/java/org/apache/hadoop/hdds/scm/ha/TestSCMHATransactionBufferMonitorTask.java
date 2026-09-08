@@ -42,6 +42,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
@@ -298,7 +299,6 @@ public class TestSCMHATransactionBufferMonitorTask {
     transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
     transactionBuffer.flush();
 
-    transactionBuffer.lock();
     Thread flusher = new Thread(() -> {
       transactionBuffer.updateLatestTrxInfo(TRX_INFO_T5);
       try {
@@ -307,13 +307,16 @@ public class TestSCMHATransactionBufferMonitorTask {
         throw new RuntimeException(e);
       }
     });
-    flusher.start();
-    waitFor(() -> flusher.getState() == Thread.State.WAITING, 10, 5_000);
+    transactionBuffer.lock();
+    try {
+      flusher.start();
+      waitFor(() -> flusher.getState() == Thread.State.WAITING, 10, 5_000);
 
-    // flush() must not have committed while the buffer lock is held.
-    assertEquals(TRX_INFO_T4, transactionInfoTable.get(TRANSACTION_INFO_KEY));
-
-    transactionBuffer.unlock();
+      // flush() must not have committed while the buffer lock is held.
+      assertEquals(TRX_INFO_T4, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+    } finally {
+      transactionBuffer.unlock();
+    }
     flusher.join(10_000);
     assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
   }
@@ -404,6 +407,75 @@ public class TestSCMHATransactionBufferMonitorTask {
     assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
     try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iterator = stateManager.getReadOnlyIterator()) {
       assertFalse(iterator.hasNext());
+    }
+  }
+
+  /**
+   * Verifies that getReadOnlyIterator does not return a row that a concurrent
+   * flush() has already removed. deletingTxIDs must be captured before creating
+   * the RocksDB iterator to avoid a race where flush() removes the row and resets
+   * deletingTxIDs before it is read.
+   */
+  @Test
+  public void testGetReadOnlyIteratorDoesNotReExposeRowRemovedDuringConcurrentFlush() throws Exception {
+    long txId = 42L;
+    DeletedBlocksTransaction tx = DeletedBlocksTransaction.newBuilder()
+        .setTxID(txId)
+        .setContainerID(1L)
+        .setCount(0)
+        .addLocalID(1L)
+        .build();
+
+    Table<Long, DeletedBlocksTransaction> deletedTable = spy(metadataStore.getDeletedBlocksTXTable());
+    DeletedBlockLogStateManagerImpl stateManager = new DeletedBlockLogStateManagerImpl(
+        deletedTable, statefulServiceConfigTable, mock(ContainerManager.class), transactionBuffer);
+    doAnswer(invocation -> {
+      stateManager.onFlush();
+      return null;
+    }).when(deletedBlockLog).onFlush();
+
+    stateManager.addTransactionsToDB(new ArrayList<>(Collections.singletonList(tx)), null);
+    transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
+    transactionBuffer.flush();
+
+    // Mark txId as hidden and buffer its removal without flushing yet - mirrors the state right
+    // after removeTransactionsFromDB() runs but before the next flush() makes it durable.
+    stateManager.removeTransactionsFromDB(new ArrayList<>(Collections.singletonList(txId)), null);
+
+    // Let the RocksDB iterator take its snapshot (still showing txId, since the removal above is
+    // only buffered, not yet committed), then pause before returning it so a concurrent flush() can
+    // commit the removal and reset deletingTxIDs underneath the already-created iterator.
+    CountDownLatch iteratorSnapshotTaken = new CountDownLatch(1);
+    CountDownLatch releaseIterator = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      Table.KeyValueIterator<Long, DeletedBlocksTransaction> result =
+          (Table.KeyValueIterator<Long, DeletedBlocksTransaction>) invocation.callRealMethod();
+      iteratorSnapshotTaken.countDown();
+      releaseIterator.await(10, TimeUnit.SECONDS);
+      return result;
+    }).when(deletedTable).iterator(any(), any());
+
+    AtomicReference<Table.KeyValueIterator<Long, DeletedBlocksTransaction>> iteratorRef = new AtomicReference<>();
+    Thread reader = new Thread(() -> {
+      try {
+        iteratorRef.set(stateManager.getReadOnlyIterator());
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
+    reader.start();
+    assertTrue(iteratorSnapshotTaken.await(10, TimeUnit.SECONDS),
+        "Timed out waiting for getReadOnlyIterator to take its RocksDB snapshot");
+
+    transactionBuffer.updateLatestTrxInfo(TRX_INFO_T5);
+    transactionBuffer.flush();
+
+    releaseIterator.countDown();
+    reader.join(10_000);
+
+    try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iterator = iteratorRef.get()) {
+      assertFalse(iterator.hasNext(),
+          "getReadOnlyIterator must not re-expose a row that flush() already committed and hid");
     }
   }
 }

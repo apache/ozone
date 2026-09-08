@@ -72,8 +72,8 @@ public class DeletedBlockLogStateManagerImpl
       throws IOException {
     return new Table.KeyValueIterator<Long, DeletedBlocksTransaction>() {
 
-      private final Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter = deletedTable.iterator();
       private final Set<Long> snapshotDeletingTxIDs = deletingTxIDs;
+      private final Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter = deletedTable.iterator();
       private TypedTable.KeyValue<Long, DeletedBlocksTransaction> nextTx;
 
       {
