@@ -49,6 +49,10 @@ import picocli.CommandLine.Option;
  * concurrent load, including in time-based (--duration) runs where paths are
  * reused.
  * <p>
+ * --read-write-ratio tunes the mix: a task still writes a single file, but
+ * reads back as many as the ratio asks for, so a run can be made read-heavy or
+ * write-heavy without changing what any one read validates.
+ * <p>
  * CRC32 keeps the validation off the critical path of the measured throughput.
  * Successive writes of a path differ in the marker only, and markers less than
  * 2^32 apart never share a CRC32, so a stale read is always detected.
@@ -89,6 +93,14 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       defaultValue = "10000")
   private int maxFilesPerThread;
 
+  @Option(names = {"--read-write-ratio"},
+      description = "Number of reads issued per write. 1 pairs one read with every write, 4 makes the run "
+          + "read-heavy with four read-backs of each write, and 0.25 makes it write-heavy with one read-back "
+          + "every fourth write. A ratio that is not a whole number is spread over the writes of a thread "
+          + "rather than rounded on every one of them.",
+      defaultValue = "1.0")
+  private double readWriteRatio;
+
   private ContentGenerator contentGenerator;
 
   private Timer writeTimer;
@@ -112,6 +124,12 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     if (maxFilesPerThread <= 0) {
       throw new IllegalArgumentException(
           "--max-files-per-thread must be positive");
+    }
+    // NaN fails the first test, and an infinite ratio would make a single task
+    // read forever
+    if (!(readWriteRatio > 0) || Double.isInfinite(readWriteRatio)) {
+      throw new IllegalArgumentException(
+          "--read-write-ratio must be a positive finite number");
     }
 
     super.init();
@@ -155,6 +173,17 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     }
     history.record(fileId, checksum);
 
+    for (int reads = history.readsDue(readWriteRatio); reads > 0; reads--) {
+      validateRandomFile(history);
+    }
+  }
+
+  /**
+   * Read back one of the files this thread wrote, picked at random, and verify
+   * that its content still matches the checksum of the latest write of that
+   * path.
+   */
+  private void validateRandomFile(ThreadHistory history) throws Exception {
     long readId = history.randomFileId();
     Path target = objectPath(readId);
     long expected = history.checksumOf(readId);
@@ -215,13 +244,15 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
    * is keyed by file id (an overwrite updates the checksum), so it holds one
    * entry per file the thread wrote and never more than
    * --max-files-per-thread. The id is kept rather than the {@link Path} it maps
-   * to, which {@link #objectPath} rebuilds on demand.
+   * to, which {@link #objectPath} rebuilds on demand. It also carries the
+   * thread's share of the read/write ratio, see {@link #readsDue(double)}.
    */
   private static final class ThreadHistory {
     private final long markerBase;
     private int markerSeq;
     private final Map<Long, Long> checksums = new HashMap<>();
     private final List<Long> fileIds = new ArrayList<>();
+    private double readCredit;
 
     private ThreadHistory(long threadSequenceId) {
       this.markerBase = threadSequenceId << Integer.SIZE;
@@ -258,6 +289,20 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
 
     private long checksumOf(long fileId) {
       return checksums.get(fileId);
+    }
+
+    /**
+     * How many files to read back after the write that just completed. The
+     * fraction a ratio like 2.5 leaves over is carried to the next write
+     * instead of being rounded away, so the thread issues the requested number
+     * of reads per write on average, and a ratio below 1 reads back every
+     * n-th write rather than never reading at all.
+     */
+    private int readsDue(double readsPerWrite) {
+      readCredit += readsPerWrite;
+      int reads = (int) readCredit;
+      readCredit -= reads;
+      return reads;
     }
   }
 }
