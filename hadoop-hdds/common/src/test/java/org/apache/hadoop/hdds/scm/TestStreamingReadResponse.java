@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.junit.jupiter.api.Test;
 
@@ -102,11 +103,9 @@ class TestStreamingReadResponse {
   void wakesOnSignalReady() throws Exception {
     final FakeRequestObserver observer = new FakeRequestObserver();
     final StreamingReadResponse response = newResponse(observer);
-    final CountDownLatch waiting = new CountDownLatch(1);
     final AtomicBoolean result = new AtomicBoolean();
     final Thread waiter = new Thread(() -> {
       try {
-        waiting.countDown();
         result.set(response.awaitReady(TimeUnit.SECONDS.toNanos(30)));
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -115,13 +114,23 @@ class TestStreamingReadResponse {
       }
     });
     waiter.start();
-    assertTrue(waiting.await(10, TimeUnit.SECONDS));
+    awaitBlocked(waiter);
+
+    // a spurious signalReady() while isReady() is still false must not wake the waiter with a wrong result
+    response.signalReady();
+    awaitBlocked(waiter);
+    assertTrue(waiter.isAlive(), "waiter must still be waiting after a spurious signalReady()");
 
     observer.ready.set(true);
     response.signalReady();
     waiter.join(TimeUnit.SECONDS.toMillis(10));
     assertFalse(waiter.isAlive(), "waiter did not return");
     assertTrue(result.get());
+  }
+
+  /** Waits until {@code thread} is actually parked in {@link StreamingReadResponse#awaitReady(long)}. */
+  private static void awaitBlocked(Thread thread) throws Exception {
+    GenericTestUtils.waitFor(() -> thread.getState() == Thread.State.TIMED_WAITING, 10, 10_000);
   }
 
   @Test

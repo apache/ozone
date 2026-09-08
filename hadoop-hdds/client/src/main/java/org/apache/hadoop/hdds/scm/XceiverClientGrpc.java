@@ -579,7 +579,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        throw new InterruptedIOException("Interrupted while waiting for stream to become ready: " + streamObserver);
+        throw (IOException) new InterruptedIOException(
+            "Interrupted while waiting for stream to become ready: " + streamObserver)
+            .initCause(e);
       }
     }
 
