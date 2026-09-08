@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -158,12 +159,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private final Map<DatanodeDetails, Integer> excludedNodes =
       new ConcurrentHashMap<>();
 
+  private final GlobalReconstructionTracker globalReconstructionTracker =
+      new GlobalReconstructionTracker();
+
   /**
    * SCMService related variables.
    * After leaving safe mode, replicationMonitor needs to wait for a while
    * before really take effect.
    */
-  private final Lock serviceLock = new ReentrantLock();
+  private final Lock serviceLifecycleLock = new ReentrantLock();
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
   private final long waitTimeInMillis;
   private long lastTimeToBeReadyInMillis = 0;
@@ -422,6 +426,36 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   }
 
   /**
+   * Returns the number of active EC reconstruction commands currently in
+   * progress across the cluster.
+   */
+  public int getInflightReconstructionCount() {
+    return globalReconstructionTracker.getInflightCount();
+  }
+
+  int getReconstructionPendingFragmentCount(long cmdId) {
+    return globalReconstructionTracker.getPendingFragmentCount(cmdId);
+  }
+
+  /**
+   * Returns the maximum number of inflight reconstruction commands allowed
+   * across the cluster at any given time.
+   * @return the maximum number of inflight reconstruction commands allowed
+   */
+  public int getReconstructionInFlightLimit() {
+    return rmConf.getReconstructionGlobalLimit();
+  }
+
+  /**
+   * Returns true if the number of inflight reconstruction commands has reached
+   * the global limit.
+   * @return true if the limit is reached, false otherwise
+   */
+  public boolean isReconstructionLimitReached() {
+    return globalReconstructionTracker.isLimitReached();
+  }
+
+  /**
    * Sends delete container command for the given container to the given
    * datanode.
    *
@@ -533,20 +567,45 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     sendDatanodeCommand(cmd, containerInfo, source);
   }
 
+  /**
+   * Send a {@link ReconstructECContainersCommand} to a datanode with capacity,
+   * after reserving a cluster-wide reconstruction slot.
+   *
+   * <p>The command may encode multiple missing EC indexes (fragments). One
+   * global slot is reserved per command; {@link #opCompleted} releases it
+   * incrementally as each fragment's pending ADD op completes or expires.
+   *
+   * <p>If the global reconstruction limit is reached, or no target datanode
+   * has spare replication capacity, a {@link CommandTargetOverloadedException}
+   * is thrown and the command is not sent. Callers (e.g.
+   * {@code ECUnderReplicationHandler}) can fall back to 1-1 replication.
+   *
+   * @param containerInfo the container to reconstruct
+   * @param command the reconstruction command to send
+   */
   public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
       ReconstructECContainersCommand command)
       throws CommandTargetOverloadedException, NotLeaderException {
-    List<DatanodeDetails> targets = command.getTargetDatanodes();
-    List<Pair<Integer, DatanodeDetails>> targetWithCmds =
-        getAvailableDatanodesForReplication(targets);
-    if (targetWithCmds.isEmpty()) {
-      metrics.incrECReconstructionCmdsDeferredTotal();
-      throw new CommandTargetOverloadedException("No target with capacity " +
-          "available for reconstruction of " + containerInfo.getContainerID());
-    }
-    DatanodeDetails target = selectAndOptionallyExcludeDatanode(
-        rmConf.getReconstructionCommandWeight(), targetWithCmds);
-    sendDatanodeCommand(command, containerInfo, target);
+    globalReconstructionTracker.reserveAndSend(
+        command.getId(),
+        command.getMissingContainerIndexes().size(),
+        containerInfo.getContainerID(),
+        () -> {
+          // Pick the least-loaded target datanode that can accept the command.
+          List<DatanodeDetails> targets = command.getTargetDatanodes();
+          List<Pair<Integer, DatanodeDetails>> targetWithCmds =
+              getAvailableDatanodesForReplication(targets);
+          if (targetWithCmds.isEmpty()) {
+            metrics.incrECReconstructionCmdsDeferredTotal();
+            throw new CommandTargetOverloadedException("No target with capacity " +
+                "available for reconstruction of " + containerInfo.getContainerID());
+          }
+          DatanodeDetails target = selectAndOptionallyExcludeDatanode(
+              rmConf.getReconstructionCommandWeight(), targetWithCmds);
+          // sendDatanodeCommand schedules one pending ADD per missing index and
+          // increments ecReconstructionCmdsSentTotal.
+          sendDatanodeCommand(command, containerInfo, target);
+        });
   }
 
   private DatanodeDetails selectAndOptionallyExcludeDatanode(
@@ -1059,6 +1118,12 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
   @Override
   public void opCompleted(ContainerReplicaOp op, ContainerID containerID, boolean timedOut) {
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD
+        && op.getCommand() != null
+        && op.getCommand().getType() == Type.reconstructECContainersCommand) {
+      globalReconstructionTracker.onFragmentComplete(op.getCommand().getId());
+    }
+
     if (!(timedOut && op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE)) {
       // We only care about expired delete ops. All others should be ignored.
       return;
@@ -1266,6 +1331,41 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int containerSampleLimit = 100;
 
+    @Config(key = "hdds.scm.replication.decommission.ec.reconstruction.enabled",
+        type = ConfigType.BOOLEAN,
+        defaultValue = "false",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "Reserved for HDDS-15072. When implemented, if true, SCM " +
+            "will switch from 1-1 replication to multi-source reconstruction for " +
+            "EC containers on decommissioning nodes when the node's load exceeds " +
+            "the threshold. Not read by SCM in this release."
+    )
+    private boolean ecDecommissionReconstructionEnabled = false;
+
+    @Config(key = "hdds.scm.replication.decommission.ec.reconstruction.load.factor",
+        type = ConfigType.DOUBLE,
+        defaultValue = "0.9",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "Reserved for HDDS-15072. When implemented, the threshold " +
+            "factor (between 0 and 1) of a node's replication limit at which " +
+            "SCM switches to reconstruction for EC decommission. Not read by " +
+            "SCM in this release. Default is 0.9."
+    )
+    private double ecDecommissionReconstructionLoadFactor = 0.9;
+
+    @Config(key = "hdds.scm.replication.reconstruction.global.limit",
+        type = ConfigType.INT,
+        defaultValue = "0",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "A cluster-wide limit to restrict the total number of " +
+            "active EC reconstruction commands across the cluster. A setting " +
+            "of zero disables global reconstruction limit checking."
+    )
+    private int reconstructionGlobalLimit = 0;
+
     @Config(key = "hdds.scm.replication.quasi.closed.stuck.best.origin.copies",
         type = ConfigType.INT,
         defaultValue = "3",
@@ -1320,6 +1420,30 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public void setDatanodeReplicationLimit(int limit) {
       this.datanodeReplicationLimit = limit;
+    }
+
+    public boolean isEcDecommissionReconstructionEnabled() {
+      return ecDecommissionReconstructionEnabled;
+    }
+
+    public void setEcDecommissionReconstructionEnabled(boolean enabled) {
+      this.ecDecommissionReconstructionEnabled = enabled;
+    }
+
+    public double getEcDecommissionReconstructionLoadFactor() {
+      return ecDecommissionReconstructionLoadFactor;
+    }
+
+    public void setEcDecommissionReconstructionLoadFactor(double factor) {
+      this.ecDecommissionReconstructionLoadFactor = factor;
+    }
+
+    public int getReconstructionGlobalLimit() {
+      return reconstructionGlobalLimit;
+    }
+
+    public void setReconstructionGlobalLimit(int limit) {
+      this.reconstructionGlobalLimit = limit;
     }
 
     public void setMaintenanceRemainingRedundancy(int redundancy) {
@@ -1415,7 +1539,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             + " must be >= datanode.reconstruction.weight: "
             + reconstructionCommandWeight);
       }
-      if (inflightReplicationLimitFactor < 0) {
+      if (!Double.isFinite(inflightReplicationLimitFactor)
+          || inflightReplicationLimitFactor < 0) {
         throw new IllegalArgumentException(
             "inflight.limit.factor is set to " + inflightReplicationLimitFactor
                 + " and must be >= 0");
@@ -1425,12 +1550,28 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             "inflight.limit.factor is set to " + inflightReplicationLimitFactor
                 + " and must be <= 1");
       }
+      if (!Double.isFinite(ecDecommissionReconstructionLoadFactor)
+          || ecDecommissionReconstructionLoadFactor < 0) {
+        throw new IllegalArgumentException(
+            "decommission.ec.reconstruction.load.factor is set to "
+                + ecDecommissionReconstructionLoadFactor + " and must be >= 0");
+      }
+      if (ecDecommissionReconstructionLoadFactor > 1) {
+        throw new IllegalArgumentException(
+            "decommission.ec.reconstruction.load.factor is set to "
+                + ecDecommissionReconstructionLoadFactor + " and must be <= 1");
+      }
+      if (reconstructionGlobalLimit < 0) {
+        throw new IllegalArgumentException(
+            "reconstruction.global.limit is set to " + reconstructionGlobalLimit
+                + " and must be >= 0");
+      }
     }
   }
 
   @Override
   public void notifyStatusChanged() {
-    serviceLock.lock();
+    serviceLifecycleLock.lock();
     try {
       // 1) SCMContext#isLeaderReady returns true.
       // 2) not in safe mode.
@@ -1446,25 +1587,28 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
           // Therefore we should clear the table so RM starts from a clean
           // state.
           containerReplicaPendingOps.clear();
+          // clear() discards pending ops without firing opCompleted, so also
+          // reset the reconstruction tracking that opCompleted maintains.
+          globalReconstructionTracker.clear();
           serviceStatus = ServiceStatus.RUNNING;
         }
       } else {
         serviceStatus = ServiceStatus.PAUSING;
       }
     } finally {
-      serviceLock.unlock();
+      serviceLifecycleLock.unlock();
     }
   }
 
   @Override
   public boolean shouldRun() {
-    serviceLock.lock();
+    serviceLifecycleLock.lock();
     try {
       // If safe mode is off, then this SCMService starts to run with a delay.
       return serviceStatus == ServiceStatus.RUNNING &&
           clock.millis() - lastTimeToBeReadyInMillis >= waitTimeInMillis;
     } finally {
-      serviceLock.unlock();
+      serviceLifecycleLock.unlock();
     }
   }
 
@@ -1589,6 +1733,117 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       LOG.debug("Replication queue is not empty, not waking up replication monitor");
       return false;
     }
+  }
+
+  /**
+   * Cluster-wide EC reconstruction slot accounting.
+   *
+   * <p>All mutations to the inflight reconstruction counter and per-command
+   * fragment map go through this class. External callers do not acquire locks.
+   *
+   * <p>Lock policy:
+   * <ul>
+   *   <li>{@link #reserveAndSend} holds {@link #lock} across reserve, map
+   *       registration, and send so {@link #clear()} on leader transition
+   *       cannot run mid-send.</li>
+   *   <li>{@link #onFragmentComplete} runs without {@link #lock}; it uses
+   *       {@code ConcurrentHashMap.compute} and tolerates a prior
+   *       {@link #clear()}.</li>
+   * </ul>
+   */
+  private final class GlobalReconstructionTracker {
+
+    private final Lock lock = new ReentrantLock();
+    private final AtomicInteger inflightCount = new AtomicInteger(0);
+    private final Map<Long, Integer> pendingFragmentCountByCommandId =
+        new ConcurrentHashMap<>();
+
+    int getInflightCount() {
+      return inflightCount.get();
+    }
+
+    int getPendingFragmentCount(long cmdId) {
+      return pendingFragmentCountByCommandId.getOrDefault(cmdId, 0);
+    }
+
+    boolean isLimitReached() {
+      int limit = getReconstructionInFlightLimit();
+      return limit > 0 && getInflightCount() >= limit;
+    }
+
+    void reserveAndSend(long cmdId, int fragmentCount, long containerId,
+        ReconstructionSendAction send)
+        throws CommandTargetOverloadedException, NotLeaderException {
+      if (fragmentCount <= 0) {
+        throw new IllegalArgumentException(
+            "Reconstruction command " + cmdId + " for container " + containerId
+                + " has no fragments");
+      }
+      lock.lock();
+      try {
+        if (!tryReserve()) {
+          metrics.incrECReconstructionCmdsDeferredTotal();
+          throw new CommandTargetOverloadedException(
+              "Global reconstruction limit (" + getReconstructionInFlightLimit()
+                  + ") reached for container " + containerId);
+        }
+        pendingFragmentCountByCommandId.put(cmdId, fragmentCount);
+        boolean sent = false;
+        try {
+          send.run();
+          sent = true;
+        } finally {
+          if (!sent) {
+            pendingFragmentCountByCommandId.remove(cmdId);
+            releaseSlot();
+          }
+        }
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    void onFragmentComplete(long cmdId) {
+      pendingFragmentCountByCommandId.compute(cmdId, (k, pendingFragments) -> {
+        if (pendingFragments == null) {
+          return null;
+        }
+        if (pendingFragments <= 1) {
+          releaseSlot();
+          return null;
+        }
+        return pendingFragments - 1;
+      });
+    }
+
+    void clear() {
+      lock.lock();
+      try {
+        pendingFragmentCountByCommandId.clear();
+        inflightCount.set(0);
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    private boolean tryReserve() {
+      int limit = getReconstructionInFlightLimit();
+      int current = inflightCount.get();
+      if (limit > 0 && current >= limit) {
+        return false;
+      }
+      inflightCount.incrementAndGet();
+      return true;
+    }
+
+    private void releaseSlot() {
+      inflightCount.updateAndGet(count -> Math.max(0, count - 1));
+    }
+  }
+
+  @FunctionalInterface
+  private interface ReconstructionSendAction {
+    void run() throws CommandTargetOverloadedException, NotLeaderException;
   }
 }
 
