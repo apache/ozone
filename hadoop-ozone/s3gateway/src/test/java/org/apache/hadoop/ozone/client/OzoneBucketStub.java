@@ -89,6 +89,7 @@ public final class OzoneBucketStub extends OzoneBucket {
   private ArrayList<OzoneAcl> aclList = new ArrayList<>();
   private ReplicationConfig replicationConfig;
   private Map<String, OzoneLifecycleConfiguration> lifecyclesMap = new HashMap<>();
+  private byte[] derivedKey;
 
   public static Builder newBuilder() {
     return new Builder();
@@ -115,6 +116,24 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   boolean isEmpty() {
     return keyDetails.isEmpty();
+  }
+
+  public void setDerivedKey(byte[] key) {
+    derivedKey = key == null ? null : key.clone();
+  }
+
+  private OzoneOutputStream addDerivedKey(OzoneOutputStream output, boolean requested) {
+    if (requested && derivedKey != null) {
+      output.setDerivedKey(ByteBuffer.wrap(derivedKey.clone()));
+    }
+    return output;
+  }
+
+  private OzoneDataStreamOutput addDerivedKey(OzoneDataStreamOutput output, boolean requested) {
+    if (requested && derivedKey != null) {
+      output.setDerivedKey(ByteBuffer.wrap(derivedKey.clone()));
+    }
+    return output;
   }
 
   @Override
@@ -174,6 +193,13 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKey(String key, long size, ReplicationConfig rConfig,
+      Map<String, String> metadata, Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createKey(key, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKey(String keyName, long size, long existingKeyGeneration,
       ReplicationConfig rConfig, Map<String, String> metadata) throws IOException {
     final ReplicationConfig repConfig;
@@ -218,6 +244,13 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKeyIfNotExists(String keyName, long size, ReplicationConfig rConfig,
+      Map<String, String> metadata, Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createKeyIfNotExists(keyName, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size,
       String expectedETag, ReplicationConfig rConfig,
       Map<String, String> metadata, Map<String, String> tags)
@@ -236,6 +269,15 @@ public final class OzoneBucketStub extends OzoneBucket {
           ResultCodes.ETAG_MISMATCH);
     }
     return createKey(keyName, size, rConfig, metadata, tags);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size, String expectedETag,
+      ReplicationConfig rConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(rewriteKeyIfMatch(keyName, size, expectedETag, rConfig, metadata, tags),
+        derivedKeyPiggyBacking);
   }
 
   @Override
@@ -291,6 +333,37 @@ public final class OzoneBucketStub extends OzoneBucket {
         };
 
     return new OzoneDataStreamOutputStub(byteBufferStreamOutput, key + size);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createStreamKey(key, size, rConfig, keyMetadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createStreamKeyIfNotExists(key, size, rConfig, keyMetadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(rewriteStreamKeyIfMatch(key, size, expectedETag, rConfig, keyMetadata, tags),
+        derivedKeyPiggyBacking);
+  }
+
+  @Override
+  public OzoneDataStreamOutput createMultipartStreamKey(String key, long size,
+      int partNumber, String uploadID, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createMultipartStreamKey(key, size, partNumber, uploadID), derivedKeyPiggyBacking);
   }
 
   @Override
@@ -637,6 +710,12 @@ public final class OzoneBucketStub extends OzoneBucket {
           };
       return new OzoneOutputStreamStub(keyOutputStream, key + size);
     }
+  }
+
+  @Override
+  public OzoneOutputStream createMultipartKey(String key, long size, int partNumber, String uploadID,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createMultipartKey(key, size, partNumber, uploadID), derivedKeyPiggyBacking);
   }
 
   @Override
