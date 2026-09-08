@@ -19,12 +19,20 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.FailingInputStream;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signatureInfo;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBody;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signingKey;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,9 +55,11 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -67,13 +77,14 @@ public class TestUploadWithStream {
   private ObjectEndpoint rest;
 
   private OzoneClient client;
+  private HttpHeaders headers;
 
   @BeforeEach
   public void setUp() throws Exception {
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(S3BUCKET);
 
-    HttpHeaders headers = mock(HttpHeaders.class);
+    headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
 
@@ -87,6 +98,7 @@ public class TestUploadWithStream {
         .setClient(client)
         .setHeaders(headers)
         .setConfig(conf)
+        .setSignatureInfo(signatureInfo())
         .build();
   }
 
@@ -98,6 +110,26 @@ public class TestUploadWithStream {
   @Test
   public void testUpload() throws Exception {
     assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, S3_COPY_EXISTING_KEY_CONTENT));
+  }
+
+  @Test
+  public void testUploadWithValidSignedChunks() throws Exception {
+    OzoneBucket bucket = configureSignedChunks(S3_COPY_EXISTING_KEY_CONTENT.length());
+
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, signedChunkedBody(S3_COPY_EXISTING_KEY_CONTENT)));
+
+    assertKeyContent(bucket, S3KEY, S3_COPY_EXISTING_KEY_CONTENT);
+  }
+
+  @Test
+  public void testUploadRejectsTamperedSignedChunk() throws Exception {
+    OzoneBucket bucket = configureSignedChunks(S3_COPY_EXISTING_KEY_CONTENT.length());
+    String tamperedBody = signedChunkedBody(S3_COPY_EXISTING_KEY_CONTENT)
+        .replace(S3_COPY_EXISTING_KEY_CONTENT, "X" + S3_COPY_EXISTING_KEY_CONTENT.substring(1));
+
+    assertErrorResponse(S3ErrorTable.SIGNATURE_DOES_NOT_MATCH,
+        () -> put(rest, S3BUCKET, S3KEY, tamperedBody));
+    assertThatThrownBy(() -> bucket.getKey(S3KEY)).isInstanceOf(IOException.class);
   }
 
   @Test
@@ -116,7 +148,8 @@ public class TestUploadWithStream {
               new HashMap<>(), new HashMap<>(), body, rest.getHeaders(), true,
               new AuditLogger.PerformanceStringBuilder(),
               S3ConditionalRequest.parseWriteConditions(rest.getHeaders(),
-                  S3KEY)));
+                  S3KEY),
+              false, derivedKey -> { }));
       assertEquals("upload interrupted", ex.getMessage());
       assertThrows(IOException.class, () -> bucket.getKey(S3KEY));
     }
@@ -143,17 +176,25 @@ public class TestUploadWithStream {
     additionalHeaders
         .put(COPY_SOURCE_HEADER, S3BUCKET + "/" + S3_COPY_EXISTING_KEY);
 
-    HttpHeaders headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
+    HttpHeaders copyHeaders = mock(HttpHeaders.class);
+    when(copyHeaders.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
     additionalHeaders
-        .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));
-    rest.setHeaders(headers);
+        .forEach((k, v) -> when(copyHeaders.getHeaderString(k)).thenReturn(v));
+    rest.setHeaders(copyHeaders);
 
     assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, null));
 
     final long newDataSize = bucket.getKey(S3KEY).getDataSize();
     assertEquals(dataSize, newDataSize);
+  }
+
+  private OzoneBucket configureSignedChunks(int decodedLength) throws IOException {
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    ((OzoneBucketStub) bucket).setDerivedKey(signingKey());
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(decodedLength));
+    return bucket;
   }
 }
