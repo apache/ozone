@@ -18,10 +18,10 @@
 
 import React, { Suspense, useMemo, useState } from 'react';
 import {
+  App,
   Button,
   Dropdown,
   Empty,
-  message,
   Skeleton,
   type MenuProps,
   type TableColumnsType,
@@ -137,6 +137,7 @@ const columns: TableColumnsType<JvmParameter> = [
 ];
 
 const JvmContent: React.FC = () => {
+  const { message } = App.useApp();
   const { data: runtime, isEmpty } = useSuspenseJmxBean<RuntimeBean>(JMX_QUERY.runtime);
 
   const [search, setSearch] = useState('');

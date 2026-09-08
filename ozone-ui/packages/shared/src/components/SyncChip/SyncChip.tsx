@@ -17,7 +17,7 @@
  */
 
 import React, { useState } from 'react';
-import { Dropdown, message, Switch, Tooltip, Typography } from 'antd';
+import { App, Dropdown, Switch, Tooltip, Typography } from 'antd';
 import { colors, radius, semanticColors, spacing, textStyles } from '../../theme/tokens';
 import { useSyncConfig } from '../../data/SyncConfigContext';
 import { fetchJson } from '../../data/fetchJson';
@@ -98,6 +98,7 @@ const rowDescStyle: React.CSSProperties = {
  */
 export const SyncChip: React.FC<SyncChipProps> = ({ lastRefreshedAt, dbSync }) => {
   const { enabled, setEnabled } = useSyncConfig();
+  const { message } = App.useApp();
   const [open, setOpen] = useState(false);
   const [dbSyncing, setDbSyncing] = useState(false);
 
@@ -188,7 +189,7 @@ export const SyncChip: React.FC<SyncChipProps> = ({ lastRefreshedAt, dbSync }) =
     <Dropdown
       open={open}
       onOpenChange={setOpen}
-      overlay={dropdownContent}
+      popupRender={() => dropdownContent}
       trigger={['click']}
       placement="bottomRight"
     >

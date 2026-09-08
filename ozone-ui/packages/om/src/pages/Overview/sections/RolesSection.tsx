@@ -54,14 +54,22 @@ const columns: TableColumnsType<RatisRole> = [
     title: 'Leader Readiness',
     dataIndex: 'readiness',
     key: 'readiness',
-    render: (readiness: RatisRole['readiness']) =>
-      readiness ? (
-        <Chip color={readiness === 'Synced' ? 'green' : 'orange'} size="small">
+    render: (readiness: RatisRole['readiness']) => {
+      if (!readiness) {
+        return (
+          <Chip color="neutral" size="small">
+            —
+          </Chip>
+        );
+      }
+      const color =
+        readiness === 'Synced' ? 'green' : readiness === 'Not Ready' ? 'orange' : 'neutral';
+      return (
+        <Chip color={color} size="small">
           {readiness}
         </Chip>
-      ) : (
-        '—'
-      ),
+      );
+    },
   },
 ];
 

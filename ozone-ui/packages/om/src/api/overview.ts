@@ -16,8 +16,6 @@
  * limitations under the License.
  */
 
-import moment from 'moment';
-
 /**
  * JMX MBean queries used by the Overview sections. Kept in one place so each
  * section references a query by name; sections that share a query (e.g. the OM
@@ -102,14 +100,21 @@ export interface KeyValue {
 
 export type RatisRoleName = 'LEADER' | 'FOLLOWER' | string;
 
+/**
+ * Readiness derived from the bean's leader-status (tuple index 4):
+ * `LEADER_AND_READY` → `Synced`, `LEADER_AND_NOT_READY` → `Not Ready`,
+ * `NOT_LEADER` → `Follower`. `null` when the bean omits the value.
+ */
+export type RatisReadiness = 'Synced' | 'Not Ready' | 'Follower';
+
 export interface RatisRole {
   key: string;
   hostName: string;
   nodeId: string;
   ratisPort: string;
   role: RatisRoleName;
-  /** Derived follower sync state; `null` for the leader row. */
-  readiness: 'Synced' | 'Lagging' | null;
+  /** Leadership readiness reported by the bean; `null` when absent. */
+  readiness: RatisReadiness | null;
   /** True for the node serving this JMX endpoint. */
   isCurrent: boolean;
 }
@@ -131,11 +136,25 @@ export interface JvmParameter {
  * carry at least the first four fields (e.g. the single-element error row the
  * bean returns when there is no leader) are skipped.
  */
+/** Map the bean's leader-status string (tuple index 4) to a readiness label. */
+function readinessFromStatus(raw: string): RatisReadiness | null {
+  switch (raw.toUpperCase()) {
+    case 'LEADER_AND_READY':
+      return 'Synced';
+    case 'LEADER_AND_NOT_READY':
+      return 'Not Ready';
+    case 'NOT_LEADER':
+      return 'Follower';
+    default:
+      return null;
+  }
+}
+
 export function parseRatisRoles(rows: string[][] | undefined, currentNodeId?: string): RatisRole[] {
   return (rows ?? [])
     .filter((row) => Array.isArray(row) && row.length >= 4)
     .map((row, index) => {
-      const [hostName = '', nodeId = '', ratisPort = '', roleRaw = ''] = row;
+      const [hostName = '', nodeId = '', ratisPort = '', roleRaw = '', readinessRaw = ''] = row;
       const role = roleRaw.toUpperCase();
       return {
         key: nodeId || String(index),
@@ -143,8 +162,8 @@ export function parseRatisRoles(rows: string[][] | undefined, currentNodeId?: st
         nodeId,
         ratisPort,
         role,
-        // The leader has no "readiness"; followers are shown as synced with the leader.
-        readiness: role === 'LEADER' ? null : 'Synced',
+        // Reflect the readiness the bean reports rather than assuming healthy.
+        readiness: readinessFromStatus(readinessRaw),
         isCurrent: !!currentNodeId && nodeId === currentNodeId,
       };
     });
@@ -314,7 +333,15 @@ export function buildJvmHighlights(runtime: RuntimeBean): JvmHighlight[] {
 
 /** Format an epoch-millis timestamp the way the Overview cards display it. */
 export function formatStarted(millis: number): string {
-  return moment(millis).format('MMM D, YYYY h:mm:ss A');
+  const d = new Date(millis);
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+  return `${date} ${time}`;
 }
 
 /**

@@ -19,7 +19,7 @@
 import React, { Suspense } from 'react';
 import { Divider, Empty, Skeleton } from 'antd';
 import { useSuspenseQueries } from '@tanstack/react-query';
-import { Card, KeyValuePair, Section, spacing } from '@ozone-ui/shared';
+import { Card, KeyValuePair, Section, spacing, useRefetchInterval } from '@ozone-ui/shared';
 import {
   JMX_QUERY,
   formatElapsed,
@@ -39,13 +39,22 @@ const kvGridStyle: React.CSSProperties = {
 };
 
 const InstanceDetailsContent: React.FC = () => {
+  const refetchInterval = useRefetchInterval();
   // Fetch all four beans in parallel (avoids an intra-component suspense waterfall).
+  // Each carries the shared refresh interval so the whole card follows Live Sync —
+  // otherwise the election metrics (unique to this card) would never re-poll.
   const [omInfoQ, ratisQ, countQ, elapsedQ] = useSuspenseQueries({
     queries: [
-      jmxQueryOptions<OzoneManagerInfoBean>(JMX_QUERY.omInfo),
-      jmxQueryOptions<RatisServerBean>(JMX_QUERY.ratisServer),
-      jmxQueryOptions<LeaderElectionCountBean>(JMX_QUERY.leaderElectionCount),
-      jmxQueryOptions<LeaderElectionElapsedBean>(JMX_QUERY.leaderElectionElapsed),
+      { ...jmxQueryOptions<OzoneManagerInfoBean>(JMX_QUERY.omInfo), refetchInterval },
+      { ...jmxQueryOptions<RatisServerBean>(JMX_QUERY.ratisServer), refetchInterval },
+      {
+        ...jmxQueryOptions<LeaderElectionCountBean>(JMX_QUERY.leaderElectionCount),
+        refetchInterval,
+      },
+      {
+        ...jmxQueryOptions<LeaderElectionElapsedBean>(JMX_QUERY.leaderElectionElapsed),
+        refetchInterval,
+      },
     ],
   });
 

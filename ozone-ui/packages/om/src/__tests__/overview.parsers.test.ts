@@ -44,8 +44,21 @@ describe('parseRatisRoles', () => {
       readiness: 'Synced',
       isCurrent: false,
     });
-    // The leader row has no readiness.
-    expect(b).toMatchObject({ role: 'LEADER', readiness: null });
+    expect(b).toMatchObject({ role: 'LEADER', readiness: 'Synced' });
+  });
+
+  it('maps the leader-status readiness value on every row', () => {
+    const [ready] = parseRatisRoles([['h', 'n', '9872', 'LEADER', 'LEADER_AND_READY']]);
+    expect(ready.readiness).toBe('Synced');
+    const [notReady] = parseRatisRoles([['h', 'n', '9872', 'LEADER', 'LEADER_AND_NOT_READY']]);
+    expect(notReady.readiness).toBe('Not Ready');
+    const [follower] = parseRatisRoles([['h', 'n', '9872', 'FOLLOWER', 'NOT_LEADER']]);
+    expect(follower.readiness).toBe('Follower');
+  });
+
+  it('leaves readiness null when the bean omits it', () => {
+    const [role] = parseRatisRoles([['h', 'n', '9872', 'FOLLOWER']]);
+    expect(role.readiness).toBeNull();
   });
 
   it('flags the current node by id', () => {

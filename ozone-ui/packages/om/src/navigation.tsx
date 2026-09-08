@@ -84,5 +84,5 @@ export const navItems: MenuItem[] = [
   },
 ];
 
-/** Product branding shown in the top utility bar. */
+/** Expanded width of the navigation rail, in px. */
 export const SIDEBAR_WIDTH = 248;

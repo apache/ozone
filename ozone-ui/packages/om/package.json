@@ -24,7 +24,6 @@
     "echarts": "^5.5.0",
     "filesize": "^6.4.0",
     "less": "^4.2.2",
-    "moment": "^2.29.4",
     "pretty-ms": "^5.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

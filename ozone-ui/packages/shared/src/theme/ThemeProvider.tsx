@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { ConfigProvider, type ThemeConfig } from 'antd';
+import { App, ConfigProvider, type ThemeConfig } from 'antd';
 import { ozoneTheme } from './antdTheme';
 
 export interface ThemeProviderProps {
@@ -33,6 +33,12 @@ export interface ThemeProviderProps {
  * Wraps an application subtree with the Ozone UI Ant Design theme. Every Ozone
  * app should mount this once near its root so all Ant Design components inherit
  * the design-system colours, typography and radii.
+ *
+ * The subtree is also wrapped in Ant Design's `App` (with `component={false}` so
+ * no extra DOM node is added), which provides the context-aware `message` /
+ * `notification` / `modal` APIs via `App.useApp()`. Using those instead of the
+ * static `message.*` methods makes toasts inherit this theme and silences Ant
+ * Design's React-18 static-method warning.
  */
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children, themeOverrides }) => {
   const theme: ThemeConfig = themeOverrides
@@ -44,7 +50,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children, themeOve
       }
     : ozoneTheme;
 
-  return <ConfigProvider theme={theme}>{children}</ConfigProvider>;
+  return (
+    <ConfigProvider theme={theme}>
+      <App component={false}>{children}</App>
+    </ConfigProvider>
+  );
 };
 
 export default ThemeProvider;
