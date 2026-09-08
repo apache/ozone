@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -131,9 +132,20 @@ public final class HAUtils {
    */
   public static ScmBlockLocationProtocol getScmBlockClient(
       OzoneConfiguration conf) {
+    return getScmBlockClient(conf,
+        new SCMBlockLocationFailoverProxyProvider(conf));
+  }
+
+  /**
+   * Create a scm block client backed by the given proxy provider. The caller
+   * keeps the provider reference so it can dynamically reload the SCM node list
+   * (see {@link SCMFailoverProxyProviderBase#changeConfig()}).
+   */
+  public static ScmBlockLocationProtocol getScmBlockClient(
+      OzoneConfiguration conf,
+      SCMBlockLocationFailoverProxyProvider proxyProvider) {
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
-        new ScmBlockLocationProtocolClientSideTranslatorPB(
-            new SCMBlockLocationFailoverProxyProvider(conf), conf);
+        new ScmBlockLocationProtocolClientSideTranslatorPB(proxyProvider, conf);
     return TracingUtil
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
@@ -141,8 +153,18 @@ public final class HAUtils {
 
   public static StorageContainerLocationProtocol getScmContainerClient(
       ConfigurationSource conf) {
-    SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(conf, null);
+    return getScmContainerClient(conf,
+        new SCMContainerLocationFailoverProxyProvider(conf, null));
+  }
+
+  /**
+   * Create a scm container client backed by the given proxy provider. The
+   * caller keeps the provider reference so it can dynamically reload the SCM
+   * node list (see {@link SCMFailoverProxyProviderBase#changeConfig()}).
+   */
+  public static StorageContainerLocationProtocol getScmContainerClient(
+      ConfigurationSource conf,
+      SCMContainerLocationFailoverProxyProvider proxyProvider) {
     StorageContainerLocationProtocol scmContainerClient =
         TracingUtil.createProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
