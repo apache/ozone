@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
+import org.apache.ratis.util.function.CheckedRunnable;
 
 // TODO: Move this class to test package after fixing Recon
 /**
@@ -112,6 +114,16 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
 
   @Override
   public void endApplyingTransaction() {
+  }
+
+  @Override
+  public void runWithBufferLock(CheckedRunnable<IOException> operation) throws IOException {
+    rwLock.readLock().lock();
+    try {
+      operation.run();
+    } finally {
+      rwLock.readLock().unlock();
+    }
   }
 
   @Override
