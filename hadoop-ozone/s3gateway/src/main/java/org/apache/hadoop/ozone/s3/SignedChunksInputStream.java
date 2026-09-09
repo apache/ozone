@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
@@ -85,6 +86,11 @@ public class SignedChunksInputStream extends InputStream {
    */
   private static final Pattern SIGNATURE_LINE_PATTERN =
       Pattern.compile("([0-9A-Fa-f]+);chunk-signature=([0-9A-Fa-f]{64})");
+  private static final Pattern TRAILER_SIGNATURE_PATTERN =
+      Pattern.compile("x-amz-trailer-signature:([0-9A-Fa-f]{64})", Pattern.CASE_INSENSITIVE);
+  private static final Pattern CHECKSUM_TRAILER_PATTERN =
+      Pattern.compile("x-amz-checksum-(crc32|crc32c|crc64nvme|sha1|sha256)");
+  private static final int MAX_LINE_LENGTH = 8 * 1024;
 
   private final InputStream originalStream;
 
@@ -100,6 +106,9 @@ public class SignedChunksInputStream extends InputStream {
   /** Signature parsed from the current chunk header line. */
   private String chunkSignature;
 
+  /** Checksum header declared by x-amz-trailer, or null for a regular signed stream. */
+  private final String trailerHeader;
+
   /**
    * Size of the chunk payload. If zero, the signature line should be parsed to
    * retrieve the subsequent chunk payload size.
@@ -113,8 +122,23 @@ public class SignedChunksInputStream extends InputStream {
   private boolean isFinalChunkEncountered = false;
 
   public SignedChunksInputStream(InputStream inputStream, String keyPath) {
+    this(inputStream, keyPath, null);
+  }
+
+  /**
+   * Creates a signed chunk stream.
+   *
+   * @param inputStream the encoded request body
+   * @param keyPath resource used in S3 errors
+   * @param trailerHeader the value of x-amz-trailer, or null when no trailer is expected
+   */
+  public SignedChunksInputStream(InputStream inputStream, String keyPath, String trailerHeader) {
     originalStream = inputStream;
     this.keyPath = keyPath;
+    this.trailerHeader = trailerHeader == null ? null : trailerHeader.trim().toLowerCase(Locale.ROOT);
+    if (this.trailerHeader != null && !CHECKSUM_TRAILER_PATTERN.matcher(this.trailerHeader).matches()) {
+      throw invalidBody("Invalid x-amz-trailer header");
+    }
   }
 
   /**
@@ -200,11 +224,14 @@ public class SignedChunksInputStream extends InputStream {
       return true;
     }
     if (remainingData == 0) {
-      // final zero-byte chunk: verify it (empty payload) and stop reading
-      if (validator != null) {
+      // The final zero-byte chunk has no payload terminator when trailing headers follow it.
+      if (validator != null && trailerHeader == null) {
         readChunkTerminator();
       }
       validateChunk();
+      if (trailerHeader != null) {
+        validateTrailer();
+      }
       isFinalChunkEncountered = true;
     } else {
       stopAtUnexpectedEof();
@@ -268,21 +295,9 @@ public class SignedChunksInputStream extends InputStream {
   }
 
   private int readContentLengthFromHeader() throws IOException {
-    int prev = -1;
-    int curr = 0;
-    StringBuilder buf = new StringBuilder();
-
-    //read everything until the next \r\n
-    while (!eol(prev, curr) && curr != -1) {
-      int next = originalStream.read();
-      if (next != -1) {
-        buf.append((char) next);
-      }
-      prev = curr;
-      curr = next;
-    }
-    if (!eol(prev, curr)) {
-      checkNotTruncated();
+    String signatureLine = readLine(false);
+    if (signatureLine == null) {
+      return -1;
     }
     // Example of a single chunk data:
     //  10000;chunk-signature=b474d8862b1487a5145d686f57f013e54db672cee1c953b3010fb58501ef5aa2\r\n
@@ -290,7 +305,7 @@ public class SignedChunksInputStream extends InputStream {
     //
     // 10000 will be read and decoded from base-16 representation to 65536, which is the size of
     // the subsequent chunk payload.
-    String signatureLine = buf.toString().trim();
+    signatureLine = signatureLine.trim();
     if (signatureLine.isEmpty()) {
       return -1;
     }
@@ -302,6 +317,73 @@ public class SignedChunksInputStream extends InputStream {
     }
     chunkSignature = matcher.group(2);
     return Integer.parseInt(matcher.group(1), 16);
+  }
+
+  private void validateTrailer() throws IOException {
+    String trailerLine = readLine(true);
+    if (trailerLine == null || trailerLine.isEmpty()) {
+      throw invalidBody("Missing trailing checksum header");
+    }
+    int separator = trailerLine.indexOf(':');
+    if (separator <= 0) {
+      throw invalidBody("Invalid trailing header: " + trailerLine);
+    }
+    String name = trailerLine.substring(0, separator).trim().toLowerCase(Locale.ROOT);
+    String value = trailerLine.substring(separator + 1).trim();
+    if (!trailerHeader.equals(name)) {
+      throw invalidBody("Unexpected trailing header: " + name);
+    }
+
+    String signatureLine = readLine(true);
+    if (signatureLine == null) {
+      throw invalidBody("Missing trailing signature");
+    }
+    Matcher matcher = TRAILER_SIGNATURE_PATTERN.matcher(signatureLine.trim());
+    if (!matcher.matches()) {
+      throw invalidBody("Invalid trailing signature");
+    }
+    if (validator != null) {
+      validator.validateTrailer(matcher.group(1), sha256Hex(name + ":" + value + "\n"));
+    }
+    // AWS SDKs terminate the trailer section with a blank line after the signature.
+    if (!"".equals(readLine(true))) {
+      throw invalidBody("Invalid trailer terminator");
+    }
+    if (originalStream.read() != -1) {
+      throw invalidBody("Unexpected data after trailing signature");
+    }
+  }
+
+  private String readLine(boolean trailingHeader) throws IOException {
+    StringBuilder line = new StringBuilder();
+    int previous = -1;
+    while (true) {
+      int current = originalStream.read();
+      if (current == -1) {
+        if (trailingHeader && line.length() > 0) {
+          throw invalidBody("Truncated trailing header");
+        }
+        if (!trailingHeader) {
+          checkNotTruncated();
+        }
+        return line.length() == 0 ? null : line.toString();
+      }
+      line.append((char) current);
+      if (line.length() > MAX_LINE_LENGTH) {
+        throw invalidBody("Chunk or trailing header line is too long");
+      }
+      if (eol(previous, current)) {
+        line.setLength(line.length() - 2);
+        return line.toString();
+      }
+      previous = current;
+    }
+  }
+
+  private static String sha256Hex(String value) {
+    MessageDigest digest = newSha256();
+    byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+    return DatatypeConverter.printHexBinary(hash).toLowerCase(Locale.ROOT);
   }
 
   private void updateDigest(byte b) {
