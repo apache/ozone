@@ -33,7 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class represents errors from Ozone S3 service.
+ * This class represents errors from Ozone S3 service and STS-compatible errors
+ * raised by the S3 gateway STS endpoint.
  * This class needs to be updated to add new errors when required.
  */
 public enum S3ErrorTable {
@@ -115,6 +116,9 @@ public enum S3ErrorTable {
       "match the signature you provided. Check your key and signing method.",
       HTTP_FORBIDDEN),
 
+  EXPIRED_TOKEN(
+      "ExpiredToken", "The provided token has expired.", HTTP_BAD_REQUEST),
+
   PRECOND_FAILED(
       "PreconditionFailed", "At least one of the pre-conditions you " +
       "specified did not hold", HTTP_PRECON_FAILED),
@@ -169,6 +173,9 @@ public enum S3ErrorTable {
       "Access Denied", "User doesn't have permission to access this resource due to a " +
       "bucket ownership mismatch.", HTTP_FORBIDDEN),
 
+  PAYLOAD_TOO_LARGE(
+      "PayloadTooLarge", "Your request body size was too large.", HTTP_BAD_REQUEST),
+
   NO_SUCH_LIFECYCLE_CONFIGURATION("NoSuchLifecycleConfiguration",
       "The specified lifecycle configurations does not exist", HTTP_NOT_FOUND),
 
@@ -181,7 +188,39 @@ public enum S3ErrorTable {
       HTTP_BAD_REQUEST),
 
   INVALID_DIGEST(
-      "InvalidDigest", "The Content-MD5 you specified is not valid.", HTTP_BAD_REQUEST);
+      "InvalidDigest", "The Content-MD5 you specified is not valid.", HTTP_BAD_REQUEST),
+
+  /** STS: Code {@code ValidationError}; message is usually overridden via {@link OS3Exception#withMessage}. */
+  STS_VALIDATION_ERROR(
+      "ValidationError", "A validation error occurred.", HTTP_BAD_REQUEST),
+
+  /**
+   * STS: Code {@code InvalidAction} with HTTP 400 (unknown action or unsupported API version).
+   * For HTTP 501 unsupported-but-known operations use {@link #STS_INVALID_ACTION_NOT_IMPLEMENTED}.
+   */
+  STS_INVALID_ACTION(
+      "InvalidAction", "Could not find operation.", HTTP_BAD_REQUEST),
+
+  /** STS: Code {@code InvalidAction} with HTTP 501 (operation known but not implemented). */
+  STS_INVALID_ACTION_NOT_IMPLEMENTED(
+      "InvalidAction", "Operation is not supported yet.", HTTP_NOT_IMPLEMENTED),
+
+  /** STS: Code {@code InternalFailure}; distinct from {@link #INTERNAL_ERROR} ({@code InternalError}). */
+  STS_INTERNAL_FAILURE(
+      "InternalFailure", "An internal error has occurred.", HTTP_INTERNAL_ERROR),
+
+  /** STS: Code {@code InvalidClientTokenId}. */
+  STS_INVALID_CLIENT_TOKEN_ID(
+      "InvalidClientTokenId",
+      "The security token included in the request is invalid.", HTTP_FORBIDDEN),
+
+  /** STS: Code {@code UnsupportedOperation}; distinct from {@link #NOT_IMPLEMENTED} ({@code NotImplemented}). */
+  STS_UNSUPPORTED_OPERATION(
+      "UnsupportedOperation", "This operation is not supported.", HTTP_NOT_IMPLEMENTED),
+
+  /** STS: Code {@code MalformedPolicyDocument}; message is usually overridden via {@link OS3Exception#withMessage}. */
+  STS_MALFORMED_POLICY_DOCUMENT(
+      "MalformedPolicyDocument", "Policy document is malformed.", HTTP_BAD_REQUEST);
 
   private static final Logger LOG = LoggerFactory.getLogger(S3ErrorTable.class);
 
@@ -214,6 +253,7 @@ public enum S3ErrorTable {
     case ACCESS_DENIED:
     case INVALID_TOKEN:
     case PERMISSION_DENIED:
+    case REVOKED_TOKEN:
       return ACCESS_DENIED;
     case ATOMIC_WRITE_CONFLICT:
       return CONDITIONAL_REQUEST_CONFLICT;
@@ -230,6 +270,8 @@ public enum S3ErrorTable {
     case ETAG_NOT_AVAILABLE:
     case KEY_ALREADY_EXISTS:
       return PRECOND_FAILED;
+    case TOKEN_EXPIRED:
+      return EXPIRED_TOKEN;
     case FILE_ALREADY_EXISTS:
       return NO_OVERWRITE;
     case INVALID_BUCKET_NAME:

@@ -166,6 +166,10 @@ enum Type {
   GetLifecycleServiceStatus    = 150;
   SetLifecycleServiceStatus    = 151;
   SaveLifecycleScanState       = 152;
+  AssumeRole = 153;
+  RevokeSTSToken = 154;
+  DeleteRevokedSTSTokens = 155;
+  GetCallerIdentity = 156;
 }
 
 enum SafeMode {
@@ -326,6 +330,11 @@ message OMRequest {
   optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 151;
   optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 152;
   optional SaveLifecycleScanStateRequest saveLifecycleScanStateRequest = 153;
+  optional AssumeRoleRequest                assumeRoleRequest              = 154;
+  optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 155;
+  optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 156;
+  optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 157;
+  optional GetCallerIdentityRequest         getCallerIdentityRequest       = 158;
 }
 
 message OMResponse {
@@ -471,6 +480,10 @@ message OMResponse {
   optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 150;
   optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 151;
   optional SaveLifecycleScanStateResponse saveLifecycleScanStateResponse = 152;
+  optional AssumeRoleResponse                assumeRoleResponse             = 153;
+  optional RevokeSTSTokenResponse            revokeSTSTokenResponse         = 154;
+  optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 155;
+  optional GetCallerIdentityResponse         getCallerIdentityResponse      = 156;
 }
 
 enum Status {
@@ -609,6 +622,8 @@ enum Status {
 
     LIFECYCLE_CONFIGURATION_NOT_FOUND = 102;
     UPDATE_ID_NOT_MATCH = 103;
+    REVOKED_TOKEN = 104;
+    MALFORMED_POLICY_DOCUMENT = 105;
 }
 
 /**
@@ -1346,6 +1361,9 @@ message ListStatusRequest {
     required string startKey = 3;
     required uint64 numEntries = 4;
     optional bool allowPartialPrefix = 5;
+    // When keyArgs.keyName is empty (root listing), this is the original S3/list
+    // prefix for STS auth. Enables LIST check on this prefix instead of "*".
+    optional string listPrefix = 6;
 }
 
 message ListStatusResponse {
@@ -1562,6 +1580,7 @@ message OMTokenProto {
     enum Type {
       DELEGATION_TOKEN = 1;
       S3AUTHINFO = 2;
+      S3_STS_TOKEN = 3;
     };
     required Type   type           = 1;
     optional uint32 version        = 2;
@@ -1579,6 +1598,13 @@ message OMTokenProto {
     optional string strToSign      = 14;
     optional string omServiceId    = 15 [deprecated = true];
     optional string secretKeyId    = 16;
+    // STS-specific fields
+    optional string roleArn             = 17;
+    optional string originalAccessKeyId = 18;
+    optional string secretAccessKey     = 19;
+    optional string sessionPolicy       = 20;
+    optional string assumedRoleId       = 21;
+    optional string assumedRoleUserArn  = 22;
 }
 
 message SecretKeyProto {
@@ -1615,6 +1641,8 @@ message CommitKeyRequest {
 
 message CommitKeyResponse {
 
+    // Modification time of the committed key, set by OM during preExecute.
+    optional uint64 modificationTime = 1;
 }
 
 message AllocateBlockRequest {
@@ -1820,6 +1848,8 @@ message MultipartCommitUploadPartResponse {
     optional string partName = 1;
     // This one is returned as Etag for S3.
     optional string eTag = 2;
+    // Modification time of the committed part key, set by OM during preExecute.
+    optional uint64 modificationTime = 3;
 }
 
 message MultipartUploadCompleteRequest {
@@ -2369,6 +2399,20 @@ message S3Authentication {
     optional string stringToSign = 1;
     optional string signature = 2;
     optional string accessId = 3;
+    // If present, indicates this request uses STS temporary credentials
+    // and carries the base64-encoded session token for validation.
+    optional string sessionToken = 4;
+    // The following fields are resolved from the STS session token by OM.
+    // They are used to enforce STS session policies during Ratis apply.
+    // They must be written or cleared by the OM leader when the token is validated.
+    optional string resolvedStsSessionPolicy = 5;
+    optional string resolvedStsRoleArn = 6;
+    optional string resolvedStsOriginalAccessKeyId = 7;
+    optional string resolvedStsTempAccessKeyId = 8;
+    optional string resolvedStsSecretKeyId = 9;
+    // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
+    // in finer-grained STS permissions.
+    optional string s3Action = 10;
 }
 
 message RecoverLeaseRequest {
@@ -2460,6 +2504,69 @@ message DeleteObjectTaggingRequest {
 }
 
 message DeleteObjectTaggingResponse {
+}
+
+message AssumeRoleRequest {
+  required string roleArn                 = 1;
+  required string roleSessionName         = 2;
+  optional int32 durationSeconds          = 3 [default = 3600];
+  optional string awsIamSessionPolicy     = 4;
+  required string requestId               = 5;
+}
+
+message AssumeRoleResponse {
+  required string accessKeyId             = 1;
+  required string secretAccessKey         = 2;
+  required string sessionToken            = 3;
+  required uint64 expirationEpochSeconds  = 4;
+  required string assumedRoleId           = 5;
+}
+
+/**
+  This request will be used internally by OM to replicate credentials generated by the leader
+  across the OMs in HA mode. This ensures all OMs have identical audit logs.
+*/
+message UpdateAssumeRoleRequest {
+  required string roleArn                 = 1;
+  required string roleSessionName         = 2;
+  required int32 durationSeconds          = 3;
+  optional string awsIamSessionPolicy     = 4;
+  required string requestId               = 5;
+  // Leader-generated credentials
+  required string tempAccessKeyId         = 6;
+  required string secretAccessKey         = 7;
+  required string roleId                  = 8;
+  optional string sessionToken            = 9;
+  optional uint64 expirationEpochSeconds  = 10;
+}
+
+message RevokeSTSTokenRequest {
+  required string originalAccessKeyId = 1;
+  // Leader-generated revocation cutoff, replicated across OMs in HA mode.
+  optional uint64 revocationTimeMillis = 2;
+}
+
+message RevokeSTSTokenResponse {
+}
+
+/**
+ This will contain a list of originalAccessKeyIds whose revocation entries should be removed from
+ the s3RevokedStsTokenTable.
+*/
+message DeleteRevokedSTSTokensRequest {
+  repeated string originalAccessKeyId = 1;
+}
+
+message DeleteRevokedSTSTokensResponse {
+}
+
+message GetCallerIdentityRequest {
+}
+
+message GetCallerIdentityResponse {
+  optional string account = 1;
+  optional string arn     = 2;
+  optional string userId  = 3;
 }
 
 enum ReadConsistencyProto {

@@ -36,6 +36,7 @@ class S3RequestContext {
     this.startNanos = Time.monotonicNowNanos();
     this.perf = new PerformanceStringBuilder();
     this.action = action;
+    endpoint.applyS3Action(action);
   }
 
   long getStartNanos() {
@@ -59,6 +60,7 @@ class S3RequestContext {
 
   void setAction(S3GAction action) {
     this.action = action;
+    endpoint.applyS3Action(action);
   }
 
   /**

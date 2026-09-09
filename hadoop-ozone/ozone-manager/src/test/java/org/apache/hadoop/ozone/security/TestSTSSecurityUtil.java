@@ -1,0 +1,512 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.security;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.UUID;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.security.token.SecretManager;
+import org.apache.hadoop.security.token.Token;
+import org.apache.ozone.test.MockClock;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Unit tests for STSSecurityUtil.
+ */
+public class TestSTSSecurityUtil {
+  private static final String TEMP_ACCESS_KEY = "temp-access-key";
+  private static final String ORIGINAL_ACCESS_KEY = "original-access-key";
+  private static final String ROLE_ARN = "arn:aws:iam::123456789012:role/test-role";
+  private static final String SECRET_ACCESS_KEY = "test-secret-access-key";
+  private static final String SESSION_POLICY = "test-session-policy";
+  private static final String ASSUMED_ROLE_ID = "AROATEST123456789:testsess";
+  private static final String ASSUMED_ROLE_USER_ARN =
+      "arn:aws:sts::123456789012:assumed-role/test-role/testsess";
+  private static final int DURATION_SECONDS = 3600;
+  private static final ManagedSecretKey MANAGED_SECRET_KEY = new SecretKeyTestClient().getCurrentSecretKey();
+  private final SecretKeyTestClient secretKeyClient = new SecretKeyTestClient();
+  private final STSTokenSecretManager tokenSecretManager = new STSTokenSecretManager(secretKeyClient);
+  private final UUID secretKeyId = secretKeyClient.getCurrentSecretKey().getId();
+  private final MockClock clock = new MockClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenInvalidProtobuf() throws IOException {
+    // Create a token whose identifier bytes are not a valid OMTokenProto
+    final Token<STSTokenIdentifier> token = new Token<>(
+        new byte[] {0x01, 0x02, 0x03}, new byte[] {0x04}, STSTokenIdentifier.KIND_NAME,
+        new Text(STSTokenIdentifier.STS_SERVICE));
+
+    final String tokenString = token.encodeToUrlString();
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage(
+            "Invalid STS token format: Invalid STS token - could not parse protocol buffer: Protocol message " +
+            "contained an invalid tag (zero).");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenSuccess() throws IOException {
+    // Create a valid token
+    final String tokenString = createStsTokenString();
+
+    // Validate and decrypt the token
+    final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+        tokenString, secretKeyClient, clock);
+
+    // Verify the result
+    assertThat(result.getOwnerId()).isEqualTo(TEMP_ACCESS_KEY);
+    assertThat(result.getOriginalAccessKeyId()).isEqualTo(ORIGINAL_ACCESS_KEY);
+    assertThat(result.getRoleArn()).isEqualTo(ROLE_ARN);
+    assertThat(result.getSecretAccessKey()).isEqualTo(SECRET_ACCESS_KEY);
+    assertThat(result.getSessionPolicy()).isEqualTo(SESSION_POLICY);
+    assertThat(result.getCreationTime()).isEqualTo(clock.instant());
+    assertThat(result.isExpired(clock.instant())).isFalse();
+    final long expirationEpochMillis = result.getExpiry().toEpochMilli();
+    assertThat(expirationEpochMillis).isEqualTo(clock.millis() + (DURATION_SECONDS * 1000));
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenSuccessWithNullSessionPolicy() throws Exception {
+    // Create a valid token with null session policy
+    final String tokenString = createStsTokenString(DURATION_SECONDS, null);
+
+    // Validate and decrypt the token
+    final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+        tokenString, secretKeyClient, clock);
+
+    // Verify the result
+    assertThat(result.getSessionPolicy()).isEmpty();
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenInvalidFormat() {
+    // Try to decrypt an invalid token string
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken("invalid-token-format", secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessageContaining("Invalid STS token format: Failed to decode STS token string");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenRuntimeDecodeFailure() {
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken("not-a-valid-token", secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(INVALID_TOKEN))
+        .hasMessageContaining("Invalid STS token format: Failed to decode STS token string")
+        .hasMessageContaining("NegativeArraySizeException");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenInvalidKind() throws Exception {
+    // Create a valid identifier to use as base
+    final String validTokenString = createStsTokenString();
+
+    final Token<STSTokenIdentifier> validToken = new Token<>();
+    validToken.decodeFromUrlString(validTokenString);
+
+    // Create token with wrong kind
+    final Token<STSTokenIdentifier> token = new Token<>(
+        validToken.getIdentifier(), validToken.getPassword(), new Text("WRONG_KIND"),
+        new Text(STSTokenIdentifier.STS_SERVICE));
+
+    final String invalidTokenString = token.encodeToUrlString();
+
+    // Try to validate the token with wrong kind
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage("Invalid STS token format: Invalid STS token - kind is incorrect: WRONG_KIND");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenInvalidService() throws Exception {
+    // Create a token with incorrect service
+    final String validTokenString = createStsTokenString();
+
+    final Token<STSTokenIdentifier> validToken = new Token<>();
+    validToken.decodeFromUrlString(validTokenString);
+
+    final Token<STSTokenIdentifier> token = new Token<>(
+        validToken.getIdentifier(), validToken.getPassword(), validToken.getKind(), new Text("WRONG_SERVICE"));
+
+    final String invalidTokenString = token.encodeToUrlString();
+
+    // Try to validate the token with wrong service
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage("Invalid STS token format: Invalid STS token - service is incorrect: WRONG_SERVICE");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenExpired() throws Exception {
+    // Create a token that expires immediately (durationSeconds of 0)
+    final String tokenString = createStsTokenString(0, SESSION_POLICY);
+
+    // Fast-forward time to ensure token is expired
+    clock.fastForward(100);
+
+    // Try to validate the expired token
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(TOKEN_EXPIRED))
+        .hasMessageContaining("Invalid STS token - token expired at");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenSecretKeyNotFound() throws Exception {
+    // Create a valid token string
+    final String validTokenString = createStsTokenString();
+
+    // Create a mock secret key client that returns null for the key
+    final SecretKeyClient mockKeyClient = mock(SecretKeyClient.class);
+    when(mockKeyClient.getSecretKey(any())).thenReturn(null);
+
+    // Try to validate the token when secret key is not found
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage(
+            "Invalid STS token format: Invalid STS token - could not readFromByteArray: Secret key not found for " +
+            "STS token secretKeyId: " + secretKeyId);
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenInvalidSecretKeyId() throws Exception {
+    // Create a valid identifier to use as base
+    final String validTokenString = createStsTokenString();
+
+    final Token<STSTokenIdentifier> validToken = new Token<>();
+    validToken.decodeFromUrlString(validTokenString);
+
+    // Rewrite the identifier with an invalid secretKeyId in the protobuf
+    final byte[] identifierBytes = validToken.getIdentifier();
+    final OMTokenProto proto = OMTokenProto.parseFrom(identifierBytes);
+
+    final OMTokenProto invalidProto = proto.toBuilder().setSecretKeyId("not-a-uuid").build();
+
+    final Token<STSTokenIdentifier> brokenToken = new Token<>(
+        invalidProto.toByteArray(), validToken.getPassword(), validToken.getKind(), validToken.getService());
+
+    final String invalidTokenString = brokenToken.encodeToUrlString();
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage("Invalid STS token format: Invalid STS token - secretKeyId was not valid: not-a-uuid");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenExpiredSecretKey() throws Exception {
+    // Create a valid token string
+    final String validTokenString = createStsTokenString();
+
+    // Create a mock secret key that is expired
+    final ManagedSecretKey expiredSecretKey = mock(ManagedSecretKey.class);
+    when(expiredSecretKey.isExpired()).thenReturn(true);
+    final Instant now = Instant.now();
+    when(expiredSecretKey.getExpiryTime()).thenReturn(now);
+
+    final SecretKeyClient mockKeyClient = mock(SecretKeyClient.class);
+    when(mockKeyClient.getSecretKey(any())).thenReturn(expiredSecretKey);
+
+    // Try to validate the token with expired secret key
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(TOKEN_EXPIRED))
+        .hasMessage("Token cannot be verified due to expired secret key: " + secretKeyId + " Token expired at " + now);
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenSecretKeyRetrievalException() throws Exception {
+    // Create a valid token string
+    final String validTokenString = createStsTokenString();
+
+    // Create a mock secret key client that throws an exception
+    final SecretKeyClient mockKeyClient = mock(SecretKeyClient.class);
+    when(mockKeyClient.getSecretKey(any())).thenThrow(new SCMSecurityException("something went wrong"));
+
+    // Try to validate the token when secret key retrieval fails
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage(
+            "Invalid STS token format: Invalid STS token - could not readFromByteArray: Failed to retrieve secret " +
+            "key: something went wrong");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenInvalidSignature() throws Exception {
+    // Create a valid token string
+    final String validTokenString = createStsTokenString();
+
+    final Token<STSTokenIdentifier> validToken = new Token<>();
+    validToken.decodeFromUrlString(validTokenString);
+
+    // Create a token with invalid signature (wrong password)
+    final Token<STSTokenIdentifier> invalidToken = new Token<>(
+        validToken.getIdentifier(), "wrong-signature".getBytes(StandardCharsets.UTF_8), validToken.getKind(),
+        validToken.getService());
+
+    final String invalidTokenString = invalidToken.encodeToUrlString();
+
+    // Try to validate the token with invalid signature
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessageContaining("Invalid STS token format: Invalid STS token - signature is not correct for token");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenRejectsDoubledToken() throws Exception {
+    final String tokenString = createStsTokenString();
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString + tokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(INVALID_TOKEN))
+        .hasMessageContaining("non-canonical token encoding");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenRejectsTokenWithSuffix() throws Exception {
+    final String tokenString = createStsTokenString();
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString + "garbage", secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(INVALID_TOKEN))
+        .hasMessageContaining("non-canonical token encoding");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptSTSTokenEmptyString() {
+    // Try to decrypt an empty token string
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken("", secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage(
+            "Invalid STS token format: Failed to decode STS token string: java.io.EOFException");
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptMultipleTokens() throws Exception {
+    // Create multiple tokens and validate them all
+    final String token1 = createStsTokenString(DURATION_SECONDS, "secret-key-1", "policy-1",
+        "temp-key-1", "orig-key-1", "role-arn-1");
+
+    final String token2 = createStsTokenString(DURATION_SECONDS, "secret-key-2", "policy-2",
+        "temp-key-2", "orig-key-2", "role-arn-2");
+
+    final STSTokenIdentifier result1 = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+        token1, secretKeyClient, clock);
+    final STSTokenIdentifier result2 = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+        token2, secretKeyClient, clock);
+
+    assertThat(result1.getOwnerId()).isEqualTo("temp-key-1");
+    assertThat(result1.getOriginalAccessKeyId()).isEqualTo("orig-key-1");
+    assertThat(result2.getOwnerId()).isEqualTo("temp-key-2");
+    assertThat(result2.getOriginalAccessKeyId()).isEqualTo("orig-key-2");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingExpiry() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(paramsBuilder().setExpiry(null).build());
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - expiry is null");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingTempAccessKeyId() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(paramsBuilder().setTempAccessKeyId(null).build());
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - tempAccessKeyId is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingRoleArn() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(paramsBuilder().setRoleArn(null).build());
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - roleArn is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingOriginalAccessKeyId() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
+        paramsBuilder().setOriginalAccessKeyId(null).build());
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - originalAccessKeyId is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingSecretAccessKey() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(paramsBuilder().setSecretAccessKey(null).build());
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - secretAccessKey is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingCreationTime() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(paramsBuilder().setCreationTime(null).build());
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - creationTime is null");
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsSuccess() throws Exception {
+    final String tokenString = createStsTokenString();
+
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setSessionToken(tokenString)
+        .setResolvedStsSessionPolicy(SESSION_POLICY)
+        .setResolvedStsRoleArn(ROLE_ARN)
+        .setResolvedStsOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setResolvedStsTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setResolvedStsSecretKeyId(secretKeyId.toString())
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsMissingSessionToken() {
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setResolvedStsSessionPolicy(SESSION_POLICY)
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureResolvedStsFieldsInvariants(request))
+        .isInstanceOf(OMException.class)
+        .hasMessageContaining("Resolved STS fields must be empty when sessionToken is not present");
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsMissingResolvedFields() throws Exception {
+    final String tokenString = createStsTokenString();
+
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setSessionToken(tokenString)
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureResolvedStsFieldsInvariants(request))
+        .isInstanceOf(OMException.class)
+        .hasMessageContaining("Resolved STS fields must be present when sessionToken is present");
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsNoS3Auth() throws Exception {
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .build();
+
+    // Should not throw
+    STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+  }
+
+  private String createStsTokenString() throws IOException {
+    return createStsTokenString(DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY,
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN);
+  }
+
+  private String createStsTokenString(int durationSeconds, String sessionPolicy)
+      throws IOException {
+    return createStsTokenString(durationSeconds, TestSTSSecurityUtil.SECRET_ACCESS_KEY, sessionPolicy,
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN);
+  }
+
+  private String createStsTokenString(int durationSeconds, String secretAccessKey, String sessionPolicy,
+      String tempAccessKey, String originalAccessKey, String roleArn) throws IOException {
+    return tokenSecretManager.createSTSTokenString(STSTokenSecretManager.CreateSTSTokenParams.newBuilder()
+        .setTempAccessKeyId(tempAccessKey)
+        .setOriginalAccessKeyId(originalAccessKey)
+        .setRoleArn(roleArn)
+        .setDurationSeconds(durationSeconds)
+        .setSecretAccessKey(secretAccessKey)
+        .setSessionPolicy(sessionPolicy)
+        .setAssumedRoleId(ASSUMED_ROLE_ID)
+        .setAssumedRoleUserArn(ASSUMED_ROLE_USER_ARN)
+        .setCreationTime(clock.instant())
+        .build());
+  }
+
+  private STSTokenIdentifier.Params.Builder paramsBuilder() {
+    return STSTokenIdentifier.Params.newBuilder()
+        .setTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setRoleArn(ROLE_ARN)
+        .setCreationTime(clock.instant())
+        .setExpiry(clock.instant().plusSeconds(DURATION_SECONDS))
+        .setSecretAccessKey(SECRET_ACCESS_KEY)
+        .setSessionPolicy(SESSION_POLICY)
+        .setManagedSecretKey(MANAGED_SECRET_KEY);
+  }
+}

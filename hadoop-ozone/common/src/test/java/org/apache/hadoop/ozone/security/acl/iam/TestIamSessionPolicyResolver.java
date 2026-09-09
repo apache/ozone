@@ -1,0 +1,2927 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.security.acl.iam;
+
+import static java.util.Collections.emptySet;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+import static org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.OzoneGrant;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.NATIVE;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.RANGER;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.ABORT_MULTIPART_UPLOAD;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.CREATE_BUCKET;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.DELETE_BUCKET;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.DELETE_OBJECT;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.DELETE_OBJECT_TAGGING;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.GET_BUCKET_ACL;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.GET_OBJECT;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.GET_OBJECT_TAGGING;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.LIST_ALL_MY_BUCKETS;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.LIST_BUCKET;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.LIST_BUCKET_MULTIPART_UPLOADS;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.LIST_MULTIPART_UPLOAD_PARTS;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.PUT_BUCKET_ACL;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.PUT_OBJECT;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action.PUT_OBJECT_TAGGING;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3ResourceType;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.buildCaseInsensitiveS3ActionMap;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.createPathsAndPermissions;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.groupObjectsByAclsAndActions;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.mapPolicyActionsToS3Actions;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.resolve;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.validateAndCategorizeResources;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Test class for {@link IamSessionPolicyResolver}.
+ * */
+public class TestIamSessionPolicyResolver {
+
+  private static final String VOLUME = "s3v";
+  private static final Set<String> ALL_OBJECT_ACTIONS = strSet(
+      "AbortMultipartUpload", "DeleteObject", "DeleteObjectTagging", "GetObject", "GetObjectTagging",
+      "ListMultipartUploadParts", "PutObject", "PutObjectTagging");
+
+  private static final Set<String> ALL_BUCKET_ACTIONS = strSet(
+      "CreateBucket", "DeleteBucket", "GetBucketAcl", "ListBucket", "ListBucketMultipartUploads", "PutBucketAcl");
+
+  private static final Set<String> ALL_BUCKET_ACTIONS_WITH_LIST_ALL_MY_BUCKETS;
+
+  static {
+    final Set<String> tempSet = new HashSet<>(ALL_BUCKET_ACTIONS);
+    tempSet.add("ListAllMyBuckets");
+    ALL_BUCKET_ACTIONS_WITH_LIST_ALL_MY_BUCKETS = Collections.unmodifiableSet(tempSet);
+  }
+
+  private static final Set<String> ALL_BUCKET_AND_OBJECT_ACTIONS;
+
+  static {
+    final Set<String> tempSet = new HashSet<>(ALL_BUCKET_ACTIONS);
+    tempSet.addAll(ALL_OBJECT_ACTIONS);
+    ALL_BUCKET_AND_OBJECT_ACTIONS = Collections.unmodifiableSet(tempSet);
+  }
+
+  private static final Set<String> ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET;
+
+  static {
+    final Set<String> tempSet = new HashSet<>(ALL_OBJECT_ACTIONS);
+    tempSet.add("ListBucket");
+    ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET = Collections.unmodifiableSet(tempSet);
+  }
+
+  @Test
+  public void testUnsupportedConditionOperatorThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringNotEqualsIgnoreCase\": { \"s3:prefix\": \"x/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Unsupported Condition operator - StringNotEqualsIgnoreCase",
+        NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testUnsupportedConditionAttributeThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"aws:SourceArn\": \"arn:aws:s3:::d\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Unsupported Condition key name - aws:SourceArn", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testMultipleConditionKeysWithPrefixFirstThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"x\", \"aws:SourceIp\": \"1.2.3.4\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Only one Condition key is supported per operator", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testMultipleConditionKeysWithUnsupportedKeyFirstThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"aws:SourceIp\": \"1.2.3.4\", \"s3:prefix\": \"x\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Only one Condition key is supported per operator", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testUnsupportedEffectThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Deny\",\n" +                       // unsupported effect
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::proj-*\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Unsupported Effect - Deny", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testInvalidJsonWithoutStatementThrows() {
+    final String json = "{\n" +
+        "  \"RandomAttribute\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"x/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Invalid policy JSON - missing Statement", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidJsonWithEmptyStatementArrayThrows() {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": []\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: No Statement(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidEffectThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": [\"Allow\"],\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Invalid Effect in JSON policy (must be a String) - [\"Allow\"]",
+        MALFORMED_POLICY_DOCUMENT);
+
+    final String jsonWithNull = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": null,\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        jsonWithNull, "IAM session policy: Invalid Effect in JSON policy (must be a String) - null",
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testMissingEffectInStatementThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Effect is missing from JSON policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testDuplicateStatementKeysThrow() {
+    final String duplicateActionGetThenStar = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String duplicateActionStarThenGet = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String duplicateEffect = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Effect\": \"Deny\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String duplicateResource = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket2/*\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateActionGetThenStar, "Action");
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateActionStarThenGet, "Action");
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateEffect, "Effect");
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateResource, "Resource");
+  }
+
+  @Test
+  public void testDuplicateNestedConditionKeysThrow() {
+    final String duplicateS3Prefix = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"team/*\", \"s3:prefix\": \"other/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateS3Prefix, "s3:prefix");
+  }
+
+  @Test
+  public void testDuplicateConditionAtStatementLevelThrows() {
+    final String duplicateConditionStringEqualsThenStringLike = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"team/*\" } },\n" +
+        "    \"Condition\": { \"StringLike\": { \"s3:prefix\": \"other/*\" } }\n" +
+        "  }]\n" +
+        "}";
+    final String duplicateConditionStringLikeThenStringEquals = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
+        "    \"Condition\": { \"StringLike\": { \"s3:prefix\": \"other/*\" } },\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"team/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateConditionStringEqualsThenStringLike, "Condition");
+    expectDuplicateFieldThrowsForBothAuthorizers(duplicateConditionStringLikeThenStringEquals, "Condition");
+  }
+
+  @Test
+  public void testInvalidStatementElementThrows() {
+    final String statementScalar = "{\n" +
+        "  \"Statement\": \"not-an-object\"\n" +
+        "}";
+    final String statementArrayWithNonObject = "{\n" +
+        "  \"Statement\": [\"not-an-object\"]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        statementScalar, "IAM session policy: Invalid Statement in JSON policy (must be an Object) - \"not-an-object\"",
+        MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        statementArrayWithNonObject,
+        "IAM session policy: Invalid Statement in JSON policy (must be an Object) - \"not-an-object\"",
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testMissingActionInStatementThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: No Action(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testMissingResourceInStatementThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: No Resource(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testNullResourceInStatementThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": null\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: No Resource(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidResourceInStatementThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"INVALID\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Unsupported Resource Arn - INVALID", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testUnsupportedStatementElementsThrow() {
+    final Set<String> unsupportedStatementElements = strSet("NotAction", "NotResource", "Principal");
+    for (String unsupportedStatementElement : unsupportedStatementElements) {
+      final String json = "{\n" +
+          "  \"Statement\": [{\n" +
+          "    \"Effect\": \"Allow\",\n" +
+          "    \"Action\": \"s3:GetObject\",\n" +
+          "    \"Resource\": \"arn:aws:s3:::bucket1/*\",\n" +
+          "    \"" + unsupportedStatementElement + "\": \"ignored\"\n" +
+          "  }]\n" +
+          "}";
+
+      expectResolveThrowsForBothAuthorizers(
+          json, "IAM session policy: Unsupported statement element - " + unsupportedStatementElement,
+          MALFORMED_POLICY_DOCUMENT);
+    }
+  }
+
+  @Test
+  public void testInvalidActionShapeThrows() {
+    final String actionObject = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": {\"Name\":\"s3:GetObject\"},\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String actionArrayWithNonString = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": [\"s3:GetObject\", 1],\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String emptyActionArray = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": [],\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+    final String nullAction = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": null,\n" +
+        "    \"Resource\": \"arn:aws:s3:::bucket1/*\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        actionObject, "IAM session policy: Invalid Action in JSON policy (must be a String or Array of Strings) - " +
+        "{\"Name\":\"s3:GetObject\"}", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        actionArrayWithNonString,
+        "IAM session policy: Invalid Action in JSON policy (must be a String or Array of Strings) - " +
+        "[\"s3:GetObject\",1]", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        emptyActionArray, "IAM session policy: No Action(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        nullAction, "IAM session policy: No Action(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidResourceShapeThrows() {
+    final String resourceObject = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": {\"Arn\":\"arn:aws:s3:::bucket1/*\"}\n" +
+        "  }]\n" +
+        "}";
+    final String resourceArrayWithNonString = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": [\"arn:aws:s3:::bucket1/*\", 1]\n" +
+        "  }]\n" +
+        "}";
+    final String emptyResourceArray = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": []\n" +
+        "  }]\n" +
+        "}";
+    final String nullResource = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": null\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        resourceObject, "IAM session policy: Invalid Resource in JSON policy (must be a String or " +
+            "Array of Strings) - {\"Arn\":\"arn:aws:s3:::bucket1/*\"}", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        resourceArrayWithNonString,
+        "IAM session policy: Invalid Resource in JSON policy (must be a String or Array of Strings) - " +
+        "[\"arn:aws:s3:::bucket1/*\",1]", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        emptyResourceArray, "IAM session policy: No Resource(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        nullResource, "IAM session policy: No Resource(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidNumberOfConditionsThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": \"s3:ListBucket\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "      \"Condition\": [\n" +
+        "        {\n" +
+        "          \"StringEquals\": {\n" +
+        "            \"aws:SourceArn\": \"arn:aws:s3:::d\"\n" +
+        "          }\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"StringEquals\": {\n" +
+        "            \"aws:SourceArn\": \"arn:aws:s3:::e\"\n" +
+        "          }\n" +
+        "        }\n" +
+        "      ]\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Only one Condition is supported", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testInvalidConditionThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": \"s3:ListBucket\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "      \"Condition\": [\"RandomCondition\"]\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Invalid Condition (must have operator StringEquals or StringLike and key name " +
+        "s3:prefix) - [\"RandomCondition\"]", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidConditionAttributeMissingStringEqualsThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": null }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Missing Condition operator value for StringEquals",
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidConditionAttributeStructureThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": [{ \"s3:prefix\": \"folder/\" }] }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Invalid Condition operator value structure - [{\"s3:prefix\":\"folder/\"}]",
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testInvalidS3PrefixConditionValueThrows() {
+    final String nullPrefix = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": null } }\n" +
+        "  }]\n" +
+        "}";
+    final String objectPrefix = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": {} } }\n" +
+        "  }]\n" +
+        "}";
+    final String mixedStringAndNumberArray = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [\"team/*\", 1] } }\n" +
+        "  }]\n" +
+        "}";
+
+    final String invalidPrefixMessagePrefix = "IAM session policy: Invalid s3:prefix in Condition (must be a " +
+        "String, Number, Boolean, or homogeneous Array of Strings, Numbers, or Booleans) - ";
+
+    expectResolveThrowsForBothAuthorizers(nullPrefix, invalidPrefixMessagePrefix + "null", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(objectPrefix, invalidPrefixMessagePrefix + "{}", MALFORMED_POLICY_DOCUMENT);
+    expectResolveThrowsForBothAuthorizers(
+        mixedStringAndNumberArray, invalidPrefixMessagePrefix + "[\"team/*\",1]", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testAcceptedS3PrefixConditionValueCoercion() throws OMException {
+    final String numericScalar = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": 123 } }\n" +
+        "  }]\n" +
+        "}";
+    final String booleanScalar = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": true } }\n" +
+        "  }]\n" +
+        "}";
+    final String numericArray = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [123] } }\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> numericScalarNative = resolve(numericScalar, VOLUME, NATIVE);
+    final Set<OzoneGrant> numericScalarRanger = resolve(numericScalar, VOLUME, RANGER);
+    assertThat(numericScalarNative).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), prefix("my-bucket", "123")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+    assertThat(numericScalarRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), key("my-bucket", "123")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+
+    final Set<OzoneGrant> booleanScalarNative = resolve(booleanScalar, VOLUME, NATIVE);
+    final Set<OzoneGrant> booleanScalarRanger = resolve(booleanScalar, VOLUME, RANGER);
+    assertThat(booleanScalarNative).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), prefix("my-bucket", "true")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+    assertThat(booleanScalarRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), key("my-bucket", "true")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+
+    final Set<OzoneGrant> numericArrayNative = resolve(numericArray, VOLUME, NATIVE);
+    final Set<OzoneGrant> numericArrayRanger = resolve(numericArray, VOLUME, RANGER);
+    assertThat(numericArrayNative).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), prefix("my-bucket", "123")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+    assertThat(numericArrayRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume(), key("my-bucket", "123")), acls(READ), strSet("ListBucket")),
+        new OzoneGrant(objSet(bucket("my-bucket")), acls(READ, LIST), strSet("ListBucket")));
+  }
+
+  @Test
+  public void testEmptyS3PrefixConditionArrayDoesNotGrantAccess() throws OMException {
+    final String emptyPrefixArrayOnAnyResource = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"*\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [] } }\n" +
+        "  }]\n" +
+        "}";
+    final String emptyPrefixArrayOnBucket = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [] } }\n" +
+        "  }]\n" +
+        "}";
+
+    assertThat(resolve(emptyPrefixArrayOnAnyResource, VOLUME, NATIVE)).isEmpty();
+    assertThat(resolve(emptyPrefixArrayOnAnyResource, VOLUME, RANGER)).isEmpty();
+    assertThat(resolve(emptyPrefixArrayOnBucket, VOLUME, NATIVE)).isEmpty();
+    assertThat(resolve(emptyPrefixArrayOnBucket, VOLUME, RANGER)).isEmpty();
+  }
+
+  @Test
+  public void testEmptyS3PrefixConditionArrayWithMultipleActionsAndResourcesDoesNotGrantAccess() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": [\"s3:ListBucket\", \"s3:PutObject\", \"s3:DeleteObject\"],\n" +
+        "    \"Resource\": [\n" +
+        "      \"arn:aws:s3:::my-bucket\",\n" +
+        "      \"arn:aws:s3:::my-bucket/*\"\n" +
+        "    ],\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [] } }\n" +
+        "  }]\n" +
+        "}";
+
+    assertThat(resolve(json, VOLUME, NATIVE)).isEmpty();
+    assertThat(resolve(json, VOLUME, RANGER)).isEmpty();
+  }
+
+  @Test
+  public void testInvalidJsonThrows() {
+    final String invalidJson = "{[{{}]\"\"";
+
+    expectResolveThrowsForBothAuthorizers(
+        invalidJson, "IAM session policy: Invalid policy JSON (most likely JSON structure is incorrect)",
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testJsonExceedsMaxLengthThrows() {
+    final String json = createJsonStringLargerThan2048Characters();
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Invalid policy JSON - exceeds maximum length of 2048 characters",
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testJsonAtMaxLengthSucceeds() throws OMException {
+    // Create a JSON string that is exactly 2048 characters
+    final String json = create2048CharJsonString();
+    assertThat(json.length()).isEqualTo(2048);
+
+    // Must not throw an exception
+    resolve(json, VOLUME, NATIVE);
+    resolve(json, VOLUME, RANGER);
+  }
+
+  @Test
+  public void testConditionKeyMustBeCaseInsensitive() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"S3:PRefiX\": \"x/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    // Must not throw exception
+    resolve(json, VOLUME, NATIVE);
+    resolve(json, VOLUME, RANGER);
+  }
+
+  @Test
+  public void testEffectMustBeCaseSensitive() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"aLLOw\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"x/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Unsupported Effect - aLLOw", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testBuildCaseInsensitiveS3ActionMapMatchesConstant() {
+    assertThat(buildCaseInsensitiveS3ActionMap()).isEqualTo(IamSessionPolicyResolver.S3_ACTION_MAP_CI);
+  }
+
+  @Test
+  public void testBuildCaseInsensitiveS3ActionMap() {
+    final Map<String, Set<S3Action>> caseInsensitiveS3ActionMap = buildCaseInsensitiveS3ActionMap();
+    // Verify that individual S3 actions are present
+    assertThat(caseInsensitiveS3ActionMap).containsKeys(
+        "s3:listbucket", "s3:getobject", "s3:putobject", "s3:deleteobject", "s3:createbucket", "s3:listallmybuckets");
+
+    // Verify that wildcard actions are present
+    assertThat(caseInsensitiveS3ActionMap).containsKeys(
+        "s3:get*", "s3:put*", "s3:list*", "s3:delete*", "s3:create*");
+
+    // Verify s3:Get* contains Get actions
+    final Set<S3Action> getActions = caseInsensitiveS3ActionMap.get("s3:get*");
+    assertThat(getActions).containsOnly(GET_OBJECT, GET_BUCKET_ACL, GET_OBJECT_TAGGING);
+
+    // Verify s3:Put* contains Put actions
+    final Set<S3Action> putActions = caseInsensitiveS3ActionMap.get("s3:put*");
+    assertThat(putActions).containsOnly(PUT_OBJECT, PUT_OBJECT_TAGGING, PUT_BUCKET_ACL);
+
+    // Verify s3:List* contains List actions
+    final Set<S3Action> listActions = caseInsensitiveS3ActionMap.get("s3:list*");
+    assertThat(listActions).containsOnly(
+        LIST_BUCKET, LIST_ALL_MY_BUCKETS, LIST_BUCKET_MULTIPART_UPLOADS, LIST_MULTIPART_UPLOAD_PARTS);
+
+    // Verify s3:Delete* contains Delete actions
+    final Set<S3Action> deleteActions = caseInsensitiveS3ActionMap.get("s3:delete*");
+    assertThat(deleteActions).containsOnly(DELETE_OBJECT, DELETE_BUCKET, DELETE_OBJECT_TAGGING);
+
+    // Verify s3:Create* contains Create actions
+    final Set<S3Action> createActions = caseInsensitiveS3ActionMap.get("s3:create*");
+    assertThat(createActions).containsOnly(CREATE_BUCKET);
+  }
+
+  @Test
+  public void testBuildCaseInsensitiveS3ActionMapIndividualActionsContainSingleEntry() {
+    final Map<String, Set<S3Action>> actionMap = buildCaseInsensitiveS3ActionMap();
+
+    // Individual actions should map to a set with exactly one entry
+    final Set<S3Action> listBucketAction = actionMap.get("s3:listbucket");
+    assertThat(listBucketAction).hasSize(1);
+
+    final Set<S3Action> getObjectAction = actionMap.get("s3:getobject");
+    assertThat(getObjectAction).hasSize(1);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithNullReturnsEmpty() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(null);
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithEmptyListReturnsEmpty() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(emptySet());
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithSingleActionMapsCorrectly() {
+    final Set<S3Action> listBucket = mapPolicyActionsToS3Actions(Collections.singleton("s3:ListBucket"));
+    assertThat(listBucket).containsOnly(LIST_BUCKET);
+
+    // Ensure case-insensitive action works
+    final Set<S3Action> listBucketCi = mapPolicyActionsToS3Actions(Collections.singleton("S3:ListBuCKet"));
+    assertThat(listBucketCi).containsOnly(LIST_BUCKET);
+
+    final Set<S3Action> deleteObject = mapPolicyActionsToS3Actions(Collections.singleton("s3:DeleteObject"));
+    assertThat(deleteObject).containsOnly(DELETE_OBJECT);
+
+    // Ensure case-insensitive action works
+    final Set<S3Action> deleteObjectCi = mapPolicyActionsToS3Actions(Collections.singleton("S3:DeLETeObjeCT"));
+    assertThat(deleteObjectCi).containsOnly(DELETE_OBJECT);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithMultipleActionsMapAllCorrectly() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:ListBucket", "s3:GetObject", "s3:PutObject"));
+    assertThat(result).containsOnly(LIST_BUCKET, GET_OBJECT, PUT_OBJECT);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithWildcardExpansion() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(Collections.singleton("s3:Get*"));
+    assertThat(result).containsOnly(GET_OBJECT, GET_BUCKET_ACL, GET_OBJECT_TAGGING);
+
+    // Ensure it is case-insensitive
+    final Set<S3Action> resultCi = mapPolicyActionsToS3Actions(Collections.singleton("s3:gET*"));
+    assertThat(resultCi).containsOnly(GET_OBJECT, GET_BUCKET_ACL, GET_OBJECT_TAGGING);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithS3StarReturnsAll() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(Collections.singleton("s3:*"));
+    assertThat(result).containsOnly(
+        LIST_ALL_MY_BUCKETS, CREATE_BUCKET, DELETE_BUCKET, GET_BUCKET_ACL, LIST_BUCKET, LIST_BUCKET_MULTIPART_UPLOADS,
+        PUT_BUCKET_ACL, ABORT_MULTIPART_UPLOAD, DELETE_OBJECT, DELETE_OBJECT_TAGGING, GET_OBJECT, GET_OBJECT_TAGGING,
+        LIST_MULTIPART_UPLOAD_PARTS, PUT_OBJECT, PUT_OBJECT_TAGGING);
+
+    final Set<S3Action> resultCi = mapPolicyActionsToS3Actions(Collections.singleton("S3:*"));
+    assertThat(resultCi).isEqualTo(result);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsIgnoresUnsupportedActions() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:GetAccelerateConfiguration", "s3:GetObject"));
+    // Unsupported action should be silently ignored
+    assertThat(result).containsOnly(GET_OBJECT);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithOnlyUnsupportedActionsReturnsEmpty() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(
+        strSet("s3:GetAccelerateConfiguration", "s3:PutBucketVersioning"));
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsDeduplicatesResults() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:Get*", "s3:GetObject", "s3:GetBucketAcl"));
+    assertThat(result).containsOnly(GET_OBJECT, GET_BUCKET_ACL, GET_OBJECT_TAGGING);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsHandlesMultipleWildcards() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:Get*", "s3:Put*"));
+    assertThat(result).containsOnly(
+        GET_OBJECT, GET_BUCKET_ACL, GET_OBJECT_TAGGING, PUT_OBJECT, PUT_OBJECT_TAGGING, PUT_BUCKET_ACL);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithS3StarIgnoresOtherActions() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:*", "s3:GetObject", "s3:PutObject"));
+    // When s3:* is present, it should return all supported concrete actions
+    assertThat(result).containsOnly(
+        LIST_ALL_MY_BUCKETS, CREATE_BUCKET, DELETE_BUCKET, GET_BUCKET_ACL, LIST_BUCKET, LIST_BUCKET_MULTIPART_UPLOADS,
+        PUT_BUCKET_ACL, ABORT_MULTIPART_UPLOAD, DELETE_OBJECT, DELETE_OBJECT_TAGGING, GET_OBJECT, GET_OBJECT_TAGGING,
+        LIST_MULTIPART_UPLOAD_PARTS, PUT_OBJECT, PUT_OBJECT_TAGGING);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithWildcard() throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("*")),
+        "IAM session policy: Wildcard bucket patterns are not supported for Ozone native authorizer",
+        NOT_SUPPORTED_OPERATION);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("*"));
+    assertThat(resultRanger).containsOnly(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.ANY, "*", null, null));
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithSingleBucket() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.BUCKET, "my-bucket", null, null);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::my-bucket"));
+    assertThat(resultNative).containsOnly(expectedResourceSpec);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::my-bucket"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketWildcard() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.BUCKET_WILDCARD, "my-bucket*", null, null);
+
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::my-bucket*")),
+        "IAM session policy: Wildcard bucket patterns are not supported for Ozone native authorizer",
+        NOT_SUPPORTED_OPERATION);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::my-bucket*"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketWildcardAndExactObjectKey() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_EXACT, "*", null, "myKey.txt");
+
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::*/myKey.txt")),
+        "IAM session policy: Wildcard bucket patterns are not supported for Ozone native authorizer",
+        NOT_SUPPORTED_OPERATION);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::*/myKey.txt"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketWildcardAndObjectWildcard() throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::*/*")),
+        "IAM session policy: Wildcard bucket patterns are not supported for Ozone native authorizer",
+        NOT_SUPPORTED_OPERATION);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "*", "*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::*/*"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndExactObjectKey() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt");
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket1/key.txt"));
+    assertThat(resultNative).containsOnly(expectedResourceSpec);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket1/key.txt"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndExactObjectKeyWithPath() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_EXACT, "bucket2", null, "path/folder/nested/key.txt");
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket2/path/folder/nested/key.txt"));
+    assertThat(resultNative).containsOnly(expectedResourceSpec);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket2/path/folder/nested/key.txt"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixAndEmpty() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedNativeResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX, "bucket3", "", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket3/*"));
+    assertThat(resultNative).containsOnly(expectedNativeResourceSpec);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixAndEmptyWithPath() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedNativeResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX, "bucket3", "path/b/", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket3/path/b/*"));
+    assertThat(resultNative).containsOnly(expectedNativeResourceSpec);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "path/b/*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/path/b/*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixAndNonEmpty() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedNativeResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX, "bucket3", "test", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket3/test*"));
+    assertThat(resultNative).containsOnly(expectedNativeResourceSpec);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "test*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/test*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixAndNonEmptyWithPath() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedNativeResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX, "bucket", "a/b/test", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket/a/b/test*"));
+    assertThat(resultNative).containsOnly(expectedNativeResourceSpec);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket", "a/b/test*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket/a/b/test*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixWildcardNotAtEnd() throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket3/*.log")),
+        "IAM session policy: Wildcard prefix patterns are not supported for Ozone native authorizer " +
+          "if wildcard is not at the end", NOT_SUPPORTED_OPERATION);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "*.log", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/*.log"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixWildcardNotAtEndWithPath() throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket/a/q/*.ps")),
+        "IAM session policy: Wildcard prefix patterns are not supported for Ozone native authorizer if " +
+        "wildcard is not at the end", NOT_SUPPORTED_OPERATION);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket", "a/q/*.ps", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket/a/q/*.ps"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixWildcardOneAtEndAndOneNotAtEnd()
+      throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket3/*key*")),
+        "IAM session policy: Wildcard prefix patterns are not supported for Ozone native authorizer " +
+            "if wildcard is not at the end", NOT_SUPPORTED_OPERATION);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "*key*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/*key*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixWildcardOneAtEndAndOneNotAtEndWithPath()
+      throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket3/a/b/t/*key*")),
+        "IAM session policy: Wildcard prefix patterns are not supported for Ozone native authorizer " +
+            "if wildcard is not at the end", NOT_SUPPORTED_OPERATION);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "a/b/t/*key*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/a/b/t/*key*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithMultipleResources() throws OMException {
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, strSet("arn:aws:s3:::bucket1", "arn:aws:s3:::bucket2/*", "arn:aws:s3:::bucket3/key.txt"));
+    assertThat(resultNative).containsOnly(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null),
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket2", "", null),
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket3", null, "key.txt"));
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, strSet("arn:aws:s3:::bucket1", "arn:aws:s3:::bucket2/*", "arn:aws:s3:::bucket3/key.txt"));
+    assertThat(resultRanger).containsOnly(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null),
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket2", "*", null),
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket3", null, "key.txt"));
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithInvalidArnThrows() {
+    final String invalidArn = "arn:aws:ec2:::bucket";
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton(invalidArn)),
+        "IAM session policy: Unsupported Resource Arn - " + invalidArn, NOT_SUPPORTED_OPERATION);
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(RANGER, Collections.singleton(invalidArn)),
+        "IAM session policy: Unsupported Resource Arn - " + invalidArn, NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithArnWithNoBucketThrows() {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::")),
+        "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", MALFORMED_POLICY_DOCUMENT);
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(RANGER, Collections.singleton("arn:aws:s3:::")),
+        "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithNoResourcesThrows() {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, emptySet()), "IAM session policy: No Resource(s) found in policy",
+        MALFORMED_POLICY_DOCUMENT);
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(RANGER, emptySet()), "IAM session policy: No Resource(s) found in policy",
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithResourceAny() {
+    // This also tests that acls are deduplicated across different resource types
+    final Set<S3Action> actions = Stream.of(LIST_ALL_MY_BUCKETS, LIST_BUCKET, GET_OBJECT)
+        .collect(Collectors.toSet()); // actions at volume, bucket and key levels
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.ANY, "*", null, null));
+
+    expectIllegalArgumentException(
+        () -> createPathsAndPermissions(
+            VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>(), new LinkedHashMap<>()),
+        "ResourceSpec type ANY not supported for OzoneNativeAuthorizer");
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    // volume and bucket have READ, LIST; key has READ; result is now grouped by (ACLs, S3 actions)
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(volume()), acls(READ, LIST), strSet("ListAllMyBuckets", "ListBucket", "GetObject")),
+        new OzoneGrant(objSet(bucket("*")), acls(READ, LIST), strSet("ListBucket", "GetObject")),
+        new OzoneGrant(objSet(key("*", "*")), acls(READ), strSet("ListBucket", "GetObject")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithBucketResourceThatIsListBucket() {
+    final Set<S3Action> actions = Collections.singleton(LIST_BUCKET);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Set<IOzoneObj> readAndListObject = objSet(bucket("bucket1"));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    final Set<IOzoneObj> nativeReadObjects = objSet(volume(), prefix("bucket1", ""));
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(readAndListObject, acls(READ, LIST), strSet("ListBucket")),
+        new OzoneGrant(nativeReadObjects, acls(READ), strSet("ListBucket")));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    final Set<IOzoneObj> rangerReadObjects = objSet(volume(), key("bucket1", "*"));
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(readAndListObject, acls(READ, LIST), strSet("ListBucket")),
+        new OzoneGrant(rangerReadObjects, acls(READ), strSet("ListBucket")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithBucketResourceThatIsNotListBucket() {
+    final Set<S3Action> actions = Collections.singleton(CREATE_BUCKET);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Set<IOzoneObj> createObject = objSet(bucket("bucket1"));
+    final Set<IOzoneObj> readObject = objSet(volume());
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(createObject, acls(CREATE), strSet("CreateBucket")),
+        new OzoneGrant(readObject, acls(READ), strSet("CreateBucket")));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(createObject, acls(CREATE), strSet("CreateBucket")),
+        new OzoneGrant(readObject, acls(READ), strSet("CreateBucket")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithBucketWildcardResource() {
+    final Set<S3Action> actions = Collections.singleton(PUT_BUCKET_ACL);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET_WILDCARD, "bucket1*", null, null));
+    final Set<IOzoneObj> readReadAclAndWriteAclObject = objSet(bucket("bucket1*"));
+    final Set<IOzoneObj> readVolume = objSet(volume());
+
+    expectIllegalArgumentException(
+        () -> createPathsAndPermissions(
+            VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>(), new LinkedHashMap<>()),
+        "ResourceSpec type BUCKET_WILDCARD not supported for OzoneNativeAuthorizer");
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(readReadAclAndWriteAclObject, acls(READ, READ_ACL, WRITE_ACL), strSet("PutBucketAcl")),
+        new OzoneGrant(readVolume, acls(READ), strSet("PutBucketAcl")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithBucketsWildcardResourceAll() {
+    // For AWS IAM, s3:ListAllMyBuckets supports both "*" and "arn:aws:s3:::*" as
+    // Resource values.  The "*" case is covered by testCreatePathsAndPermissionsWithResourceAny.
+    // This test ensures that "arn:aws:s3:::*" (parsed as BUCKET_WILDCARD with bucket="*")
+    // also grants the expected volume-level permissions for ListAllMyBuckets.
+    final Set<S3Action> actions = Stream.of(LIST_ALL_MY_BUCKETS, LIST_BUCKET)
+        .collect(Collectors.toSet());
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET_WILDCARD, "*", null, null));
+
+    expectIllegalArgumentException(
+        () -> createPathsAndPermissions(
+            VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>(), new LinkedHashMap<>()),
+        "ResourceSpec type BUCKET_WILDCARD not supported for OzoneNativeAuthorizer");
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+
+    // Both the volume and the wildcard bucket should end up with READ + LIST permissions.
+    // We also need READ access on the keys
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    final Set<IOzoneObj> volumeObj = objSet(volume());
+    final Set<IOzoneObj> bucketObj = objSet(bucket("*"));
+    final Set<IOzoneObj> readObjects = objSet(key("*", "*"));
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(volumeObj, acls(READ, LIST), strSet("ListAllMyBuckets", "ListBucket")),
+        new OzoneGrant(bucketObj, acls(READ, LIST), strSet("ListBucket")),
+        new OzoneGrant(readObjects, acls(READ), strSet("ListBucket")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithObjectExactResource() {
+    final Set<S3Action> actions = Collections.singleton(GET_OBJECT);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"));
+    final Set<IOzoneObj> readVolumeBucketAndKey = objSet(volume(), bucket("bucket1"), key("bucket1", "key.txt"));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(readVolumeBucketAndKey, acls(READ), strSet("GetObject")));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(readVolumeBucketAndKey, acls(READ), strSet("GetObject")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithDeleteObjectGrantsDeleteOnKey() {
+    final Set<S3Action> actions = Collections.singleton(DELETE_OBJECT);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"));
+    final Set<IOzoneObj> readVolumeAndBucket = objSet(volume(), bucket("bucket1"));
+    final Set<IOzoneObj> deleteKey = objSet(key("bucket1", "key.txt"));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(readVolumeAndBucket, acls(READ), strSet("DeleteObject")),
+        new OzoneGrant(deleteKey, acls(DELETE), strSet("DeleteObject")));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(readVolumeAndBucket, acls(READ), strSet("DeleteObject")),
+        new OzoneGrant(deleteKey, acls(DELETE), strSet("DeleteObject")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithAbortMultipartUploadGrantsWriteOnKey() {
+    final Set<S3Action> actions = Collections.singleton(ABORT_MULTIPART_UPLOAD);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"));
+    final Set<IOzoneObj> readVolumeAndBucket = objSet(volume(), bucket("bucket1"));
+    final Set<IOzoneObj> writeKey = objSet(key("bucket1", "key.txt"));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(readVolumeAndBucket, acls(READ), strSet("AbortMultipartUpload")),
+        new OzoneGrant(writeKey, acls(WRITE), strSet("AbortMultipartUpload")));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(readVolumeAndBucket, acls(READ), strSet("AbortMultipartUpload")),
+        new OzoneGrant(writeKey, acls(WRITE), strSet("AbortMultipartUpload")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithObjectPrefixResource() {
+    final Set<S3Action> actions = Collections.singleton(GET_OBJECT);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", "prefix/", null));
+    final Set<IOzoneObj> nativeReadVolumeBucketAndPrefix = objSet(
+        bucket("bucket1"), volume(), prefix("bucket1", "prefix/"));
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(nativeReadVolumeBucketAndPrefix, acls(READ), strSet("GetObject")));
+
+    expectIllegalArgumentException(
+        () -> createPathsAndPermissions(
+            VOLUME, RANGER, actions, resourceSpecs, null, new LinkedHashMap<>(), new LinkedHashMap<>()),
+        "ResourceSpec type OBJECT_PREFIX not supported for RangerOzoneAuthorizer");
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithObjectPrefixWildcardResource() {
+    final Set<S3Action> actions = Collections.singleton(GET_OBJECT);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", "prefix/*", null));
+
+    expectIllegalArgumentException(
+        () -> createPathsAndPermissions(
+            VOLUME, NATIVE, actions, resourceSpecs, null, new LinkedHashMap<>(), new LinkedHashMap<>()),
+        "ResourceSpec type OBJECT_PREFIX_WILDCARD not supported for OzoneNativeAuthorizer");
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(
+            objSet(bucket("bucket1"), volume(), key("bucket1", "prefix/*")), acls(READ), strSet("GetObject")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithConditionPrefixesForObjectActionMustIgnoreConditionPrefixes() {
+    final Set<S3Action> actions = Collections.singleton(GET_OBJECT);
+    final Set<String> prefixes = strSet("folder1/", "folder2/");
+    final IamSessionPolicyResolver.Condition condition = new IamSessionPolicyResolver.Condition(
+        "StringEquals", prefixes);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", "", null));
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    final Set<IOzoneObj> nativeReadVolumeBucketAndPrefix = objSet(bucket("bucket1"), volume(), prefix("bucket1", ""));
+    createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, condition, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(nativeReadVolumeBucketAndPrefix, acls(READ), strSet("GetObject")));
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", "*", null));
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    final Set<IOzoneObj> rangerReadVolumeBucketAndKey = objSet(bucket("bucket1"), volume(), key("bucket1", "*"));
+    createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, condition, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(rangerReadVolumeBucketAndKey, acls(READ), strSet("GetObject")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithConditionPrefixesForBucketActionWhenActionIsListBucket() {
+    final Set<S3Action> actions = Collections.singleton(LIST_BUCKET);
+    final Set<String> prefixes = strSet("folder1/", "folder2/");
+    final IamSessionPolicyResolver.Condition condition = new IamSessionPolicyResolver.Condition(
+        "StringEquals", prefixes);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Set<IOzoneObj> nativeReadObjects = objSet(
+        prefix("bucket1", "folder1/"), prefix("bucket1", "folder2/"), volume());
+    final Set<IOzoneObj> nativeReadAndListObject = objSet(bucket("bucket1"));
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, condition, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(nativeReadAndListObject, acls(READ, LIST), strSet("ListBucket")),
+        new OzoneGrant(nativeReadObjects, acls(READ), strSet("ListBucket")));
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Set<IOzoneObj> rangerReadObjects = objSet(
+        key("bucket1", "folder1/"), key("bucket1", "folder2/"), volume());
+    final Set<IOzoneObj> rangerReadAndListObject = objSet(bucket("bucket1"));
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, condition, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(rangerReadAndListObject, acls(READ, LIST), strSet("ListBucket")),
+        new OzoneGrant(rangerReadObjects, acls(READ), strSet("ListBucket")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithConditionPrefixesForBucketActionWhenActionIsNotListBucket() {
+    final Set<S3Action> actions = Collections.singleton(GET_BUCKET_ACL);
+    final Set<String> prefixes = strSet("folder1/", "folder2/");
+    final IamSessionPolicyResolver.Condition condition = new IamSessionPolicyResolver.Condition(
+        "StringEquals", prefixes);
+    final Set<IOzoneObj> readObject = objSet(volume());
+    final Set<IOzoneObj> readAndReadAclObject = objSet(bucket("bucket1"));
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, condition, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(readObject, acls(READ), strSet("GetBucketAcl")),
+        new OzoneGrant(readAndReadAclObject, acls(READ, READ_ACL), strSet("GetBucketAcl")));
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, condition, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(readObject, acls(READ), strSet("GetBucketAcl")),
+        new OzoneGrant(readAndReadAclObject, acls(READ, READ_ACL), strSet("GetBucketAcl")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithNoMappedActions() {
+    final Set<S3Action> actions = emptySet();
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", null, null));
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).isEmpty();
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", null, null));
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).isEmpty();
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithNoMappedResources() {
+    final Set<S3Action> actions = Collections.singleton(GET_OBJECT);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = emptySet();
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).isEmpty();
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(
+        VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).isEmpty();
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsDeduplicatesAcrossSameResourceTypes() {
+    final Set<S3Action> actions = Stream.of(GET_OBJECT, GET_OBJECT_TAGGING, DELETE_OBJECT, DELETE_OBJECT_TAGGING)
+        .collect(Collectors.toSet());
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"));
+    final Set<IOzoneObj> readAndDeleteAndWriteObject = objSet(key("bucket1", "key.txt"));
+    final Set<IOzoneObj> readObjects = objSet(bucket("bucket1"), volume());
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(
+            readAndDeleteAndWriteObject, acls(READ, DELETE, WRITE),
+            strSet("GetObject", "GetObjectTagging", "DeleteObject", "DeleteObjectTagging")),
+        new OzoneGrant(readObjects, acls(READ),
+            strSet("GetObject", "GetObjectTagging", "DeleteObject", "DeleteObjectTagging")));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(
+            readAndDeleteAndWriteObject, acls(READ, DELETE, WRITE),
+            strSet("GetObject", "GetObjectTagging", "DeleteObject", "DeleteObjectTagging")),
+        new OzoneGrant(readObjects, acls(READ),
+            strSet("GetObject", "GetObjectTagging", "DeleteObject", "DeleteObjectTagging")));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithAllConcreteS3Actions() {
+    final Set<S3Action> actions = Stream.of(S3Action.values())
+        .collect(Collectors.toSet());
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Stream.of(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"),
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket2", null, null))
+        .collect(Collectors.toSet());
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapNative = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapNative = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, null, objToAclsMapNative, objToActionsMapNative);
+    final Set<OzoneGrant> resultNative = groupObjectsByAclsAndActions(objToAclsMapNative, objToActionsMapNative);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(key("bucket1", "key.txt")), acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS),
+        new OzoneGrant(objSet(bucket("bucket1")), acls(READ), ALL_OBJECT_ACTIONS),
+        new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_AND_OBJECT_ACTIONS),
+        new OzoneGrant(
+            objSet(bucket("bucket2")), acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL), ALL_BUCKET_ACTIONS),
+        new OzoneGrant(objSet(prefix("bucket2", "")), acls(READ), strSet("ListBucket")));
+
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMapRanger = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMapRanger = new LinkedHashMap<>();
+    createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, null, objToAclsMapRanger, objToActionsMapRanger);
+    final Set<OzoneGrant> resultRanger = groupObjectsByAclsAndActions(objToAclsMapRanger, objToActionsMapRanger);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new OzoneGrant(objSet(key("bucket1", "key.txt")), acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS),
+        new OzoneGrant(objSet(bucket("bucket1")), acls(READ), ALL_OBJECT_ACTIONS),
+        new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_AND_OBJECT_ACTIONS),
+        new OzoneGrant(
+            objSet(bucket("bucket2")), acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL), ALL_BUCKET_ACTIONS),
+        new OzoneGrant(objSet(key("bucket2", "*")), acls(READ), strSet("ListBucket")));
+
+  }
+
+  @Test
+  public void testDeduplicatesAcrossMultipleStatementsWhenSameStatementsArePresent() throws OMException {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:GetBucketAcl\",\n" +
+        "        \"s3:PutBucketAcl\",\n" +
+        "        \"s3:ListBucket\"\n" +
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket\"\n" +
+        "    },\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:GetBucketAcl\",\n" +
+        "        \"s3:PutBucketAcl\",\n" +
+        "        \"s3:ListBucket\"\n" +
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: bucket READ, LIST, READ_ACL, WRITE_ACL; volume and prefix "" READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST, READ_ACL, WRITE_ACL);
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    expectedResolvedNative.add(new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: bucket READ, LIST, READ_ACL, WRITE_ACL; volume and key "*" READ
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("ListBucket")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testDeduplicatesAcrossMultipleStatementsForSameActionsButDifferentResource() throws OMException {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:GetBucketAcl\",\n" +
+        "        \"s3:PutBucketAcl\",\n" +
+        "        \"s3:ListBucket\"\n" +
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket\"\n" +
+        "    },\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:GetBucketAcl\",\n" +
+        "        \"s3:PutBucketAcl\",\n" +
+        "        \"s3:ListBucket\"\n" +
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket2\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: bucket READ, LIST, READ_ACL, WRITE_ACL; volume and prefix "" READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"), bucket("my-bucket2"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST, READ_ACL, WRITE_ACL);
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    expectedResolvedNative.add(new OzoneGrant(
+        objSet(prefix("my-bucket2", ""), prefix("my-bucket", "")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: bucket READ, LIST, READ_ACL, WRITE_ACL; volume and key "*" READ
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("my-bucket2", "*"), key("my-bucket", "*")), acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testDeduplicatesAcrossMultipleStatementsForDifferentActionsButSameResource() throws OMException {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:GetBucketAcl\",\n" +
+        "        \"s3:PutBucketAcl\",\n" +
+        "        \"s3:ListBucket\"\n" +
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket\"\n" +
+        "    },\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:GetBucketAcl\",\n" +
+        "        \"s3:CreateBucket\"\n" +
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: bucket READ, LIST, READ_ACL, WRITE_ACL, CREATE; volume, prefix "" READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST, READ_ACL, WRITE_ACL, CREATE);
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket", "CreateBucket")));
+    expectedResolvedNative.add(new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket", "CreateBucket")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: bucket READ, LIST, READ_ACL, WRITE_ACL, CREATE; volume, key "*" READ
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "PutBucketAcl", "ListBucket", "CreateBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(volume()), acls(READ), strSet("GetBucketAcl", "PutBucketAcl", "ListBucket", "CreateBucket")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testDeduplicatesAcrossMultipleStatementsWhenAllActionPresent() throws OMException {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:GetBucketAcl\",\n" +
+        "        \"s3:PutBucketAcl\",\n" +
+        "        \"s3:ListBucket\"\n" +
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket\"\n" +
+        "    },\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": \"s3:*\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: bucket union of supported bucket ACLs; volume READ; prefix "" READ (from ListBucket)
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL);
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls, ALL_BUCKET_ACTIONS));
+    expectedResolvedNative.add(new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_ACTIONS));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: bucket union of supported bucket ACLs; volume READ; key "*" READ (from ListBucket)
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, ALL_BUCKET_ACTIONS));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_ACTIONS));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testAllowGetPutOnKey() throws OMException {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": [\"s3:GetObject\", \"s3:PutObject\"],\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket/folder/file.txt\"\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedFromBothAuthorizers = new LinkedHashSet<>();
+    // Expected: READ, CREATE, WRITE on key; bucket READ; volume READ
+    final Set<IOzoneObj> keySet = objSet(key("my-bucket", "folder/file.txt"));
+    final Set<ACLType> keyAcls = acls(READ, CREATE, WRITE);
+    expectedResolvedFromBothAuthorizers.add(
+        new OzoneGrant(objSet(volume(), bucket("my-bucket")), acls(READ), strSet("GetObject", "PutObject")));
+    expectedResolvedFromBothAuthorizers.add(
+        new OzoneGrant(keySet, keyAcls, strSet("GetObject", "PutObject")));
+
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedFromBothAuthorizers);
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedFromBothAuthorizers);
+  }
+
+  @Test
+  public void testAllActionsForKey() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket/*\"\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: all supported object ACLs on prefix "" under bucket; bucket READ, volume READ
+    final Set<IOzoneObj> keyPrefixSet = objSet(prefix("my-bucket", ""));
+    final Set<ACLType> allKeyAcls = acls(READ, CREATE, WRITE, DELETE);
+    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, allKeyAcls, ALL_OBJECT_ACTIONS));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume(), bucket("my-bucket")), acls(READ), ALL_OBJECT_ACTIONS));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    // Expected for Ranger: all supported object ACLs for resource type KEY with key name "*"
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    final Set<IOzoneObj> rangerKeySet = objSet(key("my-bucket", "*"));
+    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, allKeyAcls, ALL_OBJECT_ACTIONS));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("my-bucket")), acls(READ), ALL_OBJECT_ACTIONS));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testAllActionsForKeyWithPrefixCondition() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket/*\",\n" +
+        "    \"Condition\": {\n" +
+        "      \"StringLike\": {\n" +
+        "        \"s3:prefix\": [ \"team/folder\", \"team/folder/*\" ]\n" +
+        "      }\n" +
+        "    }\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected - only ListBucket supports s3:prefix and that is a bucket action,
+    // not object action
+    assertThat(resolvedFromNativeAuthorizer).isEmpty();
+    assertThat(resolvedFromRangerAuthorizer).isEmpty();
+  }
+
+  @Test
+  public void testAllActionsForBucket() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\"\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: union of supported bucket ACLs for bucket; volume READ; prefix "" READ (from ListBucket)
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    final Set<ACLType> allBucketAcls = acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL);
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, allBucketAcls, ALL_BUCKET_ACTIONS));
+    expectedResolvedNative.add(new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_ACTIONS));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    // Expected for Ranger: union of supported bucket ACLs for bucket; volume READ; key "*" READ (from ListBucket)
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, allBucketAcls, ALL_BUCKET_ACTIONS));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_ACTIONS));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testAllActionsForBucketWithPrefixCondition() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\",\n" +
+        "    \"Condition\": {\n" +
+        "      \"StringLike\": {\n" +
+        "        \"s3:prefix\": [ \"team/folder\", \"team/folder/*\" ]\n" +
+        "      }\n" +
+        "    }\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: READ, LIST ACLs for bucket (only ListBucket supports s3:prefix); volume READ;
+    // prefix "team/folder", "team/folder/" READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST);
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(volume(), prefix("my-bucket", "team/folder"),
+            prefix("my-bucket", "team/folder/")), acls(READ), strSet("ListBucket")));
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    // Expected for Ranger: READ, LIST ACLs for bucket (only ListBucket supports s3:prefix); volume READ,
+    // key "team/folder", "team/folder/*" READ
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(volume(), key("my-bucket", "team/folder"), key("my-bucket", "team/folder/*")),
+            acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testMultipleResourcesInSeparateStatements() throws OMException {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:GetBucketAcl\",\n" +
+        "        \"s3:PutBucketAcl\",\n" +
+        "        \"s3:ListBucket\"\n" +
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket\"\n" +
+        "    },\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": \"s3:*\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket/*\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: bucket READ, LIST, READ_ACL, WRITE_ACL; volume READ; prefix "" has all supported object
+    // ACLs and is further restricted to the object actions + ListBucket.
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST, READ_ACL, WRITE_ACL);
+    final Set<String> bucketAndObjectActions = new LinkedHashSet<>(
+        strSet("GetBucketAcl", "PutBucketAcl", "ListBucket"));
+    bucketAndObjectActions.addAll(ALL_OBJECT_ACTIONS);
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls, bucketAndObjectActions));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ), bucketAndObjectActions));
+    final Set<IOzoneObj> keyPrefixSet = objSet(prefix("my-bucket", ""));
+    final Set<ACLType> allKeyAcls = acls(READ, CREATE, WRITE, DELETE);
+    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, allKeyAcls, ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: bucket READ, LIST, READ_ACL, WRITE_ACL; volume READ; key "*" has all supported object ACLs
+    // and is further restricted to the object actions + ListBucket.
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, bucketAndObjectActions));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ), bucketAndObjectActions));
+    final Set<IOzoneObj> rangerKeySet = objSet(key("my-bucket", "*"));
+    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, allKeyAcls, ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testMultipleResourcesInOneStatement() throws OMException {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:*\"\n" +
+        "      ],\n" +
+        "      \"Resource\": [\n" +
+        "        \"arn:aws:s3:::my-bucket\",\n" +
+        "        \"arn:aws:s3:::my-bucket/*\"\n" +
+        "      ]\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: bucket union of supported bucket ACLs; prefix "" union of supported object ACLs; volume READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            bucketSet, acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL), ALL_BUCKET_AND_OBJECT_ACTIONS));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(prefix("my-bucket", "")), acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_AND_OBJECT_ACTIONS));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: bucket union of supported bucket ACLs; key "*" union of supported object ACLs; volume READ
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            bucketSet, acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL), ALL_BUCKET_AND_OBJECT_ACTIONS));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(key("my-bucket", "*")), acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ), ALL_BUCKET_AND_OBJECT_ACTIONS));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testMultipleResourcesWithDifferentBucketsAndDeepPathsInOneStatement() throws OMException {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:*\"\n" +
+        "      ],\n" +
+        "      \"Resource\": [\n" +
+        "        \"arn:aws:s3:::my-bucket/team/folder1/security/*\",\n" +
+        "        \"arn:aws:s3:::my-bucket2/team/folder2/misc/*\"\n" +
+        "      ]\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: all supported object ACLs on both prefixes; bucket READ; volume READ
+    final Set<IOzoneObj> keyPrefixSet = objSet(
+        prefix("my-bucket", "team/folder1/security/"), prefix("my-bucket2", "team/folder2/misc/"));
+    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume(), bucket("my-bucket"), bucket("my-bucket2")), acls(READ), ALL_OBJECT_ACTIONS));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: all supported object ACLs for resource type KEY with key name
+    // "team/folder1/security/*" under my-bucket and "team/folder2/misc/*" under my-bucket2; bucket READ; volume READ
+    final Set<IOzoneObj> rangerKeySet = objSet(
+        key("my-bucket", "team/folder1/security/*"), key("my-bucket2", "team/folder2/misc/*"));
+    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume(), bucket("my-bucket"), bucket("my-bucket2")), acls(READ), ALL_OBJECT_ACTIONS));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testUnsupportedActionIgnoredWhenItIsTheOnlyAction() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ReplicateObject\",\n" +         // unsupported action
+        "    \"Resource\": \"*\"\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    assertThat(resolvedFromNativeAuthorizer).isEmpty();
+    assertThat(resolvedFromRangerAuthorizer).isEmpty();
+  }
+
+  @Test
+  public void testUnsupportedResourceArnThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:dynamodb:us-east-2:123456789012:table/example-table\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Unsupported Resource Arn - " +
+        "arn:aws:dynamodb:us-east-2:123456789012:table/example-table", NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testListBucketWithWildcard() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::proj-*\"\n" +
+        "  }]\n" +
+        "}";
+
+    // Wildcards on bucket are not supported for Native authorizer
+    expectBucketWildcardUnsupportedExceptionForNativeAuthorizer(json);
+
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: bucket READ and LIST on wildcard pattern; volume and key "*" READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("proj-*"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST);
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("proj-*", "*")), acls(READ), strSet("ListBucket")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testListBucketOperationsWithNoPrefixes() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:ListBucket\",\n" +
+        "        \"s3:ListBucketMultipartUploads\"\n" +
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::proj\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: bucket READ and LIST; volume, prefix "" READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("proj"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST);
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket", "ListBucketMultipartUploads")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("ListBucket", "ListBucketMultipartUploads")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(prefix("proj", "")), acls(READ), strSet("ListBucket")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    // Expected for Ranger: bucket READ and LIST; volume, key "*" READ
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket", "ListBucketMultipartUploads")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("ListBucket", "ListBucketMultipartUploads")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("proj", "*")), acls(READ), strSet("ListBucket")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testIgnoresUnsupportedActionsWhenSupportedActionsAreIncluded() throws OMException {
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Sid\": \"AllowListingOfDataLakeFolder\",\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:GetAccelerateConfiguration\",\n" +    // unsupported action
+        "        \"s3:GetBucketAcl\",\n" +                  // ignored because it doesn't support s3:prefix condition
+        "        \"s3:GetObject\",\n" +                     // object-level action not applied for bucket
+        "        \"s3:GetObjectAcl\",\n" +                  // unsupported action
+        "        \"s3:ListBucket\",\n" +
+        "        \"s3:ListBucketMultipartUploads\"\n" +     // ignored because it doesn't support s3:prefix condition
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
+        "      \"Condition\": {\n" +
+        "        \"StringLike\": {\n" +
+        "          \"s3:prefix\": [ \"team/folder\", \"team/folder/*\" ]\n" +
+        "        }\n" +
+        "      }\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+
+    // Expected for native: READ, LIST bucket acls; volume and prefixes "team/folder", "team/folder/" READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("bucket1"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST);
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket")));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(volume(), prefix("bucket1", "team/folder"), prefix("bucket1", "team/folder/")),
+            acls(READ), strSet("ListBucket")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: READ, LIST bucket acls; volume and keys "team/folder" and "team/folder/*" READ
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(volume(), key("bucket1", "team/folder"), key("bucket1", "team/folder/*")),
+            acls(READ), strSet("ListBucket")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testMultiplePrefixesWithWildcards() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::logs/*\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": [\"a/*\", \"b/*\"] } }\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // s3:prefix conditions do not apply to object actions like s3:GetObject.
+    assertThat(resolvedFromNativeAuthorizer).isEmpty();
+    assertThat(resolvedFromRangerAuthorizer).isEmpty();
+  }
+
+  @Test
+  public void testListAndGetWithPrefixConditionSkipsObjectAction() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": [\"s3:ListBucket\", \"s3:GetObject\"],\n" +
+        "    \"Resource\": [\"arn:aws:s3:::logs\", \"arn:aws:s3:::logs/*\"],\n" +
+        "    \"Condition\": { \"StringLike\": { \"s3:prefix\": \"team/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Expected for native (GetObject is ignored because s3:prefix is present): READ, LIST bucket acls; volume READ;
+    // prefix "log/team" READ
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    expectedResolvedNative.add(new OzoneGrant(objSet(bucket("logs")), acls(READ, LIST), strSet("ListBucket")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume(), prefix("logs", "team/")), acls(READ), strSet("ListBucket")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    // Expected for Ranger (GetObject is ignored because s3:prefix is present): READ, LIST bucket acls; volume READ;
+    // key "log/team/*" READ
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("logs")), acls(READ, LIST), strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume(), key("logs", "team/*")), acls(READ), strSet("ListBucket")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testListBucketOnObjectResourceReturnsEmpty() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::logs/*\"\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    assertThat(resolvedFromNativeAuthorizer).isEmpty();
+    assertThat(resolvedFromRangerAuthorizer).isEmpty();
+  }
+
+  @Test
+  public void testObjectResourceWithWildcardInMiddle() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::logs/file*.log\"\n" +
+        "  }]\n" +
+        "}";
+
+    // Wildcards in middle of object resource are not supported for Native authorizer
+    expectResolveThrows(
+        json, NATIVE, "IAM session policy: Wildcard prefix patterns are not supported for Ozone native " +
+        "authorizer if wildcard is not at the end", NOT_SUPPORTED_OPERATION);
+
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: READ acl on key "file*.log", bucket READ, volume READ
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("logs", "file*.log"), bucket("logs"), volume()), acls(READ), strSet("GetObject")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testObjectResourceWithPrefixWildcard() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::myBucket/file*\"\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: READ acl on prefix "file" under bucket, bucket READ, volume READ
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(prefix("myBucket", "file"), bucket("myBucket"), volume()), acls(READ), strSet("GetObject")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: READ acl on key "file*", bucket READ, volume READ
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(key("myBucket", "file*"), bucket("myBucket"), volume()), acls(READ), strSet("GetObject")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testBucketActionOnAllResources() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:ListAllMyBuckets\",\n" +
+        "        \"s3:ListBucket\"\n" +
+        "      ],\n" +
+        "    \"Resource\": \"*\"\n" +
+        "  }]\n" +
+        "}";
+
+    // Wildcards on bucket are not supported for Native authorizer
+    expectBucketWildcardUnsupportedExceptionForNativeAuthorizer(json);
+
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: READ and LIST on volume and bucket (wildcard), READ on key "*"
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ, LIST), strSet("ListAllMyBuckets", "ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("*")), acls(READ, LIST), strSet("ListBucket")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("*", "*")), acls(READ), strSet("ListBucket")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testObjectActionOnAllResources() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:PutObject\",\n" +
+        "    \"Resource\": \"*\"\n" +
+        "  }]\n" +
+        "}";
+
+    // Wildcards on bucket are not supported for Native authorizer
+    expectBucketWildcardUnsupportedExceptionForNativeAuthorizer(json);
+
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: CREATE and WRITE key acls on wildcard pattern, bucket READ, volume READ
+    final Set<IOzoneObj> keySet = objSet(key("*", "*"));
+    final Set<ACLType> keyAcls = acls(CREATE, WRITE);
+    expectedResolvedRanger.add(new OzoneGrant(keySet, keyAcls, strSet("PutObject")));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("*")), acls(READ), strSet("PutObject")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testAllActionsOnAllResourcesWithPrefixCondition() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"*\",\n" +
+        "    \"Condition\": {\n" +
+        "      \"StringLike\": {\n" +
+        "        \"s3:prefix\": [ \"team/folder\", \"team/folder/*\" ]\n" +
+        "      }\n" +
+        "    }\n" +
+        "  }]\n" +
+        "}";
+
+    // Wildcards on bucket are not supported for Native authorizer
+    expectBucketWildcardUnsupportedExceptionForNativeAuthorizer(json);
+
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: (only ListBucket supports s3:prefix) READ volume; READ, LIST acl on bucket;
+    // READ on key "team/folder", "team/folder/*"
+    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("*")), acls(READ, LIST), strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(volume(), key("*", "team/folder"), key("*", "team/folder/*")), acls(READ), strSet("ListBucket")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testAllActionsOnAllResources() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"*\"\n" +
+        "  }]\n" +
+        "}";
+
+    // Wildcards on bucket are not supported for Native authorizer
+    expectBucketWildcardUnsupportedExceptionForNativeAuthorizer(json);
+
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger:
+    // - volume READ, LIST (ListAllMyBuckets applies at volume scope; other actions imply navigation READ)
+    // - bucket union of supported bucket ACLs
+    // - key union of supported object ACLs (and is only action-restricted to object actions + ListBucket)
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ, LIST), emptySet()));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(bucket("*")), acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL), ALL_BUCKET_AND_OBJECT_ACTIONS));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("*", "*")), acls(READ, CREATE, WRITE, DELETE), ALL_OBJECT_ACTIONS_WITH_LIST_BUCKET));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testAllActionsOnAllBucketResources() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::*\"\n" +
+        "  }]\n" +
+        "}";
+
+    // Wildcards on bucket are not supported for Native authorizer
+    expectBucketWildcardUnsupportedExceptionForNativeAuthorizer(json);
+
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: union of supported bucket ACLs on wildcard bucket; volume READ, LIST; key "*" READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("*"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST, CREATE, DELETE, READ_ACL, WRITE_ACL);
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls, ALL_BUCKET_ACTIONS));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("*", "*")), acls(READ), strSet("ListBucket")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ, LIST), ALL_BUCKET_ACTIONS_WITH_LIST_ALL_MY_BUCKETS));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testAllActionsOnAllObjectResources() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::*/*\"\n" +
+        "  }]\n" +
+        "}";
+
+    // Wildcards on bucket are not supported for Native authorizer
+    expectBucketWildcardUnsupportedExceptionForNativeAuthorizer(json);
+
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: union of supported object ACLs on wildcard key; bucket READ; volume READ
+    final Set<IOzoneObj> keySet = objSet(key("*", "*"));
+    final Set<ACLType> keyAcls = acls(READ, CREATE, WRITE, DELETE);
+    expectedResolvedRanger.add(new OzoneGrant(keySet, keyAcls, ALL_OBJECT_ACTIONS));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("*")), acls(READ), ALL_OBJECT_ACTIONS));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testWildcardActionGroupGetStar() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:Get*\",\n" +
+        "      \"Resource\": [\n" +
+        "        \"arn:aws:s3:::my-bucket\",\n" +
+        "        \"arn:aws:s3:::my-bucket/*\"\n" +
+        "      ]\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: bucket READ, READ_ACL acls
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    final Set<ACLType> bucketAcls = acls(READ, READ_ACL);
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "GetObject", "GetObjectTagging")));
+    // Expected for native: READ acl on prefix "" under bucket; volume READ
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("GetObject", "GetObjectTagging")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("GetBucketAcl", "GetObject", "GetObjectTagging")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: bucket READ, READ_ACL acls
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcls, strSet("GetBucketAcl", "GetObject", "GetObjectTagging")));
+    // Expected for Ranger: READ key acl for resource type KEY with key name "*"; volume READ
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("GetObject", "GetObjectTagging")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("GetBucketAcl", "GetObject", "GetObjectTagging")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testWildcardActionGroupListStar() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:List*\",\n" +
+        "      \"Resource\": [\n" +
+        "        \"arn:aws:s3:::my-bucket\",\n" +
+        "        \"arn:aws:s3:::my-bucket/*\"\n" +  // ListMultipartUploadParts has READ effect on file/object resources
+        "      ]\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: READ, LIST bucket acls, READ acl on prefix "" under bucket; volume READ
+    final Set<IOzoneObj> readAndListObjectsNative = objSet(bucket("my-bucket"));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            readAndListObjectsNative, acls(READ, LIST),
+            strSet("ListBucket", "ListBucketMultipartUploads", "ListMultipartUploadParts")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ),
+            strSet("ListBucket", "ListBucketMultipartUploads", "ListMultipartUploadParts")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(prefix("my-bucket", "")), acls(READ), strSet("ListBucket", "ListMultipartUploadParts")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: READ, LIST bucket acls; READ key acl for resource type KEY with key name "*";
+    // volume READ
+    final Set<IOzoneObj> readAndListObjectRanger = objSet(bucket("my-bucket"));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            readAndListObjectRanger, acls(READ, LIST),
+            strSet("ListBucket", "ListBucketMultipartUploads", "ListMultipartUploadParts")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(volume()), acls(READ),
+            strSet("ListBucket", "ListBucketMultipartUploads", "ListMultipartUploadParts")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(key("my-bucket", "*")), acls(READ), strSet("ListBucket", "ListMultipartUploadParts")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testWildcardActionGroupPutStar() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:Put*\",\n" +
+        "      \"Resource\": [\n" +
+        "        \"arn:aws:s3:::my-bucket\",\n" +
+        "        \"arn:aws:s3:::my-bucket/*\"\n" +
+        "      ]\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: bucket READ, READ_ACL, WRITE_ACL acl
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    final Set<ACLType> bucketAcl = acls(READ, READ_ACL, WRITE_ACL);
+    expectedResolvedNative.add(
+        new OzoneGrant(bucketSet, bucketAcl, strSet("PutBucketAcl", "PutObject", "PutObjectTagging")));
+    // Expected for native: CREATE, WRITE acls on prefix "" under bucket
+    final Set<IOzoneObj> keyPrefixSet = objSet(prefix("my-bucket", ""));
+    final Set<ACLType> keyAcls = acls(CREATE, WRITE);
+    expectedResolvedNative.add(new OzoneGrant(keyPrefixSet, keyAcls, strSet("PutObject", "PutObjectTagging")));
+    // Expected for native: volume READ
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("PutBucketAcl", "PutObject", "PutObjectTagging")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: bucket READ, READ_ACL, WRITE_ACL acl
+    expectedResolvedRanger.add(
+        new OzoneGrant(bucketSet, bucketAcl, strSet("PutBucketAcl", "PutObject", "PutObjectTagging")));
+    // Expected for Ranger: CREATE, WRITE key acls for resource type KEY with key name "*"
+    final Set<IOzoneObj> rangerKeySet = objSet(key("my-bucket", "*"));
+    expectedResolvedRanger.add(new OzoneGrant(rangerKeySet, keyAcls, strSet("PutObject", "PutObjectTagging")));
+    // Expected for Ranger: volume READ
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("PutBucketAcl", "PutObject", "PutObjectTagging")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testWildcardActionGroupDeleteStar() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:Delete*\",\n" +
+        "      \"Resource\": [\n" +
+        "        \"arn:aws:s3:::my-bucket\",\n" +
+        "        \"arn:aws:s3:::my-bucket/*\"\n" +
+        "      ]\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: DELETE and WRITE on prefix "" under bucket; bucket READ, DELETE; volume READ
+    final Set<IOzoneObj> resourceSetNative = objSet(prefix("my-bucket", ""));
+    expectedResolvedNative.add(
+        new OzoneGrant(resourceSetNative, acls(DELETE, WRITE), strSet("DeleteObject", "DeleteObjectTagging")));
+    expectedResolvedNative.add(
+        new OzoneGrant(
+            objSet(bucket("my-bucket")), acls(READ, DELETE),
+            strSet("DeleteBucket", "DeleteObject", "DeleteObjectTagging")));
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("DeleteBucket", "DeleteObject", "DeleteObjectTagging")));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: DELETE and WRITE on resource type KEY with key name "*"; bucket READ, DELETE; volume READ
+    final Set<IOzoneObj> resourceSetRanger = objSet(key("my-bucket", "*"));
+    expectedResolvedRanger.add(
+        new OzoneGrant(resourceSetRanger, acls(DELETE, WRITE), strSet("DeleteObject", "DeleteObjectTagging")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(
+            objSet(bucket("my-bucket")), acls(READ, DELETE),
+            strSet("DeleteBucket", "DeleteObject", "DeleteObjectTagging")));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume()), acls(READ), strSet("DeleteBucket", "DeleteObject", "DeleteObjectTagging")));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testMismatchedActionAndResourceReturnsEmpty() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +             // object-level action
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\"\n" +  // bucket-level resource
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    assertThat(resolvedFromNativeAuthorizer).isEmpty();
+    assertThat(resolvedFromRangerAuthorizer).isEmpty();
+  }
+
+  @Test
+  public void testInvalidResourceArnThrows() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::\"\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  private static void expectIllegalArgumentException(Runnable runnable, String expectedMessage) {
+    try {
+      runnable.run();
+      throw new AssertionError("Expected exception not thrown");
+    } catch (IllegalArgumentException ex) {
+      assertThat(ex.getMessage()).isEqualTo(expectedMessage);
+    }
+  }
+
+  private static void expectOMExceptionWithCode(RunnableThrowingOMException runnable, String expectedMessage,
+      OMException.ResultCodes expectedCode) {
+    try {
+      runnable.run();
+      throw new AssertionError("Expected exception not thrown");
+    } catch (OMException ex) {
+      assertThat(ex.getMessage()).isEqualTo(expectedMessage);
+      assertThat(ex.getResult()).isEqualTo(expectedCode);
+    }
+  }
+
+  @FunctionalInterface
+  private interface RunnableThrowingOMException {
+    void run() throws OMException;
+  }
+
+  private static IOzoneObj key(String bucket, String key) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.KEY)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(VOLUME)
+        .setBucketName(bucket)
+        .setKeyName(key)
+        .build();
+  }
+
+  private static IOzoneObj volume() {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.VOLUME)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(VOLUME)
+        .build();
+  }
+
+  private static IOzoneObj bucket(String bucket) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.BUCKET)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(VOLUME)
+        .setBucketName(bucket)
+        .build();
+  }
+
+  private static IOzoneObj prefix(String bucket, String prefix) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.PREFIX)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(VOLUME)
+        .setBucketName(bucket)
+        .setPrefixName(prefix)
+        .build();
+  }
+
+  private static Set<IOzoneObj> objSet(IOzoneObj... objs) {
+    final Set<IOzoneObj> s = new LinkedHashSet<>();
+    Collections.addAll(s, objs);
+    return s;
+  }
+
+  private static Set<ACLType> acls(ACLType... types) {
+    final Set<ACLType> s = new LinkedHashSet<>();
+    Collections.addAll(s, types);
+    return s;
+  }
+
+  private static Set<String> strSet(String... strs) {
+    final Set<String> s = new LinkedHashSet<>();
+    Collections.addAll(s, strs);
+    return s;
+  }
+
+  private static void expectResolveThrows(String json, IamSessionPolicyResolver.AuthorizerType authorizerType,
+      String expectedMessage, OMException.ResultCodes expectedCode) {
+    try {
+      resolve(json, VOLUME, authorizerType);
+      throw new AssertionError("Expected exception not thrown");
+    } catch (OMException ex) {
+      assertThat(ex.getMessage()).isEqualTo(expectedMessage);
+      assertThat(ex.getResult()).isEqualTo(expectedCode);
+    }
+  }
+
+  private static void expectResolveThrowsForBothAuthorizers(String json, String expectedMessage,
+      OMException.ResultCodes expectedCode) {
+    expectResolveThrows(json, NATIVE, expectedMessage, expectedCode);
+    expectResolveThrows(json, RANGER, expectedMessage, expectedCode);
+  }
+
+  private static void expectDuplicateFieldThrowsForBothAuthorizers(String json, String duplicateFieldName) {
+    expectResolveThrowsForBothAuthorizers(
+        json, "IAM session policy: Duplicate field '" + duplicateFieldName + "' in session policy",
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  /**
+   * Ensure resources containing wildcards in buckets throw an Exception
+   * when the OzoneNativeAuthorizer is used.
+   */
+  private static void expectBucketWildcardUnsupportedExceptionForNativeAuthorizer(String json) {
+    try {
+      resolve(json, VOLUME, NATIVE);
+      throw new AssertionError("Expected exception not thrown");
+    } catch (OMException ex) {
+      assertThat(ex.getMessage()).isEqualTo(
+          "IAM session policy: Wildcard bucket patterns are not supported for Ozone native authorizer");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
+    }
+  }
+
+  private static String createJsonStringLargerThan2048Characters() {
+    final StringBuilder jsonBuilder = new StringBuilder();
+    jsonBuilder.append("{\n")
+        .append("  \"Statement\": [{\n")
+        .append("    \"Effect\": \"Allow\",\n")
+        .append("    \"Action\": \"s3:ListBucket\",\n")
+        .append("    \"Resource\": \"arn:aws:s3:::");
+    // Add enough characters to exceed 2048
+    while (jsonBuilder.length() < 2048) {
+      jsonBuilder.append("very-long-bucket-name-that-exceeds-the-limit-");
+    }
+    jsonBuilder.append("\"\n")
+        .append("  }]\n")
+        .append('}');
+    return jsonBuilder.toString();
+  }
+
+  private static String create2048CharJsonString() {
+    final StringBuilder jsonBuilder = new StringBuilder();
+    jsonBuilder.append("{\n")
+        .append("  \"Statement\": [{\n")
+        .append("    \"Effect\": \"Allow\",\n")
+        .append("    \"Action\": \"s3:ListBucket\",\n")
+        .append("    \"Resource\": \"arn:aws:s3:::");
+    // Add characters to reach exactly 2048 (accounting for closing brackets and newlines)
+    // Closing part: "\"\n  }]\n}" = 8 chars
+    while (jsonBuilder.length() < 2048 - 8) {
+      jsonBuilder.append('a');
+    }
+    jsonBuilder.append("\"\n  }]\n}");
+    return jsonBuilder.toString();
+  }
+}
+

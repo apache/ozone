@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.exception;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
@@ -69,5 +70,37 @@ public class TestOS3Exceptions {
     Response response = exceptionMapper.toResponse(exception);
 
     assertEquals(MediaType.APPLICATION_XML_TYPE, response.getMediaType());
+  }
+
+  /**
+   * AWS S3 returns HTTP 400 Bad Request for ExpiredToken (not 403).
+   */
+  @Test
+  public void testExpiredTokenUsesBadRequestHttpStatus() {
+    assertEquals(HTTP_BAD_REQUEST, S3ErrorTable.EXPIRED_TOKEN.getHttpCode());
+    final OS3Exception fromTable = S3ErrorTable.newError(S3ErrorTable.EXPIRED_TOKEN, "resource");
+    assertEquals(HTTP_BAD_REQUEST, fromTable.getHttpCode());
+  }
+
+  @Test
+  public void testOS3ExceptionWithToken0() {
+    final OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.EXPIRED_TOKEN, "resource");
+    ex.setRequestId(OzoneUtils.getRequestID());
+    ex.setHostId(OzoneUtils.getRequestID());
+    ex.setToken0("token-value");
+
+    final String val = ex.toXml();
+    final String formatString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>%n" +
+        "<Error>%n" +
+        "  <Code>%s</Code>%n" +
+        "  <Message>%s</Message>%n" +
+        "  <Resource>%s</Resource>%n" +
+        "  <RequestId>%s</RequestId>%n" +
+        "  <HostId>%s</HostId>%n" +
+        "  <Token-0>%s</Token-0>%n" +
+        "</Error>%n";
+    final String expected = String.format(formatString, ex.getCode(), ex.getErrorMessage(), ex.getResource(),
+        ex.getRequestId(), ex.getHostId(), ex.getToken0());
+    assertEquals(expected, val);
   }
 }

@@ -54,14 +54,15 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    long modificationTime = Time.now();
-    OzoneManagerProtocolProtos.SetAclRequest.Builder setAclRequestBuilder =
+    final long modificationTime = Time.now();
+    final OzoneManagerProtocolProtos.SetAclRequest.Builder setAclRequestBuilder =
         getOmRequest().getSetAclRequest().toBuilder()
             .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
+    // super.preExecute resolves S3Authentication (STS) for Ratis apply.  Merge SetAclRequest changes on top.
+    final OMRequest request = super.preExecute(ozoneManager);
+    return request.toBuilder()
         .setSetAclRequest(setAclRequestBuilder)
-        .setUserInfo(getUserInfo())
         .build();
   }
 

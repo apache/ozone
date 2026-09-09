@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.S3GAction;
@@ -65,7 +66,6 @@ import org.apache.hadoop.ozone.s3.util.ContinueToken;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,15 +144,9 @@ public class BucketEndpoint extends BucketOperationHandler {
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
 
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
-
     } catch (OMException ex) {
       getMetrics().updateGetBucketFailureStats(context.getStartNanos());
-      if (ex.getResult() == ResultCodes.FILE_NOT_FOUND) {
-        // File not found, continue and send normal response with 0 keyCount
-        LOG.debug("Key Not found prefix: {}", prefix);
-      } else {
-        throw ex;
-      }
+      handleOMException(ex, bucketName, prefix);
     } catch (Exception ex) {
       getMetrics().updateGetBucketFailureStats(context.getStartNanos());
       throw ex;
@@ -185,50 +179,56 @@ public class BucketEndpoint extends BucketOperationHandler {
     String lastKey = null;
     int count = 0;
     if (maxKeys > 0) {
-      while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
-        OzoneKey next = ozoneKeyIterator.next();
-        if (StringUtils.isNotEmpty(prefix) && !next.getName().startsWith(prefix)) {
-          continue;
-        }
-        if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
-          continue;
-        }
-        String relativeKeyName = next.getName().substring(prefix.length());
+      try {
+        while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
+          OzoneKey next = ozoneKeyIterator.next();
+          if (StringUtils.isNotEmpty(prefix) && !next.getName().startsWith(prefix)) {
+            continue;
+          }
+          if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
+            continue;
+          }
+          String relativeKeyName = next.getName().substring(prefix.length());
 
-        int depth = StringUtils.countMatches(relativeKeyName, delimiter);
-        if (!StringUtils.isEmpty(delimiter)) {
-          if (depth > 0) {
-            // means key has multiple delimiters in its value.
-            // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
-            String dirName = relativeKeyName.substring(0, relativeKeyName
-                .indexOf(delimiter));
-            if (!dirName.equals(prevDir)) {
-              response.addPrefix(EncodingTypeObject.createNullable(
-                  prefix + dirName + delimiter, encodingType));
-              prevDir = dirName;
+          int depth = StringUtils.countMatches(relativeKeyName, delimiter);
+          if (!StringUtils.isEmpty(delimiter)) {
+            if (depth > 0) {
+              // means key has multiple delimiters in its value.
+              // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
+              String dirName = relativeKeyName.substring(0, relativeKeyName
+                  .indexOf(delimiter));
+              if (!dirName.equals(prevDir)) {
+                response.addPrefix(EncodingTypeObject.createNullable(
+                    prefix + dirName + delimiter, encodingType));
+                prevDir = dirName;
+                count++;
+              }
+            } else if (relativeKeyName.endsWith(delimiter)) {
+              // means or key is same as prefix with delimiter at end and ends with
+              // delimiter. ex: dir/, where prefix is dir and delimiter is /
+              response.addPrefix(
+                  EncodingTypeObject.createNullable(relativeKeyName, encodingType));
+              count++;
+            } else {
+              // means our key is matched with prefix if prefix is given and it
+              // does not have any common prefix.
+              addKey(response, next, includeOwner);
               count++;
             }
-          } else if (relativeKeyName.endsWith(delimiter)) {
-            // means or key is same as prefix with delimiter at end and ends with
-            // delimiter. ex: dir/, where prefix is dir and delimiter is /
-            response.addPrefix(
-                EncodingTypeObject.createNullable(relativeKeyName, encodingType));
-            count++;
           } else {
             // means our key is matched with prefix if prefix is given and it
             // does not have any common prefix.
             addKey(response, next, includeOwner);
             count++;
           }
-        } else {
-          addKey(response, next, includeOwner);
-          count++;
-        }
 
-        if (count == maxKeys) {
-          lastKey = next.getName();
-          break;
+          if (count == maxKeys) {
+            lastKey = next.getName();
+            break;
+          }
         }
+      } catch (RuntimeException ex) {
+        handleRuntimeException(ex, context, bucketName, prefix);
       }
     }
 
@@ -293,19 +293,19 @@ public class BucketEndpoint extends BucketOperationHandler {
   @HEAD
   public Response head(@PathParam(BUCKET) String bucketName)
       throws OS3Exception, IOException {
-    long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.HEAD_BUCKET;
+    S3RequestContext context = new S3RequestContext(this, S3GAction.HEAD_BUCKET);
+    long startNanos = context.getStartNanos();
     try {
       OzoneBucket bucket = getVolume().getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-      auditReadSuccess(s3GAction);
+      auditReadSuccess(context.getAction());
       getMetrics().updateHeadBucketSuccessStats(startNanos);
       return Response.ok().build();
     } catch (OMException e) {
-      auditReadFailure(s3GAction, e);
+      auditReadFailure(context.getAction(), e);
       throw newError(bucketName, e);
     } catch (Exception e) {
-      auditReadFailure(s3GAction, e);
+      auditReadFailure(context.getAction(), e);
       throw e;
     }
   }
@@ -345,14 +345,21 @@ public class BucketEndpoint extends BucketOperationHandler {
       @QueryParam(QueryParams.DELETE) String delete,
       MultiDeleteRequest request
   ) throws OS3Exception, IOException {
-    S3GAction s3GAction = S3GAction.MULTI_DELETE;
+    S3RequestContext context = new S3RequestContext(this, S3GAction.MULTI_DELETE);
 
     if (request.getObjects() != null
         && request.getObjects().size() > S3Consts.S3_DELETE_OBJECTS_MAX_KEYS) {
       throw newError(S3ErrorTable.MALFORMED_XML, bucketName);
     }
 
-    OzoneBucket bucket = getVolume().getBucket(bucketName);
+    final OzoneBucket bucket;
+    try {
+      bucket = getVolume().getBucket(bucketName);
+    } catch (OMException ex) {
+      throw newError(bucketName, ex);
+    } catch (IOException ex) {
+      throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
+    }
     MultiDeleteResponse result = new MultiDeleteResponse();
     List<String> deleteKeys = new ArrayList<>();
 
@@ -361,7 +368,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       for (DeleteObject keyToDelete : request.getObjects()) {
         deleteKeys.add(keyToDelete.getKey());
       }
-      long startNanos = Time.monotonicNowNanos();
+      long startNanos = context.getStartNanos();
       try {
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
         undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
@@ -381,25 +388,35 @@ public class BucketEndpoint extends BucketOperationHandler {
         }
         getMetrics().updateDeleteKeySuccessStats(startNanos);
       } catch (IOException ex) {
-        LOG.error("Delete key failed: {}", ex.getMessage());
         getMetrics().updateDeleteKeyFailureStats(startNanos);
+        final OMException omEx = (OMException) HddsClientUtils.containsException(ex, OMException.class);
+        if (omEx != null) {
+          auditMultiDeleteFailure(context, deleteKeys, omEx);
+          throw newError(bucketName, omEx);
+        }
+        LOG.error("Delete key failed: {}", ex.getMessage());
         result.addError(
             new Error("ALL", "InternalError",
                 ex.getMessage()));
       }
     }
 
-    AuditMessage.Builder message = auditMessageFor(s3GAction);
-    message.getParams().put("failedDeletes", deleteKeys.toString());
-
     if (!result.getErrors().isEmpty()) {
-      AUDIT.logWriteFailure(message.withResult(AuditEventStatus.FAILURE)
-          .withException(new Exception("MultiDelete Exception")).build());
+      auditMultiDeleteFailure(context, deleteKeys, new Exception("MultiDelete Exception"));
     } else {
+      AuditMessage.Builder message = auditMessageFor(context.getAction());
+      message.getParams().put("failedDeletes", deleteKeys.toString());
       AUDIT.logWriteSuccess(message.withResult(AuditEventStatus.SUCCESS).build());
     }
 
     return result;
+  }
+
+  void auditMultiDeleteFailure(S3RequestContext context, List<String> deleteKeys, Throwable ex) {
+    final AuditMessage.Builder message = auditMessageFor(context.getAction());
+    message.getParams().put("failedDeletes", deleteKeys.toString());
+    AUDIT.logWriteFailure(message.withResult(AuditEventStatus.FAILURE)
+        .withException(ex).build());
   }
 
   private void addKey(ListObjectResponse response, OzoneKey next, boolean includeOwner) {
@@ -440,6 +457,33 @@ public class BucketEndpoint extends BucketOperationHandler {
         .add(this)
         .build();
     handler = new AuditingBucketOperationHandler(chain);
+  }
+
+  private void handleOMException(OMException ex, String bucketName, String prefix) throws OMException {
+    if (isExpiredToken(ex)) {
+      throw newError(S3ErrorTable.EXPIRED_TOKEN, bucketName, ex);
+    } else if (isAccessDenied(ex)) {
+      throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+    } else if (ex.getResult() == ResultCodes.FILE_NOT_FOUND) {
+      // File not found, continue and send normal response with 0 keyCount
+      LOG.debug("Key Not found prefix: {}", prefix);
+    } else {
+      throw ex;
+    }
+  }
+
+  private void handleRuntimeException(RuntimeException ex, S3RequestContext context, String bucketName, String prefix)
+      throws OMException {
+    getMetrics().updateGetBucketFailureStats(context.getStartNanos());
+    if (ex.getCause() instanceof OMException) {
+      final OMException omException = (OMException) ex.getCause();
+      if (omException.getResult() == ResultCodes.FILE_NOT_FOUND) {
+        throw ex;
+      }
+      handleOMException(omException, bucketName, prefix);
+    } else {
+      throw ex;
+    }
   }
 
   private boolean shouldIncludeOwnerInListResponse() {

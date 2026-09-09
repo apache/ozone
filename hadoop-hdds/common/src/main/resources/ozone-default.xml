@@ -2116,6 +2116,54 @@
       will be used for http authentication.
     </description>
   </property>
+
+  <property>
+    <name>ozone.s3g.sts.http.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The boolean which enables the Ozone S3Gateway STS endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.http-bind-host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The bind host for the S3 Gateway STS HTTP server.
+      If this optional address is set, it overrides only the hostname portion of
+      ozone.s3g.sts.http-address.
+      If not set, the value of ozone.s3g.http-bind-host is used.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.http-address</name>
+    <value>0.0.0.0:9880</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The HTTP address for the S3 Gateway STS endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.https-bind-host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The bind host for the S3 Gateway STS HTTPS server.
+      If this optional address is set, it overrides only the hostname portion of
+      ozone.s3g.sts.http-address.
+      If not set, the value of ozone.s3g.https-bind-host is used.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.https-address</name>
+    <value>0.0.0.0:9881</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The HTTPS address for the S3 Gateway STS endpoint.
+    </description>
+  </property>
+
   <property>
     <name>ozone.s3g.metrics.percentiles.intervals.seconds</name>
     <value>60</value>
@@ -5211,6 +5259,27 @@
     <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
   </property>
 
+  <property>
+    <name>ozone.om.sts.token.cleanup.service.interval</name>
+    <value>3h</value>
+    <tag>OZONE, OM, PERFORMANCE, SECURITY</tag>
+    <description>
+      A background service that periodically scans the s3RevokedStsTokenTable and deletes
+      revocation entries whose cutoff is older than the maximum STS token lifetime (12 hours).
+      This property controls how often the cleanup service runs. Unit could be defined with
+      postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.sts.token.cleanup.service.timeout</name>
+    <value>15m</value>
+    <tag>OZONE, OM, PERFORMANCE, SECURITY</tag>
+    <description>
+      A timeout value for the revoked STS token cleanup service. If this is set
+      greater than 0, the service will stop waiting for the deletion
+      completion after this time. Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
   <property>
     <name>ozone.scm.ratis.events.max.limit</name>
     <value>100</value>
