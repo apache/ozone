@@ -55,28 +55,24 @@ public class TestDataChecksumMismatchCheckHandler {
   }
 
   @Test
-  void testMismatchIsReportedAfterTwoScans() {
+  void testMismatchIsReported() {
     ContainerInfo container = createContainerInfo(
         RatisReplicationConfig.getInstance(THREE), 10,
         HddsProtos.LifeCycleState.CLOSED);
     Set<ContainerReplica> replicas = createReplicasWithChecksums(container,
         new long[]{10, 10, 10}, new long[]{100, 200, 100});
 
-    ReplicationManagerReport firstReport = runScan(container, replicas);
-    assertEquals(0, firstReport.getStat(DATA_CHECKSUM_MISMATCH));
-    assertFalse(handler.hasPersistentMismatch(container.containerID()));
-
-    ReplicationManagerReport secondReport = runScan(container, replicas);
-    assertEquals(1, secondReport.getStat(DATA_CHECKSUM_MISMATCH));
-    assertThat(secondReport.getSample(DATA_CHECKSUM_MISMATCH))
+    ReplicationManagerReport report = runScan(container, replicas);
+    assertEquals(1, report.getStat(DATA_CHECKSUM_MISMATCH));
+    assertThat(report.getSample(DATA_CHECKSUM_MISMATCH))
         .containsExactly(container.containerID());
-    assertThat(handler.hasPersistentMismatch(container.containerID())).isTrue();
+    assertThat(handler.hasReportedMismatch(container.containerID())).isTrue();
 
     ReplicationManagerReport resolvedReport = runScan(container,
         createReplicasWithChecksums(container, new long[]{10, 10, 10},
             new long[]{100, 100, 100}));
     assertEquals(0, resolvedReport.getStat(DATA_CHECKSUM_MISMATCH));
-    assertFalse(handler.hasPersistentMismatch(container.containerID()));
+    assertFalse(handler.hasReportedMismatch(container.containerID()));
   }
 
   @Test
@@ -86,7 +82,6 @@ public class TestDataChecksumMismatchCheckHandler {
         HddsProtos.LifeCycleState.OPEN);
     Set<ContainerReplica> replicas = createReplicasWithChecksums(openRatis,
         new long[]{10, 10, 10}, new long[]{100, 200, 100});
-    runScan(openRatis, replicas);
     ReplicationManagerReport report = runScan(openRatis, replicas);
     assertEquals(0, report.getStat(DATA_CHECKSUM_MISMATCH));
 
@@ -95,7 +90,6 @@ public class TestDataChecksumMismatchCheckHandler {
         HddsProtos.LifeCycleState.CLOSED);
     replicas = createReplicasWithChecksums(closedEc,
         new long[]{10, 10, 10}, new long[]{100, 200, 100});
-    runScan(closedEc, replicas);
     report = runScan(closedEc, replicas);
     assertEquals(0, report.getStat(DATA_CHECKSUM_MISMATCH));
   }
@@ -108,33 +102,35 @@ public class TestDataChecksumMismatchCheckHandler {
     Set<ContainerReplica> replicas = createReplicasWithChecksums(container,
         new long[]{10, 10, 10}, new long[]{100, 200, 100});
 
+    ReplicationManagerReport incompleteReport = new ReplicationManagerReport(10);
     handler.startScan();
     assertFalse(handler.handle(createRequest(container, replicas,
-        new ReplicationManagerReport(10))));
+        incompleteReport)));
     handler.abortScan();
+    assertEquals(0, incompleteReport.getStat(DATA_CHECKSUM_MISMATCH));
+    assertFalse(handler.hasReportedMismatch(container.containerID()));
 
     ReplicationManagerReport report = runScan(container, replicas);
-    assertEquals(0, report.getStat(DATA_CHECKSUM_MISMATCH));
-    assertFalse(handler.hasPersistentMismatch(container.containerID()));
+    assertEquals(1, report.getStat(DATA_CHECKSUM_MISMATCH));
+    assertThat(handler.hasReportedMismatch(container.containerID())).isTrue();
   }
 
   @Test
-  void testReadOnlyCheckDoesNotAffectDebounce() {
+  void testReadOnlyRequestIsIgnored() {
     ContainerInfo container = createContainerInfo(
         RatisReplicationConfig.getInstance(THREE), 10,
         HddsProtos.LifeCycleState.CLOSED);
     Set<ContainerReplica> replicas = createReplicasWithChecksums(container,
         new long[]{10, 10, 10}, new long[]{100, 200, 100});
+    ReplicationManagerReport report = new ReplicationManagerReport(10);
 
     handler.startScan();
-    ReplicationManagerReport readOnlyReport = new ReplicationManagerReport(10);
-    assertFalse(handler.handle(createRequest(container, replicas,
-        readOnlyReport, true)));
-    handler.completeScan(readOnlyReport);
+    assertFalse(handler.handle(createRequest(container, replicas, report,
+        true)));
+    handler.completeScan(report);
 
-    ReplicationManagerReport report = runScan(container, replicas);
     assertEquals(0, report.getStat(DATA_CHECKSUM_MISMATCH));
-    assertFalse(handler.hasPersistentMismatch(container.containerID()));
+    assertFalse(handler.hasReportedMismatch(container.containerID()));
   }
 
   private ReplicationManagerReport runScan(ContainerInfo container,

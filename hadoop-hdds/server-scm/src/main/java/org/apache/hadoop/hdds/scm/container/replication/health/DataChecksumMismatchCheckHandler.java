@@ -39,7 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Detects replicas with the same BCSID and different data checksums.
+ * Detects replicas with the same BCSID and different data checksums during a
+ * full Replication Manager scan.
  */
 public class DataChecksumMismatchCheckHandler extends AbstractCheck {
 
@@ -48,28 +49,24 @@ public class DataChecksumMismatchCheckHandler extends AbstractCheck {
 
   private final Map<ContainerID, Set<ContainerReplica>> currentMismatches =
       new HashMap<>();
-  private final Set<ContainerID> mismatchesInPreviousScan = new HashSet<>();
   private final Set<ContainerID> warnedMismatches = new HashSet<>();
-  private volatile Set<ContainerID> persistentMismatches =
+  private volatile Set<ContainerID> reportedMismatches =
       Collections.emptySet();
   private boolean scanInProgress;
 
   @Override
   public boolean handle(ContainerCheckRequest request) {
+    if (request.isReadOnly() || !scanInProgress) {
+      return false;
+    }
+
     ContainerInfo container = request.getContainerInfo();
     Set<ContainerReplica> replicas = request.getContainerReplicas();
     if (container.getState() == CLOSED &&
         container.getReplicationType() == RATIS &&
         hasMismatch(replicas, ContainerReplica::getSequenceId,
             ContainerReplica::getDataChecksum)) {
-      if (request.isReadOnly()) {
-        if (hasPersistentMismatch(container.containerID())) {
-          request.getReport().incrementAndSampleAdditionalState(
-              DATA_CHECKSUM_MISMATCH, container.containerID());
-        }
-      } else if (scanInProgress) {
-        currentMismatches.put(container.containerID(), replicas);
-      }
+      currentMismatches.put(container.containerID(), replicas);
     }
     return false;
   }
@@ -80,19 +77,16 @@ public class DataChecksumMismatchCheckHandler extends AbstractCheck {
     scanInProgress = true;
   }
 
-  /**
-   * Completes a scan and reports mismatches seen in two consecutive scans.
-   */
+  /** Completes a scan and reports the detected mismatches. */
   public void completeScan(ReplicationManagerReport report) {
-    Set<ContainerID> confirmed = new HashSet<>(currentMismatches.keySet());
-    confirmed.retainAll(mismatchesInPreviousScan);
+    Set<ContainerID> detected = new HashSet<>(currentMismatches.keySet());
 
-    confirmed.stream()
+    detected.stream()
         .sorted(Comparator.comparingLong(ContainerID::getId))
         .forEach(containerID -> report.incrementAndSampleAdditionalState(
             DATA_CHECKSUM_MISMATCH, containerID));
 
-    Set<ContainerID> newWarnings = new HashSet<>(confirmed);
+    Set<ContainerID> newWarnings = new HashSet<>(detected);
     newWarnings.removeAll(warnedMismatches);
     newWarnings.stream()
         .sorted(Comparator.comparingLong(ContainerID::getId))
@@ -100,11 +94,9 @@ public class DataChecksumMismatchCheckHandler extends AbstractCheck {
             "Container {} has replicas with the same BCSID but different data checksums: {}",
             containerID, formatChecksumDetails(currentMismatches.get(containerID))));
 
-    warnedMismatches.retainAll(currentMismatches.keySet());
-    warnedMismatches.addAll(confirmed);
-    mismatchesInPreviousScan.clear();
-    mismatchesInPreviousScan.addAll(currentMismatches.keySet());
-    persistentMismatches = Collections.unmodifiableSet(confirmed);
+    warnedMismatches.clear();
+    warnedMismatches.addAll(detected);
+    reportedMismatches = Collections.unmodifiableSet(detected);
     currentMismatches.clear();
     scanInProgress = false;
   }
@@ -115,8 +107,8 @@ public class DataChecksumMismatchCheckHandler extends AbstractCheck {
     scanInProgress = false;
   }
 
-  public boolean hasPersistentMismatch(ContainerID containerID) {
-    return persistentMismatches.contains(containerID);
+  public boolean hasReportedMismatch(ContainerID containerID) {
+    return reportedMismatches.contains(containerID);
   }
 
   private static String formatChecksumDetails(Set<ContainerReplica> replicas) {

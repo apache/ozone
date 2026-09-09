@@ -127,7 +127,7 @@ public class TestInfoSubCommand {
   }
 
   @Test
-  public void testUnconfirmedDataChecksumMismatchIsNotInOutput()
+  public void testDataChecksumMismatchIsNotShownWhenNotReported()
       throws Exception {
     doReturn(new ContainerReplicaInfoResult(
         getReplicas(false, new long[]{10, 10, 10},

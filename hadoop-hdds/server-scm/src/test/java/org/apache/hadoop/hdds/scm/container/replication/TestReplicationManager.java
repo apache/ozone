@@ -1090,7 +1090,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testDataChecksumMismatchIsDebouncedAndWarnedOnce()
+  public void testDataChecksumMismatchIsReportedAndWarnedOnce()
       throws ContainerNotFoundException {
     RatisReplicationConfig ratisReplicationConfig =
         RatisReplicationConfig.getInstance(THREE);
@@ -1109,13 +1109,6 @@ public class TestReplicationManager {
     replicationManager.processAll();
     verify(containerManager, times(1))
         .getContainerReplicas(container.containerID());
-    assertEquals(0, replicationManager.getContainerReport()
-        .getStat(DATA_CHECKSUM_MISMATCH));
-    assertFalse(replicationManager.hasContainerChecksumMismatch(
-        container.containerID()));
-    assertEquals(0, StringUtils.countMatches(logs.getOutput(), warning));
-
-    replicationManager.processAll();
     assertEquals(1, replicationManager.getContainerReport()
         .getStat(DATA_CHECKSUM_MISMATCH));
     assertThat(replicationManager.getContainerReport()
@@ -1140,9 +1133,6 @@ public class TestReplicationManager {
         container.containerID()));
 
     containerReplicaMap.put(container.containerID(), mismatch);
-    replicationManager.processAll();
-    assertEquals(0, replicationManager.getContainerReport()
-        .getStat(DATA_CHECKSUM_MISMATCH));
     replicationManager.processAll();
     assertEquals(1, replicationManager.getContainerReport()
         .getStat(DATA_CHECKSUM_MISMATCH));

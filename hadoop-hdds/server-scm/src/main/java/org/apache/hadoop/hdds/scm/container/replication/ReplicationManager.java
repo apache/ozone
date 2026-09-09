@@ -1496,7 +1496,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   }
 
   public boolean hasContainerChecksumMismatch(ContainerID containerID) {
-    return checksumMismatchCheckHandler.hasPersistentMismatch(containerID);
+    return checksumMismatchCheckHandler.hasReportedMismatch(containerID);
   }
 
   public ReplicationManagerConfiguration getConfig() {
