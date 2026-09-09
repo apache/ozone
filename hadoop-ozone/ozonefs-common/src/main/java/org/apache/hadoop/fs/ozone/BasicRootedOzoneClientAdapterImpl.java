@@ -345,6 +345,12 @@ public class BasicRootedOzoneClientAdapterImpl
         }
         // Try get bucket again
         bucket = proxy.getBucketDetails(volumeStr, bucketStr);
+
+        BucketLayout resolvedBucketLayout =
+            OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+                new HashSet<>());
+
+        OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
       } else {
         throw ex;
       }
@@ -690,19 +696,24 @@ public class BasicRootedOzoneClientAdapterImpl
    * Return FileStatusAdapter based on OFSPath being a
    * valid bucket path or valid snapshot path.
    * Throws exception in case of failure.
+   *
+   * <p>Non-snapshot paths call OM GetFileStatus directly (HDDS-15925) without a
+   * prior InfoBucket RPC. OBJECT_STORE buckets are rejected by OM GetFileStatus.
+   * Mutating OFS operations still validate layout via {@link #getBucket(OFSPath, boolean)}.
    */
   private FileStatusAdapter getFileStatusForKeyOrSnapshot(
       OFSPath ofsPath, URI uri, Path qualifiedPath, String userName,
       boolean headOp) throws IOException {
     String key = ofsPath.getKeyName();
     try {
-      OzoneBucket bucket = getBucket(ofsPath, false);
       if (ofsPath.isSnapshotPath()) {
+        OzoneBucket bucket = getBucket(ofsPath, false);
         OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
         return getFileStatusAdapterWithSnapshotIndicator(
             volume, bucket, uri);
       } else {
-        OzoneFileStatus status = bucket.getFileStatus(key, headOp);
+        OzoneFileStatus status = proxy.getOzoneFileStatus(ofsPath.getVolumeName(),
+            ofsPath.getBucketName(), key, headOp);
         return toFileStatusAdapter(status, userName, uri, qualifiedPath,
             ofsPath.getNonKeyPath());
       }
@@ -711,6 +722,10 @@ public class BasicRootedOzoneClientAdapterImpl
         throw new FileNotFoundException(key + ": No such file or directory!");
       } else if (e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
         throw new FileNotFoundException(key + ": Bucket doesn't exist!");
+      }
+      String message = e.getMessage();
+      if (message != null && message.contains("does not support file system semantics")) {
+        throw new IllegalArgumentException(message);
       }
       throw e;
     }

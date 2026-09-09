@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -62,15 +63,20 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   private BasicRootedOzoneClientAdapterImpl adapter;
   private OzoneBucket bucket;
+  private ClientProtocol proxy;
 
   @BeforeEach
   public void setUp() throws Exception {
     adapter = mock(BasicRootedOzoneClientAdapterImpl.class, CALLS_REAL_METHODS);
     bucket = mock(OzoneBucket.class);
+    proxy = mock(ClientProtocol.class);
     doReturn(bucket).when(adapter).getBucket(any(OFSPath.class), eq(false));
 
-    // Inject a mock object store so the volume/snapshot dispatch branches can
-    // run without a live OM connection.
+    Field proxyField =
+        BasicRootedOzoneClientAdapterImpl.class.getDeclaredField("proxy");
+    proxyField.setAccessible(true);
+    proxyField.set(adapter, proxy);
+
     OzoneVolume volume = mock(OzoneVolume.class);
     when(volume.getName()).thenReturn("vol");
     when(volume.getOwner()).thenReturn("user");
@@ -101,25 +107,26 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void keyPathThreadsHeadOp() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenReturn(fileStatus(false));
 
     assertFalse(adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
         "user", true).isDir());
 
     ArgumentCaptor<Boolean> headOp = ArgumentCaptor.forClass(Boolean.class);
-    verify(bucket).getFileStatus(anyString(), headOp.capture());
+    verify(proxy).getOzoneFileStatus(eq("vol"), eq("bucket"), eq("key"),
+        headOp.capture());
     assertTrue(headOp.getValue());
   }
 
   @Test
   public void fourArgOverloadDoesNotUseHeadOp() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenReturn(fileStatus(true));
 
     assertTrue(adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
         "user").isDir());
-    verify(bucket).getFileStatus(anyString(), eq(false));
+    verify(proxy).getOzoneFileStatus(eq("vol"), eq("bucket"), eq("key"), eq(false));
   }
 
   @Test
@@ -130,7 +137,7 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void fileNotFoundMappedToFileNotFoundException() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenThrow(new OMException("missing",
             OMException.ResultCodes.FILE_NOT_FOUND));
     assertThrows(FileNotFoundException.class,
@@ -140,7 +147,7 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void otherOMExceptionPropagates() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenThrow(new OMException("boom",
             OMException.ResultCodes.INTERNAL_ERROR));
     assertThrows(OMException.class,
@@ -150,7 +157,7 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
 
   @Test
   public void bucketNotFoundMappedToFileNotFoundException() throws IOException {
-    when(bucket.getFileStatus(anyString(), anyBoolean()))
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenThrow(new OMException("no bucket",
             OMException.ResultCodes.BUCKET_NOT_FOUND));
     assertThrows(FileNotFoundException.class,
@@ -169,7 +176,6 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
     when(bucket.getVolumeName()).thenReturn("vol");
     when(bucket.getName()).thenReturn("bucket");
     when(bucket.getCreationTime()).thenReturn(Instant.EPOCH);
-    // keyName == ".snapshot" is the snapshot indicator path.
     assertTrue(adapter.getFileStatus("/vol/bucket/.snapshot", URI_OFS,
         WORKING_DIR, "user", true).isDir());
   }
