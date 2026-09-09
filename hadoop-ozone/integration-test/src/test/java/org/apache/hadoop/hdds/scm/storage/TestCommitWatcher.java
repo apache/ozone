@@ -128,6 +128,11 @@ public class TestCommitWatcher {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
+    // Wait for the RATIS THREE pipeline to reach OPEN state before any writes.
+    // A pipeline only opens once it is healthy, which requires an elected Ratis
+    // leader; otherwise the first write can race leader election and fail with
+    // NotLeaderException -> RaftRetryFailureException -> AlreadyClosedException.
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 60000);
     client = OzoneClientFactory.getRpcClient(conf);
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(VOLUME_NAME);
