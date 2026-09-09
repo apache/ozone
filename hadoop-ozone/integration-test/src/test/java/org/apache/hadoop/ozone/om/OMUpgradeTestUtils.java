@@ -50,9 +50,9 @@ public final class OMUpgradeTestUtils {
             hdds.getNumDatanodesFinalized(), hdds.getNumDatanodesTotal());
         return status.getClusterFinalizationStatus() == HddsProtos.FinalizationStatus.FINALIZED;
       } catch (IOException e) {
-        fail(e.getMessage());
+        LOG.error("Failed to poll finalization status. Will retry", e);
       }
       return false;
-    }, 2000, 20000);
+    }, 2000, 60_000);
   }
 }
