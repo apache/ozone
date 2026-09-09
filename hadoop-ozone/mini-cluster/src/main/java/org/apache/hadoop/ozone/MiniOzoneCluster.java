@@ -262,6 +262,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
+    protected boolean metricsLeakAssertEnabled = true;
     protected CertificateClient certClient;
     protected SecretKeyClient secretKeyClient;
     protected DatanodeFactory dnFactory = UniformDatanodesFactory.newBuilder().build();
@@ -351,6 +352,17 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder setStartDataNodes(boolean nodes) {
       this.startDataNodes = nodes;
+      return this;
+    }
+
+    /**
+     * Whether to assert that no metrics sources leak on cluster shutdown.
+     * Disable for tests that run multiple clusters concurrently (e.g. via
+     * MiniOzoneClusterProvider), because the metrics registry is shared
+     * JVM-wide and a concurrent cluster's sources would be flagged as leaks.
+     */
+    public Builder setMetricsLeakAssertEnabled(boolean enabled) {
+      this.metricsLeakAssertEnabled = enabled;
       return this;
     }
 

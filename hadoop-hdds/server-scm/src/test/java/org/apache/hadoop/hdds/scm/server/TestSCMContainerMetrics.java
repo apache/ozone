@@ -61,7 +61,8 @@ public class TestSCMContainerMetrics {
     MetricsCollector metricsCollector = mock(MetricsCollector.class);
     when(metricsCollector.addRecord(anyString())).thenReturn(mb);
 
-    SCMContainerMetrics containerMetrics = new SCMContainerMetrics(scmmxBean);
+    SCMContainerMetrics containerMetrics =
+        new SCMContainerMetrics("SCMContainerMetrics", scmmxBean);
 
     containerMetrics.getMetrics(metricsCollector, true);
 
