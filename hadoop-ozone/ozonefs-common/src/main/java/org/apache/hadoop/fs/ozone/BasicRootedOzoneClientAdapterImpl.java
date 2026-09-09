@@ -722,10 +722,12 @@ public class BasicRootedOzoneClientAdapterImpl
         throw new FileNotFoundException(key + ": No such file or directory!");
       } else if (e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
         throw new FileNotFoundException(key + ": Bucket doesn't exist!");
-      }
-      String message = e.getMessage();
-      if (message != null && message.contains("does not support file system semantics")) {
-        throw new IllegalArgumentException(message);
+      } else if (e.getResult()
+          == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+        // OM rejects getFileStatus on an OBJECT_STORE bucket (no file system
+        // semantics). Surface it as IllegalArgumentException, matching the
+        // pre-HDDS-15925 client-side layout check.
+        throw new IllegalArgumentException(e.getMessage());
       }
       throw e;
     }
