@@ -48,6 +48,7 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -816,25 +817,42 @@ public final class HttpServer2 implements FilterContainer {
         CommonConfigurationKeysPublic.HADOOP_HTTP_LOGS_ENABLED,
         CommonConfigurationKeysPublic.HADOOP_HTTP_LOGS_ENABLED_DEFAULT);
     if (logDir != null && logsEnabled) {
-      ServletContextHandler logContext = new ServletContextHandler("/logs");
-      parent.addHandler(logContext);
-      // Jetty 12 refuses to start a context whose base resource does not
-      // exist, so ensure the log directory is present before serving it.
-      Files.createDirectories(Paths.get(logDir));
-      logContext.setBaseResourceAsString(logDir);
-      logContext.addServlet(AdminAuthorizedServlet.class, "/*");
-      if (conf.getBoolean(HADOOP_JETTY_LOGS_SERVE_ALIASES, DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
-        Map<String, String> params = logContext.getInitParams();
-        params.put("org.eclipse.jetty.servlet.Default.allowAliases", "true");
+      // Jetty 12 refuses to start a context whose base resource does not exist.
+      // Best-effort create the log directory (preserving the prior auto-create
+      // behavior); if it is absent and cannot be created -- permission denied, a
+      // regular file in the way, or a read-only mount -- skip the "/logs" context
+      // gracefully instead of failing daemon startup, mirroring the "/static"
+      // skip-if-absent guard below.
+      Path logPath = Paths.get(logDir);
+      boolean logDirReady = true;
+      try {
+        Files.createDirectories(logPath);
+      } catch (IOException e) {
+        LOG.warn("Log directory {} is not available; /logs will not be served.", logDir, e);
+        logDirReady = false;
       }
-      logContext.setDisplayName("logs");
-      SessionHandler handler = new SessionHandler();
-      handler.setHttpOnly(true);
-      handler.getSessionCookieConfig().setSecure(true);
-      logContext.setSessionHandler(handler);
-      setContextAttributes(logContext, conf);
-      addNoCacheFilter(logContext);
-      defaultContexts.put(logContext, true);
+      if (logDirReady && Files.isDirectory(logPath)) {
+        ServletContextHandler logContext = new ServletContextHandler("/logs");
+        parent.addHandler(logContext);
+        logContext.setBaseResourceAsString(logDir);
+        logContext.addServlet(AdminAuthorizedServlet.class, "/*");
+        // Jetty 12's ServletContextHandler installs a SymlinkAllowedResourceAliasChecker
+        // on POSIX filesystems, so symlinked entries under the log directory are served by
+        // default (matching Jetty 9.4). The legacy "org.eclipse.jetty.servlet.Default.allowAliases"
+        // init-param no longer has any effect. To honor the operator opt-out, clear the alias
+        // checks so aliased (e.g. symlinked) resources are denied.
+        if (!conf.getBoolean(HADOOP_JETTY_LOGS_SERVE_ALIASES, DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
+          logContext.clearAliasChecks();
+        }
+        logContext.setDisplayName("logs");
+        SessionHandler handler = new SessionHandler();
+        handler.setHttpOnly(true);
+        handler.getSessionCookieConfig().setSecure(true);
+        logContext.setSessionHandler(handler);
+        setContextAttributes(logContext, conf);
+        addNoCacheFilter(logContext);
+        defaultContexts.put(logContext, true);
+      }
     }
     // set up the context for "/static/*"
     // Jetty 12 refuses to start a context whose base resource does not exist.
@@ -868,7 +886,7 @@ public final class HttpServer2 implements FilterContainer {
    * present, matching the distribution layout; this only filters out the
    * file-system case where the shared static assets have not been unpacked.
    */
-  private static boolean baseResourceExists(String resourceUrl) {
+  static boolean baseResourceExists(String resourceUrl) {
     try {
       URI uri = URI.create(resourceUrl);
       if ("file".equals(uri.getScheme())) {

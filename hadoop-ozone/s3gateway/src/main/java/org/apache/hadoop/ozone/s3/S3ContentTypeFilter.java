@@ -29,26 +29,34 @@ import java.io.IOException;
 import java.util.Locale;
 
 /**
- * Emit {@code application/xml} without a charset parameter on S3 responses.
+ * Preserve the S3 Content-Type verbatim, without an auto-appended charset.
  *
- * <p>AWS S3 (and Ozone before the Jetty 12 upgrade) returns a bare
- * {@code application/xml} Content-Type. On Jetty 12 the servlet response tracks
- * a response character encoding ({@code _encodingFrom}); once that has been
- * promoted from {@code NOT_SET} (which happens internally, below the servlet
- * API), Jetty rebuilds the Content-Type as {@code application/xml;charset=utf-8}
- * even though the value passed to {@code setHeader} is bare. Simply stripping
- * the charset from the header value does not help, because Jetty re-appends it
- * from the tracked encoding after the wrapper runs.
+ * <p>AWS S3 (and Ozone before the Jetty 12 upgrade) returns the Content-Type
+ * exactly as the gateway set it: the stored object type for GET/HEAD and a bare
+ * {@code application/xml} for the XML API/error responses, in both cases without
+ * a charset parameter unless one was explicitly stored.
  *
- * <p>This wrapper resets the response character encoding back to {@code NOT_SET}
- * (via {@code setCharacterEncoding(null)}) right before it writes an
- * {@code application/xml} Content-Type, so Jetty keeps the header bare, and it
- * also normalizes the value itself as a safeguard. It only touches
- * {@code application/xml} responses; every other Content-Type is left unchanged.
+ * <p>On Jetty 12 the servlet response tracks a response character encoding
+ * ({@code _encodingFrom}). HttpServer2's global {@code QuotingInputFilter} runs
+ * first on every request and, for a request URI with no known extension (most
+ * object keys), defaults the response to {@code text/plain; charset=utf-8},
+ * promoting that encoding away from {@code NOT_SET}. Jetty then appends the
+ * tracked charset to any later <em>bare</em> Content-Type, so a stored
+ * {@code binary/octet-stream} or a bare {@code application/xml} goes out as
+ * {@code ...;charset=utf-8}. Stripping the charset from the header value does
+ * not help, because Jetty re-appends it from the tracked encoding after the
+ * wrapper runs.
+ *
+ * <p>This wrapper resets the tracked encoding back to {@code NOT_SET} (via
+ * {@code setCharacterEncoding(null)}) right before it writes a Content-Type
+ * that carries no {@code charset} parameter, so Jetty keeps that value bare. A
+ * Content-Type that already carries an explicit {@code charset} is written
+ * unchanged. In all cases the value itself is passed through verbatim, so the
+ * media type and any explicit charset are preserved.
  */
 public class S3ContentTypeFilter implements Filter {
 
-  private static final String APPLICATION_XML = "application/xml";
+  private static final String CONTENT_TYPE = "Content-Type";
 
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {
@@ -59,7 +67,7 @@ public class S3ContentTypeFilter implements Filter {
       ServletRequest request, ServletResponse response, FilterChain chain
   ) throws IOException, ServletException {
     if (response instanceof HttpServletResponse) {
-      chain.doFilter(request, new XmlContentTypeResponse((HttpServletResponse) response));
+      chain.doFilter(request, new VerbatimContentTypeResponse((HttpServletResponse) response));
     } else {
       chain.doFilter(request, response);
     }
@@ -69,39 +77,38 @@ public class S3ContentTypeFilter implements Filter {
   public void destroy() {
   }
 
-  private static boolean isXml(String contentType) {
+  private static boolean hasCharset(String contentType) {
     return contentType != null
-        && contentType.toLowerCase(Locale.ROOT).startsWith(APPLICATION_XML);
+        && contentType.toLowerCase(Locale.ROOT).contains("charset=");
   }
 
-  private static final class XmlContentTypeResponse extends HttpServletResponseWrapper {
+  private static final class VerbatimContentTypeResponse extends HttpServletResponseWrapper {
 
-    XmlContentTypeResponse(HttpServletResponse response) {
+    VerbatimContentTypeResponse(HttpServletResponse response) {
       super(response);
     }
 
     /**
-     * Reset the tracked response encoding so Jetty does not re-append a charset
-     * to a bare {@code application/xml} Content-Type, then write the bare value.
+     * Reset the tracked response encoding so Jetty does not append a charset to
+     * a bare Content-Type, then write the value verbatim. A value that already
+     * carries an explicit charset is written as-is, with no encoding reset.
      */
-    private void putBareXml(Runnable write) {
-      setCharacterEncoding(null);
+    private void writeContentType(String value, Runnable write) {
+      if (!hasCharset(value)) {
+        setCharacterEncoding(null);
+      }
       write.run();
     }
 
     @Override
     public void setContentType(String type) {
-      if (isXml(type)) {
-        putBareXml(() -> super.setContentType(APPLICATION_XML));
-      } else {
-        super.setContentType(type);
-      }
+      writeContentType(type, () -> super.setContentType(type));
     }
 
     @Override
     public void setHeader(String name, String value) {
-      if ("Content-Type".equalsIgnoreCase(name) && isXml(value)) {
-        putBareXml(() -> super.setHeader(name, APPLICATION_XML));
+      if (CONTENT_TYPE.equalsIgnoreCase(name)) {
+        writeContentType(value, () -> super.setHeader(name, value));
       } else {
         super.setHeader(name, value);
       }
@@ -109,8 +116,8 @@ public class S3ContentTypeFilter implements Filter {
 
     @Override
     public void addHeader(String name, String value) {
-      if ("Content-Type".equalsIgnoreCase(name) && isXml(value)) {
-        putBareXml(() -> super.addHeader(name, APPLICATION_XML));
+      if (CONTENT_TYPE.equalsIgnoreCase(name)) {
+        writeContentType(value, () -> super.addHeader(name, value));
       } else {
         super.addHeader(name, value);
       }
