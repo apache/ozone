@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.SIGNATURE_DOES_NOT_MATCH;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signatureInfo;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBody;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBodyWithTrailer;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signingKey;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
@@ -47,6 +48,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.parseETag;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -116,8 +118,6 @@ class TestObjectPut {
   private static final String DEST_BUCKET_NAME = "b2";
   private static final String DEST_KEY = "key=value/2";
   private static final String NONEXISTENT_BUCKET = "nonexist";
-  /** Well-formed but meaningless signature, for the path that only strips the chunk framing. */
-  private static final String FAKE_SIGNATURE = StringUtils.repeat('0', 64);
 
   private ObjectEndpoint objectEndpoint;
   private HttpHeaders headers;
@@ -269,21 +269,47 @@ class TestObjectPut {
   }
 
   @Test
-  void testPutObjectWithUnverifiedSignedChunks() throws Exception {
-    // Only STREAMING-AWS4-HMAC-SHA256-PAYLOAD opts into verification; the -TRAILER variant is
-    // HDDS-15142. Here the stream just strips the chunk framing, so the signatures are not checked
-    // and a body without the terminating zero-byte chunk is still accepted, as before this change.
-    String chunkedContent = "0a;chunk-signature=" + FAKE_SIGNATURE + "\r\n"
-        + "1234567890\r\n"
-        + "05;chunk-signature=" + FAKE_SIGNATURE + "\r\n"
-        + "abcde\r\n";
+  void testPutObjectWithValidSignedChunksAndTrailer() throws Exception {
+    configureSignedChunksWithTrailer(CONTENT.length());
+
+    // The trailer value is covered by the HMAC; checksum calculation is outside this test.
+    assertSucceeds(() -> putObject(signedChunkedBodyWithTrailer(
+        CONTENT, "x-amz-checksum-crc32c", "sOO8/Q==")));
+
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
+  }
+
+  @Test
+  void testPutObjectRejectsTamperedTrailer() {
+    configureSignedChunksWithTrailer(CONTENT.length());
+    String body = signedChunkedBodyWithTrailer(CONTENT, "x-amz-checksum-crc32c", "sOO8/Q==")
+        .replace("sOO8/Q==", "tampered");
+
+    assertErrorResponse(SIGNATURE_DOES_NOT_MATCH, () -> putObject(body));
+    assertKeyWasNotCommitted();
+  }
+
+  @Test
+  void testPutObjectRejectsMissingTrailerFinalChunk() {
+    configureSignedChunksWithTrailer(CONTENT.length());
+    String body = withoutFinalChunk(signedChunkedBody(CONTENT));
+
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> putObject(body));
+    assertThat(ex.getErrorMessage()).contains("terminating 0-byte chunk");
+    assertKeyWasNotCommitted();
+  }
+
+  @Test
+  void testPutObjectRejectsMissingTrailerHeader() {
+    ((OzoneBucketStub) bucket).setDerivedKey(signingKey());
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
-    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("15");
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("0");
 
-    assertSucceeds(() -> putObject(chunkedContent));
-
-    assertKeyContent(bucket, KEY_NAME, "1234567890abcde");
+    assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT,
+        () -> putObject(signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32c", "sOO8/Q==")));
+    assertKeyWasNotCommitted();
   }
 
   @Test
@@ -380,7 +406,7 @@ class TestObjectPut {
   static Stream<Arguments> chunkSignatureVerificationCases() {
     return Stream.of(
         Arguments.of(STREAMING_AWS4_HMAC_SHA256_PAYLOAD, true),
-        Arguments.of(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER, false),
+        Arguments.of(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER, true),
         Arguments.of(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD, false),
         Arguments.of(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER, false),
         Arguments.of(STREAMING_UNSIGNED_PAYLOAD_TRAILER, false));
@@ -390,6 +416,9 @@ class TestObjectPut {
   @MethodSource("chunkSignatureVerificationCases")
   void testChunkSignatureVerificationSelection(String algorithm, boolean expected) throws Exception {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(algorithm);
+    if (STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(algorithm)) {
+      when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
+    }
 
     EndpointBase.S3ChunkInputStreamInfo info = objectEndpoint.getS3ChunkInputStreamInfo(
         new ByteArrayInputStream(new byte[0]), 0, "0", KEY_NAME);
@@ -979,6 +1008,13 @@ class TestObjectPut {
     byte[] signingKey = signingKey();
     ((OzoneBucketStub) bucket).setDerivedKey(signingKey);
     configureSignedChunkHeaders(decodedLength);
+  }
+
+  private void configureSignedChunksWithTrailer(long decodedLength) {
+    configureSignedChunks(decodedLength);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
   }
 
   private void configureSignedChunkHeaders(long decodedLength) {

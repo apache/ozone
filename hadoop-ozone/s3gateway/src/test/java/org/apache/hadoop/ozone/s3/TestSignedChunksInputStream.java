@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -55,6 +56,16 @@ public class TestSignedChunksInputStream {
   private static final String KEY_PATH = "key1";
   private static final String FINAL_CHUNK_SIGNATURE =
       "b6c6ea8a5354eaf15b3cb7646744f4275b71ea724fed81ceb9323e279d449df9";
+  private static final String TRAILER_SEED_SIGNATURE =
+      "106e2a8a18243abcf37539882f36619c00e2dfc72633413f02d3b74544bfeb8e";
+  private static final String TRAILER_CHUNK1_SIGNATURE =
+      "b474d8862b1487a5145d686f57f013e54db672cee1c953b3010fb58501ef5aa2";
+  private static final String TRAILER_CHUNK2_SIGNATURE =
+      "1c1344b170168f8e65b41376b44b20fe354e373826ccbbe2c1d40a8cae51e5c7";
+  private static final String TRAILER_FINAL_CHUNK_SIGNATURE =
+      "2ca2aba2005185cf7159c6277faf83795951dd77a3a99e6e65d5c9f85863f992";
+  private static final String TRAILER_SIGNATURE =
+      "d81f82fc3505edab99d459891051a732e8730629a2e4a59689829ca17fe2e435";
 
   /** Well-formed but meaningless signature, for the tests that only strip the chunk format. */
   private static final String FAKE_SIGNATURE = repeat('0', 64);
@@ -258,6 +269,74 @@ public class TestSignedChunksInputStream {
   }
 
   @Test
+  void verifiesTrailerSignature() throws Exception {
+    String body = trailerBody();
+    try (SignedChunksInputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, "x-amz-checksum-crc32c")) {
+      is.attachValidator(newTrailerValidator());
+      assertThat(IOUtils.toString(is, UTF_8)).isEqualTo(repeat('a', 66560));
+    }
+  }
+
+  @Test
+  void rejectsTamperedTrailerSignature() {
+    String body = trailerBody().replace(TRAILER_SIGNATURE,
+        TRAILER_SIGNATURE.substring(0, TRAILER_SIGNATURE.length() - 1) + "0");
+    SignedChunksInputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, "x-amz-checksum-crc32c");
+    is.attachValidator(newTrailerValidator());
+    assertSignatureMismatch(is);
+  }
+
+  @Test
+  void rejectsMissingTrailerSignature() {
+    String body = trailerBody().replace("x-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n\r\n", "");
+    SignedChunksInputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, "x-amz-checksum-crc32c");
+    is.attachValidator(newTrailerValidator());
+    assertInvalidBody(is, "Missing trailing signature");
+  }
+
+  @Test
+  void rejectsUnterminatedTrailerSignature() {
+    String body = trailerBody();
+    body = body.substring(0, body.length() - 4);
+    SignedChunksInputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, "x-amz-checksum-crc32c");
+    is.attachValidator(newTrailerValidator());
+    assertInvalidBody(is, "Truncated trailing header");
+  }
+
+  @Test
+  void rejectsDataAfterTrailerSignature() {
+    SignedChunksInputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream((trailerBody() + "extra").getBytes(UTF_8)), KEY_PATH,
+        "x-amz-checksum-crc32c");
+    is.attachValidator(newTrailerValidator());
+    assertInvalidBody(is, "Unexpected data after trailing signature");
+  }
+
+  @Test
+  void rejectsMissingTrailerTerminator() {
+    String body = trailerBody();
+    SignedChunksInputStream is = new SignedChunksInputStream(
+        new ByteArrayInputStream(body.substring(0, body.length() - 2).getBytes(UTF_8)), KEY_PATH,
+        "x-amz-checksum-crc32c");
+    is.attachValidator(newTrailerValidator());
+    assertInvalidBody(is, "Invalid trailer terminator");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", " ", ",", "x-amz-meta-test", "x-amz-trailer-signature", "x-amz-checksum-crc32c,",
+      "x-amz-checksum-crc32c,x-amz-checksum-crc32c", "x-amz-checksum-crc32,x-amz-checksum-sha256"})
+  void rejectsInvalidTrailerHeader(String header) {
+    assertThatThrownBy(() -> new SignedChunksInputStream(
+        new ByteArrayInputStream(new byte[0]), KEY_PATH, header))
+        .isInstanceOfSatisfying(OS3Exception.class,
+            ex -> assertThat(ex.getCode()).isEqualTo(S3ErrorTable.INVALID_REQUEST.getCode()));
+  }
+
+  @Test
   void attachValidatorEnablesVerification() throws IOException {
     // The signing key is only known after the key is opened, so the validator
     // is attached to an already-constructed stream (HDDS-15140/15141).
@@ -351,6 +430,22 @@ public class TestSignedChunksInputStream {
     return new ChunksValidator(
         SignatureTestUtils.signingKey(SECRET_KEY, "20130524", "us-east-1", "s3"),
         DATE_TIME, SCOPE, SEED_SIGNATURE, KEY_PATH);
+  }
+
+  private static ChunksValidator newTrailerValidator() {
+    return new ChunksValidator(
+        SignatureTestUtils.signingKey(SECRET_KEY, "20130524", "us-east-1", "s3"),
+        DATE_TIME, SCOPE, TRAILER_SEED_SIGNATURE, KEY_PATH);
+  }
+
+  private static String trailerBody() {
+    return "10000;chunk-signature=" + TRAILER_CHUNK1_SIGNATURE + "\r\n"
+        + repeat('a', 65536) + "\r\n"
+        + "400;chunk-signature=" + TRAILER_CHUNK2_SIGNATURE + "\r\n"
+        + repeat('a', 1024) + "\r\n"
+        + "0;chunk-signature=" + TRAILER_FINAL_CHUNK_SIGNATURE + "\r\n"
+        + "x-amz-checksum-crc32c:sOO8/Q==\r\n"
+        + "x-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n\r\n";
   }
 
   private static SignedChunksInputStream verifiedStream(String body) {
