@@ -18,12 +18,22 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.grpc.Context;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
@@ -69,4 +79,62 @@ public class TestOMMetadataReader {
     }
   }
 
+  @Test
+  public void getFileStatusRejectsObjectStoreLayout() throws Exception {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    KeyManager keyManager = mock(KeyManager.class);
+    when(ozoneManager.getAclsEnabled()).thenReturn(false);
+    when(ozoneManager.getBucketManager()).thenReturn(mock(BucketManager.class));
+    when(ozoneManager.getVolumeManager()).thenReturn(mock(VolumeManager.class));
+    when(ozoneManager.getPerfMetrics()).thenReturn(mock(OMPerformanceMetrics.class));
+    when(ozoneManager.resolveBucketLink(any(OmKeyArgs.class)))
+        .thenReturn(new ResolvedBucket("vol", "obs-bucket", "vol", "obs-bucket",
+            "owner", BucketLayout.OBJECT_STORE));
+
+    OmMetadataReader reader = new OmMetadataReader(keyManager,
+        mock(PrefixManager.class), ozoneManager, mock(org.slf4j.Logger.class),
+        mock(AuditLogger.class), mock(OmMetadataReaderMetrics.class), null);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("vol")
+        .setBucketName("obs-bucket")
+        .setKeyName("key1")
+        .build();
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> reader.getFileStatus(keyArgs));
+    assertTrue(exception.getMessage().contains("obs-bucket"));
+    assertTrue(exception.getMessage().contains("OBJECT_STORE"));
+    verify(keyManager, never()).getFileStatus(any(), anyString());
+  }
+
+  @Test
+  public void getFileStatusAllowsLegacyLayout() throws Exception {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    KeyManager keyManager = mock(KeyManager.class);
+    when(ozoneManager.getAclsEnabled()).thenReturn(false);
+    when(ozoneManager.getBucketManager()).thenReturn(mock(BucketManager.class));
+    when(ozoneManager.getVolumeManager()).thenReturn(mock(VolumeManager.class));
+    when(ozoneManager.getPerfMetrics()).thenReturn(mock(OMPerformanceMetrics.class));
+    when(ozoneManager.resolveBucketLink(any(OmKeyArgs.class)))
+        .thenReturn(new ResolvedBucket("vol", "legacy-bucket", "vol",
+            "legacy-bucket", "owner", BucketLayout.LEGACY));
+    OzoneFileStatus expectedStatus = new OzoneFileStatus();
+    when(keyManager.getFileStatus(any(OmKeyArgs.class), anyString()))
+        .thenReturn(expectedStatus);
+
+    OmMetadataReader reader = new OmMetadataReader(keyManager,
+        mock(PrefixManager.class), ozoneManager, mock(org.slf4j.Logger.class),
+        mock(AuditLogger.class), mock(OmMetadataReaderMetrics.class), null);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("vol")
+        .setBucketName("legacy-bucket")
+        .setKeyName("key1")
+        .build();
+
+    OzoneFileStatus status = reader.getFileStatus(keyArgs);
+    assertEquals(expectedStatus, status);
+    verify(keyManager).getFileStatus(any(OmKeyArgs.class), anyString());
+  }
 }

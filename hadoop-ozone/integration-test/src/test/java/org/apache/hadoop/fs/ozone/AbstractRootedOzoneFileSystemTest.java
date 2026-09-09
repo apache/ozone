@@ -1835,10 +1835,6 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     assertEquals(ReplicationType.EC.name(), key.getReplicationConfig().getReplicationType().name());
   }
 
-  /**
-   * HDDS-15925: rooted OFS getFileStatus on a key path must not issue InfoBucket
-   * before GetFileStatus.
-   */
   @Test
   void testGetFileStatusUsesSingleOmRpc() throws Exception {
     String keyName = "single-rpc-" + RandomStringUtils.secure().nextAlphabetic(5);
@@ -1860,6 +1856,29 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     fs.getFileStatus(filePath);
     assertEquals(bucketInfosBefore, metrics.getNumBucketInfos());
     assertEquals(getFileStatusAfterFirst + 1, metrics.getNumGetFileStatus());
+  }
+
+  @Test
+  void testGetFileStatusRejectsObsBucket() throws Exception {
+    OzoneBucket obsBucket =
+        TestDataUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    Path obsBucketPath = new Path(
+        new Path(OZONE_URI_DELIMITER, obsBucket.getVolumeName()),
+        obsBucket.getName());
+    String keyName = "obs-key-" + RandomStringUtils.secure().nextAlphabetic(5);
+    TestDataUtil.createKey(obsBucket, keyName,
+        "data".getBytes(StandardCharsets.UTF_8));
+    Path keyPath = new Path(obsBucketPath, keyName);
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> fs.getFileStatus(keyPath));
+    assertThat(exception.getMessage()).contains(obsBucket.getName());
+    assertThat(exception.getMessage()).contains("OBJECT_STORE");
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
+        "getFileStatus must not trigger InfoBucket");
   }
 
   @Test

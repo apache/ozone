@@ -698,8 +698,8 @@ public class BasicRootedOzoneClientAdapterImpl
    * Throws exception in case of failure.
    *
    * <p>Non-snapshot paths call OM GetFileStatus directly (HDDS-15925) without a
-   * prior InfoBucket RPC. OBJECT_STORE buckets are not rejected on this path;
-   * mutating OFS operations still validate layout via {@link #getBucket(OFSPath, boolean)}.
+   * prior InfoBucket RPC. OBJECT_STORE buckets are rejected by OM GetFileStatus.
+   * Mutating OFS operations still validate layout via {@link #getBucket(OFSPath, boolean)}.
    */
   private FileStatusAdapter getFileStatusForKeyOrSnapshot(
       OFSPath ofsPath, URI uri, Path qualifiedPath, String userName,
@@ -722,6 +722,10 @@ public class BasicRootedOzoneClientAdapterImpl
         throw new FileNotFoundException(key + ": No such file or directory!");
       } else if (e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
         throw new FileNotFoundException(key + ": Bucket doesn't exist!");
+      }
+      String message = e.getMessage();
+      if (message != null && message.contains("does not support file system semantics")) {
+        throw new IllegalArgumentException(message);
       }
       throw e;
     }
