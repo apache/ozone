@@ -56,6 +56,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -72,6 +73,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -84,6 +86,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerT
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
@@ -113,6 +116,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
@@ -124,6 +128,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -992,6 +997,85 @@ public class TestKeyValueHandler {
     containerSet.registerOnDemandScanner(onDemandScanner);
 
     return new HandlerWithVolumeSet(kvHandler, volumeSet, containerSet);
+  }
+
+  /**
+   * EC/standalone writes reach the datanode with a null DispatcherContext, so KeyValueHandler
+   * fabricates one. Verify the client-supplied write pipeline version is carried onto that
+   * context for WriteChunk.
+   */
+  @Test
+  public void testWriteChunkCarriesWritePipelineVersionForEc() throws Exception {
+    Path testDir = Files.createTempDirectory("testWriteChunkEcVersion");
+    conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+
+    long containerID = ContainerTestHelper.getTestContainerID();
+    KeyValueContainer container = createOpenContainer(containerID,
+        handlerWithVolume.getVolumeSet(), handlerWithVolume.getContainerSet());
+    ChunkManager spyChunkManager = spyChunkManager(kvHandler);
+
+    BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+    ContainerCommandRequestProto request = ContainerTestHelper
+        .getWriteChunkRequest(MockPipeline.createSingleNodePipeline(), blockID, 1024)
+        .toBuilder()
+        .setWritePipelineVersion(HDDSVersion.ZDU.serialize())
+        .build();
+
+    kvHandler.handleWriteChunk(request, container, null);
+
+    ArgumentCaptor<DispatcherContext> captor = ArgumentCaptor.forClass(DispatcherContext.class);
+    verify(spyChunkManager).writeChunk(eq(container), any(), any(), any(ChunkBuffer.class), captor.capture());
+    assertEquals(HDDSVersion.ZDU, captor.getValue().getWriteVersion());
+  }
+
+  /**
+   * Same as {@link #testWriteChunkCarriesWritePipelineVersionForEc()} but for PutSmallFile.
+   */
+  @Test
+  public void testPutSmallFileCarriesWritePipelineVersionForEc() throws Exception {
+    Path testDir = Files.createTempDirectory("testPutSmallFileEcVersion");
+    conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+
+    long containerID = ContainerTestHelper.getTestContainerID();
+    KeyValueContainer container = createOpenContainer(containerID,
+        handlerWithVolume.getVolumeSet(), handlerWithVolume.getContainerSet());
+    ChunkManager spyChunkManager = spyChunkManager(kvHandler);
+
+    BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+    ContainerCommandRequestProto request = ContainerTestHelper
+        .getWriteSmallFileRequest(MockPipeline.createSingleNodePipeline(), blockID, 1024)
+        .toBuilder()
+        .setWritePipelineVersion(HDDSVersion.ZDU.serialize())
+        .build();
+
+    kvHandler.handlePutSmallFile(request, container, null);
+
+    ArgumentCaptor<DispatcherContext> captor = ArgumentCaptor.forClass(DispatcherContext.class);
+    verify(spyChunkManager).writeChunk(eq(container), any(), any(), any(ChunkBuffer.class), captor.capture());
+    assertEquals(HDDSVersion.ZDU, captor.getValue().getWriteVersion());
+  }
+
+  private static ChunkManager spyChunkManager(KeyValueHandler kvHandler) throws Exception {
+    Field field = KeyValueHandler.class.getDeclaredField("chunkManager");
+    field.setAccessible(true);
+    ChunkManager spy = spy((ChunkManager) field.get(kvHandler));
+    field.set(kvHandler, spy);
+    return spy;
+  }
+
+  private KeyValueContainer createOpenContainer(long containerID,
+      MutableVolumeSet volumeSet, ContainerSet containerSet) throws IOException {
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(), DATANODE_UUID);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+    containerSet.addContainer(container);
+    return container;
   }
 
   private static class HandlerWithVolumeSet {

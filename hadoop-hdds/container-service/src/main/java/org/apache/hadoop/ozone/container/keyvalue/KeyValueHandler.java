@@ -123,6 +123,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
+import org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
@@ -1106,7 +1107,9 @@ public class KeyValueHandler extends Handler {
 
       ChunkBuffer data = null;
       if (dispatcherContext == null) {
-        dispatcherContext = DispatcherContext.getHandleWriteChunk();
+        dispatcherContext = DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_WRITE_CHUNK)
+            .setWriteVersion(ClientCommandsUtils.getWritePipelineVersion(request))
+            .build();
       }
       final boolean isWrite = dispatcherContext.getStage().isWrite();
       if (isWrite) {
@@ -1265,7 +1268,9 @@ public class KeyValueHandler extends Handler {
       ChunkBuffer data = ChunkBuffer.wrap(
           putSmallFileReq.getData().asReadOnlyByteBufferList());
       if (dispatcherContext == null) {
-        dispatcherContext = DispatcherContext.getHandlePutSmallFile();
+        dispatcherContext = DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_PUT_SMALL_FILE)
+            .setWriteVersion(ClientCommandsUtils.getWritePipelineVersion(request))
+            .build();
       }
 
       BlockID blockID = blockData.getBlockID();
