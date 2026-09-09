@@ -115,6 +115,9 @@ import org.slf4j.LoggerFactory;
 public final class OzoneManagerRatisServer {
   private static final Logger LOG = LoggerFactory.getLogger(OzoneManagerRatisServer.class);
 
+  /** Superseded by {@code ozone.om.ha.raft.server.retrycache.expirytime}, still honoured if set. */
+  private static final String RETRY_CACHE_TIMEOUT_DEPRECATED_KEY = "ozone.om.ratis.server.retry.cache.timeout";
+
   private final int port;
   private final RaftServer server;
   private final Supplier<RaftServer.Division> serverDivision;
@@ -752,13 +755,15 @@ public final class OzoneManagerRatisServer {
 
     setRaftRpcProperties(properties, conf);
 
-    setRaftRetryCacheProperties(properties, conf);
-
     setRaftSnapshotProperties(properties, conf);
 
     setRaftCloseThreshold(properties, conf);
 
     getOMHAConfigs(conf).forEach(properties::set);
+
+    // Must run after the ozone.om.ha.* copy above, which would otherwise override it.
+    setRaftRetryCacheProperties(properties, conf);
+
     return properties;
   }
 
@@ -847,13 +852,16 @@ public final class OzoneManagerRatisServer {
   }
 
   private static void setRaftRetryCacheProperties(RaftProperties properties, ConfigurationSource conf) {
-    // Set timeout for server retry cache entry
-    TimeUnit retryCacheTimeoutUnit = OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT.getUnit();
-    final TimeDuration retryCacheTimeout = TimeDuration.valueOf(conf.getTimeDuration(
-        OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT.getDuration(), retryCacheTimeoutUnit),
-        retryCacheTimeoutUnit);
-    RaftServerConfigKeys.RetryCache.setExpiryTime(properties, retryCacheTimeout);
+    if (conf.get(RETRY_CACHE_TIMEOUT_DEPRECATED_KEY) == null) {
+      return;
+    }
+    // A value without a unit suffix is read as milliseconds, as the deprecated key always has been.
+    final TimeDuration timeout = TimeDuration.valueOf(
+        conf.getTimeDuration(RETRY_CACHE_TIMEOUT_DEPRECATED_KEY, 0, TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+    final String currentKey = OZONE_OM_HA_PREFIX + "." + RaftServerConfigKeys.RetryCache.EXPIRY_TIME_KEY;
+    // Spell out the resolved value, so it can be copied to the current key without changing meaning.
+    LOG.warn("{} is deprecated. Instead, use {} = {}.", RETRY_CACHE_TIMEOUT_DEPRECATED_KEY, currentKey, timeout);
+    RaftServerConfigKeys.RetryCache.setExpiryTime(properties, timeout);
   }
 
   private static void setRaftSnapshotProperties(RaftProperties properties, ConfigurationSource conf) {

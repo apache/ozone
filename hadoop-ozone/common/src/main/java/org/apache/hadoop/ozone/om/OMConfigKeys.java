@@ -285,12 +285,6 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT
       = TimeDuration.valueOf(3000, TimeUnit.MILLISECONDS);
-  public static final String
-      OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY
-      = "ozone.om.ratis.server.retry.cache.timeout";
-  public static final TimeDuration
-      OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT
-      = TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
   public static final String OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY
       = "ozone.om.ratis.minimum.timeout";
   public static final TimeDuration OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
