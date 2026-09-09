@@ -42,8 +42,8 @@ import {
   BucketLayout,
   BucketLayoutTypeList,
   BucketsTableProps,
-  BucketStorage,
-  BucketStorageTypeList
+  BucketStoragePolicy,
+  BucketStoragePolicyList
 } from '@/v2/types/bucket.types';
 
 function renderIsVersionEnabled(isVersionEnabled: boolean) {
@@ -54,17 +54,16 @@ function renderIsVersionEnabled(isVersionEnabled: boolean) {
     : <CloseCircleOutlined className='icon-neutral' />
 };
 
-function renderStorageType(bucketStorage: BucketStorage) {
-  const bucketStorageIconMap: Record<BucketStorage, React.ReactElement> = {
-    RAM_DISK: <LaptopOutlined />,
-    SSD: <SaveOutlined />,
-    DISK: <HddOutlined />,
-    ARCHIVE: <CloudServerOutlined />
+function renderStoragePolicy(bucketStoragePolicy: BucketStoragePolicy) {
+  const bucketStoragePolicyIconMap: Record<BucketStoragePolicy, React.ReactElement> = {
+    HOT: <SaveOutlined />,
+    WARM: <HddOutlined />,
+    COLD: <CloudServerOutlined />
   };
-  const icon = bucketStorage in bucketStorageIconMap
-    ? bucketStorageIconMap[bucketStorage]
+  const icon = bucketStoragePolicy in bucketStoragePolicyIconMap
+    ? bucketStoragePolicyIconMap[bucketStoragePolicy]
     : <FileUnknownOutlined />;
-  return <span>{icon} {bucketStorage}</span>;
+  return <span>{icon} {bucketStoragePolicy}</span>;
 };
 
 function renderBucketLayout(bucketLayout: BucketLayout) {
@@ -108,14 +107,14 @@ export const COLUMNS: ColumnsType<Bucket> = [
     render: (isVersionEnabled: boolean) => renderIsVersionEnabled(isVersionEnabled)
   },
   {
-    title: 'Storage Type',
-    dataIndex: 'storageType',
-    key: 'storageType',
+    title: 'Storage Policy',
+    dataIndex: 'storagePolicy',
+    key: 'storagePolicy',
     filterMultiple: true,
-    filters: BucketStorageTypeList.map(state => ({ text: state, value: state })),
-    onFilter: (value, record: Bucket) => record.storageType === value,
-    sorter: (a: Bucket, b: Bucket) => a.storageType.localeCompare(b.storageType),
-    render: (storageType: BucketStorage) => renderStorageType(storageType)
+    filters: BucketStoragePolicyList.map(state => ({ text: state, value: state })),
+    onFilter: (value, record: Bucket) => record.storagePolicy === value,
+    sorter: (a: Bucket, b: Bucket) => a.storagePolicy.localeCompare(b.storagePolicy),
+    render: (storagePolicy: BucketStoragePolicy) => renderStoragePolicy(storagePolicy)
   },
   {
     title: 'Bucket Layout',

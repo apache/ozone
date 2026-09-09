@@ -38,8 +38,8 @@ import CreatableSelect from "react-select/creatable";
 import {
   BucketLayout,
   BucketLayoutTypeList,
-  BucketStorage,
-  BucketStorageTypeList,
+  BucketStoragePolicy,
+  BucketStoragePolicyList,
   IAcl,
   IBucket
 } from '@/types/om.types';
@@ -59,7 +59,8 @@ interface IBucketResponse {
   volumeName: string;
   name: string;
   versioning: boolean;
-  storageType: string;
+  storagePolicy: string;
+  allowFallbackStoragePolicy?: boolean;
   bucketLayout: string;
   creationTime: number;
   modificationTime: number;
@@ -122,17 +123,16 @@ const renderIsVersionEnabled = (isVersionEnabled: boolean) => {
     <CloseCircleOutlined className='icon-neutral' />
 };
 
-const renderStorageType = (bucketStorage: BucketStorage) => {
-  const bucketStorageIconMap = {
-    RAM_DISK: <LaptopOutlined />,
-    SSD: <SaveOutlined />,
-    DISK: <HddOutlined />,
-    ARCHIVE: <CloudServerOutlined />
+const renderStoragePolicy = (bucketStoragePolicy: BucketStoragePolicy) => {
+  const bucketStoragePolicyIconMap = {
+    HOT: <SaveOutlined />,
+    WARM: <HddOutlined />,
+    COLD: <CloudServerOutlined />
   };
-  const icon = bucketStorage in bucketStorageIconMap
-    ? bucketStorageIconMap[bucketStorage]
+  const icon = bucketStoragePolicy in bucketStoragePolicyIconMap
+    ? bucketStoragePolicyIconMap[bucketStoragePolicy]
     : <FileUnknownOutlined />;
-  return <span>{icon} {bucketStorage}</span>;
+  return <span>{icon} {bucketStoragePolicy}</span>;
 };
 
 const renderBucketLayout = (bucketLayout: BucketLayout) => {
@@ -181,15 +181,15 @@ const COLUMNS: BucketTableColumn[] = [
     render: (isVersionEnabled: boolean) => renderIsVersionEnabled(isVersionEnabled)
   },
   {
-    title: 'Storage Type',
-    dataIndex: 'storageType',
-    key: 'storageType',
+    title: 'Storage Policy',
+    dataIndex: 'storagePolicy',
+    key: 'storagePolicy',
     isVisible: true,
     filterMultiple: true,
-    filters: BucketStorageTypeList.map(state => ({ text: state, value: state })),
-    onFilter: (value: BucketStorage, record: IBucket) => record.storageType === value,
-    sorter: (a: IBucket, b: IBucket) => a.storageType.localeCompare(b.storageType),
-    render: (storageType: BucketStorage) => renderStorageType(storageType)
+    filters: BucketStoragePolicyList.map(state => ({ text: state, value: state })),
+    onFilter: (value: BucketStoragePolicy, record: IBucket) => record.storagePolicy === value,
+    sorter: (a: IBucket, b: IBucket) => a.storagePolicy.localeCompare(b.storagePolicy),
+    render: (storagePolicy: BucketStoragePolicy) => renderStoragePolicy(storagePolicy)
   },
   {
     title: 'Bucket Layout',
@@ -439,7 +439,8 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
           volumeName: bucket.volumeName,
           bucketName: bucket.name,
           isVersionEnabled: bucket.versioning,
-          storageType: bucket.storageType,
+          storagePolicy: bucket.storagePolicy,
+          allowFallbackStoragePolicy: bucket.allowFallbackStoragePolicy,
           bucketLayout: bucket.bucketLayout,
           creationTime: bucket.creationTime,
           modificationTime: bucket.modificationTime,
