@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -57,6 +58,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -691,7 +694,41 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @VisibleForTesting
   OMResponse runCommand(OMRequest request, TermIndex termIndex) {
+    boolean isS3AuthThreadLocalSet = false;
+    boolean isStsThreadLocalSet = false;
     try {
+      if (ozoneManager.isSecurityEnabled() && request.hasS3Authentication()) {
+        // STS token verification runs on the leader RPC path so we don't need to recheck here on the apply
+        // after the log is committed
+        STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+
+        final OzoneManagerProtocolProtos.S3Authentication s3Auth = request.getS3Authentication();
+        // ThreadLocal carries S3 action for OmMetadataReader.
+        OzoneManager.setS3Auth(s3Auth);
+        isS3AuthThreadLocalSet = true;
+
+        if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
+          // ThreadLocal carries session policy for OmMetadataReader
+          // Use Instant.MAX for creationTime so a future revocation check on this ThreadLocal
+          // identifier never treats the token as issued before a stored cutoff.
+          final STSTokenIdentifier rehydratedTokenIdentifier = new STSTokenIdentifier(
+              STSTokenIdentifier.Params.newBuilder()
+                  .setTempAccessKeyId(
+                      s3Auth.hasResolvedStsTempAccessKeyId() ? s3Auth.getResolvedStsTempAccessKeyId() : "")
+                  .setOriginalAccessKeyId(
+                      s3Auth.hasResolvedStsOriginalAccessKeyId() ? s3Auth.getResolvedStsOriginalAccessKeyId() : "")
+                  .setRoleArn(s3Auth.hasResolvedStsRoleArn() ? s3Auth.getResolvedStsRoleArn() : "")
+                  .setCreationTime(Instant.MAX)
+                  .setExpiry(Instant.MAX) // ensure it deterministically is not expired
+                  .setSecretAccessKey(null) // no secretAccessKey needed
+                  .setSessionPolicy(
+                      s3Auth.hasResolvedStsSessionPolicy() ? s3Auth.getResolvedStsSessionPolicy() : "")
+                  .setManagedSecretKey(null) // no ManagedSecretKey needed
+                  .build());
+          OzoneManager.setStsTokenIdentifier(rehydratedTokenIdentifier);
+          isStsThreadLocalSet = true;
+        }
+      }
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
@@ -710,6 +747,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
+    } finally {
+      if (isS3AuthThreadLocalSet) {
+        OzoneManager.setS3Auth(null);
+      }
+      if (isStsThreadLocalSet) {
+        OzoneManager.setStsTokenIdentifier(null);
+      }
     }
     return null;
   }

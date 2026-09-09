@@ -25,11 +25,13 @@ import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -230,6 +232,37 @@ public class ReconReplicationManager extends ReplicationManager {
   }
 
   /**
+   * Checks data checksums among comparable closed container replicas. RATIS
+   * replicas are compared together. EC replicas are compared only with
+   * replicas that have the same replica index.
+   */
+  private boolean hasDataChecksumMismatch(
+      ContainerInfo container, Set<ContainerReplica> replicas) {
+    if (container.getState() != CLOSED || replicas == null) {
+      return false;
+    }
+
+    if (container.getReplicationType() == RATIS) {
+      return hasMismatch(replicas, ContainerReplica::getSequenceId,
+          ContainerReplica::getDataChecksum);
+    }
+
+    if (container.getReplicationType() != ReplicationType.EC) {
+      return false;
+    }
+
+    Map<Integer, List<ContainerReplica>> replicasByIndex = new HashMap<>();
+    for (ContainerReplica replica : replicas) {
+      replicasByIndex.computeIfAbsent(replica.getReplicaIndex(),
+          ignored -> new ArrayList<>()).add(replica);
+    }
+    return replicasByIndex.values().stream()
+        .anyMatch(indexReplicas -> hasMismatch(indexReplicas,
+            ContainerReplica::getSequenceId,
+            ContainerReplica::getDataChecksum));
+  }
+
+  /**
    * Override processAll() to capture ALL per-container health states,
    * not just aggregate counts and 100 samples.
    *
@@ -280,10 +313,7 @@ public class ReconReplicationManager extends ReplicationManager {
         processContainer(container, replicas, pendingOps, nullQueue, report, true);
 
         // Persist checksum mismatches in Recon's REPLICA_MISMATCH state.
-        if (container.getState() == CLOSED &&
-            container.getReplicationType() == RATIS &&
-            hasMismatch(replicas, ContainerReplica::getSequenceId,
-                ContainerReplica::getDataChecksum)) {
+        if (hasDataChecksumMismatch(container, replicas)) {
           report.addReplicaMismatchContainer(cid);
           LOG.debug("Container {} has data checksum mismatch across replicas", cid);
         }

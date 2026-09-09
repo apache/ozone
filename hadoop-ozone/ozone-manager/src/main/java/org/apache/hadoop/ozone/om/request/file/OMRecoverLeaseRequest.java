@@ -96,7 +96,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   @Override
   @DisallowedUntilLayoutVersion(HBASE_SUPPORT)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest request = super.preExecute(ozoneManager);
+    final OMRequest request = super.preExecute(ozoneManager);
     RecoverLeaseRequest recoverLeaseRequest = request.getRecoverLeaseRequest();
 
     String keyPath = recoverLeaseRequest.getKeyName();

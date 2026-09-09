@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -298,12 +299,16 @@ class RDBTable implements Table<byte[], byte[]> {
       if (startKey == null) {
         it.seekToFirst();
       } else {
+        // seek() positions the iterator and returns the landing entry without
+        // consuming it, so the loop below still starts from startKey. Comparing
+        // the landing key to startKey avoids a separate point-get just to check
+        // that startKey exists.
+        final KeyValue<byte[], byte[]> seeked = it.seek(startKey);
         if ((prefix == null || startKey.length > prefix.length)
-            && get(startKey) == null) {
-          // Key not found, return empty list
+            && (seeked == null || !Arrays.equals(seeked.getKey(), startKey))) {
+          // start key not found, return empty list
           return result;
         }
-        it.seek(startKey);
       }
 
       while (it.hasNext() && result.size() < count) {

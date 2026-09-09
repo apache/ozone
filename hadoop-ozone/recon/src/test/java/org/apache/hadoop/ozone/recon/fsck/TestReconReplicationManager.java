@@ -58,6 +58,8 @@ import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContaine
 import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Smoke tests for ReconReplicationManager Local ReplicationManager.
@@ -220,6 +222,56 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
         UnHealthyContainerStates.MIS_REPLICATED, 0, 0, 10).size());
     assertEquals(1, schemaManagerV2.getUnhealthyContainers(
         UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).size());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"EC, 1", "EC, 4", "RATIS, 0"})
+  public void testReplicaChecksumMismatch(HddsProtos.ReplicationType replicationType, int duplicateIndex)
+      throws Exception {
+    long containerId = 306L;
+    boolean isEC = replicationType == HddsProtos.ReplicationType.EC;
+    int requiredNodes = isEC ? 5 : 3;
+    ContainerInfo container = mockContainerInfo(containerId, 5, 1024L, requiredNodes);
+    when(container.getReplicationType()).thenReturn(replicationType);
+    when(containerManager.getContainers()).thenReturn(Collections.singletonList(container));
+    when(containerManager.getContainer(container.containerID())).thenReturn(container);
+
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (int i = 1; i <= requiredNodes; i++) {
+      ContainerReplica replica = mock(ContainerReplica.class);
+      int replicaIndex = isEC ? i : 0;
+      when(replica.getReplicaIndex()).thenReturn(replicaIndex);
+      when(replica.getSequenceId()).thenReturn(1L);
+      when(replica.getDataChecksum()).thenReturn(1000L + replicaIndex);
+      replicas.add(replica);
+    }
+    when(containerManager.getContainerReplicas(container.containerID())).thenReturn(replicas);
+    reconRM = createStateInjectingReconRM(Collections.emptyMap());
+
+    reconRM.processAll();
+    assertTrue(schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).isEmpty(),
+        "Different EC indexes may have different checksums");
+
+    ContainerReplica duplicate = mock(ContainerReplica.class);
+    when(duplicate.getReplicaIndex()).thenReturn(duplicateIndex);
+    when(duplicate.getSequenceId()).thenReturn(1L);
+    when(duplicate.getDataChecksum()).thenReturn(1000L + duplicateIndex);
+    replicas.add(duplicate);
+    reconRM.processAll();
+    assertTrue(schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).isEmpty(),
+        "Replicas of the same index with matching checksums should not report a mismatch");
+
+    when(duplicate.getDataChecksum()).thenReturn(2000L);
+    reconRM.processAll();
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> mismatches =
+        schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10);
+    assertEquals(1, mismatches.size());
+    assertEquals(containerId, mismatches.get(0).getContainerId());
+
+    when(duplicate.getDataChecksum()).thenReturn(1000L + duplicateIndex);
+    reconRM.processAll();
+    assertTrue(schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).isEmpty(),
+        "Resolved checksum mismatches should be removed");
   }
 
   @Test

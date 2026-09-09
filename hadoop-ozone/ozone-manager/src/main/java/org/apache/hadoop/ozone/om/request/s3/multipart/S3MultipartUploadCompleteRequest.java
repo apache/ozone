@@ -26,9 +26,11 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.BiFunction;
@@ -303,7 +305,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         }
 
         // First Check for Invalid Part Order.
-        List< Integer > partNumbers = new ArrayList<>();
+        Set<Integer> partNumbers = new HashSet<>();
         int partsListSize = getPartsListSize(requestedVolume,
                 requestedBucket, keyName, ozoneKey, partNumbers, partsList);
 
@@ -620,7 +622,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   private int getPartsListSize(String requestedVolume,
       String requestedBucket, String keyName, String ozoneKey,
-      List<Integer> partNumbers,
+      Set<Integer> partNumbers,
       List<OzoneManagerProtocolProtos.Part> partsList) throws OMException {
     int prevPartNumber = partsList.get(0).getPartNumber();
     int partsListSize = partsList.size();
