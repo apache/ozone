@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -49,6 +51,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test cases for mini ozone cluster.
@@ -101,6 +105,27 @@ public class TestMiniOzoneCluster {
         assertTrue(client.isConnected(pipeline.getFirstNode()));
       }
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDatanodesStartWithLatestLayoutVersion(boolean withCustomHostnames)
+      throws Exception {
+    MiniOzoneCluster.Builder builder =
+        MiniOzoneCluster.newBuilder(new OzoneConfiguration(conf))
+            .setNumDatanodes(1)
+            .setStartDataNodes(false);
+    if (withCustomHostnames) {
+      builder.setHosts(new String[] {"host0.test"});
+    }
+    cluster = builder.build();
+
+    OzoneConfiguration dnConf = cluster.getHddsDatanodes().get(0).getConf();
+    assertEquals(maxLayoutVersion(),
+        new DatanodeLayoutStorage(dnConf).getLayoutVersion(),
+        "Datanode must start at the latest metadata layout version. A "
+            + "datanode.id file written before the datanode starts makes it "
+            + "come up pre-finalized, as if upgraded from an older install.");
   }
 
   @Test
