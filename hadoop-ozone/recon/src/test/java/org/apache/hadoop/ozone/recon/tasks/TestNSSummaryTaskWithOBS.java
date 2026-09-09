@@ -20,25 +20,34 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Unit test for NSSummaryTaskWithOBS.
@@ -61,6 +70,60 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
     nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
         getReconOMMetadataManager(), threshold, 5, 20, 2000);
+  }
+
+  /**
+   * Bucket caching and multi-worker map replacement during reprocess. Nested so
+   * the cases are also discovered when the class is selected by name.
+   */
+  @Nested
+  class TestBucketCachingAndReplacement {
+
+    @Test
+    void testReprocessCachesBucketInfoPerWorker() throws IOException {
+      ReconOMMetadataManager omMetadataManager = spy(getReconOMMetadataManager());
+      Table<String, OmBucketInfo> bucketTable = spy(getReconOMMetadataManager().getBucketTable());
+      doReturn(bucketTable).when(omMetadataManager).getBucketTable();
+      // A single worker so every key shares one bucket cache.
+      NSSummaryTaskWithOBS task = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(), omMetadataManager,
+          OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT, 1, 1, 2000);
+
+      getReconNamespaceSummaryManager().clearNSSummaryTable();
+
+      assertThat(task.reprocessWithOBS(omMetadataManager)).isTrue();
+
+      // The per-worker cache looks up each bucket at most once, regardless of how
+      // many keys or buckets the fixture holds, so no bucket key is fetched twice.
+      ArgumentCaptor<String> bucketKeyCaptor = ArgumentCaptor.forClass(String.class);
+      verify(bucketTable, atLeastOnce()).getSkipCache(bucketKeyCaptor.capture());
+      assertThat(bucketKeyCaptor.getAllValues()).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void testReprocessLowThresholdConservesData() throws IOException {
+      getReconNamespaceSummaryManager().clearNSSummaryTable();
+
+      // maxWorkers=4 requests parallelism, but the small in-memory fixture is
+      // served from the memtable, so ParallelTableIteratorOperation takes its
+      // single-threaded fallback. A threshold of 1 still forces a flush and a
+      // fresh map after (almost) every key, exercising the repeated
+      // map-replacement, async-flush and end-of-loop drain path; the per-bucket
+      // totals must still add up exactly.
+      NSSummaryTaskWithOBS task = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
+          getReconOMMetadataManager(), 1, 4, 20, 2000);
+
+      assertThat(task.reprocessWithOBS(getReconOMMetadataManager())).isTrue();
+
+      NSSummary bucketOne = getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
+      NSSummary bucketTwo = getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
+      assertNotNull(bucketOne);
+      assertNotNull(bucketTwo);
+      // No key lost or double-counted across the repeated map replacements.
+      assertEquals(3, bucketOne.getNumOfFiles());
+      assertEquals(2, bucketTwo.getNumOfFiles());
+      assertEquals(KEY_ONE_SIZE + KEY_TWO_OLD_SIZE + KEY_THREE_SIZE, bucketOne.getSizeOfFiles());
+      assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE, bucketTwo.getSizeOfFiles());
+    }
   }
 
   /**
