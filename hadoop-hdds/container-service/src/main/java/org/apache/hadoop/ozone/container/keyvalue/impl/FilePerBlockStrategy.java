@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SHORT_CIRCUIT_FD_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
@@ -157,14 +157,24 @@ public class FilePerBlockStrategy implements ChunkManager {
     HddsVolume volume = containerData.getVolume();
 
     FileChannel channel = null;
-    boolean overwrite;
     try {
       channel = files.getChannel(chunkFile, doSyncWrite);
-      overwrite = validateChunkForOverwrite(channel, info);
     } catch (IOException e) {
       onFailure(volume);
       throw e;
     }
+
+    // Read the block file length once and reuse it for the overwrite check,
+    // the offset validation and the space accounting below.
+    long fileLengthBeforeWrite;
+    try {
+      fileLengthBeforeWrite = channel.size();
+    } catch (IOException e) {
+      throw new StorageContainerException("Encountered an error while getting the file size for "
+          + chunkFile.getName(), e, CONTAINER_INTERNAL_ERROR);
+    }
+
+    boolean overwrite = validateChunkForOverwrite(fileLengthBeforeWrite, info);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
@@ -173,15 +183,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     // check whether offset matches block file length if its an overwrite
     if (!overwrite) {
-      ChunkUtils.validateChunkSize(channel, info, chunkFile.getName());
-    }
-
-    long fileLengthBeforeWrite;
-    try {
-      fileLengthBeforeWrite = channel.size();
-    } catch (IOException e) {
-      throw new StorageContainerException("Encountered an error while getting the file size for "
-          + chunkFile.getName(), CHUNK_FILE_INCONSISTENCY);
+      ChunkUtils.validateChunkSize(fileLengthBeforeWrite, info, chunkFile.getName());
     }
 
     ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, chunkLength, volume);
