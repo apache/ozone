@@ -664,6 +664,10 @@ public class KeyOutputStream extends OutputStream
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }
 
+  public long getModificationTime() {
+    return blockOutputStreamEntryPool.getModificationTime();
+  }
+
   @VisibleForTesting
   public ExcludeList getExcludeList() {
     return blockOutputStreamEntryPool.getExcludeList();

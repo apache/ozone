@@ -74,9 +74,10 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+    final OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager = omMetadataManager.getSnapshotChainManager();
-    SnapshotMoveTableKeysRequest moveTableKeysRequest = getOmRequest().getSnapshotMoveTableKeysRequest();
+    SnapshotMoveTableKeysRequest moveTableKeysRequest = omRequest.getSnapshotMoveTableKeysRequest();
     UUID fromSnapshotID = fromProtobuf(moveTableKeysRequest.getFromSnapshotID());
     SnapshotInfo fromSnapshot = SnapshotUtils.getSnapshotInfo(ozoneManager,
         snapshotChainManager, fromSnapshotID);
@@ -179,7 +180,7 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
         }
       }
     }
-    return getOmRequest().toBuilder().setSnapshotMoveTableKeysRequest(
+    return omRequest.toBuilder().setSnapshotMoveTableKeysRequest(
         moveTableKeysRequest.toBuilder().clearDeletedDirs().clearDeletedKeys().clearRenamedKeys()
             .addAllDeletedKeys(deletedKeys).addAllDeletedDirs(deletedDirs)
             .addAllRenamedKeys(renamedKeysList).build()).build();

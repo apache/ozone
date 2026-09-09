@@ -1,0 +1,235 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.security;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.InvalidProtocolBufferException;
+import java.io.IOException;
+import java.time.Clock;
+import java.util.UUID;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.hadoop.security.token.SecretManager;
+import org.apache.hadoop.security.token.Token;
+
+/**
+ * Utility class with methods to validate and decrypt STS tokens.
+ */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
+public final class STSSecurityUtil {
+  private STSSecurityUtil() {
+  }
+
+  /**
+   * Constructs, validates and decrypts STS session token.
+   *
+   * @param sessionToken    the session token from the x-amz-security-token header
+   * @param secretKeyClient the Ozone Manager secretKeyClient
+   * @param clock           the system clock
+   * @return the STSTokenIdentifier with decrypted secretAccessKey
+   * @throws OMException if the token is not valid or processing failed otherwise
+   */
+  public static STSTokenIdentifier constructValidateAndDecryptSTSToken(String sessionToken,
+      SecretKeyClient secretKeyClient, Clock clock) throws OMException {
+    try {
+      final Token<STSTokenIdentifier> token = decodeTokenFromString(sessionToken);
+      return verifyAndDecryptToken(token, secretKeyClient, clock);
+    } catch (SecretManager.InvalidToken e) {
+      throw new OMException("Invalid STS token format: " + e.getMessage(), e, INVALID_TOKEN);
+    }
+  }
+
+  /**
+   * Verifies an STS Token by performing multiple checks.
+   *
+   * @param token the token to verify
+   * @param clock the system clock
+   * @return the STSTokenIdentifier with decrypted secretAccessKey
+   * @throws SecretManager.InvalidToken if the token is invalid
+   */
+  private static STSTokenIdentifier verifyAndDecryptToken(Token<STSTokenIdentifier> token,
+      SecretKeyClient secretKeyClient, Clock clock) throws SecretManager.InvalidToken, OMException {
+    if (!STSTokenIdentifier.KIND_NAME.equals(token.getKind())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - kind is incorrect: " + token.getKind());
+    }
+
+    if (!STSTokenIdentifier.STS_SERVICE.equals(token.getService().toString())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - service is incorrect: " + token.getService());
+    }
+
+    final byte[] tokenBytes = token.getIdentifier();
+    final OMTokenProto proto;
+    try {
+      proto = OMTokenProto.parseFrom(tokenBytes);
+    } catch (InvalidProtocolBufferException e) {
+      throw new SecretManager.InvalidToken("Invalid STS token - could not parse protocol buffer: " + e.getMessage());
+    }
+    final UUID secretKeyId;
+    try {
+      secretKeyId = UUID.fromString(proto.getSecretKeyId());
+    } catch (IllegalArgumentException e) {
+      throw new SecretManager.InvalidToken("Invalid STS token - secretKeyId was not valid: " + proto.getSecretKeyId());
+    }
+
+    final STSTokenIdentifier tokenId = new STSTokenIdentifier();
+    final ManagedSecretKey secretKey;
+    try {
+      secretKey = getValidatedSecretKey(secretKeyId, secretKeyClient);
+      tokenId.setManagedSecretKey(secretKey);
+      tokenId.readFromByteArray(tokenBytes);
+    } catch (OMException e) {
+      throw e;
+    } catch (IOException e) {
+      throw new SecretManager.InvalidToken("Invalid STS token - could not readFromByteArray: " + e.getMessage());
+    }
+
+    // Ensure essential fields are present in the token
+    ensureEssentialFieldsArePresentInToken(tokenId);
+
+    // Check expiration
+    if (tokenId.isExpired(clock.instant())) {
+      throw new OMException("Invalid STS token - token expired at " + tokenId.getExpiry(), TOKEN_EXPIRED);
+    }
+
+    // Verify token signature against the original identifier bytes
+    if (!tokenId.isValidSignature(tokenBytes, token.getPassword())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - signature is not correct for token: " + tokenId);
+    }
+
+    return tokenId;
+  }
+
+  private static ManagedSecretKey getValidatedSecretKey(UUID secretKeyId, SecretKeyClient secretKeyClient)
+      throws SecretManager.InvalidToken, OMException {
+    if (secretKeyId == null) {
+      throw new SecretManager.InvalidToken("STS token missing secret key ID");
+    }
+
+    final ManagedSecretKey secretKey;
+    try {
+      secretKey = secretKeyClient.getSecretKey(secretKeyId);
+    } catch (Exception e) {
+      throw new SecretManager.InvalidToken("Failed to retrieve secret key: " + e.getMessage());
+    }
+
+    if (secretKey == null) {
+      throw new SecretManager.InvalidToken("Secret key not found for STS token secretKeyId: " + secretKeyId);
+    }
+
+    if (secretKey.isExpired()) {
+      throw new OMException(
+          "Token cannot be verified due to expired secret key: " + secretKeyId + " Token expired at " +
+              secretKey.getExpiryTime(), TOKEN_EXPIRED);
+    }
+
+    return secretKey;
+  }
+
+  private static Token<STSTokenIdentifier> decodeTokenFromString(String encodedToken)
+      throws SecretManager.InvalidToken {
+    final Token<STSTokenIdentifier> token = new Token<>();
+    // token.decodeFromUrlString() only declares IOException, but deserialization can throw
+    // unchecked exceptions (e.g. NegativeArraySizeException) when malformed input decodes to a
+    // negative byte-array length. Map those to InvalidToken (via catching RuntimeException)
+    // instead of failing the OM request.
+    try {
+      token.decodeFromUrlString(encodedToken);
+      final String canonical = token.encodeToUrlString();
+      if (!canonical.equals(encodedToken)) {
+        throw new SecretManager.InvalidToken("Failed to decode STS token string: non-canonical token encoding");
+      }
+      return token;
+    } catch (IOException | RuntimeException e) {
+      throw new SecretManager.InvalidToken("Failed to decode STS token string: " + e);
+    }
+  }
+
+  @VisibleForTesting
+  static void ensureEssentialFieldsArePresentInToken(STSTokenIdentifier stsTokenIdentifier)
+      throws SecretManager.InvalidToken {
+    if (StringUtils.isEmpty(stsTokenIdentifier.getTempAccessKeyId())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - tempAccessKeyId is null/empty");
+    }
+    if (stsTokenIdentifier.getExpiry() == null) {
+      throw new SecretManager.InvalidToken("Invalid STS token - expiry is null");
+    }
+    if (StringUtils.isEmpty(stsTokenIdentifier.getRoleArn())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - roleArn is null/empty");
+    }
+    if (StringUtils.isEmpty(stsTokenIdentifier.getOriginalAccessKeyId())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - originalAccessKeyId is null/empty");
+    }
+    if (StringUtils.isEmpty(stsTokenIdentifier.getSecretAccessKey())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - secretAccessKey is null/empty");
+    }
+    if (stsTokenIdentifier.getCreationTime() == null) {
+      throw new SecretManager.InvalidToken("Invalid STS token - creationTime is null");
+    }
+  }
+
+  /**
+   * Ensures STS-related {@link S3Authentication} fields are structurally consistent on the Ratis
+   * apply path. Cryptographic validation (signature, expiry, secret key lookup) runs on the leader
+   * RPC path (e.g. {@code S3SecurityUtil.validateS3Credential}).  This method performs no crypto and does
+   * not contact {@link SecretKeyClient}, keeping the apply thread deterministic and lightweight.
+   *
+   * @param request OM request possibly containing S3 authentication
+   * @throws OMException if resolved fields and session token presence are inconsistent
+   */
+  public static void ensureResolvedStsFieldsInvariants(OzoneManagerProtocolProtos.OMRequest request)
+      throws OMException {
+    if (!request.hasS3Authentication()) {
+      return;
+    }
+
+    final S3Authentication s3Auth = request.getS3Authentication();
+    final boolean hasSessionToken = s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty();
+
+    if (!hasSessionToken) {
+      // If sessionToken is missing/empty, resolved fields must be empty.
+      if (s3Auth.hasResolvedStsSessionPolicy() || s3Auth.hasResolvedStsRoleArn() ||
+          s3Auth.hasResolvedStsOriginalAccessKeyId() || s3Auth.hasResolvedStsTempAccessKeyId() ||
+          s3Auth.hasResolvedStsSecretKeyId()) {
+        throw new OMException("Resolved STS fields must be empty when sessionToken is not present", INVALID_TOKEN);
+      }
+      return;
+    }
+
+    ensureResolvedFieldsArePresent(s3Auth);
+  }
+
+  private static void ensureResolvedFieldsArePresent(S3Authentication s3Auth) throws OMException {
+    if (!s3Auth.hasResolvedStsSessionPolicy() || !s3Auth.hasResolvedStsRoleArn() ||
+        !s3Auth.hasResolvedStsOriginalAccessKeyId() || !s3Auth.hasResolvedStsTempAccessKeyId() ||
+        !s3Auth.hasResolvedStsSecretKeyId()) {
+      throw new OMException("Resolved STS fields must be present when sessionToken is present", INVALID_TOKEN);
+    }
+  }
+}
+

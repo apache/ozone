@@ -66,7 +66,7 @@ public class OMLifecycleConfigurationDeleteRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest request = super.preExecute(ozoneManager);
+    final OMRequest request = super.preExecute(ozoneManager);
     DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest =
         request.getDeleteLifecycleConfigurationRequest();
 
