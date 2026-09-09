@@ -29,12 +29,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -52,6 +56,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -607,6 +612,47 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     OmBucketInfo skipped = omMetadataManager.getBucketTable().get(skippedBucketKey);
     assertEquals(54321L, skipped.getUsedBytes());
     assertEquals(77L, skipped.getUsedNamespace());
+  }
+
+  @Test
+  public void testMultipartCountLeavesUnrequestedBucketRowUnread() {
+    Map<String, QuotaRepairTask.CountPair> mpuCountMap = new HashMap<>();
+    mpuCountMap.put(OzoneConsts.OM_KEY_PREFIX + volumeName + OzoneConsts.OM_KEY_PREFIX + bucketName
+        + OzoneConsts.OM_KEY_PREFIX, new QuotaRepairTask.CountPair());
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+
+    QuotaRepairTask.extractMultipartCount(
+        OmMultipartUpload.getDbKey(volumeName, "other" + bucketName, "mpuKey", UUID.randomUUID().toString()),
+        mpuCountMap, metadataManager);
+
+    // the bucket is filtered on the key, so the row is never fetched or decoded
+    verifyNoInteractions(metadataManager);
+  }
+
+  @Test
+  public void testMultipartCountReadsRequestedBucketRow() throws Exception {
+    QuotaRepairTask.CountPair usage = new QuotaRepairTask.CountPair();
+    Map<String, QuotaRepairTask.CountPair> mpuCountMap = new HashMap<>();
+    mpuCountMap.put(OzoneConsts.OM_KEY_PREFIX + volumeName + OzoneConsts.OM_KEY_PREFIX + bucketName
+        + OzoneConsts.OM_KEY_PREFIX, usage);
+
+    String keyName = "mpuKey";
+    String uploadId = UUID.randomUUID().toString();
+    OmMultipartKeyInfo multipartInfo = newMultipartInfo(uploadId, 4003L,
+        RatisReplicationConfig.getInstance(THREE), false);
+    multipartInfo.addPartKeyInfo(createPart(bucketName, keyName, uploadId, 1, 100L));
+    multipartInfo.addPartKeyInfo(createPart(bucketName, keyName, uploadId, 2, 200L));
+    String dbKey = OmMultipartUpload.getDbKey(volumeName, bucketName, keyName, uploadId);
+
+    Table<String, OmMultipartKeyInfo> multipartInfoTable = mock(Table.class);
+    when(multipartInfoTable.getSkipCache(dbKey)).thenReturn(multipartInfo);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    when(metadataManager.getMultipartInfoTable()).thenReturn(multipartInfoTable);
+
+    QuotaRepairTask.extractMultipartCount(dbKey, mpuCountMap, metadataManager);
+
+    assertEquals((100L + 200L) * 3, usage.getSpace());
+    verify(multipartInfoTable).getSkipCache(dbKey);
   }
 
   private AtomicReference<OzoneManagerProtocolProtos.OMRequest> mockQuotaRepairRequest() throws Exception {

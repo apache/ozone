@@ -91,13 +91,6 @@ public class QuotaRepairTask {
       QuotaRepairTask.class);
   @VisibleForTesting
   static final int BATCH_SIZE = 5000;
-  /**
-   * A legacy schema multipart upload holds every committed part inline, so its rows are far
-   * larger than a key or file row: measured at roughly 320 bytes per part, a 1000 part upload
-   * decodes to about 320KB. Batch fewer of them to keep the in-flight batches bounded.
-   */
-  @VisibleForTesting
-  static final int MPU_BATCH_SIZE = 100;
   private static final int TASK_THREAD_CNT = 3;
   /**
    * Parallel full-table scans: OBS keys, FSO files, dirs, active deleted keys/dirs,
@@ -573,29 +566,33 @@ public class QuotaRepairTask {
   /**
    * Counts committed parts of incomplete multipart uploads from the active DB checkpoint.
    * Parts of a snapshot's incomplete uploads stay charged to that snapshot's own bucket,
-   * so only the active multipartInfoTable is scanned here.
+   * so only the active multipartInfoTable is scanned here. The scan reads keys only and
+   * each counting task reads the row it needs, so a row is never decoded for a bucket
+   * outside the repair and the batches hold keys instead of parts.
    */
   private void recalculateMultipartUsages(
       OMMetadataManager metadataManager, Map<String, CountPair> mpuCountMap)
       throws UncheckedIOException, UncheckedExecutionException {
     try (Table.KeyValueIterator<String, OmMultipartKeyInfo> keyIter
-        = metadataManager.getMultipartInfoTable().iterator()) {
-      scanTableInBatches(executor, keyIter, "Multipart upload usages", MPU_BATCH_SIZE,
-          kv -> extractMultipartCount(kv, mpuCountMap, metadataManager));
+        = metadataManager.getMultipartInfoTable().iterator(null, KEY_ONLY)) {
+      scanTableInBatches(executor, keyIter, "Multipart upload usages",
+          kv -> extractMultipartCount(kv.getKey(), mpuCountMap, metadataManager));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
   }
 
-  private static void extractMultipartCount(
-      Table.KeyValue<String, OmMultipartKeyInfo> kv, Map<String, CountPair> mpuCountMap,
+  @VisibleForTesting
+  static void extractMultipartCount(
+      String key, Map<String, CountPair> mpuCountMap,
       OMMetadataManager metadataManager) throws UncheckedIOException {
     try {
-      CountPair usage = mpuCountMap.get(getVolumeBucketPrefix(kv.getKey()));
+      CountPair usage = mpuCountMap.get(getVolumeBucketPrefix(key));
       if (usage == null) {
         return;
       }
-      OmMultipartKeyInfo multipartKeyInfo = kv.getValue();
+      OmMultipartKeyInfo multipartKeyInfo =
+          metadataManager.getMultipartInfoTable().getSkipCache(key);
       long replicatedSize = 0;
       if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
         for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
@@ -656,18 +653,9 @@ public class QuotaRepairTask {
       Table.KeyValueIterator<String, VALUE> keyIter, String strType,
       Consumer<Table.KeyValue<String, VALUE>> kvConsumer)
       throws UncheckedIOException, UncheckedExecutionException {
-    scanTableInBatches(executor, keyIter, strType, BATCH_SIZE, kvConsumer);
-  }
-
-  @VisibleForTesting
-  static <VALUE> void scanTableInBatches(
-      ExecutorService executor,
-      Table.KeyValueIterator<String, VALUE> keyIter, String strType, int batchSize,
-      Consumer<Table.KeyValue<String, VALUE>> kvConsumer)
-      throws UncheckedIOException, UncheckedExecutionException {
     LOG.info("Starting recalculate {}", strType);
 
-    List<Table.KeyValue<String, VALUE>> kvList = new ArrayList<>(batchSize);
+    List<Table.KeyValue<String, VALUE>> kvList = new ArrayList<>(BATCH_SIZE);
     BlockingQueue<List<Table.KeyValue<String, VALUE>>> q
         = new ArrayBlockingQueue<>(TASK_THREAD_CNT);
     List<Future<?>> tasks = new ArrayList<>();
@@ -682,9 +670,9 @@ public class QuotaRepairTask {
       while (keyIter.hasNext()) {
         count++;
         kvList.add(keyIter.next());
-        if (kvList.size() == batchSize) {
+        if (kvList.size() == BATCH_SIZE) {
           putBatch(q, kvList, tasks);
-          kvList = new ArrayList<>(batchSize);
+          kvList = new ArrayList<>(BATCH_SIZE);
         }
       }
       if (!kvList.isEmpty()) {
@@ -828,7 +816,8 @@ public class QuotaRepairTask {
     return prefix;
   }
   
-  private static class CountPair {
+  @VisibleForTesting
+  static class CountPair {
     private AtomicLong space = new AtomicLong();
     private AtomicLong namespace = new AtomicLong();
 
