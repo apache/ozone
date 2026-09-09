@@ -232,9 +232,24 @@ public class ReconReplicationManager extends ReplicationManager {
   }
 
   /**
-   * Checks data checksums among comparable closed container replicas. RATIS
-   * replicas are compared together. EC replicas are compared only with
-   * replicas that have the same replica index.
+   * Checks if container replicas have mismatched data checksums.
+   *
+   * <p>REPLICA_MISMATCH detection is crucial for identifying:
+   * <ul>
+   *   <li>Bit rot (silent data corruption)</li>
+   *   <li>Failed writes to some replicas</li>
+   *   <li>Storage corruption on specific datanodes</li>
+   *   <li>Network corruption during replication</li>
+   * </ul>
+   * </p>
+   *
+   * <p>RATIS replicas are compared together. EC replicas are compared only within the same replica index, since
+   * different indexes contain different data or parity fragments. Within each group, only replicas with the same
+   * sequence ID and non-zero data checksums are compared.</p>
+   *
+   * @param container Container whose replicas are checked
+   * @param replicas Set of container replicas to check
+   * @return true if comparable replicas have different data checksums
    */
   private boolean hasDataChecksumMismatch(
       ContainerInfo container, Set<ContainerReplica> replicas) {
