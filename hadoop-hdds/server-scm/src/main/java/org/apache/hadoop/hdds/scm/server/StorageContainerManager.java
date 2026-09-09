@@ -90,6 +90,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
+import org.apache.hadoop.hdds.scm.container.export.ContainerExportManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
@@ -311,6 +312,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final ContainerBalancer containerBalancer;
   // MoveManager is used by ContainerBalancer to schedule container moves
   private final MoveManager moveManager;
+  private final ContainerExportManager containerExportManager;
   private StatefulServiceStateManager statefulServiceStateManager;
   // Used to keep track of pending replication and pending deletes for
   // container replicas.
@@ -434,6 +436,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
     initializeSystemManagers(conf, configurator);
+
+    containerExportManager = new ContainerExportManager(
+        getScmId(), containerManager, this::checkLeader, conf);
 
     if (isSecretKeyEnable(securityConfig)) {
       secretKeyManagerService = new SecretKeyManagerService(scmContext, conf,
@@ -1598,6 +1603,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmBlockManager.start();
     leaseManager.start();
+    containerExportManager.start();
 
     try {
       httpServer = new StorageContainerManagerHttpServer(configuration, this);
@@ -1724,6 +1730,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmBlockManager.stop();
     } catch (Exception ex) {
       LOG.error("SCM block manager service stop failed.", ex);
+    }
+
+    try {
+      LOG.info("Shutting down Container Export Manager.");
+      containerExportManager.shutdown();
+    } catch (Exception ex) {
+      LOG.error("Container Export Manager shutdown failed.", ex);
     }
 
     if (metrics != null) {
@@ -1937,6 +1950,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public MoveManager getMoveManager() {
     return moveManager;
+  }
+
+  public ContainerExportManager getContainerExportManager() {
+    return containerExportManager;
   }
 
   /**
