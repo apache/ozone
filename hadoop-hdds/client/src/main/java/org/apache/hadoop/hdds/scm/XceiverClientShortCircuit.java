@@ -34,6 +34,7 @@ import java.io.InterruptedIOException;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.nio.channels.ClosedChannelException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -94,6 +95,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   private final DomainSocketFactory domainSocketFactory;
   private DomainSocket domainSocket;
   private final AtomicBoolean isDomainSocketOpen = new AtomicBoolean(false);
+  // Protects connection state, counters, and RequestEntry.sentTimeNs.
   private final Lock lock = new ReentrantLock();
   private final int bufferSize;
   private final ByteString clientId = ByteString.copyFrom(UUID.randomUUID().toString().getBytes(UTF_8));
@@ -132,46 +134,95 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
    */
   @Override
   public void connect() throws IOException {
-    // Even the in & out stream has returned EOFException, domainSocket.isOpen() is still true.
-    if (domainSocket != null && domainSocket.isOpen() && isDomainSocketOpen.get()) {
-      return;
+    lock.lock();
+    try {
+      if (closed) {
+        throw new IOException("DomainSocket is closed.");
+      }
+      if (domainSocket != null) {
+        checkOpen();
+        return;
+      }
+      boolean connected = false;
+      try {
+        domainSocket = domainSocketFactory.createSocket(readTimeoutMs, writeTimeoutMs, dnAddr);
+        if (domainSocket == null) {
+          throw new IOException("DomainSocket is not available for " + dn);
+        }
+        prefix = XceiverClientShortCircuit.class.getSimpleName() + "-" + domainSocket;
+        timer = new Timer(prefix + "-Timer");
+        isDomainSocketOpen.set(true);
+        readDaemon.start();
+        connected = true;
+        LOG.info("{} is started", prefix);
+      } finally {
+        if (!connected) {
+          closed = true;
+          isDomainSocketOpen.set(false);
+          if (timer != null) {
+            timer.cancel();
+          }
+          if (domainSocket != null) {
+            try {
+              domainSocket.close();
+            } catch (IOException e) {
+              LOG.warn("Failed to close domain socket for datanode {}", dn, e);
+            }
+          }
+        }
+      }
+    } finally {
+      lock.unlock();
     }
-    domainSocket = domainSocketFactory.createSocket(readTimeoutMs, writeTimeoutMs, dnAddr);
-    isDomainSocketOpen.set(true);
-    prefix = XceiverClientShortCircuit.class.getSimpleName() + "-" + domainSocket.toString();
-    timer = new Timer(prefix + "-Timer");
-    readDaemon.start();
-    LOG.info("{} is started", prefix);
   }
 
   /**
    * Close the DomainSocket.
    */
   @Override
-  public synchronized void close() {
-    closed = true;
-    timer.cancel();
-    if (domainSocket != null) {
-      try {
-        isDomainSocketOpen.set(false);
-        domainSocket.close();
-        LOG.info("{} is closed for {} with {} requests sent and {} responses received",
-            domainSocket.toString(), dn, requestSent, responseReceived);
-      } catch (IOException e) {
-        LOG.warn("Failed to close domain socket for datanode {}", dn, e);
-      }
-    }
-    readDaemon.interrupt();
+  public void close() {
+    final List<RequestEntry> pending;
+    lock.lock();
     try {
-      readDaemon.join();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      if (!closed) {
+        closed = true;
+        isDomainSocketOpen.set(false);
+        if (timer != null) {
+          timer.cancel();
+        }
+        if (domainSocket != null) {
+          try {
+            domainSocket.close();
+            LOG.info("{} is closed for {} with {} requests sent and {} responses received",
+                domainSocket, dn, requestSent, responseReceived);
+          } catch (IOException e) {
+            LOG.warn("Failed to close domain socket for datanode {}", dn, e);
+          }
+        }
+        readDaemon.interrupt();
+      }
+      pending = new ArrayList<>(sentRequests.values());
+    } finally {
+      lock.unlock();
+    }
+    pending.forEach(entry -> entry.fail(new ClosedChannelException()));
+    if (Thread.currentThread() != readDaemon) {
+      try {
+        readDaemon.join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
   @Override
   public boolean isClosed() {
-    return closed;
+    lock.lock();
+    try {
+      return closed;
+    } finally {
+      lock.unlock();
+    }
   }
 
   @Override
@@ -295,7 +346,12 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
             Objects.requireNonNull(ioException);
             String message = "Failed to execute command {}";
             if (LOG.isDebugEnabled()) {
-              LOG.debug(message + " on the datanode {} {}.", request, dn, domainSocket, ioException);
+              lock.lock();
+              try {
+                LOG.debug(message + " on the datanode {} {}.", request, dn, domainSocket, ioException);
+              } finally {
+                lock.unlock();
+              }
             }
             throw ioException;
           }
@@ -305,10 +361,16 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   @VisibleForTesting
   public XceiverClientReply sendCommandInternal(ContainerCommandRequestProto request)
       throws IOException, InterruptedException {
-    checkOpen();
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
-    RequestEntry entry = new RequestEntry(request, replyFuture);
+    final RequestKey key = new RequestKey(request.getClientId(), request.getCallId());
+    TimerTask task = new TimerTask() {
+      @Override
+      public void run() {
+        requestTimeout(key);
+      }
+    };
+    RequestEntry entry = new RequestEntry(request, replyFuture, task);
     sendRequest(entry);
     return new XceiverClientReply(replyFuture);
   }
@@ -320,13 +382,18 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     throw new UnsupportedOperationException("Operation Not supported for " + DomainSocketFactory.FEATURE + " client");
   }
 
-  public synchronized void checkOpen() throws IOException {
-    if (closed) {
-      throw new IOException("DomainSocket is not connected.");
-    }
-
-    if (!isDomainSocketOpen.get()) {
-      throw new IOException(domainSocket.toString() + " is not open.");
+  public void checkOpen() throws IOException {
+    lock.lock();
+    try {
+      if (closed || domainSocket == null) {
+        throw new IOException("DomainSocket is not connected.");
+      }
+      // isOpen() may remain true after EOF, so also check the receiver's state.
+      if (!domainSocket.isOpen() || !isDomainSocketOpen.get()) {
+        throw new IOException(domainSocket + " is not open.");
+      }
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -360,7 +427,13 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   }
 
   void requestTimeout(RequestKey requestKey) {
-    final RequestEntry entry = sentRequests.remove(requestKey);
+    final RequestEntry entry;
+    lock.lock();
+    try {
+      entry = sentRequests.remove(requestKey);
+    } finally {
+      lock.unlock();
+    }
     if (entry != null) {
       LOG.warn("Timeout to receive response for command {}", entry.getRequest());
       ContainerProtos.Type type = entry.getRequest().getCmdType();
@@ -369,30 +442,25 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     }
   }
 
-  void sendRequest(RequestEntry entry) {
+  void sendRequest(RequestEntry entry) throws IOException {
     ContainerCommandRequestProto request = entry.getRequest();
+    IOException failure = null;
+    List<RequestEntry> pending = null;
+    lock.lock();
     try {
+      checkOpen();
       final RequestKey key = new RequestKey(request.getClientId(), request.getCallId());
-      TimerTask task = new TimerTask() {
-        @Override
-        public void run() {
-          requestTimeout(key);
-        }
-      };
-      entry.setTimerTask(task);
-      timer.schedule(task, readTimeoutMs);
       sentRequests.put(key, entry);
       ContainerProtos.Type type = request.getCmdType();
       metrics.incrPendingContainerOpsMetrics(type);
-      byte[] bytes = request.toByteArray();
-      if (bytes.length != request.getSerializedSize()) {
-        throw new IOException("Serialized request " + request.getCmdType()
-            + " size mismatch, byte array size " + bytes.length +
-            ", serialized size " + request.getSerializedSize());
-      }
-
-      lock.lock();
+      timer.schedule(entry.getTimerTask(), readTimeoutMs);
       try {
+        byte[] bytes = request.toByteArray();
+        if (bytes.length != request.getSerializedSize()) {
+          throw new IOException("Serialized request " + request.getCmdType()
+              + " size mismatch, byte array size " + bytes.length +
+              ", serialized size " + request.getSerializedSize());
+        }
         DataOutputStream dataOut =
             new DataOutputStream(new BufferedOutputStream(domainSocket.getOutputStream(), bufferSize));
         // send version number
@@ -402,14 +470,22 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
         // send request body
         request.writeDelimitedTo(dataOut);
         dataOut.flush();
+      } catch (IOException e) {
+        isDomainSocketOpen.set(false);
+        failure = e;
+        pending = new ArrayList<>(sentRequests.values());
       } finally {
-        lock.unlock();
         entry.setSentTimeNs();
         requestSent++;
       }
-    } catch (IOException e) {
-      LOG.error("Failed to send command {}", request, e);
-      entry.getFuture().completeExceptionally(e);
+    } finally {
+      lock.unlock();
+    }
+    if (failure != null) {
+      LOG.error("Failed to send command {}", request, failure);
+      for (RequestEntry requestEntry : pending) {
+        requestEntry.fail(failure);
+      }
       metrics.decrPendingContainerOpsMetrics(request.getCmdType());
       metrics.addContainerOpsLatency(request.getCmdType(), System.nanoTime() - entry.getCreateTimeNs());
     }
@@ -417,12 +493,17 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
 
   @Override
   public String toString() {
-    final StringBuilder b =
-        new StringBuilder(getClass().getSimpleName())
-            .append('[').append(" DomainSocket: ").append(domainSocket.toString())
-            .append(" Pipeline: ").append(pipeline.toString())
-            .append(" ]");
-    return b.toString();
+    lock.lock();
+    try {
+      final StringBuilder b =
+          new StringBuilder(getClass().getSimpleName())
+              .append('[').append(" DomainSocket: ").append(domainSocket)
+              .append(" Pipeline: ").append(pipeline.toString())
+              .append(" ]");
+      return b.toString();
+    } finally {
+      lock.unlock();
+    }
   }
 
   /**
@@ -431,12 +512,29 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   public class ReceiveResponseTask implements Runnable {
     @Override
     public void run() {
-      long timerTaskCancelledCount = 0;
-      do {
+      final DomainSocket socket;
+      final Timer responseTimer;
+      lock.lock();
+      try {
+        socket = domainSocket;
+        responseTimer = timer;
         Thread.currentThread().setName(prefix + "-ReceiveResponse");
+      } finally {
+        lock.unlock();
+      }
+      long timerTaskCancelledCount = 0;
+      while (true) {
+        lock.lock();
+        try {
+          if (!isDomainSocketOpen.get()) {
+            return;
+          }
+        } finally {
+          lock.unlock();
+        }
         RequestEntry entry = null;
         try {
-          DataInputStream dataIn = new DataInputStream(domainSocket.getInputStream());
+          DataInputStream dataIn = new DataInputStream(socket.getInputStream());
           final short version = dataIn.readShort();
           if (version != DATA_TRANSFER_VERSION) {
             throw new IOException("Version Mismatch (Expected: " +
@@ -450,7 +548,14 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
           if (LOG.isDebugEnabled()) {
             LOG.debug("received response {} callId {}", type, responseProto.getCallId());
           }
-          entry = sentRequests.remove(new RequestKey(responseProto.getClientId(), responseProto.getCallId()));
+          final long sentTimeNs;
+          lock.lock();
+          try {
+            entry = sentRequests.remove(new RequestKey(responseProto.getClientId(), responseProto.getCallId()));
+            sentTimeNs = entry == null ? 0 : entry.getSentTimeNs();
+          } finally {
+            lock.unlock();
+          }
           if (entry == null) {
             // This could be two cases
             // 1. there is bug in the code
@@ -464,7 +569,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
             timerTaskCancelledCount++;
             // purge timer every 1000 cancels
             if (timerTaskCancelledCount == 1000) {
-              timer.purge();
+              responseTimer.purge();
               timerTaskCancelledCount = 0;
             }
           }
@@ -481,7 +586,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
                 // read FS from domainSocket
                 FileInputStream[] fis = new FileInputStream[1];
                 byte[] buf = new byte[1];
-                int ret = domainSocket.recvFileInputStreams(fis, buf, 0, buf.length);
+                int ret = socket.recvFileInputStreams(fis, buf, 0, buf.length);
                 if (ret == -1) {
                   throw new IOException("failed to get a file descriptor from datanode " + dn +
                       " for peer is shutdown.");
@@ -511,7 +616,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
           }
           long currentTime = System.nanoTime();
           long endToEndCost = currentTime - entry.getCreateTimeNs();
-          long sentCost = entry.getSentTimeNs() - entry.getCreateTimeNs();
+          long sentCost = sentTimeNs - entry.getCreateTimeNs();
           long receiveCost = processStartTime - receiveStartTime;
           long processCost = currentTime - processStartTime;
           if (LOG.isDebugEnabled()) {
@@ -519,26 +624,38 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
                     "process {} ns", type, entry.getRequest().getClientId().toStringUtf8(),
                 entry.getRequest().getCallId(), dn, endToEndCost, sentCost, receiveCost, processCost);
           }
-          responseReceived++;
+          lock.lock();
+          try {
+            responseReceived++;
+          } finally {
+            lock.unlock();
+          }
           metrics.decrPendingContainerOpsMetrics(type);
           metrics.addContainerOpsLatency(type, endToEndCost);
-        } catch (SocketTimeoutException | EOFException | ClosedChannelException e) {
-          isDomainSocketOpen.set(false);
-          LOG.info("{} receiveResponseTask is closed after send {} requests and received {} responses, due to {}",
-              domainSocket.toString(), requestSent, responseReceived, e.getClass().getName(), e);
-          // fail all requests pending responses
-          sentRequests.values().forEach(i -> i.fail(e));
         } catch (Throwable e) {
-          isDomainSocketOpen.set(false);
-          LOG.error("{} failed after send {} requests and received {} responses",
-              domainSocket.toString(), requestSent, responseReceived, e);
+          final List<RequestEntry> pending;
+          lock.lock();
+          try {
+            isDomainSocketOpen.set(false);
+            if (e instanceof SocketTimeoutException || e instanceof EOFException
+                || e instanceof ClosedChannelException) {
+              LOG.info("{} receiveResponseTask is closed after send {} requests and received {} responses, due to {}",
+                  socket, requestSent, responseReceived, e.getClass().getName(), e);
+            } else {
+              LOG.error("{} failed after send {} requests and received {} responses",
+                  socket, requestSent, responseReceived, e);
+            }
+            pending = new ArrayList<>(sentRequests.values());
+          } finally {
+            lock.unlock();
+          }
           if (entry != null) {
             entry.getFuture().completeExceptionally(e);
           }
-          sentRequests.values().forEach(i -> i.fail(e));
+          pending.forEach(i -> i.fail(e));
           break;
         }
-      } while (isDomainSocketOpen.get());
+      }
     }
   }
 
@@ -583,13 +700,15 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     private final ContainerCommandRequestProto request;
     private final CompletableFuture<ContainerCommandResponseProto> future;
     private final long createTimeNs;
+    // Accessed under the enclosing client's lock.
     private long sentTimeNs;
-    private TimerTask timerTask;
+    private final TimerTask timerTask;
 
     RequestEntry(ContainerCommandRequestProto requestProto,
-                 CompletableFuture<ContainerCommandResponseProto> future) {
+                 CompletableFuture<ContainerCommandResponseProto> future, TimerTask timerTask) {
       this.request = requestProto;
       this.future = future;
+      this.timerTask = timerTask;
       this.createTimeNs = System.nanoTime();
     }
 
@@ -611,10 +730,6 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
 
     public void setSentTimeNs() {
       sentTimeNs = System.nanoTime();
-    }
-
-    public void setTimerTask(TimerTask task) {
-      timerTask = task;
     }
 
     public TimerTask getTimerTask() {
