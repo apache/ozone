@@ -181,6 +181,10 @@ public class OMPerformanceMetrics {
   @Metric(about = "creteKeySuccess latency in nanoseconds")
   private MutableRate createKeySuccessLatencyNs;
 
+  @Metric(about = "Looking up a key's noncurrent versions on the write path, "
+      + "in nanoseconds")
+  private MutableRate noncurrentVersionLookupLatencyNs;
+
   public static OMPerformanceMetrics register() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME,
@@ -191,6 +195,10 @@ public class OMPerformanceMetrics {
   public static void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
+  }
+
+  public void addNoncurrentVersionLookupLatency(long latencyInNs) {
+    noncurrentVersionLookupLatencyNs.add(latencyInNs);
   }
 
   public void addLookupLatency(long latencyInNs) {

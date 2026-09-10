@@ -365,8 +365,13 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         keyArgs.getKeyName(), keyArgs.getProposedVersionId(),
         keyArgs.getModificationTime(), trxnLogIndex, 0L);
     omBucketInfo.incrUsedNamespace(inserted.getAddedNamespace());
+    if (inserted.getReleasedBytes() > 0) {
+      omBucketInfo.decrUsedBytes(inserted.getReleasedBytes(), true);
+    }
     auditMap.put(OzoneConsts.VERSION_ID,
         String.valueOf(inserted.getDeleteMarker().getVersionId()));
+    auditMap.put(OzoneConsts.NULL_VERSION,
+        String.valueOf(inserted.getDeleteMarker().isNullVersion()));
     if (inserted.getDemotedVersion() != null) {
       auditMap.put(OzoneConsts.SUPERSEDED_VERSION_ID,
           String.valueOf(inserted.getDemotedVersion().getVersionId()));

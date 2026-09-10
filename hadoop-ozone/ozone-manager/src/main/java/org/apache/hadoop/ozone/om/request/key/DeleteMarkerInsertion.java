@@ -38,6 +38,7 @@ public final class DeleteMarkerInsertion {
   private final String demotedVersionKey;
   private final OmKeyInfo demotedVersion;
   private final long addedNamespace;
+  private final long releasedBytes;
   private final String replacedNullVersionKey;
   private final Map<String, RepeatedOmKeyInfo> keysToDelete;
 
@@ -45,7 +46,8 @@ public final class DeleteMarkerInsertion {
   DeleteMarkerInsertion(OmKeyInfo deleteMarker, String objectKey,
       String demotedVersionKey, OmKeyInfo demotedVersion,
       String replacedNullVersionKey,
-      Map<String, RepeatedOmKeyInfo> keysToDelete, long addedNamespace) {
+      Map<String, RepeatedOmKeyInfo> keysToDelete, long addedNamespace,
+      long releasedBytes) {
     this.deleteMarker = deleteMarker;
     this.objectKey = objectKey;
     this.demotedVersionKey = demotedVersionKey;
@@ -53,11 +55,17 @@ public final class DeleteMarkerInsertion {
     this.replacedNullVersionKey = replacedNullVersionKey;
     this.keysToDelete = keysToDelete;
     this.addedNamespace = addedNamespace;
+    this.releasedBytes = releasedBytes;
   }
 
   /** Namespace the marker takes, not yet applied to the bucket. */
   public long getAddedNamespace() {
     return addedNamespace;
+  }
+
+  /** Space of the null version the marker replaced, not yet released. */
+  public long getReleasedBytes() {
+    return releasedBytes;
   }
 
   /**

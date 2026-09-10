@@ -340,6 +340,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         // that the key args carry.
         auditMap.put(OzoneConsts.VERSION_ID,
             String.valueOf(omKeyInfo.getVersionId()));
+        auditMap.put(OzoneConsts.NULL_VERSION,
+            String.valueOf(omKeyInfo.isNullVersion()));
       }
 
       // The version a write supersedes is kept as a noncurrent version, except
@@ -366,7 +368,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // be what this finds.
       final Pair<String, OmKeyInfo> replacedNullVersion =
           suspendedWrite && !isSameHsyncKey && supersededVersionRetained
-              ? getNoncurrentNullVersion(
+              ? getNoncurrentNullVersion(ozoneManager,
                   omMetadataManager, volumeName, bucketName, keyName)
               : null;
       // The write adds a record, unless it also removes one: replacing the

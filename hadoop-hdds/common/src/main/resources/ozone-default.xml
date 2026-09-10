@@ -5304,4 +5304,15 @@
       delays the new numbering on the affected keys rather than disordering them.
     </description>
   </property>
+  <property>
+    <name>ozone.om.versioning.lookup.warning.threshold</name>
+    <value>5s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      How long a lookup of a key's noncurrent versions may take on the write path before it is
+      logged at WARN. The lookup walks the versionedKeyTable cache and opens an iterator on the DB,
+      both inline on the write, and creating a RocksDB iterator can be slow under load. The latency
+      is also reported as an OM performance metric regardless of this threshold.
+    </description>
+  </property>
 </configuration>

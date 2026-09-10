@@ -582,6 +582,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     // Applied to the bucket only once every marker is in, so that a batch
     // failing on a later key leaves the cached bucket as it found it.
     long pendingNamespace = 0;
+    long pendingReleasedBytes = 0;
     for (OmKeyInfo currentVersion : omKeyInfoList) {
       String objectKey = omMetadataManager.getOzoneKey(
           currentVersion.getVolumeName(), currentVersion.getBucketName(),
@@ -591,6 +592,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           currentVersion.getKeyName(), proposedVersionId,
           Time.now(), trxnLogIndex, pendingNamespace);
       pendingNamespace += insertion.getAddedNamespace();
+      pendingReleasedBytes += insertion.getReleasedBytes();
       insertions.add(insertion);
     }
     // A key the bucket holds no record of supersedes nothing, so the marker
@@ -602,9 +604,13 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           omMetadataManager, omBucketInfo, null, objectKey, keyName,
           proposedVersionId, Time.now(), trxnLogIndex, pendingNamespace);
       pendingNamespace += insertion.getAddedNamespace();
+      pendingReleasedBytes += insertion.getReleasedBytes();
       insertions.add(insertion);
     }
     omBucketInfo.incrUsedNamespace(pendingNamespace);
+    if (pendingReleasedBytes > 0) {
+      omBucketInfo.decrUsedBytes(pendingReleasedBytes, true);
+    }
     return insertions;
   }
 

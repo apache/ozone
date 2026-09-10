@@ -20,12 +20,15 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Searches the noncurrent versions of a single key in the versionedKeyTable.
@@ -35,6 +38,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
  * rather than by id, which no key of the table encodes.
  */
 public final class NoncurrentVersions {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(NoncurrentVersions.class);
 
   private NoncurrentVersions() {
   }
@@ -46,8 +52,16 @@ public final class NoncurrentVersions {
   public static Pair<String, OmKeyInfo> nullVersion(
       OMMetadataManager omMetadataManager, String volumeName,
       String bucketName, String keyName) throws IOException {
-    return newestMatching(omMetadataManager, volumeName, bucketName, keyName,
-        OmKeyInfo::isNullVersionRecord);
+    return nullVersion(null, omMetadataManager, volumeName, bucketName,
+        keyName);
+  }
+
+  /** As above, reporting the lookup's cost through {@code ozoneManager}. */
+  public static Pair<String, OmKeyInfo> nullVersion(OzoneManager ozoneManager,
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName, String keyName) throws IOException {
+    return newestMatching(ozoneManager, omMetadataManager, volumeName,
+        bucketName, keyName, OmKeyInfo::isNullVersionRecord);
   }
 
   /**
@@ -76,6 +90,49 @@ public final class NoncurrentVersions {
    * match.
    */
   public static Pair<String, OmKeyInfo> newestMatching(
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName, String keyName, Predicate<OmKeyInfo> filter)
+      throws IOException {
+    return newestMatching(null, omMetadataManager, volumeName, bucketName,
+        keyName, filter);
+  }
+
+  /**
+   * As above, timed. The lookup walks the versionedKeyTable cache in full and
+   * opens an iterator on the DB, both of which a write path pays for inline,
+   * so it is measured and a slow one is named: a RocksDB iterator can be
+   * expensive to create under load, and this is where that would show.
+   *
+   * @param ozoneManager the OM to report through, or null not to report
+   */
+  public static Pair<String, OmKeyInfo> newestMatching(
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName,
+      Predicate<OmKeyInfo> filter) throws IOException {
+    if (ozoneManager == null) {
+      return lookup(omMetadataManager, volumeName, bucketName, keyName, filter);
+    }
+
+    final long startNs = System.nanoTime();
+    try {
+      return lookup(omMetadataManager, volumeName, bucketName, keyName, filter);
+    } finally {
+      final long elapsedNs = System.nanoTime() - startNs;
+      if (ozoneManager.getPerfMetrics() != null) {
+        ozoneManager.getPerfMetrics()
+            .addNoncurrentVersionLookupLatency(elapsedNs);
+      }
+      final long thresholdMs =
+          ozoneManager.getVersioningLookupWarningThresholdMs();
+      if (TimeUnit.NANOSECONDS.toMillis(elapsedNs) > thresholdMs) {
+        LOG.warn("Looking up the noncurrent versions of {}/{}/{} took {} ms, "
+            + "over the {} ms threshold.", volumeName, bucketName, keyName,
+            TimeUnit.NANOSECONDS.toMillis(elapsedNs), thresholdMs);
+      }
+    }
+  }
+
+  private static Pair<String, OmKeyInfo> lookup(
       OMMetadataManager omMetadataManager, String volumeName,
       String bucketName, String keyName, Predicate<OmKeyInfo> filter)
       throws IOException {
