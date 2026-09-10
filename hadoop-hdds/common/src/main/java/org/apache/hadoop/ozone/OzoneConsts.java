@@ -311,6 +311,7 @@ public final class OzoneConsts {
   public static final String VERSIONING_STATUS = "versioningStatus";
   // Audit keys for the object versions a write creates, demotes or removes.
   public static final String VERSION_ID = "versionId";
+  public static final String REQUESTED_VERSION_ID = "requestedVersionId";
   public static final String SUPERSEDED_VERSION_ID = "supersededVersionId";
   public static final String DELETED_VERSION_ID = "deletedVersionId";
   public static final String PROMOTED_VERSION_ID = "promotedVersionId";

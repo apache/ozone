@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -265,6 +267,65 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
             volumeName, bucketName, keyName, 100L)));
     assertFalse(deletedVersions().isEmpty(),
         "the deleted version's blocks never reached the deletedTable");
+  }
+
+  /**
+   * Every version of a key carries the objectID of the record it overwrote.
+   * Named by objectID, two version deletes would land on one deletedTable
+   * entry, and the later put would drop the earlier version's blocks for good.
+   * Deleting the current version twice in a row is the plainest case: each
+   * delete promotes the version under it.
+   */
+  @Test
+  public void testDeletingTheCurrentVersionTwiceKeepsBothInTheDeletedTable()
+      throws Exception {
+    setupVersionedBucket();
+    // A real OM derives the id from the transaction; the mock would answer 0
+    // for every transaction and hide the difference this test is about.
+    when(ozoneManager.getObjectIdFromTxId(anyLong()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    seedVersionWithBlocks(300L, true, 42L);
+    seedVersionWithBlocks(200L, false, 42L);
+
+    OMClientResponse first = deleteVersionAt(300L, false, 400L);
+    OMClientResponse second = deleteVersionAt(200L, false, 500L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        first.getOMResponse().getStatus());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        second.getOMResponse().getStatus());
+    try (BatchOperation batch =
+             omMetadataManager.getStore().initBatchOperation()) {
+      first.checkAndUpdateDB(omMetadataManager, batch);
+      second.checkAndUpdateDB(omMetadataManager, batch);
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
+
+    List<Long> deleted = new ArrayList<>();
+    for (OmKeyInfo keyInfo : deletedVersions()) {
+      deleted.add(keyInfo.getVersionId());
+    }
+    assertTrue(deleted.contains(300L), "lost the blocks of " + deleted);
+    assertTrue(deleted.contains(200L), "lost the blocks of " + deleted);
+  }
+
+  /** A version holding one block, with the objectID it shares. */
+  private void seedVersionWithBlocks(long versionId, boolean current,
+      long objectId) throws Exception {
+    OmKeyInfo version = OMRequestTestUtils.createOmKeyInfo(
+            volumeName, bucketName, keyName, replicationConfig)
+        .setVersionId(versionId)
+        .setObjectID(objectId)
+        .build();
+    OMRequestTestUtils.addKeyLocationInfo(version, 0L, 100L);
+    if (current) {
+      omMetadataManager.getKeyTable(getBucketLayout()).put(
+          omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
+          version);
+    } else {
+      omMetadataManager.getVersionedKeyTable().put(
+          omMetadataManager.getVersionedOzoneKey(
+              volumeName, bucketName, keyName, versionId), version);
+    }
   }
 
   /**

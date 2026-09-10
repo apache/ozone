@@ -48,12 +48,13 @@ public class OMKeyVersionDeleteResponse extends AbstractOMKeyDeleteResponse {
   private final String promotedKeyName;
   private final OmKeyInfo promoted;
   private final OmBucketInfo omBucketInfo;
+  private final String deletedTableKey;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyVersionDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo deletedVersion, @Nonnull String deletedKeyName,
       boolean deletedCurrent, String promotedKeyName, OmKeyInfo promoted,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull String deletedTableKey) {
     super(omResponse, omBucketInfo.getBucketLayout());
     this.deletedVersion = deletedVersion;
     this.deletedKeyName = deletedKeyName;
@@ -61,6 +62,7 @@ public class OMKeyVersionDeleteResponse extends AbstractOMKeyDeleteResponse {
     this.promotedKeyName = promotedKeyName;
     this.promoted = promoted;
     this.omBucketInfo = omBucketInfo;
+    this.deletedTableKey = deletedTableKey;
   }
 
   /**
@@ -76,6 +78,7 @@ public class OMKeyVersionDeleteResponse extends AbstractOMKeyDeleteResponse {
     this.promotedKeyName = null;
     this.promoted = null;
     this.omBucketInfo = null;
+    this.deletedTableKey = null;
     checkStatusNotOK();
   }
 
@@ -88,7 +91,8 @@ public class OMKeyVersionDeleteResponse extends AbstractOMKeyDeleteResponse {
     addDeletionToBatch(omMetadataManager, batchOperation,
         deletedCurrent ? omMetadataManager.getKeyTable(getBucketLayout())
             : omMetadataManager.getVersionedKeyTable(),
-        deletedKeyName, deletedVersion, omBucketInfo.getObjectID(), true);
+        deletedKeyName, deletedTableKey, deletedVersion,
+        omBucketInfo.getObjectID(), true);
 
     if (promoted != null) {
       omMetadataManager.getKeyTable(getBucketLayout())
