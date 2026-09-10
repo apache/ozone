@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_READ_THREADPOOL_DEFAULT;
@@ -24,6 +26,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_READ_THR
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
+import static org.apache.hadoop.hdds.scm.container.ContainerReplicaChecksumMismatch.hasMismatch;
 import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
@@ -391,10 +394,18 @@ public class SCMClientProtocolServer implements
   @Override
   public GetContainerReplicasResponseProto getContainerReplicasResponse(
       long containerId, int clientVersion) throws IOException {
+    List<HddsProtos.SCMContainerReplicaProto> replicas =
+        getContainerReplicas(containerId, clientVersion);
+    ContainerInfo container = getScm().getContainerManager()
+        .getContainer(ContainerID.valueOf(containerId));
+    boolean dataChecksumMismatch = container.getState() == CLOSED &&
+        container.getReplicationType() == RATIS &&
+        hasMismatch(replicas,
+            replica -> replica.getSequenceID(),
+            replica -> replica.getDataChecksum());
     return GetContainerReplicasResponseProto.newBuilder()
-        .addAllContainerReplica(getContainerReplicas(containerId, clientVersion))
-        .setDataChecksumMismatch(getScm().getReplicationManager()
-            .hasContainerChecksumMismatch(ContainerID.valueOf(containerId)))
+        .addAllContainerReplica(replicas)
+        .setDataChecksumMismatch(dataChecksumMismatch)
         .build();
   }
 

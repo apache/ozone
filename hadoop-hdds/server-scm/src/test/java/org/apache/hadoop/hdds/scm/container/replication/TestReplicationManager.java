@@ -1114,8 +1114,6 @@ public class TestReplicationManager {
     assertThat(replicationManager.getContainerReport()
         .getSample(DATA_CHECKSUM_MISMATCH))
         .containsExactly(container.containerID());
-    assertTrue(replicationManager.hasContainerChecksumMismatch(
-        container.containerID()));
     assertEquals(1, StringUtils.countMatches(logs.getOutput(), warning));
 
     replicationManager.processAll();
@@ -1129,8 +1127,6 @@ public class TestReplicationManager {
     replicationManager.processAll();
     assertEquals(0, replicationManager.getContainerReport()
         .getStat(DATA_CHECKSUM_MISMATCH));
-    assertFalse(replicationManager.hasContainerChecksumMismatch(
-        container.containerID()));
 
     containerReplicaMap.put(container.containerID(), mismatch);
     replicationManager.processAll();

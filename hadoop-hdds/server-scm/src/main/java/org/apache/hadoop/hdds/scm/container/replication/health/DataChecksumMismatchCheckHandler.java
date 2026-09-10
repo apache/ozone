@@ -22,18 +22,13 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.DATA_CHECKSUM_MISMATCH;
 import static org.apache.hadoop.hdds.scm.container.ContainerReplicaChecksumMismatch.hasMismatch;
 
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,68 +42,34 @@ public class DataChecksumMismatchCheckHandler extends AbstractCheck {
   private static final Logger LOG =
       LoggerFactory.getLogger(DataChecksumMismatchCheckHandler.class);
 
-  private final Map<ContainerID, Set<ContainerReplica>> currentMismatches =
-      new HashMap<>();
   private final Set<ContainerID> warnedMismatches = new HashSet<>();
-  private volatile Set<ContainerID> reportedMismatches =
-      Collections.emptySet();
-  private boolean scanInProgress;
 
   @Override
   public boolean handle(ContainerCheckRequest request) {
-    if (request.isReadOnly() || !scanInProgress) {
+    if (request.isReadOnly()) {
       return false;
     }
 
     ContainerInfo container = request.getContainerInfo();
     Set<ContainerReplica> replicas = request.getContainerReplicas();
-    if (container.getState() == CLOSED &&
+    boolean mismatch = container.getState() == CLOSED &&
         container.getReplicationType() == RATIS &&
         hasMismatch(replicas, ContainerReplica::getSequenceId,
-            ContainerReplica::getDataChecksum)) {
-      currentMismatches.put(container.containerID(), replicas);
+            ContainerReplica::getDataChecksum);
+    ContainerID containerID = container.containerID();
+    if (!mismatch) {
+      warnedMismatches.remove(containerID);
+      return false;
+    }
+
+    request.getReport().incrementAndSampleAdditionalState(
+        DATA_CHECKSUM_MISMATCH, containerID);
+    if (warnedMismatches.add(containerID)) {
+      LOG.warn(
+          "Container {} has replicas with the same BCSID but different data checksums: {}",
+          containerID, formatChecksumDetails(replicas));
     }
     return false;
-  }
-
-  /** Starts collecting mismatches for a new Replication Manager scan. */
-  public void startScan() {
-    currentMismatches.clear();
-    scanInProgress = true;
-  }
-
-  /** Completes a scan and reports the detected mismatches. */
-  public void completeScan(ReplicationManagerReport report) {
-    Set<ContainerID> detected = new HashSet<>(currentMismatches.keySet());
-
-    detected.stream()
-        .sorted(Comparator.comparingLong(ContainerID::getId))
-        .forEach(containerID -> report.incrementAndSampleAdditionalState(
-            DATA_CHECKSUM_MISMATCH, containerID));
-
-    Set<ContainerID> newWarnings = new HashSet<>(detected);
-    newWarnings.removeAll(warnedMismatches);
-    newWarnings.stream()
-        .sorted(Comparator.comparingLong(ContainerID::getId))
-        .forEach(containerID -> LOG.warn(
-            "Container {} has replicas with the same BCSID but different data checksums: {}",
-            containerID, formatChecksumDetails(currentMismatches.get(containerID))));
-
-    warnedMismatches.clear();
-    warnedMismatches.addAll(detected);
-    reportedMismatches = Collections.unmodifiableSet(detected);
-    currentMismatches.clear();
-    scanInProgress = false;
-  }
-
-  /** Discards observations when a scan does not process every container. */
-  public void abortScan() {
-    currentMismatches.clear();
-    scanInProgress = false;
-  }
-
-  public boolean hasReportedMismatch(ContainerID containerID) {
-    return reportedMismatches.contains(containerID);
   }
 
   private static String formatChecksumDetails(Set<ContainerReplica> replicas) {

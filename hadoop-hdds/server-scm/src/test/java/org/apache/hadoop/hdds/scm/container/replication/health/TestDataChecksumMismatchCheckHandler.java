@@ -62,17 +62,15 @@ public class TestDataChecksumMismatchCheckHandler {
     Set<ContainerReplica> replicas = createReplicasWithChecksums(container,
         new long[]{10, 10, 10}, new long[]{100, 200, 100});
 
-    ReplicationManagerReport report = runScan(container, replicas);
+    ReplicationManagerReport report = runCheck(container, replicas);
     assertEquals(1, report.getStat(DATA_CHECKSUM_MISMATCH));
     assertThat(report.getSample(DATA_CHECKSUM_MISMATCH))
         .containsExactly(container.containerID());
-    assertThat(handler.hasReportedMismatch(container.containerID())).isTrue();
 
-    ReplicationManagerReport resolvedReport = runScan(container,
+    ReplicationManagerReport resolvedReport = runCheck(container,
         createReplicasWithChecksums(container, new long[]{10, 10, 10},
             new long[]{100, 100, 100}));
     assertEquals(0, resolvedReport.getStat(DATA_CHECKSUM_MISMATCH));
-    assertFalse(handler.hasReportedMismatch(container.containerID()));
   }
 
   @Test
@@ -82,7 +80,7 @@ public class TestDataChecksumMismatchCheckHandler {
         HddsProtos.LifeCycleState.OPEN);
     Set<ContainerReplica> replicas = createReplicasWithChecksums(openRatis,
         new long[]{10, 10, 10}, new long[]{100, 200, 100});
-    ReplicationManagerReport report = runScan(openRatis, replicas);
+    ReplicationManagerReport report = runCheck(openRatis, replicas);
     assertEquals(0, report.getStat(DATA_CHECKSUM_MISMATCH));
 
     ContainerInfo closedEc = createContainerInfo(
@@ -90,29 +88,8 @@ public class TestDataChecksumMismatchCheckHandler {
         HddsProtos.LifeCycleState.CLOSED);
     replicas = createReplicasWithChecksums(closedEc,
         new long[]{10, 10, 10}, new long[]{100, 200, 100});
-    report = runScan(closedEc, replicas);
+    report = runCheck(closedEc, replicas);
     assertEquals(0, report.getStat(DATA_CHECKSUM_MISMATCH));
-  }
-
-  @Test
-  void testIncompleteScanIsIgnored() {
-    ContainerInfo container = createContainerInfo(
-        RatisReplicationConfig.getInstance(THREE), 10,
-        HddsProtos.LifeCycleState.CLOSED);
-    Set<ContainerReplica> replicas = createReplicasWithChecksums(container,
-        new long[]{10, 10, 10}, new long[]{100, 200, 100});
-
-    ReplicationManagerReport incompleteReport = new ReplicationManagerReport(10);
-    handler.startScan();
-    assertFalse(handler.handle(createRequest(container, replicas,
-        incompleteReport)));
-    handler.abortScan();
-    assertEquals(0, incompleteReport.getStat(DATA_CHECKSUM_MISMATCH));
-    assertFalse(handler.hasReportedMismatch(container.containerID()));
-
-    ReplicationManagerReport report = runScan(container, replicas);
-    assertEquals(1, report.getStat(DATA_CHECKSUM_MISMATCH));
-    assertThat(handler.hasReportedMismatch(container.containerID())).isTrue();
   }
 
   @Test
@@ -124,21 +101,16 @@ public class TestDataChecksumMismatchCheckHandler {
         new long[]{10, 10, 10}, new long[]{100, 200, 100});
     ReplicationManagerReport report = new ReplicationManagerReport(10);
 
-    handler.startScan();
     assertFalse(handler.handle(createRequest(container, replicas, report,
         true)));
-    handler.completeScan(report);
 
     assertEquals(0, report.getStat(DATA_CHECKSUM_MISMATCH));
-    assertFalse(handler.hasReportedMismatch(container.containerID()));
   }
 
-  private ReplicationManagerReport runScan(ContainerInfo container,
+  private ReplicationManagerReport runCheck(ContainerInfo container,
       Set<ContainerReplica> replicas) {
     ReplicationManagerReport report = new ReplicationManagerReport(10);
-    handler.startScan();
     assertFalse(handler.handle(createRequest(container, replicas, report)));
-    handler.completeScan(report);
     return report;
   }
 

@@ -170,7 +170,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private long lastTimeToBeReadyInMillis = 0;
   private final Clock clock;
   private final ContainerReplicaPendingOps containerReplicaPendingOps;
-  private final DataChecksumMismatchCheckHandler checksumMismatchCheckHandler;
   private final ECReplicationCheckHandler ecReplicationCheckHandler;
   private final ECMisReplicationCheckHandler ecMisReplicationCheckHandler;
   private final RatisReplicationCheckHandler ratisReplicationCheckHandler;
@@ -233,8 +232,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
-    this.checksumMismatchCheckHandler =
-        new DataChecksumMismatchCheckHandler();
     this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
     this.ecMisReplicationCheckHandler =
         new ECMisReplicationCheckHandler(ecContainerPlacement);
@@ -274,7 +271,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         .addNext(new DeletingContainerHandler(this))
         .addNext(new QuasiClosedStuckReplicationCheck(rmConf))
         .addNext(ecReplicationCheckHandler)
-        .addNext(checksumMismatchCheckHandler)
+        .addNext(new DataChecksumMismatchCheckHandler())
         .addNext(ratisReplicationCheckHandler)
         .addNext(new ClosedWithUnhealthyReplicasHandler(this))
         .addNext(ecMisReplicationCheckHandler)
@@ -372,8 +369,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     ReplicationManagerReport report = new ReplicationManagerReport(
         rmConf.getContainerSampleLimit());
     ReplicationQueue newRepQueue = new ReplicationQueue();
-    checksumMismatchCheckHandler.startScan();
-    int processedContainers = 0;
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
         break;
@@ -385,12 +380,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       } catch (ContainerNotFoundException e) {
         LOG.error("Container {} not found", c.getContainerID(), e);
       }
-      processedContainers++;
-    }
-    if (processedContainers == containers.size()) {
-      checksumMismatchCheckHandler.completeScan(report);
-    } else {
-      checksumMismatchCheckHandler.abortScan();
     }
     report.setComplete();
     replicationQueue.set(newRepQueue);
@@ -1493,10 +1482,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
   public ReplicationManagerMetrics getMetrics() {
     return metrics;
-  }
-
-  public boolean hasContainerChecksumMismatch(ContainerID containerID) {
-    return checksumMismatchCheckHandler.hasReportedMismatch(containerID);
   }
 
   public ReplicationManagerConfiguration getConfig() {
