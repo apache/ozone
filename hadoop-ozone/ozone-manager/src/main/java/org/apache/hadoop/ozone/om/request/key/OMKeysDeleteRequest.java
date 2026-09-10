@@ -467,24 +467,32 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       throws IOException {
 
     List<DeleteMarkerInsertion> insertions = new ArrayList<>();
+    // Applied to the bucket only once every marker is in, so that a batch
+    // failing on a later key leaves the cached bucket as it found it.
+    long pendingNamespace = 0;
     for (OmKeyInfo currentVersion : omKeyInfoList) {
       String objectKey = omMetadataManager.getOzoneKey(
           currentVersion.getVolumeName(), currentVersion.getBucketName(),
           currentVersion.getKeyName());
-      insertions.add(insertDeleteMarker(ozoneManager, omMetadataManager,
-          omBucketInfo, currentVersion, objectKey,
+      DeleteMarkerInsertion insertion = insertDeleteMarker(ozoneManager,
+          omMetadataManager, omBucketInfo, currentVersion, objectKey,
           currentVersion.getKeyName(), proposedVersionId,
-          Time.now(), trxnLogIndex));
+          Time.now(), trxnLogIndex, pendingNamespace);
+      pendingNamespace += insertion.getAddedNamespace();
+      insertions.add(insertion);
     }
     // A key the bucket holds no record of supersedes nothing, so the marker
     // is built without a current version to inherit from.
     for (String keyName : markerOnlyKeys) {
       String objectKey = omMetadataManager.getOzoneKey(
           omBucketInfo.getVolumeName(), omBucketInfo.getBucketName(), keyName);
-      insertions.add(insertDeleteMarker(ozoneManager, omMetadataManager,
-          omBucketInfo, null, objectKey, keyName, proposedVersionId,
-          Time.now(), trxnLogIndex));
+      DeleteMarkerInsertion insertion = insertDeleteMarker(ozoneManager,
+          omMetadataManager, omBucketInfo, null, objectKey, keyName,
+          proposedVersionId, Time.now(), trxnLogIndex, pendingNamespace);
+      pendingNamespace += insertion.getAddedNamespace();
+      insertions.add(insertion);
     }
+    omBucketInfo.incrUsedNamespace(pendingNamespace);
     return insertions;
   }
 

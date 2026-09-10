@@ -326,6 +326,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
                 commitKeyArgs.getProposedVersionId(), keyToDelete));
       }
       omKeyInfo = committedKeyBuilder.build();
+      if (omKeyInfo.getVersionId() != null) {
+        // The id as applied, which the floor can raise above the proposal
+        // that the key args carry.
+        auditMap.put(OzoneConsts.VERSION_ID,
+            String.valueOf(omKeyInfo.getVersionId()));
+      }
 
       // Update the block length for each block, return the allocated but
       // uncommitted blocks
@@ -435,6 +441,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             volumeName, bucketName, keyName, versionedKeyInfo.getVersionId());
         omMetadataManager.getVersionedKeyTable().addCacheEntry(
             dbVersionedKey, versionedKeyInfo, trxnLogIndex);
+        auditMap.put(OzoneConsts.SUPERSEDED_VERSION_ID,
+            String.valueOf(versionedKeyInfo.getVersionId()));
       }
 
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(

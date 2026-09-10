@@ -454,6 +454,7 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     seedCurrentVersion(100L);
     String otherKey = keyName + "-other";
     seedCurrentVersion(otherKey, 150L);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
     OMClientResponse response = new OMKeysDeleteRequest(
         batchDeleteRequest(PROPOSED, keyName, otherKey), getBucketLayout())
@@ -462,6 +463,10 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
         response.getOMResponse().getStatus());
     assertInstanceOf(OMKeysDeleteMarkerResponse.class, response);
+    // The bucket is the cached instance, which the next write to it persists:
+    // the marker that did fit must not stay counted for a batch that failed.
+    assertEquals(2L, omMetadataManager.getBucketTable().get(bucketKey)
+        .getUsedNamespace());
   }
 
   /**

@@ -23,8 +23,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
  * What inserting a delete marker changed, for the response to write out.
  *
  * <p>Produced by {@link OMKeyRequest#insertDeleteMarker}, which has already
- * applied all of it to the table cache and to the bucket's quota. A response
- * only has to put the same records into its WriteBatch.
+ * applied the records to the table cache. The namespace it adds is left to
+ * the caller to apply to the bucket, once every marker of the request is in:
+ * the bucket is the cached instance, so counting a marker of a batch that
+ * then fails would persist with the next write to it. A response only has to
+ * put the same records into its WriteBatch.
  */
 public final class DeleteMarkerInsertion {
 
@@ -32,13 +35,21 @@ public final class DeleteMarkerInsertion {
   private final String objectKey;
   private final String demotedVersionKey;
   private final OmKeyInfo demotedVersion;
+  private final long addedNamespace;
 
   DeleteMarkerInsertion(OmKeyInfo deleteMarker, String objectKey,
-      String demotedVersionKey, OmKeyInfo demotedVersion) {
+      String demotedVersionKey, OmKeyInfo demotedVersion,
+      long addedNamespace) {
     this.deleteMarker = deleteMarker;
     this.objectKey = objectKey;
     this.demotedVersionKey = demotedVersionKey;
     this.demotedVersion = demotedVersion;
+    this.addedNamespace = addedNamespace;
+  }
+
+  /** Namespace the marker takes, not yet applied to the bucket. */
+  public long getAddedNamespace() {
+    return addedNamespace;
   }
 
   /** The marker that becomes the key's current version. */

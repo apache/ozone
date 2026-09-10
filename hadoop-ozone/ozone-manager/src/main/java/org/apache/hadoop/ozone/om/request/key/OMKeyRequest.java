@@ -1472,7 +1472,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected DeleteMarkerInsertion insertDeleteMarker(OzoneManager ozoneManager,
       OMMetadataManager omMetadataManager, OmBucketInfo omBucketInfo,
       OmKeyInfo currentVersion, String objectKey, String keyName,
-      long proposedVersionId, long modificationTime, long trxnLogIndex)
+      long proposedVersionId, long modificationTime, long trxnLogIndex,
+      long pendingNamespace)
       throws IOException {
 
     String volumeName = omBucketInfo.getVolumeName();
@@ -1486,8 +1487,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // cleanup does not cover the versionedKeyTable, so a cache entry left
     // behind would never be removed and would outlive the failed request.
     // The marker is a record of its own; it holds no blocks, so it consumes
-    // namespace but no space.
-    checkBucketQuotaInNamespace(omBucketInfo, 1L);
+    // namespace but no space. The check counts what earlier markers of the
+    // same request have claimed, which the bucket does not show yet.
+    checkBucketQuotaInNamespace(omBucketInfo, pendingNamespace + 1L);
 
     OmKeyInfo.Builder markerBuilder;
     if (currentVersion != null) {
@@ -1534,13 +1536,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
           movedVersionedKeyName, movedVersionedKeyInfo, trxnLogIndex);
     }
 
-    omBucketInfo.incrUsedNamespace(1L);
-
     omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
         objectKey, deleteMarker, trxnLogIndex);
 
+    // The namespace is left to the caller: the bucket is the cached instance,
+    // and a batch that fails on a later key must not have counted this one.
     return new DeleteMarkerInsertion(deleteMarker, objectKey,
-        movedVersionedKeyName, movedVersionedKeyInfo);
+        movedVersionedKeyName, movedVersionedKeyInfo, 1L);
   }
 
 }

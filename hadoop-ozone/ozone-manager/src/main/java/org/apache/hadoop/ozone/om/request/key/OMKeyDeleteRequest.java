@@ -166,7 +166,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         insertingDeleteMarker = true;
         omClientResponse = insertDeleteMarker(ozoneManager, omMetadataManager,
             omBucketInfo, omKeyInfo, objectKey, keyArgs, trxnLogIndex,
-            omResponse);
+            omResponse, auditMap);
         // The key stays in the keyTable as a marker, so nothing is released;
         // only superseding a visible object is one fewer visible key.
         visibleKeyRemoved = omKeyInfo != null && !omKeyInfo.isDeleteMarker();
@@ -280,12 +280,20 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       OMMetadataManager omMetadataManager, OmBucketInfo omBucketInfo,
       OmKeyInfo currentVersion, String objectKey,
       OzoneManagerProtocolProtos.KeyArgs keyArgs, long trxnLogIndex,
-      OMResponse.Builder omResponse) throws IOException {
+      OMResponse.Builder omResponse, Map<String, String> auditMap)
+      throws IOException {
 
     DeleteMarkerInsertion inserted = insertDeleteMarker(ozoneManager,
         omMetadataManager, omBucketInfo, currentVersion, objectKey,
         keyArgs.getKeyName(), keyArgs.getProposedVersionId(),
-        keyArgs.getModificationTime(), trxnLogIndex);
+        keyArgs.getModificationTime(), trxnLogIndex, 0L);
+    omBucketInfo.incrUsedNamespace(inserted.getAddedNamespace());
+    auditMap.put(OzoneConsts.VERSION_ID,
+        String.valueOf(inserted.getDeleteMarker().getVersionId()));
+    if (inserted.getDemotedVersion() != null) {
+      auditMap.put(OzoneConsts.SUPERSEDED_VERSION_ID,
+          String.valueOf(inserted.getDemotedVersion().getVersionId()));
+    }
 
     return new OMKeyDeleteMarkerResponse(
         omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
