@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
+
+import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,7 +35,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.ShortCircuitValidator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -73,11 +74,6 @@ public class LocalChunkInputStream extends ChunkInputStream
     }
   }
 
-  @Override
-  boolean supportsConcurrentPositionedRead() {
-    return true;
-  }
-
   /**
    * Get the chunk from the local block replica.
    */
@@ -86,8 +82,7 @@ public class LocalChunkInputStream extends ChunkInputStream
   protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo)
       throws IOException {
     int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
-    final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(readChunkInfo.getLen(),
-        bytesPerChecksum);
+    final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(readChunkInfo.getLen(), bytesPerChecksum);
     readAtOffset(buffers, readChunkInfo.getOffset());
     Arrays.stream(buffers).forEach(ByteBuffer::flip);
     validator.accept(Arrays.asList(buffers), readChunkInfo);
@@ -102,18 +97,26 @@ public class LocalChunkInputStream extends ChunkInputStream
   private void readAtOffset(ByteBuffer[] buffers, long fileOffset) throws IOException {
     long pos = fileOffset;
     for (ByteBuffer buffer : buffers) {
-      while (buffer.hasRemaining()) {
-        int n = dataIn.read(buffer, pos);
-        if (n <= 0) {
-          if (buffer.hasRemaining()) {
-            throw new IOException("Failed to read chunk data at offset " + pos
-                + " for block chunk " + chunkInfo.getChunkName());
-          }
-          break;
-        }
-        pos += n;
+      final int remaining = buffer.remaining();
+      final long read = readAtOffset(buffer, pos);
+      if (buffer.hasRemaining()) {
+        throw new EOFException("Read only " + read + "bytes but expected to read " + remaining
+            + " bytes at offset " + pos + " for chunk " + chunkInfo.getChunkName());
       }
+      pos += read;
     }
+  }
+
+  private long readAtOffset(ByteBuffer buffer, long fileOffset) throws IOException {
+    long pos = fileOffset;
+    while (buffer.hasRemaining()) {
+      final int n = dataIn.read(buffer, pos);
+      if (n < 0) {
+        break;
+      }
+      pos += n;
+    }
+    return pos - fileOffset;
   }
 
   private void validateChunk(List<ByteBuffer> bufferList, ChunkInfo readChunkInfo)
@@ -132,20 +135,5 @@ public class LocalChunkInputStream extends ChunkInputStream
       int startIndex = (int) (relativeOffset / bytesPerChecksum);
       Checksum.verifyChecksum(bufferList, startIndex, checksumData);
     }
-  }
-
-  /**
-   * Acquire short-circuit local read client.
-   */
-  @Override
-  protected synchronized XceiverClientSpi acquireClient() throws IOException {
-    // local reads use the FileChannel directly; no xceiver client needed
-    return null;
-  }
-
-  @Override
-  protected ByteBuffer[] readChunk(XceiverClientSpi client, ChunkInfo readChunkInfo) throws IOException {
-    // client is unused: local reads go through the FileChannel path
-    return readChunk(readChunkInfo);
   }
 }
