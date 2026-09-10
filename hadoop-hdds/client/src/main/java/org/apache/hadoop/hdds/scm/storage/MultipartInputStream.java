@@ -78,8 +78,7 @@ public class MultipartInputStream extends ExtendedInputStream {
       this.partOffsets[i++] = streamLength;
       if (isStreamBlockInputStream) {
         Preconditions.assertInstanceOf(partInputStream, StreamBlockInputStream.class);
-      } else if (statelessSupported
-          && !(partInputStream instanceof BlockInputStream)) {
+      } else if (statelessSupported && !(partInputStream instanceof BlockInputStream)) {
         statelessSupported = false;
       }
       streamLength += partInputStream.getLength();
@@ -242,8 +241,7 @@ public class MultipartInputStream extends ExtendedInputStream {
    * the caller can fall back) when any part is not a {@link BlockInputStream},
    * e.g. erasure coded parts.
    */
-  private boolean readFullyStateless(long position, ByteBuffer buffer)
-      throws IOException {
+  private boolean readFullyStateless(long position, ByteBuffer buffer) throws IOException {
     if (!buffer.hasRemaining()) {
       return true;
     }
@@ -261,7 +259,7 @@ public class MultipartInputStream extends ExtendedInputStream {
         throw new EOFException("EOF encountered at pos: " + pos +
             " for key: " + key);
       }
-      int idx = partIndexForPosition(pos);
+      int idx = binarySearchOffsetIndex(partOffsets, pos);
       BlockInputStream part = (BlockInputStream) partStreams.get(idx);
       long partPos = pos - partOffsets[idx];
       int n = part.readPositioned(partPos, buffer);
@@ -278,14 +276,15 @@ public class MultipartInputStream extends ExtendedInputStream {
     return true;
   }
 
-  private int partIndexForPosition(long pos) {
-    int idx = Arrays.binarySearch(partOffsets, pos);
-    if (idx < 0) {
-      // binarySearch returns -insertionPoint - 1; the containing part is
-      // insertionPoint - 1.
-      idx = -idx - 2;
+  static int binarySearchOffsetIndex(long[] offsets, long pos) {
+    final int idx = Arrays.binarySearch(offsets, pos);
+    if (idx > 0) {
+      return idx;
     }
-    return idx;
+    // binarySearch returns n = -insertionPoint - 1;
+    // insertionPoint is -n - 1
+    // the containing index is insertionPoint - 1.
+    return -idx - 2;
   }
 
   public synchronized void initialize() throws IOException {

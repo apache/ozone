@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -38,8 +37,7 @@ public class DummyChunkInputStream extends ChunkInputStream {
   private final byte[] chunkData;
 
   // Buffers from the most recent readChunk call.
-  private final AtomicReference<List<ByteString>> lastReadByteBuffers =
-      new AtomicReference<>();
+  private final AtomicReference<List<ByteString>> lastReadByteBuffers = new AtomicReference<>();
 
   public DummyChunkInputStream(ChunkInfo chunkInfo,
       BlockID blockId,
@@ -78,17 +76,6 @@ public class DummyChunkInputStream extends ChunkInputStream {
 
     return BufferUtils.getReadOnlyByteBuffers(chunkBuffers)
         .toArray(new ByteBuffer[0]);
-  }
-
-  @Override
-  protected XceiverClientSpi acquireClient() {
-    // No action needed; in-memory reads do not use an xceiver client
-    return null;
-  }
-
-  @Override
-  protected ByteBuffer[] readChunk(XceiverClientSpi client, ChunkInfo readChunkInfo) {
-    return readChunk(readChunkInfo);
   }
 
   @Override
