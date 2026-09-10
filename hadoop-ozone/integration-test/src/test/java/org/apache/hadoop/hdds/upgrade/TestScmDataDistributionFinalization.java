@@ -79,7 +79,6 @@ import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -161,7 +160,6 @@ public class TestScmDataDistributionFinalization {
    * Test for an empty cluster.
    */
   @Test
-  @Flaky("HDDS-14050")
   public void testFinalizationEmptyClusterDataDistribution() throws Exception {
     init(new OzoneConfiguration());
     assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
@@ -190,6 +188,11 @@ public class TestScmDataDistributionFinalization {
     StorageContainerManager activeSCM = cluster.getActiveSCM();
     assertEquals(-1, lastTxId, "Last transaction ID should be -1");
 
+    // Stop deleting service so it cannot race the summary assertions below.
+    for (StorageContainerManager scm : cluster.getStorageContainerManagersList()) {
+      scm.getScmBlockManager().getSCMBlockDeletingService().stop();
+    }
+
     // generate old format deletion tx, summary should keep empty, total DB tx 4
     int txCount = 4;
     DeletedBlockLogImpl deletedBlockLog = (DeletedBlockLogImpl) activeSCM.getScmBlockManager().getDeletedBlockLog();
@@ -217,6 +220,11 @@ public class TestScmDataDistributionFinalization {
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE, summary.getTotalBlockSize());
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE * 3, summary.getTotalBlockReplicatedSize());
 
+    // Restart deleting service so transactions are drained below.
+    for (StorageContainerManager scm : cluster.getStorageContainerManagersList()) {
+      scm.getScmBlockManager().getSCMBlockDeletingService().start();
+    }
+
     // wait for all transactions deleted by SCMBlockDeletingService
     GenericTestUtils.waitFor(() -> {
       try {
@@ -227,6 +235,11 @@ public class TestScmDataDistributionFinalization {
         return false;
       }
     }, 100, 5000);
+
+    // Stop deleting service again to prevent it from racing the summary assertions below.
+    for (StorageContainerManager scm : cluster.getStorageContainerManagersList()) {
+      scm.getScmBlockManager().getSCMBlockDeletingService().stop();
+    }
 
     // generate old format deletion tx, summary should keep the same
     deletedBlockLog.addTransactions(generateDeletedBlocks(txCount, false));
