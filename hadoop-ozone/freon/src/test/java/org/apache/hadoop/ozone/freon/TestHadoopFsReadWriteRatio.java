@@ -22,13 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PositionedReadable;
-import org.apache.hadoop.fs.Seekable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,7 +35,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
 /**
- * Verifies that {@code --read-write-ratio} of {@link HadoopFsReadWriteValidator}
+ * Verifies that {@code --reads-per-write} of {@link HadoopFsReadWriteValidator}
  * (dfsrw) controls how many reads the run issues per write. The workload only
  * needs a Hadoop {@code FileSystem}, so these run against the local one instead
  * of a cluster.
@@ -80,7 +78,7 @@ public class TestHadoopFsReadWriteRatio {
   @ValueSource(ints = {2, 3, 5})
   void issuesRequestedReadsPerWrite(int ratio) {
     CommandLine cmd =
-        runValidator(2, "--read-write-ratio", String.valueOf(ratio));
+        runValidator(2, "--reads-per-write", String.valueOf(ratio));
 
     assertEquals(WRITES, writeCount(cmd));
     assertEquals((long) WRITES * ratio, readCount(cmd));
@@ -94,7 +92,7 @@ public class TestHadoopFsReadWriteRatio {
    */
   @Test
   void spreadsFractionalRatioOverWrites() {
-    CommandLine cmd = runValidator(1, "--read-write-ratio", "0.25");
+    CommandLine cmd = runValidator(1, "--reads-per-write", "0.25");
 
     assertEquals(WRITES, writeCount(cmd));
     assertEquals(WRITES / 4, readCount(cmd));
@@ -103,20 +101,35 @@ public class TestHadoopFsReadWriteRatio {
   /** A ratio with a whole and a fractional part mixes the two behaviours. */
   @Test
   void spreadsMixedRatioOverWrites() {
-    CommandLine cmd = runValidator(1, "--read-write-ratio", "1.5");
+    CommandLine cmd = runValidator(1, "--reads-per-write", "1.5");
 
     assertEquals(WRITES, writeCount(cmd));
     assertEquals(WRITES * 3 / 2, readCount(cmd));
   }
 
   /**
-   * Every read of a task validates, not only the first one: a single write read
-   * back three times fails the run when the content is corrupted before the
-   * last of the three reads.
+   * The leftover of a fractional ratio is carried exactly, so the tenth write
+   * of a run at 0.1 is read back. A ratio accumulated as a double drifts —
+   * adding 0.1 ten times gives 0.9999999999999999 — which would put that read
+   * off to an eleventh write a ten-write run never makes.
    */
   @Test
-  void everyReadOfATaskValidatesContent() {
-    CorruptingLocalFileSystem.corruptFromRead(3);
+  void carriesFractionalRatioWithoutDrift() {
+    CommandLine cmd = runValidator(1, 10, "--reads-per-write", "0.1");
+
+    assertEquals(10, writeCount(cmd));
+    assertEquals(1, readCount(cmd));
+  }
+
+  /**
+   * Every read of a task validates, not only the first or the last one: a
+   * single write read back three times fails the run wherever among the three
+   * the content is corrupted.
+   */
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2, 3})
+  void everyReadOfATaskValidatesContent(int corruptedRead) {
+    CorruptingLocalFileSystem.corruptFromRead(corruptedRead);
 
     int exitCode = new Freon().getCmd().execute(
         "-D", "fs.file.impl=" + CorruptingLocalFileSystem.class.getName(),
@@ -128,31 +141,38 @@ public class TestHadoopFsReadWriteRatio {
         "-s", "1KB",
         "--buffer", "1024",
         "--copy-buffer", "1024",
-        "--read-write-ratio", "3");
+        "--reads-per-write", "3");
 
-    assertNotEquals(0, exitCode, "Corrupted content was not detected");
+    assertNotEquals(0, exitCode,
+        "Corrupted content of read " + corruptedRead + " was not detected");
   }
 
   @Test
   void rejectsNonPositiveRatio() {
-    assertThat(execute(new Freon().getCmd(), 1, "--read-write-ratio", "0"))
+    assertThat(execute(new Freon().getCmd(), 1, WRITES, "--reads-per-write", "0"))
         .isNotZero();
-    assertThat(execute(new Freon().getCmd(), 1, "--read-write-ratio", "-1"))
+    assertThat(execute(new Freon().getCmd(), 1, WRITES, "--reads-per-write", "-1"))
         .isNotZero();
   }
 
   private CommandLine runValidator(int threads, String... args) {
+    return runValidator(threads, WRITES, args);
+  }
+
+  private CommandLine runValidator(int threads, int writes, String... args) {
     CommandLine cmd = new Freon().getCmd();
-    assertEquals(0, execute(cmd, threads, args), "Freon dfsrw command failed");
+    assertEquals(0, execute(cmd, threads, writes, args),
+        "Freon dfsrw command failed");
     return cmd;
   }
 
-  private int execute(CommandLine cmd, int threads, String... args) {
+  private int execute(CommandLine cmd, int threads, int writes,
+      String... args) {
     String[] fixed = {
         "dfsrw",
         "-r", rootPath,
         "-p", "dfsrw",
-        "-n", String.valueOf(WRITES),
+        "-n", String.valueOf(writes),
         "-t", String.valueOf(threads),
         "-s", "1KB",
         "--buffer", "1024",
@@ -207,9 +227,10 @@ public class TestHadoopFsReadWriteRatio {
 
   /**
    * Passes the wrapped stream through, with the first byte of the file flipped.
+   * {@link FSInputStream} supplies the positioned reads on top of seek and
+   * read, so only those two and the plain reads are forwarded here.
    */
-  private static final class FlippingInputStream extends InputStream
-      implements Seekable, PositionedReadable {
+  private static final class FlippingInputStream extends FSInputStream {
 
     private final FSDataInputStream input;
 
@@ -252,23 +273,6 @@ public class TestHadoopFsReadWriteRatio {
     @Override
     public boolean seekToNewSource(long targetPos) throws IOException {
       return input.seekToNewSource(targetPos);
-    }
-
-    @Override
-    public int read(long position, byte[] buffer, int offset, int length)
-        throws IOException {
-      return input.read(position, buffer, offset, length);
-    }
-
-    @Override
-    public void readFully(long position, byte[] buffer, int offset, int length)
-        throws IOException {
-      input.readFully(position, buffer, offset, length);
-    }
-
-    @Override
-    public void readFully(long position, byte[] buffer) throws IOException {
-      input.readFully(position, buffer);
     }
   }
 }
