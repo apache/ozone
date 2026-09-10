@@ -106,8 +106,8 @@ class ReadBlockComputation {
     if (responseDataSize >= remainingLength) {
       return Math.toIntExact(remainingLength);
     }
-    ChunkInfo nextChunk = chunks.get(findChunk(offset + responseDataSize)); // exclusive
-    final int lengthExcludingEndChunk = Math.toIntExact(nextChunk.getOffset() - offset);
+    ChunkInfo endChunk = chunks.get(findChunk(offset + responseDataSize)); // exclusive
+    final int lengthExcludingEndChunk = Math.toIntExact(endChunk.getOffset() - offset);
     // bytesPerChecksum must be a power of 2.
     return (responseDataSize - lengthExcludingEndChunk) & bitMask;
   }
