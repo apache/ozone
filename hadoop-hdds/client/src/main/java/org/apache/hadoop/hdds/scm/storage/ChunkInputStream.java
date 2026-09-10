@@ -309,7 +309,7 @@ public class ChunkInputStream extends InputStream
    *
    * @return the held client after ensuring it is acquired
    */
-  private synchronized XceiverClientSpi acquireClient() throws IOException {
+  protected synchronized XceiverClientSpi acquireClient() throws IOException {
     if (xceiverClientFactory != null && xceiverClient == null) {
       Pipeline pipeline = pipelineSupplier.get();
       xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
@@ -436,14 +436,14 @@ public class ChunkInputStream extends InputStream
    * at {@code chunkRelativePosition} within this chunk. Unlike the buffered
    * {@link #read} path, this does not read or mutate any of the instance's
    * buffer/position state ({@code buffers}, {@code chunkPosition},
-   * {@code bufferOffsetWrtChunkData}, ...). Concurrent calls on the same
-   * stream are thread-safe but serialized.
+   * {@code bufferOffsetWrtChunkData}, ...), so it is safe to call concurrently
+   * from multiple threads sharing the same stream.
    *
    * @param chunkRelativePosition start offset within this chunk
    * @param dst destination buffer
    * @return number of bytes copied into {@code dst}, or {@link #EOF} at EOF
    */
-  synchronized int readPositioned(long chunkRelativePosition, ByteBuffer dst) throws IOException {
+  int readPositioned(long chunkRelativePosition, ByteBuffer dst) throws IOException {
     if (chunkRelativePosition < 0 || chunkRelativePosition >= length) {
       return EOF;
     }
@@ -509,8 +509,10 @@ public class ChunkInputStream extends InputStream
    * Send RPC call to get the chunk from the container using an explicitly provided client.
    * Used by the positioned-read path so callers hold a local reference to the client
    * rather than re-reading the shared {@link #xceiverClient} field after the lock is released.
+   * Subclasses that do not use an xceiver client (e.g. local short-circuit reads) should
+   * override this method to ignore {@code client} and read through their own mechanism.
    */
-  private ByteBuffer[] readChunk(ChunkInfo readChunkInfo, XceiverClientSpi client) throws IOException {
+  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo, XceiverClientSpi client) throws IOException {
     ReadChunkResponseProto readChunkResponse =
         ContainerProtocolCalls.readChunk(client, readChunkInfo, datanodeBlockID, validators,
             tokenSupplier.get());

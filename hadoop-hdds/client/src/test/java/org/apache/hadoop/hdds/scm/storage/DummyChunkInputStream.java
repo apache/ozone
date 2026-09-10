@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -47,6 +48,11 @@ public class DummyChunkInputStream extends ChunkInputStream {
     super(chunkInfo, blockId, xceiverClientFactory, () -> pipeline,
         verifyChecksum, () -> null);
     this.chunkData = data.clone();
+  }
+
+  @Override
+  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo, XceiverClientSpi client) {
+    return readChunk(readChunkInfo);
   }
 
   @Override

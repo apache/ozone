@@ -278,7 +278,8 @@ public class MultipartInputStream extends ExtendedInputStream {
 
   static int binarySearchOffsetIndex(long[] offsets, long pos) {
     final int idx = Arrays.binarySearch(offsets, pos);
-    if (idx > 0) {
+    if (idx >= 0) {
+      // exact match: pos falls exactly on the start of chunk/part idx
       return idx;
     }
     // binarySearch returns n = -insertionPoint - 1;

@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
-
 import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -35,6 +34,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.ShortCircuitValidator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -72,6 +72,22 @@ public class LocalChunkInputStream extends ChunkInputStream
     if (LOG.isDebugEnabled()) {
       LOG.debug("{} is created for {}", LocalChunkInputStream.class.getSimpleName(), blockId);
     }
+  }
+
+  /**
+   * LocalChunkInputStream reads from a local FileChannel; no xceiver client is needed.
+   */
+  @Override
+  protected synchronized XceiverClientSpi acquireClient() {
+    return null;
+  }
+
+  /**
+   * Local reads do not use an xceiver client; delegate to the one-arg override.
+   */
+  @Override
+  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo, XceiverClientSpi client) throws IOException {
+    return readChunk(readChunkInfo);
   }
 
   /**

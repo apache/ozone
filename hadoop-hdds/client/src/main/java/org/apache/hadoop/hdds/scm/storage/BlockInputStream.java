@@ -473,22 +473,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   /**
-   * Seeks the BlockInputStream to the specified position. If the stream is
-   * not initialized, save the seeked position via blockPosition. Otherwise,
-   * update the position in 2 steps:
-   *    1. Updating the chunkIndex to the chunkStream corresponding to the
-   *    seeked position.
-   *    2. Seek the corresponding chunkStream to the adjusted position.
-   *
-   * Let’s say we have chunk size as 40 bytes. And let's say the parent block
-   * stores data from index 200 and has length 400. If the key was seeked to
-   * position 90, then this block will be seeked to position 90.
-   * When seek(90) is called on this blockStream, then
-   *    1. chunkIndex will be set to 2 (as indices 80 - 120 reside in chunk[2]).
-   *    2. chunkStream[2] will be seeked to position 10
-   *       (= 90 - chunkOffset[2] (= 80)).
-   */
-  /**
    * Stateless positioned read across this block's chunks. Fills up to
    * {@code dst.remaining()} bytes starting from {@code blockRelativePosition}
    * without mutating this stream's cursor ({@code chunkIndex},
@@ -593,6 +577,22 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
   }
 
+  /**
+   * Seeks the BlockInputStream to the specified position. If the stream is
+   * not initialized, save the seeked position via blockPosition. Otherwise,
+   * update the position in 2 steps:
+   *    1. Updating the chunkIndex to the chunkStream corresponding to the
+   *    seeked position.
+   *    2. Seek the corresponding chunkStream to the adjusted position.
+   *
+   * Let’s say we have chunk size as 40 bytes. And let's say the parent block
+   * stores data from index 200 and has length 400. If the key was seeked to
+   * position 90, then this block will be seeked to position 90.
+   * When seek(90) is called on this blockStream, then
+   *    1. chunkIndex will be set to 2 (as indices 80 - 120 reside in chunk[2]).
+   *    2. chunkStream[2] will be seeked to position 10
+   *       (= 90 - chunkOffset[2] (= 80)).
+   */
   @Override
   public synchronized void seek(long pos) throws IOException {
     if (!initialized) {
