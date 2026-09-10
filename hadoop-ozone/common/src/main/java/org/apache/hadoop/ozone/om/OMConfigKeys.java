@@ -776,6 +776,17 @@ public final class OMConfigKeys {
       OZONE_OM_VERSIONING_VERSION_ID_GENERATOR_DEFAULT = UniqueIdVersionIdGenerator.class;
 
   /**
+   * How long a lookup of a key's noncurrent versions may take on the write
+   * path before it is logged. The lookup walks the versionedKeyTable cache
+   * and opens a DB iterator, which can be slow to create under load.
+   */
+  public static final String
+      OZONE_OM_VERSIONING_LOOKUP_WARNING_THRESHOLD =
+      "ozone.om.versioning.lookup.warning.threshold";
+  public static final String
+      OZONE_OM_VERSIONING_LOOKUP_WARNING_THRESHOLD_DEFAULT = "5s";
+
+  /**
    * Never constructed.
    */
   private OMConfigKeys() {

@@ -315,6 +315,7 @@ public final class OzoneConsts {
   public static final String SUPERSEDED_VERSION_ID = "supersededVersionId";
   public static final String DELETED_VERSION_ID = "deletedVersionId";
   public static final String PROMOTED_VERSION_ID = "promotedVersionId";
+  public static final String NULL_VERSION = "nullVersion";
   public static final String CREATION_TIME = "creationTime";
   public static final String MODIFICATION_TIME = "modificationTime";
   public static final String DATA_SIZE = "dataSize";

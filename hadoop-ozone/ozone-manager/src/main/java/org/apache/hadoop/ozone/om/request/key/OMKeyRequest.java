@@ -957,10 +957,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * (dbKey, keyInfo) pair, or null if the key has no noncurrent version.
    */
   protected Pair<String, OmKeyInfo> getNewestNoncurrentVersion(
-      OMMetadataManager omMetadataManager, String volumeName,
-      String bucketName, String keyName) throws IOException {
-    return NoncurrentVersions.newestMatching(omMetadataManager, volumeName,
-        bucketName, keyName, keyInfo -> true);
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName)
+      throws IOException {
+    return NoncurrentVersions.newestMatching(ozoneManager, omMetadataManager,
+        volumeName, bucketName, keyName, keyInfo -> true);
   }
 
   /**
@@ -968,10 +969,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * key has no noncurrent null version. A key has at most one.
    */
   protected Pair<String, OmKeyInfo> getNoncurrentNullVersion(
-      OMMetadataManager omMetadataManager, String volumeName,
-      String bucketName, String keyName) throws IOException {
-    return NoncurrentVersions.nullVersion(omMetadataManager, volumeName,
-        bucketName, keyName);
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName)
+      throws IOException {
+    return NoncurrentVersions.nullVersion(ozoneManager, omMetadataManager,
+        volumeName, bucketName, keyName);
   }
 
   /**
@@ -1524,7 +1526,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // check sees what the marker removes as well as what it adds.
     final Pair<String, OmKeyInfo> noncurrentNullVersion =
         suspended && !replacesCurrent
-            ? getNoncurrentNullVersion(
+            ? getNoncurrentNullVersion(ozoneManager,
                 omMetadataManager, volumeName, bucketName, keyName)
             : null;
     final OmKeyInfo replacedNullVersion = replacesCurrent ? currentVersion
@@ -1604,8 +1606,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
       keysToDelete = addKeyInfoToDeleteMap(ozoneManager, trxnLogIndex,
           objectKey, omBucketInfo.getObjectID(),
           replacedNullVersion.withCommittedKeyDeletedFlag(true), null);
-      omBucketInfo.decrUsedBytes(sumBlockLengths(replacedNullVersion), true);
     }
+    // Released to the bucket by the caller, like the namespace, so that a
+    // batch failing on a later key leaves the cached bucket as it found it.
+    final long releasedBytes = replacedNullVersion == null ? 0L
+        : sumBlockLengths(replacedNullVersion);
 
     omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
         objectKey, deleteMarker, trxnLogIndex);
@@ -1614,7 +1619,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // and a batch that fails on a later key must not have counted this one.
     return new DeleteMarkerInsertion(deleteMarker, objectKey,
         movedVersionedKeyName, movedVersionedKeyInfo, replacedNullVersionKey,
-        keysToDelete, addedNamespace);
+        keysToDelete, addedNamespace, releasedBytes);
   }
 
   /**
@@ -1654,7 +1659,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       version = currentVersion;
     } else if (nullVersion) {
       Pair<String, OmKeyInfo> nullSlot = getNoncurrentNullVersion(
-          omMetadataManager, volumeName, bucketName, keyName);
+          ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
       deletedVersionKey = nullSlot == null ? null : nullSlot.getKey();
       version = nullSlot == null ? null : nullSlot.getValue();
     } else {
@@ -1676,7 +1681,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OmKeyInfo promoted = null;
     if (deletingCurrent) {
       Pair<String, OmKeyInfo> newest = getNewestNoncurrentVersion(
-          omMetadataManager, volumeName, bucketName, keyName);
+          ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
       if (newest != null) {
         promotedKey = newest.getKey();
         promoted = newest.getValue();

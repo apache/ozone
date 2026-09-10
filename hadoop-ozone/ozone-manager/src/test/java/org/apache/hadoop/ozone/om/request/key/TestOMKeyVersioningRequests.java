@@ -25,6 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
@@ -38,6 +41,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
@@ -1417,6 +1421,23 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
   }
 
   /**
+   * The null version lookup walks the versionedKeyTable cache and opens an
+   * iterator on the DB, inline on the write path, so its cost is reported.
+   */
+  @Test
+  public void testTheNullVersionLookupIsTimed() throws Exception {
+    OMPerformanceMetrics perf = mock(OMPerformanceMetrics.class);
+    when(ozoneManager.getPerfMetrics()).thenReturn(perf);
+    setupSuspendedBucket();
+    seedCurrentVersion(300L);
+    seedNoncurrentVersion(200L, true);
+
+    commitAt(500L, PROPOSED);
+
+    verify(perf, atLeastOnce()).addNoncurrentVersionLookupLatency(anyLong());
+  }
+
+  /**
    * The null version may be noncurrent, when versioning was enabled again
    * after the write that created it. A suspended write still replaces it, and
    * still becomes the current version.
@@ -1618,6 +1639,38 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
   }
 
   /** A noncurrent null version holding one block. */
+  /**
+   * A marker that takes the null version slot releases that version's space.
+   * The bucket is the cached instance, so a batch that then fails on a later
+   * key has to leave the space where it found it.
+   */
+  @Test
+  public void testAFailedSuspendedBatchLeavesTheBucketsSpaceAlone()
+      throws Exception {
+    // namespace is full: replacing the null slot fits, the next marker does not
+    setupSuspendedBucket(OzoneConsts.QUOTA_RESET, 2L, 2L);
+    seedCurrentVersion(300L);
+    seedNullVersionWithBlocks(200L);
+    String otherKey = keyName + "-other";
+    seedCurrentVersion(otherKey, 150L);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    // get() hands back a copy; the request works on the cached instance
+    omMetadataManager.getBucketTable().getCacheValue(new CacheKey<>(bucketKey))
+        .getCacheValue().incrUsedBytes(1000L);
+    long usedBytesBefore =
+        omMetadataManager.getBucketTable().get(bucketKey).getUsedBytes();
+    assertEquals(1000L, usedBytesBefore);
+
+    OMClientResponse response = new OMKeysDeleteRequest(
+        batchDeleteRequest(PROPOSED, keyName, otherKey), getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 500L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
+        response.getOMResponse().getStatus());
+    assertEquals(usedBytesBefore,
+        omMetadataManager.getBucketTable().get(bucketKey).getUsedBytes());
+  }
+
   private void seedNullVersionWithBlocks(long versionId) throws Exception {
     OmKeyInfo version = OMRequestTestUtils.createOmKeyInfo(
             volumeName, bucketName, keyName, replicationConfig)
