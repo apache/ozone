@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -700,6 +701,13 @@ public class BasicRootedOzoneClientAdapterImpl
    * <p>Non-snapshot paths call OM GetFileStatus directly (HDDS-15925) without a
    * prior InfoBucket RPC. OBJECT_STORE buckets are rejected by OM GetFileStatus.
    * Mutating OFS operations still validate layout via {@link #getBucket(OFSPath, boolean)}.
+   *
+   * <p>The direct call is only safe once the OM performs the server-side
+   * OBJECT_STORE rejection. During a rolling upgrade a new client can talk to an
+   * older OM that lacks that check, so when the negotiated OM version predates
+   * {@link OzoneManagerVersion#GET_FILE_STATUS_REJECTS_OBS} we fall back to the
+   * pre-HDDS-15925 path that fetches the bucket and validates its layout
+   * client-side.
    */
   private FileStatusAdapter getFileStatusForKeyOrSnapshot(
       OFSPath ofsPath, URI uri, Path qualifiedPath, String userName,
@@ -712,8 +720,17 @@ public class BasicRootedOzoneClientAdapterImpl
         return getFileStatusAdapterWithSnapshotIndicator(
             volume, bucket, uri);
       } else {
-        OzoneFileStatus status = proxy.getOzoneFileStatus(ofsPath.getVolumeName(),
-            ofsPath.getBucketName(), key, headOp);
+        OzoneFileStatus status;
+        if (proxy.getOmVersion()
+            .compareTo(OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS) >= 0) {
+          status = proxy.getOzoneFileStatus(ofsPath.getVolumeName(),
+              ofsPath.getBucketName(), key, headOp);
+        } else {
+          // Older OM has no server-side OBJECT_STORE check; validate the bucket
+          // layout on the client, matching pre-HDDS-15925 behavior.
+          OzoneBucket bucket = getBucket(ofsPath, false);
+          status = bucket.getFileStatus(key, headOp);
+        }
         return toFileStatusAdapter(status, userName, uri, qualifiedPath,
             ofsPath.getNonKeyPath());
       }

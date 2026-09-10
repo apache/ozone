@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +41,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OFSPath;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -70,6 +72,8 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
     adapter = mock(BasicRootedOzoneClientAdapterImpl.class, CALLS_REAL_METHODS);
     bucket = mock(OzoneBucket.class);
     proxy = mock(ClientProtocol.class);
+    when(proxy.getOmVersion())
+        .thenReturn(OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS);
     doReturn(bucket).when(adapter).getBucket(any(OFSPath.class), eq(false));
 
     Field proxyField =
@@ -127,6 +131,25 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
     assertTrue(adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
         "user").isDir());
     verify(proxy).getOzoneFileStatus(eq("vol"), eq("bucket"), eq("key"), eq(false));
+  }
+
+  @Test
+  public void olderOmFallsBackToClientSideBucketCheck() throws IOException {
+    // An OM older than GET_FILE_STATUS_REJECTS_OBS has no server-side
+    // OBJECT_STORE rejection, so the adapter must use the pre-HDDS-15925 path:
+    // fetch the bucket (which validates layout client-side) and call
+    // OzoneBucket#getFileStatus, without issuing a direct OM GetFileStatus.
+    when(proxy.getOmVersion())
+        .thenReturn(OzoneManagerVersion.S3_BUCKET_TAGGING_API);
+    when(bucket.getFileStatus(anyString(), anyBoolean()))
+        .thenReturn(fileStatus(false));
+
+    assertFalse(adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
+        "user", true).isDir());
+
+    verify(bucket).getFileStatus(eq("key"), eq(true));
+    verify(proxy, never())
+        .getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean());
   }
 
   @Test
