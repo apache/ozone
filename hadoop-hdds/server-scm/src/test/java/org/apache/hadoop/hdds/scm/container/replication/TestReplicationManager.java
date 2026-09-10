@@ -1136,6 +1136,32 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void testDataChecksumMismatchIsReportedForEmptyContainer() {
+    RatisReplicationConfig ratisReplicationConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisReplicationConfig, 10,
+        HddsProtos.LifeCycleState.CLOSED, 0, 0);
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (ContainerReplica replica : createReplicasWithChecksums(container,
+        new long[]{10, 10, 10}, new long[]{100, 200, 100})) {
+      replicas.add(replica.toBuilder()
+          .setKeyCount(0)
+          .setBytesUsed(0)
+          .setEmpty(true)
+          .build());
+    }
+    containerInfoSet.add(container);
+    containerReplicaMap.put(container.containerID(), replicas);
+    enableProcessAll();
+
+    replicationManager.processAll();
+
+    ReplicationManagerReport report = replicationManager.getContainerReport();
+    assertEquals(1, report.getStat(DATA_CHECKSUM_MISMATCH));
+    assertEquals(1, report.getStat(ContainerHealthState.EMPTY));
+  }
+
+  @Test
   public void testSendDatanodeDeleteCommand() throws NotLeaderException {
     ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
     ContainerInfo containerInfo =

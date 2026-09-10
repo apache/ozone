@@ -34,8 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Detects replicas with the same BCSID and different data checksums during a
- * full Replication Manager scan.
+ * Detects replicas with the same BCSID and different data checksums.
  */
 public class DataChecksumMismatchCheckHandler extends AbstractCheck {
 
@@ -46,10 +45,6 @@ public class DataChecksumMismatchCheckHandler extends AbstractCheck {
 
   @Override
   public boolean handle(ContainerCheckRequest request) {
-    if (request.isReadOnly()) {
-      return false;
-    }
-
     ContainerInfo container = request.getContainerInfo();
     Set<ContainerReplica> replicas = request.getContainerReplicas();
     boolean mismatch = container.getState() == CLOSED &&
@@ -58,13 +53,15 @@ public class DataChecksumMismatchCheckHandler extends AbstractCheck {
             ContainerReplica::getDataChecksum);
     ContainerID containerID = container.containerID();
     if (!mismatch) {
-      warnedMismatches.remove(containerID);
+      if (!request.isReadOnly()) {
+        warnedMismatches.remove(containerID);
+      }
       return false;
     }
 
     request.getReport().incrementAndSampleAdditionalState(
         DATA_CHECKSUM_MISMATCH, containerID);
-    if (warnedMismatches.add(containerID)) {
+    if (!request.isReadOnly() && warnedMismatches.add(containerID)) {
       LOG.warn(
           "Container {} has replicas with the same BCSID but different data checksums: {}",
           containerID, formatChecksumDetails(replicas));

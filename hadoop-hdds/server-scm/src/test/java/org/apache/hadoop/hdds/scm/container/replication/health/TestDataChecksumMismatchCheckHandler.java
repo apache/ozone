@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -93,18 +94,30 @@ public class TestDataChecksumMismatchCheckHandler {
   }
 
   @Test
-  void testReadOnlyRequestIsIgnored() {
+  void testReadOnlyRequestUpdatesReportWithoutAffectingWarnings() {
     ContainerInfo container = createContainerInfo(
         RatisReplicationConfig.getInstance(THREE), 10,
         HddsProtos.LifeCycleState.CLOSED);
     Set<ContainerReplica> replicas = createReplicasWithChecksums(container,
         new long[]{10, 10, 10}, new long[]{100, 200, 100});
     ReplicationManagerReport report = new ReplicationManagerReport(10);
+    LogCapturer logs =
+        LogCapturer.captureLogs(DataChecksumMismatchCheckHandler.class);
 
-    assertFalse(handler.handle(createRequest(container, replicas, report,
-        true)));
+    try {
+      assertFalse(handler.handle(createRequest(container, replicas, report,
+          true)));
+      assertEquals(1, report.getStat(DATA_CHECKSUM_MISMATCH));
+      assertThat(logs.getOutput()).doesNotContain("same BCSID");
 
-    assertEquals(0, report.getStat(DATA_CHECKSUM_MISMATCH));
+      ReplicationManagerReport writableReport = new ReplicationManagerReport(10);
+      assertFalse(handler.handle(createRequest(container, replicas,
+          writableReport)));
+      assertEquals(1, writableReport.getStat(DATA_CHECKSUM_MISMATCH));
+      assertThat(logs.getOutput()).contains("same BCSID");
+    } finally {
+      logs.stopCapturing();
+    }
   }
 
   private ReplicationManagerReport runCheck(ContainerInfo container,
