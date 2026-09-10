@@ -95,7 +95,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   private final DomainSocketFactory domainSocketFactory;
   private DomainSocket domainSocket;
   private final AtomicBoolean isDomainSocketOpen = new AtomicBoolean(false);
-  // Protects connection state, counters, and RequestEntry.sentTimeNs.
+  // Protects connection state and counters.
   private final Lock lock = new ReentrantLock();
   private final int bufferSize;
   private final ByteString clientId = ByteString.copyFrom(UUID.randomUUID().toString().getBytes(UTF_8));
@@ -427,13 +427,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   }
 
   void requestTimeout(RequestKey requestKey) {
-    final RequestEntry entry;
-    lock.lock();
-    try {
-      entry = sentRequests.remove(requestKey);
-    } finally {
-      lock.unlock();
-    }
+    final RequestEntry entry = sentRequests.remove(requestKey);
     if (entry != null) {
       LOG.warn("Timeout to receive response for command {}", entry.getRequest());
       ContainerProtos.Type type = entry.getRequest().getCmdType();
@@ -523,15 +517,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
         lock.unlock();
       }
       long timerTaskCancelledCount = 0;
-      while (true) {
-        lock.lock();
-        try {
-          if (!isDomainSocketOpen.get()) {
-            return;
-          }
-        } finally {
-          lock.unlock();
-        }
+      while (isDomainSocketOpen.get()) {
         RequestEntry entry = null;
         try {
           DataInputStream dataIn = new DataInputStream(socket.getInputStream());
@@ -548,14 +534,8 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
           if (LOG.isDebugEnabled()) {
             LOG.debug("received response {} callId {}", type, responseProto.getCallId());
           }
-          final long sentTimeNs;
-          lock.lock();
-          try {
-            entry = sentRequests.remove(new RequestKey(responseProto.getClientId(), responseProto.getCallId()));
-            sentTimeNs = entry == null ? 0 : entry.getSentTimeNs();
-          } finally {
-            lock.unlock();
-          }
+          entry = sentRequests.remove(new RequestKey(responseProto.getClientId(), responseProto.getCallId()));
+          final long sentTimeNs = entry == null ? 0 : entry.getSentTimeNs();
           if (entry == null) {
             // This could be two cases
             // 1. there is bug in the code
@@ -700,8 +680,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     private final ContainerCommandRequestProto request;
     private final CompletableFuture<ContainerCommandResponseProto> future;
     private final long createTimeNs;
-    // Accessed under the enclosing client's lock.
-    private long sentTimeNs;
+    private final AtomicLong sentTimeNs;
     private final TimerTask timerTask;
 
     RequestEntry(ContainerCommandRequestProto requestProto,
@@ -710,6 +689,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
       this.future = future;
       this.timerTask = timerTask;
       this.createTimeNs = System.nanoTime();
+      this.sentTimeNs = new AtomicLong(createTimeNs);
     }
 
     public ContainerCommandRequestProto getRequest() {
@@ -725,11 +705,11 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     }
 
     public long getSentTimeNs() {
-      return sentTimeNs;
+      return sentTimeNs.get();
     }
 
     public void setSentTimeNs() {
-      sentTimeNs = System.nanoTime();
+      sentTimeNs.set(System.nanoTime());
     }
 
     public TimerTask getTimerTask() {

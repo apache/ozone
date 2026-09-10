@@ -30,6 +30,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -59,6 +61,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -78,6 +81,20 @@ import org.mockito.MockedStatic;
  */
 @Timeout(300)
 public class TestXceiverClientManagerSC {
+
+  private static final int CONCURRENT_OPERATION_COUNT = 8;
+  private static final int REQUEST_COUNT = CONCURRENT_OPERATION_COUNT * 4;
+  private static final int RACE_ITERATION_COUNT = 10;
+  private static final int TEST_TIMEOUT_SECONDS = 30;
+  private static final int TEST_TIMEOUT_MILLIS =
+      Math.toIntExact(TimeUnit.SECONDS.toMillis(TEST_TIMEOUT_SECONDS));
+  private static final int NON_BLOCKING_TIMEOUT_SECONDS = 5;
+  private static final int WAIT_INTERVAL_MILLIS = 100;
+  private static final int DELAYED_ECHO_MILLIS =
+      Math.toIntExact(TimeUnit.SECONDS.toMillis(1));
+  private static final int RECEIVER_READ_TIMEOUT_MILLIS = 200;
+  private static final int BLOCKED_WRITE_PAYLOAD_SIZE =
+      Math.toIntExact(8 * OzoneConsts.MB);
 
   private static OzoneConfiguration config;
   private static MiniOzoneCluster cluster;
@@ -114,7 +131,7 @@ public class TestXceiverClientManagerSC {
     }
     GenericTestUtils.waitFor(() -> cluster.getHddsDatanodes().stream().allMatch(dn -> dn.getDatanodeStateMachine()
         .getContainer().getContainerSet().getContainer(echoContainer.getContainerInfo().getContainerID()) != null),
-        100, 30000);
+        WAIT_INTERVAL_MILLIS, TEST_TIMEOUT_MILLIS);
   }
 
   @AfterAll
@@ -155,21 +172,21 @@ public class TestXceiverClientManagerSC {
   @Test
   public void testConcurrentConnectAndRequests() throws Exception {
     Pipeline pipeline = echoContainer.getPipeline();
-    ExecutorService executor = Executors.newFixedThreadPool(8);
+    ExecutorService executor = Executors.newFixedThreadPool(CONCURRENT_OPERATION_COUNT);
     try (XceiverClientShortCircuit client =
         new XceiverClientShortCircuit(pipeline, config, pipeline.getClosestNode())) {
       CountDownLatch start = new CountDownLatch(1);
       List<Future<?>> connections = new ArrayList<>();
-      for (int i = 0; i < 8; i++) {
+      for (int i = 0; i < CONCURRENT_OPERATION_COUNT; i++) {
         connections.add(executor.submit(() -> {
-          assertTrue(start.await(30, TimeUnit.SECONDS));
+          assertTrue(start.await(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
           client.connect();
           return null;
         }));
       }
       start.countDown();
       for (Future<?> connection : connections) {
-        connection.get(30, TimeUnit.SECONDS);
+        connection.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
       }
       client.connect();
       assertFalse(client.isClosed());
@@ -178,21 +195,87 @@ public class TestXceiverClientManagerSC {
 
       CountDownLatch send = new CountDownLatch(1);
       List<Future<?>> requests = new ArrayList<>();
-      for (int i = 0; i < 32; i++) {
+      for (int i = 0; i < REQUEST_COUNT; i++) {
         ContainerCommandRequestProto request = echoRequest(client, 0);
         requests.add(executor.submit(() -> {
-          assertTrue(send.await(30, TimeUnit.SECONDS));
+          assertTrue(send.await(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
           assertEchoResponse(request, client.sendCommand(request));
           return null;
         }));
       }
       send.countDown();
       for (Future<?> request : requests) {
-        request.get(30, TimeUnit.SECONDS);
+        request.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
       }
     } finally {
       executor.shutdownNow();
-      assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+      assertTrue(executor.awaitTermination(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  public void testResponseAndTimeoutWhileWriteIsBlocked() throws Exception {
+    Pipeline pipeline = echoContainer.getPipeline();
+    DomainSocketFactory factory = mock(DomainSocketFactory.class);
+    DomainSocket[] sockets = DomainSocket.socketpair();
+    DomainSocket clientSocket = sockets[0];
+    DomainSocket peerSocket = sockets[1];
+    clientSocket.setAttribute(DomainSocket.SEND_BUFFER_SIZE,
+        config.getObject(OzoneClientConfig.class).getShortCircuitBufferSize());
+    when(factory.createSocket(anyInt(), anyInt(), any())).thenReturn(clientSocket);
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try (MockedStatic<DomainSocketFactory> mocked = mockStatic(DomainSocketFactory.class)) {
+      mocked.when(() -> DomainSocketFactory.getInstance(config)).thenReturn(factory);
+      try (XceiverClientShortCircuit client =
+          new XceiverClientShortCircuit(pipeline, config, pipeline.getClosestNode())) {
+        client.connect();
+        DataInputStream peerIn = new DataInputStream(peerSocket.getInputStream());
+        DataOutputStream peerOut = new DataOutputStream(peerSocket.getOutputStream());
+
+        ContainerCommandRequestProto responseRequest = echoRequest(client, 0);
+        CompletableFuture<ContainerCommandResponseProto> responseFuture =
+            client.sendCommandInternal(responseRequest).getResponse();
+        assertEquals(responseRequest, readRequest(peerIn));
+
+        ContainerCommandRequestProto timeoutRequest = echoRequest(client, 0);
+        CompletableFuture<ContainerCommandResponseProto> timeoutFuture =
+            client.sendCommandInternal(timeoutRequest).getResponse();
+        assertEquals(timeoutRequest, readRequest(peerIn));
+
+        ContainerCommandRequestProto blockedRequest = echoRequest(client, 0).toBuilder()
+            .setEcho(ContainerProtos.EchoRequestProto.newBuilder()
+                .setReadOnly(true)
+                .setPayload(ByteString.copyFrom(new byte[BLOCKED_WRITE_PAYLOAD_SIZE])))
+            .build();
+        Future<XceiverClientReply> blockedSend =
+            executor.submit(() -> client.sendCommandInternal(blockedRequest));
+        assertEquals(OzoneClientConfig.DATA_TRANSFER_VERSION, peerIn.readShort());
+        assertEquals(ContainerProtos.Type.Echo.getNumber(), peerIn.readShort());
+        assertFalse(blockedSend.isDone());
+
+        sendEchoResponse(responseRequest, peerOut);
+        assertEchoResponse(responseRequest,
+            responseFuture.get(NON_BLOCKING_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        Future<?> timeout = executor.submit(() ->
+            client.requestTimeout(new XceiverClientShortCircuit.RequestKey(
+                timeoutRequest.getClientId(), timeoutRequest.getCallId())));
+        timeout.get(NON_BLOCKING_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        assertThrows(ExecutionException.class,
+            () -> timeoutFuture.get(NON_BLOCKING_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertFalse(blockedSend.isDone());
+
+        peerSocket.close();
+        assertThrows(ExecutionException.class,
+            () -> blockedSend.get(NON_BLOCKING_TIMEOUT_SECONDS, TimeUnit.SECONDS).getResponse()
+                .get(NON_BLOCKING_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+      } finally {
+        IOUtils.cleanupWithLogger(null, peerSocket, clientSocket);
+      }
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
     }
   }
 
@@ -204,17 +287,17 @@ public class TestXceiverClientManagerSC {
       client.connect();
       List<ContainerCommandRequestProto> requests = new ArrayList<>();
       List<CompletableFuture<ContainerCommandResponseProto>> responses = new ArrayList<>();
-      for (int i = 0; i < 8; i++) {
-        ContainerCommandRequestProto request = echoRequest(client, i == 0 ? 1000 : 0);
+      for (int i = 0; i < CONCURRENT_OPERATION_COUNT; i++) {
+        ContainerCommandRequestProto request = echoRequest(client, i == 0 ? DELAYED_ECHO_MILLIS : 0);
         requests.add(request);
         responses.add(client.sendCommandInternal(request).getResponse());
       }
       assertFalse(responses.get(0).isDone());
       for (int i = 0; i < requests.size(); i++) {
-        assertEchoResponse(requests.get(i), responses.get(i).get(30, TimeUnit.SECONDS));
+        assertEchoResponse(requests.get(i), responses.get(i).get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
       }
-      client.sendCommandInternal(echoRequest(client, 1000)).getResponse()
-          .thenRun(client::close).get(30, TimeUnit.SECONDS);
+      client.sendCommandInternal(echoRequest(client, DELAYED_ECHO_MILLIS)).getResponse()
+          .thenRun(client::close).get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
       assertTrue(client.isClosed());
     }
   }
@@ -222,26 +305,27 @@ public class TestXceiverClientManagerSC {
   @Test
   public void testConcurrentCloseWithPendingRequests() throws Exception {
     Pipeline pipeline = echoContainer.getPipeline();
-    ExecutorService executor = Executors.newFixedThreadPool(8);
+    ExecutorService executor = Executors.newFixedThreadPool(CONCURRENT_OPERATION_COUNT);
     try (XceiverClientShortCircuit client =
         new XceiverClientShortCircuit(pipeline, config, pipeline.getClosestNode())) {
       client.connect();
       CompletableFuture<ContainerCommandResponseProto> pending =
-          client.sendCommandInternal(echoRequest(client, 1000)).getResponse();
+          client.sendCommandInternal(echoRequest(client, DELAYED_ECHO_MILLIS)).getResponse();
       CountDownLatch start = new CountDownLatch(1);
       List<Future<?>> closes = new ArrayList<>();
-      for (int i = 0; i < 8; i++) {
+      for (int i = 0; i < CONCURRENT_OPERATION_COUNT; i++) {
         closes.add(executor.submit(() -> {
-          assertTrue(start.await(30, TimeUnit.SECONDS));
+          assertTrue(start.await(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
           client.close();
           return null;
         }));
       }
       start.countDown();
       for (Future<?> close : closes) {
-        close.get(30, TimeUnit.SECONDS);
+        close.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
       }
-      assertThrows(ExecutionException.class, () -> pending.get(30, TimeUnit.SECONDS));
+      assertThrows(ExecutionException.class,
+          () -> pending.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
       assertTrue(client.isClosed());
       assertThrows(IOException.class, client::connect);
       assertThrows(IOException.class, client::checkOpen);
@@ -249,7 +333,7 @@ public class TestXceiverClientManagerSC {
       assertNotNull(client.toString());
     } finally {
       executor.shutdownNow();
-      assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+      assertTrue(executor.awaitTermination(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
     }
   }
 
@@ -258,7 +342,7 @@ public class TestXceiverClientManagerSC {
     Pipeline pipeline = echoContainer.getPipeline();
     ExecutorService executor = Executors.newFixedThreadPool(3);
     try {
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < RACE_ITERATION_COUNT; i++) {
         try (XceiverClientShortCircuit client =
             new XceiverClientShortCircuit(pipeline, config, pipeline.getClosestNode())) {
           if (i % 2 == 0) {
@@ -266,7 +350,7 @@ public class TestXceiverClientManagerSC {
           }
           CountDownLatch start = new CountDownLatch(1);
           Future<?> connect = executor.submit(() -> {
-            assertTrue(start.await(30, TimeUnit.SECONDS));
+            assertTrue(start.await(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             try {
               client.connect();
             } catch (IOException expected) {
@@ -275,10 +359,11 @@ public class TestXceiverClientManagerSC {
             return null;
           });
           Future<?> send = executor.submit(() -> {
-            assertTrue(start.await(30, TimeUnit.SECONDS));
+            assertTrue(start.await(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             ContainerCommandRequestProto request = echoRequest(client, 0);
             try {
-              assertEchoResponse(request, client.sendCommandInternal(request).getResponse().get(30, TimeUnit.SECONDS));
+              assertEchoResponse(request,
+                  client.sendCommandInternal(request).getResponse().get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             } catch (IOException expected) {
               // The connection may not have opened yet, or close may have won the lock.
             } catch (ExecutionException expected) {
@@ -287,21 +372,21 @@ public class TestXceiverClientManagerSC {
             return null;
           });
           Future<?> close = executor.submit(() -> {
-            assertTrue(start.await(30, TimeUnit.SECONDS));
+            assertTrue(start.await(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             client.close();
             return null;
           });
           start.countDown();
-          connect.get(30, TimeUnit.SECONDS);
-          send.get(30, TimeUnit.SECONDS);
-          close.get(30, TimeUnit.SECONDS);
+          connect.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+          send.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+          close.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
           assertTrue(client.isClosed());
           assertThrows(IOException.class, client::connect);
         }
       }
     } finally {
       executor.shutdownNow();
-      assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+      assertTrue(executor.awaitTermination(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
     }
   }
 
@@ -347,7 +432,8 @@ public class TestXceiverClientManagerSC {
   public void testReceiverFailureCannotReconnect() throws Exception {
     Pipeline pipeline = echoContainer.getPipeline();
     OzoneConfiguration timeoutConfig = new OzoneConfiguration(config);
-    timeoutConfig.setTimeDuration(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, 200, TimeUnit.MILLISECONDS);
+    timeoutConfig.setTimeDuration(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT,
+        RECEIVER_READ_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
     try (XceiverClientShortCircuit client =
         new XceiverClientShortCircuit(pipeline, timeoutConfig, pipeline.getClosestNode())) {
       client.connect();
@@ -358,7 +444,7 @@ public class TestXceiverClientManagerSC {
         } catch (IOException expected) {
           return true;
         }
-      }, 50, 30000);
+      }, WAIT_INTERVAL_MILLIS, TEST_TIMEOUT_MILLIS);
       assertFalse(client.isClosed());
       assertNotNull(client.toString());
       assertThrows(IOException.class, client::connect);
@@ -374,15 +460,37 @@ public class TestXceiverClientManagerSC {
         .setClientId(client.getClientId())
         .setCallId(client.getCallId())
         .setEcho(ContainerProtos.EchoRequestProto.newBuilder().setReadOnly(true).setSleepTimeMs(sleepTimeMs)
-            .setPayloadSizeResp(1024))
+            .setPayloadSizeResp(Math.toIntExact(OzoneConsts.KB)))
         .build();
+  }
+
+  private static ContainerCommandRequestProto readRequest(DataInputStream input) throws IOException {
+    assertEquals(OzoneClientConfig.DATA_TRANSFER_VERSION, input.readShort());
+    assertEquals(ContainerProtos.Type.Echo.getNumber(), input.readShort());
+    return ContainerCommandRequestProto.parseDelimitedFrom(input);
+  }
+
+  private static void sendEchoResponse(ContainerCommandRequestProto request, DataOutputStream output)
+      throws IOException {
+    ContainerCommandResponseProto response = ContainerCommandResponseProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.Echo)
+        .setResult(ContainerProtos.Result.SUCCESS)
+        .setClientId(request.getClientId())
+        .setCallId(request.getCallId())
+        .setEcho(ContainerProtos.EchoResponseProto.newBuilder()
+            .setPayload(ByteString.copyFrom(new byte[request.getEcho().getPayloadSizeResp()])))
+        .build();
+    output.writeShort(OzoneClientConfig.DATA_TRANSFER_VERSION);
+    output.writeShort(ContainerProtos.Type.Echo.getNumber());
+    response.writeDelimitedTo(output);
+    output.flush();
   }
 
   private static void assertEchoResponse(ContainerCommandRequestProto request, ContainerCommandResponseProto response) {
     assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
     assertEquals(request.getClientId(), response.getClientId());
     assertEquals(request.getCallId(), response.getCallId());
-    assertEquals(1024, response.getEcho().getPayload().size());
+    assertEquals(request.getEcho().getPayloadSizeResp(), response.getEcho().getPayload().size());
   }
 
 }
