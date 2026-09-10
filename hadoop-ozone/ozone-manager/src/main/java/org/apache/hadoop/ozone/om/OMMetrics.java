@@ -883,8 +883,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numKeyDeletes.incr();
   }
 
-  public void incNumKeyDeletesInternal() {
-    numKeyDeletes.incr();
+  public void incNumKeyDeletesInternal(long count) {
+    numKeyDeletes.incr(count);
   }
 
   public void incNumKeyDeletes(int count) {
