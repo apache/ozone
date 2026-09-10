@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
