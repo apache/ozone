@@ -87,6 +87,7 @@ function set_outputs_run_everything_and_exit() {
                        | cut -f1 -d'.')
     compile_needed=true
     compose_tests_needed=true
+    infer_needed=true
     integration_tests_needed=true
     kubernetes_tests_needed=true
 
@@ -98,6 +99,7 @@ function set_outputs_run_everything_and_exit() {
 function set_output_skip_all_tests_and_exit() {
     BASIC_CHECKS=""
     compose_tests_needed=false
+    infer_needed=false
     integration_tests_needed=false
     kubernetes_tests_needed=false
 
@@ -444,6 +446,24 @@ function check_needs_pmd() {
 
     start_end::group_end
 }
+function check_needs_infer() {
+    start_end::group_start "Check if infer is needed"
+    local pattern_array=(
+        "^.inferconfig$"
+        "^hadoop-ozone/dev-support/checks/infer.sh$"
+        "^hadoop-ozone/dev-support/checks/install/infer.sh$"
+        "pom.xml"
+        "src/..../java"
+    )
+    filter_changed_files
+
+    if [[ ${match_count} != "0" ]]; then
+        infer_needed=true
+    fi
+
+    start_end::group_end
+}
+
 
 # Counts other files which do not need to trigger any functional test
 # (i.e. no compose/integration/kubernetes)
@@ -462,6 +482,7 @@ function get_count_misc_files() {
         "\.bats$"
         "\.txt$"
         "\.md$"
+        ".inferconfig$"
         "findbugsExcludeFile.xml"
         "pmd-ruleset.xml"
         "/NOTICE$"
@@ -536,6 +557,7 @@ function set_outputs() {
     initialization::ga_output needs-build "${build_needed:-false}"
     initialization::ga_output needs-compile "${compile_needed}"
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
+    initialization::ga_output needs-infer "${infer_needed:-false}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
     initialization::ga_output needs-kubernetes-tests "${kubernetes_tests_needed}"
 }
@@ -582,5 +604,6 @@ check_needs_checkstyle
 check_needs_docs
 check_needs_findbugs
 check_needs_pmd
+check_needs_infer
 calculate_test_types_to_run
 set_outputs

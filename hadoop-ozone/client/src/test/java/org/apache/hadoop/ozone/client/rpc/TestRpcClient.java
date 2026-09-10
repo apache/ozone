@@ -24,11 +24,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import javax.crypto.Cipher;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
@@ -226,6 +230,16 @@ public class TestRpcClient {
     assertThrows(
         IllegalArgumentException.class,
         () -> validateOmVersion(OzoneManagerVersion.FUTURE_VERSION, null));
+  }
+
+  @Test
+  public void testGetGDPRSymmetricKeyRejectsIncompleteMetadata() {
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put(OzoneConsts.GDPR_FLAG, Boolean.TRUE.toString());
+
+    IOException ex = assertThrows(IOException.class,
+        () -> RpcClient.getGDPRSymmetricKey(metadata, Cipher.DECRYPT_MODE));
+    assertThat(ex).hasMessage("GDPR metadata is missing secret or algorithm");
   }
 
   @Test

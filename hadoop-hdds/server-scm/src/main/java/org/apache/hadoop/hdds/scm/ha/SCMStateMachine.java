@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import static java.util.Objects.requireNonNull;
 
+import com.facebook.infer.annotation.ThreadSafe;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -69,6 +70,7 @@ import org.slf4j.LoggerFactory;
  * responsible for applying ratis committed transactions to
  * {@link StorageContainerManager}.
  */
+@ThreadSafe
 public class SCMStateMachine extends BaseStateMachine {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMStateMachine.class);
