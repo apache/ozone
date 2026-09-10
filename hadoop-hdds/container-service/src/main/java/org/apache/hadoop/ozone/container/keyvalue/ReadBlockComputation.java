@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.util.List;
-
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.ratis.util.Preconditions;
 
