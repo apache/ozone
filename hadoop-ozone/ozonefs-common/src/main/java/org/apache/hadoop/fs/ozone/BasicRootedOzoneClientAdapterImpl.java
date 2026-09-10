@@ -782,6 +782,12 @@ public class BasicRootedOzoneClientAdapterImpl
         Iterator<? extends OzoneBucket> bucketIter = volume.listBuckets("");
         while (bucketIter.hasNext()) {
           OzoneBucket bucket = bucketIter.next();
+          // OBJECT_STORE buckets have no file system semantics, so no trash
+          // root. Skip them; probing would fail getFileStatus with
+          // IllegalArgumentException and abort the whole scan.
+          if (BucketLayout.OBJECT_STORE.equals(bucket.getBucketLayout())) {
+            continue;
+          }
           Path bucketPath = new Path(volumePath, bucket.getName());
           Path trashRoot = new Path(bucketPath, FileSystem.TRASH_PREFIX);
           if (allUsers) {
