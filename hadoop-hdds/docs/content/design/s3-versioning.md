@@ -105,6 +105,10 @@ status it ever holds has been through the transition check above. The field is
 on `BucketInfo` because that message is the bucket's on-disk record and the
 shape `InfoBucket` and `ListBuckets` return, not because a create needs it.
 
+Changing the status is a bucket property change and takes the same permission
+as any other, checked on `SetBucketProperty`: with native ACLs, the bucket owner
+or an Ozone administrator; with Ranger, a user holding WRITE on the bucket.
+
 A `BucketVersioningStatusProto` enum (`UNVERSIONED` / `VERSIONING_ENABLED` /
 `VERSIONING_SUSPENDED`) is added as an optional field on `BucketInfo` and
 `BucketArgs`. The legacy `isVersionEnabled` boolean is kept, and a status
