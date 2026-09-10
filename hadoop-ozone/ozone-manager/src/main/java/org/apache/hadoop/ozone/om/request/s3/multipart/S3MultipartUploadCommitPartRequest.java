@@ -312,6 +312,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       if (eTag != null) {
         commitResponseBuilder.setETag(eTag);
       }
+      commitResponseBuilder.setModificationTime(keyArgs.getModificationTime());
       omResponse.setCommitMultiPartUploadResponse(commitResponseBuilder);
 
       omMetadataManager.getBucketTable().addCacheEntry(

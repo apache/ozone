@@ -23,6 +23,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,11 +34,16 @@ import org.slf4j.LoggerFactory;
 @Provider
 public class OS3ExceptionMapper implements ExceptionMapper<OS3Exception> {
 
+  private static final String EXPIRED_TOKEN = "ExpiredToken";
+
   private static final Logger LOG =
       LoggerFactory.getLogger(OS3ExceptionMapper.class);
 
   @Inject
   private RequestIdentifier requestIdentifier;
+
+  @Inject
+  private SignatureInfo signatureInfo;
 
   @Override
   public Response toResponse(OS3Exception exception) {
@@ -45,8 +51,16 @@ public class OS3ExceptionMapper implements ExceptionMapper<OS3Exception> {
       LOG.debug("Returning exception. ex: {}", exception.toString());
     }
     exception.setRequestId(requestIdentifier.getRequestId());
+    exception.setHostId(requestIdentifier.getAmzId());
+    if (EXPIRED_TOKEN.equals(exception.getCode()) && signatureInfo != null) {
+      final String sessionToken = signatureInfo.getSessionToken();
+      if (sessionToken != null && !sessionToken.isEmpty()) {
+        exception.setToken0(sessionToken);
+      }
+    }
     return Response.status(exception.getHttpCode())
-        .type(MediaType.APPLICATION_XML_TYPE)
-        .entity(exception.toXml()).build();
+        .entity(exception.toXml())
+        .type(MediaType.APPLICATION_XML)
+        .build();
   }
 }
