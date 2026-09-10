@@ -225,7 +225,9 @@ public class TestQuasiClosedStuckReplicationCheck {
 
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(
-        ContainerReplicaOp.PendingOpType.ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+        ContainerReplicaOp.PendingOpType.ADD,
+        MockDatanodeDetails.randomDatanodeDetails(), 0, null,
+        Long.MAX_VALUE, 0, null));
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -295,7 +297,7 @@ public class TestQuasiClosedStuckReplicationCheck {
         0,
         null,
         Long.MAX_VALUE,
-        0));
+        0, null));
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())

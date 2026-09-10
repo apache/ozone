@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.fsck;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
@@ -66,7 +67,7 @@ public class NoOpsContainerReplicaPendingOps extends ContainerReplicaPendingOps 
   @Override
   public void scheduleAddReplica(ContainerID containerID, DatanodeDetails target,
       int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis,
-      long containerSize, long scheduledEpochMillis) {
+      long containerSize, StorageType storageType, long scheduledEpochMillis) {
     // No-op - Recon doesn't send commands
   }
 

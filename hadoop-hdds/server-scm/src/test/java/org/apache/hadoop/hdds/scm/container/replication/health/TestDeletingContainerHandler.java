@@ -176,7 +176,7 @@ public class TestDeletingContainerHandler {
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     containerReplicas.forEach(r -> pendingOps.add(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
-            r.getDatanodeDetails(), r.getReplicaIndex(), null, Long.MAX_VALUE, 0)));
+            r.getDatanodeDetails(), r.getReplicaIndex(), null, Long.MAX_VALUE, 0, null)));
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 0);
 
     //EC container
@@ -188,7 +188,7 @@ public class TestDeletingContainerHandler {
     pendingOps.clear();
     containerReplicas.forEach(r -> pendingOps.add(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
-            r.getDatanodeDetails(), r.getReplicaIndex(), null, Long.MAX_VALUE, 0)));
+            r.getDatanodeDetails(), r.getReplicaIndex(), null, Long.MAX_VALUE, 0, null)));
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 0);
 
   }
@@ -209,7 +209,7 @@ public class TestDeletingContainerHandler {
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     containerReplicas.stream().limit(2).forEach(replica -> pendingOps.add(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
-            replica.getDatanodeDetails(), replica.getReplicaIndex(), null, Long.MAX_VALUE, 0)));
+            replica.getDatanodeDetails(), replica.getReplicaIndex(), null, Long.MAX_VALUE, 0, null)));
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 1);
 
     //EC container
@@ -221,7 +221,7 @@ public class TestDeletingContainerHandler {
     pendingOps.clear();
     containerReplicas.stream().limit(3).forEach(replica -> pendingOps.add(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
-            replica.getDatanodeDetails(), replica.getReplicaIndex(), null, Long.MAX_VALUE, 0)));
+            replica.getDatanodeDetails(), replica.getReplicaIndex(), null, Long.MAX_VALUE, 0, null)));
     //since one delete command is end when testing ratis container, so
     //here should be 1+2 = 3 times
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 3);

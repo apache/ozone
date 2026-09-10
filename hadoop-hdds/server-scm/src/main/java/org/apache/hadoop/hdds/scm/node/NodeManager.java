@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -180,26 +181,30 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    *
    * @param datanodeInfo node info of the receiving the allocation
    * @param containerID the container being allocated
+   * @param storageType the storage type selected for the allocation
    * @return true if space was available and allocation was recorded, false otherwise
    */
-  boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID);
+  boolean checkSpaceAndRecordAllocation(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType);
 
   /**
    * Records a container allocation on the given datanode.
    * Unlike {@link #checkSpaceAndRecordAllocation}, this does not check for
-   * available space — it is called after the placement policy has already
+   * available space; it is called after the placement policy has already
    * validated space and a replication command has been committed.
    */
-  void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
+  void recordAllocationForDatanode(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType);
 
   /**
    * Returns true if the datanode has at least one available container slot considering
    * in-flight allocations tracked by PendingContainerTracker.
    *
    * @param datanodeInfo the datanode to check
+   * @param storageType storage type to check
    * @return true if at least one slot is free
    */
-  boolean hasAvailableSpace(DatanodeInfo datanodeInfo);
+  boolean hasAvailableSpace(DatanodeInfo datanodeInfo, StorageType storageType);
 
   /**
    * Removes a pending container allocation from a datanode.

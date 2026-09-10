@@ -35,11 +35,9 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -49,7 +47,6 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -284,7 +281,7 @@ public abstract class SCMCommonPlacementPolicy implements
       StorageType storageType)
       throws SCMException {
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
-        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, storageType, nodeManager))
+        hasEnoughSpace(d, metadataSizeRequired, storageType, nodeManager))
         .collect(Collectors.toList());
 
     if (nodesWithSpace.size() < nodesRequired) {
@@ -326,7 +323,7 @@ public abstract class SCMCommonPlacementPolicy implements
    *
    * <p>Data-space is checked via {@link NodeManager#hasAvailableSpace}, which
    * delegates to {@link org.apache.hadoop.hdds.scm.node.PendingContainerTracker}
-   * and accounts for both current disk usage and in-flight allocations.
+   * and accounts for current disk usage, storage type and in-flight allocations.
    * The check always uses {@code maxContainerSize} as the unit of allocation,
    * regardless of the actual container's used bytes.
    *
@@ -338,16 +335,23 @@ public abstract class SCMCommonPlacementPolicy implements
   public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
                                        long metadataSizeRequired,
                                        NodeManager nodeManager) {
+    return hasEnoughSpace(datanodeDetails, metadataSizeRequired, null,
+        nodeManager);
+  }
+
+  public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
+      long metadataSizeRequired, StorageType storageType,
+      NodeManager nodeManager) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
     boolean enoughForMeta = false;
 
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
 
-    // Data-space check: use PendingContainerTracker slot availability.
-    // This accounts for both current disk usage and in-flight allocations.
+    // Data-space check: use PendingContainerTracker availability.
+    // This accounts for current disk usage, storage type and in-flight allocations.
     // Always slot-based (maxContainerSize unit).
-    if (!nodeManager.hasAvailableSpace(datanodeInfo)) {
+    if (!nodeManager.hasAvailableSpace(datanodeInfo, storageType)) {
       LOG.debug("Datanode {} has no available container slots.", datanodeDetails);
       return false;
     }
@@ -368,30 +372,6 @@ public abstract class SCMCommonPlacementPolicy implements
               "bytes for metadata.", datanodeDetails, metadataSizeRequired);
     }
     return enoughForMeta;
-  }
-
-  public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
-      long metadataSizeRequired, long dataSizeRequired, StorageType storageType,
-      NodeManager nodeManager) {
-    if (!hasEnoughSpace(datanodeDetails, metadataSizeRequired, nodeManager)) {
-      return false;
-    }
-    if (storageType == null || dataSizeRequired <= 0) {
-      return true;
-    }
-
-    Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
-    DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
-    for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-      boolean matchesTier = StorageTypeUtils.getFromProtobuf(
-          reportProto.getStorageType()).equals(storageType);
-      if (matchesTier && VolumeUsage.getUsableSpace(reportProto) > dataSizeRequired) {
-        return true;
-      }
-    }
-    LOG.debug("Datanode {} has no {} volumes with enough space to allocate {} bytes for data.",
-        datanodeDetails, storageType, dataSizeRequired);
-    return false;
   }
 
   /**
@@ -593,7 +573,7 @@ public abstract class SCMCommonPlacementPolicy implements
     }
     NodeStatus nodeStatus = datanodeInfo.getNodeStatus();
     if (nodeStatus.isNodeWritable() &&
-        hasEnoughSpace(datanodeInfo, metadataSizeRequired, dataSizeRequired, storageType, nodeManager)) {
+        hasEnoughSpace(datanodeInfo, metadataSizeRequired, storageType, nodeManager)) {
       LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
               "required data size is {} and NodeStatus is {}",
           datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);

@@ -18,10 +18,14 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -34,10 +38,11 @@ import org.slf4j.LoggerFactory;
  * Tracks per-datanode pending container allocations at SCM using a Two Window Tumbling Bucket
  * pattern (similar to HDFS HADOOP-3707).
  *
- * Two Window Tumbling Bucket for automatic aging and cleanup.
+ * Pending allocations are grouped by storage type. Each group uses a two-window
+ * tumbling bucket for automatic aging and cleanup.
  *
  * How It Works:
- *   <li>Each DataNode has two sets: <b>currentWindow</b> and <b>previousWindow</b></li>
+ *   <li>Each bucket has two sets: <b>currentWindow</b> and <b>previousWindow</b></li>
  *   <li>New allocations go into <b>currentWindow</b></li>
  *   <li>Every <b>ROLL_INTERVAL</b> (default 5 minutes):
  *     <ul>
@@ -125,6 +130,17 @@ public class PendingContainerTracker {
       return currentWindow.contains(containerID) || previousWindow.contains(containerID);
     }
 
+    synchronized boolean containsInCurrentWindow(ContainerID containerID) {
+      return currentWindow.contains(containerID);
+    }
+
+    /**
+     * Add container to current window.
+     */
+    synchronized boolean add(ContainerID containerID) {
+      return currentWindow.add(containerID);
+    }
+
     /**
      * Remove container from both windows.
      */
@@ -132,8 +148,6 @@ public class PendingContainerTracker {
       boolean removedFromCurrent = currentWindow.remove(containerID);
       boolean removedFromPrevious = previousWindow.remove(containerID);
       boolean removed = removedFromCurrent || removedFromPrevious;
-      LOG.debug("Removed pending container {} from DataNode {}. Removed={}, Remaining={}",
-          containerID, datanodeID, removed, getCount());
       return removed;
     }
 
@@ -143,14 +157,98 @@ public class PendingContainerTracker {
     synchronized int getCount() {
       return currentWindow.size() + previousWindow.size();
     }
+  }
+
+  /**
+   * Pending container allocations for one datanode, grouped by storage type.
+   */
+  public static class PendingContainerAllocations {
+    private final Map<StorageType, TwoWindowBucket> typedBuckets =
+        new EnumMap<>(StorageType.class);
+    private final TwoWindowBucket unknownBucket;
+    private final long rollIntervalMs;
+    private final DatanodeID datanodeID;
+
+    PendingContainerAllocations(DatanodeID id, long rollIntervalMs) {
+      this.datanodeID = id;
+      this.rollIntervalMs = rollIntervalMs;
+      this.unknownBucket = new TwoWindowBucket(id, rollIntervalMs);
+    }
+
+    synchronized void rollIfNeeded() {
+      unknownBucket.rollIfNeeded();
+      typedBuckets.values().forEach(TwoWindowBucket::rollIfNeeded);
+    }
+
+    synchronized boolean contains(ContainerID containerID) {
+      return unknownBucket.contains(containerID)
+          || typedBuckets.values().stream()
+          .anyMatch(bucket -> bucket.contains(containerID));
+    }
+
+    /**
+     * Count pending containers of the given storage type.
+     * Unknown storage type entries are counted for typed checks because they
+     * may occupy the requested storage type.
+     */
+    synchronized int getCount(StorageType storageType) {
+      if (checksAllStorageTypes(storageType)) {
+        return getCount();
+      }
+      TwoWindowBucket bucket = typedBuckets.get(storageType);
+      return unknownBucket.getCount() + (bucket != null ? bucket.getCount() : 0);
+    }
+
+    /**
+     * Count of pending containers in all buckets.
+     */
+    synchronized int getCount() {
+      return unknownBucket.getCount()
+          + typedBuckets.values().stream()
+          .mapToInt(TwoWindowBucket::getCount)
+          .sum();
+    }
 
     /**
      * Records a container allocation in the current window,
      * without checking available space. Use this when the space check has
      * already been performed by the placement policy.
      */
-    synchronized void add(ContainerID containerID) {
-      currentWindow.add(containerID);
+    synchronized boolean record(ContainerID containerID, StorageType storageType) {
+      return add(containerID, storageType);
+    }
+
+    synchronized boolean add(ContainerID containerID, StorageType storageType) {
+      if (containsInCurrentWindow(containerID)) {
+        LOG.debug("Recorded pending container {} on DataNode {} with storageType {}. "
+            + "Added=false, Total pending={}",
+            containerID, datanodeID, storageType, getCount());
+        return false;
+      }
+      boolean added = bucketFor(storageType).add(containerID);
+      LOG.debug("Recorded pending container {} on DataNode {} with storageType {}. "
+          + "Added={}, Total pending={}",
+          containerID, datanodeID, storageType, added, getCount());
+      return added;
+    }
+
+    private boolean containsInCurrentWindow(ContainerID containerID) {
+      return unknownBucket.containsInCurrentWindow(containerID)
+          || typedBuckets.values().stream()
+          .anyMatch(bucket -> bucket.containsInCurrentWindow(containerID));
+    }
+
+    /**
+     * Remove container from all buckets.
+     */
+    synchronized boolean remove(ContainerID containerID) {
+      boolean removed = unknownBucket.remove(containerID);
+      for (TwoWindowBucket bucket : typedBuckets.values()) {
+        removed |= bucket.remove(containerID);
+      }
+      LOG.debug("Removed pending container {} from DataNode {}. Removed={}, Remaining={}",
+          containerID, datanodeID, removed, getCount());
+      return removed;
     }
 
     /**
@@ -161,28 +259,39 @@ public class PendingContainerTracker {
      * @param storageReports storage reports for the datanode
      * @param maxContainerSize maximum size of a single container in bytes
      * @param containerID the container being allocated
+     * @param storageType the storage type selected for the allocation
      * @return true if space was available and the container was recorded, false otherwise
      */
-
     synchronized boolean checkSpaceAndAdd(
-        List<StorageReportProto> storageReports, long maxContainerSize, ContainerID containerID) {
-      final int pendingAllocationCount = getCount();
+        List<StorageReportProto> storageReports, long maxContainerSize,
+        ContainerID containerID, StorageType storageType) {
+      rollIfNeeded();
+      final int pendingAllocationCount = getCount(storageType);
       long allocatableCount = 0;
       for (StorageReportProto report : storageReports) {
         if (report.hasFailed() && report.getFailed()) {
+          continue;
+        }
+        if (!matchesStorageType(report, storageType)) {
           continue;
         }
         final long allocatableCountOnThisDisk =
             Math.max(0L, VolumeUsage.getUsableSpace(report)) / maxContainerSize;
         allocatableCount += allocatableCountOnThisDisk;
         if (allocatableCount > pendingAllocationCount) {
-          final boolean added = currentWindow.add(containerID);
-          LOG.debug("Recorded pending container {} on DataNode {}. Added={}, Total pending={}",
-              containerID, datanodeID, added, getCount());
+          final boolean added = add(containerID, storageType);
           return added;
         }
       }
       return false;
+    }
+
+    private TwoWindowBucket bucketFor(StorageType storageType) {
+      if (checksAllStorageTypes(storageType)) {
+        return unknownBucket;
+      }
+      return typedBuckets.computeIfAbsent(storageType,
+          ignored -> new TwoWindowBucket(datanodeID, rollIntervalMs));
     }
   }
 
@@ -196,13 +305,14 @@ public class PendingContainerTracker {
   /**
    * Atomically checks if the datanode has space for a new container and records the allocation
    * if space is available. The check-and-add atomicity is enforced inside
-   * {@link TwoWindowBucket#checkSpaceAndAdd}.
+   * {@link PendingContainerAllocations#checkSpaceAndAdd}.
    *
-   * @param datanodeInfo datanode whose storage reports and pending bucket
+   * @param datanodeInfo datanode whose storage reports and pending allocations are checked
    * @param containerID the container being allocated
    * @return true if space was available and the allocation was recorded, false otherwise
    */
-  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  public boolean checkSpaceAndRecordAllocation(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType) {
     Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
     Objects.requireNonNull(containerID, "containerID == null");
 
@@ -213,7 +323,7 @@ public class PendingContainerTracker {
     }
 
     boolean added = datanodeInfo.getPendingContainerAllocations()
-        .checkSpaceAndAdd(storageReports, maxContainerSize, containerID);
+        .checkSpaceAndAdd(storageReports, maxContainerSize, containerID, storageType);
     if (metrics != null) {
       if (added) {
         metrics.incNumPendingContainersAdded();
@@ -232,39 +342,48 @@ public class PendingContainerTracker {
    *
    * @param datanodeInfo the datanode receiving the container
    * @param containerID  the container being allocated
+   * @param storageType the storage type selected for the allocation
    */
-  public void recordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  public void recordAllocation(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType) {
     Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
     Objects.requireNonNull(containerID, "containerID == null");
-    datanodeInfo.getPendingContainerAllocations().add(containerID);
-    if (metrics != null) {
+    final boolean added =
+        datanodeInfo.getPendingContainerAllocations().record(containerID, storageType);
+    if (added && metrics != null) {
       metrics.incNumPendingContainersAdded();
     }
   }
 
   /**
-   * Returns true if the given datanode has at least one allocatable container slot
-   * available, accounting for pending in-flight allocations.
+   * Returns true if the given datanode has at least one allocatable container
+   * slot available, accounting for pending in-flight allocations.
    *
    * <p>Slot availability is based on {@code maxContainerSize}: a slot exists for each
    * {@code maxContainerSize}-worth of usable space on any volume. This check is intended for the placement policy.
    * This rolls expired-window entries but does not consume a slot.
    *
    * @param datanodeInfo the datanode to check
+   * @param storageType storage type to check
    * @return true if at least one container slot is available
    */
-  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
+  public boolean hasAvailableSpace(
+      DatanodeInfo datanodeInfo, StorageType storageType) {
     Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
     List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
     if (storageReports.isEmpty()) {
       return false;
     }
-    TwoWindowBucket bucket = datanodeInfo.getPendingContainerAllocations();
-    bucket.rollIfNeeded();
-    final int pendingCount = bucket.getCount();
+    PendingContainerAllocations pendingAllocations =
+        datanodeInfo.getPendingContainerAllocations();
+    pendingAllocations.rollIfNeeded();
+    final int pendingCount = pendingAllocations.getCount(storageType);
     long allocatableCount = 0;
     for (StorageReportProto report : storageReports) {
       if (report.hasFailed() && report.getFailed()) {
+        continue;
+      }
+      if (!matchesStorageType(report, storageType)) {
         continue;
       }
       allocatableCount += Math.max(0L, VolumeUsage.getUsableSpace(report)) / maxContainerSize;
@@ -278,19 +397,30 @@ public class PendingContainerTracker {
   }
 
   /**
-   * Remove pending allocation from the bucket for the given container.
+   * Remove pending allocation for the given container.
    *
-   * @param bucket TWO window bucket of the datanode
+   * @param pendingAllocations pending allocations of the datanode
    * @param containerID containerID
    */
-  public void removePendingAllocation(TwoWindowBucket bucket, ContainerID containerID) {
+  public void removePendingAllocation(
+      PendingContainerAllocations pendingAllocations, ContainerID containerID) {
     Objects.requireNonNull(containerID, "containerID == null");
 
-    boolean removed = bucket.remove(containerID);
+    boolean removed = pendingAllocations.remove(containerID);
 
     if (removed && metrics != null) {
       metrics.incNumPendingContainersRemoved();
     }
+  }
+
+  private static boolean matchesStorageType(
+      StorageReportProto report, StorageType storageType) {
+    return checksAllStorageTypes(storageType)
+        || StorageTypeUtils.getFromProtobuf(report.getStorageType()).equals(storageType);
+  }
+
+  private static boolean checksAllStorageTypes(StorageType storageType) {
+    return storageType == null;
   }
 
   @VisibleForTesting

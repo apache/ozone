@@ -505,16 +505,16 @@ public class TestSCMCommonPlacementPolicy {
     when(datanodeInfo.getMetadataStorageReports())
         .thenReturn(Collections.singletonList(metaReport));
 
-    // Space check now uses PendingContainerTracker.hasAvailableSpace:
-    // slot available → isValidNode returns true
-    when(nodeMngr.hasAvailableSpace(datanodeInfo)).thenReturn(true);
-    assertTrue(placementPolicy.isValidNode(
-        datanodeDetails, 100, 4000, StorageType.DEFAULT));
+    // slot available -> isValidNode returns true.
+    // storageType == null checks all storage reports and relies on the slot check.
+    when(nodeMngr.hasAvailableSpace(datanodeInfo, null))
+        .thenReturn(true);
+    assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000, null));
 
-    // No slot available (all pending) → isValidNode returns false
-    when(nodeMngr.hasAvailableSpace(datanodeInfo)).thenReturn(false);
-    assertFalse(placementPolicy.isValidNode(
-        datanodeDetails, 100, 4000, StorageType.DEFAULT));
+    // No slot available (all pending) -> isValidNode returns false
+    when(nodeMngr.hasAvailableSpace(datanodeInfo, null))
+        .thenReturn(false);
+    assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000, null));
   }
 
   /**

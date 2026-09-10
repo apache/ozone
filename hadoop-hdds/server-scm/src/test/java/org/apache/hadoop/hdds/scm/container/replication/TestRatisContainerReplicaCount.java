@@ -569,7 +569,7 @@ class TestRatisContainerReplicaCount {
 
     List<ContainerReplicaOp> ops = new ArrayList<>();
     ops.add(new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
-        unhealthyReplica.getDatanodeDetails(), 0, null, System.currentTimeMillis(), 0));
+        unhealthyReplica.getDatanodeDetails(), 0, null, System.currentTimeMillis(), 0, null));
     RatisContainerReplicaCount withoutUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, false);
     validate(withoutUnhealthy, true, 0, false, false);
@@ -657,7 +657,7 @@ class TestRatisContainerReplicaCount {
     replicas.addAll(unhealthyReplicas);
     List<ContainerReplicaOp> ops = new ArrayList<>();
     ops.add(new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
-        unhealthyReplicas.iterator().next().getDatanodeDetails(), 0, null, System.currentTimeMillis(), 0));
+        unhealthyReplicas.iterator().next().getDatanodeDetails(), 0, null, System.currentTimeMillis(), 0, null));
 
     RatisContainerReplicaCount withoutUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, false);

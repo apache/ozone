@@ -163,12 +163,12 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
             anyInt())).thenReturn(mockedContainerPlacementStatus);
     List<ContainerReplicaOp> pendingOp = singletonList(
             new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
-                    MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
+                    MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0, null));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
     pendingOp = singletonList(new ContainerReplicaOp(
             ContainerReplicaOp.PendingOpType.DELETE, availableReplicas
-                    .stream().findAny().get().getDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
+                    .stream().findAny().get().getDatanodeDetails(), 1, null, Long.MAX_VALUE, 0, null));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
   }

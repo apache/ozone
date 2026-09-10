@@ -164,12 +164,12 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
             anyInt())).thenReturn(mockedContainerPlacementStatus);
     List<ContainerReplicaOp> pendingOp = Collections.singletonList(
             new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
-                    MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+                    MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0, null));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
     pendingOp = Collections.singletonList(new ContainerReplicaOp(
             ContainerReplicaOp.PendingOpType.DELETE, availableReplicas
-                    .stream().findAny().get().getDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+                    .stream().findAny().get().getDatanodeDetails(), 0, null, Long.MAX_VALUE, 0, null));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
   }

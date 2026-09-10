@@ -131,7 +131,8 @@ public class TestPipelinePlacementFactory {
       when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
-    doReturn(true).when(nodeManager).hasAvailableSpace(any(DatanodeInfo.class));
+    doReturn(true).when(nodeManager)
+        .hasAvailableSpace(any(DatanodeInfo.class), any());
 
     DBStore dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);

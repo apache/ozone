@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -245,16 +246,19 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  public boolean checkSpaceAndRecordAllocation(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType) {
     return true;
   }
 
   @Override
-  public void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  public void recordAllocationForDatanode(
+      DatanodeInfo datanodeInfo, ContainerID containerID, StorageType storageType) {
   }
   
   @Override
-  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
+  public boolean hasAvailableSpace(
+      DatanodeInfo datanodeInfo, StorageType storageType) {
     return true;
   }
 

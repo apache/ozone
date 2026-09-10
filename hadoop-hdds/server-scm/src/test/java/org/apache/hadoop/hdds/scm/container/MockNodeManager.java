@@ -490,27 +490,36 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  public boolean checkSpaceAndRecordAllocation(
+      DatanodeInfo datanodeInfo, ContainerID containerID,
+      StorageType pendingStorageType) {
     if (datanodeInfo == null) {
       return false;
     }
-    return pendingContainerTracker.checkSpaceAndRecordAllocation(datanodeInfo, containerID);
+    return pendingContainerTracker.checkSpaceAndRecordAllocation(
+        datanodeInfo, containerID, pendingStorageType);
   }
 
   @Override
-  public void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  public void recordAllocationForDatanode(
+      DatanodeInfo datanodeInfo, ContainerID containerID,
+      StorageType pendingStorageType) {
     if (datanodeInfo != null) {
-      pendingContainerTracker.recordAllocation(datanodeInfo, containerID);
+      pendingContainerTracker.recordAllocation(
+          datanodeInfo, containerID, pendingStorageType);
     }
   }
-    
-  @Override  
-  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
-    return pendingContainerTracker.hasAvailableSpace(datanodeInfo);
+
+  @Override
+  public boolean hasAvailableSpace(
+      DatanodeInfo datanodeInfo, StorageType pendingStorageType) {
+    return pendingContainerTracker.hasAvailableSpace(
+        datanodeInfo, pendingStorageType);
   }
 
   @Override
-  public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+  public void removePendingAllocationForDatanode(
+      DatanodeInfo datanodeInfo, ContainerID containerID) {
     if (datanodeInfo != null) {
       pendingContainerTracker.removePendingAllocation(
           datanodeInfo.getPendingContainerAllocations(), containerID);

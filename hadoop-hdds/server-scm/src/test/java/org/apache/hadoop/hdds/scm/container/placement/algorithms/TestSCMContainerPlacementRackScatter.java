@@ -262,10 +262,14 @@ public class TestSCMContainerPlacementRackScatter {
     }
     when(nodeManager.getClusterNetworkTopologyMap())
         .thenReturn(cluster);
-    when(nodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
-      DatanodeInfo di = invocation.getArgument(0);
-      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() > 1L);
-    });
+    when(nodeManager.hasAvailableSpace(
+        any(DatanodeInfo.class), any()))
+        .thenAnswer(invocation -> {
+          DatanodeInfo di = invocation.getArgument(0);
+          StorageType requestedStorageType = invocation.getArgument(1);
+          return di.getStorageReports().stream()
+              .anyMatch(report -> hasEnoughSpace(report, requestedStorageType));
+        });
     when(nodeManager.getNodeStat(any(DatanodeDetails.class))).thenAnswer(invocation -> {
       DatanodeDetails dd = invocation.getArgument(0);
       DatanodeInfo di = dnInfos.stream()
@@ -973,5 +977,12 @@ public class TestSCMContainerPlacementRackScatter {
       }
     }
     return racks.size();
+  }
+
+  private static boolean hasEnoughSpace(
+      StorageReportProto report, StorageType storageType) {
+    return (storageType == null
+        || getStorageTypeProto(storageType).equals(report.getStorageType()))
+        && report.getRemaining() > 1L;
   }
 }

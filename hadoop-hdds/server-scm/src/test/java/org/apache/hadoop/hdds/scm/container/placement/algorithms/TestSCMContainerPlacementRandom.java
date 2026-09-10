@@ -91,10 +91,13 @@ public class TestSCMContainerPlacementRandom {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
-    when(mockNodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
-      DatanodeInfo di = invocation.getArgument(0);
-      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() >= 15L);
-    });
+    when(mockNodeManager.hasAvailableSpace(
+        any(DatanodeInfo.class), any()))
+        .thenAnswer(invocation -> {
+          DatanodeInfo di = invocation.getArgument(0);
+          return di.getStorageReports().stream()
+              .anyMatch(r -> r.getRemaining() >= 15L);
+        });
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
@@ -215,10 +218,13 @@ public class TestSCMContainerPlacementRandom {
         .thenReturn(datanodes.get(1));
     when(mockNodeManager.getNode(datanodes.get(2).getID()))
         .thenReturn(datanodes.get(2));
-    when(mockNodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
-      DatanodeInfo di = invocation.getArgument(0);
-      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() >= 15L);
-    });
+    when(mockNodeManager.hasAvailableSpace(
+        any(DatanodeInfo.class), any()))
+        .thenAnswer(invocation -> {
+          DatanodeInfo di = invocation.getArgument(0);
+          return di.getStorageReports().stream()
+              .anyMatch(r -> r.getRemaining() >= 15L);
+        });
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,

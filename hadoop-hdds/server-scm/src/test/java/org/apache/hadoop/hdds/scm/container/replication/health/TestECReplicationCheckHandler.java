@@ -144,7 +144,7 @@ public class TestECReplicationCheckHandler {
         = createReplicas(container.containerID(), 1, 2, 4, 5);
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3, null, Long.MAX_VALUE, 0));
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3, null, Long.MAX_VALUE, 0, null));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -202,7 +202,7 @@ public class TestECReplicationCheckHandler {
         Pair.of(IN_SERVICE, 4), Pair.of(DECOMMISSIONED, 5));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 5, null, Long.MAX_VALUE, 0));
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 5, null, Long.MAX_VALUE, 0, null));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -233,7 +233,7 @@ public class TestECReplicationCheckHandler {
         Pair.of(DECOMMISSIONING, 4), Pair.of(DECOMMISSIONED, 5));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3, null, Long.MAX_VALUE, 0));
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3, null, Long.MAX_VALUE, 0, null));
 
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
@@ -376,7 +376,7 @@ public class TestECReplicationCheckHandler {
         Pair.of(IN_SERVICE, 1), Pair.of(offlineState, 2));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0, null));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -513,9 +513,9 @@ public class TestECReplicationCheckHandler {
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0, null));
     pending.add(new ContainerReplicaOp(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0, null));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -671,7 +671,7 @@ public class TestECReplicationCheckHandler {
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(DELETE,
         unhealthyReplica.getDatanodeDetails(),
-        unhealthyReplica.getReplicaIndex(), null, Long.MAX_VALUE, 0));
+        unhealthyReplica.getReplicaIndex(), null, Long.MAX_VALUE, 0, null));
 
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)

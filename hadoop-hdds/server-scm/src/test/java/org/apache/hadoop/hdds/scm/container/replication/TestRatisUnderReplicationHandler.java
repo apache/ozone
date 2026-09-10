@@ -139,7 +139,7 @@ public class TestRatisUnderReplicationHandler {
         = createReplicas(container.containerID(), State.CLOSED, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0, null));
 
     testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
         1);
@@ -166,7 +166,7 @@ public class TestRatisUnderReplicationHandler {
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0, null));
 
     testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
         0);
@@ -338,7 +338,7 @@ public class TestRatisUnderReplicationHandler {
 
     List<ContainerReplicaOp> pending = Collections.singletonList(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
-        shouldDelete.getDatanodeDetails(), 0, null, System.currentTimeMillis(), 0));
+        shouldDelete.getDatanodeDetails(), 0, null, System.currentTimeMillis(), 0, null));
 
     assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
@@ -389,7 +389,7 @@ public class TestRatisUnderReplicationHandler {
         = createReplicas(container.containerID(), State.UNHEALTHY, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
         new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0, null, System.currentTimeMillis(), 0));
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, System.currentTimeMillis(), 0, null));
 
     testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
         1);
@@ -504,9 +504,9 @@ public class TestRatisUnderReplicationHandler {
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingRemove = MockDatanodeDetails.randomDatanodeDetails();
     pendingOps.add(new ContainerReplicaOp(
-        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, System.currentTimeMillis(), 0));
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, System.currentTimeMillis(), 0, null));
     pendingOps.add(new ContainerReplicaOp(
-        ContainerReplicaOp.PendingOpType.DELETE, pendingRemove, 0, null, System.currentTimeMillis(), 0));
+        ContainerReplicaOp.PendingOpType.DELETE, pendingRemove, 0, null, System.currentTimeMillis(), 0, null));
 
     handler.processAndSendCommands(replicas, pendingOps,
         getUnderReplicatedHealthResult(), 2);

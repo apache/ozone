@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.node.PendingContainerTracker.TwoWindowBucket;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker.PendingContainerAllocations;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,9 +52,9 @@ public class DatanodeInfo extends DatanodeDetails {
   private int failedVolumeCount;
 
   /**
-   * Two-window tumbling bucket for tracking pending container allocations on this datanode.
+   * Pending container allocations tracked on this datanode.
    */
-  private final TwoWindowBucket pendingContainerAllocations;
+  private final PendingContainerAllocations pendingContainerAllocations;
 
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
@@ -81,7 +81,8 @@ public class DatanodeInfo extends DatanodeDetails {
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
     this.commandCounts = new HashMap<>();
-    this.pendingContainerAllocations = new TwoWindowBucket(this.getID(), containerRollIntervalMs);
+    this.pendingContainerAllocations =
+        new PendingContainerAllocations(this.getID(), containerRollIntervalMs);
   }
 
   /**
@@ -361,9 +362,9 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
-   * Returns the {@link TwoWindowBucket} for this datanode.
+   * Returns the pending container allocations for this datanode.
    */
-  public TwoWindowBucket getPendingContainerAllocations() {
+  public PendingContainerAllocations getPendingContainerAllocations() {
     pendingContainerAllocations.rollIfNeeded();
     return pendingContainerAllocations;
   }

@@ -41,8 +41,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
@@ -692,17 +694,21 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       List<DatanodeDetails> targets = rcc.getTargetDatanodes();
       final ByteString targetIndexes = rcc.getMissingContainerIndexes();
       long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
+      StorageType storageType = getStorageType(containerInfo);
       for (int i = 0; i < targetIndexes.size(); i++) {
         containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targets.get(i),
-            targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
+            targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs, requiredSize,
+            storageType, clock.millis());
       }
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
       long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
+      StorageType storageType = getStorageType(containerInfo);
 
       containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), rcc.getTargetDatanode(),
-          rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
+          rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize,
+          storageType, clock.millis());
 
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcReplicationCmdsSentTotal();
@@ -710,6 +716,12 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         getMetrics().incrReplicationCmdsSentTotal();
       }
     }
+  }
+
+  private StorageType getStorageType(ContainerInfo containerInfo) {
+    StorageTier storageTier = containerInfo.getStorageTier();
+    return storageTier == null || storageTier == StorageTier.EMPTY
+        ? null : storageTier.getUniformStorageType();
   }
 
   /**
@@ -1591,4 +1603,3 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     }
   }
 }
-

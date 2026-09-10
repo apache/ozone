@@ -148,7 +148,8 @@ public class TestContainerPlacementFactory {
       when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
-    when(nodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenReturn(true);
+    when(nodeManager.hasAvailableSpace(any(DatanodeInfo.class), any()))
+        .thenReturn(true);
 
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, nodeManager, cluster, true,

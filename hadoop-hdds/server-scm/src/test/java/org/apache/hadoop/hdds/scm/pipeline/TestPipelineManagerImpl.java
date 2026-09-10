@@ -50,6 +50,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -70,6 +71,7 @@ import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -1006,6 +1008,54 @@ public class TestPipelineManagerImpl {
     for (DatanodeDetails dn : pipeline.getNodes())  {
       assertThat(dns).contains(dn);
     }
+  }
+
+  /**
+   * {@link PipelineManager#checkSpaceAndRecordAllocation(Pipeline, ContainerID)}
+   * should pass the pipeline storage tier as StorageType to NodeManager.
+   */
+  @Test
+  public void testCheckSpaceAndRecordAllocationPassesStorageType() throws IOException {
+    NodeManager mockedNodeManager = mock(NodeManager.class);
+    PipelineManagerImpl pipelineManager = PipelineManagerImpl.newPipelineManager(conf,
+        SCMHAManagerStub.getInstance(true),
+        mockedNodeManager,
+        SCMDBDefinition.PIPELINES.getTable(dbStore),
+        new EventQueue(),
+        scmContext,
+        serviceManager,
+        testClock);
+
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeInfo dnInfo1 = new DatanodeInfo(dn1, NodeStatus.inServiceHealthy(),
+        null, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+    DatanodeInfo dnInfo2 = new DatanodeInfo(dn2, NodeStatus.inServiceHealthy(),
+        null, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+    DatanodeInfo dnInfo3 = new DatanodeInfo(dn3, NodeStatus.inServiceHealthy(),
+        null, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setNodes(ImmutableList.of(dn1, dn2, dn3))
+        .setState(OPEN)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE))
+        .setSupportedStorageTier(StorageTier.DISK)
+        .build();
+    ContainerID containerID = ContainerID.valueOf(1);
+
+    doReturn(dnInfo1).when(mockedNodeManager).getNode(dn1.getID());
+    doReturn(dnInfo2).when(mockedNodeManager).getNode(dn2.getID());
+    doReturn(dnInfo3).when(mockedNodeManager).getNode(dn3.getID());
+    doReturn(true).when(mockedNodeManager).checkSpaceAndRecordAllocation(
+        dnInfo1, containerID, StorageType.DISK);
+    doReturn(true).when(mockedNodeManager).checkSpaceAndRecordAllocation(
+        dnInfo2, containerID, StorageType.DISK);
+    doReturn(true).when(mockedNodeManager).checkSpaceAndRecordAllocation(
+        dnInfo3, containerID, StorageType.DISK);
+
+    assertTrue(pipelineManager.checkSpaceAndRecordAllocation(pipeline, containerID));
   }
 
   private Set<ContainerReplica> createContainerReplicasList(

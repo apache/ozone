@@ -124,7 +124,7 @@ public class TestQuasiClosedStuckOverReplicationHandler {
         0,
         null,
         Long.MAX_VALUE,
-        0));
+        0, null));
 
     int count = handler.processAndSendCommands(replicas, pendingOps, getOverReplicatedHealthResult(), 1);
     assertEquals(0, count);

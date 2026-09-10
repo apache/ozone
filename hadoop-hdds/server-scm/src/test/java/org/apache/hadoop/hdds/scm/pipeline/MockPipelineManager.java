@@ -29,6 +29,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -349,12 +350,22 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
+    StorageType storageType = getStorageType(pipeline);
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (!nodeManager.checkSpaceAndRecordAllocation(nodeManager.getNode(dn.getID()), containerID)) {
+      if (!nodeManager.checkSpaceAndRecordAllocation(
+          nodeManager.getNode(dn.getID()), containerID, storageType)) {
         return false;
       }
     }
     return true;
+  }
+
+  private StorageType getStorageType(Pipeline pipeline) {
+    StorageTier storageTier = pipeline.getSupportedStorageTier();
+    if (storageTier == null || storageTier == StorageTier.EMPTY) {
+      return null;
+    }
+    return storageTier.getUniformStorageType();
   }
 
   @Override
