@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.util.List;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.ratis.util.Preconditions;
 
@@ -31,15 +30,15 @@ class ReadBlockComputation {
 
   private final int responseDataSize;
   private final int bitMask;
-  private final List<ContainerProtos.ChunkInfo> chunks;
+  private final List<ChunkInfo> chunks;
   private int chunkIndex;
   private long lastPosition;
 
   ReadBlockComputation(int responseDataSize, int bytesPerChecksum,
-      List<ContainerProtos.ChunkInfo> chunks, int firstChunkIndex) {
+      List<ChunkInfo> chunks, int firstChunkIndex) {
     this.responseDataSize = responseDataSize;
 
-    Preconditions.assertSame(1, Long.bitCount(bytesPerChecksum), "bitCount" ); // check power of 2.
+    Preconditions.assertSame(1, Long.bitCount(bytesPerChecksum), "bitCount"); // check power of 2.
     // Suppose bytesPerChecksum = 00001000 (a power of 2), then bitMask = 11111000.
     // The following two computations are the same:
     // We will use (n & bitMask) to compute ((n / bytesPerChecksum) * bytesPerChecksum).
@@ -86,8 +85,8 @@ class ReadBlockComputation {
    */
   static long computeAdjustedLength(long blockOffset, long blockLength, long adjustedOffset,
       long bytesPerChecksum, List<ChunkInfo> chunkInfos) {
-    long blockEnd = blockOffset + blockLength - 1;
-    ContainerProtos.ChunkInfo lastChunk = chunkInfos.get(searchChunk(blockEnd, chunkInfos));
+    long blockEnd = blockOffset + blockLength - 1; // inclusive
+    ChunkInfo lastChunk = chunkInfos.get(searchChunk(blockEnd, chunkInfos));
     long chunkOffset = lastChunk.getOffset();
     long chunkLength = Math.min(
         (getEndChecksumIndex(blockEnd, chunkOffset, bytesPerChecksum) + 1) * bytesPerChecksum,
@@ -108,9 +107,9 @@ class ReadBlockComputation {
     if (responseDataSize >= remainingLength) {
       return Math.toIntExact(remainingLength);
     }
-    ContainerProtos.ChunkInfo nextChunk = chunks.get(findChunk(offset + responseDataSize));
-      final int lengthExcludingEndChunk = Math.toIntExact(nextChunk.getOffset() - offset);
-      // bytesPerChecksum must be a power of 2.
+    ChunkInfo nextChunk = chunks.get(findChunk(offset + responseDataSize)); // exclusive
+    final int lengthExcludingEndChunk = Math.toIntExact(nextChunk.getOffset() - offset);
+    // bytesPerChecksum must be a power of 2.
     return (responseDataSize - lengthExcludingEndChunk) & bitMask;
   }
 
@@ -122,8 +121,8 @@ class ReadBlockComputation {
     Preconditions.assertTrue(position >= lastPosition);
     lastPosition = position;
 
-    for(; chunkIndex < chunks.size(); chunkIndex++) {
-      final ContainerProtos.ChunkInfo chunk = chunks.get(chunkIndex);
+    for (; chunkIndex < chunks.size(); chunkIndex++) {
+      final ChunkInfo chunk = chunks.get(chunkIndex);
       if (position >= chunk.getOffset() && position < chunk.getOffset() + chunk.getLen()) {
         return chunkIndex;
       }

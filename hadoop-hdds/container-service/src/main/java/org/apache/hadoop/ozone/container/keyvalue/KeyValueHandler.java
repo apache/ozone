@@ -2367,7 +2367,8 @@ public class KeyValueHandler extends Handler {
         readBlock.getOffset(), bytesPerChecksum, chunkInfos);
     long adjustLength = ReadBlockComputation.computeAdjustedLength(
         readBlock.getOffset(), readBlock.getLength(), adjustedOffset, bytesPerChecksum, chunkInfos);
-    ReadBlockComputation readBlockComputation = new ReadBlockComputation(responseDataSize, bytesPerChecksum, chunkInfos, chunkIndex);
+    ReadBlockComputation readBlockComputation =
+        new ReadBlockComputation(responseDataSize, bytesPerChecksum, chunkInfos, chunkIndex);
 
     ChecksumData checksumData = new ChecksumData(checksumType, bytesPerChecksum);
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
@@ -2454,7 +2455,6 @@ public class KeyValueHandler extends Handler {
     }
     return checksums;
   }
-
 
   @Override
   public void addFinalizedBlock(Container container, long localID) {
