@@ -40,6 +40,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -2021,13 +2022,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public TablePrefixInfo getTableBucketPrefix(String volume, String bucket) throws IOException {
     String keyPrefix = getBucketKeyPrefix(volume, bucket);
     String keyPrefixFso = getBucketKeyPrefixFSO(volume, bucket);
-    // Set value to 12 to avoid creating too big a HashTable unnecessarily.
-    Map<String, String> tablePrefixMap = new HashMap<>(12, 1.0f);
+    // Set value to 13 to avoid creating too big a HashTable unnecessarily.
+    Map<String, String> tablePrefixMap = new HashMap<>(13, 1.0f);
 
     tablePrefixMap.put(VOLUME_TABLE, getVolumeKey(volume));
     tablePrefixMap.put(BUCKET_TABLE, getBucketKey(volume, bucket));
 
     tablePrefixMap.put(KEY_TABLE, keyPrefix);
+    tablePrefixMap.put(VERSIONED_KEY_TABLE, keyPrefix);
     tablePrefixMap.put(DELETED_TABLE, keyPrefix);
     tablePrefixMap.put(SNAPSHOT_RENAMED_TABLE, keyPrefix);
     tablePrefixMap.put(OPEN_KEY_TABLE, keyPrefix);
@@ -2050,6 +2052,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     case BUCKET_TABLE:
       return getBucketKey(volume, bucket);
     case KEY_TABLE:
+    case VERSIONED_KEY_TABLE:
     case DELETED_TABLE:
     case SNAPSHOT_RENAMED_TABLE:
     case OPEN_KEY_TABLE:

@@ -1619,4 +1619,19 @@ public class TestOmMetadataManager {
         .collect(Collectors.toList());
     assertEquals(Collections.singletonList(newlinePrefixed), newlinePrefixMatches);
   }
+
+  /**
+   * The SST filter trims a snapshot's versionedKeyTable to its bucket, by the same prefix as the keyTable, which its
+   * keys share.
+   */
+  @Test
+  public void testVersionedKeyTableHasTheBucketKeyPrefix() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB("vol1", "bucket1", omMetadataManager);
+    String bucketPrefix = omMetadataManager.getBucketKeyPrefix("vol1", "bucket1");
+
+    assertEquals(bucketPrefix,
+        omMetadataManager.getTableBucketPrefix("vol1", "bucket1").getTablePrefix(VERSIONED_KEY_TABLE));
+    assertEquals(bucketPrefix, omMetadataManager.getTableBucketPrefix(VERSIONED_KEY_TABLE, "vol1", "bucket1"));
+    assertTrue(omMetadataManager.getVersionedOzoneKey("vol1", "bucket1", "key", 1L).startsWith(bucketPrefix));
+  }
 }

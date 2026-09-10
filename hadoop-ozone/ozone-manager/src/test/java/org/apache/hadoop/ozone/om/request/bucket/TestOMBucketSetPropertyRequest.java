@@ -27,6 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -50,6 +53,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 
@@ -481,6 +487,61 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
         omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
   }
 
+  /**
+   * Changing the versioning status is a bucket property change, so it takes
+   * that request's permission: under native ACLs, the bucket owner or an
+   * administrator.
+   */
+  @Test
+  public void testOnlyOwnerOrAdminMayChangeVersioningStatus()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
+    when(authorizer.isNative()).thenReturn(true);
+    when(ozoneManager.getAccessAuthorizer()).thenReturn(authorizer);
+    when(ozoneManager.getBucketOwner(eq(volumeName), eq(bucketName),
+        any(IAccessAuthorizer.ACLType.class), any(OzoneObj.ResourceType.class)))
+        .thenReturn("bucketOwner");
+
+    // neither the owner nor an administrator
+    when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
+        .thenReturn(false);
+    when(ozoneManager.isOwner(any(UserGroupInformation.class), anyString()))
+        .thenReturn(false);
+    OMClientResponse response = setVersioningStatusAs("regularUser",
+        volumeName, bucketName, BucketVersioningStatus.ENABLED, 1);
+    assertEquals(OzoneManagerProtocolProtos.Status.PERMISSION_DENIED,
+        response.getOMResponse().getStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
+
+    // the bucket owner
+    when(ozoneManager.isOwner(any(UserGroupInformation.class),
+        eq("bucketOwner"))).thenReturn(true);
+    response = setVersioningStatusAs("bucketOwner",
+        volumeName, bucketName, BucketVersioningStatus.ENABLED, 2);
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(BucketVersioningStatus.ENABLED,
+        omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
+
+    // an administrator who does not own the bucket
+    when(ozoneManager.isOwner(any(UserGroupInformation.class), anyString()))
+        .thenReturn(false);
+    when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
+        .thenReturn(true);
+    response = setVersioningStatusAs("adminUser",
+        volumeName, bucketName, BucketVersioningStatus.SUSPENDED, 3);
+    assertTrue(response.getOMResponse().getSuccess());
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        omMetadataManager.getBucketTable().get(bucketKey).getVersioningStatus());
+  }
+
   @Test
   public void testLegacyVersioningFlagMapsToStateMachine() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -565,6 +626,15 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     assertSame(request, OMBucketSetPropertyRequest
         .disallowSetBucketPropertyWithVersioningStatus(
             request, finalizedContext));
+  }
+
+  private OMClientResponse setVersioningStatusAs(String user,
+      String volumeName, String bucketName, BucketVersioningStatus status,
+      long trxnLogIndex) throws Exception {
+    OMBucketSetPropertyRequest request = new OMBucketSetPropertyRequest(
+        createSetVersioningStatusRequest(volumeName, bucketName, status));
+    request.setUGI(UserGroupInformation.createRemoteUser(user));
+    return request.validateAndUpdateCache(ozoneManager, trxnLogIndex);
   }
 
   private OMRequest createSetVersioningStatusRequest(String volumeName,
