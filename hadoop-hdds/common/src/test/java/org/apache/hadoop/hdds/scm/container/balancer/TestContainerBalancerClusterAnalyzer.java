@@ -29,8 +29,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerClusterSnapshot.NodeUtilization;
 import org.junit.jupiter.api.Test;
 
 /** Tests for {@link ContainerBalancerClusterAnalyzer}. */
@@ -61,8 +63,8 @@ public final class TestContainerBalancerClusterAnalyzer {
     assertEquals(0, snapshot.getSourceCount());
     assertEquals(0, snapshot.getTargetCount());
     assertEquals(0, snapshot.getBytesToMove());
-    assertTrue(snapshot.getTopSourceNodeHostnames().isEmpty());
-    assertTrue(snapshot.getBottomTargetNodeHostnames().isEmpty());
+    assertTrue(snapshot.getTopSourceNodes().isEmpty());
+    assertTrue(snapshot.getBottomTargetNodes().isEmpty());
   }
 
   @Test
@@ -84,9 +86,11 @@ public final class TestContainerBalancerClusterAnalyzer {
     assertEquals(10, snapshot.getTotalUnderUtilizedBytes());
     assertEquals(snapshot.getTotalOverUtilizedBytes(), snapshot.getBytesToMove());
     assertEquals(Collections.singletonList("source-1"),
-        snapshot.getTopSourceNodeHostnames());
+        snapshot.getTopSourceNodes().stream()
+            .map(NodeUtilization::getHostname).collect(Collectors.toList()));
     assertEquals(Collections.singletonList("target-1"),
-        snapshot.getBottomTargetNodeHostnames());
+        snapshot.getBottomTargetNodes().stream()
+            .map(NodeUtilization::getHostname).collect(Collectors.toList()));
   }
 
   @Test
@@ -215,8 +219,8 @@ public final class TestContainerBalancerClusterAnalyzer {
 
     assertEquals(7, snapshot.getSourceCount());
     assertEquals(7, snapshot.getTargetCount());
-    assertEquals(5, snapshot.getTopSourceNodeHostnames().size());
-    assertEquals(5, snapshot.getBottomTargetNodeHostnames().size());
+    assertEquals(5, snapshot.getTopSourceNodes().size());
+    assertEquals(5, snapshot.getBottomTargetNodes().size());
     Set<String> expectedSources = new HashSet<>();
     for (int i = 0; i < 7; i++) {
       expectedSources.add(String.format("source-%02d", i));
@@ -225,8 +229,36 @@ public final class TestContainerBalancerClusterAnalyzer {
     for (int i = 0; i < 7; i++) {
       expectedTargets.add(String.format("target-%02d", i));
     }
-    assertTrue(expectedSources.containsAll(snapshot.getTopSourceNodeHostnames()));
-    assertTrue(expectedTargets.containsAll(snapshot.getBottomTargetNodeHostnames()));
+    assertTrue(expectedSources.containsAll(
+        snapshot.getTopSourceNodes().stream()
+            .map(NodeUtilization::getHostname).collect(Collectors.toList())));
+    assertTrue(expectedTargets.containsAll(
+        snapshot.getBottomTargetNodes().stream()
+            .map(NodeUtilization::getHostname).collect(Collectors.toList())));
+  }
+
+  @Test
+  void testTopSourceNodesCarryUtilization() {
+    List<DatanodeUsageInfoProto> nodes = Arrays.asList(
+        proto("source-hot", 100, 5),   // 95% used
+        proto("source-warm", 100, 15), // 85% used
+        proto("balanced", 100, 50),
+        proto("target-cool", 100, 90)  // 10% used
+    );
+
+    ContainerBalancerClusterSnapshot snapshot =
+        ContainerBalancerClusterAnalyzer.analyze(nodes, THRESHOLD,
+            Collections.emptySet(), Collections.emptySet());
+
+    List<NodeUtilization> top = snapshot.getTopSourceNodes();
+    assertEquals("source-hot", top.get(0).getHostname());
+    assertEquals(0.95, top.get(0).getUtilization(), 1e-9);
+    assertEquals("source-warm", top.get(1).getHostname());
+    assertEquals(0.85, top.get(1).getUtilization(), 1e-9);
+
+    List<NodeUtilization> bottom = snapshot.getBottomTargetNodes();
+    assertEquals("target-cool", bottom.get(0).getHostname());
+    assertEquals(0.10, bottom.get(0).getUtilization(), 1e-9);
   }
 
   @Test

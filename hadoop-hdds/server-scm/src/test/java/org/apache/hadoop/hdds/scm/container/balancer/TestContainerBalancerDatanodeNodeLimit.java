@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerClusterSnapshot.NodeUtilization;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -155,18 +156,32 @@ public class TestContainerBalancerDatanodeNodeLimit {
         Math.max(snapshot.getTotalOverUtilizedBytes(), snapshot.getTotalUnderUtilizedBytes()) / OzoneConsts.GB,
         task.getMetrics().getDataSizeUnbalancedGB());
 
-    List<String> expectedTopSources = task.getOverUtilizedNodes().stream()
+    List<NodeUtilization> expectedTopSources = task.getOverUtilizedNodes().stream()
         .sorted(Comparator.comparingDouble((DatanodeUsageInfo n) -> n.calculateUtilization()).reversed())
         .limit(5)
-        .map(n -> n.getDatanodeDetails().getHostName())
+        .map(n -> new NodeUtilization(n.getDatanodeDetails().getHostName(),
+            n.calculateUtilization()))
         .collect(Collectors.toList());
-    List<String> expectedBottomTargets = task.getUnderUtilizedNodes().stream()
+    List<NodeUtilization> expectedBottomTargets = task.getUnderUtilizedNodes().stream()
         .sorted(Comparator.comparingDouble((DatanodeUsageInfo n) -> n.calculateUtilization()))
         .limit(5)
-        .map(n -> n.getDatanodeDetails().getHostName())
+        .map(n -> new NodeUtilization(n.getDatanodeDetails().getHostName(),
+            n.calculateUtilization()))
         .collect(Collectors.toList());
-    assertEquals(expectedTopSources, snapshot.getTopSourceNodeHostnames());
-    assertEquals(expectedBottomTargets, snapshot.getBottomTargetNodeHostnames());
+
+    List<NodeUtilization> actualTopSources = snapshot.getTopSourceNodes();
+    assertEquals(expectedTopSources.size(), actualTopSources.size());
+    for (int i = 0; i < expectedTopSources.size(); i++) {
+      assertEquals(expectedTopSources.get(i).getHostname(), actualTopSources.get(i).getHostname());
+      assertEquals(expectedTopSources.get(i).getUtilization(), actualTopSources.get(i).getUtilization(), 0.0001);
+    }
+
+    List<NodeUtilization> actualBottomTargets = snapshot.getBottomTargetNodes();
+    assertEquals(expectedBottomTargets.size(), actualBottomTargets.size());
+    for (int i = 0; i < expectedBottomTargets.size(); i++) {
+      assertEquals(expectedBottomTargets.get(i).getHostname(), actualBottomTargets.get(i).getHostname());
+      assertEquals(expectedBottomTargets.get(i).getUtilization(), actualBottomTargets.get(i).getUtilization(), 0.0001);
+    }
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")

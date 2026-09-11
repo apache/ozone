@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerClusterSnapshot.NodeUtilization;
 
 /**
  * Classifies datanode usage protos using the same rules as
@@ -129,8 +130,8 @@ public final class ContainerBalancerClusterAnalyzer {
     double upperLimit = computeUpperLimit(clusterAvgUtilization, thresholdRatio);
     double lowerLimit = computeLowerLimit(clusterAvgUtilization, thresholdRatio);
 
-    List<NodeClassification> sources = new ArrayList<>();
-    List<NodeClassification> targets = new ArrayList<>();
+    List<NodeUtilization> sources = new ArrayList<>();
+    List<NodeUtilization> targets = new ArrayList<>();
     double maxUtilization = Double.NEGATIVE_INFINITY;
     double minUtilization = Double.POSITIVE_INFINITY;
     long clusterCapacityBytes = 0;
@@ -148,15 +149,15 @@ public final class ContainerBalancerClusterAnalyzer {
       String hostname = getDisplayHostname(node);
       if (isOverUtilized(utilization, upperLimit)) {
         totalOverUtilizedBytes += overUtilizedBytes(capacity, utilization, upperLimit);
-        sources.add(new NodeClassification(hostname, utilization));
+        sources.add(new NodeUtilization(hostname, utilization));
       } else if (isUnderUtilized(utilization, lowerLimit)) {
         totalUnderUtilizedBytes += underUtilizedBytes(capacity, utilization, lowerLimit);
-        targets.add(new NodeClassification(hostname, utilization));
+        targets.add(new NodeUtilization(hostname, utilization));
       }
     }
 
-    sources.sort(Comparator.comparingDouble(NodeClassification::getUtilization).reversed());
-    targets.sort(Comparator.comparingDouble(NodeClassification::getUtilization));
+    sources.sort(Comparator.comparingDouble(NodeUtilization::getUtilization).reversed());
+    targets.sort(Comparator.comparingDouble(NodeUtilization::getUtilization));
 
     double imbalance = maxUtilization - minUtilization;
 
@@ -173,8 +174,8 @@ public final class ContainerBalancerClusterAnalyzer {
         .setTotalOverUtilizedBytes(totalOverUtilizedBytes)
         .setTotalUnderUtilizedBytes(totalUnderUtilizedBytes)
         .setImbalance(imbalance)
-        .setTopSourceNodeHostnames(topHostnames(sources))
-        .setBottomTargetNodeHostnames(topHostnames(targets))
+        .setTopSourceNodes(topNodes(sources))
+        .setBottomTargetNodes(topNodes(targets))
         .build();
   }
 
@@ -241,13 +242,13 @@ public final class ContainerBalancerClusterAnalyzer {
     return datanode.getIpAddress();
   }
 
-  private static List<String> topHostnames(List<NodeClassification> nodes) {
+  private static List<NodeUtilization> topNodes(List<NodeUtilization> nodes) {
     int limit = Math.min(TOP_NODE_LIMIT, nodes.size());
-    List<String> hostnames = new ArrayList<>(limit);
+    List<NodeUtilization> result = new ArrayList<>(limit);
     for (int i = 0; i < limit; i++) {
-      hostnames.add(nodes.get(i).getHostname());
+      result.add(nodes.get(i));
     }
-    return hostnames;
+    return result;
   }
 
   private static ContainerBalancerClusterSnapshot emptySnapshot(double thresholdRatio) {
@@ -264,26 +265,8 @@ public final class ContainerBalancerClusterAnalyzer {
         .setTotalOverUtilizedBytes(0)
         .setTotalUnderUtilizedBytes(0)
         .setImbalance(0)
-        .setTopSourceNodeHostnames(Collections.emptyList())
-        .setBottomTargetNodeHostnames(Collections.emptyList())
+        .setTopSourceNodes(Collections.emptyList())
+        .setBottomTargetNodes(Collections.emptyList())
         .build();
-  }
-
-  private static final class NodeClassification {
-    private final String hostname;
-    private final double utilization;
-
-    private NodeClassification(String hostname, double utilization) {
-      this.hostname = hostname;
-      this.utilization = utilization;
-    }
-
-    private String getHostname() {
-      return hostname;
-    }
-
-    private double getUtilization() {
-      return utilization;
-    }
   }
 }

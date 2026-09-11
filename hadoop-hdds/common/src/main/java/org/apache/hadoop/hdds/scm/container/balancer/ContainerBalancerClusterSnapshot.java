@@ -39,8 +39,8 @@ public final class ContainerBalancerClusterSnapshot {
   private final long totalUnderUtilizedBytes;
   private final long bytesToMove;
   private final double imbalance;
-  private final List<String> topSourceNodeHostnames;
-  private final List<String> bottomTargetNodeHostnames;
+  private final List<NodeUtilization> topSourceNodes;
+  private final List<NodeUtilization> bottomTargetNodes;
 
   private ContainerBalancerClusterSnapshot(Builder b) {
     this.totalEligibleDatanodes = b.totalEligibleDatanodes;
@@ -56,10 +56,10 @@ public final class ContainerBalancerClusterSnapshot {
     this.totalUnderUtilizedBytes = b.totalUnderUtilizedBytes;
     this.bytesToMove = b.totalOverUtilizedBytes;
     this.imbalance = b.imbalance;
-    this.topSourceNodeHostnames = Collections.unmodifiableList(
-        Objects.requireNonNull(b.topSourceNodeHostnames));
-    this.bottomTargetNodeHostnames = Collections.unmodifiableList(
-        Objects.requireNonNull(b.bottomTargetNodeHostnames));
+    this.topSourceNodes = Collections.unmodifiableList(
+        Objects.requireNonNull(b.topSourceNodes));
+    this.bottomTargetNodes = Collections.unmodifiableList(
+        Objects.requireNonNull(b.bottomTargetNodes));
   }
 
   public int getTotalEligibleDatanodes() {
@@ -114,12 +114,12 @@ public final class ContainerBalancerClusterSnapshot {
     return imbalance;
   }
 
-  public List<String> getTopSourceNodeHostnames() {
-    return topSourceNodeHostnames;
+  public List<NodeUtilization> getTopSourceNodes() {
+    return topSourceNodes;
   }
 
-  public List<String> getBottomTargetNodeHostnames() {
-    return bottomTargetNodeHostnames;
+  public List<NodeUtilization> getBottomTargetNodes() {
+    return bottomTargetNodes;
   }
 
   public static Builder newBuilder() {
@@ -142,8 +142,8 @@ public final class ContainerBalancerClusterSnapshot {
     private long totalOverUtilizedBytes;
     private long totalUnderUtilizedBytes;
     private double imbalance;
-    private List<String> topSourceNodeHostnames = Collections.emptyList();
-    private List<String> bottomTargetNodeHostnames = Collections.emptyList();
+    private List<NodeUtilization> topSourceNodes = Collections.emptyList();
+    private List<NodeUtilization> bottomTargetNodes = Collections.emptyList();
 
     private Builder() {
     }
@@ -208,18 +208,40 @@ public final class ContainerBalancerClusterSnapshot {
       return this;
     }
 
-    public Builder setTopSourceNodeHostnames(List<String> topSourceNodeHostnames) {
-      this.topSourceNodeHostnames = topSourceNodeHostnames;
+    public Builder setTopSourceNodes(List<NodeUtilization> topSourceNodes) {
+      this.topSourceNodes = topSourceNodes;
       return this;
     }
 
-    public Builder setBottomTargetNodeHostnames(List<String> bottomTargetNodeHostnames) {
-      this.bottomTargetNodeHostnames = bottomTargetNodeHostnames;
+    public Builder setBottomTargetNodes(List<NodeUtilization> bottomTargetNodes) {
+      this.bottomTargetNodes = bottomTargetNodes;
       return this;
     }
 
     public ContainerBalancerClusterSnapshot build() {
       return new ContainerBalancerClusterSnapshot(this);
+    }
+  }
+
+  /**
+   * Hostname and utilization ratio of a single datanode, retained on the snapshot
+   * for per-node display in CLI output (e.g., assessment).
+   */
+  public static final class NodeUtilization {
+    private final String hostname;
+    private final double utilization;
+
+    public NodeUtilization(String hostname, double utilization) {
+      this.hostname = hostname;
+      this.utilization = utilization;
+    }
+
+    public String getHostname() {
+      return hostname;
+    }
+
+    public double getUtilization() {
+      return utilization;
     }
   }
 }
