@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
@@ -39,7 +40,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * Response for CommitKey request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, DELETED_TABLE,
-    BUCKET_TABLE})
+    BUCKET_TABLE, VERSIONED_KEY_TABLE})
 public class OMKeyCommitResponse extends OmKeyResponse {
 
   private OmKeyInfo omKeyInfo;
@@ -51,6 +52,9 @@ public class OMKeyCommitResponse extends OmKeyResponse {
   private OmKeyInfo newOpenKeyInfo;
   private OmKeyInfo openKeyToUpdate;
   private String openKeyNameToUpdate;
+  private String versionedKeyName;
+  private OmKeyInfo versionedKeyInfo;
+  private String replacedNullVersionKey;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyCommitResponse(
@@ -82,6 +86,27 @@ public class OMKeyCommitResponse extends OmKeyResponse {
     checkStatusNotOK();
   }
 
+  /**
+   * The version this commit overwrote, to be kept in the versionedKeyTable as
+   * a noncurrent version. Null for buckets without S3-compatible versioning.
+   */
+  public OMKeyCommitResponse withVersionedKey(String dbVersionedKey,
+      OmKeyInfo keyInfo) {
+    this.versionedKeyName = dbVersionedKey;
+    this.versionedKeyInfo = keyInfo;
+    return this;
+  }
+
+  /**
+   * The noncurrent null version this commit replaced, to be removed from the
+   * versionedKeyTable. Null unless a suspended write replaced a null version
+   * that was not the current one.
+   */
+  public OMKeyCommitResponse withReplacedNullVersion(String dbVersionedKey) {
+    this.replacedNullVersionKey = dbVersionedKey;
+    return this;
+  }
+
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
@@ -97,6 +122,16 @@ public class OMKeyCommitResponse extends OmKeyResponse {
 
     omMetadataManager.getKeyTable(getBucketLayout())
         .putWithBatch(batchOperation, ozoneKeyName, omKeyInfo);
+
+    if (versionedKeyInfo != null) {
+      omMetadataManager.getVersionedKeyTable()
+          .putWithBatch(batchOperation, versionedKeyName, versionedKeyInfo);
+    }
+
+    if (replacedNullVersionKey != null) {
+      omMetadataManager.getVersionedKeyTable()
+          .deleteWithBatch(batchOperation, replacedNullVersionKey);
+    }
 
     updateDeletedTable(omMetadataManager, batchOperation);
     handleOpenKeyToUpdate(omMetadataManager, batchOperation);
