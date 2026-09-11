@@ -223,6 +223,28 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     Map<String, SCMProxyInfo> oldProxyInfoMap = new HashMap<>(scmProxyInfoMap);
     loadConfigs();
 
+    // Keep the current proxy pointer valid before touching any proxy: if the
+    // node it referenced was removed (or the list shrank), fall back to the
+    // first node. Otherwise keep pointing to the same node but re-sync the index
+    // to the rebuilt list. Doing this before stopping stale proxies means a
+    // stopProxy failure cannot leave the pointer naming a node absent from the
+    // rebuilt map.
+    if (!scmNodeIds.contains(currentProxySCMNodeId)) {
+      currentProxyIndex = 0;
+      currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
+    } else {
+      currentProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
+    }
+
+    // A pending failover target (set on a retriable-no-failover error) may name
+    // a node that this reload removed; clear it so performFailover does not
+    // point at a node absent from the rebuilt proxy map, which would NPE in
+    // createSCMProxy on the next failover.
+    if (updatedLeaderNodeID != null
+        && !scmProxyInfoMap.containsKey(updatedLeaderNodeID)) {
+      updatedLeaderNodeID = null;
+    }
+
     for (Map.Entry<String, SCMProxyInfo> entry : oldProxyInfoMap.entrySet()) {
       String nodeId = entry.getKey();
       SCMProxyInfo newInfo = scmProxyInfoMap.get(nodeId);
@@ -230,19 +252,14 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
           || !newInfo.getAddress().equals(entry.getValue().getAddress())) {
         ProxyInfo<T> staleProxy = scmProxies.remove(nodeId);
         if (staleProxy != null && staleProxy.proxy != null) {
-          RPC.stopProxy(staleProxy.proxy);
+          try {
+            RPC.stopProxy(staleProxy.proxy);
+          } catch (RuntimeException stopEx) {
+            getLogger().warn("Failed to stop stale proxy for SCM node {}",
+                nodeId, stopEx);
+          }
         }
       }
-    }
-
-    // Keep the current proxy pointer valid: if the node it referenced was
-    // removed (or the list shrank), fall back to the first node. Otherwise keep
-    // pointing to the same node but re-sync the index to the rebuilt list.
-    if (!scmNodeIds.contains(currentProxySCMNodeId)) {
-      currentProxyIndex = 0;
-      currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
-    } else {
-      currentProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
     }
 
     getLogger().info("Reloaded SCM proxy configuration for protocol {} with {} nodes: {}",

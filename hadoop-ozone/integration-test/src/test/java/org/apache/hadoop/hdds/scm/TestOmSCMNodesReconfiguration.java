@@ -19,10 +19,15 @@ package org.apache.hadoop.hdds.scm;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -31,6 +36,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ScmClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,18 +115,38 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Reconfiguring the SCM node list on a running OM drives the SCM proxy reload
-   * end to end. All SCM addresses are present, so the reload succeeds.
+   * Reconfiguring the SCM node list on a running OM must reload the SCM failover
+   * proxies to the new membership. Dropping one SCM from the list has to shrink
+   * the proxy node set for both the block and container providers; the reload
+   * reads the list from the (freshly written) configuration, so reconfiguring to
+   * a genuinely different value is what exercises the wiring.
    */
   @Test
-  void testReconfigureScmNodesReloadsProxies() {
+  void testReconfigureScmNodesReloadsProxies() throws Exception {
     OzoneManager om = cluster.getOzoneManager();
     ReconfigurationHandler handler = om.getReconfigurationHandler();
+    ScmClient scmClient = om.getScmClient();
     String scmNodesKey =
         ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
-    String currentNodes = om.getConfiguration().get(scmNodesKey);
 
-    assertDoesNotThrow(
-        () -> handler.reconfigureProperty(scmNodesKey, currentNodes));
+    List<String> before =
+        new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
+    assertEquals(3, before.size());
+
+    // Drop one SCM from the OM's view. Its address stays in the configuration,
+    // so the reload of the remaining nodes succeeds.
+    String dropped = before.get(before.size() - 1);
+    List<String> remaining = new ArrayList<>(before.subList(0, before.size() - 1));
+    Set<String> expected = new HashSet<>(remaining);
+
+    handler.reconfigureProperty(scmNodesKey, String.join(",", remaining));
+
+    Set<String> afterContainer =
+        new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
+    Set<String> afterBlock =
+        new HashSet<>(scmClient.getBlockProxyProvider().getSCMNodeIds());
+    assertEquals(expected, afterContainer);
+    assertEquals(expected, afterBlock);
+    assertFalse(afterContainer.contains(dropped));
   }
 }

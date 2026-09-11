@@ -5769,15 +5769,44 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  /**
+   * Reload the block and container SCM failover proxies after the SCM node list
+   * ({@code ozone.scm.nodes.<serviceId>}) is reconfigured, so the OM can reach a
+   * newly added SCM without a restart. The per-node address keys
+   * ({@code ozone.scm.address.<serviceId>.<nodeId>}) must already be present for
+   * the involved nodes.
+   *
+   * Scope: only the block and container proxies are reloaded here. Changing an
+   * address key alone does not trigger a reload; touch the node list to apply
+   * it. The secure-mode SCM security and secret-key proxy providers are not
+   * reloaded and continue to use the node list captured at startup.
+   */
   private String reconfScmNodes(String value) {
     if (StringUtils.isBlank(value)) {
       throw new IllegalArgumentException("Reconfiguration failed since setting an empty SCM nodes "
           + "configuration is not allowed");
     }
-    // The SCM address for the involved node IDs must already be present in the
-    // configuration; changeConfig() throws otherwise, leaving the previous state
-    // intact so the reconfiguration can be retried once both keys are updated.
-    scmClient.reloadScmNodes();
+    // ReconfigurableBase stores the new value into the configuration only after
+    // this callback returns, but reloadScmNodes() rebuilds the SCM proxies from
+    // that same live configuration. Publish the new node list first so the
+    // reload sees the intended membership, and roll it back if the reload fails
+    // (e.g. a newly added SCM's address is not set yet) so the property is not
+    // left naming a node set the proxies never adopted; that also lets the
+    // reconfiguration be retried once both keys are updated.
+    String scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY,
+        HddsUtils.getScmServiceId(configuration));
+    String previousValue = configuration.get(scmNodesKey);
+    configuration.set(scmNodesKey, value);
+    try {
+      scmClient.reloadScmNodes();
+    } catch (RuntimeException e) {
+      if (previousValue == null) {
+        configuration.unset(scmNodesKey);
+      } else {
+        configuration.set(scmNodesKey, previousValue);
+      }
+      throw e;
+    }
     LOG.info("Reloaded SCM proxy configuration for {} : {}", OZONE_SCM_NODES_KEY, value);
     return value;
   }
