@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
@@ -101,8 +102,11 @@ import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.response.key.OMKeyVersionDeleteResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -1566,6 +1570,118 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // and a batch that fails on a later key must not have counted this one.
     return new DeleteMarkerInsertion(deleteMarker, objectKey,
         movedVersionedKeyName, movedVersionedKeyInfo, 1L);
+  }
+
+  /**
+   * Permanently removes the addressed version: the only delete that destroys
+   * data on a versioned bucket. Removing the current version hands its keyTable
+   * place over to the next-newest version of the key, or removes the key
+   * outright when none survives. Shared so that a single delete and a batch
+   * delete remove a version the same way.
+   *
+   * @param currentVersion the key's current version, or null if it has none
+   * @param auditMap where to record the versions involved, or null
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  protected OMKeyVersionDeleteResponse deleteVersion(OzoneManager ozoneManager,
+      OMMetadataManager omMetadataManager,
+      OmBucketInfo omBucketInfo, OmKeyInfo currentVersion,
+      String volumeName, String bucketName, String keyName, long versionId,
+      boolean nullVersion, long trxnLogIndex,
+      OMResponse.Builder omResponse, Map<String, String> auditMap)
+      throws IOException {
+
+    boolean deletingCurrent = currentVersion != null && (nullVersion
+        ? currentVersion.isNullVersion()
+        : Long.valueOf(versionId).equals(currentVersion.getVersionId()));
+
+    String objectKey =
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+
+    // The dbKey the version is deleted from, in the keyTable when it is the
+    // current version and in the versionedKeyTable otherwise. Everything that
+    // can fail runs before the first cache entry is added, so that a failed
+    // request leaves no versionedKeyTable cache entry behind.
+    String deletedVersionKey;
+    OmKeyInfo version;
+    if (deletingCurrent) {
+      deletedVersionKey = objectKey;
+      version = currentVersion;
+    } else if (nullVersion) {
+      Pair<String, OmKeyInfo> nullSlot = getNoncurrentNullVersion(
+          omMetadataManager, volumeName, bucketName, keyName);
+      deletedVersionKey = nullSlot == null ? null : nullSlot.getKey();
+      version = nullSlot == null ? null : nullSlot.getValue();
+    } else {
+      deletedVersionKey = omMetadataManager.getVersionedOzoneKey(
+          volumeName, bucketName, keyName, versionId);
+      version =
+          omMetadataManager.getVersionedKeyTable().get(deletedVersionKey);
+    }
+    if (version == null) {
+      throw new OMException("Version not found for key " + keyName,
+          KEY_NOT_FOUND);
+    }
+
+    // Removing the current version leaves the key without one, so the newest
+    // noncurrent version is promoted to keep the invariant that keyTable holds
+    // the current version of every key that still has one. The record moves
+    // unchanged: promotion is positional, the version keeps its identity.
+    String promotedKey = null;
+    OmKeyInfo promoted = null;
+    if (deletingCurrent) {
+      Pair<String, OmKeyInfo> newest = getNewestNoncurrentVersion(
+          omMetadataManager, volumeName, bucketName, keyName);
+      if (newest != null) {
+        promotedKey = newest.getKey();
+        promoted = newest.getValue();
+      }
+    }
+
+    version = version.toBuilder().setUpdateID(trxnLogIndex).build();
+
+    if (deletingCurrent) {
+      if (promoted != null) {
+        omMetadataManager.getKeyTable(getBucketLayout())
+            .addCacheEntry(objectKey, promoted, trxnLogIndex);
+        omMetadataManager.getVersionedKeyTable().addCacheEntry(
+            new CacheKey<>(promotedKey), CacheValue.get(trxnLogIndex));
+      } else {
+        // no version survives, so the key disappears entirely
+        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+            new CacheKey<>(objectKey), CacheValue.get(trxnLogIndex));
+      }
+    } else {
+      omMetadataManager.getVersionedKeyTable().addCacheEntry(
+          new CacheKey<>(deletedVersionKey), CacheValue.get(trxnLogIndex));
+    }
+
+    if (auditMap != null) {
+      auditMap.put(OzoneConsts.DELETED_VERSION_ID,
+          String.valueOf(version.getVersionId()));
+      if (promoted != null) {
+        auditMap.put(OzoneConsts.PROMOTED_VERSION_ID,
+            String.valueOf(promoted.getVersionId()));
+      }
+    }
+
+    // A delete marker holds no blocks, so it releases namespace but no space.
+    long quotaReleased = sumBlockLengths(version);
+    boolean isVersionNonEmpty = !OmKeyInfo.isKeyEmpty(version);
+    omBucketInfo.decrUsedBytes(quotaReleased, isVersionNonEmpty);
+    omBucketInfo.decrUsedNamespace(1L, isVersionNonEmpty);
+
+    // Named by this transaction rather than the version's objectID: every
+    // version of a key carries the objectID of the record it overwrote, so two
+    // version deletes named by objectID would land on one deletedTable entry,
+    // and the later put would drop the earlier version's blocks for good.
+    String deletedTableKey = omMetadataManager.getOzoneDeletePathKey(
+        ozoneManager.getObjectIdFromTxId(trxnLogIndex), objectKey);
+
+    return new OMKeyVersionDeleteResponse(
+        omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
+        version, deletedVersionKey, deletingCurrent,
+        promotedKey, promoted, omBucketInfo.copyObject(), deletedTableKey);
   }
 
 }

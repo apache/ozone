@@ -1504,12 +1504,25 @@ message DeleteKeyArgs {
     // a versionId only has to increase within a single key; the applying OM
     // raises it per key against that key's current version.
     optional uint64 proposedVersionId = 5;
+    // Entries of an S3 DeleteObjects that name a version: each permanently
+    // deletes that version, as a DeleteKey with a versionId does.
+    repeated KeyVersion keyVersions = 6;
+}
+
+// One version of a key, named by versionId or as the key's null version.
+message KeyVersion {
+    required string key = 1;
+    optional uint64 versionId = 2;
+    optional bool nullVersion = 3;
 }
 
 message DeleteKeyError {
     optional string key = 1;
     optional string errorCode = 2;
     optional string errorMsg = 3;
+    // set when the entry that failed named a version
+    optional uint64 versionId = 4;
+    optional bool nullVersion = 5;
 }
 
 message DeleteKeysResponse {

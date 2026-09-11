@@ -24,11 +24,14 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABL
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -93,16 +96,41 @@ public class OMKeyVersionDeleteResponse extends AbstractOMKeyDeleteResponse {
             : omMetadataManager.getVersionedKeyTable(),
         deletedKeyName, deletedTableKey, deletedVersion,
         omBucketInfo.getObjectID(), true);
+    addPromotionToBatch(omMetadataManager, batchOperation);
 
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+            omBucketInfo.getBucketName()), omBucketInfo);
+  }
+
+  /**
+   * Adds this delete to the batch of a DeleteKeys request, which writes the
+   * bucket itself. Versions of one key deleted in one transaction share a
+   * deletedTable key, so their blocks are gathered in {@code deletedBlocks} for
+   * the caller to put once: a put per version would keep only the last one's.
+   */
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation, Map<String, RepeatedOmKeyInfo> deletedBlocks) throws IOException {
+    (deletedCurrent ? omMetadataManager.getKeyTable(getBucketLayout()) : omMetadataManager.getVersionedKeyTable())
+        .deleteWithBatch(batchOperation, deletedKeyName);
+    if (!OmKeyInfo.isKeyEmpty(deletedVersion)) {
+      RepeatedOmKeyInfo blocks = OmUtils.prepareKeyForDelete(omBucketInfo.getObjectID(),
+          deletedVersion.withCommittedKeyDeletedFlag(true), deletedVersion.getUpdateID());
+      RepeatedOmKeyInfo gathered = deletedBlocks.putIfAbsent(deletedTableKey, blocks);
+      if (gathered != null) {
+        blocks.getOmKeyInfoList().forEach(gathered::addOmKeyInfo);
+      }
+    }
+    addPromotionToBatch(omMetadataManager, batchOperation);
+  }
+
+  private void addPromotionToBatch(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
     if (promoted != null) {
       omMetadataManager.getKeyTable(getBucketLayout())
           .putWithBatch(batchOperation, deletedKeyName, promoted);
       omMetadataManager.getVersionedKeyTable()
           .deleteWithBatch(batchOperation, promotedKeyName);
     }
-
-    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
-            omBucketInfo.getBucketName()), omBucketInfo);
   }
 }

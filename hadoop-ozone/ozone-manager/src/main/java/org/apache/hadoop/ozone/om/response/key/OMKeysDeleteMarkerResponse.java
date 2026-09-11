@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABLE;
@@ -26,12 +27,15 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.DeleteMarkerInsertion;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -40,24 +44,29 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * Response for a batch DeleteKeys request on a bucket with S3-compatible
  * versioning enabled: no data is removed. Each key gets a delete marker as its
  * current version, and the version each marker supersedes moves to the
- * versionedKeyTable.
+ * versionedKeyTable. Entries naming a version are the exception: each
+ * permanently deletes that version, as {@link OMKeyVersionDeleteResponse} does
+ * for a single delete.
  *
  * <p>The single-key counterpart is {@link OMKeyDeleteMarkerResponse}; both
  * write out what {@code OMKeyRequest.insertDeleteMarker} produced.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE, VERSIONED_KEY_TABLE, BUCKET_TABLE,
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, VERSIONED_KEY_TABLE, DELETED_TABLE, BUCKET_TABLE,
     LIFECYCLE_SCAN_STATE_TABLE})
 public class OMKeysDeleteMarkerResponse extends OmKeyResponse {
 
   private List<DeleteMarkerInsertion> insertions;
+  private List<OMKeyVersionDeleteResponse> versionDeletes;
   private OmBucketInfo omBucketInfo;
   private OmLifecycleScanState scanState;
 
   public OMKeysDeleteMarkerResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<DeleteMarkerInsertion> insertions,
+      @Nonnull List<OMKeyVersionDeleteResponse> versionDeletes,
       @Nonnull OmBucketInfo omBucketInfo, OmLifecycleScanState scanState) {
     super(omResponse, BucketLayout.OBJECT_STORE);
     this.insertions = insertions;
+    this.versionDeletes = versionDeletes;
     this.omBucketInfo = omBucketInfo;
     this.scanState = scanState;
   }
@@ -94,6 +103,16 @@ public class OMKeysDeleteMarkerResponse extends OmKeyResponse {
       }
       omMetadataManager.getKeyTable(getBucketLayout()).putWithBatch(
           batchOperation, inserted.getObjectKey(), inserted.getDeleteMarker());
+    }
+
+    // After the markers and in request order, as the request applied them to
+    // the table cache.
+    Map<String, RepeatedOmKeyInfo> deletedBlocks = new HashMap<>();
+    for (OMKeyVersionDeleteResponse deleted : versionDeletes) {
+      deleted.addToDBBatch(omMetadataManager, batchOperation, deletedBlocks);
+    }
+    for (Map.Entry<String, RepeatedOmKeyInfo> entry : deletedBlocks.entrySet()) {
+      omMetadataManager.getDeletedTable().putWithBatch(batchOperation, entry.getKey(), entry.getValue());
     }
 
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,

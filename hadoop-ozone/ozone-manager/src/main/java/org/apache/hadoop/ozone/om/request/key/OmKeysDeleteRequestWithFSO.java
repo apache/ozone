@@ -165,11 +165,11 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
-      Map<String, ErrorInfo> keyToErrors,
+      Map<String, ErrorInfo> keyToErrors, List<OzoneManagerProtocolProtos.DeleteKeyError> versionErrors,
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String,
       OmKeyInfo> openKeyInfoMap, OmLifecycleScanState state) {
     OMClientResponse omClientResponse;
-    List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
+    List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>(versionErrors);
     for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
       deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyError.newBuilder()
           .setKey(key.getKey()).setErrorCode(key.getValue().getCode())

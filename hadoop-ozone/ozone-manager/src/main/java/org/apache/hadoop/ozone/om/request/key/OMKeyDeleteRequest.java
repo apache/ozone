@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -189,8 +188,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         }
         deletingVersion = true;
         omClientResponse = deleteVersion(ozoneManager, omMetadataManager,
-            omBucketInfo,
-            omKeyInfo, keyArgs, volumeName, bucketName, keyName, trxnLogIndex,
+            omBucketInfo, omKeyInfo, volumeName, bucketName, keyName,
+            keyArgs.getVersionId(), keyArgs.getNullVersion(), trxnLogIndex,
             omResponse, auditMap);
         // Noncurrent versions are invisible to plain reads, so removing one
         // does not change the visible key count. Deleting the current one
@@ -321,116 +320,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
-  }
-
-  /**
-   * Permanently removes the addressed version: the only delete that destroys
-   * data on a versioned bucket. Removing the current version hands its keyTable
-   * place over to the next-newest version of the key, or removes the key
-   * outright when none survives.
-   *
-   * @param currentVersion the key's current version, or null if it has none
-   */
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  private OMClientResponse deleteVersion(OzoneManager ozoneManager,
-      OMMetadataManager omMetadataManager,
-      OmBucketInfo omBucketInfo, OmKeyInfo currentVersion,
-      OzoneManagerProtocolProtos.KeyArgs keyArgs, String volumeName,
-      String bucketName, String keyName, long trxnLogIndex,
-      OMResponse.Builder omResponse, Map<String, String> auditMap)
-      throws IOException {
-
-    boolean nullVersion = keyArgs.getNullVersion();
-    boolean deletingCurrent = currentVersion != null && (nullVersion
-        ? currentVersion.isNullVersion()
-        : Long.valueOf(keyArgs.getVersionId()).equals(
-            currentVersion.getVersionId()));
-
-    String objectKey =
-        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
-
-    // The dbKey the version is deleted from, in the keyTable when it is the
-    // current version and in the versionedKeyTable otherwise. Everything that
-    // can fail runs before the first cache entry is added, so that a failed
-    // request leaves no versionedKeyTable cache entry behind.
-    String deletedVersionKey;
-    OmKeyInfo version;
-    if (deletingCurrent) {
-      deletedVersionKey = objectKey;
-      version = currentVersion;
-    } else if (nullVersion) {
-      Pair<String, OmKeyInfo> nullSlot = getNoncurrentNullVersion(
-          omMetadataManager, volumeName, bucketName, keyName);
-      deletedVersionKey = nullSlot == null ? null : nullSlot.getKey();
-      version = nullSlot == null ? null : nullSlot.getValue();
-    } else {
-      deletedVersionKey = omMetadataManager.getVersionedOzoneKey(
-          volumeName, bucketName, keyName, keyArgs.getVersionId());
-      version =
-          omMetadataManager.getVersionedKeyTable().get(deletedVersionKey);
-    }
-    if (version == null) {
-      throw new OMException("Version not found for key " + keyName,
-          KEY_NOT_FOUND);
-    }
-
-    // Removing the current version leaves the key without one, so the newest
-    // noncurrent version is promoted to keep the invariant that keyTable holds
-    // the current version of every key that still has one. The record moves
-    // unchanged: promotion is positional, the version keeps its identity.
-    String promotedKey = null;
-    OmKeyInfo promoted = null;
-    if (deletingCurrent) {
-      Pair<String, OmKeyInfo> newest = getNewestNoncurrentVersion(
-          omMetadataManager, volumeName, bucketName, keyName);
-      if (newest != null) {
-        promotedKey = newest.getKey();
-        promoted = newest.getValue();
-      }
-    }
-
-    version = version.toBuilder().setUpdateID(trxnLogIndex).build();
-
-    if (deletingCurrent) {
-      if (promoted != null) {
-        omMetadataManager.getKeyTable(getBucketLayout())
-            .addCacheEntry(objectKey, promoted, trxnLogIndex);
-        omMetadataManager.getVersionedKeyTable().addCacheEntry(
-            new CacheKey<>(promotedKey), CacheValue.get(trxnLogIndex));
-      } else {
-        // no version survives, so the key disappears entirely
-        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
-            new CacheKey<>(objectKey), CacheValue.get(trxnLogIndex));
-      }
-    } else {
-      omMetadataManager.getVersionedKeyTable().addCacheEntry(
-          new CacheKey<>(deletedVersionKey), CacheValue.get(trxnLogIndex));
-    }
-
-    auditMap.put(OzoneConsts.DELETED_VERSION_ID,
-        String.valueOf(version.getVersionId()));
-    if (promoted != null) {
-      auditMap.put(OzoneConsts.PROMOTED_VERSION_ID,
-          String.valueOf(promoted.getVersionId()));
-    }
-
-    // A delete marker holds no blocks, so it releases namespace but no space.
-    long quotaReleased = sumBlockLengths(version);
-    boolean isVersionNonEmpty = !OmKeyInfo.isKeyEmpty(version);
-    omBucketInfo.decrUsedBytes(quotaReleased, isVersionNonEmpty);
-    omBucketInfo.decrUsedNamespace(1L, isVersionNonEmpty);
-
-    // Named by this transaction rather than the version's objectID: every
-    // version of a key carries the objectID of the record it overwrote, so two
-    // version deletes named by objectID would land on one deletedTable entry,
-    // and the later put would drop the earlier version's blocks for good.
-    String deletedTableKey = omMetadataManager.getOzoneDeletePathKey(
-        ozoneManager.getObjectIdFromTxId(trxnLogIndex), objectKey);
-
-    return new OMKeyVersionDeleteResponse(
-        omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-        version, deletedVersionKey, deletingCurrent,
-        promotedKey, promoted, omBucketInfo.copyObject(), deletedTableKey);
   }
 
   /**

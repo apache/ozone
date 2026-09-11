@@ -65,12 +65,15 @@ import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeyVersionDeleteResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteMarkerResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
@@ -99,6 +102,14 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     DeleteKeysRequest deleteKeysRequest = super.preExecute(ozoneManager).getDeleteKeysRequest();
     Objects.requireNonNull(deleteKeysRequest, "deleteKeysRequest == null");
+    for (KeyVersion keyVersion : deleteKeysRequest.getDeleteKeys().getKeyVersionsList()) {
+      // S3 names the null version with the literal versionId "null", so an
+      // entry names its version one way, never both or neither.
+      if (keyVersion.hasVersionId() == keyVersion.getNullVersion()) {
+        throw new OMException("Entry for key " + keyVersion.getKey()
+            + " has to name one version, by versionId or as the null version", INVALID_REQUEST);
+      }
+    }
 
     if (deleteKeysRequest.getSourceType() == RequestSource.LIFECYCLE && deleteKeysRequest.hasScanState()) {
       if (ozoneManager.isAdminAuthorizationEnabled()) {
@@ -304,6 +315,60 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         visibleKeysRemoved = deleteKeys.size();
       }
 
+      // Entries naming a version permanently delete it, as a DeleteKey with a
+      // versionId does. They run after the markers, so a key named both ways
+      // is marked first. An entry that fails is reported on its own.
+      List<OMKeyVersionDeleteResponse> versionDeletes = new ArrayList<>();
+      List<DeleteKeyError> versionErrors = new ArrayList<>();
+      List<String> deletedVersions = new ArrayList<>();
+      for (KeyVersion keyVersion : deleteKeyArgs.getKeyVersionsList()) {
+        String keyName = keyVersion.getKey();
+        try {
+          checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY, volumeOwner);
+        } catch (Exception ex) {
+          LOG.error("Acl check failed for Key: {}", keyName, ex);
+          addVersionError(versionErrors, unDeletedKeys, keyVersion,
+              OMException.ResultCodes.ACCESS_DENIED, "ACL check failed");
+          continue;
+        }
+        if (!omBucketInfo.isS3VersioningEnabled()) {
+          // as a single delete reports it
+          addVersionError(versionErrors, unDeletedKeys, keyVersion,
+              OMException.ResultCodes.KEY_NOT_FOUND, "Bucket does not have S3 versioning enabled");
+          continue;
+        }
+        OmKeyInfo currentVersion = getOmKeyInfo(ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
+        try {
+          // The batch writes these out through its own response, so the
+          // OMResponse each one carries is never sent.
+          versionDeletes.add(deleteVersion(ozoneManager, omMetadataManager, omBucketInfo,
+              currentVersion, volumeName, bucketName, keyName, keyVersion.getVersionId(),
+              keyVersion.getNullVersion(), trxnLogIndex, OmResponseUtil.getOMResponseBuilder(getOmRequest()),
+              null));
+        } catch (OMException ex) {
+          if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
+            throw ex;
+          }
+          addVersionError(versionErrors, unDeletedKeys, keyVersion,
+              OMException.ResultCodes.KEY_NOT_FOUND, ex.getMessage());
+          continue;
+        }
+        deletedVersions.add(keyName + "=" + (keyVersion.getNullVersion() ? "null" : keyVersion.getVersionId()));
+        // As in a single delete: a visible key goes away only when its current
+        // version is deleted with nothing left to promote.
+        if (currentVersion != null && !currentVersion.isDeleteMarker()
+            && getOmKeyInfo(ozoneManager, omMetadataManager, volumeName, bucketName, keyName) == null) {
+          visibleKeysRemoved++;
+        }
+      }
+      if (!versionErrors.isEmpty()) {
+        deleteStatus = false;
+      }
+      if (!deletedVersions.isEmpty()) {
+        auditMap.put(OzoneConsts.DELETED_VERSION_ID, String.join(",", deletedVersions));
+      }
+
       OmLifecycleScanState state = null;
       if (sourceType == RequestSource.LIFECYCLE && deleteKeyRequest.hasScanState()) {
         state = OmLifecycleScanState.getFromProtobuf(deleteKeyRequest.getScanState());
@@ -316,14 +381,15 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       if (markerInsertions != null) {
         omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
-            .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
+            .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllErrors(versionErrors))
             .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus);
         omClientResponse = new OMKeysDeleteMarkerResponse(omResponse.build(),
-            markerInsertions, omBucketInfo.copyObject(), state);
+            markerInsertions, versionDeletes, omBucketInfo.copyObject(), state);
       } else {
         omClientResponse =
             getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
-                unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap, state);
+                unDeletedKeys, keyToError, versionErrors, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap,
+                state);
       }
 
       result = Result.SUCCESS;
@@ -343,6 +409,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         keyToError.put(deleteKeyArgs.getKeys(i), new ErrorInfo(OMException.ResultCodes.INTERNAL_ERROR.name(),
             ex.getMessage()));
       }
+      unDeletedKeys.clearKeyVersions().addAllKeyVersions(deleteKeyArgs.getKeyVersionsList());
 
       omResponse.setDeleteKeysResponse(
           DeleteKeysResponse.newBuilder().setStatus(false)
@@ -429,17 +496,31 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     return null;
   }
 
+  /** Records an entry naming a version that the batch could not delete. */
+  private static void addVersionError(List<DeleteKeyError> errors, DeleteKeyArgs.Builder unDeletedKeys,
+      KeyVersion keyVersion, OMException.ResultCodes code, String message) {
+    unDeletedKeys.addKeyVersions(keyVersion);
+    DeleteKeyError.Builder error = DeleteKeyError.newBuilder()
+        .setKey(keyVersion.getKey()).setErrorCode(code.name()).setErrorMsg(message);
+    if (keyVersion.hasVersionId()) {
+      error.setVersionId(keyVersion.getVersionId());
+    } else {
+      error.setNullVersion(true);
+    }
+    errors.add(error.build());
+  }
+
   @Nonnull
   @SuppressWarnings("parameternumber")
   protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
-      Map<String, ErrorInfo> keyToErrors,
+      Map<String, ErrorInfo> keyToErrors, List<DeleteKeyError> versionErrors,
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmKeyInfo> openKeyInfoMap,
       OmLifecycleScanState scanState) {
     OMClientResponse omClientResponse;
-    List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
+    List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>(versionErrors);
     for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
       deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyError.newBuilder().setKey(key.getKey())
           .setErrorCode(key.getValue().getCode()).setErrorMsg(key.getValue().getMessage()).build());
