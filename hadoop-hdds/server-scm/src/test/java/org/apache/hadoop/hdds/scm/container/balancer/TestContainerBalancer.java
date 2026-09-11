@@ -459,6 +459,33 @@ public class TestContainerBalancer {
     assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
   }
 
+  /**
+   * Container Balancer runs iterations continuously with only a short wait in
+   * between, so the default balancing interval is 3 minutes.
+   */
+  @Test
+  public void testDefaultBalancingIntervalIsThreeMinutes() {
+    ContainerBalancerConfiguration defaultConfig =
+        new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+    assertEquals(3, defaultConfig.getBalancingInterval().toMinutes());
+  }
+
+  /**
+   * The freshness bound for the balancing interval is the node report interval
+   * and not the hourly du refresh period. The
+   * default 3m interval is above a typical 1m node report interval.
+   */
+  @Test
+  public void testBalancingIntervalNodeReportFreshnessBoundary() {
+    long nodeReportIntervalMs = TimeUnit.MINUTES.toMillis(1);
+    // Below the node report interval -> too short.
+    assertTrue(ContainerBalancer.isBalancingIntervalBelowNodeReportInterval(
+        TimeUnit.SECONDS.toMillis(30), nodeReportIntervalMs));
+    // The default 3m interval is above the node report interval -> acceptable.
+    assertFalse(ContainerBalancer.isBalancingIntervalBelowNodeReportInterval(
+        TimeUnit.MINUTES.toMillis(3), nodeReportIntervalMs));
+  }
+
   private static List<DatanodeInfo> createEligibleDatanodes(int count) {
     List<DatanodeInfo> datanodes = new ArrayList<>(count);
     for (int i = 0; i < count; i++) {

@@ -193,7 +193,7 @@ public class TestContainerBalancerOperations {
 
     //If config value is not added in ozone-site.xml and CLI option is not passed
     //then it takes the default configuration
-    assertEquals(70, config.getBalancingInterval().toMinutes());
+    assertEquals(3, config.getBalancingInterval().toMinutes());
 
     //If config value is added in ozone-site.xml and CLI option is not passed
     //then it takes the value from ozone-site.xml
