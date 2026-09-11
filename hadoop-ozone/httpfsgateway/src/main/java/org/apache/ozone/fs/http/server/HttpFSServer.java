@@ -20,7 +20,7 @@ package org.apache.ozone.fs.http.server;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.security.AccessControlException;
+import org.apache.hadoop.security.AccessControlException;
 import java.security.PrivilegedExceptionAction;
 import java.text.MessageFormat;
 import java.util.EnumSet;
