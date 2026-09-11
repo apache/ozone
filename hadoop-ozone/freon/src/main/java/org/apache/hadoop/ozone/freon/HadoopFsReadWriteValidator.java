@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,9 +49,11 @@ import picocli.CommandLine.Option;
  * concurrent load, including in time-based (--duration) runs where paths are
  * reused.
  * <p>
- * --reads-per-write tunes the mix: a task still writes a single file, but reads
- * back as many as the ratio asks for, so a run can be made read-heavy or
- * write-heavy without changing what any one read validates.
+ * --read-percent tunes the mix: every operation of the run independently draws
+ * whether to write a file or to read one back, so a run can be made read-heavy
+ * or write-heavy without changing what any one read validates. -n therefore
+ * counts operations of both kinds rather than writes alone, and the split holds
+ * on average rather than exactly.
  * <p>
  * CRC32 keeps the validation off the critical path of the measured throughput.
  * Successive writes of a path differ in the marker only, and markers less than
@@ -69,21 +69,6 @@ import picocli.CommandLine.Option;
 @MetaInfServices(FreonSubcommand.class)
 public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     implements Callable<Void> {
-
-  /**
-   * One read, in the fixed-point units the read credit of a thread is counted
-   * in. The ratio is converted to whole units once, so the fraction it leaves
-   * over on every write is carried exactly. Accumulating the ratio itself as a
-   * double drifts: adding 0.1 ten times gives 0.9999999999999999, which delays
-   * the read the tenth write is due to an eleventh write.
-   */
-  private static final long CREDIT_UNIT = 1_000_000L;
-
-  /**
-   * Beyond this a run reads back more files per write than it could complete,
-   * and the bound is what keeps the credit of a thread well inside a long.
-   */
-  private static final BigDecimal MAX_READS_PER_WRITE = new BigDecimal("1000000");
 
   @Option(names = {"-s", "--size"},
       description = "Size of the generated files. " +
@@ -110,17 +95,14 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       defaultValue = "10000")
   private int maxFilesPerThread;
 
-  @Option(names = {"--reads-per-write"},
-      description = "Number of validation reads issued per write. 1 pairs one read with every write, 4 makes the "
-          + "run read-heavy with four validation reads per write, and 0.25 makes it write-heavy with one read "
-          + "every fourth write. Every read picks a file the thread wrote at random, so this changes how many "
-          + "files a task validates, not which write it validates. A value that is not a whole number is spread "
-          + "over the writes of a thread rather than rounded on every one of them.",
-      defaultValue = "1.0")
-  private BigDecimal readsPerWrite;
-
-  /** {@link #readsPerWrite} in the units of {@link ThreadHistory#readCredit}. */
-  private long creditPerWrite;
+  @Option(names = {"--read-percent"},
+      description = "Percentage of the operations that read a file back and validate it instead of writing one. "
+          + "0 only writes, 50 pairs a read with every write on average, and 90 makes the run read-heavy. Every "
+          + "operation draws on its own, so the split holds over a run rather than on any particular pair of "
+          + "operations. A read validates a file the thread wrote, picked at random; a thread that has written "
+          + "nothing yet has nothing to read and writes instead.",
+      defaultValue = "50")
+  private double readPercent;
 
   private ContentGenerator contentGenerator;
 
@@ -146,16 +128,11 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       throw new IllegalArgumentException(
           "--max-files-per-thread must be positive");
     }
-    if (readsPerWrite.signum() <= 0
-        || readsPerWrite.compareTo(MAX_READS_PER_WRITE) > 0) {
-      throw new IllegalArgumentException("--reads-per-write must be positive "
-          + "and at most " + MAX_READS_PER_WRITE.toPlainString());
+    // negated so that NaN, which fails every comparison, is rejected too
+    if (!(readPercent >= 0 && readPercent <= 100)) {
+      throw new IllegalArgumentException(
+          "--read-percent must be between 0 and 100");
     }
-    // Rounded away from zero, so a ratio finer than a credit unit still reads
-    // back now and then instead of silently never reading at all.
-    creditPerWrite = readsPerWrite.multiply(BigDecimal.valueOf(CREDIT_UNIT))
-        .setScale(0, RoundingMode.UP)
-        .longValueExact();
 
     super.init();
 
@@ -172,7 +149,7 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       writeTimer = getMetrics().timer("file-write");
       readTimer = getMetrics().timer("file-read-validate");
 
-      runTests(this::writeAndValidate);
+      runTests(this::readOrWrite);
     } finally {
       org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(fileSystem);
     }
@@ -180,11 +157,30 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     return null;
   }
 
-  private void writeAndValidate(long counter) throws Exception {
+  /**
+   * One operation of the run, a read or a write. The counter of the task is not
+   * what the written file is named after: with the two kinds of operation drawn
+   * at random it no longer counts the writes of the thread, which is what has
+   * to stay within --max-files-per-thread.
+   */
+  private void readOrWrite(long counter) throws Exception {
     ThreadHistory history = threadHistory.get();
-    long fileId = counter % maxFilesPerThread;
-    Path file = objectPath(fileId);
+    if (history.isEmpty() || !readsNext()) {
+      writeAndRecord(history);
+    } else {
+      validateRandomFile(history);
+    }
+  }
+
+  /** Draws whether this operation reads, see --read-percent. */
+  private boolean readsNext() {
+    return ThreadLocalRandom.current().nextDouble(100) < readPercent;
+  }
+
+  private void writeAndRecord(ThreadHistory history) throws Exception {
     long marker = history.nextMarker();
+    long fileId = fileIdOf(marker);
+    Path file = objectPath(fileId);
 
     long checksum;
     try {
@@ -197,10 +193,15 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       throw e;
     }
     history.record(fileId, checksum);
+  }
 
-    for (int reads = history.readsDue(creditPerWrite); reads > 0; reads--) {
-      validateRandomFile(history);
-    }
+  /**
+   * File a write goes to. The low half of its marker is the write sequence of
+   * the thread, so ids cycle within --max-files-per-thread and a thread keeps
+   * at most that many checksums however its reads and writes fall.
+   */
+  private long fileIdOf(long marker) {
+    return (marker & 0xFFFFFFFFL) % maxFilesPerThread;
   }
 
   /**
@@ -269,16 +270,13 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
    * is keyed by file id (an overwrite updates the checksum), so it holds one
    * entry per file the thread wrote and never more than
    * --max-files-per-thread. The id is kept rather than the {@link Path} it maps
-   * to, which {@link #objectPath} rebuilds on demand. It also carries the
-   * thread's share of the read/write ratio, see {@link #readsDue(long)}.
+   * to, which {@link #objectPath} rebuilds on demand.
    */
   private static final class ThreadHistory {
     private final long markerBase;
     private int markerSeq;
     private final Map<Long, Long> checksums = new HashMap<>();
     private final List<Long> fileIds = new ArrayList<>();
-    /** Owed reads, in {@link #CREDIT_UNIT}s, left over by earlier writes. */
-    private long readCredit;
 
     private ThreadHistory(long threadSequenceId) {
       this.markerBase = threadSequenceId << Integer.SIZE;
@@ -309,27 +307,17 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       }
     }
 
+    /** Whether the thread has written anything it could read back yet. */
+    private boolean isEmpty() {
+      return fileIds.isEmpty();
+    }
+
     private long randomFileId() {
       return fileIds.get(ThreadLocalRandom.current().nextInt(fileIds.size()));
     }
 
     private long checksumOf(long fileId) {
       return checksums.get(fileId);
-    }
-
-    /**
-     * How many files to read back after the write that just completed. The
-     * fraction a ratio like 2.5 leaves over is carried to the next write
-     * instead of being rounded away, so the thread issues the requested number
-     * of reads per write on average, and a ratio below 1 reads back every
-     * n-th write rather than never reading at all. The carry is exact: it is
-     * counted in whole {@link #CREDIT_UNIT}s, not accumulated as a double.
-     */
-    private int readsDue(long creditPerWrite) {
-      readCredit += creditPerWrite;
-      int reads = (int) (readCredit / CREDIT_UNIT);
-      readCredit %= CREDIT_UNIT;
-      return reads;
     }
   }
 }

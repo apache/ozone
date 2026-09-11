@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.freon;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
@@ -35,14 +36,23 @@ import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
 /**
- * Verifies that {@code --reads-per-write} of {@link HadoopFsReadWriteValidator}
- * (dfsrw) controls how many reads the run issues per write. The workload only
- * needs a Hadoop {@code FileSystem}, so these run against the local one instead
- * of a cluster.
+ * Verifies that {@code --read-percent} of {@link HadoopFsReadWriteValidator}
+ * (dfsrw) controls how the operations of a run split between reads and writes.
+ * The workload only needs a Hadoop {@code FileSystem}, so these run against the
+ * local one instead of a cluster.
  */
-public class TestHadoopFsReadWriteRatio {
+public class TestHadoopFsReadPercent {
 
-  private static final int WRITES = 8;
+  /**
+   * Operations per run of the tests that assert a split. Each one draws on its
+   * own, so a split is only exact at 0 and 100 percent; a run of this many
+   * leaves the share of reads far closer to the percentage than the tolerance
+   * of {@link #assertSplit} allows for.
+   */
+  private static final int OPS = 1000;
+
+  /** Operations of the runs that assert an exact count. */
+  private static final int FEW_OPS = 8;
 
   @TempDir
   private java.nio.file.Path tempDir;
@@ -58,77 +68,56 @@ public class TestHadoopFsReadWriteRatio {
     CorruptingLocalFileSystem.corruptFromRead(Integer.MAX_VALUE);
   }
 
-  /**
-   * One read per write is the default, and it stays that way when the ratio is
-   * given explicitly.
-   */
+  /** Half of the operations read, unless the run asks for another split. */
   @Test
-  void pairsOneReadWithEveryWriteByDefault() {
-    CommandLine cmd = runValidator(2);
+  void splitsOperationsEvenlyByDefault() {
+    CommandLine cmd = runValidator(1, OPS);
 
-    assertEquals(WRITES, writeCount(cmd));
-    assertEquals(WRITES, readCount(cmd));
+    assertSplit(cmd, 50);
   }
 
   /**
-   * A whole number of reads per write holds however the writes are spread over
-   * the threads, so this can afford more than one of them.
+   * The requested share of the operations reads, whether that leaves the run
+   * write-heavy or read-heavy.
    */
   @ParameterizedTest
-  @ValueSource(ints = {2, 3, 5})
-  void issuesRequestedReadsPerWrite(int ratio) {
+  @ValueSource(ints = {10, 75, 90})
+  void splitsOperationsByPercent(int percent) {
     CommandLine cmd =
-        runValidator(2, "--reads-per-write", String.valueOf(ratio));
+        runValidator(1, OPS, "--read-percent", String.valueOf(percent));
 
-    assertEquals(WRITES, writeCount(cmd));
-    assertEquals((long) WRITES * ratio, readCount(cmd));
+    assertSplit(cmd, percent);
+  }
+
+  /** Nothing is read back at 0, which leaves a pure write load. */
+  @Test
+  void writesEveryOperationAtZeroPercent() {
+    CommandLine cmd = runValidator(1, FEW_OPS, "--read-percent", "0");
+
+    assertEquals(FEW_OPS, writeCount(cmd));
+    assertEquals(0, readCount(cmd));
   }
 
   /**
-   * A ratio below 1 reads back only every n-th write, and the fraction it
-   * leaves over is carried between writes rather than rounded away on each of
-   * them, which would read back nothing at all. The leftover is per thread, so
-   * only a single thread gives an exact count.
+   * Even at 100 a thread writes once: a read validates a file the thread wrote,
+   * and its first operation has nothing to read back yet.
    */
   @Test
-  void spreadsFractionalRatioOverWrites() {
-    CommandLine cmd = runValidator(1, "--reads-per-write", "0.25");
+  void readsEveryOperationButTheFirstAtFullPercent() {
+    CommandLine cmd = runValidator(1, FEW_OPS, "--read-percent", "100");
 
-    assertEquals(WRITES, writeCount(cmd));
-    assertEquals(WRITES / 4, readCount(cmd));
-  }
-
-  /** A ratio with a whole and a fractional part mixes the two behaviours. */
-  @Test
-  void spreadsMixedRatioOverWrites() {
-    CommandLine cmd = runValidator(1, "--reads-per-write", "1.5");
-
-    assertEquals(WRITES, writeCount(cmd));
-    assertEquals(WRITES * 3 / 2, readCount(cmd));
+    assertEquals(1, writeCount(cmd));
+    assertEquals(FEW_OPS - 1, readCount(cmd));
   }
 
   /**
-   * The leftover of a fractional ratio is carried exactly, so the tenth write
-   * of a run at 0.1 is read back. A ratio accumulated as a double drifts —
-   * adding 0.1 ten times gives 0.9999999999999999 — which would put that read
-   * off to an eleventh write a ten-write run never makes.
-   */
-  @Test
-  void carriesFractionalRatioWithoutDrift() {
-    CommandLine cmd = runValidator(1, 10, "--reads-per-write", "0.1");
-
-    assertEquals(10, writeCount(cmd));
-    assertEquals(1, readCount(cmd));
-  }
-
-  /**
-   * Every read of a task validates, not only the first or the last one: a
-   * single write read back three times fails the run wherever among the three
-   * the content is corrupted.
+   * Every read validates, not only the first or the last one: a run whose
+   * single write is read back three times fails wherever among the three the
+   * content is corrupted.
    */
   @ParameterizedTest
   @ValueSource(ints = {1, 2, 3})
-  void everyReadOfATaskValidatesContent(int corruptedRead) {
+  void everyReadValidatesContent(int corruptedRead) {
     CorruptingLocalFileSystem.corruptFromRead(corruptedRead);
 
     int exitCode = new Freon().getCmd().execute(
@@ -136,43 +125,56 @@ public class TestHadoopFsReadWriteRatio {
         "dfsrw",
         "-r", rootPath,
         "-p", "dfsrw-corrupt",
-        "-n", "1",
+        // the first operation writes, so the other three all read that file
+        "-n", "4",
         "-t", "1",
         "-s", "1KB",
         "--buffer", "1024",
         "--copy-buffer", "1024",
-        "--reads-per-write", "3");
+        "--read-percent", "100");
 
     assertNotEquals(0, exitCode,
         "Corrupted content of read " + corruptedRead + " was not detected");
   }
 
   @Test
-  void rejectsNonPositiveRatio() {
-    assertThat(execute(new Freon().getCmd(), 1, WRITES, "--reads-per-write", "0"))
+  void rejectsPercentOutsideRange() {
+    assertThat(execute(new Freon().getCmd(), 1, FEW_OPS, "--read-percent", "-1"))
         .isNotZero();
-    assertThat(execute(new Freon().getCmd(), 1, WRITES, "--reads-per-write", "-1"))
+    assertThat(execute(new Freon().getCmd(), 1, FEW_OPS, "--read-percent", "101"))
         .isNotZero();
   }
 
-  private CommandLine runValidator(int threads, String... args) {
-    return runValidator(threads, WRITES, args);
+  /**
+   * Every operation was a read or a write, and the reads are close enough to
+   * the requested share of them. The tolerance is six standard deviations of
+   * the draw: wide enough that a passing run is not chance, narrow enough to
+   * catch a split that ignores the percentage.
+   */
+  private static void assertSplit(CommandLine cmd, int percent) {
+    long reads = readCount(cmd);
+    assertEquals(OPS, reads + writeCount(cmd),
+        "every operation is either a read or a write");
+
+    double fraction = percent / 100.0;
+    long tolerance =
+        (long) Math.ceil(6 * Math.sqrt(OPS * fraction * (1 - fraction)));
+    assertThat(reads).isCloseTo(Math.round(OPS * fraction), within(tolerance));
   }
 
-  private CommandLine runValidator(int threads, int writes, String... args) {
+  private CommandLine runValidator(int threads, int ops, String... args) {
     CommandLine cmd = new Freon().getCmd();
-    assertEquals(0, execute(cmd, threads, writes, args),
+    assertEquals(0, execute(cmd, threads, ops, args),
         "Freon dfsrw command failed");
     return cmd;
   }
 
-  private int execute(CommandLine cmd, int threads, int writes,
-      String... args) {
+  private int execute(CommandLine cmd, int threads, int ops, String... args) {
     String[] fixed = {
         "dfsrw",
         "-r", rootPath,
         "-p", "dfsrw",
-        "-n", String.valueOf(writes),
+        "-n", String.valueOf(ops),
         "-t", String.valueOf(threads),
         "-s", "1KB",
         "--buffer", "1024",
