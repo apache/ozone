@@ -35,7 +35,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -493,18 +492,18 @@ public class TestHSync {
         try (FSDataOutputStream os1 = fs.create(key2, true)) {
           os1.write(1);
           // There should be 2 key in openFileTable
-          assertThat(2 == getOpenKeyInfo(BUCKET_LAYOUT).size());
+          assertEquals(2, filterByKeyName(getOpenKeyInfo(BUCKET_LAYOUT), key1.getName(), key2.getName()).size());
           // One key will be in fileTable as hsynced
-          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
+          assertEquals(1, filterByKeyName(getKeyInfo(BUCKET_LAYOUT), key1.getName(), key2.getName()).size());
 
           // Resume openKeyCleanupService
           openKeyCleanupService.resume();
           // Verify hsync openKey gets committed eventually
           // Key without hsync is deleted
           GenericTestUtils.waitFor(() ->
-              getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
+              filterByKeyName(getOpenKeyInfo(BUCKET_LAYOUT), key1.getName(), key2.getName()).isEmpty(), 1000, 12000);
           // Verify only one key is still present in fileTable
-          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
+          assertEquals(1, filterByKeyName(getKeyInfo(BUCKET_LAYOUT), key1.getName(), key2.getName()).size());
 
           // Clean up
           assertTrue(fs.delete(key1, false));
@@ -579,14 +578,14 @@ public class TestHSync {
         os.write(1);
         os.hsync();
         // There should be 1 key in openFileTable
-        assertThat(1 == getOpenKeyInfo(BUCKET_LAYOUT).size());
+        assertEquals(1, filterByKeyName(getOpenKeyInfo(BUCKET_LAYOUT), key1.getName()).size());
         // Delete directory recursively
         fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
             bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);
 
         // Verify if DELETED_HSYNC_KEY metadata is added to openKey
         GenericTestUtils.waitFor(() -> {
-          List<OmKeyInfo> omKeyInfo = getOpenKeyInfo(BUCKET_LAYOUT);
+          List<OmKeyInfo> omKeyInfo = filterByKeyName(getOpenKeyInfo(BUCKET_LAYOUT), key1.getName());
           return !omKeyInfo.isEmpty() && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
         }, 1000, 12000);
 
@@ -595,7 +594,7 @@ public class TestHSync {
 
         // Verify entry from openKey gets deleted eventually
         GenericTestUtils.waitFor(() ->
-            getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
+            filterByKeyName(getOpenKeyInfo(BUCKET_LAYOUT), key1.getName()).isEmpty(), 1000, 12000);
       } catch (OMException ex) {
         assertEquals(OMException.ResultCodes.DIRECTORY_NOT_FOUND, ex.getResult());
       } finally {
@@ -622,16 +621,33 @@ public class TestHSync {
   private List<OmKeyInfo> getKeyInfo(BucketLayout bucketLayout) {
     List<OmKeyInfo> omKeyInfo = new ArrayList<>();
 
-    Table<String, OmKeyInfo> openFileTable =
+    Table<String, OmKeyInfo> fileTable =
         cluster.getOzoneManager().getMetadataManager().getKeyTable(bucketLayout);
     try (Table.KeyValueIterator<String, OmKeyInfo>
-             iterator = openFileTable.iterator()) {
+             iterator = fileTable.iterator()) {
       while (iterator.hasNext()) {
         omKeyInfo.add(iterator.next().getValue());
       }
     } catch (Exception e) {
     }
     return omKeyInfo;
+  }
+
+  /**
+   * Tests in this class share one bucket, so other tests' keys can still be in the tables.
+   * Narrow a table listing down to the keys the calling test created.
+   */
+  private List<OmKeyInfo> filterByKeyName(List<OmKeyInfo> omKeyInfos, String... keyNames) {
+    List<OmKeyInfo> filtered = new ArrayList<>();
+    for (OmKeyInfo omKeyInfo : omKeyInfos) {
+      for (String keyName : keyNames) {
+        if (keyName.equals(omKeyInfo.getFileName())) {
+          filtered.add(omKeyInfo);
+          break;
+        }
+      }
+    }
+    return filtered;
   }
 
   @Test
