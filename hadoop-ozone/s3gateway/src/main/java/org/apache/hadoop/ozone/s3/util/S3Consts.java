@@ -131,6 +131,11 @@ public final class S3Consts {
   /** Request header carrying the list of object attributes to return. */
   public static final String OBJECT_ATTRIBUTES_HEADER = "x-amz-object-attributes";
 
+  // S3 storage class values passed via the `x-amz-storage-class` request header.
+  public static final String S3_STORAGE_CLASS_STANDARD = "STANDARD";
+  public static final String S3_STORAGE_CLASS_STANDARD_IA = "STANDARD_IA";
+  public static final String S3_STORAGE_CLASS_GLACIER = "GLACIER";
+
   //Never Constructed
   private S3Consts() {
 
