@@ -117,7 +117,7 @@
     <jnr-constants.version>0.11.0</jnr-constants.version>
     <jnr-posix.version>3.2.2</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
-    <jooq.version>3.11.10</jooq.version>
+    <jooq.version>3.19.37</jooq.version>
     <jsch.version>0.1.55</jsch.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
@@ -208,7 +208,7 @@
     <sonar.projectKey>hadoop-ozone</sonar.projectKey>
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
-    <spring.version>5.3.39</spring.version>
+    <spring.version>6.2.19</spring.version>
     <sqlite.version>3.53.2.1</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
@@ -1610,12 +1610,6 @@
         <groupId>org.jooq</groupId>
         <artifactId>jooq</artifactId>
         <version>${jooq.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.jooq</groupId>
