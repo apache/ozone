@@ -46,7 +46,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.TimeDurationUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -444,14 +444,14 @@ public class BaseFreonGenerator implements FreonSubcommand {
     return new OzoneManagerProtocolClientSideTranslatorPB(transport, clientId);
   }
 
-  public StorageContainerLocationProtocol createStorageContainerLocationClient(
+  public StorageContainerLocationInternalInterface createStorageContainerLocationClient(
       OzoneConfiguration ozoneConf) throws IOException {
     return HAUtils.getScmContainerClient(ozoneConf);
   }
 
   @SuppressWarnings("java:S3864") // Stream.peek (for debug)
   public static Pipeline findPipelineForTest(String pipelineId,
-      StorageContainerLocationProtocol client, Logger log) throws IOException {
+      StorageContainerLocationInternalInterface client, Logger log) throws IOException {
     Stream<Pipeline> pipelines = client.listPipelines().stream();
     Pipeline pipeline;
     if (log.isDebugEnabled()) {

@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -79,7 +79,7 @@ public class TestBlockDeletionService {
   private static final String BUCKET_NAME = "bucket1";
   private static final int KEY_SIZE = 5 * 1024; // 5 KB
   private static MiniOzoneCluster cluster;
-  private static StorageContainerLocationProtocol scmClient;
+  private static StorageContainerLocationInternalInterface scmClient;
   private static OzoneBucket bucket;
   private static SCMPerformanceMetrics metrics;
 

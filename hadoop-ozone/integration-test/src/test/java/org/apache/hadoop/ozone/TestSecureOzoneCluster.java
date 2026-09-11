@@ -102,7 +102,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -403,7 +403,7 @@ final class TestSecureOzoneCluster {
   private void assertScmAdminProtocolDeniesNonAdminUser() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
         testUserPrincipal, testUserKeytab.getCanonicalPath());
-    StorageContainerLocationProtocol scmRpcClient =
+    StorageContainerLocationInternalInterface scmRpcClient =
         HAUtils.getScmContainerClient(conf, ugi);
     IOException adminException = assertThrows(IOException.class,
         scmRpcClient::forceExitSafeMode);
@@ -414,7 +414,7 @@ final class TestSecureOzoneCluster {
   private void assertScmAdminProtocolRejectsNonKerberosUser() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser("test");
     ugi.setAuthenticationMethod(AuthMethod.TOKEN);
-    StorageContainerLocationProtocol scmRpcClient =
+    StorageContainerLocationInternalInterface scmRpcClient =
         HAUtils.getScmContainerClient(conf, ugi);
     IOException adminException = assertThrows(IOException.class,
         scmRpcClient::forceExitSafeMode);

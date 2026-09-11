@@ -102,7 +102,7 @@ import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
@@ -158,7 +158,7 @@ public class TestKeyManagerImpl {
   private static KeyManagerImpl keyManager;
   private static StorageContainerManager scm;
   private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
-  private static StorageContainerLocationProtocol mockScmContainerClient;
+  private static StorageContainerLocationInternalInterface mockScmContainerClient;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
   private static long scmBlockSize;
@@ -208,7 +208,7 @@ public class TestKeyManagerImpl {
     conf.setLong(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, 10);
 
     mockScmContainerClient =
-        mock(StorageContainerLocationProtocol.class);
+        mock(StorageContainerLocationInternalInterface.class);
     
     OmTestManagers omTestManagers
         = new OmTestManagers(conf, scm.getBlockProtocolServer(),
@@ -1355,8 +1355,8 @@ public class TestKeyManagerImpl {
 
     OzoneManager ozoneManager = om;
 
-    StorageContainerLocationProtocol sclProtocolMock = mock(
-        StorageContainerLocationProtocol.class);
+    StorageContainerLocationInternalInterface sclProtocolMock = mock(
+        StorageContainerLocationInternalInterface.class);
     OMPerformanceMetrics metrics = mock(OMPerformanceMetrics.class);
 
     List<Long> containerIDs = new ArrayList<>();
@@ -1427,8 +1427,8 @@ public class TestKeyManagerImpl {
     OzoneManager ozoneManager = om;
 
     String errorMessage = "Cannot find container!!";
-    StorageContainerLocationProtocol sclProtocolMock = mock(
-        StorageContainerLocationProtocol.class);
+    StorageContainerLocationInternalInterface sclProtocolMock = mock(
+        StorageContainerLocationInternalInterface.class);
     doThrow(new IOException(errorMessage)).when(sclProtocolMock)
         .getContainerWithPipelineBatch(any());
 

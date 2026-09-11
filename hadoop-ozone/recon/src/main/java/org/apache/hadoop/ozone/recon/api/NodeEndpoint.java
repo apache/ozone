@@ -61,7 +61,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
@@ -88,12 +88,12 @@ public class NodeEndpoint {
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager reconContainerManager;
-  private StorageContainerLocationProtocol scmClient;
+  private StorageContainerLocationInternalInterface scmClient;
   private String errorMessage = "Error getting pipeline and container metrics for ";
 
   @Inject
   NodeEndpoint(OzoneStorageContainerManager reconSCM,
-               StorageContainerLocationProtocol scmClient) {
+               StorageContainerLocationInternalInterface scmClient) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
     this.reconContainerManager =

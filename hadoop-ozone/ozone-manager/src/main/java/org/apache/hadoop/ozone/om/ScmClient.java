@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.ozone.util.CacheMetrics;
 
 /**
@@ -54,13 +54,13 @@ import org.apache.hadoop.ozone.util.CacheMetrics;
 public class ScmClient {
 
   private final ScmBlockLocationProtocol blockClient;
-  private final StorageContainerLocationProtocol containerClient;
+  private final StorageContainerLocationInternalInterface containerClient;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
   private final CacheMetrics datanodeDetailsCacheMetrics;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
-            StorageContainerLocationProtocol containerClient,
+            StorageContainerLocationInternalInterface containerClient,
             OzoneConfiguration configuration) {
     this.containerClient = containerClient;
     this.blockClient = blockClient;
@@ -77,7 +77,7 @@ public class ScmClient {
 
   static LoadingCache<Long, Pipeline> createContainerLocationCache(
       OzoneConfiguration configuration,
-      StorageContainerLocationProtocol containerClient,
+      StorageContainerLocationInternalInterface containerClient,
       Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache) {
     int maxSize = configuration.getInt(OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE,
         OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT);
@@ -148,7 +148,7 @@ public class ScmClient {
     return this.blockClient;
   }
 
-  public StorageContainerLocationProtocol getContainerClient() {
+  public StorageContainerLocationInternalInterface getContainerClient() {
     return this.containerClient;
   }
 

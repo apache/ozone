@@ -137,7 +137,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io_.retry.RetryProxy;
@@ -154,12 +154,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This class is the client-side translator to translate the requests made on
- * the {@link StorageContainerLocationProtocol} interface to the RPC server
+ * the {@link StorageContainerLocationInternalInterface} interface to the RPC server
  * implementing {@link StorageContainerLocationProtocolPB}.
  */
 @InterfaceAudience.Private
 public final class StorageContainerLocationProtocolClientSideTranslatorPB
-    implements StorageContainerLocationProtocol, ProtocolTranslator, Closeable {
+    implements StorageContainerLocationInternalInterface, ProtocolTranslator, Closeable {
 
   /**
    * RpcController is not used and hence is set to null.

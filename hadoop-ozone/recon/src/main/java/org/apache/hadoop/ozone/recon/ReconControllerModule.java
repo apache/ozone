@@ -34,7 +34,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -218,9 +218,9 @@ public class ReconControllerModule extends AbstractModule {
   }
 
   @Provides
-  StorageContainerLocationProtocol getSCMProtocol(
+  StorageContainerLocationInternalInterface getSCMProtocol(
       final OzoneConfiguration configuration) {
-    StorageContainerLocationProtocol storageContainerLocationProtocol = null;
+    StorageContainerLocationInternalInterface storageContainerLocationProtocol = null;
     storageContainerLocationProtocol = newContainerRpcClient(configuration);
     return storageContainerLocationProtocol;
   }
