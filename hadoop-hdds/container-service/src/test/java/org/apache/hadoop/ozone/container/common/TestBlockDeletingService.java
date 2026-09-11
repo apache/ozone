@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
@@ -113,6 +114,7 @@ import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -878,6 +880,39 @@ public class TestBlockDeletingService {
     // Shutdown service and verify all threads are stopped
     blockDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> blockDeletingService.getThreadCount() == 0, 100, 1000);
+  }
+
+  @Test
+  public void testUpdateAndRestartUsesDatanodeInterval() throws Exception {
+    Duration startupInterval = Duration.ofMinutes(5);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionInterval(startupInterval);
+    conf.setFromObject(dnConf);
+
+    OzoneContainer ozoneContainer = mockDependencies(newContainerSet(), null);
+    BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
+        startupInterval.toMillis(), 1000, TimeUnit.MILLISECONDS, 10, conf,
+        new ContainerChecksumTreeManager(conf));
+    try {
+      // Reconfiguring only the workers must keep the interval configured for
+      // the datanode, not fall back to the OM's block deleting interval.
+      OzoneConfiguration updatedConf = new OzoneConfiguration(conf);
+      updatedConf.setInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS, 20);
+      svc.updateAndRestart(updatedConf);
+      assertEquals(startupInterval.toMillis(), svc.getIntervalMillis());
+      assertEquals(20, svc.getExecutorService().getCorePoolSize());
+
+      // Changing the datanode interval is what updates the running service.
+      Duration newInterval = Duration.ofSeconds(30);
+      DatanodeConfiguration updatedDnConf =
+          updatedConf.getObject(DatanodeConfiguration.class);
+      updatedDnConf.setBlockDeletionInterval(newInterval);
+      updatedConf.setFromObject(updatedDnConf);
+      svc.updateAndRestart(updatedConf);
+      assertEquals(newInterval.toMillis(), svc.getIntervalMillis());
+    } finally {
+      svc.shutdown();
+    }
   }
 
   @ContainerTestVersionInfo.ContainerTest
