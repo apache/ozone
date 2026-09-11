@@ -66,7 +66,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -3464,7 +3463,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         String linkBucketName = "link-bucket";
         nonS3Volume.createBucket(OzoneConsts.BUCKET);
         BucketArgs.Builder bb = new BucketArgs.Builder()
-            .setStorageType(StorageType.DEFAULT)
             .setVersioning(false)
             .setSourceVolume(NON_S3_VOLUME_NAME)
             .setSourceBucket(OzoneConsts.BUCKET);
@@ -3494,7 +3492,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         String linkBucket = "link-bucket-dangling";
         nonS3Volume.createBucket(sourceBucket);
         BucketArgs.Builder bb = new BucketArgs.Builder()
-            .setStorageType(StorageType.DEFAULT)
             .setVersioning(false)
             .setSourceVolume(NON_S3_VOLUME_NAME)
             .setSourceBucket(sourceBucket);

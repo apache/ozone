@@ -34,7 +34,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StoragePolicyProto;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -260,7 +260,7 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
             .setVolumeName(volumeName)
             .setIsVersionEnabled(false)
             .setQuotaInBytes(99999L)
-            .setStorageType(StorageTypeProto.SSD)
+            .setStoragePolicy(StoragePolicyProto.HOT)
             .addAllMetadata(OMRequestTestUtils.getMetadataList()).build();
     OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
         OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
@@ -390,7 +390,7 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
         OzoneManagerProtocolProtos.BucketInfo.newBuilder()
             .setBucketName(bucketName)
             .setVolumeName(volumeName)
-            .setStorageType(HddsProtos.StorageTypeProto.SSD)
+            .setStoragePolicy(HddsProtos.StoragePolicyProto.HOT)
             .setIsVersionEnabled(false)
             .setQuotaInBytes(5000L)
             .addAcls(OzoneAcl.toProtobuf(OzoneAcl.parseAcl(acl)));
@@ -484,8 +484,10 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     assertTrue(dbBucketInfo.getAcls().containsAll(bucketInfoFromProto.getAcls()));
     assertEquals(bucketInfoFromProto.getIsVersionEnabled(),
         dbBucketInfo.getIsVersionEnabled());
-    assertEquals(bucketInfoFromProto.getStorageType(),
-        dbBucketInfo.getStorageType());
+    assertEquals(bucketInfoFromProto.getStoragePolicy(),
+        dbBucketInfo.getStoragePolicy());
+    assertEquals(bucketInfoFromProto.getAllowFallbackStoragePolicy(),
+        dbBucketInfo.getAllowFallbackStoragePolicy());
     assertEquals(bucketInfoFromProto.getMetadata(),
         dbBucketInfo.getMetadata());
     assertEquals(bucketInfoFromProto.getEncryptionKeyInfo(),
@@ -506,7 +508,9 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     assertEquals(original.getBucketName(), updated.getBucketName());
     assertEquals(original.getVolumeName(), updated.getVolumeName());
     assertEquals(original.getIsVersionEnabled(), updated.getIsVersionEnabled());
-    assertEquals(original.getStorageType(), updated.getStorageType());
+    assertEquals(original.getStoragePolicy(), updated.getStoragePolicy());
+    assertEquals(original.getAllowFallbackStoragePolicy(),
+        updated.getAllowFallbackStoragePolicy());
     assertEquals(original.getMetadataList(), updated.getMetadataList());
     assertNotEquals(original.getCreationTime(), updated.getCreationTime());
   }

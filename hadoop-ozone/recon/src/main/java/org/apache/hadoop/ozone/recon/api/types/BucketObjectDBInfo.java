@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -31,8 +31,11 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
   @JsonProperty("volumeName")
   private String volumeName;
 
-  @JsonProperty("storageType")
-  private StorageType storageType;
+  @JsonProperty("storagePolicy")
+  private StoragePolicy storagePolicy;
+
+  @JsonProperty("allowFallbackStoragePolicy")
+  private Boolean allowFallbackStoragePolicy;
 
   @JsonProperty("versioning")
   private boolean isVersioningEnabled;
@@ -78,7 +81,9 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
     this.sourceBucket = omBucketInfo.getSourceBucket();
     this.sourceVolume = omBucketInfo.getSourceVolume();
     this.isVersioningEnabled = omBucketInfo.getIsVersionEnabled();
-    this.storageType = omBucketInfo.getStorageType();
+    this.storagePolicy = omBucketInfo.getStoragePolicy();
+    this.allowFallbackStoragePolicy =
+        omBucketInfo.getAllowFallbackStoragePolicy();
     this.defaultReplicationConfig = omBucketInfo.getDefaultReplicationConfig();
     this.bucketLayout = omBucketInfo.getBucketLayout();
     this.owner = omBucketInfo.getOwner();
@@ -95,12 +100,12 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
     this.volumeName = volumeName;
   }
 
-  public StorageType getStorageType() {
-    return storageType;
+  public StoragePolicy getStoragePolicy() {
+    return storagePolicy;
   }
 
-  public void setStorageType(StorageType storageType) {
-    this.storageType = storageType;
+  public Boolean getAllowFallbackStoragePolicy() {
+    return allowFallbackStoragePolicy;
   }
 
   public long getUsedBytes() {

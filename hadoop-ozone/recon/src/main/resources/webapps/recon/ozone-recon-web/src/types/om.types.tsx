@@ -39,7 +39,8 @@ export interface IBucket {
   volumeName: string;
   bucketName: string;
   isVersionEnabled: boolean;
-  storageType: BucketStorage;
+  storagePolicy: BucketStoragePolicy;
+  allowFallbackStoragePolicy?: boolean;
   creationTime: number;
   modificationTime: number;
   sourceVolume?: string;
@@ -53,10 +54,10 @@ export interface IBucket {
   bucketLayout: BucketLayout;
 }
 
-// Corresponds to OzoneManagerProtocolProtos.StorageTypeProto
-export const BucketStorageTypeList = ['RAM_DISK', 'SSD', 'DISK', 'ARCHIVE'];
-type BucketStorageType = typeof BucketStorageTypeList;
-export type BucketStorage = BucketStorageType[number];
+// Corresponds to OzoneStoragePolicy
+export const BucketStoragePolicyList = ['HOT', 'WARM', 'COLD'];
+type BucketStoragePolicyType = typeof BucketStoragePolicyList;
+export type BucketStoragePolicy = BucketStoragePolicyType[number];
 
 // Corresponds to OzoneManagerProtocolProtos.BucketLayoutProto
 export const BucketLayoutTypeList = ['FILE_SYSTEM_OPTIMIZED', 'OBJECT_STORE', 'LEGACY'];

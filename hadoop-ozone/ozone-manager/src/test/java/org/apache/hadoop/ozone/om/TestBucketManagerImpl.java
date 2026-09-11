@@ -48,10 +48,10 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -220,7 +220,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setStorageType(StorageType.DISK)
+        .setStoragePolicy(OzoneStoragePolicy.WARM)
         .setIsVersionEnabled(false)
         .build();
     // Note: the helper method createBucket() in this scope won't create the
@@ -243,7 +243,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
     OmBucketInfo result = bucketManager.getBucketInfo(volumeName, bucketName);
     assertEquals(volumeName, result.getVolumeName());
     assertEquals(bucketName, result.getBucketName());
-    assertEquals(StorageType.DISK, result.getStorageType());
+    assertEquals(OzoneStoragePolicy.WARM, result.getStoragePolicy());
     assertFalse(result.getIsVersionEnabled());
   }
 
@@ -253,7 +253,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
   }
 
   @Test
-  public void testSetBucketPropertyChangeStorageType() throws Exception {
+  public void testSetBucketPropertyChangeStoragePolicy() throws Exception {
     String volume = volumeName();
     createSampleVol(volume);
 
@@ -262,23 +262,24 @@ class TestBucketManagerImpl extends OzoneTestBase {
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volume)
         .setBucketName("bucket-one")
-        .setStorageType(StorageType.DISK)
+        .setStoragePolicy(OzoneStoragePolicy.WARM)
         .build();
     createBucket(metaMgr, bucketInfo);
     OmBucketInfo result = bucketManager.getBucketInfo(
         volume, "bucket-one");
-    assertEquals(StorageType.DISK,
-        result.getStorageType());
+    assertEquals(OzoneStoragePolicy.WARM,
+        result.getStoragePolicy());
     OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
         .setVolumeName(volume)
         .setBucketName("bucket-one")
-        .setStorageType(StorageType.SSD)
+        .setStoragePolicy(OzoneStoragePolicy.HOT)
+        .setAllowFallbackStoragePolicy(true)
         .build();
     writeClient.setBucketProperty(bucketArgs);
     OmBucketInfo updatedResult = bucketManager.getBucketInfo(
         volume, "bucket-one");
-    assertEquals(StorageType.SSD,
-        updatedResult.getStorageType());
+    assertEquals(OzoneStoragePolicy.HOT,
+        updatedResult.getStoragePolicy());
   }
 
   @Test
@@ -401,7 +402,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
         .setQuotaInNamespace(24 * 1024)
         .setUsedBytes(10 * 1024)
         .setUsedNamespace(5 * 1024)
-        .setStorageType(StorageType.SSD)
+        .setStoragePolicy(OzoneStoragePolicy.HOT)
         .setIsVersionEnabled(true)
         .addAllMetadata(singletonMap("CustomKey", "CustomValue"))
         .build();
@@ -470,8 +471,8 @@ class TestBucketManagerImpl extends OzoneTestBase {
         bucketInfo.getMetadata(),
         storedLinkBucket.getMetadata());
     assertEquals(
-        bucketInfo.getStorageType(),
-        storedLinkBucket.getStorageType());
+        bucketInfo.getStoragePolicy(),
+        storedLinkBucket.getStoragePolicy());
     assertEquals(
         bucketInfo.getIsVersionEnabled(),
         storedLinkBucket.getIsVersionEnabled());

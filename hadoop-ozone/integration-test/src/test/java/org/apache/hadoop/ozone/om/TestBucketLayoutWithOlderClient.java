@@ -21,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.UUID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.DataTestUtil;
@@ -86,8 +85,7 @@ public abstract class TestBucketLayoutWithOlderClient implements NonHATests.Test
                     .setBucketInfo(
                         OzoneManagerProtocolProtos.BucketInfo.newBuilder()
                             .setVolumeName(volumeName).setBucketName(buckName)
-                            .setIsVersionEnabled(false).setStorageType(
-                            StorageTypeProto.DISK)
+                            .setIsVersionEnabled(false)
                             .build())
                     .build()).build();
     createBucketReq = createBucketReq.toBuilder()

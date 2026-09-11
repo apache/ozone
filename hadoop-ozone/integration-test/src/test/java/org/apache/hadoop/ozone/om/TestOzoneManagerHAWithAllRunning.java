@@ -52,8 +52,8 @@ import javax.management.MBeanInfo;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -258,7 +258,7 @@ class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
     OzoneVolume retVolume = createAndCheckVolume(volumeName);
 
     BucketArgs bucketArgs =
-        BucketArgs.newBuilder().setStorageType(StorageType.DISK)
+        BucketArgs.newBuilder().setStoragePolicy(OzoneStoragePolicy.WARM)
             .setVersioning(true).build();
 
 
@@ -270,7 +270,7 @@ class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
     assertEquals(volumeName, ozoneBucket.getVolumeName());
     assertEquals(bucketName, ozoneBucket.getName());
     assertTrue(ozoneBucket.getVersioning());
-    assertEquals(StorageType.DISK, ozoneBucket.getStorageType());
+    assertEquals(OzoneStoragePolicy.WARM, ozoneBucket.getStoragePolicy());
     assertFalse(ozoneBucket.getCreationTime().isAfter(Instant.now()));
 
 

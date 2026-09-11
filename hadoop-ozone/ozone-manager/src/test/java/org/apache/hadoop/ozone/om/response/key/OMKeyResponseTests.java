@@ -26,7 +26,6 @@ import java.util.Random;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -97,7 +96,6 @@ public class OMKeyResponseTests {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setObjectID(System.currentTimeMillis())
-            .setStorageType(StorageType.DISK)
             .setIsVersionEnabled(false)
             .build();
 

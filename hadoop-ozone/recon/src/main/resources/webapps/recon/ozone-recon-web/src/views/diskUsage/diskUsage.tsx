@@ -443,9 +443,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           values.push(summaryResponse.objectInfo.sourceVolume);
         }
 
-        if (summaryResponse.objectInfo?.storageType !== undefined && summaryResponse.objectInfo?.storageType !== -1) {
-          keys.push('Storage Type');
-          values.push(summaryResponse.objectInfo.storageType);
+        if (summaryResponse.objectInfo?.storagePolicy !== undefined && summaryResponse.objectInfo?.storagePolicy !== -1) {
+          keys.push('Storage Policy');
+          values.push(summaryResponse.objectInfo.storagePolicy);
+        }
+        if (summaryResponse.objectInfo?.allowFallbackStoragePolicy !== undefined) {
+          keys.push('Allow Fallback Storage Policy');
+          values.push(String(summaryResponse.objectInfo.allowFallbackStoragePolicy));
         }
 
         if (summaryResponse.objectInfo?.usedBytes !== undefined && summaryResponse.objectInfo?.usedBytes !== -1) {

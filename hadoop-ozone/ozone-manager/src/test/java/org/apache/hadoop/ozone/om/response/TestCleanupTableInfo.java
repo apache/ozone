@@ -42,7 +42,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
@@ -305,7 +304,6 @@ public class TestCleanupTableInfo {
         .setVolumeName(TEST_VOLUME_NAME)
         .setBucketName(TEST_BUCKET_NAME)
         .setIsVersionEnabled(false)
-        .setStorageType(StorageType.DEFAULT)
         .build();
   }
 

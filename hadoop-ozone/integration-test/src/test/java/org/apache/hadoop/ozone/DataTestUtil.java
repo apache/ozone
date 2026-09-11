@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -70,7 +69,6 @@ public final class DataTestUtil {
       String volumeName, String bucketName, BucketLayout bucketLayout) throws IOException {
     BucketArgs omBucketArgs;
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     if (bucketLayout != null) {
       builder.setBucketLayout(bucketLayout);
     }
@@ -85,7 +83,6 @@ public final class DataTestUtil {
       throws IOException {
     BucketArgs omBucketArgs;
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     if (bucketLayout != null) {
       builder.setBucketLayout(bucketLayout);
     }
@@ -207,7 +204,6 @@ public final class DataTestUtil {
   public static OzoneBucket createLinkedBucket(OzoneClient client, String vol, String sourceBucketName,
                                                String linkedBucketName) throws IOException {
     BucketArgs.Builder bb = new BucketArgs.Builder()
-        .setStorageType(StorageType.DEFAULT)
         .setVersioning(false)
         .setSourceVolume(vol)
         .setSourceBucket(sourceBucketName);

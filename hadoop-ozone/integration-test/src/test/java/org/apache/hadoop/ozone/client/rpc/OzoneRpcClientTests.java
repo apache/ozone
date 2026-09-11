@@ -116,6 +116,7 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -124,7 +125,6 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -753,18 +753,18 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
-  public void testCreateBucketWithStorageType()
+  public void testCreateBucketWithStoragePolicy()
       throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.SSD);
+    builder.setStoragePolicy(OzoneStoragePolicy.HOT);
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     assertEquals(bucketName, bucket.getName());
-    assertEquals(StorageType.SSD, bucket.getStorageType());
+    assertEquals(OzoneStoragePolicy.HOT, bucket.getStoragePolicy());
   }
 
   @Test
@@ -813,14 +813,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setVersioning(true)
-        .setStorageType(StorageType.SSD)
+        .setStoragePolicy(OzoneStoragePolicy.HOT)
         .addAcl(userAcl)
         .setDefaultReplicationConfig(new DefaultReplicationConfig(repConfig));
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     assertEquals(bucketName, bucket.getName());
     assertTrue(bucket.getVersioning());
-    assertEquals(StorageType.SSD, bucket.getStorageType());
+    assertEquals(OzoneStoragePolicy.HOT, bucket.getStoragePolicy());
     assertThat(bucket.getAcls()).contains(userAcl);
     assertEquals(repConfig, bucket.getReplicationConfig());
   }
@@ -1000,7 +1000,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
-  public void testSetBucketStorageType()
+  public void testSetBucketStoragePolicy()
       throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -1008,10 +1008,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    bucket.setStorageType(StorageType.SSD);
+    bucket.setStoragePolicy(OzoneStoragePolicy.HOT);
     OzoneBucket newBucket = volume.getBucket(bucketName);
     assertEquals(bucketName, newBucket.getName());
-    assertEquals(StorageType.SSD, newBucket.getStorageType());
+    assertEquals(OzoneStoragePolicy.HOT, newBucket.getStoragePolicy());
   }
 
   @ParameterizedTest
@@ -2065,7 +2065,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneVolume volumeWithLinkedBucket = store.getVolume(targetVolName);
     String targetBucketName = UUID.randomUUID().toString();
     BucketArgs.Builder argsBuilder = new BucketArgs.Builder()
-        .setStorageType(StorageType.DEFAULT)
         .setVersioning(false)
         .setSourceVolume(volumeName)
         .setSourceBucket(bucketName);

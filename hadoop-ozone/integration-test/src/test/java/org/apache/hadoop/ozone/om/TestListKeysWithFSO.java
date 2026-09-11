@@ -34,7 +34,6 @@ import java.util.Optional;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -92,7 +91,6 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     // create buckets
     BucketArgs omBucketArgs;
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     omBucketArgs = builder.build();
 
@@ -109,7 +107,6 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     emptyFsoOzoneBucket = ozoneVolume.getBucket(fsoBucketName);
 
     builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     omBucketArgs = builder.build();
     String legacyBucketName = uniqueObjectName("bucket");

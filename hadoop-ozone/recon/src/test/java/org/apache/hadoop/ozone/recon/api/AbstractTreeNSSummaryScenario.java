@@ -35,7 +35,6 @@ import java.util.Comparator;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -548,8 +547,6 @@ public abstract class AbstractTreeNSSummaryScenario extends NSSummaryTestScenari
     assertEquals(5, bucket.getCountStats().getNumTotalKey());
     assertEquals(VOL,
         ((BucketObjectDBInfo) bucket.getObjectDBInfo()).getVolumeName());
-    assertEquals(StorageType.DISK,
-        ((BucketObjectDBInfo) bucket.getObjectDBInfo()).getStorageType());
     assertEquals(getBucketLayout(),
         ((BucketObjectDBInfo) bucket.getObjectDBInfo()).getBucketLayout());
     assertEquals(BUCKET_ONE,
@@ -565,8 +562,6 @@ public abstract class AbstractTreeNSSummaryScenario extends NSSummaryTestScenari
     assertEquals(2, bucket.getCountStats().getNumTotalKey());
     assertEquals(VOL,
         ((BucketObjectDBInfo) bucket.getObjectDBInfo()).getVolumeName());
-    assertEquals(StorageType.DISK,
-        ((BucketObjectDBInfo) bucket.getObjectDBInfo()).getStorageType());
     assertEquals(getBucketLayout(),
         ((BucketObjectDBInfo) bucket.getObjectDBInfo()).getBucketLayout());
     assertEquals(BUCKET_TWO,

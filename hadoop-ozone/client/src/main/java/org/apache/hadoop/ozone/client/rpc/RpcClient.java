@@ -67,15 +67,16 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -637,8 +638,9 @@ public class RpcClient implements ClientProtocol {
     }
 
     boolean isVersionEnabled = bucketArgs.getVersioning();
-    StorageType storageType = bucketArgs.getStorageType() == null ?
-        StorageType.DEFAULT : bucketArgs.getStorageType();
+    StoragePolicy storagePolicy = bucketArgs.getStoragePolicy() == null ?
+        OzoneStoragePolicy.getDefaultPolicy() : bucketArgs.getStoragePolicy();
+    Boolean allowFallbackStoragePolicy = bucketArgs.getAllowFallbackStoragePolicy();
     BucketLayout bucketLayout = bucketArgs.getBucketLayout();
     BucketEncryptionKeyInfo bek = null;
     if (bucketArgs.getEncryptionKey() != null) {
@@ -651,7 +653,8 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setIsVersionEnabled(isVersionEnabled)
         .addAllMetadata(bucketArgs.getMetadata())
-        .setStorageType(storageType)
+        .setStoragePolicy(storagePolicy)
+        .setAllowFallbackStoragePolicy(allowFallbackStoragePolicy)
         .setSourceVolume(bucketArgs.getSourceVolume())
         .setSourceBucket(bucketArgs.getSourceBucket())
         .setQuotaInBytes(bucketArgs.getQuotaInBytes())
@@ -687,11 +690,11 @@ public class RpcClient implements ClientProtocol {
         ? "with bucket layout " + bucketLayout
         : "with server-side default bucket layout";
     LOG.info("Creating Bucket: {}/{}, {}, {} as owner, Versioning {}, " +
-            "Storage Type set to {} and Encryption set to {}, " +
+            "Storage Policy set to {} (allowFallback={}) and Encryption set to {}, " +
             "Replication Type set to {}, Namespace Quota set to {}, " +
             "Space Quota set to {} ",
         volumeName, bucketName, layoutMsg, owner, isVersionEnabled,
-        storageType, bek != null, replicationType,
+        storagePolicy, allowFallbackStoragePolicy, bek != null, replicationType,
         bucketArgs.getQuotaInNamespace(), bucketArgs.getQuotaInBytes());
 
     ozoneManagerClient.createBucket(builder.build());
@@ -1220,16 +1223,16 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void setBucketStorageType(
-      String volumeName, String bucketName, StorageType storageType)
+  public void setBucketStoragePolicy(
+      String volumeName, String bucketName, StoragePolicy storagePolicy)
       throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
-    Objects.requireNonNull(storageType, "storageType == null");
+    Objects.requireNonNull(storagePolicy, "storagePolicy == null");
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setStorageType(storageType);
+        .setStoragePolicy(storagePolicy);
     ozoneManagerClient.setBucketProperty(builder.build());
   }
 
@@ -1323,7 +1326,8 @@ public class RpcClient implements ClientProtocol {
     return OzoneBucket.newBuilder(conf, this)
         .setVolumeName(bucketInfo.getVolumeName())
         .setName(bucketInfo.getBucketName())
-        .setStorageType(bucketInfo.getStorageType())
+        .setStoragePolicy(bucketInfo.getStoragePolicy())
+        .setAllowFallbackStoragePolicy(bucketInfo.getAllowFallbackStoragePolicy())
         .setVersioning(bucketInfo.getIsVersionEnabled())
         .setCreationTime(bucketInfo.getCreationTime())
         .setModificationTime(bucketInfo.getModificationTime())
@@ -1356,7 +1360,8 @@ public class RpcClient implements ClientProtocol {
             OzoneBucket.newBuilder(conf, this)
                 .setVolumeName(bucket.getVolumeName())
                 .setName(bucket.getBucketName())
-                .setStorageType(bucket.getStorageType())
+                .setStoragePolicy(bucket.getStoragePolicy())
+                .setAllowFallbackStoragePolicy(bucket.getAllowFallbackStoragePolicy())
                 .setVersioning(bucket.getIsVersionEnabled())
                 .setCreationTime(bucket.getCreationTime())
                 .setModificationTime(bucket.getModificationTime())

@@ -768,7 +768,7 @@ public final class OMRequestTestUtils {
     return BucketInfo.newBuilder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
-        .setStorageType(HddsProtos.StorageTypeProto.SSD)
+        .setStoragePolicy(HddsProtos.StoragePolicyProto.HOT)
         .setIsVersionEnabled(false)
         .addAllMetadata(getMetadataList());
   }

@@ -70,7 +70,8 @@ type ObjectInfo = {
   sourceBucket: string | null;
   usedBytes: number | null;
   usedNamespace: number;
-  storageType: string;
+  storagePolicy: string;
+  allowFallbackStoragePolicy?: boolean;
   creationTime: number;
   dataSize: number;
   modificationTime: number;
@@ -157,7 +158,8 @@ const NUMetadata: React.FC<MetadataProps> = ({
      */
     const selectedInfoKeys = [
       'bucketName', 'bucketLayout', 'encInfo', 'fileName', 'keyName',
-      'name', 'owner', 'storageType', 'usedNamespace', 'volumeName', 'volume'
+      'name', 'owner', 'storagePolicy', 'allowFallbackStoragePolicy',
+      'usedNamespace', 'volumeName', 'volume'
     ] as const;
     const objectInfo: ObjectInfo = summaryResponse.objectInfo ?? {};
 

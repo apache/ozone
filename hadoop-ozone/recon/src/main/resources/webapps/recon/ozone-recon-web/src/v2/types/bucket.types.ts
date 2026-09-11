@@ -19,14 +19,13 @@
 import { Acl } from "@/v2/types/acl.types";
 import { Option as MultiOption } from "@/v2/components/select/multiSelect";
 
-// Corresponds to OzoneManagerProtocolProtos.StorageTypeProto
-export const BucketStorageTypeList = [
-  'RAM_DISK',
-  'SSD',
-  'DISK',
-  'ARCHIVE'
+// Corresponds to OzoneStoragePolicy
+export const BucketStoragePolicyList = [
+  'HOT',
+  'WARM',
+  'COLD'
 ] as const;
-export type BucketStorage = typeof BucketStorageTypeList[number];
+export type BucketStoragePolicy = typeof BucketStoragePolicyList[number];
 
 // Corresponds to OzoneManagerProtocolProtos.BucketLayoutProto
 export const BucketLayoutTypeList = [
@@ -41,7 +40,8 @@ export type Bucket = {
   volumeName: string;
   name: string;
   versioning: boolean;
-  storageType: BucketStorage;
+  storagePolicy: BucketStoragePolicy;
+  allowFallbackStoragePolicy?: boolean;
   creationTime: number;
   modificationTime: number;
   sourceVolume?: string;

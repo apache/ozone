@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -164,12 +164,22 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       bucketInfoBuilder.setModificationTime(
           setBucketPropertyRequest.getModificationTime());
 
-      //Check StorageType to update
-      StorageType storageType = omBucketArgs.getStorageType();
-      if (storageType != null) {
-        bucketInfoBuilder.setStorageType(storageType);
-        LOG.debug("Updating bucket storage type for bucket: {} in volume: {}",
+      //Check StoragePolicy to update
+      StoragePolicy storagePolicy = omBucketArgs.getStoragePolicy();
+      if (storagePolicy != null) {
+        bucketInfoBuilder.setStoragePolicy(storagePolicy);
+        LOG.debug("Updating bucket storage policy for bucket: {} in volume: {}",
             bucketName, volumeName);
+      }
+
+      //Check allowFallbackStoragePolicy to update
+      Boolean allowFallbackStoragePolicy =
+          omBucketArgs.getAllowFallbackStoragePolicy();
+      if (allowFallbackStoragePolicy != null) {
+        bucketInfoBuilder.setAllowFallbackStoragePolicy(
+            allowFallbackStoragePolicy);
+        LOG.debug("Updating bucket allowFallbackStoragePolicy for bucket: {}" +
+            " in volume: {}", bucketName, volumeName);
       }
 
       //Check Versioning to update

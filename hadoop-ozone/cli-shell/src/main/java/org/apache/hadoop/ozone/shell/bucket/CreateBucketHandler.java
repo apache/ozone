@@ -21,7 +21,6 @@ import com.google.common.base.Strings;
 import java.io.IOException;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -80,7 +79,7 @@ public class CreateBucketHandler extends BucketHandler {
     }
 
     BucketArgs.Builder bb =
-        new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
+        new BucketArgs.Builder()
             .setVersioning(false).setOwner(ownerName);
     if (allowedBucketLayout != null) {
       bb.setBucketLayout(allowedBucketLayout);

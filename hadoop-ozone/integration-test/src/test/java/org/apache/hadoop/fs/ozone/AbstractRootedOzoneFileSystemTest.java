@@ -91,7 +91,6 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -1782,7 +1781,6 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   void testBucketDefaultsShouldNotBeInheritedToFileForNonEC()
       throws Exception {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     builder.setDefaultReplicationConfig(
         new DefaultReplicationConfig(StandaloneReplicationConfig.getInstance(
@@ -1811,7 +1809,6 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   void testBucketDefaultsShouldBeInheritedToFileForEC()
       throws Exception {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     builder.setDefaultReplicationConfig(
         new DefaultReplicationConfig(
@@ -2013,7 +2010,6 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   private Path createAndGetBucketPath()
       throws IOException {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(bucketLayout);
     BucketArgs omBucketArgs = builder.build();
     String vol = UUID.randomUUID().toString();

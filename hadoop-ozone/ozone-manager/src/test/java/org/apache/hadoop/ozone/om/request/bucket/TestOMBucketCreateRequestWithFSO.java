@@ -170,8 +170,8 @@ public class TestOMBucketCreateRequestWithFSO
     assertTrue(dbBucketInfo.getAcls().containsAll(bucketInfoFromProto.getAcls()));
     assertEquals(bucketInfoFromProto.getIsVersionEnabled(),
         dbBucketInfo.getIsVersionEnabled());
-    assertEquals(bucketInfoFromProto.getStorageType(),
-        dbBucketInfo.getStorageType());
+    assertEquals(bucketInfoFromProto.getStoragePolicy(),
+        dbBucketInfo.getStoragePolicy());
     assertEquals(bucketInfoFromProto.getMetadata(),
         dbBucketInfo.getMetadata());
     assertEquals(bucketInfoFromProto.getEncryptionKeyInfo(),
