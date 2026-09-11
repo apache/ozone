@@ -858,8 +858,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         return false;
       }
       
-      // Reset health state to HEALTHY before processing this container
-      report.resetContainerHealthState();
       final boolean isEC = isEC(containerInfo.getReplicationConfig());
 
       ContainerCheckRequest checkRequest = new ContainerCheckRequest.Builder()
@@ -878,10 +876,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       if (!handled) {
         LOG.debug("Container {} had no actions after passing through the " +
             "check chain", containerInfo.containerID());
-        // Container remains HEALTHY (set at start of loop)
       }
-      // Apply final health state from report to container
-      containerInfo.setHealthState(report.getContainerHealthState());
+      if (!readOnly) {
+        containerInfo.setHealthState(checkRequest.getHealthState());
+      }
       return handled;
     }
   }
