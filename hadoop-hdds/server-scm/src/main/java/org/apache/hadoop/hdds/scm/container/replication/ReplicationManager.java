@@ -877,9 +877,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         LOG.debug("Container {} had no actions after passing through the " +
             "check chain", containerInfo.containerID());
       }
-      if (!readOnly) {
-        containerInfo.setHealthState(checkRequest.getHealthState());
-      }
+      containerInfo.setHealthState(checkRequest.getHealthState());
       return handled;
     }
   }
