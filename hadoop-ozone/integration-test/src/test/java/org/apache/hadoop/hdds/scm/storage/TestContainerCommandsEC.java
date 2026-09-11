@@ -834,7 +834,7 @@ public class TestContainerCommandsEC {
       BlockID entryBlockID = blockOutputStreamEntry.getBlockID();
       long entryContainerID = entryBlockID.getContainerID();
       Pipeline entryPipeline = blockOutputStreamEntry.getPipeline();
-      Map<DatanodeDetails, Integer> replicaIndexes = entryPipeline.getReplicaIndexesForTesting();
+      Map<DatanodeDetails, Integer> replicaIndexes = entryPipeline.getReplicaIndexes();
       try {
         for (Map.Entry<DatanodeDetails, Integer> entry : replicaIndexes.entrySet()) {
           DatanodeDetails key = entry.getKey();

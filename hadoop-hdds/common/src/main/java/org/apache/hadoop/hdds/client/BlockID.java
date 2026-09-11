@@ -108,7 +108,7 @@ public class BlockID {
         .setContainerID(containerBlockID.getContainerID())
         .setLocalID(containerBlockID.getLocalID())
         .setBlockCommitSequenceId(blockCommitSequenceId);
-    if (replicaIdx != null && replicaIdx > 0) {
+    if (replicaIdx != null) {
       b.setReplicaIndex(replicaIdx);
     }
     return b;

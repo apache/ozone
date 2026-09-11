@@ -257,7 +257,7 @@ public final class Pipeline {
     return true;
   }
 
-  public Map<DatanodeDetails, Integer> getReplicaIndexesForTesting() {
+  public Map<DatanodeDetails, Integer> getReplicaIndexes() {
     return Collections.unmodifiableMap(replicaIndexes);
   }
 
