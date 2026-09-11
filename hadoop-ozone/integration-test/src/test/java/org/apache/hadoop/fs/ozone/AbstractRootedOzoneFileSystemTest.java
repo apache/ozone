@@ -1836,15 +1836,73 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
+  void testGetFileStatusUsesSingleOmRpc() throws Exception {
+    String keyName = "single-rpc-" + RandomStringUtils.secure().nextAlphabetic(5);
+    Path filePath = new Path(bucketPath, keyName);
+    ContractTestUtils.touch(fs, filePath);
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+    long getFileStatusBefore = metrics.getNumGetFileStatus();
+
+    FileStatus status = fs.getFileStatus(filePath);
+    assertTrue(status.isFile());
+
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
+        "getFileStatus must not trigger InfoBucket");
+    assertEquals(getFileStatusBefore + 1, metrics.getNumGetFileStatus());
+
+    long getFileStatusAfterFirst = metrics.getNumGetFileStatus();
+    fs.getFileStatus(filePath);
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos());
+    assertEquals(getFileStatusAfterFirst + 1, metrics.getNumGetFileStatus());
+  }
+
+  @Test
+  void testGetFileStatusRejectsObsBucket() throws Exception {
+    OzoneBucket obsBucket =
+        DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    Path obsBucketPath = new Path(
+        new Path(OZONE_URI_DELIMITER, obsBucket.getVolumeName()),
+        obsBucket.getName());
+    String keyName = "obs-key-" + RandomStringUtils.secure().nextAlphabetic(5);
+    DataTestUtil.createKey(obsBucket, keyName,
+        "data".getBytes(StandardCharsets.UTF_8));
+    Path keyPath = new Path(obsBucketPath, keyName);
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> fs.getFileStatus(keyPath));
+    assertThat(exception.getMessage()).contains(obsBucket.getName());
+    assertThat(exception.getMessage()).contains("OBJECT_STORE");
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
+        "getFileStatus must not trigger InfoBucket");
+  }
+
+  @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);
     Path volume = new Path("/" + volumeNameLocal);
     fs.mkdirs(volume);
-    assertThrows(OMException.class,
-        () -> fs.getFileStatus(new Path(volume, bucketNameLocal)));
-    // Cleanup
-    fs.delete(volume, false);
+    try {
+      FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+          () -> fs.getFileStatus(new Path(volume, bucketNameLocal)));
+      assertThat(exception.getMessage()).contains("Bucket doesn't exist");
+    } finally {
+      fs.delete(volume, false);
+    }
+  }
+
+  @Test
+  void testGetFileStatusMissingFile() throws Exception {
+    Path missingFile = new Path(bucketPath, "missing-file-" +
+        RandomStringUtils.secure().nextAlphanumeric(5));
+    FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+        () -> fs.getFileStatus(missingFile));
+    assertThat(exception.getMessage()).contains("No such file or directory");
   }
 
   @Test

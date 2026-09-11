@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -1062,6 +1063,14 @@ public interface ClientProtocol {
    * @throws IOException
    */
   OzoneFsServerDefaults getServerDefaults() throws IOException;
+
+  /**
+   * Returns the negotiated Ozone Manager version for the connected cluster.
+   * In an HA cluster this is the minimum version across all OMs, so callers
+   * can safely gate client behavior on new server-side features.
+   * @return the effective Ozone Manager version.
+   */
+  OzoneManagerVersion getOmVersion();
 
   /**
    * Get KMS client provider.
