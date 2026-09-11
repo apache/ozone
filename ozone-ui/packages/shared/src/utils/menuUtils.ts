@@ -18,10 +18,14 @@
 import React from 'react';
 
 export type MenuItem = {
-  key: string;
-  label: string;
+  key?: string;
+  label?: string;
   path?: string;
   icon?: React.ReactNode;
+  /** `group` renders a non-clickable section label; `divider` a separator line. */
+  type?: 'group' | 'divider';
+  /** Inline style forwarded to the underlying Ant Design menu item. */
+  style?: React.CSSProperties;
   children?: MenuItem[];
 };
 
@@ -47,8 +51,8 @@ export const findSelectedKey = (
   header: string | null;
 } => {
   for (const item of items) {
-    if (item.path === pathname) {
-      return { selectedKey: item.key, header: item.label };
+    if (item.path !== undefined && item.path === pathname) {
+      return { selectedKey: item.key ?? null, header: item.label ?? null };
     }
     if (item.children) {
       const result = findSelectedKey(item.children, pathname);

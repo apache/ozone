@@ -20,60 +20,70 @@ import React from 'react';
 import { Typography } from 'antd';
 import { semanticColors, spacing, textStyles } from '../../theme/tokens';
 
-export interface PageHeaderProps {
-  /** Page title. */
+export interface SectionProps {
+  /** Section heading. */
   title: React.ReactNode;
-  /** Optional supporting text under the title. */
-  subtitle?: React.ReactNode;
-  /** Optional content rendered above the title (e.g. breadcrumbs). */
-  breadcrumb?: React.ReactNode;
+  /** Optional supporting text rendered under the title (e.g. "High Availability"). */
+  description?: React.ReactNode;
+  /** Right-aligned actions rendered on the header row. */
+  actions?: React.ReactNode;
+  /** Section body. */
+  children?: React.ReactNode;
   style?: React.CSSProperties;
 }
 
 /**
- * Page header. Renders the page title with optional breadcrumb, subtitle and
- * right-aligned actions, matching the "Page Header" component used at the top of
- * the Ozone content area.
+ * A labelled content section: a title (with optional supporting text and
+ * right-aligned actions) followed by its content. Matches the "section-header"
+ * pattern that groups the cards and tables on the Ozone detail screens.
  */
-export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, breadcrumb, style }) => {
-  return (
+export const Section: React.FC<SectionProps> = ({
+  title,
+  description,
+  actions,
+  children,
+  style,
+}) => (
+  <section style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg, ...style }}>
     <div
       style={{
         display: 'flex',
-        flexDirection: 'column',
-        gap: spacing.xs,
-        marginBottom: spacing.xl,
-        ...style,
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: spacing.lg,
       }}
     >
-      {breadcrumb}
       <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xxs }}>
         <Typography.Title
-          level={1}
+          level={3}
           style={{
             margin: 0,
-            fontSize: textStyles.h1.fontSize,
-            lineHeight: `${textStyles.h1.lineHeight}px`,
-            fontWeight: textStyles.h1.fontWeight,
+            fontSize: textStyles.h3.fontSize,
+            lineHeight: `${textStyles.h3.lineHeight}px`,
+            fontWeight: textStyles.h3.fontWeight,
             color: semanticColors.textPrimary,
           }}
         >
           {title}
         </Typography.Title>
-        {subtitle && (
+        {description && (
           <Typography.Text
             style={{
               color: semanticColors.textSecondary,
-              fontSize: textStyles.bodyStandard.fontSize,
-              lineHeight: `${textStyles.bodyStandard.lineHeight}px`,
+              fontSize: textStyles.bodySmall.fontSize,
+              lineHeight: `${textStyles.bodySmall.lineHeight}px`,
             }}
           >
-            {subtitle}
+            {description}
           </Typography.Text>
         )}
       </div>
+      {actions && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>{actions}</div>
+      )}
     </div>
-  );
-};
+    {children}
+  </section>
+);
 
-export default PageHeader;
+export default Section;

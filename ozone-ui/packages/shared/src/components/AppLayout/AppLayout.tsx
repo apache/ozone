@@ -23,6 +23,8 @@ import { semanticColors, spacing, textStyles } from '../../theme/tokens';
 const { Header, Content } = Layout;
 
 export interface AppLayoutProps {
+  /** Full-width chrome rendered above the rail + content row (e.g. the shared `UtilityBar`). */
+  utilityBar?: React.ReactNode;
   /** Navigation rail, typically the shared `Sidebar`. */
   sider?: React.ReactNode;
   /** Page/section title rendered in the header. */
@@ -41,6 +43,7 @@ export interface AppLayoutProps {
  * layout background. Compose with the shared `Sidebar` for the `sider` slot.
  */
 export const AppLayout: React.FC<AppLayoutProps> = ({
+  utilityBar,
   sider,
   title,
   headerExtra,
@@ -48,59 +51,65 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   maxContentWidth,
 }) => {
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      {sider}
-      <Layout>
-        {(title || headerExtra) && (
-          <Header
+    // Lock the shell to the viewport so the rail (and its bottom collapse
+    // trigger) stay fixed while only the content column scrolls.
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
+      {utilityBar}
+      <Layout style={{ flex: 1, minHeight: 0 }}>
+        {sider}
+        {/* Breathing room between the navigation rail and the content column. */}
+        <Layout style={{ marginInlineStart: spacing.lg, minHeight: 0 }}>
+          {(title || headerExtra) && (
+            <Header
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: semanticColors.bgContainer,
+                borderBottom: `1px solid ${semanticColors.border}`,
+                paddingInline: spacing.xl,
+              }}
+            >
+              {typeof title === 'string' ? (
+                <Typography.Title
+                  level={4}
+                  style={{
+                    margin: 0,
+                    fontSize: textStyles.h2.fontSize,
+                    lineHeight: `${textStyles.h2.lineHeight}px`,
+                    color: semanticColors.textPrimary,
+                  }}
+                >
+                  {title}
+                </Typography.Title>
+              ) : (
+                title
+              )}
+              {headerExtra && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+                  {headerExtra}
+                </div>
+              )}
+            </Header>
+          )}
+          <Content
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: semanticColors.bgContainer,
-              borderBottom: `1px solid ${semanticColors.border}`,
-              paddingInline: spacing.xl,
+              padding: spacing.xl,
+              background: semanticColors.bgLayout,
+              overflow: 'auto',
             }}
           >
-            {typeof title === 'string' ? (
-              <Typography.Title
-                level={4}
-                style={{
-                  margin: 0,
-                  fontSize: textStyles.h2.fontSize,
-                  lineHeight: `${textStyles.h2.lineHeight}px`,
-                  color: semanticColors.textPrimary,
-                }}
-              >
-                {title}
-              </Typography.Title>
-            ) : (
-              title
-            )}
-            {headerExtra && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-                {headerExtra}
-              </div>
-            )}
-          </Header>
-        )}
-        <Content
-          style={{
-            padding: spacing.xl,
-            background: semanticColors.bgLayout,
-            overflow: 'auto',
-          }}
-        >
-          <div
-            style={{
-              maxWidth: maxContentWidth,
-              marginInline: maxContentWidth ? 'auto' : undefined,
-              width: '100%',
-            }}
-          >
-            {children}
-          </div>
-        </Content>
+            <div
+              style={{
+                maxWidth: maxContentWidth,
+                marginInline: maxContentWidth ? 'auto' : undefined,
+                width: '100%',
+              }}
+            >
+              {children}
+            </div>
+          </Content>
+        </Layout>
       </Layout>
     </Layout>
   );

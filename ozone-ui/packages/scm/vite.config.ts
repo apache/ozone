@@ -56,8 +56,6 @@ export default defineConfig({
           'antd-vendor': ['antd', '@ant-design/icons'],
           // Router
           'router-vendor': ['react-router-dom'],
-          // HTTP client
-          'axios-vendor': ['axios'],
           // Other utilities
           'utils-vendor': ['@fontsource/roboto', 'less'],
         },
@@ -66,7 +64,7 @@ export default defineConfig({
   },
   // Optimize dependencies to prevent outdated cache issues
   optimizeDeps: {
-    include: ['react', 'react-dom', 'antd', '@ant-design/icons', 'react-router-dom', 'axios'],
+    include: ['react', 'react-dom', 'antd', '@ant-design/icons', 'react-router-dom'],
     force: false, // Set to true temporarily if you need to force re-optimization
   },
   server: {

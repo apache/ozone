@@ -15,24 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import { QueryProvider, ThemeProvider } from '@ozone-ui/shared';
-import '@fontsource/roboto/400.css';
-import '@fontsource/roboto/500.css';
-import '@fontsource/roboto/700.css';
-import App from './App';
-import './index.css';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryProvider>
-      <ThemeProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ThemeProvider>
-    </QueryProvider>
-  </StrictMode>
+import React from 'react';
+import { Empty } from 'antd';
+import { PageHeader } from '@ozone-ui/shared';
+
+export interface PlaceholderProps {
+  title: string;
+}
+
+/** Stub page for navigation items that are not implemented yet. */
+export const Placeholder: React.FC<PlaceholderProps> = ({ title }) => (
+  <div>
+    <PageHeader title={title} />
+    <Empty description={`${title} is not implemented yet.`} style={{ marginTop: 96 }} />
+  </div>
 );
+
+export default Placeholder;

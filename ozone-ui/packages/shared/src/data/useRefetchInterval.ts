@@ -15,24 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import { QueryProvider, ThemeProvider } from '@ozone-ui/shared';
-import '@fontsource/roboto/400.css';
-import '@fontsource/roboto/500.css';
-import '@fontsource/roboto/700.css';
-import App from './App';
-import './index.css';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryProvider>
-      <ThemeProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ThemeProvider>
-    </QueryProvider>
-  </StrictMode>
-);
+import { useSyncConfig } from './SyncConfigContext';
+
+/**
+ * Returns the `refetchInterval` value to pass to TanStack Query: the configured
+ * interval in milliseconds when auto-refresh is enabled, or `false` to disable
+ * polling. Reads from the nearest `SyncConfigProvider`.
+ *
+ * @example
+ * ```ts
+ * const refetchInterval = useRefetchInterval();
+ * const { data } = useSuspenseQuery({ ...queryOptions, refetchInterval });
+ * ```
+ */
+export function useRefetchInterval(): number | false {
+  const { enabled, refetchIntervalMs } = useSyncConfig();
+  return enabled ? refetchIntervalMs : false;
+}

@@ -56,8 +56,8 @@ export default defineConfig({
           'antd-vendor': ['antd', '@ant-design/icons'],
           // Router
           'router-vendor': ['react-router-dom'],
-          // HTTP client
-          'axios-vendor': ['axios'],
+          // Server-state
+          'query-vendor': ['@tanstack/react-query'],
           // Other utilities
           'utils-vendor': ['@fontsource/roboto', 'less'],
         },
@@ -66,13 +66,26 @@ export default defineConfig({
   },
   // Optimize dependencies to prevent outdated cache issues
   optimizeDeps: {
-    include: ['react', 'react-dom', 'antd', '@ant-design/icons', 'react-router-dom', 'axios'],
+    include: [
+      'react',
+      'react-dom',
+      'antd',
+      '@ant-design/icons',
+      'react-router-dom',
+      '@tanstack/react-query',
+    ],
     force: false, // Set to true temporarily if you need to force re-optimization
   },
   server: {
     proxy: {
       '/api': {
         target: 'http://localhost:9862',
+      },
+      // JMX endpoint — the json-server mock in dev (see mock/server.cjs), or a real
+      // OM via `OM_JMX_TARGET=http://<host>:<port> pnpm --filter @ozone-ui/ozone-om dev`.
+      '/jmx': {
+        target: process.env.OM_JMX_TARGET ?? 'http://localhost:9878',
+        changeOrigin: true,
       },
     },
   },
@@ -98,7 +111,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: 'src/__tests__/vitest.setup.ts',
-    include: ['src/__tests__/**/*.test.tsx'],
+    include: ['src/__tests__/**/*.test.{ts,tsx}'],
     reporters: ['verbose'],
   },
 });

@@ -16,9 +16,11 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "lint": "eslint ."
   },
   "peerDependencies": {
+    "@tanstack/react-query": "^5.62.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.3.0"
@@ -29,6 +31,7 @@
     "classnames": "^2.3.2"
   },
   "devDependencies": {
+    "@tanstack/react-query": "^5.62.0",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "react-router-dom": "^7.3.0",

@@ -17,8 +17,9 @@
  */
 
 import React from 'react';
-import { Typography } from 'antd';
-import { semanticColors, spacing, textStyles } from '../../theme/tokens';
+import { Tooltip, Typography } from 'antd';
+import { InfoCircleOutlined } from '@ant-design/icons';
+import { colors, semanticColors, spacing, textStyles } from '../../theme/tokens';
 
 export interface KeyValuePairProps {
   /** The label (key) text. */
@@ -33,6 +34,8 @@ export interface KeyValuePairProps {
   labelWidth?: number | string;
   /** Allow the value to be copied (adds an inline copy affordance). */
   copyable?: boolean;
+  /** Optional help text shown via an info (i) icon next to the label. */
+  tooltip?: React.ReactNode;
   style?: React.CSSProperties;
 }
 
@@ -48,6 +51,7 @@ export const KeyValuePair: React.FC<KeyValuePairProps> = ({
   layout = 'vertical',
   labelWidth = 160,
   copyable = false,
+  tooltip,
   style,
 }) => {
   const isHorizontal = layout === 'horizontal';
@@ -55,6 +59,9 @@ export const KeyValuePair: React.FC<KeyValuePairProps> = ({
   const labelNode = (
     <span
       style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: spacing.xs,
         color: semanticColors.textSecondary,
         fontSize: textStyles.bodySmall.fontSize,
         lineHeight: `${textStyles.bodySmall.lineHeight}px`,
@@ -64,6 +71,14 @@ export const KeyValuePair: React.FC<KeyValuePairProps> = ({
       }}
     >
       {label}
+      {tooltip && (
+        <Tooltip title={tooltip}>
+          <InfoCircleOutlined
+            aria-label="More information"
+            style={{ color: colors.green[500], cursor: 'help', fontSize: 12 }}
+          />
+        </Tooltip>
+      )}
     </span>
   );
 
