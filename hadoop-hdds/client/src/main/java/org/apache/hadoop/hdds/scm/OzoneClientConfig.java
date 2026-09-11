@@ -284,6 +284,25 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
+  @Config(key = "ozone.client.fs.bucket.layout.cache.expiry",
+      defaultValue = "2m",
+      type = ConfigType.TIME,
+      description = "Expiry of entries in the client-side cache of resolved bucket layouts used by "
+          + "OFS getFileStatus. Bucket layout is immutable for a bucket's lifetime, so a cached "
+          + "layout lets getFileStatus skip the per-call InfoBucket RPC; the expiry bounds staleness "
+          + "if a bucket is deleted and recreated with a different layout. OBJECT_STORE layouts are "
+          + "cached as well and re-rejected from the cache, so this expiry applies to them too.",
+      tags = ConfigTag.CLIENT)
+  private Duration fsBucketLayoutCacheExpiry = Duration.ofMinutes(2);
+
+  @Config(key = "ozone.client.fs.bucket.layout.cache.size",
+      defaultValue = "1000",
+      description = "Maximum number of resolved bucket layouts cached client-side for OFS "
+          + "getFileStatus. Bounds the memory used by the layout cache; a value of 0 disables "
+          + "caching, so every getFileStatus re-fetches and re-validates the bucket layout.",
+      tags = ConfigTag.CLIENT)
+  private long fsBucketLayoutCacheSize = 1000;
+
   @Config(key = "ozone.client.hbase.enhancements.allowed",
       defaultValue = "false",
       description = "When set to false, client-side HBase enhancement-related Ozone (experimental) features " +
@@ -628,6 +647,14 @@ public class OzoneClientConfig {
 
   public String getFsDefaultBucketLayout() {
     return fsDefaultBucketLayout;
+  }
+
+  public Duration getFsBucketLayoutCacheExpiry() {
+    return fsBucketLayoutCacheExpiry;
+  }
+
+  public long getFsBucketLayoutCacheSize() {
+    return fsBucketLayoutCacheSize;
   }
 
   public void setEnablePutblockPiggybacking(boolean enablePutblockPiggybacking) {
