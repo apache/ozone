@@ -1237,6 +1237,14 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void setBucketStoragePolicy(OmBucketArgs args) throws IOException {
+    Objects.requireNonNull(args, "args == null");
+    verifyVolumeName(args.getVolumeName());
+    verifyBucketName(args.getBucketName());
+    ozoneManagerClient.setBucketProperty(args);
+  }
+
+  @Override
   public void setBucketQuota(String volumeName, String bucketName,
       long quotaInNamespace, long quotaInBytes) throws IOException {
     verifyVolumeName(volumeName);

@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -292,6 +293,16 @@ public interface ClientProtocol {
   void setBucketStoragePolicy(String volumeName, String bucketName,
                               StoragePolicy storagePolicy)
       throws IOException;
+
+  /**
+   * Sets the storage-policy related properties of a bucket carried in the
+   * given {@link OmBucketArgs} (storage policy, allowFallback, or unset).
+   * Unlike the three-arg overload, the policy may be absent or explicitly
+   * cleared via {@link OmBucketArgs.Builder#setUnSetStoragePolicy}.
+   * @param args Bucket arguments carrying the properties to update.
+   * @throws IOException
+   */
+  void setBucketStoragePolicy(OmBucketArgs args) throws IOException;
 
   /**
    * Deletes a bucket if it is empty.

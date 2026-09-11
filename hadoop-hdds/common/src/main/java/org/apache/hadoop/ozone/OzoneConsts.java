@@ -300,6 +300,7 @@ public final class OzoneConsts {
   public static final String STORAGE_TYPE = "storageType";
   public static final String STORAGE_POLICY = "storagePolicy";
   public static final String ALLOW_FALLBACK_STORAGE_POLICY = "allowFallbackStoragePolicy";
+  public static final String UNSET_STORAGE_POLICY = "unSetStoragePolicy";
   public static final String RESOURCE_TYPE = "resourceType";
   public static final String IS_VERSION_ENABLED = "isVersionEnabled";
   public static final String CREATION_TIME = "creationTime";

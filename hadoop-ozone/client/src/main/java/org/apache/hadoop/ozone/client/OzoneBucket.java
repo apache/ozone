@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -375,6 +376,17 @@ public class OzoneBucket extends WithMetadata {
   public void setStoragePolicy(StoragePolicy newStoragePolicy) throws IOException {
     proxy.setBucketStoragePolicy(volumeName, name, newStoragePolicy);
     storagePolicy = newStoragePolicy;
+  }
+
+  /**
+   * Sets the bucket's storage-policy properties carried in the given
+   * {@link OmBucketArgs} (storage policy, allowFallback, or unset). Used by the
+   * update path, where the policy may be absent or explicitly cleared.
+   * @param args Bucket arguments carrying the properties to update.
+   * @throws IOException
+   */
+  public void setStoragePolicyProperty(OmBucketArgs args) throws IOException {
+    proxy.setBucketStoragePolicy(args);
   }
 
   /**

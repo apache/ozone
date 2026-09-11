@@ -55,6 +55,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    * the flag was not set.
    */
   private final Boolean allowFallbackStoragePolicy;
+  /**
+   * Whether to clear (unset) the bucket's storage policy. {@code null} or
+   * {@code false} leaves the existing policy unchanged.
+   */
+  private final Boolean unSetStoragePolicy;
 
   /**
    * Bucket encryption key info if encryption is enabled.
@@ -81,6 +86,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     this.isVersionEnabled = b.isVersionEnabled;
     this.storagePolicy = b.storagePolicy;
     this.allowFallbackStoragePolicy = b.allowFallbackStoragePolicy;
+    this.unSetStoragePolicy = b.unSetStoragePolicy;
     this.ownerName = b.ownerName;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
     this.quotaInBytesSet = b.quotaInBytesSet;
@@ -130,6 +136,14 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   public Boolean getAllowFallbackStoragePolicy() {
     return allowFallbackStoragePolicy;
+  }
+
+  /**
+   * Returns whether the bucket's storage policy should be cleared (unset).
+   * @return unSetStoragePolicy (may be {@code null} when not set).
+   */
+  public Boolean getUnSetStoragePolicy() {
+    return unSetStoragePolicy;
   }
 
   /**
@@ -213,6 +227,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       auditMap.put(OzoneConsts.ALLOW_FALLBACK_STORAGE_POLICY,
           String.valueOf(this.allowFallbackStoragePolicy));
     }
+    if (this.unSetStoragePolicy != null) {
+      auditMap.put(OzoneConsts.UNSET_STORAGE_POLICY,
+          String.valueOf(this.unSetStoragePolicy));
+    }
     if (this.ownerName != null) {
       auditMap.put(OzoneConsts.OWNER, this.ownerName);
     }
@@ -249,6 +267,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private Boolean isVersionEnabled;
     private StoragePolicy storagePolicy;
     private Boolean allowFallbackStoragePolicy;
+    private Boolean unSetStoragePolicy;
     private boolean quotaInBytesSet = false;
     private long quotaInBytes;
     private boolean quotaInNamespaceSet = false;
@@ -303,6 +322,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
     public Builder setAllowFallbackStoragePolicy(Boolean allowFallback) {
       this.allowFallbackStoragePolicy = allowFallback;
+      return this;
+    }
+
+    public Builder setUnSetStoragePolicy(Boolean unSet) {
+      this.unSetStoragePolicy = unSet;
       return this;
     }
 
@@ -371,6 +395,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (allowFallbackStoragePolicy != null) {
       builder.setAllowFallbackStoragePolicy(allowFallbackStoragePolicy);
     }
+    if (unSetStoragePolicy != null) {
+      builder.setUnSetStoragePolicy(unSetStoragePolicy);
+    }
     if (quotaInBytesSet && (
         quotaInBytes > 0 || quotaInBytes == OzoneConsts.QUOTA_RESET)) {
       builder.setQuotaInBytes(quotaInBytes);
@@ -415,6 +442,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     }
     if (bucketArgs.hasAllowFallbackStoragePolicy()) {
       builder.setAllowFallbackStoragePolicy(bucketArgs.getAllowFallbackStoragePolicy());
+    }
+    if (bucketArgs.hasUnSetStoragePolicy()) {
+      builder.setUnSetStoragePolicy(bucketArgs.getUnSetStoragePolicy());
     }
     if (bucketArgs.hasOwnerName()) {
       builder.setOwnerName(bucketArgs.getOwnerName());

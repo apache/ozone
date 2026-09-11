@@ -901,6 +901,7 @@ message BucketArgs {
     repeated hadoop.hdds.KeyValue tags = 13;
     optional hadoop.hdds.StoragePolicyProto storagePolicy = 14;
     optional bool allowFallbackStoragePolicy = 15;
+    optional bool unSetStoragePolicy = 16;
 }
 
 message PrefixInfo {
