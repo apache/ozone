@@ -1,5 +1,4 @@
 share/ozone/lib/aircompressor.jar
-share/ozone/lib/aircompressor.jar
 share/ozone/lib/angus-activation.jar
 share/ozone/lib/animal-sniffer-annotations.jar
 share/ozone/lib/annotations.jar
@@ -108,8 +107,6 @@ share/ozone/lib/jackson-jaxrs-json-provider.jar
 share/ozone/lib/jackson-module-jakarta-xmlbind-annotations.jar
 share/ozone/lib/jackson-module-jaxb-annotations.jar
 share/ozone/lib/jakarta.activation-api.jar
-share/ozone/lib/jakarta.activation.jar
-share/ozone/lib/jakarta.activation.jar
 share/ozone/lib/jakarta.annotation-api.jar
 share/ozone/lib/jakarta.el-api.jar
 share/ozone/lib/jakarta.enterprise.cdi-api.jar
@@ -124,7 +121,6 @@ share/ozone/lib/javassist-GA.jar
 share/ozone/lib/javax.annotation-api.jar
 share/ozone/lib/javax.servlet-api.jar
 share/ozone/lib/jaxb-core.jar
-share/ozone/lib/jaxb-impl.jar
 share/ozone/lib/jaxb-runtime.jar
 share/ozone/lib/jcip-annotations.jar
 share/ozone/lib/jcl-over-slf4j.jar
@@ -182,7 +178,6 @@ share/ozone/lib/kerby-asn1.jar
 share/ozone/lib/kerby-config.jar
 share/ozone/lib/kerby-pkix.jar
 share/ozone/lib/kerby-util.jar
-share/ozone/lib/kotlin-stdlib-common.jar
 share/ozone/lib/kotlin-stdlib-jdk7.jar
 share/ozone/lib/kotlin-stdlib-jdk8.jar
 share/ozone/lib/kotlin-stdlib.jar
@@ -217,7 +212,6 @@ share/ozone/lib/nimbus-jose-jwt.jar
 share/ozone/lib/okhttp-jvm.jar
 share/ozone/lib/okhttp-sse.jar
 share/ozone/lib/okhttp.jar
-share/ozone/lib/okio-jvm.jar
 share/ozone/lib/okio-jvm.jar
 share/ozone/lib/okio.jar
 share/ozone/lib/openai4j.jar
@@ -312,7 +306,6 @@ share/ozone/lib/spring-core.jar
 share/ozone/lib/spring-jdbc.jar
 share/ozone/lib/spring-tx.jar
 share/ozone/lib/sqlite-jdbc.jar
-share/ozone/lib/stax2-api.jar
 share/ozone/lib/stax2-api.jar
 share/ozone/lib/txw2.jar
 share/ozone/lib/ugsync-util.jar

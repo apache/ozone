@@ -24,9 +24,20 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.http.UriCompliance;
@@ -167,6 +178,81 @@ public class TestHttpServer2 {
   @Test
   public void testStaticGuardSkipsMalformedResourceUrl() {
     assertFalse(HttpServer2.baseResourceExists("http://exa mple/static"));
+  }
+
+  /**
+   * Drives hadoop's real {@code AuthenticationFilter} through the
+   * {@link org.apache.hadoop.hdds.server.http.servletbridge.JavaxFilterBridge}
+   * on an embedded Jetty EE10 server, exercising the javax->jakarta adaptation
+   * ({@code JakartaToJavaxFilterConfig}, {@code JakartaToJavaxServletContext})
+   * that the synthetic bridge unit tests do not cover. Uses simple/pseudo auth
+   * with anonymous access disallowed: a request without a user is refused with
+   * 401, and one carrying a user reaches the servlet with {@code getRemoteUser()}
+   * bridged back onto the jakarta request.
+   */
+  @Test
+  public void testHadoopAuthFilterRunsThroughBridge() throws Exception {
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .build();
+
+    Map<String, String> params = new HashMap<>();
+    params.put("type", "simple");
+    params.put("simple.anonymous.allowed", "false");
+    params.put("signature.secret", "bridge-test-secret");
+    server.addGlobalFilter("auth",
+        "org.apache.hadoop.security.authentication.server.AuthenticationFilter",
+        params);
+    server.addServlet("whoami", "/whoami", RemoteUserServlet.class);
+    server.start();
+    try {
+      int port = server.getConnectorAddress(0).getPort();
+      String base = "http://localhost:" + port + "/whoami";
+
+      // No user and anonymous disallowed: the filter refuses with a 401.
+      assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED, statusOf(base));
+
+      // A user carried through pseudo auth reaches the servlet, and the
+      // authenticated principal is bridged back onto the jakarta request.
+      HttpURLConnection accepted =
+          (HttpURLConnection) new URL(base + "?user.name=alice").openConnection();
+      accepted.setConnectTimeout(5000);
+      accepted.setReadTimeout(5000);
+      assertEquals(HttpURLConnection.HTTP_OK, accepted.getResponseCode());
+      assertEquals("alice", readBody(accepted));
+    } finally {
+      server.stop();
+    }
+  }
+
+  private static int statusOf(String url) throws IOException {
+    HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+    conn.setConnectTimeout(5000);
+    conn.setReadTimeout(5000);
+    try {
+      return conn.getResponseCode();
+    } finally {
+      conn.disconnect();
+    }
+  }
+
+  private static String readBody(HttpURLConnection conn) throws IOException {
+    try (InputStream in = conn.getInputStream()) {
+      return IOUtils.toString(in, StandardCharsets.UTF_8).trim();
+    }
+  }
+
+  /** Servlet that echoes the authenticated remote user for the bridge test. */
+  public static class RemoteUserServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+        throws IOException {
+      resp.setContentType("text/plain");
+      String user = req.getRemoteUser();
+      resp.getWriter().write(user == null ? "" : user);
+    }
   }
 
   private static HttpServer2 buildServer(boolean allowAmbiguousUri)

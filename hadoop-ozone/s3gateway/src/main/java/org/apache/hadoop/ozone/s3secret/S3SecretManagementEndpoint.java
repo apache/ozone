@@ -26,6 +26,7 @@ import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -77,8 +78,12 @@ public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
           S3GAction.GENERATE_SECRET, getAuditParameters(), e));
       if (e.getResult() == OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS) {
         // Jetty 12 no longer emits custom HTTP reason phrases, so convey the
-        // error code in the response body instead of the status line.
-        return Response.status(BAD_REQUEST).entity(e.getResult().toString()).build();
+        // error code in the response body instead of the status line, as a
+        // plain-text entity with an explicit media type.
+        return Response.status(BAD_REQUEST)
+            .type(MediaType.TEXT_PLAIN)
+            .entity(e.getResult().toString())
+            .build();
       } else {
         LOG.error("Can't execute get secret request: ", e);
         return Response.serverError().build();
@@ -116,8 +121,10 @@ public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
           S3GAction.REVOKE_SECRET, getAuditParameters(), e));
       if (e.getResult() == OMException.ResultCodes.S3_SECRET_NOT_FOUND) {
         // Jetty 12 no longer emits custom HTTP reason phrases, so convey the
-        // error code in the response body instead of the status line.
+        // error code in the response body instead of the status line, as a
+        // plain-text entity with an explicit media type.
         return Response.status(NOT_FOUND)
+            .type(MediaType.TEXT_PLAIN)
             .entity(OMException.ResultCodes.S3_SECRET_NOT_FOUND.toString())
             .build();
       } else {

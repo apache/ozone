@@ -52,6 +52,10 @@ import org.slf4j.LoggerFactory;
  * This servlet is based off of the JMXProxyServlet from Tomcat 7.0.14. It has
  * been rewritten to be read only and to output in a JSON format so it is not
  * really that close to the original.
+ *
+ * Forked from hadoop-common 3.4.3 org.apache.hadoop.jmx.JMXJsonServlet; the only
+ * change is the switch from javax.servlet to jakarta.servlet imports. Re-sync
+ * when bumping hadoop.version.
  */
 /**
  * Provides Read only web access to JMX.

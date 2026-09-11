@@ -271,10 +271,10 @@
            via exec:java with classpathScope=compile) requires the javax.xml.bind.*
            API, which the EE10 jakarta.xml.bind-api 4.0.x no longer ships. provided
            scope keeps javax.xml.bind off the recon runtime/dist classpath, which
-           stays on jakarta.xml.bind 4.0.x. -->
+           stays on jakarta.xml.bind 4.0.x. Same artifact/version as recon-codegen,
+           managed centrally (jaxb-api-jooq.version); remove with HDDS-11142. -->
       <groupId>javax.xml.bind</groupId>
       <artifactId>jaxb-api</artifactId>
-      <version>2.3.1</version>
       <scope>provided</scope>
     </dependency>
     <dependency>

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.server.http.servletbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -110,6 +111,37 @@ class TestJavaxFilterBridge {
     assertNull(downstream.get(), "chain must not be invoked when auth is refused");
     verify(jakartaResponse).setHeader("WWW-Authenticate", "Negotiate");
     verify(jakartaResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED);
+  }
+
+  @Test
+  void responseWrappedByDelegateIsNotPropagatedButChainStillRuns() throws Exception {
+    HttpServletRequest jakartaRequest = mock(HttpServletRequest.class);
+    HttpServletResponse jakartaResponse = mock(HttpServletResponse.class);
+
+    // A javax filter that wraps the response before forwarding the chain. The
+    // bridge cannot carry that wrapper into the jakarta chain, but it must not
+    // break the request: the original jakarta response is still what flows
+    // downstream.
+    javax.servlet.Filter delegate = new AbstractJavaxFilter() {
+      @Override
+      public void doFilter(javax.servlet.ServletRequest req, javax.servlet.ServletResponse resp,
+          javax.servlet.FilterChain chain) throws java.io.IOException, javax.servlet.ServletException {
+        javax.servlet.http.HttpServletResponseWrapper wrapped =
+            new javax.servlet.http.HttpServletResponseWrapper(
+                (javax.servlet.http.HttpServletResponse) resp) {
+            };
+        chain.doFilter(req, wrapped);
+      }
+    };
+
+    AtomicReference<HttpServletResponse> downstream = new AtomicReference<>();
+    jakarta.servlet.FilterChain jakartaChain =
+        (req, resp) -> downstream.set((HttpServletResponse) resp);
+
+    new JavaxFilterBridge(delegate).doFilter(jakartaRequest, jakartaResponse, jakartaChain);
+
+    assertSame(jakartaResponse, downstream.get(),
+        "downstream chain must receive the original jakarta response, not the delegate's wrapper");
   }
 
   @Test

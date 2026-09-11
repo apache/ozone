@@ -67,6 +67,9 @@ public final class LogLevel {
   private static final String MARKER = "<!-- OUTPUT -->";
   private static final Pattern TAG = Pattern.compile("<[^>]*>");
 
+  // HTML_TAIL and Servlet.initHTML below are copied from hadoop-common 3.4.3
+  // org.apache.hadoop.util.ServletUtil (initHTML adapted to jakarta.servlet's
+  // HttpServletResponse). Re-sync when bumping hadoop.version.
   private static final String HTML_TAIL = "<hr />\n"
       + "<a href='http://hadoop.apache.org'>Hadoop</a>, "
       + Calendar.getInstance().get(Calendar.YEAR) + ".\n"

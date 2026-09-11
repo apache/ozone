@@ -47,7 +47,10 @@ public final class ServletElementsFactory {
     Class<?> filterClass = loadFilterClass(classname);
     if (javax.servlet.Filter.class.isAssignableFrom(filterClass)) {
       // hadoop-auth based filters still implement javax.servlet.Filter; run
-      // them through the bridge so they work inside Jetty EE10 (jakarta).
+      // them through the bridge so they work inside Jetty EE10 (jakarta). The
+      // bridge only carries the authenticated principal downstream (see
+      // JavaxFilterBridge); a javax filter that wraps the response or overrides
+      // non-principal request methods is not fully supported.
       holder.setFilter(new JavaxFilterBridge(newJavaxFilter(filterClass)));
     } else {
       holder.setClassName(classname);

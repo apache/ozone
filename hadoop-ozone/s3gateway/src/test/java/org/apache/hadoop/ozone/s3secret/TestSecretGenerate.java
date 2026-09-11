@@ -23,6 +23,7 @@ import static org.mockito.Mockito.notNull;
 import static org.mockito.Mockito.when;
 
 import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.MultivaluedHashMap;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
@@ -106,6 +107,9 @@ class TestSecretGenerate {
     assertEquals(BAD_REQUEST.getStatusCode(), response.getStatus());
     assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS.toString(),
         response.getEntity());
+    // The error code moved from the status line into the body, so the body
+    // must carry an explicit plain-text media type.
+    assertEquals(MediaType.TEXT_PLAIN_TYPE, response.getMediaType());
   }
 
   @Test

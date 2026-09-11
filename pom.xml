@@ -105,6 +105,7 @@
     <javassist.version>3.32.0-GA</javassist.version>
     <javax-servlet-api.version>3.1.0</javax-servlet-api.version>
     <javax.inject.version>1</javax.inject.version>
+    <jaxb-api-jooq.version>2.3.1</jaxb-api-jooq.version>
     <jaxb-api.version>4.0.2</jaxb-api.version>
     <jaxb-runtime.version>4.0.5</jaxb-runtime.version>
     <jcip-annotations.version>1.0-1</jcip-annotations.version>
@@ -120,6 +121,7 @@
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.11.10</jooq.version>
     <jsch.version>0.1.55</jsch.version>
+    <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
     <junit5.version>5.14.4</junit5.version>
     <kerby.version>2.1.2</kerby.version>
@@ -161,6 +163,7 @@
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>24.17.0</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
+    <okio.version>3.17.0</okio.version>
     <opentelemetry.version>1.65.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <ozone.java.version.client>8</ozone.java.version.client>
@@ -491,6 +494,13 @@
         <version>${okhttp3.version}</version>
       </dependency>
       <dependency>
+        <!-- Pinned so the dist ships a single okio-jvm: most modules bring 3.17.0
+             while Recon brings 3.6.0 transitively. -->
+        <groupId>com.squareup.okio</groupId>
+        <artifactId>okio-jvm</artifactId>
+        <version>${okio.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.sun.jersey</groupId>
         <artifactId>jersey-client</artifactId>
         <version>${jersey.version}</version>
@@ -639,9 +649,26 @@
         <version>${javax-servlet-api.version}</version>
       </dependency>
       <dependency>
+        <!-- Transitive from hadoop-common; pinned so the version reaching the dist
+             classpath stays managed centrally rather than floating with hadoop. -->
+        <groupId>javax.servlet.jsp</groupId>
+        <artifactId>jsp-api</artifactId>
+        <version>${jsp-api.version}</version>
+      </dependency>
+      <dependency>
         <groupId>javax.ws.rs</groupId>
         <artifactId>jsr311-api</artifactId>
         <version>${jsr311-api.version}</version>
+      </dependency>
+      <dependency>
+        <!-- jOOQ 3.11.10's org.jooq.meta.jaxb.* code-generator config classes are
+             annotated with javax JAXB; this 2.3.x api still ships the javax.xml.bind.*
+             classes that the 4.0.x jakarta.xml.bind-api (jaxb-api.version) no longer
+             carries. Used only at build time by recon / recon-codegen; remove with
+             HDDS-11142. -->
+        <groupId>javax.xml.bind</groupId>
+        <artifactId>jaxb-api</artifactId>
+        <version>${jaxb-api-jooq.version}</version>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -1579,6 +1606,13 @@
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcutil-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <!-- Pinned so the dist ships a single stax2-api: different modules bring
+             4.2.1 (via woodstox-core) and 4.2.2 transitively. -->
+        <groupId>org.codehaus.woodstox</groupId>
+        <artifactId>stax2-api</artifactId>
+        <version>${stax2.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.hk2</groupId>

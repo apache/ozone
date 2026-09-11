@@ -31,6 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.MultivaluedHashMap;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
@@ -112,6 +113,10 @@ public class TestSecretRevoke {
         .when(objectStore).revokeS3Secret(any());
     Response secondResponse = endpoint.revoke();
     assertEquals(NOT_FOUND.getStatusCode(), secondResponse.getStatus());
+    // The error code moved from the status line into the body, so the body
+    // must carry the code as an explicit plain-text media type.
+    assertEquals(S3_SECRET_NOT_FOUND.toString(), secondResponse.getEntity());
+    assertEquals(MediaType.TEXT_PLAIN_TYPE, secondResponse.getMediaType());
   }
 
   @Test

@@ -28,6 +28,9 @@ import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.security.Principal;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Runs a {@code javax.servlet.Filter} inside a Jetty EE10 (jakarta) servlet
@@ -44,10 +47,27 @@ import java.security.Principal;
  * when the delegate short-circuits (for example writing a 401), the response
  * has already been written through to the jakarta response and the downstream
  * chain is not invoked.
+ *
+ * <p><b>Bridging scope.</b> Only the delegate's authentication result crosses
+ * back into the jakarta chain: the four principal methods
+ * ({@code getRemoteUser}, {@code getUserPrincipal}, {@code getAuthType},
+ * {@code isUserInRole}) of the request the delegate forwards are overlaid onto
+ * the original jakarta request. Any other request wrapping the delegate adds
+ * (extra headers, parameters, attributes) and any response wrapper it forwards
+ * are not propagated downstream. This matches hadoop's
+ * {@code AuthenticationFilter} family and {@code StaticUserFilter}, which only
+ * establish a principal; a javax filter that depends on wrapping the response
+ * or on non-principal request overrides is not fully supported here. The bridge
+ * logs a warning if the delegate forwards a response other than the javax view
+ * it was given, since that wrapper is silently dropped.
  */
 public class JavaxFilterBridge implements Filter {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(JavaxFilterBridge.class);
+
   private final javax.servlet.Filter delegate;
+  private final AtomicBoolean warnedResponseWrapped = new AtomicBoolean();
 
   public JavaxFilterBridge(javax.servlet.Filter delegate) {
     this.delegate = delegate;
@@ -87,6 +107,12 @@ public class JavaxFilterBridge implements Filter {
       if (downstreamRequest instanceof javax.servlet.http.HttpServletRequest) {
         authenticated = new AuthenticatedRequest(jakartaRequest,
             (javax.servlet.http.HttpServletRequest) downstreamRequest);
+      }
+      if (downstreamResponse != javaxResponse
+          && warnedResponseWrapped.compareAndSet(false, true)) {
+        LOG.warn("javax filter {} wrapped or replaced the response; the wrapper "
+            + "is not propagated to the jakarta chain (only the authenticated "
+            + "principal is bridged).", delegate.getClass().getName());
       }
       try {
         chain.doFilter(authenticated, jakartaResponse);

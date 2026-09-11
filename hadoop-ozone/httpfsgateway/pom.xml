@@ -63,8 +63,9 @@
       <artifactId>jakarta.ws.rs-api</artifactId>
     </dependency>
     <dependency>
-      <!-- Retained for HttpFSAuthenticationFilter, which still extends
-           hadoop-auth's javax.servlet-based DelegationTokenAuthenticationFilter. -->
+      <!-- Retained for the nested HadoopAuthDelegate in HttpFSAuthenticationFilter,
+           which extends hadoop-auth's javax.servlet-based
+           DelegationTokenAuthenticationFilter and runs through JavaxFilterBridge. -->
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
     </dependency>
@@ -159,6 +160,14 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-reload4j</artifactId>
       <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <!-- Test-only: TestHttpFSServerWebServer references
+           org.eclipse.jetty.http.UriCompliance directly. At runtime jetty-http
+           arrives transitively via jetty-server. -->
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-http</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
