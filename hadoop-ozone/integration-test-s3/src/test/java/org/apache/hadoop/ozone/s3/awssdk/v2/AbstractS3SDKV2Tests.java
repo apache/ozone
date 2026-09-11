@@ -2785,6 +2785,26 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .lifecycleConfiguration(validConfig)));
     assertEquals(HttpURLConnection.HTTP_NOT_FOUND, exception2.statusCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), exception2.awsErrorDetails().errorCode());
+
+    LifecycleRule pastDateRule = LifecycleRule.builder()
+        .id("past-date")
+        .prefix("logs/")
+        .status(ExpirationStatus.ENABLED)
+        .expiration(LifecycleExpiration.builder().date(Instant.parse("2020-01-01T00:00:00Z")).build())
+        .build();
+    BucketLifecycleConfiguration pastDateConfig = BucketLifecycleConfiguration.builder()
+        .rules(pastDateRule)
+        .build();
+
+    S3Exception exception3 = assertThrows(S3Exception.class,
+        () -> s3Client.putBucketLifecycleConfiguration(b -> b
+            .bucket(bucketName)
+            .lifecycleConfiguration(pastDateConfig)));
+    assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, exception3.statusCode());
+    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), exception3.awsErrorDetails().errorCode());
+    assertTrue(exception3.awsErrorDetails().errorMessage().contains("must be in the future"),
+        "The client should receive OM's detailed message explaining the date is in the past, got: "
+            + exception3.awsErrorDetails().errorMessage());
   }
 
   @Test
