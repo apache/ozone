@@ -53,6 +53,9 @@ public abstract class RDBSnapshotProvider implements Closeable {
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBSnapshotProvider.class);
 
+  // Tolerate one no-progress part, e.g. a truncated exclude list made the leader resend files already present.
+  private static final int MAX_NO_PROGRESS_PARTS = 2;
+
   private final File snapshotDir;
   private final File candidateDir;
   private final String dbName;
@@ -109,14 +112,16 @@ public abstract class RDBSnapshotProvider implements Closeable {
         "reloading state from the snapshot.", leaderNodeID);
     checkLeaderConsistency(leaderNodeID);
     int numParts = 0;
+    int numNoProgressParts = 0;
+    int numFiles = HAUtils.getExistingFiles(candidateDir).size();
 
     while (true) {
       String snapshotFileName = getSnapshotFileName(leaderNodeID);
       File targetFile = new File(snapshotDir, snapshotFileName);
       downloadSnapshot(leaderNodeID, targetFile);
+      numParts++;
       LOG.info("Successfully download the latest snapshot {} from leader OM: {}, part : {}",
           targetFile, leaderNodeID, numParts);
-      numParts++;
 
       numDownloaded.incrementAndGet();
       injectPause();
@@ -129,6 +134,22 @@ public abstract class RDBSnapshotProvider implements Closeable {
         LOG.info("DB snapshot transfer is complete.");
         return getCheckpointFromUntarredDb(unTarredDb);
       }
+
+      // The next request is built from the files already in the candidate dir, so a part which brings
+      // no new file leaves the leader with the same request to answer and the transfer cannot progress.
+      int numFilesAfterPart = HAUtils.getExistingFiles(candidateDir).size();
+      if (numFilesAfterPart > numFiles) {
+        numNoProgressParts = 0;
+      } else if (++numNoProgressParts >= MAX_NO_PROGRESS_PARTS) {
+        throw new IOException(String.format("DB snapshot transfer from leader %s aborted after %d parts: the last"
+            + " %d parts brought no new file into %s and the transfer is still incomplete. A single file on the"
+            + " leader is likely larger than its per-request SST size limit"
+            + " (OM: ozone.om.ratis.snapshot.max.total.sst.size).",
+            leaderNodeID, numParts, numNoProgressParts, candidateDir));
+      } else {
+        LOG.warn("Part {} from leader {} brought no new file into {}.", numParts, leaderNodeID, candidateDir);
+      }
+      numFiles = numFilesAfterPart;
     }
   }
 
