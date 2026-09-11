@@ -180,6 +180,15 @@ public final class OzoneConsts {
 
   public static final String OM_KEY_PREFIX = "/";
   public static final String DOUBLE_SLASH_OM_KEY_PREFIX  = "//";
+  /**
+   * Separates a key name from the versionId suffix in versionedKeyTable DB keys.
+   * OM_KEY_PREFIX cannot be used: OBJECT_STORE key names contain '/' verbatim, so
+   * a key's versions would interleave with the versions of keys nested under it.
+   * 0x00 is the minimum byte value, so {keyName} + this separator can never be a
+   * prefix of {keyName} + "/". Written as an octal escape because a literal
+   * unicode escape for NUL is expanded by the Java lexer before parsing.
+   */
+  public static final String OM_VERSIONED_KEY_SEPARATOR = "\0";
   public static final String OM_USER_PREFIX = "$";
   public static final String OM_S3_PREFIX = "S3:";
   public static final String OM_S3_CALLER_CONTEXT_PREFIX = "S3Auth:S3G|";
@@ -299,6 +308,14 @@ public final class OzoneConsts {
   public static final String STORAGE_TYPE = "storageType";
   public static final String RESOURCE_TYPE = "resourceType";
   public static final String IS_VERSION_ENABLED = "isVersionEnabled";
+  public static final String VERSIONING_STATUS = "versioningStatus";
+  // Audit keys for the object versions a write creates, demotes or removes.
+  public static final String VERSION_ID = "versionId";
+  public static final String REQUESTED_VERSION_ID = "requestedVersionId";
+  public static final String SUPERSEDED_VERSION_ID = "supersededVersionId";
+  public static final String DELETED_VERSION_ID = "deletedVersionId";
+  public static final String PROMOTED_VERSION_ID = "promotedVersionId";
+  public static final String NULL_VERSION = "nullVersion";
   public static final String CREATION_TIME = "creationTime";
   public static final String MODIFICATION_TIME = "modificationTime";
   public static final String DATA_SIZE = "dataSize";

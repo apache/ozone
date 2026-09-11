@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -114,6 +115,40 @@ public class TestOmKeyInfo {
         (ECReplicationConfig) recovered.getReplicationConfig();
     assertEquals(3, config.getData());
     assertEquals(2, config.getParity());
+  }
+
+  @Test
+  public void protobufConversionWithVersioningFields() {
+    // records without versioning fields keep them unset after a round trip
+    OmKeyInfo key = createOmKeyInfo(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    OzoneManagerProtocolProtos.KeyInfo proto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
+    assertFalse(proto.hasVersionId());
+    assertFalse(proto.hasIsDeleteMarker());
+    assertFalse(proto.hasIsNullVersion());
+    OmKeyInfo recovered = OmKeyInfo.getFromProtobuf(proto);
+    assertNull(recovered.getVersionId());
+    assertFalse(recovered.isDeleteMarker());
+    assertFalse(recovered.isNullVersion());
+
+    // versioning fields survive a round trip and the copy constructor
+    key = createOmKeyInfo(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .toBuilder()
+        .setVersionId(4242L)
+        .setDeleteMarker(true)
+        .setNullVersion(true)
+        .build();
+    recovered = OmKeyInfo.getFromProtobuf(key.getProtobuf(ClientVersion.CURRENT_VERSION));
+    assertEquals(4242L, recovered.getVersionId());
+    assertTrue(recovered.isDeleteMarker());
+    assertTrue(recovered.isNullVersion());
+
+    // records differing only in a versioning field must not compare equal
+    OmKeyInfo plain = createOmKeyInfo(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    assertNotEquals(plain, plain.toBuilder().setVersionId(1L).build());
+    assertNotEquals(plain, plain.toBuilder().setDeleteMarker(true).build());
+    assertNotEquals(plain, plain.toBuilder().setNullVersion(true).build());
   }
 
   private OmKeyInfo createOmKeyInfo(ReplicationConfig replicationConfig) {

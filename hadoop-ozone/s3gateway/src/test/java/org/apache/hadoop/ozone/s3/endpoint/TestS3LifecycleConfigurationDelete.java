@@ -21,6 +21,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_NO_CONTENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
@@ -78,6 +79,48 @@ public class TestS3LifecycleConfigurationDelete {
       assertEquals(NO_SUCH_LIFECYCLE_CONFIGURATION.getCode(),
           ex.getCode());
     }
+  }
+
+  /**
+   * A configuration carrying the versioning actions has to be removable like
+   * any other: the rule model round-trips through Put, Get and Delete.
+   */
+  @Test
+  public void testDeleteLifecycleConfigurationWithVersioningActions()
+      throws Exception {
+    String bucketName = "bucket1";
+    bucketEndpoint.put(bucketName, versioningRules());
+    Response r = bucketEndpoint.delete(bucketName);
+
+    assertEquals(HTTP_NO_CONTENT, r.getStatus());
+
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.get(bucketName));
+    assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
+    assertEquals(NO_SUCH_LIFECYCLE_CONFIGURATION.getCode(), ex.getCode());
+  }
+
+  private static InputStream versioningRules() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws"
+        + ".com/doc/2006-03-01/\">"
+        + "<Rule>"
+        + "<ID>trim noncurrent versions</ID>"
+        + "<Prefix>prefix/</Prefix>"
+        + "<Status>Enabled</Status>"
+        + "<NoncurrentVersionExpiration>"
+        + "<NoncurrentDays>30</NoncurrentDays>"
+        + "</NoncurrentVersionExpiration>"
+        + "</Rule>"
+        + "<Rule>"
+        + "<ID>sweep expired delete markers</ID>"
+        + "<Prefix>prefix/</Prefix>"
+        + "<Status>Enabled</Status>"
+        + "<Expiration>"
+        + "<ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker>"
+        + "</Expiration>"
+        + "</Rule>"
+        + "</LifecycleConfiguration>";
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
 
   private static InputStream getBody() {

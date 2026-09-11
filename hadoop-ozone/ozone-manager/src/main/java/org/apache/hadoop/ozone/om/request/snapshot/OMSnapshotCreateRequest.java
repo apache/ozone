@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.SNAPSHOT_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
@@ -174,6 +175,24 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // Snapshot referenced size should be bucket's used bytes
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
+
+      // volumeName and bucketName were resolved to the source bucket in
+      // preExecute, so a linked bucket is judged by what it points at. The
+      // check runs here rather than in preExecute so that it and the versioning
+      // transition check in OMBucketSetPropertyRequest are ordered by Ratis:
+      // whichever applies second sees the state the first one committed.
+      if (omBucketInfo.hasEverBeenVersioned()
+          && !ozoneManager.isSnapshotVersioningCoexistenceAllowed()) {
+        throw new OMException("Cannot create a snapshot of bucket "
+            + bucketName + ": its object versioning status is "
+            + omBucketInfo.getVersioningStatus() + ". Snapshots and S3 object"
+            + " versioning cannot be used on the same bucket until"
+            + " snapshot-aware version reclamation is available; without it a"
+            + " noncurrent version reclaimed from the active object store"
+            + " would take blocks a snapshot still references.",
+            NOT_SUPPORTED_OPERATION);
+      }
+
       snapshotInfo.setReferencedReplicatedSize(omBucketInfo.getUsedBytes());
 
       // Snapshot referenced size in this case is an *estimate* inferred from

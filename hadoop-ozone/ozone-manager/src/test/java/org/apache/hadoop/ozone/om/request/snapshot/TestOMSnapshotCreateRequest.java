@@ -40,11 +40,14 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -58,11 +61,13 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotRequestAndResponseTests;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -155,6 +160,115 @@ public class TestOMSnapshotCreateRequest extends SnapshotRequestAndResponseTests
         () -> doPreExecute(omRequest));
     assertEquals("Only bucket owners and Ozone admins can create snapshots",
         omException.getMessage());
+  }
+
+  /**
+   * A snapshot shares blocks with the active object store and keeps them only
+   * because KeyDeletingService refuses to reclaim what a previous snapshot
+   * references. That decision is not version-aware yet, so the two features
+   * cannot be used on the same bucket. SUSPENDED is refused along with ENABLED
+   * because a suspended bucket still holds noncurrent versions.
+   */
+  @EnumSource(value = BucketVersioningStatus.class,
+      names = {"ENABLED", "SUSPENDED"})
+  @ParameterizedTest
+  public void testCreateSnapshotRejectedOnVersionedBucket(
+      BucketVersioningStatus status) throws Exception {
+    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+    setBucketVersioningStatus(getVolumeName(), getBucketName(), status);
+
+    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
+        getBucketName(), snapshotName1);
+    OMSnapshotCreateRequest request = doPreExecute(omRequest);
+
+    OMResponse omResponse = request
+        .validateAndUpdateCache(getOzoneManager(), 1).getOMResponse();
+
+    assertEquals(Status.NOT_SUPPORTED_OPERATION, omResponse.getStatus());
+    assertThat(omResponse.getMessage())
+        .contains("Snapshots and S3 object versioning cannot be used on the"
+            + " same bucket");
+    // nothing was written
+    assertNull(getOmMetadataManager().getSnapshotInfoTable()
+        .get(getTableKey(getVolumeName(), getBucketName(), snapshotName1)));
+  }
+
+  @Test
+  public void testCreateSnapshotAllowedOnUnversionedBucket() throws Exception {
+    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+    setBucketVersioningStatus(getVolumeName(), getBucketName(),
+        BucketVersioningStatus.UNVERSIONED);
+
+    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
+        getBucketName(), snapshotName1);
+    OMSnapshotCreateRequest request = doPreExecute(omRequest);
+
+    assertEquals(OK, request.validateAndUpdateCache(getOzoneManager(), 1)
+        .getOMResponse().getStatus());
+  }
+
+  /**
+   * preExecute resolves a linked bucket to its source, so the check applies to
+   * what the link points at rather than to the link itself.
+   */
+  @Test
+  public void testCreateSnapshotRejectedOnLinkToVersionedBucket()
+      throws Exception {
+    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+    String sourceBucketName = getBucketName() + "-source";
+    OMRequestTestUtils.addVolumeAndBucketToDB(getVolumeName(),
+        sourceBucketName, getOmMetadataManager());
+    setBucketVersioningStatus(getVolumeName(), sourceBucketName,
+        BucketVersioningStatus.ENABLED);
+    when(getOzoneManager().resolveBucketLink(any(Pair.class),
+        any(OMClientRequest.class)))
+        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0),
+            Pair.of(getVolumeName(), sourceBucketName), "owner",
+            BucketLayout.OBJECT_STORE));
+
+    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
+        getBucketName(), snapshotName1);
+    OMSnapshotCreateRequest request = doPreExecute(omRequest);
+
+    OMResponse omResponse = request
+        .validateAndUpdateCache(getOzoneManager(), 1).getOMResponse();
+
+    assertEquals(Status.NOT_SUPPORTED_OPERATION, omResponse.getStatus());
+    assertThat(omResponse.getMessage()).contains(sourceBucketName);
+  }
+
+  /**
+   * The dev-only flag lifts the exclusion so that the integration tests for
+   * snapshot-aware version reclamation can be written against a real
+   * mixed-state bucket.
+   */
+  @Test
+  public void testCreateSnapshotAllowedOnVersionedBucketWithDevFlag()
+      throws Exception {
+    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+    when(getOzoneManager().isSnapshotVersioningCoexistenceAllowed())
+        .thenReturn(true);
+    setBucketVersioningStatus(getVolumeName(), getBucketName(),
+        BucketVersioningStatus.ENABLED);
+
+    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
+        getBucketName(), snapshotName1);
+    OMSnapshotCreateRequest request = doPreExecute(omRequest);
+
+    assertEquals(OK, request.validateAndUpdateCache(getOzoneManager(), 1)
+        .getOMResponse().getStatus());
+  }
+
+  private void setBucketVersioningStatus(String volume, String bucket,
+      BucketVersioningStatus status) throws Exception {
+    String bucketKey = getOmMetadataManager().getBucketKey(volume, bucket);
+    OmBucketInfo bucketInfo = getOmMetadataManager().getBucketTable()
+        .get(bucketKey).toBuilder()
+        .setVersioningStatus(status)
+        .build();
+    getOmMetadataManager().getBucketTable().addCacheEntry(
+        new CacheKey<>(bucketKey), CacheValue.get(1L, bucketInfo));
+    getOmMetadataManager().getBucketTable().put(bucketKey, bucketInfo);
   }
 
   @Test
