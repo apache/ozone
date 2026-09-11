@@ -89,14 +89,15 @@ public class UtilizationEndpoint {
       Table<FileSizeCountKey, Long> fileCountTable = reconFileMetadataManager.getFileCountTable();
       
       if (volume != null && bucket != null && fileSize > 0) {
-        // Query for specific volume, bucket, and file size
-        FileSizeCountKey key = new FileSizeCountKey(volume, bucket, fileSize);
+        // Counts are stored per file size bin, so map the requested size to its bin upper bound.
+        long fileSizeUpperBound = ReconUtils.getFileSizeUpperBound(fileSize);
+        FileSizeCountKey key = new FileSizeCountKey(volume, bucket, fileSizeUpperBound);
         Long count = fileCountTable.get(key);
         if (count != null && count > 0) {
           FileCountBySize record = new FileCountBySize();
           record.setVolume(volume);
           record.setBucket(bucket);
-          record.setFileSize(fileSize);
+          record.setFileSize(fileSizeUpperBound);
           record.setCount(count);
           resultSet.add(record);
         }
