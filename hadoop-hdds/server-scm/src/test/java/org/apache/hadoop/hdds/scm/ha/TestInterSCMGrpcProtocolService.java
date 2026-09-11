@@ -41,6 +41,7 @@ import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -200,7 +201,8 @@ class TestInterSCMGrpcProtocolService {
     KeyPair serviceKeys = CertificateTestUtils.aKeyPair(conf);
     KeyPair clientKeys = CertificateTestUtils.aKeyPair(conf);
 
-    serviceCert = createSelfSignedCert(serviceKeys, "service");
+    serviceCert = createSelfSignedCert(serviceKeys, "service",
+        Collections.singletonList("localhost"));
     clientCert = createSelfSignedCert(clientKeys, "client");
 
     ReloadingX509TrustManager toSpyServerTrustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(),

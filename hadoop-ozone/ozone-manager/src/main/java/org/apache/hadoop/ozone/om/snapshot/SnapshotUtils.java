@@ -319,9 +319,9 @@ public final class SnapshotUtils {
     }
 
     List<OmKeyLocationInfo> deletedLocationList =
-        deletedOmKeyLocation.getLocationList();
+        deletedOmKeyLocation.createLocationList();
     List<OmKeyLocationInfo> prevLocationList =
-        prevOmKeyLocation.getLocationList();
+        prevOmKeyLocation.createLocationList();
 
     if (deletedLocationList.size() != prevLocationList.size()) {
       return false;

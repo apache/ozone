@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.rpc.read;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -58,14 +60,19 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.function.CheckedBiConsumer;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 /**
  * Tests {@link StreamBlockInputStream}.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestStreamRead {
+
   {
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("com"), Level.ERROR);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org"), Level.ERROR);
@@ -86,12 +93,10 @@ public class TestStreamRead {
 
   static final String DUMMY_KEY = "dummyKey";
 
-  static MiniOzoneCluster newCluster(int bytesPerChecksum) throws Exception {
-    final OzoneConfiguration conf = new OzoneConfiguration();
+  private MiniOzoneCluster cluster;
 
-    OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
-    config.setBytesPerChecksum(bytesPerChecksum);
-    conf.setFromObject(config);
+  static MiniOzoneCluster newCluster() throws Exception {
+    final OzoneConfiguration conf = new OzoneConfiguration();
 
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 1);
@@ -107,6 +112,19 @@ public class TestStreamRead {
     return MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
         .build();
+  }
+
+  @BeforeAll
+  void startup() throws Exception {
+    System.out.println("cluster starting ...");
+    cluster = newCluster();
+    cluster.waitForClusterToBeReady();
+    System.out.println("cluster ready");
+  }
+
+  @AfterAll
+  void shutdown() {
+    IOUtils.closeQuietly(cluster);
   }
 
   @Test
@@ -128,83 +146,88 @@ public class TestStreamRead {
   }
 
   void runTestReadKey(SizeInBytes keySize, SizeInBytes bytesPerChecksum) throws Exception {
-    System.out.println("cluster starting ...");
-    try (MiniOzoneCluster cluster = newCluster(bytesPerChecksum.getSizeInt())) {
-      cluster.waitForClusterToBeReady();
-      System.out.println("cluster ready");
+    final List<HddsDatanodeService> datanodes = cluster.getHddsDatanodes();
+    assertEquals(1, datanodes.size());
+    final HddsDatanodeService datanode = datanodes.get(0);
 
-      final List<HddsDatanodeService> datanodes = cluster.getHddsDatanodes();
-      assertEquals(1, datanodes.size());
-      final HddsDatanodeService datanode = datanodes.get(0);
+    OzoneConfiguration conf = cluster.getConf();
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setBytesPerChecksum(bytesPerChecksum.getSizeInt());
+    clientConfig.setStreamReadBlock(true);
+    final OzoneConfiguration steamReadConf = new OzoneConfiguration(conf);
+    steamReadConf.setFromObject(clientConfig);
 
-      OzoneConfiguration conf = cluster.getConf();
-      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-      clientConfig.setStreamReadBlock(true);
-      final OzoneConfiguration steamReadConf = new OzoneConfiguration(conf);
-      steamReadConf.setFromObject(clientConfig);
+    clientConfig.setStreamReadBlock(false);
+    final OzoneConfiguration nonSteamReadConf = new OzoneConfiguration(conf);
+    nonSteamReadConf.setFromObject(clientConfig);
 
-      clientConfig.setStreamReadBlock(false);
-      final OzoneConfiguration nonSteamReadConf = new OzoneConfiguration(conf);
-      nonSteamReadConf.setFromObject(clientConfig);
+    final SizeInBytes[] bufferSizes = {
+        SizeInBytes.valueOf("32M"),
+        SizeInBytes.valueOf("8M"),
+        SizeInBytes.valueOf("1M"),
+        SizeInBytes.valueOf("4k"),
+    };
 
-      final SizeInBytes[] bufferSizes = {
-          SizeInBytes.valueOf("32M"),
-          SizeInBytes.valueOf("8M"),
-          SizeInBytes.valueOf("1M"),
-          SizeInBytes.valueOf("4k"),
-      };
+    try (OzoneClient streamReadClient = OzoneClientFactory.getRpcClient(steamReadConf);
+         OzoneClient nonStreamReadClient = OzoneClientFactory.getRpcClient(nonSteamReadConf)) {
 
-      try (OzoneClient streamReadClient = OzoneClientFactory.getRpcClient(steamReadConf);
-           OzoneClient nonStreamReadClient = OzoneClientFactory.getRpcClient(nonSteamReadConf)) {
-        final BucketForTesting testBucket = BucketForTesting.newBuilder(streamReadClient).build();
-        final String volume = testBucket.delegate().getVolumeName();
-        final String bucket = testBucket.delegate().getName();
-        final String keyName = "key0";
+      assertClientBytesPerChecksum(bytesPerChecksum, streamReadClient);
+      assertClientBytesPerChecksum(bytesPerChecksum, nonStreamReadClient);
 
-        // get the client ready by writing a dummy key
-        createKey(testBucket.delegate(), DUMMY_KEY, SizeInBytes.ONE_KB, SizeInBytes.ONE_KB);
+      final BucketForTesting testBucket = BucketForTesting.newBuilder(streamReadClient).build();
+      final String volume = testBucket.delegate().getVolumeName();
+      final String bucket = testBucket.delegate().getName();
+      final String keyName = "key0";
 
-        for (SizeInBytes bufferSize : bufferSizes) {
-          // create key
-          System.out.println("---------------------------------------------------------");
-          createKey(testBucket.delegate(), keyName, keySize, bufferSize);
+      // get the client ready by writing a dummy key
+      createKey(testBucket.delegate(), DUMMY_KEY, SizeInBytes.ONE_KB, SizeInBytes.ONE_KB);
 
-          // get block file and generate md5
-          final OmKeyInfo info = nonStreamReadClient.getProxy().getKeyInfo(volume, bucket, keyName, false);
-          final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().getLocationList();
-          assertEquals(1, locations.size());
-          final BlockID blockId = locations.get(0).getBlockID();
-          final ContainerData containerData = datanode.getDatanodeStateMachine().getContainer().getContainerSet()
-              .getContainer(blockId.getContainerID()).getContainerData();
-          final File blockFile = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(containerData, blockId, null);
-          assertTrue(blockFile.exists());
-          assertEquals(BLOCK_SIZE, blockFile.length());
-          final String expectedMd5 = generateMd5(keySize, SizeInBytes.ONE_MB, blockFile);
+      for (SizeInBytes bufferSize : bufferSizes) {
+        // create key
+        System.out.println("---------------------------------------------------------");
+        createKey(testBucket.delegate(), keyName, keySize, bufferSize);
 
-          // run tests
-          System.out.println("---------------------------------------------------------");
-          System.out.printf("%s with %s bytes and %s bytesPerChecksum%n",
-              keyName, keySize, bytesPerChecksum);
+        // get block file and generate md5
+        final OmKeyInfo info = nonStreamReadClient.getProxy().getKeyInfo(volume, bucket, keyName, false);
+        final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
+        assertEquals(1, locations.size());
+        final BlockID blockId = locations.get(0).getBlockID();
+        final ContainerData containerData = datanode.getDatanodeStateMachine().getContainer().getContainerSet()
+            .getContainer(blockId.getContainerID()).getContainerData();
+        final File blockFile = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(containerData, blockId, null);
+        assertTrue(blockFile.exists());
+        assertEquals(BLOCK_SIZE, blockFile.length());
+        final String expectedMd5 = generateMd5(keySize, SizeInBytes.ONE_MB, blockFile);
 
-          final CheckedBiConsumer<SizeInBytes, String, Exception> streamRead = (readBufferSize, md5)
-              -> streamRead(keySize, readBufferSize, md5, testBucket, keyName);
-          final CheckedBiConsumer<SizeInBytes, String, Exception> nonStreamRead = (readBufferSize, md5)
-              -> nonStreamRead(keySize, readBufferSize, md5, nonStreamReadClient, volume, bucket, keyName);
-          final CheckedBiConsumer<SizeInBytes, String, Exception> fileRead = (readBufferSize, md5)
-              -> fileRead(keySize, readBufferSize, md5, blockFile);
-          final List<CheckedBiConsumer<SizeInBytes, String, Exception>> operations
-              = Arrays.asList(streamRead, nonStreamRead, fileRead);
-          Collections.shuffle(operations);
+        // run tests
+        System.out.println("---------------------------------------------------------");
+        System.out.printf("%s with %s bytes and %s bytesPerChecksum%n",
+            keyName, keySize, bytesPerChecksum);
 
-          for (CheckedBiConsumer<SizeInBytes, String, Exception> op : operations) {
-            for (int i = 0; i < 5; i++) {
-              op.accept(bufferSize, null);
-            }
-            op.accept(bufferSize, expectedMd5);
+        final CheckedBiConsumer<SizeInBytes, String, Exception> streamRead = (readBufferSize, md5)
+            -> streamRead(keySize, readBufferSize, md5, testBucket, keyName);
+        final CheckedBiConsumer<SizeInBytes, String, Exception> nonStreamRead = (readBufferSize, md5)
+            -> nonStreamRead(keySize, readBufferSize, md5, nonStreamReadClient, volume, bucket, keyName);
+        final CheckedBiConsumer<SizeInBytes, String, Exception> fileRead = (readBufferSize, md5)
+            -> fileRead(keySize, readBufferSize, md5, blockFile);
+        final List<CheckedBiConsumer<SizeInBytes, String, Exception>> operations
+            = Arrays.asList(streamRead, nonStreamRead, fileRead);
+        Collections.shuffle(operations);
+
+        for (CheckedBiConsumer<SizeInBytes, String, Exception> op : operations) {
+          for (int i = 0; i < 5; i++) {
+            op.accept(bufferSize, null);
           }
+          op.accept(bufferSize, expectedMd5);
         }
       }
     }
+  }
+
+  private static void assertClientBytesPerChecksum(SizeInBytes configured, OzoneClient client) {
+    int expected = Math.max(configured.getSizeInt(), OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE);
+    OzoneClientConfig clientConfig = client.getConfiguration().getObject(OzoneClientConfig.class);
+    assertEquals(expected, clientConfig.getBytesPerChecksum());
   }
 
   static void streamRead(SizeInBytes keySize, SizeInBytes bufferSize, String expectedMD5,

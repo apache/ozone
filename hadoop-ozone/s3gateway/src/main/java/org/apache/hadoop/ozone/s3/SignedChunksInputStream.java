@@ -21,9 +21,16 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.xml.bind.DatatypeConverter;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 
 /**
  * Input stream implementation to read body of a signed chunked upload. This should also work
@@ -53,8 +60,9 @@ import java.util.regex.Pattern;
  * </p>
  *
  * <p>
- * Note that there are no actual chunk signature verification taking place. The InputStream only
- * returns the actual chunk payload from chunked signatures format.
+ * If a {@link ChunksValidator} is supplied, the signature of each chunk is verified (in real time, without
+ * buffering the whole chunk) as the payload is read. Without a validator the stream only strips the chunk
+ * signatures format and returns the payload.
  * </p>
  *
  * Reference:
@@ -71,10 +79,26 @@ import java.util.regex.Pattern;
  */
 public class SignedChunksInputStream extends InputStream {
 
-  private final Pattern signatureLinePattern =
-      Pattern.compile("([0-9A-Fa-f]+);chunk-signature=.*");
+  /**
+   * Chunk header line. The signature is HMAC-SHA256, i.e. exactly 64 hex characters: the S3 Gateway only
+   * accepts the AWS4-HMAC-SHA256 signing algorithm, so this is the only chunk signature format it can see.
+   */
+  private static final Pattern SIGNATURE_LINE_PATTERN =
+      Pattern.compile("([0-9A-Fa-f]+);chunk-signature=([0-9A-Fa-f]{64})");
 
   private final InputStream originalStream;
+
+  /** Identifies the object in the S3 error response for a malformed body. */
+  private final String keyPath;
+
+  /** Verifies each chunk signature, or {@code null} to skip verification. */
+  private ChunksValidator validator;
+
+  /** SHA-256 of the current chunk payload; {@code null} when not verifying. */
+  private MessageDigest chunkDigest;
+
+  /** Signature parsed from the current chunk header line. */
+  private String chunkSignature;
 
   /**
    * Size of the chunk payload. If zero, the signature line should be parsed to
@@ -88,34 +112,49 @@ public class SignedChunksInputStream extends InputStream {
    */
   private boolean isFinalChunkEncountered = false;
 
-  public SignedChunksInputStream(InputStream inputStream) {
+  public SignedChunksInputStream(InputStream inputStream, String keyPath) {
     originalStream = inputStream;
+    this.keyPath = keyPath;
+  }
+
+  /**
+   * Enable chunk-signature verification. Used when the signing key (derived by
+   * OM, see HDDS-15140) only becomes available after the key is opened, i.e.
+   * after this stream is constructed. Must be called before the first read.
+   */
+  public void attachValidator(ChunksValidator chunksValidator) {
+    this.validator = Objects.requireNonNull(chunksValidator, "chunksValidator == null");
+    this.chunkDigest = newSha256();
+  }
+
+  /**
+   * @return the signed chunk stream the request body is built on, or {@code null} if the body is not
+   *         a signed multi-chunk upload.
+   */
+  public static SignedChunksInputStream unwrap(InputStream body) {
+    if (body instanceof MultiDigestInputStream) {
+      InputStream wrapped = ((MultiDigestInputStream) body).getWrappedStream();
+      if (wrapped instanceof SignedChunksInputStream) {
+        return (SignedChunksInputStream) wrapped;
+      }
+    }
+    return null;
   }
 
   @Override
   public int read() throws IOException {
-    if (isFinalChunkEncountered) {
+    if (isFinalChunkEncountered || !ensureChunkPayload()) {
       return -1;
     }
-    if (remainingData > 0) {
-      int curr = originalStream.read();
-      remainingData--;
-      if (remainingData == 0) {
-        //read the "\r\n" at the end of the data section
-        originalStream.read();
-        originalStream.read();
-      }
-      return curr;
-    } else {
-      remainingData = readContentLengthFromHeader();
-      if (remainingData <= 0) {
-        // there is always a final zero byte chunk so we can stop reading
-        // if we encounter this chunk
-        isFinalChunkEncountered = true;
-        return -1;
-      }
-      return read();
+    int curr = originalStream.read();
+    if (curr == -1) {
+      stopAtUnexpectedEof();
+      return -1;
     }
+    remainingData--;
+    updateDigest((byte) curr);
+    endChunkIfComplete();
+    return curr;
   }
 
   @Override
@@ -126,44 +165,106 @@ public class SignedChunksInputStream extends InputStream {
           + len + " don't match the array length of " + b.length);
     } else if (len == 0) {
       return 0;
-    } else if (isFinalChunkEncountered) {
-      return -1;
     }
     int currentOff = off;
     int currentLen = len;
     int totalReadBytes = 0;
-    int realReadLen = 0;
-    int maxReadLen = 0;
-    do {
-      if (remainingData > 0) {
-        // The chunk payload size has been decoded, now read the actual chunk payload
-        maxReadLen = Math.min(remainingData, currentLen);
-        realReadLen = originalStream.read(b, currentOff, maxReadLen);
-        if (realReadLen == -1) {
-          break;
-        }
-        currentOff += realReadLen;
-        currentLen -= realReadLen;
-        totalReadBytes += realReadLen;
-        remainingData -= realReadLen;
-        if (remainingData == 0) {
-          //read the "\r\n" at the end of the data section
-          originalStream.read();
-          originalStream.read();
-        }
-      } else {
-        remainingData = readContentLengthFromHeader();
-        if (remainingData == 0) {
-          // there is always a final zero byte chunk so we can stop reading
-          // if we encounter this chunk
-          isFinalChunkEncountered = true;
-        }
-        if (isFinalChunkEncountered || remainingData == -1) {
-          break;
-        }
+    while (currentLen > 0 && !isFinalChunkEncountered && ensureChunkPayload()) {
+      // The chunk payload size has been decoded, now read the actual chunk payload
+      int realReadLen = originalStream.read(b, currentOff, Math.min(remainingData, currentLen));
+      if (realReadLen == -1) {
+        stopAtUnexpectedEof();
+        break;
       }
-    } while (currentLen > 0);
+      updateDigest(b, currentOff, realReadLen);
+      currentOff += realReadLen;
+      currentLen -= realReadLen;
+      totalReadBytes += realReadLen;
+      remainingData -= realReadLen;
+      endChunkIfComplete();
+    }
     return totalReadBytes > 0 ? totalReadBytes : -1;
+  }
+
+  /**
+   * Make sure a chunk payload is available to read, reading the next chunk header if the previous chunk was
+   * fully consumed. Returns false at the end of the chunked stream: either the terminating zero-byte chunk
+   * (verified here, since it has an empty payload) or a body that ends without one.
+   */
+  private boolean ensureChunkPayload() throws IOException {
+    if (remainingData > 0) {
+      return true;
+    }
+    remainingData = readContentLengthFromHeader();
+    if (remainingData > 0) {
+      return true;
+    }
+    if (remainingData == 0) {
+      // final zero-byte chunk: verify it (empty payload) and stop reading
+      if (validator != null) {
+        readChunkTerminator();
+      }
+      validateChunk();
+      isFinalChunkEncountered = true;
+    } else {
+      stopAtUnexpectedEof();
+    }
+    return false;
+  }
+
+  /** Read the "\r\n" after the payload and verify the chunk, once its payload is fully consumed. */
+  private void endChunkIfComplete() throws IOException {
+    if (remainingData == 0) {
+      readChunkTerminator();
+      validateChunk();
+    }
+  }
+
+  /**
+   * A malformed chunked body is the client's error, so it must not surface as an InternalError.
+   * The message is specific; the S3 error code is the generic InvalidRequest (HTTP 400).
+   */
+  private OS3Exception invalidBody(String message) {
+    OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyPath);
+    ex.setErrorMessage(message);
+    return ex;
+  }
+
+  private void stopAtUnexpectedEof() throws IOException {
+    checkNotTruncated();
+    isFinalChunkEncountered = true;
+  }
+
+  /**
+   * Complete verification after the caller has consumed the decoded content length. This verifies the terminating
+   * zero-byte chunk and rejects a decoded length that ends in the middle of a chunk. No-op without a validator.
+   */
+  public void verifyComplete() throws IOException {
+    if (validator == null || isFinalChunkEncountered) {
+      return;
+    }
+    if (read() != -1) {
+      throw invalidBody("Decoded content length ended before the chunked stream");
+    }
+  }
+
+  /**
+   * A verified stream must end with the terminating 0-byte chunk. Reaching EOF before it means the
+   * body was truncated, so the payload read so far was never fully authenticated. Without a validator
+   * the stream keeps its lenient behavior.
+   */
+  private void checkNotTruncated() throws IOException {
+    if (validator != null) {
+      throw invalidBody("Chunked stream ended before the terminating 0-byte chunk");
+    }
+  }
+
+  private void readChunkTerminator() throws IOException {
+    int carriageReturn = originalStream.read();
+    int lineFeed = originalStream.read();
+    if (validator != null && (carriageReturn != '\r' || lineFeed != '\n')) {
+      throw invalidBody("Invalid chunk data terminator");
+    }
   }
 
   private int readContentLengthFromHeader() throws IOException {
@@ -180,6 +281,9 @@ public class SignedChunksInputStream extends InputStream {
       prev = curr;
       curr = next;
     }
+    if (!eol(prev, curr)) {
+      checkNotTruncated();
+    }
     // Example of a single chunk data:
     //  10000;chunk-signature=b474d8862b1487a5145d686f57f013e54db672cee1c953b3010fb58501ef5aa2\r\n
     //  <65536-bytes>\r\n
@@ -191,12 +295,47 @@ public class SignedChunksInputStream extends InputStream {
       return -1;
     }
 
-    //parse the data length.
-    Matcher matcher = signatureLinePattern.matcher(signatureLine);
-    if (matcher.matches()) {
-      return Integer.parseInt(matcher.group(1), 16);
-    } else {
-      throw new IOException("Invalid signature line: " + signatureLine);
+    //parse the data length and the chunk signature.
+    Matcher matcher = SIGNATURE_LINE_PATTERN.matcher(signatureLine);
+    if (!matcher.matches()) {
+      throw invalidBody("Invalid signature line: " + signatureLine);
+    }
+    chunkSignature = matcher.group(2);
+    return Integer.parseInt(matcher.group(1), 16);
+  }
+
+  private void updateDigest(byte b) {
+    if (chunkDigest != null) {
+      chunkDigest.update(b);
+    }
+  }
+
+  private void updateDigest(byte[] b, int off, int len) {
+    if (chunkDigest != null) {
+      chunkDigest.update(b, off, len);
+    }
+  }
+
+  /**
+   * Verify the signature of the chunk just read. {@link MessageDigest#digest()}
+   * also resets the digest for the next chunk. No-op without a validator.
+   */
+  private void validateChunk() {
+    if (validator != null) {
+      validator.validateChunk(chunkSignature,
+          DatatypeConverter.printHexBinary(chunkDigest.digest()).toLowerCase(Locale.ROOT));
+    }
+  }
+
+  /**
+   * A dedicated instance rather than {@code EndpointBase.getSha256DigestInstance()}: that is a shared
+   * ThreadLocal, and {@link MultiDigestInputStream} may already be using it for the request's own SHA-256.
+   */
+  private static MessageDigest newSha256() {
+    try {
+      return MessageDigest.getInstance("SHA-256");
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 not available", e);
     }
   }
 }

@@ -39,6 +39,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -141,6 +142,7 @@ public final class S3Utils {
   public static WebApplicationException wrapOS3Exception(OS3Exception ex) {
     return new WebApplicationException(ex.getErrorMessage(), ex,
         Response.status(ex.getHttpCode())
+            .type(MediaType.APPLICATION_XML_TYPE)
             .entity(ex.toXml())
             .build());
   }

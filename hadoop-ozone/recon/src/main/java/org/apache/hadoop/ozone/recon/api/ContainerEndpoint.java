@@ -745,14 +745,15 @@ public class ContainerEndpoint {
       List<OmKeyLocationInfoGroup> matchedKeys, long containerID) {
     List<ContainerBlockMetadata> blockIds = new ArrayList<>();
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : matchedKeys) {
-      List<OmKeyLocationInfo> omKeyLocationInfos = omKeyLocationInfoGroup
-          .getLocationList()
-          .stream()
-          .filter(c -> c.getContainerID() == containerID)
-          .collect(Collectors.toList());
-      for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfos) {
-        blockIds.add(new ContainerBlockMetadata(omKeyLocationInfo
-            .getContainerID(), omKeyLocationInfo.getLocalID()));
+      for (List<OmKeyLocationInfo> omKeyLocationInfos :
+          omKeyLocationInfoGroup.getLocationLists()) {
+        for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfos) {
+          if (omKeyLocationInfo.getContainerID() == containerID) {
+            blockIds.add(new ContainerBlockMetadata(
+                omKeyLocationInfo.getContainerID(),
+                omKeyLocationInfo.getLocalID()));
+          }
+        }
       }
     }
     return blockIds;

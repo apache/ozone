@@ -21,10 +21,13 @@ import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.apache.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
@@ -33,13 +36,20 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Upgrade action for TASK_STATUS_STATISTICS feature layout change, which adds
- * <code>last_task_run_status</code> and <code>current_task_run_status</code> columns to
- * {@link ReconTaskSchemaDefinition} in case it is missing .
+ * <code>last_task_run_status</code> and
+ * <code>is_current_task_running</code> columns to
+ * {@link ReconTaskSchemaDefinition} when they are missing.
  */
 @UpgradeActionRecon(feature = ReconLayoutFeature.TASK_STATUS_STATISTICS)
 public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
+  private static final String LAST_TASK_RUN_STATUS =
+      "last_task_run_status";
+  private static final String IS_CURRENT_TASK_RUNNING =
+      "is_current_task_running";
+  private static final int COLUMN_MISSING = -1;
 
   /**
    * Utility function to add provided column to RECON_TASK_STATUS table as INTEGER type.
@@ -63,33 +73,68 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
         .execute();
   }
 
+  /**
+   * Returns the JDBC nullability value for a column, or
+   * {@link #COLUMN_MISSING} if it does not exist.
+   */
+  private int getColumnNullability(Connection connection, String columnName)
+      throws SQLException {
+    DatabaseMetaData metaData = connection.getMetaData();
+    try (ResultSet columns = metaData.getColumns(null, null, null, null)) {
+      while (columns.next()) {
+        String table = columns.getString("TABLE_NAME");
+        String column = columns.getString("COLUMN_NAME");
+        if (RECON_TASK_STATUS_TABLE_NAME.equalsIgnoreCase(table)
+            && columnName.equalsIgnoreCase(column)) {
+          return columns.getInt("NULLABLE");
+        }
+      }
+    }
+    return COLUMN_MISSING;
+  }
+
+  /**
+   * Adds a missing column and completes any partially applied migration.
+   */
+  private void repairColumn(Connection connection, DSLContext dslContext,
+                            String columnName) throws SQLException {
+    int nullability = getColumnNullability(connection, columnName);
+    if (nullability == COLUMN_MISSING) {
+      LOG.info("Adding '{}' column to task status table.", columnName);
+      addColumnToTable(dslContext, columnName);
+      nullability = DatabaseMetaData.columnNullable;
+    }
+
+    if (nullability != DatabaseMetaData.columnNoNulls) {
+      Field<Integer> column =
+          DSL.field(DSL.name(columnName), SQLDataType.INTEGER);
+      int updatedRowCount = dslContext
+          .update(DSL.table(RECON_TASK_STATUS_TABLE_NAME))
+          .set(column, 0)
+          .where(column.isNull())
+          .execute();
+      LOG.info("Updated {} rows with a default value for '{}'.",
+          updatedRowCount, columnName);
+      setColumnAsNonNullable(dslContext, columnName);
+    }
+  }
+
   @Override
-  public void execute(DataSource dataSource) throws DataAccessException {
+  public void execute(DataSource dataSource) throws SQLException {
     try (Connection conn = dataSource.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
+        LOG.info("{} table does not exist; task status schema repair is not "
+            + "required.", RECON_TASK_STATUS_TABLE_NAME);
         return;
       }
 
       DSLContext dslContext = DSL.using(conn);
-      // JOOQ doesn't support Derby DB officially, there is no way to run 'ADD COLUMN' command in single call
-      // for multiple columns. Hence, we run it as two separate steps.
-      LOG.info("Adding 'last_task_run_status' column to task status table");
-      addColumnToTable(dslContext, "last_task_run_status");
-      LOG.info("Adding 'is_current_task_running' column to task status table");
-      addColumnToTable(dslContext, "is_current_task_running");
-
-      //Handle previous table values with new columns default values
-      int updatedRowCount = dslContext.update(DSL.table(RECON_TASK_STATUS_TABLE_NAME))
-          .set(DSL.field(DSL.name("last_task_run_status"), SQLDataType.INTEGER), 0)
-          .set(DSL.field(DSL.name("is_current_task_running"), SQLDataType.INTEGER), 0)
-          .execute();
-      LOG.info("Updated {} rows with default value for new columns", updatedRowCount);
-
-      // Now we will set the column as not-null to enforce constraints
-      setColumnAsNonNullable(dslContext, "last_task_run_status");
-      setColumnAsNonNullable(dslContext, "is_current_task_running");
+      repairColumn(conn, dslContext, LAST_TASK_RUN_STATUS);
+      repairColumn(conn, dslContext, IS_CURRENT_TASK_RUNNING);
     } catch (SQLException | DataAccessException ex) {
       LOG.error("Error while upgrading RECON_TASK_STATUS table.", ex);
+      throw new SQLException(
+          "Failed to repair the RECON_TASK_STATUS table.", ex);
     }
   }
 }

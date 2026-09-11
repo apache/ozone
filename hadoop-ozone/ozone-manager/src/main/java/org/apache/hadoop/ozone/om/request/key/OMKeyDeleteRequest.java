@@ -75,7 +75,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
+    final DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
         .getDeleteKeyRequest();
     Objects.requireNonNull(deleteKeyRequest, "deleteKeyRequest == null");
 

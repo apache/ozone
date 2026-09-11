@@ -87,6 +87,14 @@ public class ChecksumCache {
           + bytesPerChecksum + " call=" + chksumSize);
     }
     final int currChunkLength = data.remaining();
+    final List<ByteBuffer> buffers = data.asByteBufferList();
+    long readableByteCount = 0;
+    for (ByteBuffer buffer : buffers) {
+      readableByteCount += buffer.remaining();
+    }
+    Preconditions.checkState(readableByteCount == currChunkLength,
+        "ChunkBuffer remaining byte count is %s, but its underlying buffers expose %s bytes",
+        currChunkLength, readableByteCount);
 
     if (currChunkLength == prevChunkLength) {
       LOG.debug("ChunkBuffer data length same as last time ({}). "
@@ -111,7 +119,7 @@ public class ChecksumCache {
     algo.reset();
     long position = 0;
 
-    for (ByteBuffer src : data.asByteBufferList()) {
+    for (ByteBuffer src : buffers) {
       int srcPos = src.position();
       final int srcLim = src.limit();
       final int srcLen = srcLim - srcPos;

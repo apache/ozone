@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -37,6 +38,9 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
@@ -124,12 +128,22 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public OzoneKey headS3Object(String bucketName, String keyName,
                                int partNumber) throws IOException {
-    // The stub does not model individual multipart parts, so it returns
-    // whole-object metadata (consistent with getS3KeyDetails). Real part-number
-    // semantics (InvalidPart, per-part size) are covered by the SDK-based
-    // integration tests against a live cluster.
-    return objectStoreStub.getS3Volume().getBucket(bucketName)
-        .headObject(keyName);
+    OzoneBucket bucket = objectStoreStub.getS3Volume().getBucket(bucketName);
+    if (bucket instanceof OzoneBucketStub) {
+      return ((OzoneBucketStub) bucket).headObject(keyName, partNumber);
+    }
+    return bucket.headObject(keyName);
+  }
+
+  @Override
+  public S3HeadObjectAttributes headS3ObjectAttributes(String bucketName, String keyName)
+      throws IOException {
+    OzoneBucket bucket = objectStoreStub.getS3Volume().getBucket(bucketName);
+    OzoneKey key = bucket.headObject(keyName);
+    NavigableMap<Integer, Long> partSizes = bucket instanceof OzoneBucketStub
+        ? ((OzoneBucketStub) bucket).getCompletedMultipartPartSizes(keyName)
+        : Collections.emptyNavigableMap();
+    return new S3HeadObjectAttributes(key, partSizes);
   }
 
   @Override
@@ -255,6 +269,15 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKey(String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createKey(keyName, size, replicationConfig, metadata, tags, derivedKeyPiggyBacking);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
       long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
       Map<String, String> metadata) throws IOException {
@@ -272,6 +295,15 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKeyIfNotExists(String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createKeyIfNotExists(keyName, size, replicationConfig, metadata, tags, derivedKeyPiggyBacking);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKeyIfMatch(String volumeName,
       String bucketName, String keyName, long size, String expectedETag,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
@@ -279,6 +311,15 @@ public class ClientProtocolStub implements ClientProtocol {
     return getBucket(volumeName, bucketName)
         .rewriteKeyIfMatch(keyName, size, expectedETag, replicationConfig,
             metadata, tags);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName, String keyName, long size,
+      String expectedETag, ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName).rewriteKeyIfMatch(keyName, size, expectedETag, replicationConfig,
+        metadata, tags, derivedKeyPiggyBacking);
   }
 
   @Override
@@ -419,6 +460,14 @@ public class ClientProtocolStub implements ClientProtocol {
       throws IOException {
     return getBucket(volumeName, bucketName).createMultipartKey(keyName, size,
         partNumber, uploadID);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createMultipartKey(String volumeName, String bucketName, String keyName, long size,
+      int partNumber, String uploadID, boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createMultipartKey(keyName, size, partNumber, uploadID, derivedKeyPiggyBacking);
   }
 
   @Override
@@ -645,9 +694,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public List<OzoneFileStatusLight> listStatusLight(String volumeName,
-      String bucketName, String keyName, boolean recursive, String startKey,
-      long numEntries, boolean allowPartialPrefixes) throws IOException {
+  public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options) throws IOException {
     return null;
   }
 
@@ -890,6 +937,21 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void deleteObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
     getBucket(volumeName, bucketName).deleteObjectTagging(keyName);
+  }
+
+  @Override
+  public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy, String requestId) throws IOException {
+    return null;
+  }
+
+  @Override
+  public CallerIdentityInfo getCallerIdentity() throws IOException {
+    return null;
+  }
+
+  @Override
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException {
   }
 
   @Override

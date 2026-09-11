@@ -52,9 +52,9 @@ public final class LeaseRecoveryClientDNHandler {
   public static List<OmKeyLocationInfo> getOmKeyLocationInfos(LeaseKeyInfo leaseKeyInfo,
       OzoneClientAdapter adapter, boolean forceRecovery) throws IOException {
     OmKeyLocationInfoGroup keyLatestVersionLocations = leaseKeyInfo.getKeyInfo().getLatestVersionLocations();
-    List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.getLocationList();
+    List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.createLocationList();
     OmKeyLocationInfoGroup openKeyLatestVersionLocations = leaseKeyInfo.getOpenKeyInfo().getLatestVersionLocations();
-    List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.getLocationList();
+    List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.createLocationList();
 
     int openKeyLocationSize = openKeyLocationInfoList.size();
     int keyLocationSize = keyLocationInfoList.size();

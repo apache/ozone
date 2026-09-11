@@ -387,13 +387,14 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   private Set<Long> getContainers(List<OmKeyLocationInfoGroup> locationVersions, Set<Long> targetContainerIds) {
     Set<Long> keyContainers = new HashSet<>();
     locationVersions.forEach(
-        e -> e.getLocationList().forEach(
-            blk -> {
-              long cid = blk.getBlockID().getContainerID();
-              if (targetContainerIds.contains(cid)) {
-                keyContainers.add(cid);
-              }
-            }));
+        e -> e.getLocationLists().forEach(
+            locationList -> locationList.forEach(
+                blk -> {
+                  long cid = blk.getBlockID().getContainerID();
+                  if (targetContainerIds.contains(cid)) {
+                    keyContainers.add(cid);
+                  }
+                })));
     return keyContainers;
   }
 

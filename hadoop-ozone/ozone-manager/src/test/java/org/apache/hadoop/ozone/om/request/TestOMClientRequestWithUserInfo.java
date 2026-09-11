@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInf
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -41,13 +42,19 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -138,34 +145,296 @@ public class TestOMClientRequestWithUserInfo {
   }
 
   @Test
-  public void testUserInfoInCaseOfGrpcTransport() throws IOException {
-    try (MockedStatic<Context> mockedGrpcRequestContextKey =
-             mockStatic(Context.class)) {
-      // given
-      Context.Key<String> hostnameKey = mock(Context.Key.class);
-      when(hostnameKey.get()).thenReturn("hostname");
+  public void testUserInfoInCaseOfGrpcTransport() throws Exception {
+    OMRequest s3SignedOMRequest = createRequestWithS3Credentials("AccessId",
+        "Signature", "StringToSign");
+    OMClientRequest omClientRequest =
+        new OMKeyCommitRequest(s3SignedOMRequest, mock(BucketLayout.class));
 
-      Context.Key<String> ipAddress = mock(Context.Key.class);
-      when(ipAddress.get()).thenReturn("172.5.3.5");
+    // The gRPC transport propagates the client host/IP through the request
+    // Context rather than the Hadoop RPC Server thread-local, so attach a real
+    // Context carrying those values and resolve the UserInfo within it.
+    Context grpcContext = Context.current()
+        .withValue(GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY, "hostname")
+        .withValue(GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY, "172.5.3.5");
+    OzoneManagerProtocolProtos.UserInfo userInfo =
+        grpcContext.call(omClientRequest::getUserInfo);
 
-      mockedGrpcRequestContextKey.when(() -> Context.key("CLIENT_HOSTNAME"))
-          .thenReturn(hostnameKey);
-      mockedGrpcRequestContextKey.when(() -> Context.key("CLIENT_IP_ADDRESS"))
-          .thenReturn(ipAddress);
+    assertEquals("hostname", userInfo.getHostName());
+    assertEquals("172.5.3.5", userInfo.getRemoteAddress());
+    assertEquals("AccessId", userInfo.getUserName());
+  }
 
-      OMRequest s3SignedOMRequest = createRequestWithS3Credentials("AccessId",
-          "Signature", "StringToSign");
-      OMClientRequest omClientRequest =
-          new OMKeyCommitRequest(s3SignedOMRequest, mock(BucketLayout.class));
+  @Test
+  public void testClientSuppliedUserNameDoesNotOverrideS3AuthIdentity()
+      throws IOException {
+    // A gRPC S3G request carries validated S3 authentication (accessId
+    // "AccessId") but also a client-supplied userInfo.userName. The
+    // client-supplied name is unauthenticated and must never override the
+    // identity derived from S3 authentication; getUserInfo() must resolve the
+    // acting user from the accessId, not the forged name.
+    OMRequest request = createRequestWithS3Credentials("AccessId", "Signature",
+        "StringToSign").toBuilder()
+        .setUserInfo(OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName("forged-admin"))
+        .build();
+    OMClientRequest omClientRequest =
+        new OMKeyCommitRequest(request, mock(BucketLayout.class));
 
-      // when
-      OzoneManagerProtocolProtos.UserInfo userInfo =
-          omClientRequest.getUserInfo();
+    assertEquals("AccessId", omClientRequest.getUserInfo().getUserName());
+  }
 
-      // then
-      assertEquals("hostname", userInfo.getHostName());
-      assertEquals("172.5.3.5", userInfo.getRemoteAddress());
-      assertEquals("AccessId", userInfo.getUserName());
+  @Test
+  public void testUserInfoWithSTSToken() throws IOException {
+    final String accessId = "ASIA12345";
+    final String signature = "Signature";
+    final String stringToSign = "StringToSign";
+    final String sessionToken = "SessionToken";
+    final String originalAccessKeyId = "AKIAORIGINAL";
+
+    final STSTokenIdentifier stsTokenIdentifier = mock(STSTokenIdentifier.class);
+    when(stsTokenIdentifier.getOriginalAccessKeyId()).thenReturn(originalAccessKeyId);
+
+    final S3Authentication s3Authentication = S3Authentication.newBuilder()
+        .setAccessId(accessId)
+        .setSignature(signature)
+        .setStringToSign(stringToSign)
+        .setSessionToken(sessionToken)
+        .build();
+
+    OzoneManager.setS3Auth(s3Authentication);
+    OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
+
+    try {
+      final OMRequest.Builder omRequestBuilder = OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+          .setClientId(UUID.randomUUID().toString())
+          .setS3Authentication(s3Authentication);
+
+      final OMRequest omRequest = omRequestBuilder.build();
+      final OMClientRequest omClientRequest = new OMKeyCommitRequest(omRequest, mock(BucketLayout.class));
+
+      final OzoneManagerProtocolProtos.UserInfo userInfo = omClientRequest.getUserInfo();
+      assertEquals(originalAccessKeyId, userInfo.getUserName());
+    } finally {
+      OzoneManager.setStsTokenIdentifier(null);
+      OzoneManager.setS3Auth(null);
+    }
+  }
+
+  @Test
+  public void testPreExecuteOverwritesResolvedStsFields() throws Exception {
+    try (MockedStatic<Server> mockedRpcServer = mockStatic(Server.class)) {
+      mockedRpcServer.when(Server::getRemoteUser).thenReturn(userGroupInformation);
+      mockedRpcServer.when(Server::getRemoteIp).thenReturn(inetAddress);
+      mockedRpcServer.when(Server::getRemoteAddress).thenReturn(inetAddress.toString());
+
+      final String accessId = "ASIA12345";
+      final String signature = "Signature";
+      final String stringToSign = "StringToSign";
+      final String sessionToken = "SessionToken";
+      final String originalAccessKeyId = "AKIAORIGINAL";
+      final String roleArn = "arn:aws:iam::123456789012:role/test-role";
+      final String sessionPolicy = "test-session-policy";
+      final UUID secretKeyId = UUID.randomUUID();
+
+      final STSTokenIdentifier stsTokenIdentifier = mock(STSTokenIdentifier.class);
+      when(stsTokenIdentifier.getSessionPolicy()).thenReturn(sessionPolicy);
+      when(stsTokenIdentifier.getRoleArn()).thenReturn(roleArn);
+      when(stsTokenIdentifier.getOriginalAccessKeyId()).thenReturn(originalAccessKeyId);
+      when(stsTokenIdentifier.getTempAccessKeyId()).thenReturn(accessId);
+      when(stsTokenIdentifier.getSecretKeyId()).thenReturn(secretKeyId);
+
+      final S3Authentication s3Authentication = S3Authentication.newBuilder()
+          .setAccessId(accessId)
+          .setSignature(signature)
+          .setStringToSign(stringToSign)
+          .setSessionToken(sessionToken)
+          .setResolvedStsSessionPolicy("client-session-policy")
+          .setResolvedStsRoleArn("client-role")
+          .setResolvedStsOriginalAccessKeyId("client-original-access-key-id")
+          .setResolvedStsTempAccessKeyId("client-temp-access-key-id")
+          .setResolvedStsSecretKeyId("client-secret-key-id")
+          .build();
+
+      OzoneManager.setS3Auth(s3Authentication);
+      OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
+
+      try {
+        final String bucketName = UUID.randomUUID().toString();
+        final String volumeName = UUID.randomUUID().toString();
+        final BucketInfo.Builder bucketInfo =
+            newBucketInfoBuilder(bucketName, volumeName)
+                .setIsVersionEnabled(true)
+                .setStorageType(StorageTypeProto.DISK);
+
+        final OMRequest omRequest = newCreateBucketRequest(bucketInfo)
+            .setS3Authentication(s3Authentication)
+            .build();
+
+        final OMBucketCreateRequest omBucketCreateRequest = new OMBucketCreateRequest(omRequest);
+        final OMRequest modifiedRequest = omBucketCreateRequest.preExecute(ozoneManager);
+        final S3Authentication modifiedS3Auth = modifiedRequest.getS3Authentication();
+
+        assertEquals(sessionPolicy, modifiedS3Auth.getResolvedStsSessionPolicy());
+        assertEquals(roleArn, modifiedS3Auth.getResolvedStsRoleArn());
+        assertEquals(originalAccessKeyId, modifiedS3Auth.getResolvedStsOriginalAccessKeyId());
+        assertEquals(accessId, modifiedS3Auth.getResolvedStsTempAccessKeyId());
+        assertEquals(secretKeyId.toString(), modifiedS3Auth.getResolvedStsSecretKeyId());
+      } finally {
+        OzoneManager.setStsTokenIdentifier(null);
+        OzoneManager.setS3Auth(null);
+      }
+    }
+  }
+
+  @Test
+  public void testUserInfoWithSTSAccessKeyMissingSessionToken() {
+    final String accessId = "ASIA12345";
+    final String signature = "Signature";
+    final String stringToSign = "StringToSign";
+
+    final OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setS3Authentication(S3Authentication.newBuilder()
+            .setAccessId(accessId)
+            .setSignature(signature)
+            .setStringToSign(stringToSign)
+            .build())
+        .build();
+
+    final OMClientRequest omClientRequest = new OMKeyCommitRequest(omRequest, mock(BucketLayout.class));
+    final IOException ex = assertThrows(IOException.class, omClientRequest::getUserInfo);
+
+    assertEquals("Error with STS token", ex.getMessage());
+    assertEquals("Missing session token for accessKeyId: " + accessId, ex.getCause().getMessage());
+  }
+
+  @Test
+  public void testUserInfoWithSessionTokenButNoStsTokenIdentifier() {
+    final String accessId = "ASIA12345";
+    final String signature = "Signature";
+    final String stringToSign = "StringToSign";
+    final String sessionToken = "SessionToken";
+
+    final S3Authentication s3Authentication = S3Authentication.newBuilder()
+        .setAccessId(accessId)
+        .setSignature(signature)
+        .setStringToSign(stringToSign)
+        .setSessionToken(sessionToken)
+        .build();
+
+    final OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setS3Authentication(s3Authentication)
+        .build();
+
+    OzoneManager.setS3Auth(s3Authentication);
+    OzoneManager.setStsTokenIdentifier(null);
+
+    try {
+      final OMClientRequest omClientRequest = new OMKeyCommitRequest(omRequest, mock(BucketLayout.class));
+      final IOException ex = assertThrows(IOException.class, omClientRequest::getUserInfo);
+
+      assertEquals("Error with STS Token", ex.getMessage());
+      assertEquals(
+          "OMClientRequest has session token but no token identifier in OzoneManager", ex.getCause().getMessage());
+    } finally {
+      OzoneManager.setS3Auth(null);
+    }
+  }
+
+  @Test
+  public void testUserInfoWithSessionTokenButEmptyOriginalAccessKeyId() {
+    final String accessId = "ASIA12345";
+    final String signature = "Signature";
+    final String stringToSign = "StringToSign";
+    final String sessionToken = "SessionToken";
+
+    final STSTokenIdentifier stsTokenIdentifier = mock(STSTokenIdentifier.class);
+    when(stsTokenIdentifier.getOriginalAccessKeyId()).thenReturn("");
+
+    final S3Authentication s3Authentication = S3Authentication.newBuilder()
+        .setAccessId(accessId)
+        .setSignature(signature)
+        .setStringToSign(stringToSign)
+        .setSessionToken(sessionToken)
+        .build();
+
+    OzoneManager.setS3Auth(s3Authentication);
+    OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
+
+    try {
+      final OMRequest omRequest = OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+          .setClientId(UUID.randomUUID().toString())
+          .setS3Authentication(s3Authentication)
+          .build();
+
+      final OMClientRequest omClientRequest = new OMKeyCommitRequest(omRequest, mock(BucketLayout.class));
+      final IOException ex = assertThrows(IOException.class, omClientRequest::getUserInfo);
+
+      assertEquals("Error with STS Token", ex.getMessage());
+      assertEquals("Invalid STS Token format - could not find originalAccessKeyId", ex.getCause().getMessage());
+    } finally {
+      OzoneManager.setS3Auth(null);
+      OzoneManager.setStsTokenIdentifier(null);
+    }
+  }
+
+  @Test
+  public void testPreExecuteRejectsSessionTokenWithoutStsTokenIdentifierWhenSecurityEnabled() {
+    when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+
+    final String accessId = "ASIA12345";
+    final String signature = "Signature";
+    final String stringToSign = "StringToSign";
+    final String sessionToken = "SessionToken";
+
+    final S3Authentication s3Authentication = S3Authentication.newBuilder()
+        .setAccessId(accessId)
+        .setSignature(signature)
+        .setStringToSign(stringToSign)
+        .setSessionToken(sessionToken)
+        .build();
+
+    final OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setS3Authentication(s3Authentication)
+        .build();
+
+    try {
+      OzoneManager.setStsTokenIdentifier(null);
+      final OMClientRequest omClientRequest = new DummyOMClientRequest(omRequest);
+
+      final OMException ex = assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+      assertTrue(ex.getMessage().contains("session token"));
+    } finally {
+      OzoneManager.setStsTokenIdentifier(null);
+    }
+  }
+
+  private static final class DummyOMClientRequest extends OMClientRequest {
+    private DummyOMClientRequest(OMRequest omRequest) {
+      super(omRequest);
+    }
+
+    @Override
+    public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(OzoneManager ozoneManager) {
+      return OzoneManagerProtocolProtos.UserInfo.newBuilder()
+          .setUserName("test-user")
+          .setHostName("localhost")
+          .setRemoteAddress("127.0.0.1")
+          .build();
+    }
+
+    @Override
+    public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+      return null;
     }
   }
 

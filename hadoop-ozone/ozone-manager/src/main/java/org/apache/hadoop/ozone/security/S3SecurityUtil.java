@@ -17,13 +17,21 @@
 
 package org.apache.hadoop.ozone.security;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REVOKED_TOKEN;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 import com.google.protobuf.ServiceException;
+import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.om.AWSV4AuthValidator;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -32,6 +40,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.security.token.SecretManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class which holds methods required for parse/validation of
@@ -40,6 +50,9 @@ import org.apache.hadoop.security.token.SecretManager;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public final class S3SecurityUtil {
+
+  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
+  private static final Logger LOG = LoggerFactory.getLogger(S3SecurityUtil.class);
 
   private S3SecurityUtil() {
   }
@@ -54,6 +67,43 @@ public final class S3SecurityUtil {
   public static void validateS3Credential(OMRequest omRequest,
       OzoneManager ozoneManager) throws ServiceException, OMException {
     if (ozoneManager.isSecurityEnabled()) {
+      // If STS session token is present, decode, decrypt and validate it once and save in thread-local
+      if (omRequest.getS3Authentication().hasSessionToken()) {
+        final String token = omRequest.getS3Authentication().getSessionToken();
+        if (!token.isEmpty()) {
+          final STSTokenIdentifier stsTokenIdentifier = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+              token, ozoneManager.getSecretKeyClient(), CLOCK);
+
+          // Ensure the token is not revoked
+          if (isRevokedStsToken(stsTokenIdentifier, ozoneManager)) {
+            LOG.info(
+                "STS token has been revoked for originalAccessKeyId={}, tempAccessKeyId={}",
+                stsTokenIdentifier.getOriginalAccessKeyId(), stsTokenIdentifier.getTempAccessKeyId());
+            throw new OMException("STS token has been revoked", REVOKED_TOKEN);
+          }
+
+          // Ensure the principal that created the STS token (originalAccessKeyId) has not been revoked
+          if (isOriginalAccessKeyIdRevoked(stsTokenIdentifier, ozoneManager)) {
+            LOG.info("OriginalAccessKeyId for session token has been revoked: {}, {}",
+                stsTokenIdentifier.getOriginalAccessKeyId(), stsTokenIdentifier.getTempAccessKeyId());
+            throw new OMException("STS token no longer valid: OriginalAccessKeyId principal revoked", REVOKED_TOKEN);
+          }
+
+          // Ensure the access key ID in the request matches the one encoded in the token.
+          // This prevents using a valid token and secretKey to authenticate arbitrary accessKeyIds.
+          final String requestAccessId = omRequest.getS3Authentication().getAccessId();
+          if (!requestAccessId.equals(stsTokenIdentifier.getTempAccessKeyId())) {
+            throw new OMException(
+                "STS token validation failed - accessKeyId is invalid for session token", INVALID_TOKEN);
+          }
+
+          // HMAC signature and expiration were validated above.  Now validate AWS signature.
+          validateSTSTokenAwsSignature(stsTokenIdentifier, omRequest);
+          OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
+          return;
+        }
+      }
+
       OzoneTokenIdentifier s3Token = constructS3Token(omRequest);
       try {
         // authenticate user with signature verification through
@@ -79,7 +129,7 @@ public final class S3SecurityUtil {
   /**
    * Construct and return {@link OzoneTokenIdentifier} from {@link OMRequest}.
    */
-  private static OzoneTokenIdentifier constructS3Token(OMRequest omRequest) {
+  public static OzoneTokenIdentifier constructS3Token(OMRequest omRequest) {
     S3Authentication auth = omRequest.getS3Authentication();
     OzoneTokenIdentifier s3Token = new OzoneTokenIdentifier();
     s3Token.setTokenType(S3AUTHINFO);
@@ -88,5 +138,72 @@ public final class S3SecurityUtil {
     s3Token.setAwsAccessId(auth.getAccessId());
     s3Token.setOwner(new Text(auth.getAccessId()));
     return s3Token;
+  }
+
+  /**
+   * Validates the AWS signature of an STSTokenIdentifier that has already been decrypted.
+   * @param stsTokenIdentifier      the decrypted STS token
+   * @param omRequest               the OMRequest containing STS token
+   * @throws OMException            if the AWS signature validation fails
+   */
+  private static void validateSTSTokenAwsSignature(STSTokenIdentifier stsTokenIdentifier, OMRequest omRequest)
+      throws OMException {
+    final String secretAccessKey = stsTokenIdentifier.getSecretAccessKey();
+    final S3Authentication s3Authentication = omRequest.getS3Authentication();
+    if (AWSV4AuthValidator.validateRequest(
+        s3Authentication.getStringToSign(), s3Authentication.getSignature(), secretAccessKey)) {
+      return;
+    }
+    throw new OMException(
+        "STS token validation failed for token: " + omRequest.getS3Authentication().getSessionToken(), INVALID_TOKEN);
+  }
+
+  /**
+   * Returns true if the STS token was created before the revocation cutoff for its originalAccessKeyId.
+   */
+  private static boolean isRevokedStsToken(STSTokenIdentifier stsTokenIdentifier, OzoneManager ozoneManager)
+      throws OMException {
+    try {
+      final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
+      final OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+      if (metadataManager == null) {
+        final String msg = "Could not determine STS revocation: metadataManager is null";
+        LOG.warn(msg);
+        throw new OMException(msg, INTERNAL_ERROR);
+      }
+
+      final Table<String, Long> revokedStsTokenTable = metadataManager.getS3RevokedStsTokenTable();
+      if (revokedStsTokenTable == null) {
+        final String msg = "Could not determine STS revocation: revokedStsTokenTable is null";
+        LOG.warn(msg);
+        throw new OMException(msg, INTERNAL_ERROR);
+      }
+
+      final Long revocationTimeMillis = revokedStsTokenTable.getIfExist(originalAccessKeyId);
+      return revocationTimeMillis != null
+          && stsTokenIdentifier.getCreationTime().toEpochMilli() < revocationTimeMillis;
+    } catch (Exception e) {
+      final String msg = "Could not determine STS revocation because of Exception: " + e.getMessage();
+      LOG.warn(msg, e);
+      throw new OMException(msg, e, INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Returns true if the originalAccessKeyId of the STS token has been revoked.
+   */
+  private static boolean isOriginalAccessKeyIdRevoked(STSTokenIdentifier stsTokenIdentifier, OzoneManager ozoneManager)
+      throws OMException {
+    // We already know originalAccessKeyId is not null from STSSecurityUtil.ensureEssentialFieldsArePresentInToken()
+    // method called from STSSecurityUtil.constructValidateAndDecryptSTSToken() method above
+    final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
+    try {
+      // If the secret for the original principal is missing, it means it was revoked
+      return !ozoneManager.getS3SecretManager().hasS3Secret(originalAccessKeyId);
+    } catch (IOException e) {
+      final String msg = "Could not determine if original principal is revoked: " + e.getMessage();
+      LOG.warn(msg, e);
+      throw new OMException(msg, e, INTERNAL_ERROR);
+    }
   }
 }
