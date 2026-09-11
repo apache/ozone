@@ -61,7 +61,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
   private Long expectedDataGeneration = null;
+  // Original S3/list prefix when keyName is empty (root listing). Used for STS
+  // auth to check LIST on this prefix instead of "*".
+  private final String listPrefix;
   private final String expectedETag;
+  private final boolean derivedKeyPiggyBacking;
 
   private OmKeyArgs(Builder b) {
     super(b);
@@ -83,7 +87,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.listPrefix = b.listPrefix;
     this.expectedETag = b.expectedETag;
+    this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
   }
 
   public boolean getIsMultipartKey() {
@@ -166,8 +172,20 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return expectedDataGeneration;
   }
 
+  /**
+   * Original S3/list prefix when keyName is empty (root listing).
+   * Used for STS auth to check LIST on this prefix instead of "*".
+   */
+  public String getListPrefix() {
+    return listPrefix;
+  }
+
   public String getExpectedETag() {
     return expectedETag;
+  }
+
+  public boolean isDerivedKeyPiggyBacking() {
+    return derivedKeyPiggyBacking;
   }
 
   @Override
@@ -243,7 +261,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private boolean forceUpdateContainerCacheFromSCM;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private String listPrefix = null;
     private String expectedETag;
+    private boolean derivedKeyPiggyBacking;
 
     public Builder() {
       this(AclListBuilder.empty());
@@ -290,8 +310,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
+      this.derivedKeyPiggyBacking = obj.derivedKeyPiggyBacking;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
+      this.listPrefix = obj.listPrefix;
     }
 
     public Builder setVolumeName(String volume) {
@@ -425,8 +447,18 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    public Builder setListPrefix(String prefix) {
+      this.listPrefix = prefix;
+      return this;
+    }
+
     public Builder setExpectedETag(String eTag) {
       this.expectedETag = eTag;
+      return this;
+    }
+
+    public Builder setDerivedKeyPiggyBacking(boolean derivedKeyPiggyBacking) {
+      this.derivedKeyPiggyBacking = derivedKeyPiggyBacking;
       return this;
     }
 

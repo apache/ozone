@@ -55,7 +55,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -67,6 +66,7 @@ import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -181,7 +181,6 @@ import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.ScriptBasedMapping;
@@ -755,15 +754,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .build();
     }
 
-    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
-        conf.getClass(
-            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            ScriptBasedMapping.class, DNSToSwitchMapping.class);
-    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
-        dnsToSwitchMappingClass, conf);
-    dnsToSwitchMapping =
-        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
-            : new CachedDNSToSwitchMapping(newInstance));
+    dnsToSwitchMapping = createDNSToSwitchMapping(conf);
 
     if (configurator.getScmNodeManager() != null) {
       scmNodeManager = configurator.getScmNodeManager();
@@ -2095,20 +2086,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Get the safe mode status of all rules.
    *
-   * @return map of rule statuses.
+   * @return list of rule statuses.
    */
-  public Map<String, Pair<Boolean, String>> getRuleStatus() {
+  public List<SafeModeRuleStatusProto> getRuleStatus() {
     return scmSafeModeManager.getRuleStatus();
   }
 
   @Override
   public Map<String, String[]> getSafeModeRuleStatus() {
     Map<String, String[]> map = new HashMap<>();
-    for (Map.Entry<String, Pair<Boolean, String>> entry :
-        scmSafeModeManager.getRuleStatus().entrySet()) {
-      String[] status =
-          {entry.getValue().getRight(), entry.getValue().getLeft().toString()};
-      map.put(entry.getKey(), status);
+    for (SafeModeRuleStatusProto entry : scmSafeModeManager.getRuleStatus()) {
+      String[] status = {entry.getStatusText(), Boolean.toString(entry.getValidate())};
+      map.put(entry.getRuleName(), status);
     }
     return map;
   }
@@ -2221,10 +2210,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     String primordialNode = SCMHAUtils.getPrimordialSCM(configuration);
     // primordialNode can be nodeId too . If it is then return hostname.
     if (HddsUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
-      List<SCMNodeDetails> localAndPeerNodes =
-          new ArrayList<>(scmHANodeDetails.getPeerNodeDetails());
-      localAndPeerNodes.add(getSCMHANodeDetails().getLocalNodeDetails());
-      for (SCMNodeDetails nodes : localAndPeerNodes) {
+      for (SCMNodeDetails nodes : scmHANodeDetails.getAllNodeDetails()) {
         if (nodes.getNodeId().equals(primordialNode)) {
           return nodes.getHostName();
         }
@@ -2373,6 +2359,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.debug("Node resolution did not yield any result for {}", hostname);
       return null;
     }
+  }
+
+  static DNSToSwitchMapping createDNSToSwitchMapping(OzoneConfiguration conf) {
+    Class<? extends DNSToSwitchMapping> mappingClass =
+        conf.getClass(
+            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScriptBasedMapping.class, DNSToSwitchMapping.class);
+    return ReflectionUtils.newInstance(mappingClass, conf);
   }
 
 }

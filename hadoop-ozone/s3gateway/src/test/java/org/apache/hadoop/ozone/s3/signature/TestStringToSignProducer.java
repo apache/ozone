@@ -95,6 +95,7 @@ public class TestStringToSignProducer {
             //NOOP
           }
         }.parseSignature();
+    signatureInfo.setPayloadHash("Content-SHA");
     signatureInfo.setUnfilteredURI("/buckets");
 
     headers.fixContentType();
@@ -129,7 +130,7 @@ public class TestStringToSignProducer {
 
     final String canonicalRequest = StringToSignProducer.buildCanonicalRequest(
         "https", "GET", "/bucket/a+b*c~d/foo bar", "host;x-amz-content-sha256;x-amz-date",
-        headers, queryParams, true);
+        headers, queryParams, UNSIGNED_PAYLOAD);
 
     assertEquals(
         "GET\n"

@@ -144,7 +144,6 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.ozone.OmUtils;
@@ -177,7 +176,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
@@ -379,15 +377,15 @@ public class KeyManagerImpl implements KeyManager {
       keyLifecycleService.start();
     }
 
-    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
-        configuration.getClass(
+    dnsToSwitchMapping = createDNSToSwitchMapping(configuration);
+  }
+
+  static DNSToSwitchMapping createDNSToSwitchMapping(OzoneConfiguration conf) {
+    Class<? extends DNSToSwitchMapping> mappingClass =
+        conf.getClass(
             ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             ScriptBasedMapping.class, DNSToSwitchMapping.class);
-    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
-        dnsToSwitchMappingClass, configuration);
-    dnsToSwitchMapping =
-        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
-            : new CachedDNSToSwitchMapping(newInstance));
+    return ReflectionUtils.newInstance(mappingClass, conf);
   }
 
   /**
@@ -724,10 +722,13 @@ public class KeyManagerImpl implements KeyManager {
     if (grpcBlockTokenEnabled) {
       String remoteUser = getRemoteUser().getShortUserName();
       for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-        key.getLocationList().forEach(k -> {
-          k.setToken(secretManager.generateToken(remoteUser, k.getBlockID(),
-              EnumSet.of(READ), k.getLength()));
-        });
+        for (List<OmKeyLocationInfo> locationInfoList :
+            key.getLocationLists()) {
+          locationInfoList.forEach(k -> {
+            k.setToken(secretManager.generateToken(remoteUser, k.getBlockID(),
+                EnumSet.of(READ), k.getLength()));
+          });
+        }
       }
     }
   }
@@ -887,13 +888,16 @@ public class KeyManagerImpl implements KeyManager {
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
               List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
-                  .flatMap(versionLocations -> versionLocations.getLocationList().stream()
+                  .flatMap(versionLocations -> versionLocations.getLocationLists().stream()
+                      .flatMap(List::stream)
                       .map(b -> new DeletedBlock(
                           new BlockID(b.getContainerID(), b.getLocalID()),
                           b.getLength(),
                           QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()),
                           QuotaUtil.getSizePerReplica(b.getLength(), info.getReplicationConfig())
                       ))).collect(Collectors.toList());
+              // Reuse the replicated sizes computed above.
+              long purgedBytes = deletedBlocks.stream().mapToLong(DeletedBlock::getReplicatedSize).sum();
               String blockGroupName = kv.getKey() + "/" + reclaimableKeyCount++;
 
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(blockGroupName)
@@ -901,7 +905,7 @@ public class KeyManagerImpl implements KeyManager {
                   .build();
               reclaimableKeys.put(blockGroupName,
                   new PurgedKey(info.getVolumeName(), info.getBucketName(), bucketId,
-                  keyBlocks, kv.getKey(), OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
+                  keyBlocks, kv.getKey(), purgedBytes, info.isDeletedKeyCommitted()));
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);
@@ -2263,34 +2267,37 @@ public class KeyManagerImpl implements KeyManager {
           LOG.warn("No location for key {}", keyInfo);
           continue;
         }
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          Pipeline pipeline = k.getPipeline();
-          List<DatanodeDetails> nodes = pipeline.getNodes();
-          if (nodes.isEmpty()) {
-            LOG.warn("No datanodes in pipeline {}", pipeline.getId());
-            continue;
-          }
-
-          final Set<String> uuidSet = nodes.stream().map(DatanodeDetails::getUuidString)
-              .collect(Collectors.toSet());
-
-          List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
-          if (sortedNodes == null) {
-            sortedNodes = sortDatanodes(nodes, clientMachine);
-            // Cache only a freshly sorted order, not an input list returned
-            // unchanged when no sort happens: that order is per-pipeline and must
-            // not be reused for another pipeline with the same node set. The read
-            // sort always returns a new list, so this never skips caching here; it
-            // keeps the pattern identical to the write path.
-            if (sortedNodes != null && sortedNodes != nodes) {
-              sortedPipelines.put(uuidSet, sortedNodes);
+        for (List<OmKeyLocationInfo> locationInfoList :
+            key.getLocationLists()) {
+          for (OmKeyLocationInfo k : locationInfoList) {
+            Pipeline pipeline = k.getPipeline();
+            List<DatanodeDetails> nodes = pipeline.getNodes();
+            if (nodes.isEmpty()) {
+              LOG.warn("No datanodes in pipeline {}", pipeline.getId());
+              continue;
             }
-          } else if (LOG.isDebugEnabled()) {
-            LOG.debug("Found sorted datanodes for pipeline {} and client {} "
-                + "in cache", pipeline.getId(), clientMachine);
-          }
-          if (!Objects.equals(pipeline.getNodesInOrder(), sortedNodes)) {
-            k.setPipeline(pipeline.copyWithNodesInOrder(sortedNodes));
+
+            final Set<String> uuidSet = nodes.stream().map(DatanodeDetails::getUuidString)
+                .collect(Collectors.toSet());
+
+            List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
+            if (sortedNodes == null) {
+              sortedNodes = sortDatanodes(nodes, clientMachine);
+              // Cache only a freshly sorted order, not an input list returned
+              // unchanged when no sort happens: that order is per-pipeline and must
+              // not be reused for another pipeline with the same node set. The read
+              // sort always returns a new list, so this never skips caching here; it
+              // keeps the pattern identical to the write path.
+              if (sortedNodes != null && sortedNodes != nodes) {
+                sortedPipelines.put(uuidSet, sortedNodes);
+              }
+            } else if (LOG.isDebugEnabled()) {
+              LOG.debug("Found sorted datanodes for pipeline {} and client {} "
+                  + "in cache", pipeline.getId(), clientMachine);
+            }
+            if (!Objects.equals(pipeline.getNodesInOrder(), sortedNodes)) {
+              k.setPipeline(pipeline.copyWithNodesInOrder(sortedNodes));
+            }
           }
         }
       }
@@ -2569,7 +2576,8 @@ public class KeyManagerImpl implements KeyManager {
   @Nonnull
   private Stream<Long> extractContainerIDs(OmKeyInfo keyInfo) {
     return keyInfo.getKeyLocationVersions().stream()
-        .flatMap(v -> v.getLocationList().stream())
+        .flatMap(v -> v.getLocationLists().stream())
+        .flatMap(List::stream)
         .map(BlockLocationInfo::getContainerID);
   }
 }

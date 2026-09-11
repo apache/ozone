@@ -160,8 +160,7 @@ public class TestOzoneECClient {
       assertEquals(1, datanodeStorage.getAllBlockData().size());
       ByteString content =
           datanodeStorage.getAllBlockData().values().iterator().next();
-      assertEquals(new String(inputChunks[i], UTF_8),
-          content.toStringUtf8());
+      assertEquals(ByteString.copyFrom(inputChunks[i]), content);
     }
   }
 
@@ -190,9 +189,7 @@ public class TestOzoneECClient {
       assertEquals(1, datanodeStorage.getAllBlockData().size());
       ByteString content =
           datanodeStorage.getAllBlockData().values().iterator().next();
-      assertEquals(
-          new String(parityBuffers[i - dataBlocks].array(), UTF_8),
-          content.toStringUtf8());
+      assertEquals(ByteString.copyFrom(parityBuffers[i - dataBlocks].array()), content);
     }
 
   }
@@ -341,12 +338,11 @@ public class TestOzoneECClient {
           storages.get(getMatchingStorage(storages, DatanodeID.fromProto(member.getId())));
       dns.add(mockDatanodeStorage);
     }
-    String firstBlockData = dns.get(0).getFullBlockData(new BlockID(
+    ByteString firstBlockData = dns.get(0).getFullBlockData(new BlockID(
         keyLocations.getBlockID().getContainerBlockID().getContainerID(),
         keyLocations.getBlockID().getContainerBlockID().getLocalID()));
 
-    assertArrayEquals(
-        firstSmallChunk, firstBlockData.getBytes(UTF_8));
+    assertEquals(ByteString.copyFrom(firstSmallChunk), firstBlockData);
 
     final ByteBuffer[] dataBuffers = new ByteBuffer[dataBlocks];
     dataBuffers[0] = ByteBuffer.wrap(firstSmallChunk);
@@ -364,13 +360,12 @@ public class TestOzoneECClient {
 
     //Lets assert the parity data.
     for (int i = dataBlocks; i < dataBlocks + parityBlocks; i++) {
-      String parityBlockData = dns.get(i).getFullBlockData(new BlockID(
+      ByteString parityBlockData = dns.get(i).getFullBlockData(new BlockID(
           keyLocations.getBlockID().getContainerBlockID().getContainerID(),
           keyLocations.getBlockID().getContainerBlockID().getLocalID()));
-      String expected =
-          new String(parityBuffers[i - dataBlocks].array(), UTF_8);
+      ByteString expected = ByteString.copyFrom(parityBuffers[i - dataBlocks].array());
       assertEquals(expected, parityBlockData);
-      assertEquals(expected.length(), parityBlockData.length());
+      assertEquals(expected.size(), parityBlockData.size());
 
     }
   }

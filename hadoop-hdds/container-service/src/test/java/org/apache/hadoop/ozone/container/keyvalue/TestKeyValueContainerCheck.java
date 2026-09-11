@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
  * Test the KeyValueContainerCheck class's ability to detect container errors.
  */
 public class TestKeyValueContainerCheck
-    extends TestKeyValueContainerIntegrityChecks {
+    extends KeyValueContainerIntegrityTestBase {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestKeyValueContainerCheck.class);
 

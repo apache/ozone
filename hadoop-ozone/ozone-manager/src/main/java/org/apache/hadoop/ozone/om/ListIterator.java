@@ -56,6 +56,10 @@ public class ListIterator {
    * Entry to be added to the heap.
    */
   public static class HeapEntry implements Comparable<HeapEntry> {
+    private static final Comparator<HeapEntry> COMPARATOR =
+        Comparator.comparing(HeapEntry::getKey)
+            .thenComparingInt(HeapEntry::getEntryIteratorId);
+
     private final int entryIteratorId;
     private final String tableName;
     private final String key;
@@ -87,8 +91,7 @@ public class ListIterator {
 
     @Override
     public int compareTo(HeapEntry other) {
-      return Comparator.comparing(HeapEntry::getKey)
-          .thenComparing(HeapEntry::getEntryIteratorId).compare(this, other);
+      return COMPARATOR.compare(this, other);
     }
 
     @Override

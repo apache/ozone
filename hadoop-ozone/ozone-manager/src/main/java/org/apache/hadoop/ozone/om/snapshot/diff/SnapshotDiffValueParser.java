@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.om.snapshot.diff;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.CodedInputStream;
@@ -35,8 +35,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo
  * Parses snapshot diff values without full deserialization.
  */
 public final class SnapshotDiffValueParser {
-  private static final int INT_BYTES = 4;
-  private static final int LONG_BYTES = 8;
   private static final int HSYNC_METADATA_PRESENT_TAG = 1001;
   private static final String DIGEST_ALGORITHM = "SHA-256";
 
@@ -103,7 +101,7 @@ public final class SnapshotDiffValueParser {
         keyLocationListCount++;
         break;
       case KeyInfo.METADATA_FIELD_NUMBER:
-        byte[] metadataDigest = parseKeyValueDigest(input.readBytes().toByteArray(), true, hasHsyncMetadata);
+        byte[] metadataDigest = parseKeyValueDigest(input.readBytes(), true, hasHsyncMetadata);
         if (metadataDigest != null) {
           metadataSignatures.add(metadataDigest);
         }
@@ -113,7 +111,7 @@ public final class SnapshotDiffValueParser {
         updateDigestWithBytes(digest, fieldNumber, input.readBytes());
         break;
       case KeyInfo.TAGS_FIELD_NUMBER:
-        byte[] tagDigest = parseKeyValueDigest(input.readBytes().toByteArray(), false, null);
+        byte[] tagDigest = parseKeyValueDigest(input.readBytes(), false, null);
         if (tagDigest != null) {
           tagSignatures.add(tagDigest);
         }
@@ -184,7 +182,7 @@ public final class SnapshotDiffValueParser {
       int fieldNumber = WireFormat.getTagFieldNumber(tag);
       switch (fieldNumber) {
       case DirectoryInfo.METADATA_FIELD_NUMBER:
-        byte[] metadataDigest = parseKeyValueDigest(input.readBytes().toByteArray(), false, null);
+        byte[] metadataDigest = parseKeyValueDigest(input.readBytes(), false, null);
         if (metadataDigest != null) {
           metadataSignatures.add(metadataDigest);
         }
@@ -205,18 +203,15 @@ public final class SnapshotDiffValueParser {
 
   private static void updateDigestWithLong(MessageDigest digest, int fieldNumber, long value) {
     updateDigestWithInt(digest, fieldNumber);
-    byte[] buffer = new byte[LONG_BYTES];
-    for (int i = LONG_BYTES - 1; i >= 0; i--) {
-      buffer[i] = (byte) (value & 0xFFL);
-      value >>>= 8;
+    for (int shift = Long.SIZE - 8; shift >= 0; shift -= 8) {
+      digest.update((byte) (value >>> shift));
     }
-    digest.update(buffer);
   }
 
   private static void updateDigestWithBytes(MessageDigest digest, int fieldNumber, ByteString value) {
     updateDigestWithInt(digest, fieldNumber);
     updateDigestWithInt(digest, value.size());
-    digest.update(value.toByteArray());
+    digest.update(value.asReadOnlyByteBuffer());
   }
 
   private static void updateTaggedString(MessageDigest digest, int fieldNumber, String value) {
@@ -242,12 +237,10 @@ public final class SnapshotDiffValueParser {
   }
 
   private static void updateDigestWithInt(MessageDigest digest, int value) {
-    byte[] buffer = new byte[INT_BYTES];
-    for (int i = INT_BYTES - 1; i >= 0; i--) {
-      buffer[i] = (byte) (value & 0xFF);
-      value >>>= 8;
-    }
-    digest.update(buffer);
+    digest.update((byte) (value >>> 24));
+    digest.update((byte) (value >>> 16));
+    digest.update((byte) (value >>> 8));
+    digest.update((byte) value);
   }
 
   private static MessageDigest newDigest() {
@@ -271,12 +264,12 @@ public final class SnapshotDiffValueParser {
     updateDigestWithRawBytes(digest, fieldNumber, metadataDigest.digest());
   }
 
-  private static byte[] parseKeyValueDigest(byte[] keyValueBytes, boolean computeHsync, AtomicBoolean hasHsync)
+  private static byte[] parseKeyValueDigest(ByteString keyValueBytes, boolean computeHsync, AtomicBoolean hasHsync)
       throws IOException {
-    if (keyValueBytes == null || keyValueBytes.length == 0) {
+    if (keyValueBytes == null || keyValueBytes.isEmpty()) {
       return null;
     }
-    CodedInputStream input = CodedInputStream.newInstance(keyValueBytes);
+    CodedInputStream input = keyValueBytes.newCodedInput();
     String key = null;
     String value = null;
     while (!input.isAtEnd()) {

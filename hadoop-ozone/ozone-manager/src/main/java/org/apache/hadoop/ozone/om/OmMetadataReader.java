@@ -32,6 +32,7 @@ import java.net.InetAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.Server;
@@ -56,6 +57,9 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -124,14 +128,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
-    OmKeyArgs resolvedArgs = bucket.update(args);
+    OmKeyArgs resolvedArgs = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getLookupAclCheckLatencyNs(),
             () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
                 ACLType.READ, bucket,
-                args.getKeyName())
+                resolvedArgs.getKeyName())
         );
       }
       metrics.incNumKeyLookups();
@@ -177,14 +181,15 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         () -> ozoneManager.resolveBucketLink(resolvedVolumeArgs));
 
     boolean auditSuccess = true;
-    OmKeyArgs resolvedArgs = bucket.update(resolvedVolumeArgs);
+    OmKeyArgs resolvedArgs =
+        normalizeKeyArgs(bucket.update(resolvedVolumeArgs), bucket);
 
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
             checkAcls(ResourceType.KEY,
                 StoreType.OZONE, ACLType.READ,
-                bucket, args.getKeyName())
+                bucket, resolvedArgs.getKeyName())
         );
       }
 
@@ -235,8 +240,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-            bucket, args.getKeyName());
+        checkListStatusAcls(args, bucket);
       }
       metrics.incNumListStatus();
       return keyManager.listStatus(args, recursive, startKey,
@@ -272,8 +276,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(getResourceType(resolvedArgs), StoreType.OZONE, ACLType.READ,
-            bucket, resolvedArgs.getKeyName());
+        checkListStatusAcls(resolvedArgs, bucket);
       }
       metrics.incNumListStatus();
       List<OzoneFileStatus> ozoneFileStatuses = keyManager.listStatus(
@@ -305,8 +308,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-            bucket, args.getKeyName());
+        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
       }
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args, getClientAddress());
@@ -331,7 +333,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
-    args = bucket.update(args);
+    args = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
       if (isAclEnabled) {
@@ -371,10 +373,23 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
-            checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-            bucket.realVolume(), bucket.realBucket(), keyPrefix)
-        );
+        if (isStsS3Request()) {
+          // Check with key null to ensure there is LIST permission on the bucket
+          captureLatencyNs(
+              perfMetrics.getListKeysAclCheckLatencyNs(), () -> checkAcls(
+                  ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(),
+                  null));
+          // With STS we must check acl on the prefix to be compliant with AWS
+          final String aclKey = (keyPrefix == null || keyPrefix.isEmpty()) ? "*" : keyPrefix;
+          captureLatencyNs(
+              perfMetrics.getListKeysAclCheckLatencyNs(), () -> checkAcls(
+                  ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket.realVolume(), bucket.realBucket(), aclKey));
+        } else {
+          captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
+              checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+                  bucket.realVolume(), bucket.realBucket(), keyPrefix)
+          );
+        }
       }
       metrics.incNumKeyLists();
       return keyManager.listKeys(bucket.realVolume(), bucket.realBucket(),
@@ -473,14 +488,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
-    OmKeyArgs resolvedArgs = bucket.update(args);
+    OmKeyArgs resolvedArgs = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getGetObjectTaggingAclCheckLatencyNs(),
             () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
                 ACLType.READ, bucket,
-                args.getKeyName())
+                resolvedArgs.getKeyName())
         );
       }
       metrics.incNumGetObjectTagging();
@@ -540,6 +555,32 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   }
 
   /**
+   * Normalize the key name on the read args up front, so the ACL check and the
+   * key read resolve the SAME key. The read path
+   * ({@link KeyManagerImpl#readKeyInfo}) normalizes '.'/'..' path segments before
+   * the DB lookup for layouts that use filesystem semantics (FSO, and LEGACY when
+   * {@code ozone.om.enable.filesystem.paths} is set). If the ACL check instead ran
+   * on the raw name, a request such as {@code a/../k1} would be evaluated against a
+   * different (literal) path than the normalized key {@code k1} that the read
+   * actually serves. Normalizing here keeps the check and the read in agreement for
+   * every authorizer (native and Ranger). Layouts that do not normalize (OBJECT_STORE)
+   * are returned unchanged.
+   */
+  private OmKeyArgs normalizeKeyArgs(OmKeyArgs args, ResolvedBucket bucket)
+      throws OMException {
+    String keyName = args.getKeyName();
+    if (keyName == null || keyName.isEmpty() || bucket.bucketLayout() == null) {
+      return args;
+    }
+    String normalized = OMClientRequest.validateAndNormalizeKey(
+        ozoneManager.getEnableFileSystemPaths(), keyName, bucket.bucketLayout());
+    if (normalized.equals(keyName)) {
+      return args;
+    }
+    return args.toBuilder().setKeyName(normalized).build();
+  }
+
+  /**
    * Checks if current caller has acl permissions.
    *
    * @param resType - Type of ozone resource. Ex volume, bucket.
@@ -555,8 +596,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       throws IOException {
     UserGroupInformation user;
     if (getS3Auth() != null) {
+      final String effectiveAccessId = OzoneManager.getS3AuthEffectiveAccessId();
       String principal =
-          OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId());
+          OzoneAclUtils.accessIdToUserPrincipal(effectiveAccessId);
       user = UserGroupInformation.createRemoteUser(principal);
     } else {
       user = ProtobufRpcEngine.Server.getRemoteUser();
@@ -590,8 +632,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       throws IOException {
     UserGroupInformation user;
     if (getS3Auth() != null) {
+      final String effectiveAccessId = OzoneManager.getS3AuthEffectiveAccessId();
       String principal =
-          OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId());
+          OzoneAclUtils.accessIdToUserPrincipal(effectiveAccessId);
       user = UserGroupInformation.createRemoteUser(principal);
     } else {
       user = ProtobufRpcEngine.Server.getRemoteUser();
@@ -632,16 +675,15 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         .setVolumeName(vol)
         .setBucketName(bucket)
         .setKeyName(key).build();
-    RequestContext context = RequestContext.newBuilder()
+    RequestContext.Builder contextBuilder = RequestContext.newBuilder()
         .setClientUgi(ugi)
         .setIp(remoteAddress)
         .setHost(hostName)
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
-        .setOwnerName(owner)
-        .build();
+        .setOwnerName(owner);
 
-    return checkAcls(obj, context, throwIfPermissionDenied);
+    return checkAcls(obj, contextBuilder, throwIfPermissionDenied);
   }
 
   /**
@@ -651,8 +693,11 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
    *                     and throwOnPermissionDenied set to true.
    */
-  public boolean checkAcls(OzoneObj obj, RequestContext context,
+  public boolean checkAcls(OzoneObj obj, RequestContext.Builder contextBuilder,
       boolean throwIfPermissionDenied) throws OMException {
+
+    maybeAddToContextFromThreadLocal(contextBuilder);
+    final RequestContext context = contextBuilder.build();
 
     if (!captureLatencyNs(perfMetrics::setCheckAccessLatencyNs,
         () -> accessAuthorizer.checkAccess(obj, context))) {
@@ -663,11 +708,25 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
                 "Bucket:" + obj.getBucketName() + " " : "";
         String keyName = obj.getKeyName() != null ?
                 "Key:" + obj.getKeyName() : "";
+        // For STS tokens, make clear that the user is using an assumed role, otherwise the access denied
+        // message could be confusing
+        String user = context.getClientUgi().getShortUserName();
+        final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
+        if (stsTokenIdentifier != null) {
+          final StringBuilder builder = new StringBuilder(user)
+              .append(" (STS assumed role arn = ")
+              .append(stsTokenIdentifier.getRoleArn())
+              .append(", tempAccessKeyId = ")
+              .append(stsTokenIdentifier.getTempAccessKeyId())
+              .append(')');
+          user = builder.toString();
+        }
         log.warn("User {} doesn't have {} permission to access {} {}{}{}",
-            context.getClientUgi().getShortUserName(), context.getAclRights(),
+            user,
+            context.getAclRights(),
             obj.getResourceType(), volumeName, bucketName, keyName);
         throw new OMException(
-            "User " + context.getClientUgi().getShortUserName() +
+            "User " + user +
             " doesn't have " + context.getAclRights() +
             " permission to access " + obj.getResourceType() + " " +
             volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);
@@ -675,6 +734,32 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       return false;
     } else {
       return true;
+    }
+  }
+
+  /**
+   * Enriches the given {@link RequestContext.Builder} with per-request fields from the Ozone Manager
+   * thread locals: the session policy from {@link STSTokenIdentifier} (set on STS requests) and the
+   * S3 action from {@link S3Authentication} (set on S3 requests). Either or both may be absent, in
+   * which case the corresponding field is left untouched on the builder.
+   * <p>
+   * The S3 action is only propagated when the S3 STS feature flag is enabled, since it is only used
+   * for fine-grained STS authorization.
+   * @param contextBuilder the builder to enrich in-place
+   */
+  private void maybeAddToContextFromThreadLocal(RequestContext.Builder contextBuilder) {
+    if (!ozoneManager.isS3STSEnabled()) {
+      return;
+    }
+
+    final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
+    if (stsTokenIdentifier != null) {
+      contextBuilder.setSessionPolicy(stsTokenIdentifier.getSessionPolicy());
+    }
+
+    final S3Authentication s3Authentication = OzoneManager.getS3Auth();
+    if (s3Authentication != null && s3Authentication.hasS3Action() && !s3Authentication.getS3Action().isEmpty()) {
+      contextBuilder.setS3Action(s3Authentication.getS3Action());
     }
   }
 
@@ -726,6 +811,59 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    */
   public boolean isNativeAuthorizerEnabled() {
     return accessAuthorizer.isNative();
+  }
+
+  private boolean isStsS3Request() {
+    return getS3Auth() != null && OzoneManager.getStsTokenIdentifier() != null;
+  }
+
+  private void checkListStatusAcls(OmKeyArgs args, ResolvedBucket bucket) throws IOException {
+    if (isStsS3Request()) {
+      checkAcls(
+          ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket.realVolume(), bucket.realBucket(),
+          getStsListStatusAclKey(args));
+      return;
+    }
+
+    checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
+  }
+
+  private static String getStsListStatusAclKey(OmKeyArgs args) throws OMException {
+    // When listPrefix is set (original S3 ListObjects prefix), authorize READ on that prefix for the whole listing,
+    // including FSO traversal where keyName is an internal directory (e.g. userA) under prefix user.
+    final String listPrefix = args.getListPrefix();
+    final String keyName = args.getKeyName();
+    if (StringUtils.isNotBlank(listPrefix)) {
+      if (StringUtils.isBlank(keyName) || isStsListPathUnderRequestPrefix(keyName, listPrefix)) {
+        return listPrefix;
+      }
+      throw new OMException(
+          "STS listStatus: key path: " + keyName + " does not match authorized list prefix: " + listPrefix,
+          ResultCodes.PERMISSION_DENIED);
+    }
+    if (StringUtils.isNotEmpty(keyName)) {
+      return keyName;
+    }
+    return "*";
+  }
+
+  /**
+   * For STS, {@code listPrefix} is the original S3 ListObjects prefix. Internal FSO listing may call
+   * {@code listStatus} with {@code keyName} set to a subdirectory (e.g. userA) while the session policy
+   * still authorizes only the request prefix (e.g. user). This returns true when {@code keyName} is the
+   * prefix itself, a key path under that prefix, or an ancestor directory on the way to a deeper prefix.
+   */
+  private static boolean isStsListPathUnderRequestPrefix(String keyName, String listPrefix) {
+    if (StringUtils.isBlank(listPrefix) || StringUtils.isBlank(keyName)) {
+      return false;
+    }
+    if (keyName.equals(listPrefix)) {
+      return true;
+    }
+    if (keyName.startsWith(listPrefix)) {
+      return true;
+    }
+    return listPrefix.startsWith(keyName + "/");
   }
 
   private ResourceType getResourceType(OmKeyArgs args) {

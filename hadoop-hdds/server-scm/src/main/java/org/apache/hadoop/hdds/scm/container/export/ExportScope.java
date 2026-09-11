@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
  * Container listing filters for an export job.
  * An export job filters containers by {@link ContainerHealthState}, {@link LifeCycleState} or both.
  * Example archive name:
- * {@code container-ids_health-MISSING_lifecycle-OPEN_20260101T120000Z_job{jobId}.tar.gz}
+ * {@code container-ids_health-MISSING_lifecycle-OPEN_2026-01-01-12-00-00_job{jobId}.tar.gz}
  */
 public final class ExportScope {
 
@@ -40,6 +40,10 @@ public final class ExportScope {
   }
 
   public static ExportScope of(LifeCycleState lifeCycleState, ContainerHealthState healthState) {
+    if (lifeCycleState == null && healthState == null) {
+      throw new IllegalArgumentException("At least one of healthState or lifecycleState filter is required.");
+    }
+
     String health = healthState != null ? healthState.name() : ANY;
     String lifecycle = lifeCycleState != null ? lifeCycleState.name() : ANY;
     String value = "health-" + health + "_lifecycle-" + lifecycle;
@@ -55,7 +59,7 @@ public final class ExportScope {
   }
 
   /**
-   * Stable filter name segment used in export TAR and shard file names.
+   * Stable filter name segment used in export TAR and part file names.
    */
   public String getValue() {
     return value;

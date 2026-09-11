@@ -26,28 +26,18 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
-import org.apache.hadoop.security.KerberosInfo;
 
 /**
  * ScmBlockLocationProtocol is used by an HDFS node to find the set of nodes
  * to read/write a block.
  */
-@KerberosInfo(serverPrincipal = ScmConfig.ConfigStrings
-      .HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 public interface ScmBlockLocationProtocol extends Closeable {
-
-  @SuppressWarnings("checkstyle:ConstantName")
-  /**
-   * Version 1: Initial version.
-   */
-  long versionID = 1L;
 
   /**
    * Asks SCM where a block should be allocated. SCM responds with the
