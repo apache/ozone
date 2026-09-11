@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATIO
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE_DEFAULT;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -170,6 +171,16 @@ public class ScmClient {
     if (containerProxyProvider != null) {
       containerProxyProvider.changeConfig();
     }
+  }
+
+  @VisibleForTesting
+  public SCMFailoverProxyProviderBase<?> getBlockProxyProvider() {
+    return blockProxyProvider;
+  }
+
+  @VisibleForTesting
+  public SCMFailoverProxyProviderBase<?> getContainerProxyProvider() {
+    return containerProxyProvider;
   }
 
   public ScmBlockLocationProtocol getBlockClient() {
