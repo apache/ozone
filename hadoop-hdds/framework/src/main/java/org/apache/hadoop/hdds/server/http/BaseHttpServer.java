@@ -155,26 +155,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
                                     conf.getBoolean(HddsConfigKeys.HDDS_PROFILER_ENABLED, false);
 
       if (prometheusSupport) {
-        prometheusMetricsSink = new PrometheusMetricsSink(name);
-        httpServer.getWebAppContext().getServletContext()
-            .setAttribute(PROMETHEUS_SINK, prometheusMetricsSink);
-        HddsPrometheusConfig prometheusConfig =
-            conf.getObject(HddsPrometheusConfig.class);
-        String token = prometheusConfig.getPrometheusEndpointToken();
-        if (StringUtils.isNotEmpty(token)) {
-          httpServer.getWebAppContext().getServletContext()
-              .setAttribute(PrometheusServlet.SECURITY_TOKEN, token);
-          // Adding as internal servlet since we want to have token based
-          // auth and hence SPNEGO should be disabled if security is enabled.
-          httpServer.addInternalServlet("prometheus", "/prom",
-              PrometheusServlet.class);
-        } else {
-          // If token is not configured, keeping as regular servlet and not
-          // internal servlet since we do not want to expose /prom endpoint
-          // without authentication in a secure cluster.
-          httpServer.addServlet("prometheus", "/prom",
-              PrometheusServlet.class);
-        }
+        prometheusMetricsSink = addPrometheusEndpoint(httpServer, conf, name);
       }
 
       if (profilerSupport) {
@@ -241,6 +222,27 @@ public abstract class BaseHttpServer implements AutoCloseable {
       LOG.info("Starting Web-server for {} at: {}", name, uri);
     }
     return builder;
+  }
+
+  /**
+   * Add the Prometheus endpoint at {@code /prom} to an existing {@link HttpServer2} instance.
+   * Returns the registered sink for use in start/stop lifecycle calls.
+   */
+  public static PrometheusMetricsSink addPrometheusEndpoint(
+      HttpServer2 httpServer, ConfigurationSource conf, String name) {
+    PrometheusMetricsSink sink = new PrometheusMetricsSink(name);
+    httpServer.getWebAppContext().getServletContext().setAttribute(PROMETHEUS_SINK, sink);
+    String token = conf.getObject(HddsPrometheusConfig.class).getPrometheusEndpointToken();
+    if (StringUtils.isNotEmpty(token)) {
+      httpServer.getWebAppContext().getServletContext()
+          .setAttribute(PrometheusServlet.SECURITY_TOKEN, token);
+      // Token-based auth: use internal servlet so SPNEGO is bypassed.
+      httpServer.addInternalServlet("prometheus", "/prom", PrometheusServlet.class);
+    } else {
+      // No token: regular servlet, protected by the server's auth filter in secure mode.
+      httpServer.addServlet("prometheus", "/prom", PrometheusServlet.class);
+    }
+    return sink;
   }
 
   /**

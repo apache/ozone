@@ -61,3 +61,12 @@ scrape_configs:
          - "recon:9888"
        labels:
          component: recon
+  - job_name: ozone-httpfs
+    metrics_path: /prom
+    params:
+      user.name: [hadoop]
+    static_configs:
+      - targets:
+          - "httpfs:14000"
+        labels:
+          component: httpfs
