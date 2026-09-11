@@ -73,6 +73,7 @@ import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.fs.ozone.OzoneTrashPolicy;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -1276,6 +1277,93 @@ public class TestOzoneShellHA {
       fs.close();
     }
 
+  }
+
+  @Test
+  @SuppressWarnings("methodlength")
+  public void testShCreateBucketWithStoragePolicy() throws Exception {
+    ObjectStore objectStore = client.getObjectStore();
+    execute(ozoneShell, new String[]{"volume", "create", "spvol1"});
+    out.reset();
+
+    // No -sp: server defaults to WARM and allowFallback true.
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol1/bucket1"});
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket1")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.WARM);
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket1")
+        .getAllowFallbackStoragePolicy()).isTrue();
+
+    // -sp null on create still yields a non-null policy (defaults to WARM).
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol1/bucket2", "-s", "null"});
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket2")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.WARM);
+
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol1/bucket3", "-s", "HOT"});
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket3")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+
+    execute(ozoneShell,
+        new String[]{"bucket", "create", "spvol1/bucket4", "-s", "HOT", "-a", "false"});
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket4")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket4")
+        .getAllowFallbackStoragePolicy()).isFalse();
+
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol1/bucket5", "-s", "COLD"});
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket5")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+
+    objectStore.getVolume("spvol1").deleteBucket("bucket1");
+    objectStore.getVolume("spvol1").deleteBucket("bucket2");
+    objectStore.getVolume("spvol1").deleteBucket("bucket3");
+    objectStore.getVolume("spvol1").deleteBucket("bucket4");
+    objectStore.getVolume("spvol1").deleteBucket("bucket5");
+    objectStore.deleteVolume("spvol1");
+  }
+
+  @Test
+  @SuppressWarnings("methodlength")
+  public void testShUpdateBucketStoragePolicy() throws Exception {
+    ObjectStore objectStore = client.getObjectStore();
+    execute(ozoneShell, new String[]{"volume", "create", "spvol2"});
+    out.reset();
+
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol2/bucket1"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.WARM);
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getAllowFallbackStoragePolicy()).isTrue();
+
+    // Update policy only; allowFallback is left unchanged.
+    execute(ozoneShell, new String[]{"bucket", "update", "spvol2/bucket1", "-s", "HOT"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getAllowFallbackStoragePolicy()).isTrue();
+
+    // Update both policy and allowFallback.
+    execute(ozoneShell,
+        new String[]{"bucket", "update", "spvol2/bucket1", "-s", "COLD", "-a", "false"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getAllowFallbackStoragePolicy()).isFalse();
+
+    // Unset the policy via -sp null (case-insensitive).
+    execute(ozoneShell, new String[]{"bucket", "update", "spvol2/bucket1", "-s", "NULL"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isNull();
+
+    // Set it again, then unset via lowercase null.
+    execute(ozoneShell, new String[]{"bucket", "update", "spvol2/bucket1", "-s", "HOT"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+    execute(ozoneShell, new String[]{"bucket", "update", "spvol2/bucket1", "-s", "null"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isNull();
+
+    objectStore.getVolume("spvol2").deleteBucket("bucket1");
+    objectStore.deleteVolume("spvol2");
   }
 
   @Test

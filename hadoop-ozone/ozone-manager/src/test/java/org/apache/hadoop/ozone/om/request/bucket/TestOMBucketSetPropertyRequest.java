@@ -29,6 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -495,5 +497,76 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
             dbBucketInfoAfter.getDefaultReplicationConfig());
     assertEquals(20 * GB, dbBucketInfoAfter.getQuotaInBytes());
     assertEquals(1000L, dbBucketInfoAfter.getQuotaInNamespace());
+  }
+
+  @Test
+  public void testSettingStoragePolicy() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OmBucketInfo.Builder bucketInfo = new OmBucketInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setStoragePolicy(OzoneStoragePolicy.WARM);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(omMetadataManager, bucketInfo);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    assertThat(omMetadataManager.getBucketTable().get(bucketKey)
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.WARM);
+
+    // Set the StoragePolicy to HOT and disable fallback.
+    OMClientResponse response = runSetStoragePolicy(volumeName, bucketName,
+        OzoneStoragePolicy.HOT, null, false, 1);
+    assertThat(response.getOMResponse().getSuccess()).isTrue();
+    OmBucketInfo updated = omMetadataManager.getBucketTable().get(bucketKey);
+    assertThat(updated.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+    assertThat(updated.getAllowFallbackStoragePolicy()).isFalse();
+
+    // Set the StoragePolicy to COLD and enable fallback.
+    response = runSetStoragePolicy(volumeName, bucketName,
+        OzoneStoragePolicy.COLD, null, true, 2);
+    assertThat(response.getOMResponse().getSuccess()).isTrue();
+    updated = omMetadataManager.getBucketTable().get(bucketKey);
+    assertThat(updated.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    assertThat(updated.getAllowFallbackStoragePolicy()).isTrue();
+
+    // Unset the StoragePolicy.
+    response = runSetStoragePolicy(volumeName, bucketName, null, true, null, 3);
+    assertThat(response.getOMResponse().getSuccess()).isTrue();
+    updated = omMetadataManager.getBucketTable().get(bucketKey);
+    assertThat(updated.getStoragePolicy()).isNull();
+
+    // Set and unset the StoragePolicy at the same time is not allowed.
+    response = runSetStoragePolicy(volumeName, bucketName,
+        OzoneStoragePolicy.HOT, true, null, 4);
+    assertThat(response.getOMResponse().getSuccess()).isFalse();
+    assertThat(response.getOMResponse().getStatus())
+        .isEqualTo(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION);
+  }
+
+  private OMClientResponse runSetStoragePolicy(String volumeName,
+      String bucketName, StoragePolicy storagePolicy,
+      Boolean unSetStoragePolicy, Boolean allowFallbackStoragePolicy,
+      long txnId) throws Exception {
+    OmBucketArgs.Builder argsBuilder = OmBucketArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName);
+    if (storagePolicy != null) {
+      argsBuilder.setStoragePolicy(storagePolicy);
+    }
+    if (unSetStoragePolicy != null) {
+      argsBuilder.setUnSetStoragePolicy(unSetStoragePolicy);
+    }
+    if (allowFallbackStoragePolicy != null) {
+      argsBuilder.setAllowFallbackStoragePolicy(allowFallbackStoragePolicy);
+    }
+    OMRequest omRequest = OMRequest.newBuilder().setSetBucketPropertyRequest(
+        SetBucketPropertyRequest.newBuilder()
+            .setBucketArgs(argsBuilder.build().getProtobuf()))
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
+        .setClientId(UUID.randomUUID().toString()).build();
+    return new OMBucketSetPropertyRequest(omRequest)
+        .validateAndUpdateCache(ozoneManager, txnId);
   }
 }
