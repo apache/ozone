@@ -171,7 +171,9 @@ For object retention, the interaction with Ranger policies depends on the config
 * **Governance Mode and `BypassGovernanceRetention`**:
   * **Mechanism**: Governance Mode allows authorized users to overwrite, delete, or alter the retention duration of a locked object before its expiration date.
   * **Authorization Binding**: Evaluated at the **Key level** via the **`BypassGovernanceRetention`** action.
-  * **Enforcement Flow**: While regular users are strictly blocked from mutating locked objects in Governance Mode, any request attempting to overwrite or delete such objects requires explicit `BypassGovernanceRetention` entitlement in Ranger for that key/path. Without this permission, even administrators using standard client tools cannot modify or remove the locked object.### New Ozone APIs
+  * **Enforcement Flow**: While regular users are strictly blocked from mutating locked objects in Governance Mode, any request attempting to overwrite or delete such objects requires explicit `BypassGovernanceRetention` entitlement in Ranger for that key. Without this permission, even administrators using standard client tools cannot modify or remove the locked object.
+
+### New Ozone APIs
 
 **ObjectStore**
 
@@ -210,9 +212,6 @@ Standard data mutating APIs will intercept the Object Lock state and return the 
 > * **Object Lock Immutability & Future Versioning Binding**:
 >   - **Current State (No Versioning)**: Once Object Lock is enabled on a bucket (`objectLockEnabled = true`), it cannot be disabled.
 >   - **AWS S3 Alignment & Future Evolution**: In standard AWS S3, Object Lock inherently requires and automatically enables Versioning upon bucket creation. While Ozone temporarily decouples them due to unsupporting Versioning, future implementations will align with S3 semantics: enabling Object Lock will automatically enforce Versioning, and Versioning can never be suspended or disabled thereafter.
-> * **Bucket Creation Semantics**:
->   AWS S3 supports enabling Object Lock and configuring RetentionConfig directly during bucket creation.
->   In Apache Ozone's current design, these settings must be configured via dedicated API calls after the bucket has been created.
 
 ### Impact on Write and Delete Flows
 
@@ -265,6 +264,7 @@ Since Ozone runs on customer-managed infrastructure, operations executed with OS
 * **Low-Level DR Tools:** Using disaster recovery tools like `ozone repair` to explicitly restore the OM's DB directory from an older Ratis snapshot (taken before the lock was applied) or running `skip-ratis-transaction` to skip retention state entries.
 * **Storage Level Deletion:** Directly deleting block files from the DataNode filesystems.
 * **System Clock Tampering**: Artificially manipulating or rolling back the system clock (NTP/OS time) on OM or DataNode hosts to prematurely expire object retention periods or evade time-based WORM validation.
+* **Ranger Super Admin Privilege Abuse**: Modifying, disabling, or overriding Ozone authorization policies via Apache Ranger admin credentials (or direct access to Ranger’s backend database), allowing privileged operators to alter bucket WORM flags or grant unrestricted deletion permissions outside normal enforcement workflows.
 
 **Compliance Recommendation:**
 To achieve strict regulatory compliance (e.g., SEC 17a-4 or FINRA WORM requirements) in an on-premise deployment, Ozone's Object Lock must be complemented with strict infrastructure security measures. This includes enforcing rigid OS-level RBAC/IAM, restricting SSH/root access to OM/DN nodes, and continuously forwarding Ozone audit logs to a tamper-evident, external SIEM system to detect manual offline interventions.
@@ -306,8 +306,165 @@ To achieve strict regulatory compliance (e.g., SEC 17a-4 or FINRA WORM requireme
 
 ## Plan
 
-All Ranger integration capabilities are currently verified via Smoke Tests. We plan to add dedicated test suites under the Smoke Test framework to validate S3 WORM functionality across diverse permission scenarios.
+The implementation of S3 Object Lock in Apache Ozone is divided into five structured phases covering the 11 core functional requirements. This ensures incremental delivery, clean service boundaries, and testability at each stage.
+
+### Phase 1: Metadata Infrastructure & Schema Definitions (Item 1)
+
+*Goal: Establish protobuf schemas, in-memory domain models, and RocksDB table serialization codecs.*
+
+1. **Protobuf Definitions (`OmClientProtocol.proto`)**:
+   - Introduce retention domain messages:
+     - `RetentionMode` enum (`GOVERNANCE = 1`, `COMPLIANCE = 2`).
+     - `Rule` message (`retentionMode`, `days`, `years`).
+     - `EventHold` message (`enabled`, `rule`).
+     - `RetentionConfig` message (`rule`, `eventHold`).
+   - Extend `BucketInfo` (OBS buckets only):
+     - `optional bool objectLockEnabled = 24 [default = false];`
+     - `optional RetentionConfig defaultRetention = 25;`
+   - Extend `KeyInfo` & `KeyInfoProtoLight`:
+     - `optional RetentionConfig retentionConfig = 23;`
+     - `optional bool legalHold = 24 [default = false];`
+
+2. **Domain Models & Helpers (`hadoop-ozone/common`)**:
+   - Update `OmBucketInfo` / `OmBucketInfo.Builder` with getters, setters, and protobuf translation.
+   - Update `OmKeyInfo` / `OmKeyInfo.Builder` with getters, setters, and protobuf translation.
+   - Create domain helper `RetentionUtils` in `org.apache.hadoop.ozone.om.helpers` to calculate `RetainUntilDate` from days/years against creation timestamp and validate date boundaries.
+   - Validate bucket layout: enforce that Object Lock can only be enabled on `OBJECT_STORE` (OBS) layout buckets; reject `FILE_SYSTEM_OPTIMIZED` (FSO) or `LEGACY` buckets.
+
+---
+
+### Phase 2: Ranger Integration & Action Mapping (Item 2)
+
+*Goal: Enable fine-grained access control separating standard data mutating permissions from compliance actions.*
+
+1. **Ranger Service Definition & Access Types**:
+   - Register dedicated access types in Ranger Ozone service definition (`ranger-servicedef-ozone.json`):
+     - `get_bucket_object_lock_configuration`
+     - `put_bucket_object_lock_configuration`
+     - `get_object_retention`
+     - `put_object_retention`
+     - `get_object_legal_hold`
+     - `put_object_legal_hold`
+     - `bypass_governance_retention`
+   - Ensure these access types map directly to AWS IAM S3 action names without the `s3:` prefix.
+
+2. **S3 Gateway & IAM Action Resolution**:
+   - Update `S3GAction` in `hadoop-ozone/s3gateway`: add audit actions for all lock configuration operations.
+   - Update `S3GActionIamMapper` in `hadoop-ozone/s3gateway`: map the new audit actions to standard IAM S3 actions (`GetBucketObjectLockConfiguration`, `PutBucketObjectLockConfiguration`, `GetObjectRetention`, `PutObjectRetention`, `GetObjectLegalHold`, `PutObjectLegalHold`, `BypassGovernanceRetention`).
+   - Update `IamSessionPolicyResolver.S3Action` in `hadoop-ozone/common`: register the actions with their resource scopes (Bucket vs. Object) and base permissions (`READ`, `WRITE`).
+   - Propagate `s3Action` via `S3Auth` through OM RPC to `RequestContext.s3Action` for evaluation by `RangerOzoneAuthorizer`.
+
+---
+
+### Phase 3: Object Lock Management APIs (Items 3 – 8)
+
+*Goal: Implement S3 REST endpoints, OM client RPC protocols, and OM HA consensus handlers for configuring and querying locks.*
+
+#### 1. Bucket Object Lock Configuration (Items 3 & 6)
+- **`PutBucketObjectLockConfiguration` (Item 3)**:
+  - *S3G*: Route `PUT /{bucket}?object-lock`. Parse `ObjectLockConfiguration` XML (`ObjectLockEnabled`, optional `DefaultRetention`).
+  - *RPC*: Add `SetBucketObjectLockConfigRequest` / `Response` in `OmClientProtocol.proto`.
+  - *OM Handler (`OMBucketSetObjectLockConfigRequest`)*:
+    - `preExecute`: Validate Ranger action `PutBucketObjectLockConfiguration`. Fail-fast on invalid parameters.
+    - `validateAndUpdateCache`: Under bucket write lock, check bucket exists and layout is OBS. Ensure immutability: if `objectLockEnabled` is already `true`, it cannot be toggled to `false`. Set `objectLockEnabled` and update `defaultRetention`. Commit to `BucketTable`.
+- **`GetBucketObjectLockConfiguration` (Item 6)**:
+  - *S3G*: Route `GET /{bucket}?object-lock`. Return `ObjectLockConfiguration` XML.
+  - *OM / Metadata Reader*: Authorize `GetBucketObjectLockConfiguration`. Read from `BucketTable`. Return `404 ObjectLockConfigurationNotFoundError` if Object Lock is not enabled.
+
+#### 2. Object Retention Management (Items 4 & 7)
+- **`PutObjectRetention` (Item 4)**:
+  - *S3G*: Route `PUT /{bucket}/{key}?retention`. Parse `Retention` XML (`Mode`, `RetainUntilDate`). Parse header `x-amz-bypass-governance-retention`.
+  - *RPC*: Add `SetObjectRetentionRequest` / `Response` in `OmClientProtocol.proto`.
+  - *OM Handler (`OMKeySetRetentionRequest`)*:
+    - `preExecute`: Authorize `PutObjectRetention`. If bypass header is set, authorize `BypassGovernanceRetention`.
+    - `validateAndUpdateCache`: Under key write lock, verify bucket has `objectLockEnabled == true`.
+      - **Compliance Mode**: If existing key is in COMPLIANCE, the new `RetainUntilDate` MUST be >= existing `RetainUntilDate` (cannot shorten duration or switch mode).
+      - **Governance Mode**: If shortening retention or removing, caller must have `BypassGovernanceRetention` permission and send the bypass flag.
+      - Update `OmKeyInfo.retentionConfig` in `KeyTable`.
+- **`GetObjectRetention` (Item 7)**:
+  - *S3G*: Route `GET /{bucket}/{key}?retention`. Return `Retention` XML.
+  - *OM / Metadata Reader*: Authorize `GetObjectRetention`. Read from `KeyTable`. Return `404 NoSuchObjectLockConfiguration` if no retention policy is applied.
+
+#### 3. Object Legal Hold Management (Items 5 & 8)
+- **`PutObjectLegalHold` (Item 5)**:
+  - *S3G*: Route `PUT /{bucket}/{key}?legal-hold`. Parse `LegalHold` XML (`Status`: `ON` / `OFF`).
+  - *RPC*: Add `SetObjectLegalHoldRequest` / `Response` in `OmClientProtocol.proto`.
+  - *OM Handler (`OMKeySetLegalHoldRequest`)*:
+    - `preExecute`: Authorize `PutObjectLegalHold`.
+    - `validateAndUpdateCache`: Under key write lock, verify bucket has `objectLockEnabled == true`. Update `OmKeyInfo.legalHold` (`true` for `ON`, `false` for `OFF`) in `KeyTable`.
+- **`GetObjectLegalHold` (Item 8)**:
+  - *S3G*: Route `GET /{bucket}/{key}?legal-hold`. Return `LegalHold` XML (`Status`: `ON` / `OFF`).
+  - *OM / Metadata Reader*: Authorize `GetObjectLegalHold`. Read from `KeyTable`. Return `404 NoSuchObjectLockConfiguration` if unconfigured.
+
+---
+
+### Phase 4: WORM Enforcement on Data Operations (Items 9 – 11)
+
+*Goal: Enforce dual-gate WORM protection on all data-mutating operations to guarantee immutability on single-version OBS objects.*
+
+#### 1. Check Lock on Put / Copy Operations (Item 9)
+- **Bucket Default Retention Inheritance**:
+  - When creating a *new* key in an Object-Lock-enabled bucket:
+    - If bucket has `defaultRetention`, automatically calculate `RetainUntilDate = currentTime + duration` and attach `RetentionConfig` to the newly committed `OmKeyInfo`.
+    - If request provides explicit retention/legal hold headers (`x-amz-object-lock-*`), validate permissions and apply them on creation.
+- **Overwrite Protection (Two-Phase Validation)**:
+  - **`OMKeyCreateRequest.preExecute`** (Fail-fast):
+    - Check if key already exists in `KeyTable`.
+    - If exists and locked (`legalHold == true` OR unexpired `retentionConfig` without valid Governance bypass): immediately fail with `WORMProtectionException` (maps to S3 `403 AccessDenied`). Avoids unnecessary Raft consensus.
+  - **`OMKeyCommitRequest.validateAndUpdateCache`** (Linearizability):
+    - Under bucket/key write lock, perform authoritative WORM check against committed `KeyTable`.
+    - Reject commit if target is actively locked. Keys that fail to commit remain in `OpenKeyTable` and are reclaimed by background open-key cleanup.
+
+#### 2. Check Lock on Delete Operations (Item 10)
+- **Single Delete (`DeleteObject`)**:
+  - In `OMKeyDeleteRequest.validateAndUpdateCache` under key write lock:
+    - Lookup target key in `KeyTable`. If absent, return standard idempotent success (`204 No Content`).
+    - If key exists:
+      - Active Legal Hold (`legalHold == true`) -> Reject with `WORMProtectionException`.
+      - Active Retention:
+        - `COMPLIANCE` -> Reject unconditionally.
+        - `GOVERNANCE` -> Allow only if caller has `BypassGovernanceRetention` permission AND header `x-amz-bypass-governance-retention: true` is present; otherwise reject.
+    - If unlocked or bypass authorized, proceed with deletion and quota reclaim.
+- **Batch Delete (`DeleteObjects`)**:
+  - In `S3BatchDeleteRequest` / `MultiDeleteEndpoint`: evaluate WORM status per key.
+  - Locked keys return `<Error><Code>AccessDenied</Code><Message>Access Denied: Object is WORM protected</Message></Error>` in the multi-delete XML payload while allowing unlocked keys in the batch to proceed.
+
+#### 3. Check Lock on Multipart Upload Operations (Item 11)
+- **`InitiateMultipartUpload` (`S3InitiateMultipartUploadRequest`)**:
+  - `preExecute`: Perform fail-fast WORM check on destination key. If target exists and is locked, reject before creating MPU state in `multipartInfoTable`.
+  - Carry forward default/specified retention parameters into MPU metadata.
+- **`UploadPart` / `UploadPartCopy` (`S3MultipartUploadCommitPartRequest`)**:
+  - `preExecute`: Fail-fast check on destination key to detect concurrent locks applied after initiation.
+- **`CompleteMultipartUpload` (`S3MultipartUploadCompleteRequest`)**:
+  - `validateAndUpdateCache`: Under bucket write lock, perform linearizable WORM check on destination key before committing the final assembled key.
+  - Apply inherited or initiated retention/legal hold metadata to the completed `OmKeyInfo`.
+- **`AbortMultipartUpload`**:
+  - Only aborts open parts in `multipartInfoTable` and `openKeyTable`; does not affect existing locked committed objects.
+
+---
+
+### Phase 5: Verification, Testing & Tooling
+
+*Goal: Ensure end-to-end test coverage across unit, integration, and security acceptance suites.*
+
+1. **Unit & Contract Tests**:
+   - `TestOmBucketInfo` & `TestOmKeyInfo`: Serialization/deserialization of retention configs and legal hold flags.
+   - `TestOMKeyCreateRequest`, `TestOMKeyCommitRequest`, `TestOMKeyDeleteRequest`, `TestS3MultipartUploadCompleteRequest`: Validate fail-fast (`preExecute`) and linearizable (`validateAndUpdateCache`) WORM rejections.
+   - `TestS3GActionIamMapper` & `TestIamSessionPolicyResolver`: Verify IAM S3 action string translations and scope mappings.
+2. **Acceptance & Ranger Smoke Tests (Docker Compose)**:
+   - Add automated test suites under `hadoop-ozone/dist/src/main/smoketest/security/s3-object-lock.robot`.
+   - Run in `ozonesecure-ha` environment (`test-ranger.sh`):
+     - Test dual-gate access control: verify users with `WRITE`/`DELETE` permissions are blocked by active WORM status.
+     - Test compliance officer role with `PutObjectLegalHold` and `BypassGovernanceRetention`.
+     - Test compliance immutability against admin accounts.
 
 Once S3 Versioning support matures, future efforts will focus on ensuring compatibility with S3 multi-version object locking.
 
 ## References
+
+- [AWS S3 Object Lock User Guide](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html)
+- [AWS S3 PutBucketObjectLockConfiguration API](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketObjectLockConfiguration.html)
+- [AWS S3 PutObjectRetention API](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObjectRetention.html)
+- [AWS S3 PutObjectLegalHold API](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObjectLegalHold.html)
+- [HDDS-15945: S3 Object Lock Support in Apache Ozone](https://issues.apache.org/jira/browse/HDDS-15945)
+- [Ozone STS Design](ozone-sts.md)
