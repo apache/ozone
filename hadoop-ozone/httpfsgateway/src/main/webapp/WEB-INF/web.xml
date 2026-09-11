@@ -62,27 +62,27 @@
 
   <filter-mapping>
     <filter-name>authFilter</filter-name>
-    <url-pattern>*</url-pattern>
+    <url-pattern>/*</url-pattern>
   </filter-mapping>
 
   <filter-mapping>
     <filter-name>MDCFilter</filter-name>
-    <url-pattern>*</url-pattern>
+    <url-pattern>/*</url-pattern>
   </filter-mapping>
 
   <filter-mapping>
     <filter-name>hostnameFilter</filter-name>
-    <url-pattern>*</url-pattern>
+    <url-pattern>/*</url-pattern>
   </filter-mapping>
 
   <filter-mapping>
     <filter-name>checkUploadContentType</filter-name>
-    <url-pattern>*</url-pattern>
+    <url-pattern>/*</url-pattern>
   </filter-mapping>
 
   <filter-mapping>
     <filter-name>fsReleaseFilter</filter-name>
-    <url-pattern>*</url-pattern>
+    <url-pattern>/*</url-pattern>
   </filter-mapping>
 
 </web-app>
