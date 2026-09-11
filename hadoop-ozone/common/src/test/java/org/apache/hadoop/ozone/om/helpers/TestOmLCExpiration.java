@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getFutureDateString;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
@@ -92,7 +93,7 @@ class TestOmLCExpiration {
         .setDate(getFutureDateString(100));
     long currentTime = System.currentTimeMillis();
     assertOMException(() -> exp1.build().valid(currentTime), INVALID_REQUEST,
-        "Either 'days' or 'date' should be specified, but not both or neither.");
+        "exactly one of 'Days', 'Date' and 'ExpiredObjectDeleteMarker'");
 
     OmLCExpiration.Builder exp2 = new OmLCExpiration.Builder()
         .setDays(-1);
@@ -102,16 +103,16 @@ class TestOmLCExpiration {
     OmLCExpiration.Builder exp3 = new OmLCExpiration.Builder()
         .setDate(null);
     assertOMException(() -> exp3.build().valid(currentTime), INVALID_REQUEST,
-        "Either 'days' or 'date' should be specified, but not both or neither.");
+        "exactly one of 'Days', 'Date' and 'ExpiredObjectDeleteMarker'");
 
     OmLCExpiration.Builder exp4 = new OmLCExpiration.Builder()
         .setDate("");
     assertOMException(() -> exp4.build().valid(currentTime), INVALID_REQUEST,
-        "Either 'days' or 'date' should be specified, but not both or neither.");
+        "exactly one of 'Days', 'Date' and 'ExpiredObjectDeleteMarker'");
 
     OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder();
     assertOMException(() -> exp5.build().valid(currentTime), INVALID_REQUEST,
-        "Either 'days' or 'date' should be specified, but not both or neither.");
+        "exactly one of 'Days', 'Date' and 'ExpiredObjectDeleteMarker'");
 
     OmLCExpiration.Builder exp6 = new OmLCExpiration.Builder()
         .setDate("10-10-2099");
@@ -170,6 +171,43 @@ class TestOmLCExpiration {
     OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:00+01:00");
     assertOMException(() -> exp5.build().valid(currentTime), INVALID_REQUEST, "'Date' must represent midnight UTC");
+  }
+
+  /**
+   * ExpiredObjectDeleteMarker removes a marker rather than expiring an object
+   * by age, so it stands alone among the three.
+   */
+  @Test
+  public void testExpiredObjectDeleteMarkerIsExclusive() {
+    long currentTime = System.currentTimeMillis();
+
+    assertDoesNotThrow(() -> new OmLCExpiration.Builder()
+        .setExpiredObjectDeleteMarker(true).build().valid(currentTime));
+
+    assertOMException(() -> new OmLCExpiration.Builder()
+        .setExpiredObjectDeleteMarker(true).setDays(30).build()
+        .valid(currentTime), INVALID_REQUEST,
+        "exactly one of 'Days', 'Date' and 'ExpiredObjectDeleteMarker'");
+
+    assertOMException(() -> new OmLCExpiration.Builder()
+        .setExpiredObjectDeleteMarker(true)
+        .setDate(getFutureDateString(100)).build()
+        .valid(currentTime), INVALID_REQUEST,
+        "exactly one of 'Days', 'Date' and 'ExpiredObjectDeleteMarker'");
+  }
+
+  @Test
+  public void testExpiredObjectDeleteMarkerSurvivesProtobuf()
+      throws OMException {
+    OmLCExpiration marker = new OmLCExpiration.Builder()
+        .setExpiredObjectDeleteMarker(true).build();
+
+    OmLCExpiration back = OmLCExpiration.getFromProtobuf(
+        marker.getProtobuf().getExpiration());
+
+    assertTrue(back.isExpiredObjectDeleteMarker());
+    assertNull(back.getDays());
+    assertNull(back.getDate());
   }
 
   @Test

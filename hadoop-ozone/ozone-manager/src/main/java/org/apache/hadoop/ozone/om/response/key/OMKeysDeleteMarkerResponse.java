@@ -1,0 +1,141 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.om.response.key;
+
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VERSIONED_KEY_TABLE;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
+
+import jakarta.annotation.Nonnull;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.key.DeleteMarkerInsertion;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+
+/**
+ * Response for a batch DeleteKeys request on a bucket that has ever been
+ * versioned: no version the key still needs is removed. Each key gets a delete
+ * marker as its current version, and the version each marker supersedes moves
+ * to the versionedKeyTable. While versioning is suspended the marker is the
+ * key's null version, so it replaces whatever held that slot: that record is
+ * dropped and its blocks are queued for reclamation. Entries naming a version
+ * are the exception: each permanently deletes that version, as
+ * {@link OMKeyVersionDeleteResponse} does for a single delete.
+ *
+ * <p>The single-key counterpart is {@link OMKeyDeleteMarkerResponse}; both
+ * write out what {@code OMKeyRequest.insertDeleteMarker} produced.
+ */
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, VERSIONED_KEY_TABLE, DELETED_TABLE, BUCKET_TABLE,
+    LIFECYCLE_SCAN_STATE_TABLE})
+public class OMKeysDeleteMarkerResponse extends OmKeyResponse {
+
+  private List<DeleteMarkerInsertion> insertions;
+  private List<OMKeyVersionDeleteResponse> versionDeletes;
+  private OmBucketInfo omBucketInfo;
+  private OmLifecycleScanState scanState;
+
+  public OMKeysDeleteMarkerResponse(@Nonnull OMResponse omResponse,
+      @Nonnull List<DeleteMarkerInsertion> insertions,
+      @Nonnull List<OMKeyVersionDeleteResponse> versionDeletes,
+      @Nonnull OmBucketInfo omBucketInfo, OmLifecycleScanState scanState) {
+    super(omResponse, BucketLayout.OBJECT_STORE);
+    this.insertions = insertions;
+    this.versionDeletes = versionDeletes;
+    this.omBucketInfo = omBucketInfo;
+    this.scanState = scanState;
+  }
+
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMKeysDeleteMarkerResponse(@Nonnull OMResponse omResponse,
+      @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
+    checkStatusNotOK();
+  }
+
+  @Override
+  public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+    if (getOMResponse().getStatus() == OK
+        || getOMResponse().getStatus() == PARTIAL_DELETE) {
+      addToDBBatch(omMetadataManager, batchOperation);
+    }
+  }
+
+  @Override
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+
+    // Everything the batch sends to the deletedTable, put once per key: the
+    // null version a suspended marker replaced and the versions deleted by id
+    // of the same key are named by the same transaction.
+    Map<String, RepeatedOmKeyInfo> deletedBlocks = new HashMap<>();
+    for (DeleteMarkerInsertion inserted : insertions) {
+      // The version the marker supersedes and the marker itself go in one
+      // batch, so a reader never sees the key without either.
+      if (inserted.getDemotedVersion() != null) {
+        omMetadataManager.getVersionedKeyTable().putWithBatch(batchOperation,
+            inserted.getDemotedVersionKey(), inserted.getDemotedVersion());
+      }
+      omMetadataManager.getKeyTable(getBucketLayout()).putWithBatch(
+          batchOperation, inserted.getObjectKey(), inserted.getDeleteMarker());
+
+      // The null version a suspended marker replaced, if the key had one.
+      if (inserted.getReplacedNullVersionKey() != null) {
+        omMetadataManager.getVersionedKeyTable().deleteWithBatch(
+            batchOperation, inserted.getReplacedNullVersionKey());
+      }
+      if (inserted.getKeysToDelete() != null) {
+        deletedBlocks.putAll(inserted.getKeysToDelete());
+      }
+    }
+
+    // After the markers and in request order, as the request applied them to
+    // the table cache.
+    for (OMKeyVersionDeleteResponse deleted : versionDeletes) {
+      deleted.addToDBBatch(omMetadataManager, batchOperation, deletedBlocks);
+    }
+    for (Map.Entry<String, RepeatedOmKeyInfo> entry : deletedBlocks.entrySet()) {
+      omMetadataManager.getDeletedTable().putWithBatch(batchOperation, entry.getKey(), entry.getValue());
+    }
+
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+            omBucketInfo.getBucketName()), omBucketInfo);
+
+    if (scanState != null) {
+      omMetadataManager.getLifecycleScanStateTable().putWithBatch(
+          batchOperation, scanState.getBucketKey(), scanState);
+    }
+  }
+}
