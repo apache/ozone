@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ipc_.Server;
@@ -273,7 +274,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
         any(), any(), clientMachine.capture());
     assertEquals("1.2.3.4", clientMachine.getValue());
-    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any());
+    verify(mockKeyManager, never()).resolveClientForWrite(anyString(), any());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
   }
 
   @Test
@@ -282,7 +284,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     // clientMachine even when the client requests sorted datanodes.
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
-    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any()))
+    when(mockKeyManager.resolveClientForWrite(anyString(), any())).thenReturn(mock(Node.class));
+    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
     when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
@@ -311,7 +314,111 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
         any(), any(), clientMachine.capture());
     assertEquals("1.2.3.4", clientMachine.getValue());
-    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any());
+    verify(mockKeyManager, never()).resolveClientForWrite(anyString(), any());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
+  }
+
+  @Test
+  public void testAllocateBlockFallsBackToScmWhenClientUnresolved() throws Exception {
+    // Flag on and topology available, but OM cannot place the client in its
+    // topology: OM must not sort, and SCM receives the client address so it can
+    // try with its own node manager and mapping.
+    List<DatanodeDetails> nodes = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    List<DatanodeDetails> scmOrder = new ArrayList<>(nodes);
+    Collections.reverse(scmOrder);
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes)
+        .setNodesInOrder(scmOrder)
+        .build();
+    AllocatedBlock block = new AllocatedBlock.Builder().setPipeline(pipeline)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
+    ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), clientMachine.capture()))
+        .thenReturn(Collections.singletonList(block));
+
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
+    when(mockKeyManager.resolveClientForWrite(anyString(), any())).thenReturn(null);
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+    when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
+
+    OMAllocateBlockRequest request =
+        getOmAllocateBlockRequest(createAllocateBlockRequest());
+    List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
+        new ExcludeList(), scmBlockSize, true,
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
+
+    assertEquals("1.2.3.4", clientMachine.getValue());
+    verify(mockKeyManager, times(1)).resolveClientForWrite(eq("1.2.3.4"), any());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
+    assertEquals(1, locations.size());
+    // SCM's order is kept as-is.
+    assertEquals(scmOrder, locations.get(0).getPipeline().getNodesInOrder());
+  }
+
+  @Test
+  public void testAllocateBlockResolvesClientOnceAcrossPipelines() throws Exception {
+    // Two blocks on two different pipelines (different datanode sets): the
+    // client is resolved once for the request and reused for both sorts.
+    List<DatanodeDetails> nodes1 = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    List<DatanodeDetails> nodes2 = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    Pipeline pipeline1 = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes1)
+        .build();
+    Pipeline pipeline2 = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes2)
+        .build();
+    AllocatedBlock block1 = new AllocatedBlock.Builder().setPipeline(pipeline1)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
+    AllocatedBlock block2 = new AllocatedBlock.Builder().setPipeline(pipeline2)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID + 1, LOCAL_ID + 1)).build();
+    ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), clientMachine.capture()))
+        .thenReturn(Arrays.asList(block1, block2));
+
+    Node client = mock(Node.class);
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
+    when(mockKeyManager.resolveClientForWrite(eq("1.2.3.4"), any())).thenReturn(client);
+    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+    when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
+
+    OMAllocateBlockRequest request =
+        getOmAllocateBlockRequest(createAllocateBlockRequest());
+    List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
+        new ExcludeList(), 2 * scmBlockSize, true,
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
+
+    assertEquals(2, locations.size());
+    // OM sorts, so SCM is told not to.
+    assertEquals("", clientMachine.getValue());
+    verify(mockKeyManager, times(1)).resolveClientForWrite(eq("1.2.3.4"), any());
+    verify(mockKeyManager, times(2)).sortDatanodesForWrite(any(), eq("1.2.3.4"), eq(client), any());
   }
 
   @Test
@@ -345,9 +452,11 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
     List<DatanodeDetails> sortedOrder = new ArrayList<>(nodes);
     Collections.reverse(sortedOrder);
+    Node client = mock(Node.class);
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
-    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any()))
+    when(mockKeyManager.resolveClientForWrite(eq("1.2.3.4"), any())).thenReturn(client);
+    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any(), any()))
         .thenAnswer(inv -> sortedOrder);
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
     when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
@@ -360,7 +469,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
 
     // Sorted once for the shared pipeline...
-    verify(mockKeyManager, times(1)).sortDatanodesForWrite(any(), eq("1.2.3.4"), any());
+    verify(mockKeyManager, times(1)).resolveClientForWrite(eq("1.2.3.4"), any());
+    verify(mockKeyManager, times(1)).sortDatanodesForWrite(any(), eq("1.2.3.4"), eq(client), any());
     // ...and the sorted order is applied to every block's pipeline.
     assertEquals(2, locations.size());
     for (OmKeyLocationInfo location : locations) {
@@ -411,7 +521,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
     // Skip the sort: null signals that no sort happened.
-    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any())).thenReturn(null);
+    when(mockKeyManager.resolveClientForWrite(anyString(), any())).thenReturn(mock(Node.class));
+    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any(), any())).thenReturn(null);
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
     when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
 
@@ -463,7 +574,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         UserInfo.newBuilder().setRemoteAddress("").build(), ozoneManager);
 
     assertEquals("", clientMachine.getValue());
-    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any());
+    verify(mockKeyManager, never()).resolveClientForWrite(anyString(), any());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
     assertEquals(1, locations.size());
     // Assert the write order (nodesInOrder), which copyWithNodesInOrder would
     // have changed had OM sorted; it must stay as the original pipeline order.
@@ -477,7 +589,9 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         MockDatanodeDetails.randomDatanodeDetails(),
         MockDatanodeDetails.randomDatanodeDetails());
     assertThrows(IllegalArgumentException.class,
-        () -> keyManager.sortDatanodesForWrite(nodes, "", mock(NetworkTopology.class)));
+        () -> keyManager.sortDatanodesForWrite(nodes, "", mock(Node.class), mock(NetworkTopology.class)));
+    assertThrows(IllegalArgumentException.class,
+        () -> keyManager.resolveClientForWrite("", mock(NetworkTopology.class)));
   }
 
   // Like createAllocateBlockRequest, but sets sortDatanodes so preExecute

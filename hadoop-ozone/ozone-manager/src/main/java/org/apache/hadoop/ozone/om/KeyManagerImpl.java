@@ -2313,20 +2313,24 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
+  public Node resolveClientForWrite(String clientMachine, NetworkTopology clusterMap) {
+    Preconditions.checkArgument(!StringUtils.isEmpty(clientMachine), "clientMachine is empty");
+    Objects.requireNonNull(clusterMap, "clusterMap is null");
+    return getOtherNode(clientMachine, clusterMap);
+  }
+
+  @Override
   public List<? extends DatanodeDetails> sortDatanodesForWrite(
-      List<? extends DatanodeDetails> nodes, String clientMachine, NetworkTopology clusterMap) {
-    Preconditions.checkArgument(!StringUtils.isEmpty(clientMachine),
-        "clientMachine is empty");
+      List<? extends DatanodeDetails> nodes, String clientMachine, Node client, NetworkTopology clusterMap) {
+    Preconditions.checkArgument(!StringUtils.isEmpty(clientMachine), "clientMachine is empty");
+    Objects.requireNonNull(client, "client is null");
     Objects.requireNonNull(clusterMap, "clusterMap is null");
     return captureLatencyNs(
         metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
-          final Node client = getClientNode(clientMachine, nodes, clusterMap);
-          if (client == null) {
-            // Skip the sort for writes: the first node is the write primary, so
-            // do not shuffle when the client cannot be resolved.
-            return null;
-          }
-          return sortByClusterMapDistance(clusterMap, client, nodes);
+          // A pipeline datanode matching the client is at distance zero from
+          // itself, so it sorts first; the rack-level client cannot do that.
+          final Node pipelineClient = findClientInPipeline(clientMachine, nodes, clusterMap);
+          return sortByClusterMapDistance(clusterMap, pipelineClient != null ? pipelineClient : client, nodes);
         });
   }
 
@@ -2369,6 +2373,12 @@ public class KeyManagerImpl implements KeyManager {
 
   private Node getClientNode(String clientMachine,
       List<? extends DatanodeDetails> nodes, NetworkTopology clusterMap) {
+    final Node pipelineClient = findClientInPipeline(clientMachine, nodes, clusterMap);
+    return pipelineClient != null ? pipelineClient : getOtherNode(clientMachine, clusterMap);
+  }
+
+  private Node findClientInPipeline(String clientMachine,
+      List<? extends DatanodeDetails> nodes, NetworkTopology clusterMap) {
     for (DatanodeDetails node : nodes) {
       // Match by either IP or hostname, like SCM's getNodesByAddress. clientMachine
       // may be a hostname on the read path; the streaming-write remoteAddress is
@@ -2381,7 +2391,7 @@ public class KeyManagerImpl implements KeyManager {
         return resolved != null ? resolved : node;
       }
     }
-    return getOtherNode(clientMachine, clusterMap);
+    return null;
   }
 
   private Node getOtherNode(String clientMachine,

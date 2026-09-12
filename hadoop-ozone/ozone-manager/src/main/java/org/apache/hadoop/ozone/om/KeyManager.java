@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -402,20 +403,33 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   KeyLifecycleService getKeyLifecycleService();
 
   /**
+   * Resolve the streaming-write client to a node in OM's cached cluster map
+   * through the DNS-to-switch mapping. Called once per allocateBlock request,
+   * before the block loop, so the mapping is consulted at most once.
+   *
+   * @param clientMachine client address (IP or hostname), must not be empty
+   * @param clusterMap OM's cached cluster map
+   * @return a node attached to the client's rack, or null when the client
+   *     cannot be placed in the topology; the caller then leaves the sort to SCM
+   */
+  Node resolveClientForWrite(String clientMachine, NetworkTopology clusterMap);
+
+  /**
    * Sort the datanodes of a write pipeline by network-topology distance to the
-   * client, using OM's locally cached cluster map. Unlike the read-path sort,
-   * the original order is preserved when the client cannot be resolved, because
-   * the first node is used as the streaming-write primary.
+   * client, using OM's locally cached cluster map. When the client is one of the
+   * pipeline datanodes, that datanode is used as the client so it sorts first;
+   * otherwise {@code client} from {@link #resolveClientForWrite} is used.
    *
    * @param nodes the pipeline nodes to sort
-   * @param clientMachine client address (IP or hostname)
+   * @param clientMachine client address (IP or hostname), must not be empty
+   * @param client the node returned by {@link #resolveClientForWrite}, must not be null
    * @param clusterMap OM's cached cluster map used to resolve topology distance
-   * @return nodes sorted nearest-first, or null when the sort is skipped
-   *     (client unresolved, or a pipeline node missing from the cluster map);
-   *     callers must leave the pipeline order unchanged in that case
+   * @return nodes sorted nearest-first, or null when the sort is skipped because
+   *     a pipeline node is missing from the cluster map; callers must leave the
+   *     pipeline order unchanged in that case
    */
   List<? extends DatanodeDetails> sortDatanodesForWrite(
-      List<? extends DatanodeDetails> nodes, String clientMachine, NetworkTopology clusterMap);
+      List<? extends DatanodeDetails> nodes, String clientMachine, Node client, NetworkTopology clusterMap);
 
   /**
    * @return true if OM should sort the streaming-write pipeline locally

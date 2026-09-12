@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -210,18 +211,23 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final NetworkTopology clusterMap = shouldSortDatanodes
         && keyManager.isSortDatanodesForWriteEnabled()
         ? ozoneManager.getClusterMapAllowNull() : null;
+    // Resolve the client once per request, before the block loop, so the
+    // DNS-to-switch mapping is consulted at most once.
+    final Node omClient = clusterMap != null && !remoteAddress.isEmpty()
+        ? keyManager.resolveClientForWrite(remoteAddress, clusterMap) : null;
     if (!shouldSortDatanodes) {
       scmClientMachine = "";
       omClientMachine = "";
       sortedByNodes = null;
-    } else if (clusterMap != null && !remoteAddress.isEmpty()) {
+    } else if (omClient != null) {
       // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
       scmClientMachine = "";
       omClientMachine = remoteAddress;
       sortedByNodes = new HashMap<>();
     } else {
-      // Sort in SCM (or keep order when remoteAddress is empty, since SCM skips
-      // sorting for an empty client machine).
+      // Sort in SCM when OM has no topology or cannot resolve the client (or
+      // keep order when remoteAddress is empty, since SCM skips sorting for an
+      // empty client machine).
       scmClientMachine = remoteAddress;
       omClientMachine = "";
       sortedByNodes = null;
@@ -250,7 +256,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .map(DatanodeDetails::getUuidString).collect(Collectors.toSet());
         List<? extends DatanodeDetails> sorted = sortedByNodes.get(uuidSet);
         if (sorted == null) {
-          sorted = keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap);
+          sorted = keyManager.sortDatanodesForWrite(nodes, omClientMachine, omClient, clusterMap);
           // A skipped sort returns null and is not cached: that pipeline keeps
           // its own order, which must not be reused for another pipeline with
           // the same node set.
