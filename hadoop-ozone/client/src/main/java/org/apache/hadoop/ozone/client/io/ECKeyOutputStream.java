@@ -499,6 +499,9 @@ public final class ECKeyOutputStream extends KeyOutputStream
     } finally {
       closeCurrentStreamEntry();
       blockOutputStreamEntryPool.cleanup();
+      // Release the encoder's native resources (e.g. ISA-L coder context)
+      // that were allocated in the constructor.
+      encoder.release();
     }
   }
 
