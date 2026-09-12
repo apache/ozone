@@ -87,8 +87,6 @@ public final class Proto2Codec<M extends MessageLite> implements Codec<M> {
   @Override
   public M fromCodecBuffer(@Nonnull CodecBuffer buffer)
       throws CodecException {
-    // Parse the buffer directly, as Proto3Codec does: parsing through an InputStream makes protobuf
-    // allocate a 4 KB decoding buffer per call, on values which are typically a few hundred bytes.
     try {
       return parser.parseFrom(buffer.asReadOnlyByteBuffer());
     } catch (InvalidProtocolBufferException e) {
