@@ -185,6 +185,16 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
+  public void lock() {
+    rwLock.readLock().lock();
+  }
+
+  @Override
+  public void unlock() {
+    rwLock.readLock().unlock();
+  }
+
+  @Override
   public void init() throws RocksDatabaseException, CodecException {
     metadataStore = scm.getScmMetadataStore();
 

@@ -83,6 +83,12 @@
         <property name="matchAcrossLines" value="true"/>
         <property name="message" value="Use Objects.requireNonNull instead of Preconditions.checkNotNull"/>
     </module>
+    <module name="RegexpMultiline">
+        <property name="format"
+                  value="@Override\s+public\s+(?:(?:final|synchronized)\s+)*OMRequest\s+preExecute\s*\([^\)]*\)\s*(?:throws\s+[^{]+)?\s*\{(?!(?:(?!\/\*|\*\/)[\s\S]|\/\*(?:(?!\*\/)[\s\S])*\*\/){0,400}?(?:^|\r?\n|(?&lt;=\{))[ \t]*(?!\*|\/)(?:return\s+|final\s+(?:[a-zA-Z0-9_]+\s+)*[a-zA-Z0-9_]+[ \t]*=[ \t]*)?(?:\([a-zA-Z0-9_]+\)\s*)?super\s*\.\s*preExecute\s*\()"/>
+        <property name="matchAcrossLines" value="true"/>
+        <property name="message" value="preExecute() overrides must call super.preExecute(ozoneManager) and its result must be final or returned"/>
+    </module>
     <module name="TreeWalker">
         <module name="SuppressWarningsHolder"/>
         <module name="SuppressionCommentFilter"/>

@@ -29,7 +29,6 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -46,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.Assertions;
@@ -352,7 +352,7 @@ public class TestOzoneManagerRequestHandler {
     // Set up perf metrics (needed by captureLatencyNs)
     OMPerformanceMetrics perfMetrics = Mockito.mock(OMPerformanceMetrics.class);
     Mockito.when(perfMetrics.getValidateAndUpdateCacheLatencyNs())
-        .thenReturn(Mockito.mock(MutableRate.class));
+        .thenReturn(Mockito.mock(ConcurrentMutableRate.class));
     Mockito.when(ozoneManager.getPerfMetrics()).thenReturn(perfMetrics);
 
     // Disable ACLs so preExecute doesn't need ACL setup

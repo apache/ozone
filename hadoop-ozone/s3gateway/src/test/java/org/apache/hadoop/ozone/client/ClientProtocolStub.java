@@ -38,6 +38,9 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
@@ -691,9 +694,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public List<OzoneFileStatusLight> listStatusLight(String volumeName,
-      String bucketName, String keyName, boolean recursive, String startKey,
-      long numEntries, boolean allowPartialPrefixes) throws IOException {
+  public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options) throws IOException {
     return null;
   }
 
@@ -936,6 +937,21 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void deleteObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
     getBucket(volumeName, bucketName).deleteObjectTagging(keyName);
+  }
+
+  @Override
+  public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy, String requestId) throws IOException {
+    return null;
+  }
+
+  @Override
+  public CallerIdentityInfo getCallerIdentity() throws IOException {
+    return null;
+  }
+
+  @Override
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException {
   }
 
   @Override
