@@ -18,9 +18,10 @@
 name: scheduled-label-pull-requests
 
 on:
-  # every 5 minutes
+  # every 30 minutes; component labeling scans all open PRs, so keep the
+  # cadence moderate
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/30 * * * *'
 
 permissions:
   contents: read
