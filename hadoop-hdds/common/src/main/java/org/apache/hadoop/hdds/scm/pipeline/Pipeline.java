@@ -240,7 +240,7 @@ public final class Pipeline {
   /**
    * @param fromIndex the replica index starting from (inclusive)
    * @param toIndex the replica index starting to (exclusive)
-   * @return true iff this pipeline contain all replica indexes within the given range.
+   * @return true if this pipeline contains all replica indexes within the given range.
    */
   public boolean containsAllReplicaIndexes(int fromIndex, int toIndex) {
     final boolean[] contains = new boolean[toIndex - fromIndex];
