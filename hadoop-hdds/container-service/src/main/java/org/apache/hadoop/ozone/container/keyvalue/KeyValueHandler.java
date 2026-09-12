@@ -692,6 +692,17 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Objects.requireNonNull(blockData, "blockData == null");
+      Objects.requireNonNull(blockData.getBlockID());
+      if (blockData.getBlockID().getStorageType() != null
+          && kvContainer.getContainerData().getStorageType() != null) {
+        if (blockData.getBlockID().getStorageType() !=
+            kvContainer.getContainerData().getStorageType()) {
+          throw new StorageContainerException(
+              String.format("Block storage type %s does not match container storage type %s",
+                  blockData.getBlockID().getStorageType(),
+                  kvContainer.getContainerData().getStorageType()), INVALID_ARGUMENT);
+        }
+      }
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
@@ -1114,6 +1125,14 @@ public class KeyValueHandler extends Handler {
 
       WriteChunkRequestProto writeChunk = request.getWriteChunk();
       BlockID blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
+      if (blockID.getStorageType() != null
+          && kvContainer.getContainerData().getStorageType() != null) {
+        if (blockID.getStorageType() != kvContainer.getContainerData().getStorageType()) {
+          throw new StorageContainerException(
+              String.format("Block storage type %s does not match container storage type %s",
+                  blockID.getStorageType(), kvContainer.getContainerData().getStorageType()), INVALID_ARGUMENT);
+        }
+      }
       ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
 
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
@@ -1272,6 +1291,14 @@ public class KeyValueHandler extends Handler {
       BlockData blockData = BlockData.getFromProtoBuf(
           putSmallFileReq.getBlock().getBlockData());
       Objects.requireNonNull(blockData, "blockData == null");
+      if (blockData.getBlockID().getStorageType() != null
+          && kvContainer.getContainerData().getStorageType() != null
+          && blockData.getBlockID().getStorageType() != kvContainer.getContainerData().getStorageType()) {
+        throw new StorageContainerException(
+            String.format("Block storage type %s does not match container storage type %s",
+                blockData.getBlockID().getStorageType(), kvContainer.getContainerData().getStorageType()),
+            INVALID_ARGUMENT);
+      }
 
       ContainerProtos.ChunkInfo chunkInfoProto = putSmallFileReq.getChunkInfo();
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);

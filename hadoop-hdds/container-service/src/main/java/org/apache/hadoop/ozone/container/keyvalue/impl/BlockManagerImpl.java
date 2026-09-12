@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_ARGUMENT;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 
@@ -187,6 +188,15 @@ public class BlockManagerImpl implements BlockManager {
     Objects.requireNonNull(data, "data == null");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +
         "cannot be negative");
+    if (data.getBlockID().getStorageType() != null
+        && container.getContainerData().getStorageType() != null) {
+      if (data.getBlockID().getStorageType() != container.getContainerData().getStorageType()) {
+        throw new StorageContainerException(String.format(
+            "Block storage type %s does not match container storage type %s",
+            data.getBlockID().getStorageType(), container.getContainerData().getStorageType()),
+            INVALID_ARGUMENT);
+      }
+    }
 
     KeyValueContainerData containerData = container.getContainerData();
 

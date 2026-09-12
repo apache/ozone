@@ -137,10 +137,17 @@ public class TestContainerPersistence {
   }
 
   @BeforeAll
-  public static void init() {
+  public static void init() throws IOException {
     conf = new OzoneConfiguration();
     hddsPath = hddsFile.getPath();
-    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsPath);
+    StringBuilder hddsDirs = new StringBuilder();
+    for (StorageType storageType : StorageType.values()) {
+      hddsDirs.append('[').append(storageType.name()).append(']');
+      String volume = Files.createTempDirectory(
+          TestContainerPersistence.class.getSimpleName() + storageType.name()).toFile().getAbsolutePath();
+      hddsDirs.append(volume).append(',');
+    }
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, hddsPath);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
@@ -194,9 +201,12 @@ public class TestContainerPersistence {
 
   private KeyValueContainer addContainer(ContainerSet cSet, long cID)
       throws IOException {
-    long commitBytesBefore = 0;
-    long commitBytesAfter = 0;
-    long commitIncrement = 0;
+    return addContainer(cSet, cID, StorageType.DISK);
+  }
+
+  private KeyValueContainer addContainer(ContainerSet cSet, long cID,
+      StorageType storageType)
+      throws IOException {
     KeyValueContainerData data = new KeyValueContainerData(cID,
         layout,
         ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
@@ -204,17 +214,19 @@ public class TestContainerPersistence {
     data.addMetadata("VOLUME", "shire");
     data.addMetadata("owner)", "bilbo");
     KeyValueContainer container = new KeyValueContainer(data, conf);
-    commitBytesBefore = StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()).get(0).getCommittedBytes();
+    Map<HddsVolume, Long> committedBytes = new HashMap<>();
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(
+        volumeSet.getVolumesList())) {
+      committedBytes.put(volume, volume.getCommittedBytes());
+    }
 
-    container.create(volumeSet, volumeChoosingPolicy, SCM_ID, StorageType.DISK);
+    container.create(volumeSet, volumeChoosingPolicy, SCM_ID, storageType);
     cSet.addContainer(container);
 
-    commitBytesAfter = container.getContainerData()
-        .getVolume().getCommittedBytes();
-    commitIncrement = commitBytesAfter - commitBytesBefore;
     // did we commit space for the new container?
-    assertEquals(commitIncrement,
-        ContainerTestHelper.CONTAINER_MAX_SIZE);
+    HddsVolume volume = container.getContainerData().getVolume();
+    assertEquals(ContainerTestHelper.CONTAINER_MAX_SIZE,
+        volume.getCommittedBytes() - committedBytes.get(volume));
     return container;
   }
 
@@ -423,7 +435,7 @@ public class TestContainerPersistence {
     // Set up container 1.
     long testContainerID1 = getTestContainerID();
     Container<KeyValueContainerData> container1 =
-        addContainer(containerSet, testContainerID1);
+        addContainer(containerSet, testContainerID1, StorageType.DISK);
     BlockID container1Block = addBlockToContainer(container1);
     container1.close();
     KeyValueContainerData container1Data = container1.getContainerData();
@@ -432,7 +444,7 @@ public class TestContainerPersistence {
     // Set up container 2.
     long testContainerID2 = getTestContainerID();
     Container<KeyValueContainerData> container2 =
-        addContainer(containerSet, testContainerID2);
+        addContainer(containerSet, testContainerID2, StorageType.DISK);
     BlockID container2Block = addBlockToContainer(container2);
     container2.close();
     KeyValueContainerData container2Data = container2.getContainerData();
@@ -907,6 +919,64 @@ public class TestContainerPersistence {
     ChunkInfo readChunk =
         ChunkInfo.getFromProtoBuf(readBlockData.getChunks().get(0));
     assertEquals(info.getChecksumData(), readChunk.getChecksumData());
+  }
+
+  /**
+   * Tests a put block and read block with StorageType.
+   * @throws IOException
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPutBlockWithStorageType(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    for (StorageType storageType : StorageType.values()) {
+      long testContainerID = getTestContainerID();
+      Container container = addContainer(containerSet, testContainerID, storageType);
+
+      BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID, 0, storageType);
+      ChunkInfo info = writeChunkHelper(blockID);
+      BlockData blockData = new BlockData(blockID);
+      List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
+      chunkList.add(info.getProtoBufMessage());
+      blockData.setChunks(chunkList);
+      blockManager.putBlock(container, blockData);
+      BlockData readBlockData = blockManager.getBlock(container, blockData.getBlockID());
+      ChunkInfo readChunk = ChunkInfo.getFromProtoBuf(readBlockData.getChunks().get(0));
+      assertEquals(info.getChecksumData(), readChunk.getChecksumData());
+      assertEquals(storageType, readBlockData.getBlockID().getStorageType());
+    }
+  }
+
+  /**
+   * Tests a put block and read block with StorageType.
+   * @throws IOException
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testInvalidPutBlockWithStorageType(
+      ContainerTestVersionInfo versionInfo) throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    // If StorageType in the request is not null,
+    // the PutBlock must put to a Container of the same StorageType.
+    long testContainerID1 = getTestContainerID();
+    Container container1 = addContainer(containerSet, testContainerID1,
+        StorageType.DISK);
+    BlockData blockData1 = getBlockData(testContainerID1, StorageType.DISK);
+    blockManager.putBlock(container1, blockData1);
+
+    long testContainerID2 = getTestContainerID();
+    Container container2 = addContainer(containerSet, testContainerID2, StorageType.DISK);
+    BlockData blockData2 = getBlockData(testContainerID2, StorageType.SSD);
+    assertThrows(IllegalArgumentException.class, () -> blockManager.putBlock(container2, blockData2));
+  }
+
+  private BlockData getBlockData(long containerID, StorageType storageType) throws IOException {
+    BlockID blockID = ContainerTestHelper.getTestBlockID(containerID, 0, storageType);
+    ChunkInfo info = writeChunkHelper(blockID);
+    BlockData blockData = new BlockData(blockID);
+    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
+    chunkList.add(info.getProtoBufMessage());
+    blockData.setChunks(chunkList);
+    return blockData;
   }
 
   /**
