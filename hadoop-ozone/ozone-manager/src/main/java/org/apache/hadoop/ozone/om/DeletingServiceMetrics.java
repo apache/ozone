@@ -70,6 +70,13 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong numKeysPurged;
   @Metric("Total no. of rename entries purged")
   private MutableGaugeLong numRenameEntriesPurged;
+  /*
+   * Which path decided reclaimability: the visibility interval, or the previous snapshot lookup.
+   */
+  @Metric("Total no. of deleted key versions reclaimed from their visibility interval")
+  private MutableGaugeLong numReclaimDecisionsFromInterval;
+  @Metric("Total no. of deleted key versions that fell back to the previous snapshot lookup path")
+  private MutableGaugeLong numReclaimDecisionsFromSnapshotLookup;
 
   /*
    * Key deletion metrics in the last 24 hours.
@@ -196,6 +203,22 @@ public final class DeletingServiceMetrics {
 
   public void incrNumKeysSentForPurge(long keysPurge) {
     this.numKeysSentForPurge.incr(keysPurge);
+  }
+
+  public void incrNumReclaimDecisionsFromInterval() {
+    this.numReclaimDecisionsFromInterval.incr();
+  }
+
+  public void incrNumReclaimDecisionsFromSnapshotLookup() {
+    this.numReclaimDecisionsFromSnapshotLookup.incr();
+  }
+
+  public long getNumReclaimDecisionsFromInterval() {
+    return numReclaimDecisionsFromInterval.value();
+  }
+
+  public long getNumReclaimDecisionsFromSnapshotLookup() {
+    return numReclaimDecisionsFromSnapshotLookup.value();
   }
 
   public void incrNumDirPurged(long dirPurged) {

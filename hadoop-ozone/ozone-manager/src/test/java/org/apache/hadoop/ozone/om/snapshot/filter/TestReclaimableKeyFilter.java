@@ -19,15 +19,22 @@ package org.apache.hadoop.ozone.om.snapshot.filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -35,6 +42,7 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -149,6 +157,147 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
       assertTrue(keyFilter.getExclusiveSizeMap().isEmpty());
     }
 
+  }
+
+  // Snapshot "snapN" gets create transaction index (N + 1) * SNAPSHOT_CREATE_INDEX_STEP.
+  private static final long SNAPSHOT_CREATE_INDEX_STEP = 100;
+
+  private static final Function<SnapshotInfo, SnapshotInfo> WITH_CREATE_TRANSACTION_INFO = info -> {
+    long ordinal = Long.parseLong(info.getName().substring("snap".length()));
+    try {
+      info.setCreateTransactionInfo(
+          TransactionInfo.valueOf(1, (ordinal + 1) * SNAPSHOT_CREATE_INDEX_STEP).toByteString());
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    return info;
+  };
+
+  private OmKeyInfo getMockedOmKeyInfoWithInterval(Long seqNumMin, Long seqNumMax) {
+    OmKeyInfo keyInfo = getMockedOmKeyInfo(1);
+    when(keyInfo.getSeqNumMin()).thenReturn(seqNumMin);
+    when(keyInfo.getSeqNumMax()).thenReturn(seqNumMax);
+    return keyInfo;
+  }
+
+  /**
+   * Runs the filter over the active object store and asserts both the verdict and whether the
+   * previous snapshot was read. The previous snapshot's create index is
+   * {@code numberOfSnapshots * SNAPSHOT_CREATE_INDEX_STEP}.
+   */
+  private void assertIntervalVerdict(int numberOfSnapshots, OmKeyInfo keyInfo, boolean expectedReclaimable,
+      boolean expectPreviousSnapshotRead) throws IOException, RocksDBException {
+    assertIntervalVerdict(numberOfSnapshots, keyInfo, expectedReclaimable, expectPreviousSnapshotRead,
+        WITH_CREATE_TRANSACTION_INFO);
+  }
+
+  private void assertIntervalVerdict(int numberOfSnapshots, OmKeyInfo keyInfo, boolean expectedReclaimable,
+      boolean expectPreviousSnapshotRead, Function<SnapshotInfo, SnapshotInfo> snapshotProps)
+      throws IOException, RocksDBException {
+    setup(2, numberOfSnapshots, numberOfSnapshots, 1, 1, snapshotProps, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    String volume = getVolumes().get(0);
+    String bucket = getBuckets().get(0);
+    when(keyInfo.getVolumeName()).thenReturn(volume);
+    when(keyInfo.getBucketName()).thenReturn(bucket);
+
+    // The lookup path reports "still present", so a "reclaimable" verdict can only come from
+    // the interval.
+    OmKeyInfo prevKeyInfo = getMockedOmKeyInfo(1);
+    for (SnapshotInfo info : getLastSnapshotInfos(volume, bucket, 2, numberOfSnapshots)) {
+      if (info != null) {
+        KeyManager snapshotKeyManager =
+            mockOmSnapshot(getOmSnapshotManager().getActiveSnapshot(volume, bucket, info.getName()));
+        when(snapshotKeyManager.getPreviousSnapshotOzoneKeyInfo(anyLong(), any(), any()))
+            .thenReturn(km -> null);
+      }
+    }
+    when(getKeyManager().getPreviousSnapshotOzoneKeyInfo(anyLong(), any(), eq(keyInfo)))
+        .thenReturn(km -> prevKeyInfo);
+    getMockedSnapshotUtils().when(() -> SnapshotUtils.isBlockLocationInfoSame(eq(prevKeyInfo), eq(keyInfo)))
+        .thenReturn(true);
+
+    assertEquals(expectedReclaimable, getReclaimableFilter().apply(Table.newKeyValue("key", keyInfo)));
+    if (expectPreviousSnapshotRead) {
+      verify(getKeyManager()).getPreviousSnapshotOzoneKeyInfo(anyLong(), any(), eq(keyInfo));
+    } else {
+      verify(getKeyManager(), never()).getPreviousSnapshotOzoneKeyInfo(anyLong(), any(), eq(keyInfo));
+    }
+  }
+
+  /** The case the optimization exists for. */
+  @Test
+  public void testVersionCreatedAfterPreviousSnapshotSkipsSnapshotLookup()
+      throws IOException, RocksDBException {
+    // Previous snapshot snap2 has create index 300; the key lived entirely in [310, 320).
+    assertIntervalVerdict(3, getMockedOmKeyInfoWithInterval(310L, 320L), true, false);
+  }
+
+  /**
+   * An interval closing at or before the previous snapshot's create index cannot occur while the
+   * deletedTable is drained at checkpoint time. If one shows up anyway, an older snapshot could sit
+   * inside it unchecked, so the filter must fall back rather than reclaim.
+   */
+  @ParameterizedTest
+  @MethodSource("intervalsClosingBeforePreviousSnapshot")
+  public void testIntervalClosingBeforePreviousSnapshotFallsBackToSnapshotLookup(
+      Long seqNumMin, Long seqNumMax) throws IOException, RocksDBException {
+    assertIntervalVerdict(3, getMockedOmKeyInfoWithInterval(seqNumMin, seqNumMax), false, true);
+  }
+
+  static List<Arguments> intervalsClosingBeforePreviousSnapshot() {
+    List<Arguments> arguments = new ArrayList<>();
+    // Closes well before the previous snapshot (create index 300).
+    arguments.add(Arguments.of(120L, 250L));
+    // Closes exactly at it.
+    arguments.add(Arguments.of(250L, 300L));
+    // Empty interval.
+    arguments.add(Arguments.of(300L, 300L));
+    return arguments;
+  }
+
+  /** Falls through to the lookup path, which is also what computes exclusive sizes. */
+  @Test
+  public void testVersionVisibleToPreviousSnapshotIsNotReclaimable() throws IOException, RocksDBException {
+    assertIntervalVerdict(3, getMockedOmKeyInfoWithInterval(250L, 350L), false, true);
+  }
+
+  @Test
+  public void testSeqNumMinBoundaryIsInclusive() throws IOException, RocksDBException {
+    assertIntervalVerdict(3, getMockedOmKeyInfoWithInterval(300L, 350L), false, true);
+  }
+
+  @Test
+  public void testNoPreviousSnapshotIsReclaimable() throws IOException, RocksDBException {
+    assertIntervalVerdict(0, getMockedOmKeyInfoWithInterval(310L, 320L), true, false);
+  }
+
+  /** Missing metadata must mean "look it up", never "safe to reclaim". */
+  @ParameterizedTest
+  @MethodSource("incompleteIntervals")
+  public void testMissingIntervalFallsBackToSnapshotLookup(Long seqNumMin, Long seqNumMax)
+      throws IOException, RocksDBException {
+    assertIntervalVerdict(3, getMockedOmKeyInfoWithInterval(seqNumMin, seqNumMax), false, true);
+  }
+
+  static List<Arguments> incompleteIntervals() {
+    List<Arguments> arguments = new ArrayList<>();
+    arguments.add(Arguments.of(null, null));
+    arguments.add(Arguments.of(310L, null));
+    arguments.add(Arguments.of(null, 320L));
+    return arguments;
+  }
+
+  @Test
+  public void testMissingSnapshotCreateTransactionInfoFallsBackToSnapshotLookup()
+      throws IOException, RocksDBException {
+    assertIntervalVerdict(3, getMockedOmKeyInfoWithInterval(310L, 320L), false, true, info -> info);
+  }
+
+  @Test
+  public void testOptimizationDisabledBeforeLayoutFeatureFinalization()
+      throws IOException, RocksDBException {
+    setLayoutFeatureAllowed(false);
+    assertIntervalVerdict(3, getMockedOmKeyInfoWithInterval(310L, 320L), false, true);
   }
 
   private OmKeyInfo getMockedOmKeyInfo(long objectId, long size, long replicatedSize) {
