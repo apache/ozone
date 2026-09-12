@@ -410,9 +410,9 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @param nodes the pipeline nodes to sort
    * @param clientMachine client address (IP or hostname)
    * @param clusterMap OM's cached cluster map used to resolve topology distance
-   * @return nodes sorted nearest-first, or the original {@code nodes} list
-   *     instance unchanged when sorting is skipped (client unresolved or stale
-   *     topology); callers may use reference equality to detect a skipped sort
+   * @return nodes sorted nearest-first, or null when the sort is skipped
+   *     (client unresolved, or a pipeline node missing from the cluster map);
+   *     callers must leave the pipeline order unchanged in that case
    */
   List<? extends DatanodeDetails> sortDatanodesForWrite(
       List<? extends DatanodeDetails> nodes, String clientMachine, NetworkTopology clusterMap);

@@ -2322,9 +2322,9 @@ public class KeyManagerImpl implements KeyManager {
         metrics.getAllocateBlockSortDatanodesLatencyNs(), () -> {
           final Node client = getClientNode(clientMachine, nodes, clusterMap);
           if (client == null) {
-            // Preserve pipeline order for writes: the first node is the write
-            // primary, so do not shuffle when the client cannot be resolved.
-            return nodes;
+            // Skip the sort for writes: the first node is the write primary, so
+            // do not shuffle when the client cannot be resolved.
+            return null;
           }
           return sortByClusterMapDistance(clusterMap, client, nodes);
         });
@@ -2342,6 +2342,8 @@ public class KeyManagerImpl implements KeyManager {
    * {@link Integer#MAX_VALUE}) and the order comes out random. Look each node
    * up in OM's cluster map to get the topology-linked instance, sort those,
    * then map the order back to the original nodes.
+   *
+   * @return the sorted nodes, or null when a node is missing from the cluster map
    */
   private List<? extends DatanodeDetails> sortByClusterMapDistance(
       NetworkTopology clusterMap, Node client,
@@ -2351,7 +2353,7 @@ public class KeyManagerImpl implements KeyManager {
     for (DatanodeDetails node : nodes) {
       final Node resolved = clusterMap.getNode(node.getNetworkFullPath());
       if (resolved == null) {
-        return nodes;
+        return null;
       }
       topologyNodes.add(resolved);
       nodeByPath.put(resolved.getNetworkFullPath(), node);

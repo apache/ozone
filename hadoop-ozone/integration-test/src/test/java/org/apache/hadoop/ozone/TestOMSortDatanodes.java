@@ -22,7 +22,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
 import com.google.common.collect.ImmutableMap;
@@ -204,28 +204,22 @@ public class TestOMSortDatanodes {
   }
 
   @Test
-  public void sortDatanodesForWriteKeepsOrderForStaleTopology() {
+  public void sortDatanodesForWriteReturnsNullForStaleTopology() {
     List<DatanodeDetails> nodes = new ArrayList<>();
     nodes.add(randomDatanodeDetails());
     nodes.addAll(nodeManager.getAllNodes());
 
-    List<? extends DatanodeDetails> sorted =
-        keyManager.sortDatanodesForWrite(nodes, "edge0", om.getClusterMap());
-
-    assertSame(nodes, sorted,
-        "Pipeline order should be preserved when a node is missing from the OM topology");
+    assertNull(keyManager.sortDatanodesForWrite(nodes, "edge0", om.getClusterMap()),
+        "Sort must be skipped when a node is missing from the OM topology");
   }
 
   @Test
-  public void sortDatanodesForWriteKeepsOrderWhenClientUnresolved() {
+  public void sortDatanodesForWriteReturnsNullWhenClientUnresolved() {
     List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
-    List<DatanodeDetails> original = new ArrayList<>(nodes);
     // A client that resolves to no known rack must NOT trigger a shuffle.
     String unresolved = nodes.get(0).getIpAddress() + "X";
-    List<? extends DatanodeDetails> result =
-        keyManager.sortDatanodesForWrite(nodes, unresolved, om.getClusterMap());
-    assertEquals(original, result,
-        "Write pipeline order must be preserved when client is unresolved");
+    assertNull(keyManager.sortDatanodesForWrite(nodes, unresolved, om.getClusterMap()),
+        "Sort must be skipped when the client is unresolved");
   }
 
   private String nodeAddress(DatanodeDetails dn) {

@@ -371,20 +371,26 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   @Test
   public void testAllocateBlockKeepsPerPipelineOrderWhenSortSkipped() throws Exception {
     // Two pipelines share the same datanode set but in a different order. When
-    // the sort is skipped (sortDatanodesForWrite returns the input unchanged),
-    // each pipeline must keep its own order: the unsorted result must not be
-    // cached under the node set and reused for the other pipeline.
+    // the sort is skipped (sortDatanodesForWrite returns null), each pipeline
+    // must keep its own order: null must not be cached under the node set and
+    // reused for the other pipeline.
     DatanodeDetails a = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails b = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails c = MockDatanodeDetails.randomDatanodeDetails();
     List<DatanodeDetails> nodes1 = Arrays.asList(a, b, c);
     List<DatanodeDetails> nodes2 = Arrays.asList(c, b, a);
+    // nodesInOrder deliberately differs from getNodes() so the test catches an
+    // implementation that overwrites an existing order with getNodes() when the
+    // sort is skipped.
+    List<DatanodeDetails> inOrder1 = Arrays.asList(b, c, a);
+    List<DatanodeDetails> inOrder2 = Arrays.asList(a, c, b);
     Pipeline pipeline1 = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setReplicationConfig(
             StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(nodes1)
+        .setNodesInOrder(inOrder1)
         .build();
     Pipeline pipeline2 = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
@@ -392,6 +398,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         .setReplicationConfig(
             StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(nodes2)
+        .setNodesInOrder(inOrder2)
         .build();
     AllocatedBlock block1 = new AllocatedBlock.Builder().setPipeline(pipeline1)
         .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
@@ -403,9 +410,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
-    // Skip the sort: return the input list instance unchanged.
-    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any()))
-        .thenAnswer(inv -> inv.getArgument(0));
+    // Skip the sort: null signals that no sort happened.
+    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any())).thenReturn(null);
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
     when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
 
@@ -416,11 +422,10 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
 
     assertEquals(2, locations.size());
-    // Each pipeline keeps its own order; the skipped-sort result is not shared.
-    assertEquals(nodes1, locations.get(0).getPipeline().getNodesInOrder());
-    assertEquals(nodes2, locations.get(1).getPipeline().getNodesInOrder());
-    // Sorted per pipeline, since the unsorted result is not cached.
-    verify(mockKeyManager, times(2)).sortDatanodesForWrite(any(), eq("1.2.3.4"), any());
+    // Each pipeline keeps its own existing nodesInOrder; the skipped sort is
+    // neither shared nor replaced by getNodes().
+    assertEquals(inOrder1, locations.get(0).getPipeline().getNodesInOrder());
+    assertEquals(inOrder2, locations.get(1).getPipeline().getNodesInOrder());
   }
 
   @Test

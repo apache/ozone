@@ -251,14 +251,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
         List<? extends DatanodeDetails> sorted = sortedByNodes.get(uuidSet);
         if (sorted == null) {
           sorted = keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap);
-          // Cache only a freshly sorted order, not an input list returned
-          // unchanged when the client is unresolved: that order is per-pipeline
-          // and must not be reused for another pipeline with the same node set.
-          if (sorted != nodes) {
+          // A skipped sort returns null and is not cached: that pipeline keeps
+          // its own order, which must not be reused for another pipeline with
+          // the same node set.
+          if (sorted != null) {
             sortedByNodes.put(uuidSet, sorted);
           }
         }
-        if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
+        if (sorted != null && !Objects.equals(sorted, pipeline.getNodesInOrder())) {
           pipeline = pipeline.copyWithNodesInOrder(sorted);
         }
       }
