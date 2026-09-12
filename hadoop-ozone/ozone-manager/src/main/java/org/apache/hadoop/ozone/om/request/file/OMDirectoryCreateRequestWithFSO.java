@@ -133,7 +133,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
           omDirectoryResult == NONE) {
 
         OmBucketInfo omBucketInfo =
-            getBucketInfo(omMetadataManager, volumeName, bucketName);
+            getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
         // prepare all missing parents
         missingParentInfos = getAllMissingParentDirInfo(
                 ozoneManager, keyArgs, omBucketInfo, omPathInfo, trxnLogIndex);
@@ -156,6 +156,10 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
             volumeId, bucketId, trxnLogIndex,
             missingParentInfos, dirInfo);
+
+        // Publish only here: createDirectoryInfoWithACL above can still fail with UNAUTHORIZED.
+        omMetadataManager.getBucketTable().addCacheEntry(
+            omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse =

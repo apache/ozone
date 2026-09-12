@@ -38,6 +38,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -145,6 +147,48 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
     OMKeysDeleteRequest omKeysDeleteRequest =
         new OMKeysDeleteRequest(omRequest, getBucketLayout());
     checkDeleteKeysResponseForFailure(omKeysDeleteRequest, Status.PARTIAL_DELETE, sourceType);
+  }
+
+  @Test
+  public void testPartialDeletePublishesBucketUsage() throws Exception {
+    createPreRequisites();
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    // createPreRequisites adds the keys straight to the table cache, so charge the bucket for
+    // them here; without it the released namespace would drive the counter negative.
+    omMetadataManager.getBucketTable().getCacheValue(new CacheKey<>(bucketKey))
+        .getCacheValue().incrUsedNamespace(KEY_COUNT);
+    long usedNamespaceBefore = omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+
+    // One key does not exist, so the request succeeds partially.
+    omRequest = omRequest.toBuilder()
+        .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
+            .setDeleteKeys(DeleteKeyArgs.newBuilder()
+                .setBucketName(bucketName).setVolumeName(volumeName)
+                .addAllKeys(deleteKeyList).addKeys("dummy"))).build();
+
+    OMClientResponse omClientResponse = getOmKeysDeleteRequest(omRequest)
+        .validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(Status.PARTIAL_DELETE, omClientResponse.getOMResponse().getStatus());
+
+    // PARTIAL_DELETE still persists the accepted keys and the bucket row, so the released
+    // namespace has to reach the cache too. Only the keys that existed are released; "dummy" is
+    // counted as undeleted.
+    long usedNamespaceCached = omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+    assertEquals(usedNamespaceBefore - expectedNamespaceReleasedOnPartialDelete(),
+        usedNamespaceCached);
+
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    assertEquals(usedNamespaceCached,
+        omMetadataManager.getBucketTable().getSkipCache(bucketKey).getUsedNamespace());
+  }
+
+  protected long expectedNamespaceReleasedOnPartialDelete() {
+    return KEY_COUNT;
   }
 
   @ParameterizedTest
@@ -280,6 +324,10 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
 
   protected void createPreRequisites() throws Exception {
     createPreRequisites(RequestSource.USER);
+  }
+
+  protected OMKeysDeleteRequest getOmKeysDeleteRequest(OMRequest request) {
+    return new OMKeysDeleteRequest(request, getBucketLayout());
   }
 
   protected void createPreRequisites(RequestSource sourceType) throws Exception {

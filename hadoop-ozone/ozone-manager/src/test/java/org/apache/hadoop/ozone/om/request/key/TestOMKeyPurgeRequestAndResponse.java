@@ -40,12 +40,16 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketNameInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketPurgeKeysSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -135,6 +139,67 @@ public class TestOMKeyPurgeRequestAndResponse extends OMKeyRequestTests {
     assertNotEquals(originalOmRequest, modifiedOmRequest);
 
     return modifiedOmRequest;
+  }
+
+  @Test
+  public void testPurgedSizesReachCacheAndDb() throws Exception {
+    Pair<List<String>, List<String>> deleteKeysAndRenamedEntry =
+        createAndDeleteKeysAndRenamedEntry(1, null);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey)).getCacheValue();
+    bucketInfo.incrSnapshotUsedBytes(500L);
+    bucketInfo.incrSnapshotUsedNamespace(5L);
+
+    BucketNameInfo bucketNameInfo = BucketNameInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketId(bucketInfo.getObjectID())
+        .build();
+    // A bucket id that does not match must leave the counters alone.
+    BucketNameInfo staleBucketNameInfo = BucketNameInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketId(bucketInfo.getObjectID() + 1)
+        .build();
+
+    // Two entries for the same bucket, so the deltas have to accumulate on one copy.
+    PurgeKeysRequest purgeKeysRequest = PurgeKeysRequest.newBuilder()
+        .addDeletedKeys(DeletedKeys.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .addAllKeys(deleteKeysAndRenamedEntry.getKey()))
+        .addAllRenamedKeys(deleteKeysAndRenamedEntry.getValue())
+        .addBucketPurgeKeysSize(BucketPurgeKeysSize.newBuilder()
+            .setBucketNameInfo(bucketNameInfo).setPurgedBytes(100L).setPurgedNamespace(1L))
+        .addBucketPurgeKeysSize(BucketPurgeKeysSize.newBuilder()
+            .setBucketNameInfo(bucketNameInfo).setPurgedBytes(200L).setPurgedNamespace(2L))
+        .addBucketPurgeKeysSize(BucketPurgeKeysSize.newBuilder()
+            .setBucketNameInfo(staleBucketNameInfo).setPurgedBytes(999L).setPurgedNamespace(9L))
+        .build();
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setPurgeKeysRequest(purgeKeysRequest)
+        .setCmdType(Type.PurgeKeys)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+
+    OMClientResponse omClientResponse =
+        new OMKeyPurgeRequest(preExecute(omRequest)).validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
+
+    OmBucketInfo cached = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(500L - 300L, cached.getSnapshotUsedBytes());
+    assertEquals(5L - 3L, cached.getSnapshotUsedNamespace());
+
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    OmBucketInfo durable = omMetadataManager.getBucketTable().getSkipCache(bucketKey);
+    assertEquals(cached.getSnapshotUsedBytes(), durable.getSnapshotUsedBytes());
+    assertEquals(cached.getSnapshotUsedNamespace(), durable.getSnapshotUsedNamespace());
   }
 
   @Test
