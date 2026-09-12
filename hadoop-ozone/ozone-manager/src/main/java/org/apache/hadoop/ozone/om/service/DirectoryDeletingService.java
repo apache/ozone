@@ -40,14 +40,18 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -127,7 +131,8 @@ import org.slf4j.LoggerFactory;
  *
  * <h2>Threading and Parallelism</h2>
  * <ul>
- *   <li>Uses a configurable thread pool for parallel deletion tasks within each store/snapshot.</li>
+ *   <li>Uses a configurable thread pool for parallel deletion tasks within each store or snapshot.</li>
+ *   <li>Coordinates snapshot workers so each thread closes its own snapshot DB handles before submitting requests.</li>
  *   <li>Each snapshot and AOS get a separate background task for deletion.</li>
  * </ul>
  *
@@ -159,6 +164,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final SnapshotChainManager snapshotChainManager;
   private final boolean deepCleanSnapshots;
   private ExecutorService deletionThreadPool;
+  private final ReentrantLock snapshotProcessingLock = new ReentrantLock();
   private final AtomicInteger numberOfParallelThreadsPerStore;
   private final AtomicLong deletedDirsCount;
   private final AtomicLong movedDirsCount;
@@ -330,7 +336,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableDirChecker,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableFileChecker,
       Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap,
-      UUID expectedPreviousSnapshotId, long rnCnt, AtomicInteger remainNum) {
+      UUID expectedPreviousSnapshotId, long rnCnt, AtomicInteger remainNum,
+      Runnable beforeSubmit) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -361,6 +368,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         break;
       }
     }
+    beforeSubmit.run();
+
     if (!purgePathRequestList.isEmpty()) {
       submitPurgePathsWithBatching(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap);
     }
@@ -639,7 +648,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
      * @param keyManager KeyManager of the underlying store.
      */
     @VisibleForTesting
-    void processDeletedDirsForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager, long rnCnt, int remainNum)
+    void processDeletedDirsForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
+        UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot, long rnCnt, int remainNum)
         throws IOException, ExecutionException, InterruptedException {
       String volume, bucket; String snapshotTableKey;
       if (currentSnapshotInfo != null) {
@@ -650,6 +660,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         volume = null; bucket = null; snapshotTableKey = null;
       }
 
+      Map<UUID, Pair<Long, Long>> exclusiveSizeMap = Maps.newConcurrentMap();
+      boolean processedAllDeletedDirs;
       try (DeletedDirSupplier dirSupplier = new DeletedDirSupplier(currentSnapshotInfo == null ?
           keyManager.getDeletedDirEntries() : keyManager.getDeletedDirEntries(volume, bucket))) {
         // This is to avoid race condition b/w purge request and snapshot chain update. For AOS taking the global
@@ -658,43 +670,94 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         UUID expectedPreviousSnapshotId = currentSnapshotInfo == null ?
             snapshotChainManager.getLatestGlobalSnapshotId() :
             SnapshotUtils.getPreviousSnapshotId(currentSnapshotInfo, snapshotChainManager);
-        Map<UUID, Pair<Long, Long>> exclusiveSizeMap = Maps.newConcurrentMap();
-
-        CompletableFuture<Boolean> processedAllDeletedDirs = CompletableFuture.completedFuture(true);
         final int parallelThreads = numberOfParallelThreadsPerStore.get();
+        CountDownLatch snapshotDbHandlesClosed = currentSnapshotInfo == null ? null :
+            new CountDownLatch(parallelThreads);
+        CountDownLatch submitSnapshotRequests = currentSnapshotInfo == null ? null : new CountDownLatch(1);
+        CompletableFuture<Boolean> workersCompleted = CompletableFuture.completedFuture(true);
         for (int i = 0; i < parallelThreads; i++) {
-          CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
-            try {
-              return processDeletedDirectories(currentSnapshotInfo, keyManager, dirSupplier,
-                  expectedPreviousSnapshotId, exclusiveSizeMap, rnCnt, remainNum);
-            } catch (Throwable e) {
-              return false;
+          AtomicBoolean workerReady = new AtomicBoolean();
+          try {
+            CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
+              try {
+                return processDeletedDirectories(currentSnapshotInfo, keyManager, dirSupplier,
+                    expectedPreviousSnapshotId, exclusiveSizeMap, rnCnt, remainNum, () -> {
+                      if (snapshotDbHandlesClosed != null) {
+                        signalWorkerReady(workerReady, snapshotDbHandlesClosed);
+                        if (awaitUninterruptibly(submitSnapshotRequests)) {
+                          Thread.currentThread().interrupt();
+                        }
+                      }
+                    });
+              } catch (Throwable e) {
+                return false;
+              } finally {
+                if (snapshotDbHandlesClosed != null) {
+                  signalWorkerReady(workerReady, snapshotDbHandlesClosed);
+                }
+              }
+            }, isThreadPoolActive(deletionThreadPool) ? deletionThreadPool : ForkJoinPool.commonPool());
+            workersCompleted = workersCompleted.thenCombine(future, (a, b) -> a && b);
+          } catch (RejectedExecutionException e) {
+            if (snapshotDbHandlesClosed != null) {
+              countDown(snapshotDbHandlesClosed, parallelThreads - i);
             }
-          }, isThreadPoolActive(deletionThreadPool) ? deletionThreadPool : ForkJoinPool.commonPool());
-          processedAllDeletedDirs = processedAllDeletedDirs.thenCombine(future, (a, b) -> a && b);
-        }
-        // If AOS or all directories have been processed for snapshot, update snapshot size delta and deep clean flag
-        // if it is a snapshot.
-        if (processedAllDeletedDirs.get()) {
-          List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
-
-          for (Map.Entry<UUID, Pair<Long, Long>> entry : exclusiveSizeMap.entrySet()) {
-            UUID snapshotID = entry.getKey();
-            long exclusiveSize = entry.getValue().getLeft();
-            long exclusiveReplicatedSize = entry.getValue().getRight();
-            setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(
-                exclusiveSize, exclusiveReplicatedSize, snapshotID));
+            workersCompleted = workersCompleted.thenApply(ignored -> false);
+            break;
           }
-
-          // Updating directory deep clean flag of snapshot.
-          if (currentSnapshotInfo != null) {
-            setSnapshotPropertyRequests.add(OzoneManagerProtocolProtos.SetSnapshotPropertyRequest.newBuilder()
-                .setSnapshotKey(snapshotTableKey)
-                .setDeepCleanedDeletedDir(true)
-                .build());
-          }
-          submitSetSnapshotRequests(setSnapshotPropertyRequests);
         }
+
+        boolean interrupted = false;
+        if (currentSnapshotInfo != null) {
+          interrupted = awaitUninterruptibly(snapshotDbHandlesClosed);
+          // Workers have released their previous-snapshot DB handles and stopped using the iterator and current
+          // snapshot. Close the task-owned resources before allowing synchronous OM requests to be submitted.
+          try {
+            dirSupplier.close();
+            currentSnapshot.close();
+          } finally {
+            submitSnapshotRequests.countDown();
+          }
+        }
+
+        while (true) {
+          try {
+            processedAllDeletedDirs = workersCompleted.get();
+            break;
+          } catch (InterruptedException e) {
+            if (currentSnapshotInfo == null) {
+              throw e;
+            }
+            interrupted = true;
+          }
+        }
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+          throw new InterruptedException();
+        }
+      }
+
+      // If AOS or all directories have been processed for snapshot, update snapshot size delta and deep clean flag
+      // if it is a snapshot. All snapshot DB iterators and handles have been closed before this synchronous request.
+      if (processedAllDeletedDirs) {
+        List<OzoneManagerProtocolProtos.SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
+
+        for (Map.Entry<UUID, Pair<Long, Long>> entry : exclusiveSizeMap.entrySet()) {
+          UUID snapshotID = entry.getKey();
+          long exclusiveSize = entry.getValue().getLeft();
+          long exclusiveReplicatedSize = entry.getValue().getRight();
+          setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(
+              exclusiveSize, exclusiveReplicatedSize, snapshotID));
+        }
+
+        // Updating directory deep clean flag of snapshot.
+        if (currentSnapshotInfo != null) {
+          setSnapshotPropertyRequests.add(OzoneManagerProtocolProtos.SetSnapshotPropertyRequest.newBuilder()
+              .setSnapshotKey(snapshotTableKey)
+              .setDeepCleanedDeletedDir(true)
+              .build());
+        }
+        submitSetSnapshotRequests(setSnapshotPropertyRequests);
       }
     }
 
@@ -713,9 +776,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
      * @param remaining Number of dirs to be processed.
      * @return A boolean indicating whether the processed directory list is empty.
      */
+    @SuppressWarnings("checkstyle:ParameterNumber")
     private boolean processDeletedDirectories(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
         DeletedDirSupplier dirSupplier, UUID expectedPreviousSnapshotId,
-        Map<UUID, Pair<Long, Long>> totalExclusiveSizeMap, long runCount, int remaining) {
+        Map<UUID, Pair<Long, Long>> totalExclusiveSizeMap, long runCount, int remaining,
+        Runnable afterSnapshotDbHandlesClosed) {
       OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
       IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
       String snapshotTableKey = currentSnapshotInfo == null ? null : currentSnapshotInfo.getTableKey();
@@ -769,7 +834,14 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             subFileNum, allSubDirList, purgePathRequestList, snapshotTableKey,
             startTime, getOzoneManager().getKeyManager(),
             reclaimableDirFilter, reclaimableFileFilter, bucketNameInfos, expectedPreviousSnapshotId,
-            runCount, remainNum);
+            runCount, remainNum, () -> {
+              // Keep the snapshot GC locks until the purge requests complete, but release all snapshot DB read
+              // locks first. Otherwise a synchronous request can wait for the double buffer while the double
+              // buffer waits for a colliding snapshot DB write lock.
+              reclaimableDirFilter.closeSnapshotDbHandles();
+              reclaimableFileFilter.closeSnapshotDbHandles();
+              afterSnapshotDbHandlesClosed.run();
+            });
         Map<UUID, Long> exclusiveReplicatedSizeMap = reclaimableFileFilter.getExclusiveReplicatedSizeMap();
         Map<UUID, Long> exclusiveSizeMap = reclaimableFileFilter.getExclusiveSizeMap();
         List<UUID> previousPathSnapshotsInChain =
@@ -791,6 +863,30 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         LOG.error("Error while running delete directories for store : {} and files background task. " +
                 "Will retry at next run. ", snapshotTableKey, e);
         return false;
+      }
+    }
+
+    private void signalWorkerReady(AtomicBoolean workerReady, CountDownLatch snapshotDbHandlesClosed) {
+      if (workerReady.compareAndSet(false, true)) {
+        snapshotDbHandlesClosed.countDown();
+      }
+    }
+
+    private void countDown(CountDownLatch latch, int count) {
+      for (int i = 0; i < count; i++) {
+        latch.countDown();
+      }
+    }
+
+    private boolean awaitUninterruptibly(CountDownLatch latch) {
+      boolean interrupted = false;
+      while (true) {
+        try {
+          latch.await();
+          return interrupted;
+        } catch (InterruptedException e) {
+          interrupted = true;
+        }
       }
     }
 
@@ -824,12 +920,25 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           } else if (!isPreviousPurgeTransactionFlushed()) {
             return BackgroundTaskResult.EmptyTaskResult.newResult();
           }
-          try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapInfo == null ? null :
-              omSnapshotManager.getActiveSnapshot(snapInfo.getVolumeName(), snapInfo.getBucketName(),
-                  snapInfo.getName())) {
-            KeyManager keyManager = snapInfo == null ? getOzoneManager().getKeyManager()
-                : omSnapshot.get().getKeyManager();
-            processDeletedDirsForStore(snapInfo, keyManager, run, pathLimitPerTask);
+          boolean snapshotProcessingLockAcquired = false;
+          try {
+            if (snapInfo != null) {
+              // Serialize snapshot setup before opening the snapshot DB. Workers still process each snapshot in
+              // parallel, but another snapshot task cannot wait here while retaining a task-owned DB handle.
+              snapshotProcessingLock.lockInterruptibly();
+              snapshotProcessingLockAcquired = true;
+            }
+            try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapInfo == null ? null :
+                omSnapshotManager.getActiveSnapshot(snapInfo.getVolumeName(), snapInfo.getBucketName(),
+                    snapInfo.getName())) {
+              KeyManager keyManager = snapInfo == null ? getOzoneManager().getKeyManager()
+                  : omSnapshot.get().getKeyManager();
+              processDeletedDirsForStore(snapInfo, keyManager, omSnapshot, run, pathLimitPerTask);
+            }
+          } finally {
+            if (snapshotProcessingLockAcquired) {
+              snapshotProcessingLock.unlock();
+            }
           }
         } catch (IOException | ExecutionException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
