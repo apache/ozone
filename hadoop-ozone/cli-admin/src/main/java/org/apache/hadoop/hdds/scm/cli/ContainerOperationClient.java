@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfoResult;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -350,14 +352,21 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<ContainerReplicaInfo> getContainerReplicas(long containerId) throws IOException {
-    List<HddsProtos.SCMContainerReplicaProto> protos =
-        storageContainerLocationClient.getContainerReplicas(containerId,
-            ClientVersion.CURRENT_VERSION);
+    return getContainerReplicasWithStatus(containerId).getReplicas();
+  }
+
+  @Override
+  public ContainerReplicaInfoResult getContainerReplicasWithStatus(
+      long containerId) throws IOException {
+    GetContainerReplicasResponseProto response = storageContainerLocationClient
+        .getContainerReplicasResponse(containerId, ClientVersion.CURRENT_VERSION);
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
-    for (HddsProtos.SCMContainerReplicaProto p : protos) {
+    for (HddsProtos.SCMContainerReplicaProto p :
+        response.getContainerReplicaList()) {
       replicas.add(ContainerReplicaInfo.fromProto(p));
     }
-    return replicas;
+    return new ContainerReplicaInfoResult(replicas,
+        response.getDataChecksumMismatch());
   }
 
   @Override

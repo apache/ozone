@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfoResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -118,8 +119,12 @@ public class InfoSubcommand extends ScmSubcommand {
     }
 
     List<ContainerReplicaInfo> replicas = null;
+    boolean dataChecksumMismatch = false;
     try {
-      replicas = scmClient.getContainerReplicas(containerID);
+      ContainerReplicaInfoResult result =
+          scmClient.getContainerReplicasWithStatus(containerID);
+      replicas = result.getReplicas();
+      dataChecksumMismatch = result.hasDataChecksumMismatch();
     } catch (IOException e) {
       rootCommand().printError(e);
     }
@@ -129,13 +134,15 @@ public class InfoSubcommand extends ScmSubcommand {
         ContainerWithPipelineAndReplicas wrapper =
             new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
                 container.getPipeline(), replicas,
-                container.getContainerInfo().getPipelineID());
+                container.getContainerInfo().getPipelineID(),
+                dataChecksumMismatch);
         System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
       } else {
         ContainerWithoutDatanodes wrapper =
             new ContainerWithoutDatanodes(container.getContainerInfo(),
                 container.getPipeline(), replicas,
-                container.getContainerInfo().getPipelineID());
+                container.getContainerInfo().getPipelineID(),
+                dataChecksumMismatch);
         System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
       }
     } else {
@@ -175,6 +182,9 @@ public class InfoSubcommand extends ScmSubcommand {
 
       // Print the replica details if available
       if (replicas != null) {
+        if (dataChecksumMismatch) {
+          System.out.println("Data checksum mismatch: true");
+        }
         String replicaStr = replicas.stream()
             .sorted(Comparator.comparing(ContainerReplicaInfo::getReplicaIndex))
             .map(InfoSubcommand::buildReplicaDetails)
@@ -195,6 +205,8 @@ public class InfoSubcommand extends ScmSubcommand {
       sb.append(" ReplicaIndex: ").append(replica.getReplicaIndex()).append(';');
     }
     sb.append(" SequenceId: ").append(replica.getSequenceId()).append(';')
+        .append(" DataChecksum: ")
+        .append(HddsUtils.checksumToString(replica.getDataChecksum())).append(';')
         .append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(';')
         .append(" Location: ").append(buildDatanodeDetails(replica.getDatanodeDetails()));
     return sb.toString();
@@ -206,13 +218,16 @@ public class InfoSubcommand extends ScmSubcommand {
     private Pipeline pipeline;
     private List<ContainerReplicaInfo> replicas;
     private PipelineID writePipelineID;
+    private boolean dataChecksumMismatch;
 
     ContainerWithPipelineAndReplicas(ContainerInfo container, Pipeline pipeline,
-        List<ContainerReplicaInfo> replicas, PipelineID pipelineID) {
+        List<ContainerReplicaInfo> replicas, PipelineID pipelineID,
+        boolean dataChecksumMismatch) {
       this.containerInfo = container;
       this.pipeline = pipeline;
       this.replicas = replicas;
       this.writePipelineID = pipelineID;
+      this.dataChecksumMismatch = dataChecksumMismatch;
     }
 
     public ContainerInfo getContainerInfo() {
@@ -231,6 +246,10 @@ public class InfoSubcommand extends ScmSubcommand {
       return writePipelineID;
     }
 
+    public boolean getDataChecksumMismatch() {
+      return dataChecksumMismatch;
+    }
+
   }
 
   private static class ContainerWithoutDatanodes {
@@ -239,13 +258,16 @@ public class InfoSubcommand extends ScmSubcommand {
     private PipelineWithoutDatanodes pipeline;
     private List<ContainerReplicaInfo> replicas;
     private PipelineID writePipelineId;
+    private boolean dataChecksumMismatch;
 
     ContainerWithoutDatanodes(ContainerInfo container, Pipeline pipeline,
-        List<ContainerReplicaInfo> replicas, PipelineID pipelineID) {
+        List<ContainerReplicaInfo> replicas, PipelineID pipelineID,
+        boolean dataChecksumMismatch) {
       this.containerInfo = container;
       this.pipeline = new PipelineWithoutDatanodes(pipeline);
       this.replicas = replicas;
       this.writePipelineId = pipelineID;
+      this.dataChecksumMismatch = dataChecksumMismatch;
     }
 
     public ContainerInfo getContainerInfo() {
@@ -262,6 +284,10 @@ public class InfoSubcommand extends ScmSubcommand {
 
     public PipelineID getWritePipelineId() {
       return writePipelineId;
+    }
+
+    public boolean getDataChecksumMismatch() {
+      return dataChecksumMismatch;
     }
   }
 

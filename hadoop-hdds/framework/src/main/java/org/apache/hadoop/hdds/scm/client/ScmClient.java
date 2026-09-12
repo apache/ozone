@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfoResult;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -82,6 +83,17 @@ public interface ScmClient extends Closeable {
    */
   List<ContainerReplicaInfo> getContainerReplicas(
       long containerId) throws IOException;
+
+  /**
+   * Gets replica information and the container-level status determined by
+   * SCM.
+   *
+   * @param containerId the container ID
+   * @return replicas and container-level status
+   * @throws IOException on failure
+   */
+  ContainerReplicaInfoResult getContainerReplicasWithStatus(long containerId)
+      throws IOException;
 
   /**
    * Close a container.
