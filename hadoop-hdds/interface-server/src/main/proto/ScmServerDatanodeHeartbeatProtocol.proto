@@ -189,6 +189,8 @@ message StorageReportProto {
    */
   optional uint64 fsCapacity = 11 [default = 0];
   optional uint64 fsAvailable = 12 [default = 0];
+  // Number of OPEN containers currently on this storage volume.
+  optional uint64 openContainerCount = 13 [default = 0];
 }
 
 message MetadataStorageReportProto {
