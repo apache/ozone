@@ -20,7 +20,10 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestCount;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestTime;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -178,6 +181,72 @@ public class TestDirectoryDeletingService {
             && dirDeletingService.getMovedFilesCount() <= 2000,
         500, 60000);
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThanOrEqualTo(1);
+  }
+
+  /**
+   * The DirectoryDeletingService submits an internal {@code PurgeDirectories} request, which should
+   * be counted in the OmClientProtocol per-type metrics just like a client request.
+   */
+  @Test
+  public void testDeleteDirectoryIncrementsPurgeDirectoriesMetric() throws Exception {
+    OzoneConfiguration conf = createConfAndInitValues(10);
+    OmTestManagers omTestManagers = new OmTestManagers(conf);
+    OzoneManagerProtocol writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        om.getMetadataManager(), BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    String bucketKey = om.getMetadataManager().getBucketKey(volumeName, bucketName);
+    OmBucketInfo bucketInfo = om.getMetadataManager().getBucketTable().get(bucketKey);
+
+    OmDirectoryInfo dir1 = OmDirectoryInfo.newBuilder()
+        .setName("dir1")
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setObjectID(1)
+        .setParentObjectID(bucketInfo.getObjectID())
+        .setUpdateID(0)
+        .build();
+    OMRequestTestUtils.addDirKeyToDirTable(true, dir1, volumeName, bucketName,
+        1L, om.getMetadataManager());
+
+    for (int i = 0; i < 5; ++i) {
+      String keyName = "key" + i;
+      OmKeyInfo omKeyInfo =
+          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+              .setObjectID(dir1.getObjectID() + 1 + i)
+              .setParentObjectID(dir1.getObjectID())
+              .setUpdateID(100L)
+              .build();
+      OMRequestTestUtils.addFileToKeyTable(false, true, keyName,
+          omKeyInfo, 1234L, i + 1, om.getMetadataManager());
+    }
+
+    // This OM is freshly created, so no PurgeDirectories call has been recorded yet.
+    assertEquals(0, getRequestCount(om.getOmClientProtocolMetrics(),
+        OzoneManagerProtocolProtos.Type.PurgeDirectories));
+    assertEquals(0, getRequestTime(om.getOmClientProtocolMetrics(),
+        OzoneManagerProtocolProtos.Type.PurgeDirectories));
+
+    // delete directory recursively
+    OmKeyArgs delArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName("dir1")
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setDataSize(0).setRecursive(true)
+        .build();
+    writeClient.deleteKey(delArgs);
+
+    // The DirectoryDeletingService should pick up the deleted directory and submit PurgeDirectories.
+    GenericTestUtils.waitFor(
+        () -> getRequestCount(om.getOmClientProtocolMetrics(),
+            OzoneManagerProtocolProtos.Type.PurgeDirectories) > 0,
+        500, 60000);
+    // A real submission was measured, so the summed latency must be greater than zero.
+    assertThat(getRequestTime(om.getOmClientProtocolMetrics(),
+        OzoneManagerProtocolProtos.Type.PurgeDirectories)).isGreaterThan(0L);
   }
 
   @Test

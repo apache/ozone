@@ -25,6 +25,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestCount;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -258,6 +260,32 @@ class TestKeyDeletingService extends OzoneTestBase {
           keyManager, om.getMetadataManager().getLock())) {
         assertThat(keyManager.getPendingDeletionKeys(filter, Integer.MAX_VALUE).getPurgedKeys()).isEmpty();
       }
+    }
+
+    /**
+     * The KeyDeletingService submits an internal {@code PurgeKeys} request, which should be counted
+     * in the OmClientProtocol per-type metrics just like a client request.
+     */
+    @Test
+    void testPurgeKeysMetricIsRecorded()
+        throws IOException, TimeoutException, InterruptedException {
+      final long beforeCount = getRequestCount(om.getOmClientProtocolMetrics(),
+          OzoneManagerProtocolProtos.Type.PurgeKeys);
+      final long beforeTime = getRequestTime(om.getOmClientProtocolMetrics(),
+          OzoneManagerProtocolProtos.Type.PurgeKeys);
+      final long initialDeletedCount = getDeletedKeyCount();
+
+      final int keyCount = 10;
+      createAndDeleteKeys(keyCount, 1);
+
+      GenericTestUtils.waitFor(
+          () -> getDeletedKeyCount() >= initialDeletedCount + keyCount,
+          100, 10000);
+
+      assertThat(getRequestCount(om.getOmClientProtocolMetrics(),
+          OzoneManagerProtocolProtos.Type.PurgeKeys)).isGreaterThan(beforeCount);
+      assertThat(getRequestTime(om.getOmClientProtocolMetrics(),
+          OzoneManagerProtocolProtos.Type.PurgeKeys)).isGreaterThan(beforeTime);
     }
 
     /**
