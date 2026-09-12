@@ -562,6 +562,38 @@ public class TestHddsDispatcher {
         dispatcher.getContainer(1L).getContainerData().getState());
   }
 
+  @Test
+  public void testStorageTypeMismatchDoesNotMarkContainerUnhealthy() throws IOException {
+    File diskVolume = Files.createTempDirectory(tempDir, "disk").toFile();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, diskVolume.getAbsolutePath());
+    DatanodeDetails dd = randomDatanodeDetails();
+    HddsDispatcher dispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+
+    ContainerCommandRequestProto validWriteChunkRequest =
+        getWriteChunkRequest(dd.getUuidString(), 1L, 1L, null);
+    assertEquals(ContainerProtos.Result.SUCCESS,
+        dispatcher.dispatch(validWriteChunkRequest, null).getResult());
+
+    ContainerCommandResponseProto putBlockResponse = dispatcher.dispatch(
+        newPutBlock(1L, 2L, HddsProtos.StorageTypeProto.SSD), null);
+    assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, putBlockResponse.getResult());
+    assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
+        dispatcher.getContainer(1L).getContainerData().getState());
+
+    ContainerCommandResponseProto putSmallFileResponse = dispatcher.dispatch(
+        newPutSmallFile(1L, 3L, HddsProtos.StorageTypeProto.SSD), null);
+    assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, putSmallFileResponse.getResult());
+    assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
+        dispatcher.getContainer(1L).getContainerData().getState());
+
+    ContainerCommandResponseProto writeChunkResponse = dispatcher.dispatch(
+        getWriteChunkRequest(dd.getUuidString(), 1L, 4L, HddsProtos.StorageTypeProto.SSD), null);
+    assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, writeChunkResponse.getResult());
+    assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
+        dispatcher.getContainer(1L).getContainerData().getState());
+  }
+
   private void assertContainerDoNotExist(HddsDispatcher hddsDispatcher,
       ContainerCommandRequestProto request) {
     ContainerCommandResponseProto response =
