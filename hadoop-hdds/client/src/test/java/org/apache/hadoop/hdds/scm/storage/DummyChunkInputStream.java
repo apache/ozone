@@ -19,10 +19,13 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -34,8 +37,8 @@ public class DummyChunkInputStream extends ChunkInputStream {
 
   private final byte[] chunkData;
 
-  // Stores the read chunk data in each readChunk call
-  private final List<ByteString> readByteBuffers = new ArrayList<>();
+  // Buffers from the most recent readChunk call.
+  private final AtomicReference<List<ByteString>> lastReadByteBuffers = new AtomicReference<>();
 
   public DummyChunkInputStream(ChunkInfo chunkInfo,
       BlockID blockId,
@@ -48,13 +51,18 @@ public class DummyChunkInputStream extends ChunkInputStream {
   }
 
   @Override
+  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo, XceiverClientSpi client) {
+    return readChunk(readChunkInfo);
+  }
+
+  @Override
   protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) {
     int offset = (int) readChunkInfo.getOffset();
     int remainingToRead = (int) readChunkInfo.getLen();
 
     int bufferCapacity = readChunkInfo.getChecksumData().getBytesPerChecksum();
     int bufferLen;
-    readByteBuffers.clear();
+    List<ByteString> chunkBuffers = new ArrayList<>();
     while (remainingToRead > 0) {
       if (remainingToRead < bufferCapacity) {
         bufferLen = remainingToRead;
@@ -64,19 +72,16 @@ public class DummyChunkInputStream extends ChunkInputStream {
       ByteString byteString = ByteString.copyFrom(chunkData,
           offset, bufferLen);
 
-      readByteBuffers.add(byteString);
+      chunkBuffers.add(byteString);
 
       offset += bufferLen;
       remainingToRead -= bufferLen;
     }
 
-    return BufferUtils.getReadOnlyByteBuffers(readByteBuffers)
-        .toArray(new ByteBuffer[0]);
-  }
+    lastReadByteBuffers.set(chunkBuffers);
 
-  @Override
-  protected void acquireClient() {
-    // No action needed
+    return BufferUtils.getReadOnlyByteBuffers(chunkBuffers)
+        .toArray(new ByteBuffer[0]);
   }
 
   @Override
@@ -85,6 +90,7 @@ public class DummyChunkInputStream extends ChunkInputStream {
   }
 
   public List<ByteString> getReadByteBuffers() {
-    return readByteBuffers;
+    List<ByteString> last = lastReadByteBuffers.get();
+    return last != null ? last : Collections.emptyList();
   }
 }

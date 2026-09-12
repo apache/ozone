@@ -306,13 +306,16 @@ public class ChunkInputStream extends InputStream
 
   /**
    * Acquire new client if previous one was released.
+   *
+   * @return the held client after ensuring it is acquired
    */
-  protected synchronized void acquireClient() throws IOException {
+  protected synchronized XceiverClientSpi acquireClient() throws IOException {
     if (xceiverClientFactory != null && xceiverClient == null) {
       Pipeline pipeline = pipelineSupplier.get();
       xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
       updateDatanodeBlockId(pipeline);
     }
+    return xceiverClient;
   }
 
   /**
@@ -378,29 +381,10 @@ public class ChunkInputStream extends InputStream
     // successful read in adjustBufferPosition()
     storePosition();
 
-    long adjustedBuffersOffset, adjustedBuffersLen;
-    if (verifyChecksum) {
-      // Adjust the chunk offset and length to include required checksum
-      // boundaries
-      Pair<Long, Long> adjustedOffsetAndLength =
-          computeChecksumBoundaries(startByteIndex, len);
-      adjustedBuffersOffset = adjustedOffsetAndLength.getLeft();
-      adjustedBuffersLen = adjustedOffsetAndLength.getRight();
-    } else {
-      // Read from the startByteIndex
-      adjustedBuffersOffset = startByteIndex;
-      adjustedBuffersLen = len;
-    }
-
-    // Adjust the chunkInfo so that only the required bytes are read from
-    // the chunk.
-    final ChunkInfo adjustedChunkInfo = ChunkInfo.newBuilder(chunkInfo)
-        .setOffset(chunkInfo.getOffset() + adjustedBuffersOffset)
-        .setLen(adjustedBuffersLen)
-        .build();
+    final ChunkInfo adjustedChunkInfo = getChunkInfo(startByteIndex, len);
 
     readChunkDataIntoBuffers(adjustedChunkInfo);
-    bufferOffsetWrtChunkData = adjustedBuffersOffset;
+    bufferOffsetWrtChunkData = adjustedChunkInfo.getOffset() - chunkInfo.getOffset();
 
     // If the stream was seeked to position before, then the buffer
     // position should be adjusted as the reads happen at checksum boundaries.
@@ -410,6 +394,24 @@ public class ChunkInputStream extends InputStream
     //    2. Chunk was read from index < the current position to account for
     //    checksum boundaries.
     adjustBufferPosition(startByteIndex - bufferOffsetWrtChunkData);
+  }
+
+  ChunkInfo getChunkInfo(long chunkRelativePosition, int toRead) {
+    final long adjustedOffset;
+    final long adjustedLen;
+    if (verifyChecksum) {
+      Pair<Long, Long> boundaries = computeChecksumBoundaries(chunkRelativePosition, toRead);
+      adjustedOffset = boundaries.getLeft();
+      adjustedLen = boundaries.getRight();
+    } else {
+      adjustedOffset = chunkRelativePosition;
+      adjustedLen = toRead;
+    }
+
+    return ChunkInfo.newBuilder(chunkInfo)
+        .setOffset(chunkInfo.getOffset() + adjustedOffset)
+        .setLen(adjustedLen)
+        .build();
   }
 
   protected void readChunkDataIntoBuffers(ChunkInfo readChunkInfo)
@@ -430,14 +432,89 @@ public class ChunkInputStream extends InputStream
   }
 
   /**
-   * Send RPC call to get the chunk from the container.
+   * Stateless positioned read of up to {@code dst.remaining()} bytes starting
+   * at {@code chunkRelativePosition} within this chunk. Unlike the buffered
+   * {@link #read} path, this does not read or mutate any of the instance's
+   * buffer/position state ({@code buffers}, {@code chunkPosition},
+   * {@code bufferOffsetWrtChunkData}, ...), so it is safe to call concurrently
+   * from multiple threads sharing the same stream.
+   *
+   * @param chunkRelativePosition start offset within this chunk
+   * @param dst destination buffer
+   * @return number of bytes copied into {@code dst}, or {@link #EOF} at EOF
+   */
+  int readPositioned(long chunkRelativePosition, ByteBuffer dst) throws IOException {
+    if (chunkRelativePosition < 0 || chunkRelativePosition >= length) {
+      return EOF;
+    }
+    final int toRead = (int) Math.min(dst.remaining(), length - chunkRelativePosition);
+    if (toRead == 0) {
+      return 0;
+    }
+
+    final ChunkInfo readChunkInfo = getChunkInfo(chunkRelativePosition, toRead);
+    final long adjustedOffset = readChunkInfo.getOffset() - chunkInfo.getOffset();
+
+    // Capture the client reference under the acquireClient() lock so that a concurrent
+    // releaseClient() (e.g. from the sequential read's handleReadError or unbuffer) cannot
+    // null the xceiverClient field between acquisition and use.
+    final XceiverClientSpi client = acquireClient();
+    final ByteBuffer[] readBuffers = readChunk(readChunkInfo, client);
+    return copyRange(readBuffers, chunkRelativePosition - adjustedOffset, toRead, dst);
+  }
+
+  /**
+   * Copy {@code toCopy} bytes from {@code src} buffers, skipping the first
+   * {@code skip} bytes, into {@code dst}. Operates on duplicates so the source
+   * buffers' positions are left untouched.
+   */
+  private static int copyRange(ByteBuffer[] src, long skip, int toCopy, ByteBuffer dst) {
+    long remainingSkip = skip;
+    int copied = 0;
+    for (ByteBuffer buffer : src) {
+      if (copied >= toCopy) {
+        break;
+      }
+      if (remainingSkip > 0) {
+        if (remainingSkip >= buffer.remaining()) {
+          remainingSkip -= buffer.remaining();
+          continue;
+        } else {
+          buffer.position(Math.toIntExact(buffer.position() + remainingSkip));
+          remainingSkip = 0;
+        }
+      }
+      int n = Math.min(buffer.remaining(), toCopy - copied);
+      if (n <= 0) {
+        continue;
+      }
+      buffer.limit(buffer.position() + n);
+      dst.put(buffer);
+      copied += n;
+    }
+    return copied;
+  }
+
+  /**
+   * Send RPC call to get the chunk from the container using the sequential-read client held in
+   * {@link #xceiverClient}. Called by the buffered sequential read path via
+   * {@link #readChunkDataIntoBuffers}.
    */
   @VisibleForTesting
-  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo)
-      throws IOException {
+  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) throws IOException {
+    return readChunk(readChunkInfo, xceiverClient);
+  }
 
+  /**
+   * Send RPC call to get the chunk from the container using an explicitly provided client.
+   * Used by the positioned-read path so callers hold a local reference to the client
+   * rather than re-reading the shared {@link #xceiverClient} field after the lock is released.
+   * Subclasses that do not use an xceiver client (e.g. local short-circuit reads) should
+   * override this method to ignore {@code client} and read through their own mechanism.
+   */
+  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo, XceiverClientSpi client) throws IOException {
     ReadChunkResponseProto readChunkResponse =
-        ContainerProtocolCalls.readChunk(xceiverClient, readChunkInfo, datanodeBlockID, validators,
+        ContainerProtocolCalls.readChunk(client, readChunkInfo, datanodeBlockID, validators,
             tokenSupplier.get());
 
     if (readChunkResponse.hasData()) {

@@ -40,6 +40,7 @@ public class MultipartInputStream extends ExtendedInputStream {
   // List of PartInputStream, one for each part of the key
   private final List<? extends PartInputStream> partStreams;
   private final boolean isStreamBlockInputStream;
+  private final boolean statelessPositionedReadSupported;
 
   // partOffsets[i] stores the index of the first data byte in
   // partStream w.r.t the whole key data.
@@ -70,15 +71,19 @@ public class MultipartInputStream extends ExtendedInputStream {
 
     // Calculate and update the partOffsets
     this.partOffsets = new long[inputStreams.size()];
+    boolean statelessSupported = !inputStreams.isEmpty();
     int i = 0;
     long streamLength = 0L;
     for (PartInputStream partInputStream : inputStreams) {
       this.partOffsets[i++] = streamLength;
       if (isStreamBlockInputStream) {
         Preconditions.assertInstanceOf(partInputStream, StreamBlockInputStream.class);
+      } else if (statelessSupported && !(partInputStream instanceof BlockInputStream)) {
+        statelessSupported = false;
       }
       streamLength += partInputStream.getLength();
     }
+    this.statelessPositionedReadSupported = statelessSupported;
     this.length = streamLength;
   }
 
@@ -191,10 +196,19 @@ public class MultipartInputStream extends ExtendedInputStream {
 
   @Override
   public boolean readFully(long position, ByteBuffer buffer) throws IOException {
-    if (!isStreamBlockInputStream) {
-      return false;
+    if (isStreamBlockInputStream) {
+      return readFullyStreamBlock(position, buffer);
     }
+    return readFullyStateless(position, buffer);
+  }
 
+  /**
+   * Positioned read for the StreamBlock path. This emulates a positioned read
+   * with seek-read-restore on the shared stream cursor, so it is synchronized
+   * to keep concurrent callers from corrupting each other's position.
+   */
+  private synchronized boolean readFullyStreamBlock(long position,
+      ByteBuffer buffer) throws IOException {
     final long oldPos = getPos();
     seek(position);
     try {
@@ -217,6 +231,61 @@ public class MultipartInputStream extends ExtendedInputStream {
       seek(oldPos);
     }
     return true;
+  }
+
+  /**
+   * Stateless positioned read for the replicated (Ratis) path. Routes the read
+   * across the part {@link BlockInputStream}s using the immutable
+   * {@link #partOffsets} without seeking or mutating the shared cursor, so
+   * concurrent positioned reads run independently. Returns {@code false} (so
+   * the caller can fall back) when any part is not a {@link BlockInputStream},
+   * e.g. erasure coded parts.
+   */
+  private boolean readFullyStateless(long position, ByteBuffer buffer) throws IOException {
+    if (!buffer.hasRemaining()) {
+      return true;
+    }
+    if (!statelessPositionedReadSupported) {
+      return false;
+    }
+
+    long pos = position;
+    int bytesRead = 0;
+    while (buffer.hasRemaining()) {
+      if (pos < 0 || pos >= length) {
+        if (bytesRead > 0) {
+          return true;
+        }
+        throw new EOFException("EOF encountered at pos: " + pos +
+            " for key: " + key);
+      }
+      int idx = binarySearchOffsetIndex(partOffsets, pos);
+      BlockInputStream part = (BlockInputStream) partStreams.get(idx);
+      long partPos = pos - partOffsets[idx];
+      int n = part.readPositioned(partPos, buffer);
+      if (n <= 0) {
+        if (bytesRead > 0) {
+          return true;
+        }
+        throw new EOFException("EOF encountered at pos: " + pos +
+            " for key: " + key);
+      }
+      bytesRead += n;
+      pos += n;
+    }
+    return true;
+  }
+
+  static int binarySearchOffsetIndex(long[] offsets, long pos) {
+    final int idx = Arrays.binarySearch(offsets, pos);
+    if (idx >= 0) {
+      // exact match: pos falls exactly on the start of chunk/part idx
+      return idx;
+    }
+    // binarySearch returns n = -insertionPoint - 1;
+    // insertionPoint is -n - 1
+    // the containing index is insertionPoint - 1.
+    return -idx - 2;
   }
 
   public synchronized void initialize() throws IOException {

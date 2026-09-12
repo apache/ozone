@@ -23,6 +23,7 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -76,7 +77,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private XceiverClientShortCircuit xceiverClientShortCircuit;
   private final AtomicBoolean fallbackToGrpc = new AtomicBoolean(false);
   private volatile FileInputStream blockFileInputStream;
-  private boolean initialized = false;
+  private volatile boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy;
 
@@ -421,10 +422,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
       // Get the current chunkStream and read data from it
       ChunkInputStream current = chunkStreams.get(chunkIndex);
-      int numBytesToRead = Math.min(len, (int)current.getRemaining());
+      int readLength = Math.min(len, (int)current.getRemaining());
       int numBytesRead;
       try {
-        numBytesRead = strategy.readFromBlock(current, numBytesToRead);
+        numBytesRead = strategy.readFromBlock(current, readLength);
         retries = 0;
         // If we get a StorageContainerException or an IOException due to
         // datanodes are not reachable, refresh to get the latest pipeline
@@ -452,14 +453,14 @@ public class BlockInputStream extends BlockExtendedInputStream {
         }
       }
 
-      if (numBytesRead != numBytesToRead) {
+      if (numBytesRead != readLength) {
         // This implies that there is either data loss or corruption in the
         // chunk entries. Even EOF in the current stream would be covered in
         // this case.
         throw new IOException(String.format(
-            "Inconsistent read for chunkName=%s length=%d numBytesToRead= %d " +
+            "Inconsistent read for chunkName=%s length=%d readLength= %d " +
                 "numBytesRead=%d", current.getChunkName(), current.getLength(),
-            numBytesToRead, numBytesRead));
+            readLength, numBytesRead));
       }
       totalReadLen += numBytesRead;
       len -= numBytesRead;
@@ -469,6 +470,111 @@ public class BlockInputStream extends BlockExtendedInputStream {
       }
     }
     return totalReadLen;
+  }
+
+  /**
+   * Stateless positioned read across this block's chunks. Fills up to
+   * {@code dst.remaining()} bytes starting from {@code blockRelativePosition}
+   * without mutating this stream's cursor ({@code chunkIndex},
+   * {@code blockPosition}) or the sequential chunk streams' buffered state.
+   * Each covering chunk is read through an ephemeral {@link ChunkInputStream}
+   * closed as soon as its bytes have been copied.
+   *
+   * @return bytes copied into {@code dst}, or {@link #EOF} at EOF
+   */
+  int readPositioned(long blockRelativePosition, ByteBuffer dst) throws IOException {
+    if (blockRelativePosition < 0) {
+      return EOF;
+    }
+
+    if (!initialized) {
+      initialize();
+    }
+    final long[] offsets;
+    final BlockData currentBlockData;
+    final long blockLength;
+    synchronized (this) {
+      checkOpen();
+      if (chunkOffsets == null || blockData == null || blockRelativePosition >= length) {
+        return EOF;
+      }
+
+      offsets = Arrays.copyOf(chunkOffsets, chunkOffsets.length);
+      currentBlockData = blockData;
+      blockLength = length;
+    }
+
+    final List<ChunkInfo> chunkInfos = currentBlockData.getChunksList();
+    int index = MultipartInputStream.binarySearchOffsetIndex(offsets, blockRelativePosition);
+
+    long pos = blockRelativePosition;
+    int totalReadLen = 0;
+    while (dst.hasRemaining() && pos < blockLength && index < chunkInfos.size()) {
+      final ChunkInfo chunkInfo = chunkInfos.get(index);
+      final long chunkOffset = pos - offsets[index];
+      final long readLength = Math.min(Math.min(dst.remaining(), chunkInfo.getLen() - chunkOffset), blockLength - pos);
+      if (readLength > 0) {
+        final int numBytesRead = readChunkAt(chunkInfo, chunkOffset, (int) readLength, dst);
+        totalReadLen += numBytesRead;
+        pos += numBytesRead;
+      }
+      index++;
+    }
+    return totalReadLen == 0 ? EOF : totalReadLen;
+  }
+
+  /**
+   * Read {@code readLength} bytes starting at {@code chunkOffset} of the given chunk into {@code dst}
+   * through an ephemeral {@link ChunkInputStream}, retrying like {@link #readWithStrategy(ByteReaderStrategy)}
+   * but with a retry counter local to this call.
+   */
+  private int readChunkAt(ChunkInfo chunkInfo, long chunkOffset, int readLength, ByteBuffer dst) throws IOException {
+    final int startPosition = dst.position();
+    int preadRetries = 0;
+    while (true) {
+      final ChunkInputStream chunkStream;
+      synchronized (this) {
+        checkOpen();
+        chunkStream = createChunkInputStream(chunkInfo);
+      }
+      final int numBytesRead;
+      try {
+        final int oldLimit = dst.limit();
+        try {
+          dst.limit(startPosition + readLength);
+          numBytesRead = chunkStream.readPositioned(chunkOffset, dst);
+        } finally {
+          dst.limit(oldLimit);
+        }
+      } catch (SCMSecurityException ex) {
+        throw ex;
+      } catch (StorageContainerException ex) {
+        if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
+          throw ex;
+        }
+        handleReadError(ex);
+        dst.position(startPosition);
+        continue;
+      } catch (IOException ex) {
+        if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
+          throw ex;
+        }
+        if (isConnectivityIssue(ex)) {
+          handleReadError(ex);
+        }
+        dst.position(startPosition);
+        continue;
+      } finally {
+        chunkStream.close();
+      }
+
+      if (numBytesRead != readLength) {
+        throw new IOException(String.format(
+            "Inconsistent read for chunkName=%s length=%d readLength=%d numBytesRead=%d",
+            chunkInfo.getChunkName(), chunkInfo.getLen(), readLength, numBytesRead));
+      }
+      return numBytesRead;
+    }
   }
 
   /**
@@ -639,7 +745,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     blockPosition = getPos();
   }
 
-  private void handleReadError(IOException cause) throws IOException {
+  private synchronized void handleReadError(IOException cause) throws IOException {
     releaseClient();
     final List<ChunkInputStream> inputStreams = this.chunkStreams;
     if (inputStreams != null) {
