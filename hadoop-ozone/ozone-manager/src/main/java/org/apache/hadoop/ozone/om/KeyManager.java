@@ -404,8 +404,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
 
   /**
    * Resolve the streaming-write client to a node in OM's cached cluster map
-   * through the DNS-to-switch mapping. Called once per allocateBlock request,
-   * before the block loop, so the mapping is consulted at most once.
+   * through the DNS-to-switch mapping.
    *
    * @param clientMachine client address (IP or hostname), must not be empty
    * @param clusterMap OM's cached cluster map

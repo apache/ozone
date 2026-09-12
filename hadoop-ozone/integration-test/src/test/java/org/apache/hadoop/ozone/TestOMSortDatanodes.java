@@ -239,12 +239,8 @@ public class TestOMSortDatanodes {
 
   @Test
   public void sortDatanodesForWritePrefersPipelineDatanodeAsClient() {
-    // The pre-resolved client is rack-level and equidistant to every datanode
-    // in its rack, so with two same-rack datanodes in the pipeline only the
-    // datanode identity can put the client's own datanode first. To make the
-    // test deterministic (no equidistant shuffle), pass a client resolved for
-    // the OTHER rack: without the pipeline match, an other-rack datanode would
-    // sort first; with it, the client datanode must.
+    // Two same-rack datanodes in the pipeline: only the datanode identity can put the client's own first.
+    // Resolve the client in the other rack so preferring the matching pipeline datanode is deterministic.
     List<? extends DatanodeDetails> all = nodeManager.getAllNodes();
     DatanodeDetails clientDn = all.get(0);
     DatanodeDetails sameRack = null;
@@ -295,9 +291,6 @@ public class TestOMSortDatanodes {
 
   @Test
   public void resolveClientForWriteIsTheOnlyMappingLookup() {
-    // Resolve an edge client once, then sort several different datanode sets:
-    // the DNS-to-switch mapping must be consulted exactly once, by
-    // resolveClientForWrite, never by sortDatanodesForWrite.
     List<? extends DatanodeDetails> all = nodeManager.getAllNodes();
     CountingStaticMapping.RESOLVED_NAMES.set(0);
     Node client = keyManager.resolveClientForWrite("edge0", om.getClusterMap());

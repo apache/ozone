@@ -350,8 +350,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
     when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
 
-    OMAllocateBlockRequest request =
-        getOmAllocateBlockRequest(createAllocateBlockRequest());
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
     List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
         new ExcludeList(), scmBlockSize, true,
         UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
@@ -408,8 +407,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
     when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
 
-    OMAllocateBlockRequest request =
-        getOmAllocateBlockRequest(createAllocateBlockRequest());
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
     List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
         new ExcludeList(), 2 * scmBlockSize, true,
         UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
