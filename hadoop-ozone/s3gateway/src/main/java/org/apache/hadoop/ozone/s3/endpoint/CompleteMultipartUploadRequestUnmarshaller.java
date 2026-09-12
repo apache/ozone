@@ -22,16 +22,16 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
+import jakarta.inject.Singleton;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.MultivaluedMap;
+import jakarta.ws.rs.ext.Provider;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
-import javax.inject.Singleton;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.ext.Provider;
 
 /**
  * Custom unmarshaller to read CompleteMultipartUploadRequest wo namespace.

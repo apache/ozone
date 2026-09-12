@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import jakarta.xml.bind.DatatypeConverter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.security.MessageDigest;
@@ -47,7 +48,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;

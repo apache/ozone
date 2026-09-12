@@ -17,10 +17,13 @@
 
 package org.apache.ozone.lib.wsrs;
 
-import javax.ws.rs.core.Response;
-import javax.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.ext.ExceptionMapper;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.util.HttpExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +39,16 @@ public class ExceptionProvider implements ExceptionMapper<Throwable> {
 
   protected Response createResponse(Response.Status status,
                                     Throwable throwable) {
-    return HttpExceptionUtils.createJerseyExceptionResponse(status, throwable);
+    // Mirror hadoop-auth's HttpExceptionUtils JSON error contract so WebHDFS
+    // clients can reconstruct the remote exception. hadoop's helper returns a
+    // javax.ws.rs Response, so build the jakarta.ws.rs equivalent directly.
+    Map<String, Object> error = new LinkedHashMap<>();
+    error.put("message", getOneLineMessage(throwable));
+    error.put("exception", throwable.getClass().getSimpleName());
+    error.put("javaClassName", throwable.getClass().getName());
+    Map<String, Object> json = Collections.singletonMap("RemoteException", error);
+    return Response.status(status).type(MediaType.APPLICATION_JSON)
+        .entity(json).build();
   }
 
   protected String getOneLineMessage(Throwable throwable) {

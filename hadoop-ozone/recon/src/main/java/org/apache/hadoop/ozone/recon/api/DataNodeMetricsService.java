@@ -25,6 +25,9 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -40,9 +43,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import javax.annotation.PreDestroy;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;

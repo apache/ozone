@@ -110,7 +110,7 @@ public class TestChecksumKeyHandler {
     assertEquals(keySize, json.get("dataSize").asLong());
     assertEquals("COMPOSITE-CRC32", json.get("algorithm").asText());
 
-    String expectedChecksum = javax.xml.bind.DatatypeConverter.printHexBinary(
+    String expectedChecksum = jakarta.xml.bind.DatatypeConverter.printHexBinary(
         CrcUtil.intToBytes(Integer.valueOf(CHECKSUM)));
     assertEquals(expectedChecksum, json.get("checksum").asText());
   }

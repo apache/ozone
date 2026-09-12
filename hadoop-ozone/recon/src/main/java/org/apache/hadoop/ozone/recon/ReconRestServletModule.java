@@ -20,13 +20,13 @@ package org.apache.hadoop.ozone.recon;
 import com.google.inject.Injector;
 import com.google.inject.Scopes;
 import com.google.inject.servlet.ServletModule;
+import jakarta.inject.Inject;
+import jakarta.servlet.ServletContext;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.UriBuilder;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
-import javax.inject.Inject;
-import javax.servlet.ServletContext;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.UriBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -81,7 +81,7 @@ public class ReconRestServletModule extends ServletModule {
       sb.append(pkg);
     }
     Map<String, String> params = new HashMap<>();
-    params.put("javax.ws.rs.Application",
+    params.put("jakarta.ws.rs.Application",
         GuiceResourceConfig.class.getCanonicalName());
     if (sb.length() > 0) {
       params.put("jersey.config.server.provider.packages", sb.toString());

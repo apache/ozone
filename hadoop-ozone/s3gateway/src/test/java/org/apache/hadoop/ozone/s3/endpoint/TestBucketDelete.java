@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import javax.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;

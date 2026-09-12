@@ -21,11 +21,11 @@ import static org.apache.commons.io.filefilter.TrueFileFilter.TRUE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
-import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.io.IOCase;
 import org.apache.commons.io.file.Counters;
 import org.apache.commons.io.file.CountingPathVisitor;

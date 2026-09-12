@@ -42,11 +42,11 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.ws.rs.core.HttpHeaders;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Stream;
-import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;

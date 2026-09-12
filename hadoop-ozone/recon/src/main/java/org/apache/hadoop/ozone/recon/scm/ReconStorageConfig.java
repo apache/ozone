@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.recon.scm;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_STORAGE_DIR;
 
+import jakarta.inject.Inject;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
-import javax.inject.Inject;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;

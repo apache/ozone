@@ -29,10 +29,10 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.ws.rs.core.HttpHeaders;
 import java.io.ByteArrayInputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
-import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;

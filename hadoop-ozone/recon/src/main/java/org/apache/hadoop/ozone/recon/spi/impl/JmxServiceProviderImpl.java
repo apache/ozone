@@ -19,13 +19,13 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_AUTH_TYPE;
 
+import jakarta.inject.Singleton;
+import jakarta.ws.rs.core.Response;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import javax.inject.Singleton;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;

@@ -42,7 +42,8 @@ S3 Gateway Secret Already Exists
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
                         Execute                             ozone s3 getsecret ${OM_HA_PARAM}
     ${result} =         Execute                             curl -X PUT --negotiate -u : -v ${ENDPOINT_URL}/secret
-                        Should contain          ${result}       HTTP/1.1 400 S3_SECRET_ALREADY_EXISTS    ignore_case=True
+                        Should contain          ${result}       HTTP/1.1 400    ignore_case=True
+                        Should contain          ${result}       S3_SECRET_ALREADY_EXISTS
 
 S3 Gateway Generate Secret By Username
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled

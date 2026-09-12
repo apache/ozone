@@ -22,9 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.Collections;
-import javax.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
 
 /** Tests for {@link ReconResponseUnwrapper}. */

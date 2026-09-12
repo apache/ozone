@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import jakarta.annotation.PreDestroy;
+import jakarta.enterprise.context.RequestScoped;
+import jakarta.enterprise.inject.Produces;
+import jakarta.inject.Inject;
 import java.io.IOException;
-import javax.annotation.PreDestroy;
-import javax.enterprise.context.RequestScoped;
-import javax.enterprise.inject.Produces;
-import javax.inject.Inject;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

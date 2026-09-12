@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NS
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import jakarta.inject.Inject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,7 +37,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;

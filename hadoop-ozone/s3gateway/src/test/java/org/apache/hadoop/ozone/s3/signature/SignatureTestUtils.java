@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.s3.signature;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import jakarta.xml.bind.DatatypeConverter;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import javax.xml.bind.DatatypeConverter;
 
 /**
  * Shared AWS Signature Version 4 helpers for tests.

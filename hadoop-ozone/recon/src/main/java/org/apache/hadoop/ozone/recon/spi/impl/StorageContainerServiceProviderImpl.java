@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 
 import jakarta.annotation.Nonnull;
+import jakarta.inject.Inject;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -29,7 +30,6 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;

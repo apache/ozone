@@ -55,10 +55,17 @@
       <artifactId>jackson-databind</artifactId>
     </dependency>
     <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+    </dependency>
+    <dependency>
       <groupId>jakarta.ws.rs</groupId>
       <artifactId>jakarta.ws.rs-api</artifactId>
     </dependency>
     <dependency>
+      <!-- Retained for the nested HadoopAuthDelegate in HttpFSAuthenticationFilter,
+           which extends hadoop-auth's javax.servlet-based
+           DelegationTokenAuthenticationFilter and runs through JavaxFilterBridge. -->
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
     </dependency>
@@ -95,6 +102,15 @@
       <artifactId>ozone-common</artifactId>
     </dependency>
     <dependency>
+      <!-- Needed on the gateway runtime classpath for HttpServer2 (HttpField),
+           and at test compile for TestHttpFSServerWebServer (UriCompliance).
+           Only the test bytecode references it, so dependency:analyze reports it
+           as "non-test scoped test only" (ignored in the root pom). -->
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-http</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
       <scope>compile</scope>
@@ -125,8 +141,8 @@
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-webapp</artifactId>
+      <groupId>org.eclipse.jetty.ee10</groupId>
+      <artifactId>jetty-ee10-webapp</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>

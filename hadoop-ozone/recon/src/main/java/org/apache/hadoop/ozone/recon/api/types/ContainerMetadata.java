@@ -18,10 +18,10 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.xml.bind.annotation.XmlAccessType;
+import jakarta.xml.bind.annotation.XmlAccessorType;
+import jakarta.xml.bind.annotation.XmlElement;
 import java.util.List;
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 /**

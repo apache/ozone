@@ -17,15 +17,15 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ContainerResponseFilter;
+import jakarta.ws.rs.container.ResourceInfo;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.ext.Provider;
 import java.io.IOException;
 import java.io.OutputStream;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.container.ContainerResponseContext;
-import javax.ws.rs.container.ContainerResponseFilter;
-import javax.ws.rs.container.ResourceInfo;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.client.io.WrappedOutputStream;
 

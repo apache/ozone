@@ -21,7 +21,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_P
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import com.google.inject.Inject;
-import javax.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;

@@ -22,10 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import jakarta.ws.rs.core.Response;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;

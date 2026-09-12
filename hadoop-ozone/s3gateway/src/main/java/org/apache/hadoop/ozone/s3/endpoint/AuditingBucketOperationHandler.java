@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 /** Performs audit logging for {@link BucketOperationHandler}s. */

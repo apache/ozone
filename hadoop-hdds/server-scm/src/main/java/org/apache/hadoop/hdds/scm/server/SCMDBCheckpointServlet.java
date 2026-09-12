@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import jakarta.servlet.ServletException;
 import java.util.Collections;
-import javax.servlet.ServletException;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;

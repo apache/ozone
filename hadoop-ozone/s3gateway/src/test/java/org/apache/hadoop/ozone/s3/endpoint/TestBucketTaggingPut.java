@@ -33,9 +33,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import jakarta.ws.rs.core.HttpHeaders;
 import java.io.IOException;
 import java.util.Map;
-import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;

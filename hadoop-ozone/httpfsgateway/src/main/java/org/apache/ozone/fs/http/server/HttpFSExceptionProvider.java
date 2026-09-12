@@ -17,10 +17,10 @@
 
 package org.apache.ozone.fs.http.server;
 
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.ext.Provider;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.scm.container.ContainerException;
 import org.apache.ozone.lib.service.FileSystemAccessException;

@@ -26,10 +26,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.ws.rs.core.Response;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.recon.api.BucketEndpoint;
 import org.apache.hadoop.ozone.recon.api.ClusterStateEndpoint;
 import org.apache.hadoop.ozone.recon.api.ContainerEndpoint;
