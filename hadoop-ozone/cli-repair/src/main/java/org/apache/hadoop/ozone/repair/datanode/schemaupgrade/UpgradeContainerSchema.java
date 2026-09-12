@@ -311,7 +311,7 @@ public class UpgradeContainerSchema extends RepairTool {
         final File file =
             UpgradeUtils.getVolumeUpgradeCompleteFile(r.getHddsVolume());
         // create a flag file
-        if (e == null && r.isSuccess()) {
+        if (e == null && r.isSuccess() && !isDryRun()) {
           try {
             UpgradeUtils.createFile(file);
           } catch (IOException ioe) {
@@ -321,7 +321,7 @@ public class UpgradeContainerSchema extends RepairTool {
         if (lockFile.exists()) {
           boolean deleted = lockFile.delete();
           if (!deleted) {
-            error("Failed to delete upgrade lock file %s.", file);
+            error("Failed to delete upgrade lock file %s.", lockFile);
           }
         }
       });
