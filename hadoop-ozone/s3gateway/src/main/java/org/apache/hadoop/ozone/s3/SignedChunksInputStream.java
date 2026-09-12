@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
@@ -29,6 +28,7 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
@@ -344,7 +344,7 @@ public class SignedChunksInputStream extends InputStream {
       throw invalidBody("Invalid trailing signature");
     }
     if (validator != null) {
-      validator.validateTrailer(matcher.group(1), sha256Hex(name + ":" + value + "\n"));
+      validator.validateTrailer(matcher.group(1), DigestUtils.sha256Hex(name + ":" + value + "\n"));
     }
     // AWS SDKs terminate the trailer section with a blank line after the signature.
     if (!"".equals(readLine(true))) {
@@ -379,12 +379,6 @@ public class SignedChunksInputStream extends InputStream {
       }
       previous = current;
     }
-  }
-
-  private static String sha256Hex(String value) {
-    MessageDigest digest = newSha256();
-    byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
-    return DatatypeConverter.printHexBinary(hash).toLowerCase(Locale.ROOT);
   }
 
   private void updateDigest(byte b) {
