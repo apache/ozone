@@ -104,7 +104,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EmptySource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 /**
@@ -268,21 +270,25 @@ class TestObjectPut {
     assertThat(keyDetails.getDataSize()).isEqualTo(CONTENT.length());
   }
 
-  @Test
-  void testPutObjectWithValidSignedChunksAndTrailer() throws Exception {
-    configureSignedChunksWithTrailer(CONTENT.length());
+  @ParameterizedTest
+  @EmptySource
+  @ValueSource(strings = CONTENT)
+  void testPutObjectWithValidSignedChunksAndTrailer(String content) throws Exception {
+    configureSignedChunksWithTrailer(content.length());
 
     // The trailer value is covered by the HMAC; checksum calculation is outside this test.
     assertSucceeds(() -> putObject(signedChunkedBodyWithTrailer(
-        CONTENT, "x-amz-checksum-crc32c", "sOO8/Q==")));
+        content, "x-amz-checksum-crc32c", "sOO8/Q==")));
 
-    assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertThat(assertKeyContent(bucket, KEY_NAME, content).getDataSize()).isEqualTo(content.length());
   }
 
-  @Test
-  void testPutObjectRejectsTamperedTrailer() {
-    configureSignedChunksWithTrailer(CONTENT.length());
-    String body = signedChunkedBodyWithTrailer(CONTENT, "x-amz-checksum-crc32c", "sOO8/Q==")
+  @ParameterizedTest
+  @EmptySource
+  @ValueSource(strings = CONTENT)
+  void testPutObjectRejectsTamperedTrailer(String content) {
+    configureSignedChunksWithTrailer(content.length());
+    String body = signedChunkedBodyWithTrailer(content, "x-amz-checksum-crc32c", "sOO8/Q==")
         .replace("sOO8/Q==", "tampered");
 
     assertErrorResponse(SIGNATURE_DOES_NOT_MATCH, () -> putObject(body));

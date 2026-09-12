@@ -1519,12 +1519,11 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
   }
 
   @Test
-  public void testCreateKeyWithS3DerivedKey() throws Exception {
+  public void testCreateKeyDoesNotDeriveSigningKeyDuringApply() throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(true, true));
     when(ozoneManager.isSecurityEnabled()).thenReturn(true);
-    byte[] expectedDerivedKey = new byte[] {9, 8, 7, 6};
-    when(ozoneManager.getS3DerivedKey(anyString(), anyString())).thenReturn(expectedDerivedKey);
+    when(ozoneManager.getS3DerivedKey(any())).thenThrow(new IOException("Credentials unavailable during apply"));
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName)
@@ -1568,8 +1567,8 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     OzoneManagerProtocolProtos.CreateKeyResponse createKeyResponse =
         response.getOMResponse().getCreateKeyResponse();
     assertNotNull(createKeyResponse);
-    assertTrue(createKeyResponse.hasDerivedKey());
-    assertEquals(com.google.protobuf.ByteString.copyFrom(expectedDerivedKey), createKeyResponse.getDerivedKey());
+    assertThat(createKeyResponse.hasDerivedKey()).isFalse();
+    verify(ozoneManager, never()).getS3DerivedKey(any());
   }
 
   @Test

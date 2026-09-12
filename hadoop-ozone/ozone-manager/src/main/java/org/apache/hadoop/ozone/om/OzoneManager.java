@@ -5535,9 +5535,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     new QuotaRepairTask(this).repair(buckets);
   }
 
-  public byte[] getS3DerivedKey(String accessId, String signingKey) throws IOException {
-    String awsSecretKey = s3SecretManager.getSecretString(accessId);
-    return AWSV4AuthValidator.getSigningKey(awsSecretKey, signingKey);
+  /** Derives the signing key on the RPC thread after S3 authentication has succeeded. */
+  public byte[] getS3DerivedKey(S3Authentication s3Auth) throws IOException {
+    final String awsSecretKey;
+    if (StringUtils.isNotEmpty(s3Auth.getSessionToken())) {
+      STSTokenIdentifier stsToken = getStsTokenIdentifier();
+      if (stsToken == null || !s3Auth.getAccessId().equals(stsToken.getTempAccessKeyId())
+          || StringUtils.isEmpty(stsToken.getSecretAccessKey())) {
+        throw new OMException("Missing authenticated STS credentials for signing key derivation",
+            OMException.ResultCodes.INVALID_TOKEN);
+      }
+      awsSecretKey = stsToken.getSecretAccessKey();
+    } else {
+      awsSecretKey = getS3SecretManager().getSecretString(s3Auth.getAccessId());
+    }
+    return AWSV4AuthValidator.getSigningKey(awsSecretKey, s3Auth.getStringToSign());
   }
 
   @Override

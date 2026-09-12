@@ -28,6 +28,8 @@ import java.util.Locale;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Verifies {@link ChunksValidator} against the canonical AWS SigV4 streaming
@@ -107,8 +109,9 @@ class TestChunksValidator {
         SignatureTestUtils.sha256Hex(chunk, 0, chunk.length))).doesNotThrowAnyException();
   }
 
-  @Test
-  void acceptsMatchingTrailerSignature() {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void validatesTrailerSignature(boolean tampered) {
     ChunksValidator validator = newTrailerValidator();
     byte[] chunk1 = repeat('a', 65536);
     byte[] chunk2 = repeat('a', 1024);
@@ -120,17 +123,14 @@ class TestChunksValidator {
         SignatureTestUtils.sha256Hex(chunk2, 0, chunk2.length)));
     assertDoesNotThrow(() -> validator.validateChunk(TRAILER_FINAL_CHUNK_SIGNATURE,
         SignatureTestUtils.sha256Hex(new byte[0], 0, 0)));
-    assertDoesNotThrow(() -> validator.validateTrailer(TRAILER_SIGNATURE,
-        SignatureTestUtils.sha256Hex((trailer + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8),
-            0, trailer.length() + 1)));
-  }
-
-  @Test
-  void rejectsTamperedTrailerSignature() {
-    ChunksValidator validator = newTrailerValidator();
-    assertSignatureMismatch(() -> validator.validateTrailer(
-        TRAILER_SIGNATURE.substring(0, TRAILER_SIGNATURE.length() - 1) + "0",
-        "invalid-trailer-hash"));
+    String hash = SignatureTestUtils.sha256Hex((trailer + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        0, trailer.length() + 1);
+    if (tampered) {
+      assertSignatureMismatch(() -> validator.validateTrailer(
+          TRAILER_SIGNATURE.substring(0, TRAILER_SIGNATURE.length() - 1) + "0", hash));
+    } else {
+      assertDoesNotThrow(() -> validator.validateTrailer(TRAILER_SIGNATURE, hash));
+    }
   }
 
   @Test
