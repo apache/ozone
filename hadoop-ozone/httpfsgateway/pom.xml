@@ -102,6 +102,15 @@
       <artifactId>ozone-common</artifactId>
     </dependency>
     <dependency>
+      <!-- Needed on the gateway runtime classpath for HttpServer2 (HttpField),
+           and at test compile for TestHttpFSServerWebServer (UriCompliance).
+           Only the test bytecode references it, so dependency:analyze reports it
+           as "non-test scoped test only" (ignored in the root pom). -->
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-http</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
       <scope>compile</scope>
@@ -160,14 +169,6 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-reload4j</artifactId>
       <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <!-- Test-only: TestHttpFSServerWebServer references
-           org.eclipse.jetty.http.UriCompliance directly. At runtime jetty-http
-           arrives transitively via jetty-server. -->
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-http</artifactId>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 
