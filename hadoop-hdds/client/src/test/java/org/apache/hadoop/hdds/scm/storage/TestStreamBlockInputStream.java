@@ -270,6 +270,52 @@ public class TestStreamBlockInputStream {
     }
   }
 
+  /**
+   * A stream killed with DEADLINE_EXCEEDED (e.g. by a deadline on the long-lived call) must be treated
+   * like any other connectivity failure: fail over to a fresh stream instead of surfacing the error.
+   */
+  @Test
+  public void testDeadlineExceededFailsOverToFreshStream() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setReadRetryInterval(0);
+    BlockID blockID = new BlockID(1L, 13L);
+    byte[] data = {1, 2, 3, 4};
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+    when(streamingReadResponse.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+
+    AtomicInteger initCount = new AtomicInteger();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      if (initCount.incrementAndGet() == 1) {
+        // First stream is killed by the transport.
+        reader.onError(Status.DEADLINE_EXCEEDED.asRuntimeException());
+      } else {
+        reader.onNext(ContainerCommandResponseProto.newBuilder()
+            .setCmdType(Type.ReadBlock)
+            .setResult(ContainerProtos.Result.SUCCESS)
+            .setReadBlock(buildReadBlockResponse(data))
+            .build());
+      }
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, data.length, pipeline, null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      assertEquals(data.length, sbis.read(buf), "read should succeed after failing over to a fresh stream");
+      assertArrayEquals(data, buf.array());
+    }
+    assertEquals(2, initCount.get(), "a fresh stream should have been initialized for the retry");
+  }
+
   private OzoneClientConfig newStreamReadConfig() {
     OzoneClientConfig clientConfig = new OzoneClientConfig();
     clientConfig.setChecksumVerify(false);
