@@ -31,8 +31,8 @@ import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 /**
- * Verifies the per-chunk signatures of a SigV4 chunked upload
- * ({@code STREAMING-AWS4-HMAC-SHA256-PAYLOAD}).
+ * Verifies the per-chunk and trailing-header signatures of a SigV4 chunked upload
+ * ({@code STREAMING-AWS4-HMAC-SHA256-PAYLOAD} and its trailer variant).
  * <p>
  * Each chunk signature is {@code hex(HMAC-SHA256(signingKey, stringToSign))},
  * where the string-to-sign is:
@@ -57,6 +57,8 @@ public class ChunksValidator {
 
   private static final String CHUNK_STRING_TO_SIGN_ALGORITHM =
       "AWS4-HMAC-SHA256-PAYLOAD";
+  private static final String TRAILER_STRING_TO_SIGN_ALGORITHM =
+      "AWS4-HMAC-SHA256-TRAILER";
   private static final String HMAC_SHA256 = "HmacSHA256";
   private static final String NEWLINE = "\n";
 
@@ -101,15 +103,34 @@ public class ChunksValidator {
     String stringToSign = String.join(NEWLINE,
         CHUNK_STRING_TO_SIGN_ALGORITHM, dateTime, credentialScope,
         previousSignature, EMPTY_STRING_SHA256, payloadSha256Hex);
-    byte[] expected = hmacSha256(stringToSign);
-    // Constant-time comparison to avoid leaking the signature via timing. Decoding the hex also
-    // makes the comparison case-insensitive, as the signature may be sent in either case.
-    if (!MessageDigest.isEqual(expected, DatatypeConverter.parseHexBinary(chunkSignature))) {
-      throw newError(SIGNATURE_DOES_NOT_MATCH, resource);
-    }
+    validateSignature(chunkSignature, stringToSign);
     // The chain feeds this chunk's signature, in hex, into the next chunk's string-to-sign.
     // chunkSignature equals expected (verified above), so reuse it normalized to lower-case.
     previousSignature = chunkSignature.toLowerCase(Locale.ROOT);
+  }
+
+  /**
+   * Verify the signature of the trailing headers and complete the signature chain.
+   *
+   * @param trailerSignature the signature from the {@code x-amz-trailer-signature} header
+   * @param trailingHeadersSha256Hex SHA-256 of the canonical trailing headers
+   * @throws OS3Exception if the computed signature does not match
+   */
+  public void validateTrailer(String trailerSignature, String trailingHeadersSha256Hex)
+      throws OS3Exception {
+    String stringToSign = String.join(NEWLINE,
+        TRAILER_STRING_TO_SIGN_ALGORITHM, dateTime, credentialScope,
+        previousSignature, trailingHeadersSha256Hex);
+    validateSignature(trailerSignature, stringToSign);
+  }
+
+  private void validateSignature(String signature, String stringToSign) {
+    byte[] expected = hmacSha256(stringToSign);
+    // Constant-time comparison to avoid leaking the signature via timing. Decoding the hex also
+    // makes the comparison case-insensitive, as the signature may be sent in either case.
+    if (!MessageDigest.isEqual(expected, DatatypeConverter.parseHexBinary(signature))) {
+      throw newError(SIGNATURE_DOES_NOT_MATCH, resource);
+    }
   }
 
   private byte[] hmacSha256(String msg) {

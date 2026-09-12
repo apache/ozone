@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -176,6 +177,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
   private OMResponse internalProcessRequest(OMRequest request) throws ServiceException {
     boolean s3Auth = false;
+    ByteString derivedKey = null;
 
     try {
       if (request.hasS3Authentication()) {
@@ -185,6 +187,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
           // If request has S3Authentication, validate S3 credentials.
           // If current OM is leader and then proceed with the request.
           S3SecurityUtil.validateS3Credential(request, ozoneManager);
+          if (ozoneManager.isSecurityEnabled() && request.getCmdType() == OzoneManagerProtocolProtos.Type.CreateKey
+              && request.getCreateKeyRequest().getDerivedKeyPiggyBacking()) {
+            derivedKey = ByteString.copyFrom(ozoneManager.getS3DerivedKey(request.getS3Authentication()));
+            // Only the RPC response needs this key. Older followers must not derive it during apply either.
+            request = request.toBuilder().setCreateKeyRequest(request.getCreateKeyRequest().toBuilder()
+                .clearDerivedKeyPiggyBacking()).build();
+          }
         } catch (IOException ex) {
           return createErrorResponse(request, ex);
         }
@@ -201,13 +210,16 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
 
       // check retry cache
-      final OMResponse cached = omRatisServer.checkRetryCache();
-      if (cached != null) {
-        return cached;
+      OMResponse response = omRatisServer.checkRetryCache();
+      if (response == null) {
+        this.lastRequestToSubmit = request;
+        response = ozoneManager.getOmExecutionFlow().submit(request, true);
       }
-
-      this.lastRequestToSubmit = request;
-      return ozoneManager.getOmExecutionFlow().submit(request, true);
+      if (derivedKey != null && response.getSuccess() && response.hasCreateKeyResponse()) {
+        return response.toBuilder().setCreateKeyResponse(response.getCreateKeyResponse().toBuilder()
+            .setDerivedKey(derivedKey)).build();
+      }
+      return response;
     } finally {
       OzoneManager.setS3Auth(null);
       OzoneManager.setStsTokenIdentifier(null);

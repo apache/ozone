@@ -26,12 +26,15 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSuccee
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signatureInfo;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBody;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBodyWithTrailer;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signingKey;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -133,6 +136,29 @@ public class TestUploadWithStream {
   }
 
   @Test
+  public void testUploadWithValidSignedTrailer() throws Exception {
+    OzoneBucket bucket = configureSignedChunksWithTrailer(S3_COPY_EXISTING_KEY_CONTENT.length());
+    String body = signedChunkedBodyWithTrailer(
+        S3_COPY_EXISTING_KEY_CONTENT, "x-amz-checksum-crc32c", "sOO8/Q==");
+
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, body));
+
+    assertKeyContent(bucket, S3KEY, S3_COPY_EXISTING_KEY_CONTENT);
+  }
+
+  @Test
+  public void testUploadRejectsTamperedTrailer() throws Exception {
+    OzoneBucket bucket = configureSignedChunksWithTrailer(S3_COPY_EXISTING_KEY_CONTENT.length());
+    String body = signedChunkedBodyWithTrailer(
+        S3_COPY_EXISTING_KEY_CONTENT, "x-amz-checksum-crc32c", "sOO8/Q==")
+        .replace("sOO8/Q==", "tampered");
+
+    assertErrorResponse(S3ErrorTable.SIGNATURE_DOES_NOT_MATCH,
+        () -> put(rest, S3BUCKET, S3KEY, body));
+    assertThatThrownBy(() -> bucket.getKey(S3KEY)).isInstanceOf(IOException.class);
+  }
+
+  @Test
   public void testUploadDoesNotCommitWhenBodyReadFails() throws Exception {
     OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
     byte[] keyContent = S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8);
@@ -195,6 +221,14 @@ public class TestUploadWithStream {
     ((OzoneBucketStub) bucket).setDerivedKey(signingKey());
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(decodedLength));
+    return bucket;
+  }
+
+  private OzoneBucket configureSignedChunksWithTrailer(int decodedLength) throws IOException {
+    OzoneBucket bucket = configureSignedChunks(decodedLength);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
     return bucket;
   }
 }
