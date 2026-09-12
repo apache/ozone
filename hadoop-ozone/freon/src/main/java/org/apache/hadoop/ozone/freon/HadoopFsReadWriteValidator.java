@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -49,6 +51,10 @@ import picocli.CommandLine.Option;
  * concurrent load, including in time-based (--duration) runs where paths are
  * reused.
  * <p>
+ * --reads-per-write tunes the mix: a task still writes a single file, but reads
+ * back as many as the ratio asks for, so a run can be made read-heavy or
+ * write-heavy without changing what any one read validates.
+ * <p>
  * CRC32 keeps the validation off the critical path of the measured throughput.
  * Successive writes of a path differ in the marker only, and markers less than
  * 2^32 apart never share a CRC32, so a stale read is always detected.
@@ -63,6 +69,21 @@ import picocli.CommandLine.Option;
 @MetaInfServices(FreonSubcommand.class)
 public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     implements Callable<Void> {
+
+  /**
+   * One read, in the fixed-point units the read credit of a thread is counted
+   * in. The ratio is converted to whole units once, so the fraction it leaves
+   * over on every write is carried exactly. Accumulating the ratio itself as a
+   * double drifts: adding 0.1 ten times gives 0.9999999999999999, which delays
+   * the read the tenth write is due to an eleventh write.
+   */
+  private static final long CREDIT_UNIT = 1_000_000L;
+
+  /**
+   * Beyond this a run reads back more files per write than it could complete,
+   * and the bound is what keeps the credit of a thread well inside a long.
+   */
+  private static final BigDecimal MAX_READS_PER_WRITE = new BigDecimal("1000000");
 
   @Option(names = {"-s", "--size"},
       description = "Size of the generated files. " +
@@ -89,6 +110,18 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       defaultValue = "10000")
   private int maxFilesPerThread;
 
+  @Option(names = {"--reads-per-write"},
+      description = "Number of validation reads issued per write. 1 pairs one read with every write, 4 makes the "
+          + "run read-heavy with four validation reads per write, and 0.25 makes it write-heavy with one read "
+          + "every fourth write. Every read picks a file the thread wrote at random, so this changes how many "
+          + "files a task validates, not which write it validates. A value that is not a whole number is spread "
+          + "over the writes of a thread rather than rounded on every one of them.",
+      defaultValue = "1.0")
+  private BigDecimal readsPerWrite;
+
+  /** {@link #readsPerWrite} in the units of {@link ThreadHistory#readCredit}. */
+  private long creditPerWrite;
+
   private ContentGenerator contentGenerator;
 
   private Timer writeTimer;
@@ -113,6 +146,16 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       throw new IllegalArgumentException(
           "--max-files-per-thread must be positive");
     }
+    if (readsPerWrite.signum() <= 0
+        || readsPerWrite.compareTo(MAX_READS_PER_WRITE) > 0) {
+      throw new IllegalArgumentException("--reads-per-write must be positive "
+          + "and at most " + MAX_READS_PER_WRITE.toPlainString());
+    }
+    // Rounded away from zero, so a ratio finer than a credit unit still reads
+    // back now and then instead of silently never reading at all.
+    creditPerWrite = readsPerWrite.multiply(BigDecimal.valueOf(CREDIT_UNIT))
+        .setScale(0, RoundingMode.UP)
+        .longValueExact();
 
     super.init();
 
@@ -155,6 +198,17 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     }
     history.record(fileId, checksum);
 
+    for (int reads = history.readsDue(creditPerWrite); reads > 0; reads--) {
+      validateRandomFile(history);
+    }
+  }
+
+  /**
+   * Read back one of the files this thread wrote, picked at random, and verify
+   * that its content still matches the checksum of the latest write of that
+   * path.
+   */
+  private void validateRandomFile(ThreadHistory history) throws Exception {
     long readId = history.randomFileId();
     Path target = objectPath(readId);
     long expected = history.checksumOf(readId);
@@ -215,13 +269,16 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
    * is keyed by file id (an overwrite updates the checksum), so it holds one
    * entry per file the thread wrote and never more than
    * --max-files-per-thread. The id is kept rather than the {@link Path} it maps
-   * to, which {@link #objectPath} rebuilds on demand.
+   * to, which {@link #objectPath} rebuilds on demand. It also carries the
+   * thread's share of the read/write ratio, see {@link #readsDue(long)}.
    */
   private static final class ThreadHistory {
     private final long markerBase;
     private int markerSeq;
     private final Map<Long, Long> checksums = new HashMap<>();
     private final List<Long> fileIds = new ArrayList<>();
+    /** Owed reads, in {@link #CREDIT_UNIT}s, left over by earlier writes. */
+    private long readCredit;
 
     private ThreadHistory(long threadSequenceId) {
       this.markerBase = threadSequenceId << Integer.SIZE;
@@ -258,6 +315,21 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
 
     private long checksumOf(long fileId) {
       return checksums.get(fileId);
+    }
+
+    /**
+     * How many files to read back after the write that just completed. The
+     * fraction a ratio like 2.5 leaves over is carried to the next write
+     * instead of being rounded away, so the thread issues the requested number
+     * of reads per write on average, and a ratio below 1 reads back every
+     * n-th write rather than never reading at all. The carry is exact: it is
+     * counted in whole {@link #CREDIT_UNIT}s, not accumulated as a double.
+     */
+    private int readsDue(long creditPerWrite) {
+      readCredit += creditPerWrite;
+      int reads = (int) (readCredit / CREDIT_UNIT);
+      readCredit %= CREDIT_UNIT;
+      return reads;
     }
   }
 }
