@@ -2286,8 +2286,8 @@ public class KeyManagerImpl implements KeyManager {
               // Cache only a freshly sorted order, not an input list returned
               // unchanged when no sort happens: that order is per-pipeline and must
               // not be reused for another pipeline with the same node set. The read
-              // sort always returns a new list, so this never skips caching here; it
-              // keeps the pattern identical to the write path.
+              // sort always returns a new list, so this never skips caching here; the
+              // write path uses a null contract for a skipped sort instead.
               if (sortedNodes != null && sortedNodes != nodes) {
                 sortedPipelines.put(uuidSet, sortedNodes);
               }
@@ -2316,7 +2316,8 @@ public class KeyManagerImpl implements KeyManager {
   public Node resolveClientForWrite(String clientMachine, NetworkTopology clusterMap) {
     Preconditions.checkArgument(!StringUtils.isEmpty(clientMachine), "clientMachine is empty");
     Objects.requireNonNull(clusterMap, "clusterMap is null");
-    return getOtherNode(clientMachine, clusterMap);
+    return captureLatencyNs(metrics.getAllocateBlockSortDatanodesLatencyNs(),
+        () -> getOtherNode(clientMachine, clusterMap));
   }
 
   @Override
