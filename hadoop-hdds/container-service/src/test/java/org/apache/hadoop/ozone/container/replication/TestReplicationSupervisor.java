@@ -24,6 +24,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status.EXECUTED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
@@ -111,6 +113,7 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -155,8 +158,12 @@ public class TestReplicationSupervisor {
     clock = new MockClock(Instant.now(), ZoneId.systemDefault());
     set = newContainerSet();
     DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
+    OzoneConfiguration contextConf = new OzoneConfiguration();
+    DatanodeConfiguration contextDnConf = new DatanodeConfiguration();
+    contextDnConf.setReplicationCommandStatusReportEnabled(true);
+    contextConf.setFromObject(contextDnConf);
     context = new StateContext(
-        new OzoneConfiguration(),
+        contextConf,
         DatanodeStateMachine.DatanodeStates.getInitState(),
         stateMachine, "");
     context.setTermOfLeaderSCM(CURRENT_TERM);
@@ -690,6 +697,68 @@ public class TestReplicationSupervisor {
     }
   }
 
+  @Test
+  public void reportsExecutedStatusOnSuccess() {
+    ReplicationSupervisor supervisor = supervisorWithReplicator(
+        __ -> task -> task.setStatus(AbstractReplicationTask.Status.DONE));
+    ReplicateContainerCommand cmd = createCommand(1L);
+    context.addCmdStatus(cmd);
+    supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
+    assertEquals(EXECUTED, context.getCommandStatusMap().get(cmd.getId()).getStatus());
+  }
+
+  @Test
+  public void reportsFailedStatusOnFailure() {
+    ReplicateContainerCommand cmd = createCommand(2L);
+    context.addCmdStatus(cmd);
+    ReplicationSupervisor supervisor = supervisorWithReplicator(
+        __ -> task -> task.setStatus(AbstractReplicationTask.Status.FAILED));
+    supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
+    assertEquals(FAILED, context.getCommandStatusMap().get(cmd.getId()).getStatus());
+  }
+
+  @Test
+  public void reportsExecutedStatusOnSkip() {
+    ReplicationSupervisor supervisor = supervisorWithReplicator(
+        __ -> task -> task.setStatus(AbstractReplicationTask.Status.SKIPPED));
+    ReplicateContainerCommand cmd = createCommand(3L);
+    context.addCmdStatus(cmd);
+    supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
+    assertEquals(EXECUTED, context.getCommandStatusMap().get(cmd.getId()).getStatus());
+  }
+
+  @Test
+  public void reportsNoStatusWhenReportingDisabled() {
+    StateContext disabled = new StateContext(new OzoneConfiguration(),
+        DatanodeStateMachine.DatanodeStates.getInitState(), mock(DatanodeStateMachine.class), "");
+    disabled.setTermOfLeaderSCM(CURRENT_TERM);
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(disabled)
+        .executor(newDirectExecutorService())
+        .clock(clock)
+        .build();
+    replicatorRef.set(task -> task.setStatus(AbstractReplicationTask.Status.DONE));
+
+    ReplicateContainerCommand cmd = createCommand(5L);
+    disabled.addCmdStatus(cmd);
+    supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
+
+    assertTrue(disabled.getCommandStatusMap().isEmpty());
+  }
+
+  @Test
+  public void reportsFailedStatusWhenDeadlinePassed() {
+    ReplicationSupervisor supervisor = supervisorWith(
+        __ -> task -> task.setStatus(AbstractReplicationTask.Status.DONE),
+        newDirectExecutorService());
+    ReplicateContainerCommand cmd = createCommand(4L);
+    cmd.setDeadline(clock.millis() + 5000);
+    context.addCmdStatus(cmd);
+    clock.fastForward(10000);
+    supervisor.addTask(new ReplicationTask(cmd, replicatorRef.get()));
+    assertEquals(FAILED, context.getCommandStatusMap().get(cmd.getId()).getStatus());
+  }
+
   private static class BlockingTask extends AbstractReplicationTask {
 
     private final CountDownLatch runningLatch;
@@ -1015,6 +1084,53 @@ public class TestReplicationSupervisor {
 
     rs.nodeStateUpdated(IN_SERVICE);
     assertEquals(3, threadPoolSize.get());
+  }
+
+  @Test
+  public void reportsFailedStatusWhenQueueFull() {
+    final int maxQueueSize = 1;
+    DatanodeConfiguration datanodeConfig = new DatanodeConfiguration();
+    datanodeConfig.setCommandQueueLimit(maxQueueSize);
+    ReplicationServer.ReplicationConfig repConf = new ReplicationServer.ReplicationConfig();
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .executor(new DiscardingExecutorService())
+        .datanodeConfig(datanodeConfig)
+        .replicationConfig(repConf)
+        .clock(clock)
+        .build();
+
+    ReplicateContainerCommand fillCmd = createCommand(100L);
+    supervisor.addTask(new ReplicationTask(fillCmd, noopReplicator));
+    assertEquals(maxQueueSize, supervisor.getTotalInFlightReplications());
+
+    ReplicateContainerCommand droppedCmd = createCommand(200L);
+    context.addCmdStatus(droppedCmd);
+    supervisor.addTask(new ReplicationTask(droppedCmd, noopReplicator));
+
+    assertEquals(FAILED, context.getCommandStatusMap().get(droppedCmd.getId()).getStatus());
+  }
+
+  @Test
+  public void reportsExecutedStatusWhenDuplicate() {
+    // A duplicate task (same container already in-flight) should drain its own PENDING
+    // status entry without asking SCM to clear the pending op for the in-flight task.
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .executor(new DiscardingExecutorService())
+        .clock(clock)
+        .build();
+
+    ReplicateContainerCommand firstCmd = createCommand(300L);
+    supervisor.addTask(new ReplicationTask(firstCmd, noopReplicator));
+    assertEquals(1, supervisor.getTotalInFlightReplications());
+
+    ReplicateContainerCommand dupCmd = createCommand(300L);
+    context.addCmdStatus(dupCmd);
+    supervisor.addTask(new ReplicationTask(dupCmd, noopReplicator));
+
+    assertEquals(EXECUTED, context.getCommandStatusMap().get(dupCmd.getId()).getStatus());
   }
 
   @ContainerLayoutTestInfo.ContainerTest

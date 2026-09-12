@@ -24,6 +24,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
@@ -100,6 +101,16 @@ public final class CommandDispatcher {
         handler.handle(command, container, context, connectionManager);
       } catch (Exception ex) {
         LOG.error("Exception while handle command, ", ex);
+        if (StateContext.isReplicationCommand(command.getType())) {
+          // The handler threw before the task reached the replication supervisor, so nothing else
+          // will report an outcome. Drain the PENDING entry to stop it being resent forever, but
+          // leave a status the supervisor already reported alone.
+          context.updateCommandStatus(command.getId(), cmdStatus -> {
+            if (cmdStatus.getStatus() == Status.PENDING) {
+              cmdStatus.markAsFailed();
+            }
+          });
+        }
       }
     } else {
       LOG.error("Unknown SCM Command queued. There is no handler for this " +

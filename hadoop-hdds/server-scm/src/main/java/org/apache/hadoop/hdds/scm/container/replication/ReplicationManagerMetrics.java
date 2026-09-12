@@ -119,6 +119,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of container replicas which timed out before being created.")
   private MutableCounterLong replicaCreateTimeoutTotal;
 
+  @Metric("Number of container replicas whose create command was reported as failed by the datanode.")
+  private MutableCounterLong replicaCreateFailedTotal;
+
   @Metric("Number of deletion commands sent.")
   private MutableCounterLong deletionCmdsSentTotal;
 
@@ -180,6 +183,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   @Metric("Number of EC replicas scheduled to be created which timed out.")
   private MutableCounterLong ecReplicaCreateTimeoutTotal;
+
+  @Metric("Number of EC replicas whose create command was reported as failed by the datanode.")
+  private MutableCounterLong ecReplicaCreateFailedTotal;
 
   @Metric("Number of EC replicas scheduled for delete which timed out.")
   private MutableCounterLong ecReplicaDeleteTimeoutTotal;
@@ -267,6 +273,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     replicationCmdsSentTotal.snapshot(builder, all);
     replicasCreatedTotal.snapshot(builder, all);
     replicaCreateTimeoutTotal.snapshot(builder, all);
+    replicaCreateFailedTotal.snapshot(builder, all);
     deletionCmdsSentTotal.snapshot(builder, all);
     replicasDeletedTotal.snapshot(builder, all);
     replicaDeleteTimeoutTotal.snapshot(builder, all);
@@ -276,6 +283,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     ecReplicasDeletedTotal.snapshot(builder, all);
     ecReconstructionCmdsSentTotal.snapshot(builder, all);
     ecReplicaCreateTimeoutTotal.snapshot(builder, all);
+    ecReplicaCreateFailedTotal.snapshot(builder, all);
     ecReplicasDeletedTotal.snapshot(builder, all);
     ecReplicaDeleteTimeoutTotal.snapshot(builder, all);
     ecReconstructionCmdsDeferredTotal.snapshot(builder, all);
@@ -305,6 +313,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public void incrReplicaCreateTimeoutTotal() {
     this.replicaCreateTimeoutTotal.incr();
+  }
+
+  public void incrReplicaCreateFailedTotal() {
+    this.replicaCreateFailedTotal.incr();
   }
 
   public void incrDeletionCmdsSentTotal() {
@@ -388,6 +400,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     return this.replicaCreateTimeoutTotal.value();
   }
 
+  public long getReplicaCreateFailedTotal() {
+    return this.replicaCreateFailedTotal.value();
+  }
+
   public long getDeletionCmdsSentTotal() {
     return this.deletionCmdsSentTotal.value();
   }
@@ -464,6 +480,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     this.ecReplicaCreateTimeoutTotal.incr();
   }
 
+  public void incrEcReplicaCreateFailedTotal() {
+    this.ecReplicaCreateFailedTotal.incr();
+  }
+
   public long getEcDeletionCmdsSentTotal() {
     return ecDeletionCmdsSentTotal.value();
   }
@@ -482,6 +502,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getEcReplicaCreateTimeoutTotal() {
     return ecReplicaCreateTimeoutTotal.value();
+  }
+
+  public long getEcReplicaCreateFailedTotal() {
+    return ecReplicaCreateFailedTotal.value();
   }
 
   public long getEcReplicaDeleteTimeoutTotal() {

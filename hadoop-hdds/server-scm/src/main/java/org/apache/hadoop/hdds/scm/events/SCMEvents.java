@@ -212,6 +212,15 @@ public final class SCMEvents {
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
 
+  /**
+   * This event will be triggered by CommandStatusReportHandler whenever a
+   * datanode reports a failed replication or reconstruction command.
+   */
+  public static final TypedEvent<CommandStatusReportHandler.ReplicationStatus>
+      REPLICATION_STATUS =
+      new TypedEvent<>(CommandStatusReportHandler.ReplicationStatus.class,
+          "Replication_Status");
+
   public static final TypedEvent<DatanodeDetails>
       REPLICATION_MANAGER_NOTIFY =
       new TypedEvent<>(DatanodeDetails.class, "Replication_Manager_Notify");

@@ -43,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -60,6 +61,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -271,6 +273,8 @@ public final class ReplicationSupervisor {
     if (queueHasRoomFor(task)) {
       initCounters(task);
       addToQueue(task);
+    } else {
+      reportTerminalStatus(task);
     }
   }
 
@@ -305,6 +309,9 @@ public final class ReplicationSupervisor {
 
   private void addToQueue(AbstractReplicationTask task) {
     if (!inFlight.add(task)) {
+      // An equivalent task is already in flight and will do the work. EXECUTED drains this
+      // command's own entry without asking SCM to reschedule.
+      updateCommandStatus(task, CommandStatus::markAsExecuted);
       return;
     }
     if (task.getPriority() != ReplicationCommandPriority.LOW) {
@@ -324,6 +331,7 @@ public final class ReplicationSupervisor {
     queuedCounter.get(task.getMetricName()).decrementAndGet();
     inFlight.remove(task);
     decrementTaskCounter(task);
+    reportTerminalStatus(task);
   }
 
   private ExecutorService selectExecutor(AbstractReplicationTask task) {
@@ -367,6 +375,29 @@ public final class ReplicationSupervisor {
       return executor;
     }
     return volumeExecutor;
+  }
+
+  private void updateCommandStatus(AbstractReplicationTask task,
+      Consumer<CommandStatus> updater) {
+    long cmdId = task.getCommandId();
+    if (context == null || cmdId == 0) {
+      // No SCM context (test) or no tracked command (e.g. reconcile task).
+      return;
+    }
+    context.updateCommandStatus(cmdId, updater);
+  }
+
+  /**
+   * Reports a terminal status so the PENDING entry drains: EXECUTED when the task needs no retry,
+   * FAILED otherwise so SCM clears the pending op and can reschedule.
+   */
+  private void reportTerminalStatus(AbstractReplicationTask task) {
+    Status status = task.getStatus();
+    if (status == Status.DONE || status == Status.SKIPPED) {
+      updateCommandStatus(task, CommandStatus::markAsExecuted);
+    } else {
+      updateCommandStatus(task, CommandStatus::markAsFailed);
+    }
   }
 
   private void decrementTaskCounter(AbstractReplicationTask task) {
@@ -431,6 +462,7 @@ public final class ReplicationSupervisor {
       queuedCounter.get(task.getMetricName()).decrementAndGet();
       inFlight.remove(task);
       decrementTaskCounter(task);
+      reportTerminalStatus(task);
     }
   }
 
@@ -577,6 +609,7 @@ public final class ReplicationSupervisor {
         opsLatencyMs.get(task.getMetricName()).add(Time.monotonicNow() - startTime);
         inFlight.remove(task);
         decrementTaskCounter(task);
+        reportTerminalStatus(task);
       }
     }
 

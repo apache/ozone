@@ -255,6 +255,16 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int cmdQueueLimit = 5000;
 
+  @Config(key = "hdds.datanode.replication.command.status.report.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {DATANODE},
+      description = "Report the outcome of container replication and EC reconstruction commands to SCM "
+          + "in the command status report, so SCM can clear a failed pending replication without waiting "
+          + "for hdds.scm.replication.event.timeout. Adds one status entry per queued replication command."
+  )
+  private boolean replicationCommandStatusReportEnabled = false;
+
   @Config(key = "hdds.datanode.block.deleting.service.interval",
           defaultValue = "60s",
           type = ConfigType.TIME,
@@ -1170,6 +1180,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setCommandQueueLimit(int queueLimit) {
     this.cmdQueueLimit = queueLimit;
+  }
+
+  public boolean isReplicationCommandStatusReportEnabled() {
+    return replicationCommandStatusReportEnabled;
+  }
+
+  public void setReplicationCommandStatusReportEnabled(boolean enabled) {
+    this.replicationCommandStatusReportEnabled = enabled;
   }
 
   public boolean isChunkDataValidationCheck() {
