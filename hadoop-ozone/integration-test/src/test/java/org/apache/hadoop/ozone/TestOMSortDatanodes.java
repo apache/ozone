@@ -239,7 +239,6 @@ public class TestOMSortDatanodes {
 
   @Test
   public void sortDatanodesForWritePrefersPipelineDatanodeAsClient() {
-    // Two same-rack datanodes in the pipeline: only the datanode identity can put the client's own first.
     // Resolve the client in the other rack so preferring the matching pipeline datanode is deterministic.
     List<? extends DatanodeDetails> all = nodeManager.getAllNodes();
     DatanodeDetails clientDn = all.get(0);
@@ -265,8 +264,7 @@ public class TestOMSortDatanodes {
     assertNotEquals(clientDn.getNetworkLocation(), otherRackClient.getNetworkLocation());
 
     for (String address : new String[] {clientDn.getIpAddress(), clientDn.getHostName()}) {
-      // Pipeline without the client datanode: the passed client decides, so an
-      // other-rack datanode sorts first.
+      // Without a matching datanode, sort relative to the supplied client.
       List<DatanodeDetails> without = new ArrayList<>();
       without.add(rpcCopy(sameRack));
       without.add(rpcCopy(otherRack.get(0)));
@@ -276,8 +274,7 @@ public class TestOMSortDatanodes {
       assertNotNull(sortedWithout);
       assertEquals(otherRackClient.getNetworkLocation(), sortedWithout.get(0).getNetworkLocation());
 
-      // Pipeline containing the client datanode: its identity wins over the
-      // passed other-rack client, so it sorts first (distance zero).
+      // A matching datanode takes precedence over the supplied client and sorts first.
       List<DatanodeDetails> with = new ArrayList<>();
       with.add(rpcCopy(otherRack.get(0)));
       with.add(rpcCopy(sameRack));

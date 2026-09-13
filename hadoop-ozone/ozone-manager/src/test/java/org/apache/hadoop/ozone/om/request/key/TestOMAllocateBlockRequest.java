@@ -478,18 +478,13 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
   @Test
   public void testAllocateBlockKeepsPerPipelineOrderWhenSortSkipped() throws Exception {
-    // Two pipelines share the same datanode set but in a different order. When
-    // the sort is skipped (sortDatanodesForWrite returns null), each pipeline
-    // must keep its own order: null must not be cached under the node set and
-    // reused for the other pipeline.
+    // Pipelines sharing a datanode set must keep their own order when sorting is skipped.
     DatanodeDetails a = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails b = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails c = MockDatanodeDetails.randomDatanodeDetails();
     List<DatanodeDetails> nodes1 = Arrays.asList(a, b, c);
     List<DatanodeDetails> nodes2 = Arrays.asList(c, b, a);
-    // nodesInOrder deliberately differs from getNodes() so the test catches an
-    // implementation that overwrites an existing order with getNodes() when the
-    // sort is skipped.
+    // Use a different nodesInOrder to catch a skipped sort overwriting it with getNodes().
     List<DatanodeDetails> inOrder1 = Arrays.asList(b, c, a);
     List<DatanodeDetails> inOrder2 = Arrays.asList(a, c, b);
     Pipeline pipeline1 = Pipeline.newBuilder()
@@ -518,7 +513,6 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
-    // Skip the sort: null signals that no sort happened.
     when(mockKeyManager.resolveClientForWrite(anyString(), any())).thenReturn(mock(Node.class));
     when(mockKeyManager.sortDatanodesForWrite(any(), any(), any(), any())).thenReturn(null);
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
@@ -531,8 +525,6 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
 
     assertEquals(2, locations.size());
-    // Each pipeline keeps its own existing nodesInOrder; the skipped sort is
-    // neither shared nor replaced by getNodes().
     assertEquals(inOrder1, locations.get(0).getPipeline().getNodesInOrder());
     assertEquals(inOrder2, locations.get(1).getPipeline().getNodesInOrder());
   }

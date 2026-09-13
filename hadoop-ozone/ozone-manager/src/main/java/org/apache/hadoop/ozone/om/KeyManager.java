@@ -403,29 +403,24 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   KeyLifecycleService getKeyLifecycleService();
 
   /**
-   * Resolve the streaming-write client to a node in OM's cached cluster map
-   * through the DNS-to-switch mapping.
+   * Resolve the streaming-write client's rack in OM's cached cluster map using the DNS-to-switch mapping.
    *
    * @param clientMachine client address (IP or hostname), must not be empty
    * @param clusterMap OM's cached cluster map
-   * @return a node attached to the client's rack, or null when the client
-   *     cannot be placed in the topology; the caller then leaves the sort to SCM
+   * @return a node attached to the client's rack, or null if unresolved so the caller can let SCM sort
    */
   Node resolveClientForWrite(String clientMachine, NetworkTopology clusterMap);
 
   /**
-   * Sort the datanodes of a write pipeline by network-topology distance to the
-   * client, using OM's locally cached cluster map. When the client is one of the
-   * pipeline datanodes, that datanode is used as the client so it sorts first;
-   * otherwise {@code client} from {@link #resolveClientForWrite} is used.
+   * Sort write pipeline datanodes nearest-first using OM's cached cluster map. A datanode matching
+   * {@code clientMachine} takes precedence over {@code client} and sorts first.
    *
    * @param nodes the pipeline nodes to sort
    * @param clientMachine client address (IP or hostname), must not be empty
    * @param client the node returned by {@link #resolveClientForWrite}, must not be null
    * @param clusterMap OM's cached cluster map used to resolve topology distance
-   * @return nodes sorted nearest-first, or null when the sort is skipped because
-   *     a pipeline node is missing from the cluster map; callers must leave the
-   *     pipeline order unchanged in that case
+   * @return nodes sorted nearest-first, or null if a pipeline node is missing from the cluster map;
+   *     callers must preserve the pipeline's order in that case
    */
   List<? extends DatanodeDetails> sortDatanodesForWrite(
       List<? extends DatanodeDetails> nodes, String clientMachine, Node client, NetworkTopology clusterMap);
