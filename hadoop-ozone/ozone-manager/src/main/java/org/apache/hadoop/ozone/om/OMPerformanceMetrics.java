@@ -138,7 +138,7 @@ public class OMPerformanceMetrics implements MetricsSource {
     getKeyInfoSortDatanodesLatencyNs = stat("GetKeyInfoSortDatanodesLatencyNs",
         "Sort datanodes latency in getKeyInfo");
     allocateBlockSortDatanodesLatencyNs = stat("AllocateBlockSortDatanodesLatencyNs",
-        "Sort datanodes latency in allocateBlock (streaming write)");
+        "Client lookup and datanode sort latency in allocateBlock (streaming write), recorded as separate samples");
     getKeyInfoResolveBucketLatencyNs = stat("GetKeyInfoResolveBucketLatencyNs",
         "resolveBucketLink latency in getKeyInfo");
     s3VolumeContextLatencyNs = stat("S3VolumeContextLatencyNs",

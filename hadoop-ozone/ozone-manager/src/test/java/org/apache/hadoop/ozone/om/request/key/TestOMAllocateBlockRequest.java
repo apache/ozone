@@ -584,6 +584,13 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         () -> keyManager.resolveClientForWrite("", mock(NetworkTopology.class)));
   }
 
+  @Test
+  public void sortDatanodesForWriteRequiresClient() {
+    NullPointerException exception = assertThrows(NullPointerException.class,
+        () -> keyManager.sortDatanodesForWrite(Collections.emptyList(), "1.2.3.4", null, mock(NetworkTopology.class)));
+    assertEquals("client is null", exception.getMessage());
+  }
+
   // Like createAllocateBlockRequest, but sets sortDatanodes so preExecute
   // resolves the client address from the RPC context.
   private OMRequest createAllocateBlockRequestWithSort() {

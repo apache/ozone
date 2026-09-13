@@ -2283,11 +2283,6 @@ public class KeyManagerImpl implements KeyManager {
             List<? extends DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
             if (sortedNodes == null) {
               sortedNodes = sortDatanodes(nodes, clientMachine);
-              // Cache only a freshly sorted order, not an input list returned
-              // unchanged when no sort happens: that order is per-pipeline and must
-              // not be reused for another pipeline with the same node set. The read
-              // sort always returns a new list, so this never skips caching here; the
-              // write path uses a null contract for a skipped sort instead.
               if (sortedNodes != null && sortedNodes != nodes) {
                 sortedPipelines.put(uuidSet, sortedNodes);
               }
