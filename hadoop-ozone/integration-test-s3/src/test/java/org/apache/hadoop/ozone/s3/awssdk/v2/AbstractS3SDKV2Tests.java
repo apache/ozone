@@ -278,6 +278,21 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testDeletePublicAccessBlockDoesNotDeleteBucket() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.deletePublicAccessBlock(b -> b.bucket(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, exception.statusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(),
+        exception.awsErrorDetails().errorCode());
+    assertDoesNotThrow(() -> s3Client.headBucket(b -> b.bucket(bucketName)));
+
+    s3Client.deleteBucket(b -> b.bucket(bucketName));
+  }
+
+  @Test
   public void testPutObject() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();

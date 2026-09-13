@@ -53,6 +53,7 @@ import com.amazonaws.services.s3.model.CopyPartRequest;
 import com.amazonaws.services.s3.model.CopyPartResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.DeleteBucketTaggingConfigurationRequest;
+import com.amazonaws.services.s3.model.DeletePublicAccessBlockRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetBucketLifecycleConfigurationRequest;
 import com.amazonaws.services.s3.model.GetBucketTaggingConfigurationRequest;
@@ -483,6 +484,21 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     assertFalse(s3Client.doesBucketExist(bucketName));
     assertFalse(s3Client.doesBucketExistV2(bucketName));
+  }
+
+  @Test
+  public void testDeletePublicAccessBlockDoesNotDeleteBucket() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    AmazonServiceException exception = assertThrows(AmazonServiceException.class,
+        () -> s3Client.deletePublicAccessBlock(
+            new DeletePublicAccessBlockRequest().withBucketName(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, exception.getStatusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), exception.getErrorCode());
+    assertTrue(s3Client.doesBucketExistV2(bucketName));
+
+    s3Client.deleteBucket(bucketName);
   }
 
   @Test
