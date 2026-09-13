@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -29,6 +31,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -44,10 +49,12 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for TestXceiverClientGrpc, to ensure topology aware reads work
@@ -319,33 +326,37 @@ public class TestXceiverClientGrpc {
   @Test
   public void testStreamReadWaitsUntilReadyThenSends() throws Exception {
     TrackingStreamObserver obs = new TrackingStreamObserver(false);
-    StreamingReadResponse response = new StreamingReadResponse(
-        MockDatanodeDetails.randomDatanodeDetails(), obs);
-    // mirrors what ReadyAwareResponseObserver.beforeStart() registers on a real call
-    obs.setOnReadyHandler(response::signalReady);
+    StreamingReaderSpi reader = mock(StreamingReaderSpi.class);
+    new XceiverClientGrpc.ReadyAwareResponseObserver(MockDatanodeDetails.randomDatanodeDetails(), reader)
+        .beforeStart(obs);
+    ArgumentCaptor<StreamingReadResponse> captured = ArgumentCaptor.forClass(StreamingReadResponse.class);
+    verify(reader).setStreamingReadResponse(captured.capture());
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
 
-    Thread readySignaller = new Thread(() -> {
+    OzoneConfiguration longTimeout = new OzoneConfiguration();
+    longTimeout.set("ozone.client.stream.read.timeout", "60s");
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, longTimeout)) {
+      FutureTask<Void> send = new FutureTask<>(() -> {
+        client.streamRead(request, captured.getValue());
+        return null;
+      });
+      Thread sender = new Thread(send);
+      sender.start();
       try {
-        Thread.sleep(200);
-      } catch (InterruptedException ignored) {
-        return;
+        GenericTestUtils.waitFor(() -> sender.getState() == Thread.State.TIMED_WAITING, 10, 5_000);
+        assertThrows(TimeoutException.class, () -> send.get(200, TimeUnit.MILLISECONDS));
+        assertThat(obs.getSent()).isEmpty();
+        obs.markReady();
+        send.get(5, TimeUnit.SECONDS);
+        assertThat(obs.getReadyCalls().get()).as("isReady() calls must stay bounded while waiting").isBetween(3, 5);
+      } finally {
+        sender.interrupt();
+        sender.join(TimeUnit.SECONDS.toMillis(5));
       }
-      obs.markReady();
-    });
-    long start;
-    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
-      start = System.currentTimeMillis();
-      readySignaller.start();
-      client.streamRead(request, response);
     }
-    long elapsed = System.currentTimeMillis() - start;
-    readySignaller.join();
 
     assertEquals(1, obs.getSent().size(), "onNext must be called exactly once");
     assertEquals(request, obs.getSent().get(0));
-    assertThat(elapsed).isGreaterThanOrEqualTo(200L);
-    assertThat(obs.getReadyCalls().get()).isGreaterThanOrEqualTo(2);
   }
 
   /**

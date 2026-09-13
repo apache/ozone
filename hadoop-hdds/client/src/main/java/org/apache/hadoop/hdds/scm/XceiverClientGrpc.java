@@ -642,7 +642,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * hands the {@link StreamingReadResponse} to the reader from there, and tells it when the call terminates so a
    * sender blocked in {@link StreamingReadResponse#awaitReady(long)} fails right away.
    */
-  private static final class ReadyAwareResponseObserver
+  @VisibleForTesting
+  static final class ReadyAwareResponseObserver
       implements ClientResponseObserver<ContainerCommandRequestProto, ContainerCommandResponseProto> {
     private final DatanodeDetails dn;
     private final StreamingReaderSpi reader;
