@@ -51,7 +51,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -115,7 +115,7 @@ public class OMKeyRequestTests {
   protected ScmClient scmClient;
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
   protected ScmBlockLocationProtocol scmBlockLocationProtocol;
-  protected StorageContainerLocationProtocol scmContainerLocationProtocol;
+  protected StorageContainerLocationInternalInterface scmContainerLocationProtocol;
   protected OMPerformanceMetrics perfMetrics;
   protected DeletingServiceMetrics delMetrics;
 
@@ -189,7 +189,7 @@ public class OMKeyRequestTests {
     when(ozoneManager.getOMServiceId()).thenReturn(
         UUID.randomUUID().toString());
     when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
-    scmContainerLocationProtocol = Mockito.mock(StorageContainerLocationProtocol.class);
+    scmContainerLocationProtocol = Mockito.mock(StorageContainerLocationInternalInterface.class);
     when(scmClient.getContainerClient()).thenReturn(scmContainerLocationProtocol);
 
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);

@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfigurat
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
@@ -131,10 +131,10 @@ public class TestFailoverWithSCMHA {
         Level.DEBUG);
     logCapture = LogCapturer.captureLogs(SCMContainerLocationFailoverProxyProvider.class);
     proxyProvider.changeCurrentProxy(scm.getSCMNodeId());
-    StorageContainerLocationProtocol scmContainerClient =
+    StorageContainerLocationInternalInterface scmContainerClient =
         TracingUtil.createProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider), StorageContainerLocationProtocol.class, conf);
+                proxyProvider), StorageContainerLocationInternalInterface.class, conf);
 
     scmContainerClient.allocateContainer(HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, "ozone");
