@@ -201,11 +201,11 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
         }
         readDaemon.interrupt();
       }
-      pending = new ArrayList<>(sentRequests.values());
+      pending = removePendingRequests();
     } finally {
       lock.unlock();
     }
-    pending.forEach(entry -> entry.fail(new ClosedChannelException()));
+    failRequests(pending, new ClosedChannelException());
     if (Thread.currentThread() != readDaemon) {
       try {
         readDaemon.join();
@@ -430,9 +430,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     final RequestEntry entry = sentRequests.remove(requestKey);
     if (entry != null) {
       LOG.warn("Timeout to receive response for command {}", entry.getRequest());
-      ContainerProtos.Type type = entry.getRequest().getCmdType();
-      metrics.decrPendingContainerOpsMetrics(type);
-      entry.getFuture().completeExceptionally(new TimeoutException("Timeout to receive response"));
+      failRequest(entry, new TimeoutException("Timeout to receive response"));
     }
   }
 
@@ -467,7 +465,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
       } catch (IOException e) {
         isDomainSocketOpen.set(false);
         failure = e;
-        pending = new ArrayList<>(sentRequests.values());
+        pending = removePendingRequests();
       } finally {
         entry.setSentTimeNs();
         requestSent++;
@@ -477,12 +475,30 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     }
     if (failure != null) {
       LOG.error("Failed to send command {}", request, failure);
-      for (RequestEntry requestEntry : pending) {
-        requestEntry.fail(failure);
-      }
-      metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-      metrics.addContainerOpsLatency(request.getCmdType(), System.nanoTime() - entry.getCreateTimeNs());
+      failRequests(pending, failure);
     }
+  }
+
+  private List<RequestEntry> removePendingRequests() {
+    // The caller holds the lock and has prevented new requests from being registered.
+    List<RequestEntry> pending = new ArrayList<>();
+    sentRequests.forEach((key, entry) -> {
+      if (sentRequests.remove(key, entry)) {
+        pending.add(entry);
+      }
+    });
+    return pending;
+  }
+
+  private void failRequests(List<RequestEntry> requests, Throwable failure) {
+    requests.forEach(entry -> failRequest(entry, failure));
+  }
+
+  private void failRequest(RequestEntry entry, Throwable failure) {
+    entry.fail(failure);
+    ContainerProtos.Type type = entry.getRequest().getCmdType();
+    metrics.decrPendingContainerOpsMetrics(type);
+    metrics.addContainerOpsLatency(type, System.nanoTime() - entry.getCreateTimeNs());
   }
 
   @Override
@@ -585,7 +601,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
                 LOG.warn("Failed to handle short-circuit information exchange", e);
                 // disable docket socket for a while
                 domainSocketFactory.disableShortCircuit();
-                entry.getFuture().completeExceptionally(e);
+                failRequest(entry, e);
                 continue;
               }
             }
@@ -625,14 +641,14 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
               LOG.error("{} failed after send {} requests and received {} responses",
                   socket, requestSent, responseReceived, e);
             }
-            pending = new ArrayList<>(sentRequests.values());
+            pending = removePendingRequests();
           } finally {
             lock.unlock();
           }
           if (entry != null) {
-            entry.getFuture().completeExceptionally(e);
+            failRequest(entry, e);
           }
-          pending.forEach(i -> i.fail(e));
+          failRequests(pending, e);
           break;
         }
       }

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
@@ -216,6 +217,7 @@ public class TestXceiverClientManagerSC {
   @Test
   public void testResponseAndTimeoutWhileWriteIsBlocked() throws Exception {
     Pipeline pipeline = echoContainer.getPipeline();
+    XceiverClientMetrics metrics = mock(XceiverClientMetrics.class);
     DomainSocketFactory factory = mock(DomainSocketFactory.class);
     DomainSocket[] sockets = DomainSocket.socketpair();
     DomainSocket clientSocket = sockets[0];
@@ -225,8 +227,10 @@ public class TestXceiverClientManagerSC {
     when(factory.createSocket(anyInt(), anyInt(), any())).thenReturn(clientSocket);
 
     ExecutorService executor = Executors.newFixedThreadPool(2);
-    try (MockedStatic<DomainSocketFactory> mocked = mockStatic(DomainSocketFactory.class)) {
-      mocked.when(() -> DomainSocketFactory.getInstance(config)).thenReturn(factory);
+    try (MockedStatic<DomainSocketFactory> mockedFactory = mockStatic(DomainSocketFactory.class);
+         MockedStatic<XceiverClientManager> mockedManager = mockStatic(XceiverClientManager.class)) {
+      mockedFactory.when(() -> DomainSocketFactory.getInstance(config)).thenReturn(factory);
+      mockedManager.when(XceiverClientManager::getXceiverClientMetrics).thenReturn(metrics);
       try (XceiverClientShortCircuit client =
           new XceiverClientShortCircuit(pipeline, config, pipeline.getClosestNode())) {
         client.connect();
@@ -242,6 +246,11 @@ public class TestXceiverClientManagerSC {
         CompletableFuture<ContainerCommandResponseProto> timeoutFuture =
             client.sendCommandInternal(timeoutRequest).getResponse();
         assertEquals(timeoutRequest, readRequest(peerIn));
+
+        ContainerCommandRequestProto failureRequest = echoRequest(client, 0);
+        CompletableFuture<ContainerCommandResponseProto> failureFuture =
+            client.sendCommandInternal(failureRequest).getResponse();
+        assertEquals(failureRequest, readRequest(peerIn));
 
         ContainerCommandRequestProto blockedRequest = echoRequest(client, 0).toBuilder()
             .setEcho(ContainerProtos.EchoRequestProto.newBuilder()
@@ -270,6 +279,11 @@ public class TestXceiverClientManagerSC {
         assertThrows(ExecutionException.class,
             () -> blockedSend.get(NON_BLOCKING_TIMEOUT_SECONDS, TimeUnit.SECONDS).getResponse()
                 .get(NON_BLOCKING_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertThrows(ExecutionException.class,
+            () -> failureFuture.get(NON_BLOCKING_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        verify(metrics, times(4)).incrPendingContainerOpsMetrics(ContainerProtos.Type.Echo);
+        verify(metrics, times(4)).decrPendingContainerOpsMetrics(ContainerProtos.Type.Echo);
+        verify(metrics, times(4)).addContainerOpsLatency(any(), anyLong());
       } finally {
         IOUtils.cleanupWithLogger(null, peerSocket, clientSocket);
       }
@@ -306,31 +320,38 @@ public class TestXceiverClientManagerSC {
   public void testConcurrentCloseWithPendingRequests() throws Exception {
     Pipeline pipeline = echoContainer.getPipeline();
     ExecutorService executor = Executors.newFixedThreadPool(CONCURRENT_OPERATION_COUNT);
-    try (XceiverClientShortCircuit client =
-        new XceiverClientShortCircuit(pipeline, config, pipeline.getClosestNode())) {
-      client.connect();
-      CompletableFuture<ContainerCommandResponseProto> pending =
-          client.sendCommandInternal(echoRequest(client, DELAYED_ECHO_MILLIS)).getResponse();
-      CountDownLatch start = new CountDownLatch(1);
-      List<Future<?>> closes = new ArrayList<>();
-      for (int i = 0; i < CONCURRENT_OPERATION_COUNT; i++) {
-        closes.add(executor.submit(() -> {
-          assertTrue(start.await(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-          client.close();
-          return null;
-        }));
+    XceiverClientMetrics metrics = mock(XceiverClientMetrics.class);
+    try (MockedStatic<XceiverClientManager> mockedManager = mockStatic(XceiverClientManager.class)) {
+      mockedManager.when(XceiverClientManager::getXceiverClientMetrics).thenReturn(metrics);
+      try (XceiverClientShortCircuit client =
+          new XceiverClientShortCircuit(pipeline, config, pipeline.getClosestNode())) {
+        client.connect();
+        CompletableFuture<ContainerCommandResponseProto> pending =
+            client.sendCommandInternal(echoRequest(client, DELAYED_ECHO_MILLIS)).getResponse();
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> closes = new ArrayList<>();
+        for (int i = 0; i < CONCURRENT_OPERATION_COUNT; i++) {
+          closes.add(executor.submit(() -> {
+            assertTrue(start.await(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            client.close();
+            return null;
+          }));
+        }
+        start.countDown();
+        for (Future<?> close : closes) {
+          close.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        }
+        assertThrows(ExecutionException.class,
+            () -> pending.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertTrue(client.isClosed());
+        assertThrows(IOException.class, client::connect);
+        assertThrows(IOException.class, client::checkOpen);
+        assertThrows(IOException.class, () -> client.sendCommandInternal(echoRequest(client, 0)));
+        assertNotNull(client.toString());
+        verify(metrics).incrPendingContainerOpsMetrics(ContainerProtos.Type.Echo);
+        verify(metrics).decrPendingContainerOpsMetrics(ContainerProtos.Type.Echo);
+        verify(metrics).addContainerOpsLatency(any(), anyLong());
       }
-      start.countDown();
-      for (Future<?> close : closes) {
-        close.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-      }
-      assertThrows(ExecutionException.class,
-          () -> pending.get(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-      assertTrue(client.isClosed());
-      assertThrows(IOException.class, client::connect);
-      assertThrows(IOException.class, client::checkOpen);
-      assertThrows(IOException.class, () -> client.sendCommandInternal(echoRequest(client, 0)));
-      assertNotNull(client.toString());
     } finally {
       executor.shutdownNow();
       assertTrue(executor.awaitTermination(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS));
