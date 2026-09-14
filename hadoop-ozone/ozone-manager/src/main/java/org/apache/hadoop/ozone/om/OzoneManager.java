@@ -675,9 +675,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ScmBlockLocationProtocol scmBlockClient =
         getScmBlockClient(scmLocationClientConfiguration,
             scmLocationSocketFactory);
+    ScmBlockLocationProtocol keyDeletionScmBlockClient =
+        getScmBlockClient(configuration, null);
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
-        configuration);
+        configuration, keyDeletionScmBlockClient);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 
