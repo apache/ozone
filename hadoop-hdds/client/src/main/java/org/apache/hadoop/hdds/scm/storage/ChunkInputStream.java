@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.ByteBufferReadable;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -47,6 +49,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
@@ -300,18 +303,22 @@ public class ChunkInputStream extends InputStream
     datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder(replicaIdx).build();
   }
 
+  private DatanodeBlockID buildDatanodeBlockId(Pipeline pipeline) throws IOException {
+    updateDatanodeBlockId(pipeline);
+    return datanodeBlockID;
+  }
+
   /**
    * Acquire new client if previous one was released.
    *
    * @return the held client after ensuring it is acquired
    */
-  protected synchronized XceiverClientSpi acquireClient() throws IOException {
+  private synchronized void acquireClient() throws IOException {
     if (xceiverClientFactory != null && xceiverClient == null) {
       Pipeline pipeline = pipelineSupplier.get();
       xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
       updateDatanodeBlockId(pipeline);
     }
-    return xceiverClient;
   }
 
   /**
@@ -451,12 +458,21 @@ public class ChunkInputStream extends InputStream
     final ChunkInfo readChunkInfo = getChunkInfo(chunkRelativePosition, toRead);
     final long adjustedOffset = readChunkInfo.getOffset() - chunkInfo.getOffset();
 
-    // Capture the client reference under the acquireClient() lock so that a concurrent
-    // releaseClient() (e.g. from the sequential read's handleReadError or unbuffer) cannot
-    // null the xceiverClient field between acquisition and use.
-    final XceiverClientSpi client = acquireClient();
-    final ByteBuffer[] readBuffers = readChunk(readChunkInfo, client);
-    return copyRange(readBuffers, chunkRelativePosition - adjustedOffset, toRead, dst);
+    final long skip = chunkRelativePosition - adjustedOffset;
+    if (xceiverClientFactory == null) {
+      // for LocalChunkInputStream, which does not use a xceiver client, just read the chunk directly
+      return copyRange(readChunk(readChunkInfo), skip, toRead, dst);
+    }
+
+    final Pipeline pipeline = pipelineSupplier.get();
+    final ContainerProtos.DatanodeBlockID bid = buildDatanodeBlockId(pipeline);
+    final XceiverClientSpi client = xceiverClientFactory.acquireClientForReadData(pipeline);
+    try {
+      final ByteBuffer[] readBuffers = readChunk(readChunkInfo, client, bid, validators, tokenSupplier.get());
+      return copyRange(readBuffers, skip, toRead, dst);
+    } finally {
+      xceiverClientFactory.releaseClientForReadData(client, false);
+    }
   }
 
   /**
@@ -498,7 +514,7 @@ public class ChunkInputStream extends InputStream
    */
   @VisibleForTesting
   protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) throws IOException {
-    return readChunk(readChunkInfo, xceiverClient);
+    return readChunk(readChunkInfo, xceiverClient, datanodeBlockID, validators, tokenSupplier.get());
   }
 
   /**
@@ -508,10 +524,12 @@ public class ChunkInputStream extends InputStream
    * Subclasses that do not use an xceiver client (e.g. local short-circuit reads) should
    * override this method to ignore {@code client} and read through their own mechanism.
    */
-  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo, XceiverClientSpi client) throws IOException {
-    ReadChunkResponseProto readChunkResponse =
-        ContainerProtocolCalls.readChunk(client, readChunkInfo, datanodeBlockID, validators,
-            tokenSupplier.get());
+  private static ByteBuffer[] readChunk(
+      ChunkInfo chunk, XceiverClientSpi client, DatanodeBlockID blockID,
+      List<Validator> validators, Token<? extends TokenIdentifier> token) throws IOException {
+    Objects.requireNonNull(client, "client");
+    final ReadChunkResponseProto readChunkResponse = ContainerProtocolCalls.readChunk(
+        client, chunk, blockID, validators, token);
 
     if (readChunkResponse.hasData()) {
       return readChunkResponse.getData().asReadOnlyByteBufferList()
