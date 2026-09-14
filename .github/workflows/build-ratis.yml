@@ -58,7 +58,7 @@ on:
         description: "Arguments for building with Ratis"
         value: ${{ jobs.summary.outputs.build-args }}
 env:
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Daether.connector.http.retryHandler.count=10
 permissions: { }
 jobs:
   ratis:
