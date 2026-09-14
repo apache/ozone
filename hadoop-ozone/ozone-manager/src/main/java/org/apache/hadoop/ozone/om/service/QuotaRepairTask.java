@@ -38,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -68,9 +69,13 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
@@ -89,9 +94,9 @@ public class QuotaRepairTask {
   private static final int TASK_THREAD_CNT = 3;
   /**
    * Parallel full-table scans: OBS keys, FSO files, dirs, active deleted keys/dirs,
-   * snapshot DB deleted keys/dirs.
+   * snapshot DB deleted keys/dirs, multipart upload parts.
    */
-  private static final int QUOTA_REPAIR_SCAN_TASKS = 6;
+  private static final int QUOTA_REPAIR_SCAN_TASKS = 7;
   private static final AtomicBoolean IN_PROGRESS = new AtomicBoolean(false);
   private static final RepairStatus REPAIR_STATUS = new RepairStatus();
   private static final AtomicLong RUN_CNT = new AtomicLong(0);
@@ -328,6 +333,7 @@ public class QuotaRepairTask {
     Map<String, CountPair> directoryCountMap = new ConcurrentHashMap<>();
     Map<String, CountPair> snapshotDeletedKeyMap = new ConcurrentHashMap<>();
     Map<String, CountPair> snapshotDeletedDirMap = new ConcurrentHashMap<>();
+    Map<String, CountPair> mpuCountMap = new ConcurrentHashMap<>();
     try {
       nameBucketInfoMap.keySet().stream().forEach(e -> keyCountMap.put(e,
           new CountPair()));
@@ -337,6 +343,7 @@ public class QuotaRepairTask {
           new CountPair()));
       nameBucketInfoMap.keySet().forEach(k -> snapshotDeletedKeyMap.put(k, new CountPair()));
       idBucketInfoMap.keySet().forEach(k -> snapshotDeletedDirMap.put(k, new CountPair()));
+      nameBucketInfoMap.keySet().forEach(k -> mpuCountMap.put(k, new CountPair()));
 
       List<Future<?>> tasks = new ArrayList<>();
       tasks.add(executor.submit(() -> recalculateUsages(
@@ -365,6 +372,7 @@ public class QuotaRepairTask {
           throw new UncheckedIOException(ex);
         }
       }));
+      tasks.add(executor.submit(() -> recalculateMultipartUsages(metadataManager, mpuCountMap)));
 
       // await every scan before propagating a failure, so no scan outlives the checkpoint
       Exception scanFailure = awaitAll(tasks, null);
@@ -383,6 +391,7 @@ public class QuotaRepairTask {
     updateCountToBucketInfo(nameBucketInfoMap, keyCountMap);
     updateCountToBucketInfo(idBucketInfoMap, fileCountMap);
     updateCountToBucketInfo(idBucketInfoMap, directoryCountMap);
+    updateCountToBucketInfo(nameBucketInfoMap, mpuCountMap);
     mergeSnapshotDeletedTableCounts(nameBucketInfoMap, snapshotDeletedKeyMap);
     mergeDeletedDirSnapshotNamespace(idBucketInfoMap, snapshotDeletedDirMap);
     LOG.info("Completed quota repair counting for all keys, files and directories");
@@ -549,6 +558,54 @@ public class QuotaRepairTask {
       LOG.info(
           "Recalculate snapshot namespace from deletedDirectoryTable ({}) completed, count {} time {}ms",
           sourceLabel, count, (Time.monotonicNow() - startTime));
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  /**
+   * Counts committed parts of incomplete multipart uploads from the active DB checkpoint.
+   * Parts of a snapshot's incomplete uploads stay charged to that snapshot's own bucket,
+   * so only the active multipartInfoTable is scanned here. The scan reads keys only and
+   * each counting task reads the row it needs, so a row is never decoded for a bucket
+   * outside the repair and the batches hold keys instead of parts.
+   */
+  private void recalculateMultipartUsages(
+      OMMetadataManager metadataManager, Map<String, CountPair> mpuCountMap)
+      throws UncheckedIOException, UncheckedExecutionException {
+    try (Table.KeyValueIterator<String, OmMultipartKeyInfo> keyIter
+        = metadataManager.getMultipartInfoTable().iterator(null, KEY_ONLY)) {
+      scanTableInBatches(executor, keyIter, "Multipart upload usages",
+          kv -> extractMultipartCount(kv.getKey(), mpuCountMap, metadataManager));
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  @VisibleForTesting
+  static void extractMultipartCount(
+      String key, Map<String, CountPair> mpuCountMap,
+      OMMetadataManager metadataManager) throws UncheckedIOException {
+    try {
+      CountPair usage = mpuCountMap.get(getVolumeBucketPrefix(key));
+      if (usage == null) {
+        return;
+      }
+      OmMultipartKeyInfo multipartKeyInfo =
+          metadataManager.getMultipartInfoTable().getSkipCache(key);
+      long replicatedSize = 0;
+      if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
+        for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
+          replicatedSize += QuotaUtil.getReplicatedSize(
+              partKeyInfo.getPartKeyInfo().getDataSize(), multipartKeyInfo.getReplicationConfig());
+        }
+      } else {
+        SortedMap<Integer, OmMultipartPartInfo> parts =
+            OMMultipartUploadUtils.scanParts(metadataManager, multipartKeyInfo.getUploadID());
+        replicatedSize = OMMultipartUploadUtils.getReplicatedSize(
+            parts, multipartKeyInfo.getReplicationConfig());
+      }
+      usage.incrSpace(replicatedSize);
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
@@ -759,7 +816,8 @@ public class QuotaRepairTask {
     return prefix;
   }
   
-  private static class CountPair {
+  @VisibleForTesting
+  static class CountPair {
     private AtomicLong space = new AtomicLong();
     private AtomicLong namespace = new AtomicLong();
 
