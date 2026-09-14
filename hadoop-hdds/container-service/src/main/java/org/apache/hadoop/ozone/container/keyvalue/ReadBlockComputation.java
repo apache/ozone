@@ -29,6 +29,7 @@ class ReadBlockComputation {
 
   private final int responseDataSize;
   private final int bitMask;
+  private final int bytesPerChecksum;
   private final List<ChunkInfo> chunks;
   private int chunkIndex;
   private long lastPosition;
@@ -42,6 +43,7 @@ class ReadBlockComputation {
     // The following two computations are the same:
     // We will use (n & bitMask) to compute ((n / bytesPerChecksum) * bytesPerChecksum).
     this.bitMask = -bytesPerChecksum;
+    this.bytesPerChecksum = bytesPerChecksum;
 
     this.chunks = chunks;
     this.chunkIndex = firstChunkIndex;
@@ -71,9 +73,8 @@ class ReadBlockComputation {
    * Return the read offset aligned back to the previous checksum boundary
    * within the chunk that contains {@code blockOffset}.
    */
-  static long computeAdjustedOffset(int startChunkIndex, long blockOffset,
-      long bytesPerChecksum, List<ChunkInfo> chunkInfos) {
-    long offsetAlignment = (blockOffset - chunkInfos.get(startChunkIndex).getOffset()) % bytesPerChecksum;
+  long computeAdjustedOffset(long blockOffset) {
+    long offsetAlignment = (blockOffset - chunks.get(chunkIndex).getOffset()) % bytesPerChecksum;
     return blockOffset - offsetAlignment;
   }
 
@@ -82,19 +83,15 @@ class ReadBlockComputation {
    * {@code [blockOffset, blockOffset + blockLength)} is fully covered
    * with checksum-aligned boundaries.
    */
-  static long computeAdjustedLength(long blockOffset, long blockLength, long adjustedOffset,
-      long bytesPerChecksum, List<ChunkInfo> chunkInfos) {
+  long computeAdjustedLength(long blockOffset, long blockLength, long adjustedOffset) {
     long blockEnd = blockOffset + blockLength - 1; // inclusive
-    ChunkInfo lastChunk = chunkInfos.get(searchChunk(blockEnd, chunkInfos));
+    ChunkInfo lastChunk = chunks.get(searchChunk(blockEnd, chunks));
     long chunkOffset = lastChunk.getOffset();
-    long chunkLength = Math.min(
-        (getEndChecksumIndex(blockEnd, chunkOffset, bytesPerChecksum) + 1) * bytesPerChecksum,
-        lastChunk.getLen());
-    return chunkOffset + chunkLength - adjustedOffset;
-  }
 
-  private static int getEndChecksumIndex(long blockEnd, long chunkOffset, long bytesPerChecksum) {
-    return (int) ((blockEnd - chunkOffset) / bytesPerChecksum);
+    long roundDown = (blockEnd - chunkOffset) & bitMask;
+    long roundUp = roundDown + bytesPerChecksum;
+    long chunkLength = Math.min(roundUp, lastChunk.getLen());
+    return chunkOffset + chunkLength - adjustedOffset;
   }
 
   /**

@@ -2363,12 +2363,12 @@ public class KeyValueHandler extends Handler {
     // TODO: Support client-side flag to toggle checksum verification.
     // If checksum is disabled, chunk offset adjustment can be skipped.
     int chunkIndex = ReadBlockComputation.searchChunk(readBlock.getOffset(), chunkInfos);
-    long adjustedOffset = ReadBlockComputation.computeAdjustedOffset(chunkIndex,
-        readBlock.getOffset(), bytesPerChecksum, chunkInfos);
-    long adjustLength = ReadBlockComputation.computeAdjustedLength(
-        readBlock.getOffset(), readBlock.getLength(), adjustedOffset, bytesPerChecksum, chunkInfos);
     ReadBlockComputation readBlockComputation =
         new ReadBlockComputation(responseDataSize, bytesPerChecksum, chunkInfos, chunkIndex);
+    long adjustedOffset = readBlockComputation.computeAdjustedOffset(readBlock.getOffset());
+
+    long adjustLength = readBlockComputation.computeAdjustedLength(
+        readBlock.getOffset(), readBlock.getLength(), adjustedOffset);
 
     ChecksumData checksumData = new ChecksumData(checksumType, bytesPerChecksum);
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
