@@ -42,6 +42,35 @@ Create bucket with invalid bucket name
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket invalid_bucket_${randStr}   255
                         Should contain          ${result}           InvalidBucketName
 
+Create bucket with name too short
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket ab   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket with name too long
+    ${bucket} =         Evaluate    'a' * 64
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket ${bucket}   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket with all uppercase characters in bucket name
+    ${randStr} =        Generate Random String     8    [UPPER]
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket BUCKET${randStr}   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket with mixed uppercase characters in bucket name
+    ${randStr} =        Generate Random String     8    [LOWER]
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket BuCkEt-${randStr}   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket with trailing dash in bucket name
+    ${randStr} =        Generate Random String     8    [LOWER]
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket bucket-${randStr}-   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket with maximum valid name length
+    ${randStr} =        Generate Random String     62    [LOWER]
+    ${bucket} =         Set Variable               b${randStr}
+                        Create bucket with name    ${bucket}
+
 Create new bucket and check default group ACL
     [tags]    aws-skip
     ${bucket} =         Create bucket
