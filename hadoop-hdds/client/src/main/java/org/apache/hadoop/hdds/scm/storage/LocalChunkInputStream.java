@@ -63,7 +63,9 @@ public class LocalChunkInputStream extends ChunkInputStream
   LocalChunkInputStream(ChunkInfo chunkInfo, BlockID blockId, XceiverClientFactory xceiverClientFactory,
       Supplier<Pipeline> pipelineSupplier, boolean verifyChecksum, Supplier<Token<?>> tokenSupplier,
       XceiverClientShortCircuit xceiverClientShortCircuit, FileInputStream blockInputStream) {
-    super(chunkInfo, blockId, xceiverClientFactory, pipelineSupplier, verifyChecksum, tokenSupplier);
+    // Pass null for xceiverClientFactory such readPositioned() is taken, both routing reads
+    // and checksum verification are done locally.
+    super(chunkInfo, blockId, null, pipelineSupplier, verifyChecksum, tokenSupplier);
     this.chunkInfo = chunkInfo;
     this.dataIn = blockInputStream.getChannel();
     this.validator = this::validateChunk;
