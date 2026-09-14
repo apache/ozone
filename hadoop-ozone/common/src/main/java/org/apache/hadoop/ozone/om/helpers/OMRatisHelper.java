@@ -54,7 +54,7 @@ public final class OMRatisHelper {
   }
 
   /**
-   * Convert the given proto 2 response to a proto 3 {@link ByteString}.
+   * Convert the given proto 2 response to a Ratis {@link Message}.
    * <p>
    * The response is serialized eagerly so that the returned {@link Message} holds only the serialized bytes.
    * Ratis keeps the reply {@link Message} in its retry cache (on the leader and on every follower) for
