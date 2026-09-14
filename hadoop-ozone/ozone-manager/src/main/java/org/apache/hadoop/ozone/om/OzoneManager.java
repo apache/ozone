@@ -661,9 +661,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Honor property 'hadoop.security.token.service.use_ip'
     omRpcAddressTxt = new Text(SecurityUtil.buildTokenService(omNodeRpcAddr));
 
-    metrics = OMMetrics.create();
-    perfMetrics = OMPerformanceMetrics.register(conf);
-
     OzoneConfiguration scmLocationClientConfiguration =
         OMScmLocationClientConfig.createScmClientConfiguration(configuration);
     SocketFactory scmLocationSocketFactory =
