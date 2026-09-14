@@ -158,15 +158,13 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
   }
 
   /**
-   * One operation of the run, a read or a write. The counter of the task is not
-   * what the written file is named after: with the two kinds of operation drawn
-   * at random it no longer counts the writes of the thread, which is what has
-   * to stay within --max-files-per-thread.
+   * One operation of the run, a read or a write, drawn per --read-percent. A
+   * thread that has written nothing yet has nothing to read back and writes.
    */
   private void readOrWrite(long counter) throws Exception {
     ThreadHistory history = threadHistory.get();
     if (history.isEmpty() || !readsNext()) {
-      writeAndRecord(history);
+      writeAndRecord(history, counter);
     } else {
       validateRandomFile(history);
     }
@@ -177,9 +175,10 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     return ThreadLocalRandom.current().nextDouble(100) < readPercent;
   }
 
-  private void writeAndRecord(ThreadHistory history) throws Exception {
+  private void writeAndRecord(ThreadHistory history, long counter)
+      throws Exception {
     long marker = history.nextMarker();
-    long fileId = fileIdOf(marker);
+    long fileId = counter % maxFilesPerThread;
     Path file = objectPath(fileId);
 
     long checksum;
@@ -193,15 +192,6 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       throw e;
     }
     history.record(fileId, checksum);
-  }
-
-  /**
-   * File a write goes to. The low half of its marker is the write sequence of
-   * the thread, so ids cycle within --max-files-per-thread and a thread keeps
-   * at most that many checksums however its reads and writes fall.
-   */
-  private long fileIdOf(long marker) {
-    return (marker & 0xFFFFFFFFL) % maxFilesPerThread;
   }
 
   /**
@@ -223,10 +213,13 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
   }
 
   /**
-   * Path of the file for the given counter. The thread sequence id is part of
-   * the path so each worker owns a private namespace; paths are reused once a
-   * thread has written --max-files-per-thread of them, and this keeps one
-   * thread from overwriting a file another thread is reading back.
+   * Path of the file for the given id. The thread sequence id is part of the
+   * path so each worker owns a private namespace, which keeps one thread from
+   * overwriting a file another thread is reading back. The id comes from the
+   * task counter, which the framework recycles within -n, so a time-based run
+   * writes over its paths rather than growing without bound; the modulo caps a
+   * count-based run at --max-files-per-thread distinct ids, and with it the
+   * checksums a thread has to remember.
    */
   private Path objectPath(long fileId) {
     return new Path(getRootPath() + "/" + generateObjectName(fileId)
