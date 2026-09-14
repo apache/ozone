@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -966,7 +967,9 @@ public class TestContainerPersistence {
     long testContainerID2 = getTestContainerID();
     Container container2 = addContainer(containerSet, testContainerID2, StorageType.DISK);
     BlockData blockData2 = getBlockData(testContainerID2, StorageType.SSD);
-    assertThrows(IllegalArgumentException.class, () -> blockManager.putBlock(container2, blockData2));
+    StorageContainerException storageContainerException =
+        assertThrows(StorageContainerException.class, () -> blockManager.putBlock(container2, blockData2));
+    assertEquals(Result.INVALID_ARGUMENT, storageContainerException.getResult());
   }
 
   private BlockData getBlockData(long containerID, StorageType storageType) throws IOException {
