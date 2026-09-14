@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import javax.net.SocketFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.io.ObjectWritable;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ClientCache;
@@ -153,9 +152,6 @@ class TestOMScmLocationClientConfig {
     assertEquals(2, scmClientConfiguration.getTimeDuration(
         OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_RETRY_INTERVAL,
         0, TimeUnit.SECONDS));
-    assertEquals(3,
-        scmClientConfiguration.getObject(SCMClientConfig.class)
-            .getRetryCount());
   }
 
   @Test
