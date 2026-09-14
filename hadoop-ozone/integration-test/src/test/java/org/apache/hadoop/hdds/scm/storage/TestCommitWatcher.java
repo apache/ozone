@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
@@ -162,6 +163,15 @@ public class TestCommitWatcher {
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
         assertEquals(1, xceiverClient.getRefcount());
         XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
+        // Ensure the freshly-allocated pipeline has an elected Ratis leader
+        // before the async write burst: register the Ratis group on the
+        // pipeline datanodes and commit a CreateContainer synchronously.
+        // Otherwise the first write races leader election and can fail with
+        // NotLeaderException -> RaftRetryFailureException -> AlreadyClosedException.
+        OzoneTestHelper.createPipelineOnDatanode(pipeline, cluster);
+        ratisClient.sendCommandAsync(
+            ContainerTestHelper.getCreateContainerRequest(containerId, pipeline))
+            .getResponse().get();
         CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
         BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
         List<XceiverClientReply> replies = new ArrayList<>();
@@ -228,6 +238,15 @@ public class TestCommitWatcher {
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
         assertEquals(1, xceiverClient.getRefcount());
         XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
+        // Ensure the freshly-allocated pipeline has an elected Ratis leader
+        // before the async write burst: register the Ratis group on the
+        // pipeline datanodes and commit a CreateContainer synchronously.
+        // Otherwise the first write races leader election and can fail with
+        // NotLeaderException -> RaftRetryFailureException -> AlreadyClosedException.
+        OzoneTestHelper.createPipelineOnDatanode(pipeline, cluster);
+        ratisClient.sendCommandAsync(
+            ContainerTestHelper.getCreateContainerRequest(containerId, pipeline))
+            .getResponse().get();
         CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
         BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
         List<XceiverClientReply> replies = new ArrayList<>();
