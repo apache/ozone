@@ -84,7 +84,14 @@ class ReadBlockComputation {
    * with checksum-aligned boundaries.
    */
   long computeAdjustedLength(long blockOffset, long blockLength, long adjustedOffset) {
-    long blockEnd = blockOffset + blockLength - 1; // inclusive
+    // We use an inclusive blockEnd to straightforwardly identify which chunk and checksum
+    // cover the final byte.
+    // For example, if bytesPerChecksum = 16 and we read up to byte 36 (exclusive readEnd = 36),
+    // it correctly locates the chunk. However, calculating the checksum index from an
+    // exclusive boundary requires extra +1/-1 edge-case handling, specifically when the
+    // end aligns exactly on a checksum boundary.
+    // Using the inclusive index makes ((blockEnd - chunkOffset) / bytesPerChecksum) straightforward.
+    long blockEnd = blockOffset + blockLength - 1;
     ChunkInfo lastChunk = chunks.get(searchChunk(blockEnd, chunks));
     long chunkOffset = lastChunk.getOffset();
 
@@ -103,7 +110,29 @@ class ReadBlockComputation {
     if (responseDataSize >= remainingLength) {
       return Math.toIntExact(remainingLength);
     }
-    ChunkInfo endChunk = chunks.get(findChunk(offset + responseDataSize)); // exclusive
+
+    /*
+     * Use an exclusive boundary here. If we used an inclusive boundary
+     * that perfectly aligned with the start of the next chunk, it would
+     * incorrectly truncate the buffer limit.
+     *
+     * Example Scenario:
+     * - bytesPerChecksum = 16 (bitMask = -16)
+     * - Chunk 1: offset = 0, length = 20
+     * - Chunk 2: offset = 20, length = 20
+     * - Current offset = 0, responseDataSize = 20
+     *
+     * If using an INCLUSIVE boundary (end = 20 - 1 = 19):
+     * - endChunk = findChunk(19) -> Chunk 1 (offset = 0)
+     * - lengthExcludingEndChunk = 0 - 0 = 0
+     * - Result = ((20 - 0) & -16) + 0 = 16 (Incorrectly truncates 4 bytes)
+     *
+     * If using an EXCLUSIVE boundary (end = 20):
+     * - endChunk = findChunk(20) -> Chunk 2 (offset = 20)
+     * - lengthExcludingEndChunk = 20 - 0 = 20
+     * - Result = ((20 - 20) & -16) + 20 = 20 (Correctly reads the entire Chunk 1)
+     */
+    ChunkInfo endChunk = chunks.get(findChunk(offset + responseDataSize));
     final int lengthExcludingEndChunk = Math.toIntExact(endChunk.getOffset() - offset);
     // bytesPerChecksum must be a power of 2.
     return ((responseDataSize - lengthExcludingEndChunk) & bitMask) + lengthExcludingEndChunk;
