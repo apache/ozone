@@ -99,6 +99,7 @@
     <jacoco.version>0.8.15</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.0.1</jakarta.inject.version>
+    <jakarta.servlet-api.version>6.0.0</jakarta.servlet-api.version>
     <jakarta.ws.rs-api.version>3.1.0</jakarta.ws.rs-api.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <java.security.egd>file:///dev/urandom</java.security.egd>
@@ -111,7 +112,7 @@
     <jcip-annotations.version>1.0-1</jcip-annotations.version>
     <jdeb.version>1.14</jdeb.version>
     <jersey.version>1.19.4</jersey.version>
-    <jersey2.version>3.1.12</jersey2.version>
+    <jersey3.version>3.1.12</jersey3.version>
     <jetbrains-annotations.version>17.0.0</jetbrains-annotations.version>
     <jetty.version>12.0.38</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
@@ -201,7 +202,6 @@
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>3.0.1</restrict-imports.enforcer.version>
     <rocksdb.version>10.10.1.1</rocksdb.version>
-    <servlet-api.version>6.0.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.18</slf4j.version>
     <snakeyaml.version>2.5</snakeyaml.version>
@@ -285,7 +285,7 @@
       <dependency>
         <groupId>org.glassfish.jersey</groupId>
         <artifactId>jersey-bom</artifactId>
-        <version>${jersey2.version}</version>
+        <version>${jersey3.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -620,7 +620,7 @@
       <dependency>
         <groupId>jakarta.servlet</groupId>
         <artifactId>jakarta.servlet-api</artifactId>
-        <version>${servlet-api.version}</version>
+        <version>${jakarta.servlet-api.version}</version>
       </dependency>
       <dependency>
         <groupId>jakarta.ws.rs</groupId>

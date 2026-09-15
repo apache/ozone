@@ -79,6 +79,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.server.http.HttpServerConfigurationException;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -355,6 +356,10 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
           serviceRuntimeInfo.setHttpsPort(String.valueOf(httpsPort));
         }
 
+      } catch (HttpServerConfigurationException ex) {
+        // A filter/HTTP misconfiguration will never succeed on retry; fail fast
+        // instead of silently starting the datanode without a web server.
+        throw ex;
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }

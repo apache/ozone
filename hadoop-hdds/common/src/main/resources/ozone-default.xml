@@ -2226,13 +2226,15 @@
       set, ozone.security.http.kerberos.enabled should be set to true.
       Filters registered by these initializers run inside a Jetty EE10
       (jakarta.servlet) server. A filter that still implements the legacy
-      javax.servlet.Filter API is only supported for the hadoop-auth
-      authentication filters, which merely establish an authenticated
-      principal; such a filter is run through a bridge that propagates only
-      that principal, and any request or response wrapping it adds is not
-      carried downstream. A javax.servlet filter outside that family is
-      rejected at startup, so provide jakarta.servlet.Filter implementations
-      for any other filter.
+      javax.servlet.Filter API is run through a bridge and is supported when it
+      only acts on the request and response it is given - the hadoop-auth
+      authentication filters (which establish an authenticated principal),
+      StaticUserWebFilter, CrossOriginFilter (CORS response headers) and
+      RestCsrfPreventionFilter. A filter that wraps the request or response and
+      forwards the wrapper downstream (for example XFrameOptionsFilter) is not
+      supported, because the bridge does not carry that wrapper. A javax.servlet
+      filter outside the supported set aborts HTTP server startup, so provide
+      jakarta.servlet.Filter implementations for any other filter.
     </description>
   </property>
   <property>

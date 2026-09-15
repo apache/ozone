@@ -61,6 +61,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -129,9 +130,13 @@ import org.mockito.ArgumentCaptor;
  * with the Jetty 12 runtime this build targets, so MiniKMS was removed from
  * the integration-test classpath during the Jetty 12 migration (HDDS-8280).
  * The jceks provider is a no-op for EDEK warm-up and exposes no KMS queue to
- * observe, so warm-up on OM startup is asserted with a spy over the provider
- * (see {@link #testWarmupEDEKCacheOnStartup()}) rather than by polling queue
- * size. Restoring coverage against a real KMS is tracked as a follow-up JIRA.
+ * observe, so warm-up on OM startup is covered in two ways that do not need a
+ * real KMS: {@link #testWarmupEDEKCacheOnStartup()} swaps a spy over the live
+ * provider and re-triggers the warm-up path directly to assert the exact key,
+ * and {@link #testWarmupEDEKCacheOnOmRestart()} restarts the OM to exercise the
+ * genuine startup trigger and asserts warm-up from the loader's log line.
+ * Restoring coverage against a real KMS is tracked as a follow-up JIRA
+ * (HDDS-16424).
  * </p>
  */
 class TestOzoneAtRestEncryption {
@@ -246,6 +251,32 @@ class TestOzoneAtRestEncryption {
       assertThat(keysCaptor.getAllValues()).contains(TEST_KEY);
     } finally {
       HddsWhiteboxTestUtils.setInternalState(ozoneManager, "kmsProvider", original);
+    }
+  }
+
+  @Test
+  public void testWarmupEDEKCacheOnOmRestart() throws Exception {
+    // A bucket with an encryption key so the OM has an EDEK to warm up. The
+    // encrypted bucket is persisted and survives the restart, so the genuine
+    // startup trigger (OzoneManagerStateMachine#notifyLeaderChanged ->
+    // initializeEdekCache) rediscovers it.
+    createVolumeAndBucket(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), BucketLayout.OBJECT_STORE);
+
+    // Unlike testWarmupEDEKCacheOnStartup, this restarts the OM to drive the real
+    // startup path rather than calling initializeEdekCache directly. The jceks
+    // provider cannot be spied across a restart, so warm-up is asserted from the
+    // EDEKCacheLoader's "Successfully warmed up" log line.
+    GenericTestUtils.LogCapturer omLogs =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.class);
+    try {
+      cluster.restartOzoneManager();
+      GenericTestUtils.waitFor(
+          (BooleanSupplier) () -> omLogs.getOutput().contains("Successfully warmed up"),
+          500, 60000);
+    } finally {
+      omLogs.stopCapturing();
+      reInitClient();
     }
   }
 

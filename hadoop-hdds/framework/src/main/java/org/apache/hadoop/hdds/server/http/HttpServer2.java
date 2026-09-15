@@ -176,18 +176,25 @@ public final class HttpServer2 implements FilterContainer {
   /**
    * URI compliance mode used when {@code allowAmbiguousUri} is set. S3 object
    * keys and WebHDFS paths legitimately contain empty path segments ("//"),
-   * percent encodings ("%25") and encoded path separators, which Jetty 12
-   * rejects with 400 by default. Rather than Jetty's broad LEGACY mode -- which
-   * would also re-admit %2e/%2e%2e path traversal, UTF-16 and truncated UTF-8
-   * encodings, suspicious path characters and userinfo on the internet-facing
-   * S3 Gateway and HttpFS -- relax only those three violations the use case
-   * needs.
+   * percent encodings ("%25"), encoded path separators, and after decoding a
+   * backslash or other suspicious character (DEL and C0 controls), all of which
+   * Jetty 12 rejects with 400 by default. Jetty 9.4 (pre-migration) had no such
+   * check and passed these through, so relax those four violations to keep that
+   * behavior; a decoded backslash or control byte is opaque key/path data in
+   * Ozone (which uses only "/" as a separator), so it does not open path
+   * traversal. Rather than Jetty's broad LEGACY mode -- which would also
+   * re-admit %2e/%2e%2e path traversal, UTF-16 and truncated UTF-8 encodings and
+   * userinfo on the internet-facing S3 Gateway and HttpFS -- relax only those
+   * violations the use case needs. Genuinely illegal (unencoded) URI characters
+   * such as "[" and "]" remain rejected, since conforming clients percent-encode
+   * them.
    */
   private static final UriCompliance OZONE_AMBIGUOUS_URI_COMPLIANCE =
       UriCompliance.DEFAULT.with("OZONE",
           UriCompliance.Violation.AMBIGUOUS_EMPTY_SEGMENT,
           UriCompliance.Violation.AMBIGUOUS_PATH_ENCODING,
-          UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR);
+          UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR,
+          UriCompliance.Violation.SUSPICIOUS_PATH_CHARACTERS);
 
   public static final String FILTER_INITIALIZER_PROPERTY
       = "ozone.http.filter.initializers";
@@ -833,12 +840,13 @@ public final class HttpServer2 implements FilterContainer {
         CommonConfigurationKeysPublic.HADOOP_HTTP_LOGS_ENABLED,
         CommonConfigurationKeysPublic.HADOOP_HTTP_LOGS_ENABLED_DEFAULT);
     if (logDir != null && logsEnabled) {
-      // Jetty 12 refuses to start a context whose base resource does not exist.
-      // Best-effort create the log directory (preserving the prior auto-create
-      // behavior); if it is absent and cannot be created -- permission denied, a
-      // regular file in the way, or a read-only mount -- skip the "/logs" context
-      // gracefully instead of failing daemon startup, mirroring the "/static"
-      // skip-if-absent guard below.
+      // Jetty 12 refuses to start a context whose base resource does not exist,
+      // so best-effort create the log directory here. This is new behavior:
+      // Jetty 9.4 silently tolerated a missing base resource and did not create
+      // it. If the directory is absent and cannot be created -- permission
+      // denied, a regular file in the way, or a read-only mount -- skip the
+      // "/logs" context gracefully instead of failing daemon startup, mirroring
+      // the "/static" skip-if-absent guard below.
       Path logPath = Paths.get(logDir);
       boolean logDirReady = true;
       try {
@@ -854,7 +862,7 @@ public final class HttpServer2 implements FilterContainer {
         logContext.addServlet(AdminAuthorizedServlet.class, "/*");
         // Jetty 12's ServletContextHandler installs a SymlinkAllowedResourceAliasChecker
         // on POSIX filesystems, so symlinked entries under the log directory are served by
-        // default (matching Jetty 9.4). The legacy "org.eclipse.jetty.servlet.Default.allowAliases"
+        // default (matching Jetty 9.4). The legacy "org.eclipse.jetty.servlet.Default.aliases"
         // init-param no longer has any effect. To honor the operator opt-out, clear the alias
         // checks so aliased (e.g. symlinked) resources are denied.
         if (!conf.getBoolean(HADOOP_JETTY_LOGS_SERVE_ALIASES, DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {

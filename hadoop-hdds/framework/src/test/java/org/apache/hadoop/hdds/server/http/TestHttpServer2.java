@@ -40,6 +40,8 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.http.UriCompliance;
 import org.eclipse.jetty.server.Handler;
@@ -89,12 +91,12 @@ public class TestHttpServer2 {
   }
 
   /**
-   * With allowAmbiguousUri the connector relaxes only the ambiguous empty
-   * segments ("//"), percent encodings ("%25") and encoded path separators that
-   * S3 object keys and WebHDFS paths need, and the servlet layer decodes
-   * ambiguous URIs. Unlike Jetty's LEGACY mode it must not re-admit %2e/%2e%2e
-   * path traversal, UTF-16 or truncated UTF-8 encodings, suspicious path
-   * characters or userinfo.
+   * With allowAmbiguousUri the connector relaxes the ambiguous empty segments
+   * ("//"), percent encodings ("%25") and encoded path separators that S3 object
+   * keys and WebHDFS paths need, plus the suspicious path characters (backslash,
+   * DEL, C0 controls) that Jetty 9.4 passed through, and the servlet layer
+   * decodes ambiguous URIs. Unlike Jetty's LEGACY mode it must not re-admit
+   * %2e/%2e%2e path traversal, UTF-16 or truncated UTF-8 encodings or userinfo.
    */
   @Test
   public void testUriComplianceRelaxedWhenAmbiguousAllowed() throws Exception {
@@ -102,7 +104,8 @@ public class TestHttpServer2 {
     assertEquals(EnumSet.of(
         UriCompliance.Violation.AMBIGUOUS_EMPTY_SEGMENT,
         UriCompliance.Violation.AMBIGUOUS_PATH_ENCODING,
-        UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR),
+        UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR,
+        UriCompliance.Violation.SUSPICIOUS_PATH_CHARACTERS),
         uriComplianceOf(srv).getAllowed());
     assertTrue(srv.getWebAppContext().getServletHandler()
         .isDecodeAmbiguousURIs());
@@ -110,10 +113,11 @@ public class TestHttpServer2 {
 
   /**
    * The relaxed compliance mode is enforced at the wire level on a running
-   * server: with allowAmbiguousUri the S3/WebHDFS use case (empty segments and
-   * percent encodings) reaches the servlet, while %2e%2e path traversal and %u
-   * UTF-16 encodings -- which Jetty's LEGACY mode would re-admit -- are still
-   * rejected with a 400.
+   * server: with allowAmbiguousUri the S3/WebHDFS use case (empty segments,
+   * percent encodings and the suspicious path characters -- an encoded backslash
+   * such as an S3 key "dir\file", a C0 control and DEL) reaches the servlet, while
+   * %2e%2e path traversal and %u UTF-16 encodings -- which Jetty's LEGACY mode
+   * would re-admit -- are still rejected with a 400.
    */
   @Test
   public void testAmbiguousUriHardeningStillRejectsTraversal() throws Exception {
@@ -130,6 +134,12 @@ public class TestHttpServer2 {
       // Empty path segments ("//") and percent encodings ("%25") are the
       // S3/WebHDFS use case: admitted and delivered to the servlet.
       assertEquals(HttpURLConnection.HTTP_OK, statusOf(base + "/echo/a//b%25c"));
+      // The suspicious path characters (SUSPICIOUS_PATH_CHARACTERS) that Jetty 9.4
+      // passed through -- an encoded backslash such as an S3 key "dir\file", a C0
+      // control (%01) and DEL (%7F) -- are admitted and delivered to the servlet.
+      assertEquals(HttpURLConnection.HTTP_OK, statusOf(base + "/echo/a%5Cb"));
+      assertEquals(HttpURLConnection.HTTP_OK, statusOf(base + "/echo/a%01b"));
+      assertEquals(HttpURLConnection.HTTP_OK, statusOf(base + "/echo/a%7Fb"));
       // Path traversal and UTF-16 encodings stay outside that use case: 400.
       assertEquals(HttpURLConnection.HTTP_BAD_REQUEST,
           statusOf(base + "/echo/%2e%2e/x"));
@@ -166,38 +176,71 @@ public class TestHttpServer2 {
   }
 
   /**
-   * By default the "/logs" context serves symlinked entries, matching Jetty 9.4:
-   * Jetty 12's ServletContextHandler installs a symlink alias checker, so the
-   * alias-check list is non-empty.
+   * By default the "/logs" context serves symlinked entries, matching Jetty 9.4.
+   * Drive it over the wire on a running server with a symlink that escapes the
+   * log directory (the case the opt-out below rejects): it is served with a 200,
+   * rather than only asserting Jetty's alias-check list is non-empty. A symlink
+   * whose target stays inside the log directory is served in both modes -- the
+   * DefaultServlet re-installs an in-base AllowedResourceAliasChecker at startup
+   * -- so only an escaping symlink distinguishes the opt-out.
    */
   @Test
-  public void testLogsContextServesAliasesByDefault(@TempDir Path logDir)
+  public void testLogsContextServesSymlinkByDefault(@TempDir Path tmp)
       throws Exception {
-    ServletContextHandler logs = buildLogsContext(logDir, new OzoneConfiguration());
-    assertNotNull(logs, "expected a /logs context");
-    assertFalse(logs.getAliasChecks().isEmpty(),
-        "symlinked log entries should be served by default");
+    Path logDir = Files.createDirectory(tmp.resolve("logs"));
+    Files.write(logDir.resolve("real.log"), "log line".getBytes(StandardCharsets.UTF_8));
+    Path outside = Files.createDirectory(tmp.resolve("outside"));
+    Path target = Files.write(outside.resolve("secret.log"),
+        "outside".getBytes(StandardCharsets.UTF_8));
+    Files.createSymbolicLink(logDir.resolve("link.log"), target);
+    HttpServer2 server = startLogsServer(logDir, new OzoneConfiguration());
+    try {
+      String base = "http://localhost:"
+          + server.getConnectorAddress(0).getPort() + "/logs/";
+      assertEquals(HttpURLConnection.HTTP_OK, statusOf(base + "real.log"),
+          "a regular log file must be served");
+      assertEquals(HttpURLConnection.HTTP_OK, statusOf(base + "link.log"),
+          "symlinked log entries should be served by default");
+    } finally {
+      server.stop();
+    }
   }
 
   /**
    * With hadoop.jetty.logs.serve.aliases=false the opt-out must actually take
-   * effect: the alias checks are cleared so aliased (e.g. symlinked) entries
-   * under the log directory are denied rather than served.
+   * effect: on a running server a symlink that escapes the log directory is
+   * denied with a 404 while the regular file beside it is still served, rather
+   * than only asserting Jetty's alias-check list is empty.
    */
   @Test
-  public void testLogsContextOptOutClearsAliasChecks(@TempDir Path logDir)
+  public void testLogsContextOptOutDeniesSymlink(@TempDir Path tmp)
       throws Exception {
+    Path logDir = Files.createDirectory(tmp.resolve("logs"));
+    Files.write(logDir.resolve("real.log"), "log line".getBytes(StandardCharsets.UTF_8));
+    Path outside = Files.createDirectory(tmp.resolve("outside"));
+    Path target = Files.write(outside.resolve("secret.log"),
+        "outside".getBytes(StandardCharsets.UTF_8));
+    Files.createSymbolicLink(logDir.resolve("link.log"), target);
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean("hadoop.jetty.logs.serve.aliases", false);
-    ServletContextHandler logs = buildLogsContext(logDir, conf);
-    assertNotNull(logs, "expected a /logs context");
-    assertTrue(logs.getAliasChecks().isEmpty(),
-        "opt-out must deny aliased (symlinked) log entries");
+    HttpServer2 server = startLogsServer(logDir, conf);
+    try {
+      String base = "http://localhost:"
+          + server.getConnectorAddress(0).getPort() + "/logs/";
+      assertEquals(HttpURLConnection.HTTP_OK, statusOf(base + "real.log"),
+          "a regular log file must still be served with the opt-out");
+      assertEquals(HttpURLConnection.HTTP_NOT_FOUND, statusOf(base + "link.log"),
+          "opt-out must deny symlinked log entries that escape the log dir");
+    } finally {
+      server.stop();
+    }
   }
 
   /**
    * When hadoop.log.dir points at a directory that does not yet exist, the
-   * server creates it and serves "/logs" from it (preserving auto-create).
+   * server creates it and serves "/logs" from it. This is new behavior added
+   * because Jetty 12 refuses to start a context whose base resource is missing;
+   * Jetty 9.4 silently tolerated it.
    */
   @Test
   public void testLogsDirectoryAutoCreatedWhenAbsent(@TempDir Path parent)
@@ -357,6 +400,71 @@ public class TestHttpServer2 {
     }
   }
 
+  /**
+   * Exercises the {@code /logLevel} servlet end to end on an embedded server.
+   * The servlet was reimplemented with inlined ServletUtil helpers during the
+   * jakarta port, so a broken registration, content type or parameter trimming
+   * would otherwise go unnoticed. A GET with a logger and level returns 200
+   * text/html, reports the new effective level and actually reconfigures the
+   * log4j logger; a blank (whitespace-only) log parameter is trimmed to nothing
+   * by the inlined getParameter helper, so the form is returned without changing
+   * any logger.
+   */
+  @Test
+  public void testLogLevelServletGetsAndSetsLevel() throws Exception {
+    String probe = "org.apache.hadoop.hdds.server.http.LogLevelServletProbe";
+    Logger probeLogger = Logger.getLogger(probe);
+    Level original = probeLogger.getLevel();
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .build();
+    server.start();
+    try {
+      String base = "http://localhost:" + server.getConnectorAddress(0).getPort()
+          + "/logLevel";
+
+      // Set the level through the servlet: 200 text/html, the effective level is
+      // reported back and the log4j logger is actually reconfigured.
+      probeLogger.setLevel(Level.INFO);
+      HttpURLConnection set = (HttpURLConnection)
+          new URL(base + "?log=" + probe + "&level=DEBUG").openConnection();
+      set.setConnectTimeout(5000);
+      set.setReadTimeout(5000);
+      assertEquals(HttpURLConnection.HTTP_OK, set.getResponseCode());
+      assertTrue(set.getContentType().startsWith("text/html"),
+          "log level page must be served as HTML");
+      String body = readBody(set);
+      assertTrue(body.contains("Setting Level to DEBUG"),
+          "servlet must report the level change");
+      assertTrue(body.contains("Effective Level: <b>DEBUG</b>"),
+          "servlet must report the new effective level");
+      assertEquals(Level.DEBUG, probeLogger.getEffectiveLevel(),
+          "the log4j logger must actually be reconfigured");
+
+      // A blank (whitespace-only) log parameter is trimmed to null by the inlined
+      // getParameter helper: the form is returned and no logger is changed.
+      probeLogger.setLevel(Level.INFO);
+      HttpURLConnection blank = (HttpURLConnection)
+          new URL(base + "?log=%20").openConnection();
+      blank.setConnectTimeout(5000);
+      blank.setReadTimeout(5000);
+      assertEquals(HttpURLConnection.HTTP_OK, blank.getResponseCode());
+      assertTrue(blank.getContentType().startsWith("text/html"));
+      String form = readBody(blank);
+      assertTrue(form.contains("Get Log Level"),
+          "blank request must return the get/set form");
+      assertFalse(form.contains("Results"),
+          "blank request must not run the get/set path");
+      assertEquals(Level.INFO, probeLogger.getEffectiveLevel(),
+          "a blank log parameter must not change any logger");
+    } finally {
+      probeLogger.setLevel(original);
+      server.stop();
+    }
+  }
+
   private static int statusOf(String url) throws IOException {
     HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
     conn.setConnectTimeout(5000);
@@ -420,6 +528,33 @@ public class TestHttpServer2 {
         .addEndpoint(URI.create("http://example.com/"))
         .allowAmbiguousUri(allowAmbiguousUri)
         .build();
+  }
+
+  /**
+   * Builds and starts a server whose "/logs" context is backed by the given log
+   * directory. hadoop.log.dir must be set before build() so addDefaultApps picks
+   * it up; the running context keeps its base resource once started, so the
+   * property is restored immediately afterwards.
+   */
+  private static HttpServer2 startLogsServer(
+      Path logDir, OzoneConfiguration conf) throws Exception {
+    String previous = System.getProperty("hadoop.log.dir");
+    System.setProperty("hadoop.log.dir", logDir.toString());
+    try {
+      HttpServer2 server = new HttpServer2.Builder()
+          .setConf(conf)
+          .setName("test")
+          .addEndpoint(URI.create("http://localhost:0"))
+          .build();
+      server.start();
+      return server;
+    } finally {
+      if (previous == null) {
+        System.clearProperty("hadoop.log.dir");
+      } else {
+        System.setProperty("hadoop.log.dir", previous);
+      }
+    }
   }
 
   private static ServletContextHandler buildLogsContext(

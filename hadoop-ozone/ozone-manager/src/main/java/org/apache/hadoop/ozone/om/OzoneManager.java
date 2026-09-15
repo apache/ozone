@@ -212,6 +212,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
+import org.apache.hadoop.hdds.server.http.HttpServerConfigurationException;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.FaultInjector;
@@ -2050,6 +2051,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
       httpServer.start();
+    } catch (HttpServerConfigurationException ex) {
+      // A filter/HTTP misconfiguration will never succeed on retry; fail fast
+      // instead of silently starting OM without a web server.
+      throw ex;
     } catch (Exception ex) {
       // Allow OM to start as Http Server failure is not fatal.
       LOG.error("OM HttpServer failed to start.", ex);
@@ -2136,6 +2141,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
       httpServer.start();
+    } catch (HttpServerConfigurationException ex) {
+      // A filter/HTTP misconfiguration will never succeed on retry; fail fast
+      // instead of silently starting OM without a web server.
+      throw ex;
     } catch (Exception ex) {
       // Allow OM to start as Http Server failure is not fatal.
       LOG.error("OM HttpServer failed to start.", ex);

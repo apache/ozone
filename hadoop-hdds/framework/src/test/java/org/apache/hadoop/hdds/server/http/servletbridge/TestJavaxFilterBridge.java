@@ -20,12 +20,13 @@ package org.apache.hadoop.hdds.server.http.servletbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.security.Principal;
@@ -114,14 +115,13 @@ class TestJavaxFilterBridge {
   }
 
   @Test
-  void responseWrappedByDelegateIsNotPropagatedButChainStillRuns() throws Exception {
+  void responseWrappedByDelegateFailsRequest() {
     HttpServletRequest jakartaRequest = mock(HttpServletRequest.class);
     HttpServletResponse jakartaResponse = mock(HttpServletResponse.class);
 
     // A javax filter that wraps the response before forwarding the chain. The
-    // bridge cannot carry that wrapper into the jakarta chain, but it must not
-    // break the request: the original jakarta response is still what flows
-    // downstream.
+    // bridge cannot carry that wrapper into the jakarta chain, so rather than
+    // silently drop it the bridge must fail the request.
     javax.servlet.Filter delegate = new AbstractJavaxFilter() {
       @Override
       public void doFilter(javax.servlet.ServletRequest req, javax.servlet.ServletResponse resp,
@@ -138,10 +138,12 @@ class TestJavaxFilterBridge {
     jakarta.servlet.FilterChain jakartaChain =
         (req, resp) -> downstream.set((HttpServletResponse) resp);
 
-    new JavaxFilterBridge(delegate).doFilter(jakartaRequest, jakartaResponse, jakartaChain);
-
-    assertSame(jakartaResponse, downstream.get(),
-        "downstream chain must receive the original jakarta response, not the delegate's wrapper");
+    ServletException ex = assertThrows(ServletException.class, () ->
+        new JavaxFilterBridge(delegate).doFilter(jakartaRequest, jakartaResponse, jakartaChain));
+    assertTrue(ex.getMessage().contains("wrapped or replaced the response"),
+        "exception must explain the dropped response wrapper");
+    assertNull(downstream.get(),
+        "downstream chain must not run when the delegate forwards a wrapped response");
   }
 
   @Test

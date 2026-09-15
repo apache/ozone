@@ -38,10 +38,14 @@ import org.junit.jupiter.api.Test;
  * Tests the JSON/query contract of the forked {@link JMXJsonServlet}.
  *
  * <p>Ported from hadoop-common's {@code TestJMXJsonServlet} so the qry/get
- * parameter handling and the 400/404 paths of the forked servlet are covered by
- * the unit gate; previously only acceptance robots parsed the /jmx body. The
- * JSONP {@code callback} parameter of the original servlet is not present in the
- * fork, so it is not exercised here.</p>
+ * parameter handling and the servlet's error handling are covered by the unit
+ * gate; previously only acceptance robots parsed the /jmx body. The servlet
+ * streams and flushes the JSON body before it calls setStatus, so a bad or
+ * unknown get request is already committed at HTTP 200: its error surfaces as
+ * {@code "result":"ERROR"} in the body rather than as a 400/404 wire status,
+ * and that is what these tests assert. The JSONP {@code callback} parameter of
+ * the original servlet is not present in the fork, so it is not exercised
+ * here.</p>
  */
 public class TestJMXJsonServlet {
 

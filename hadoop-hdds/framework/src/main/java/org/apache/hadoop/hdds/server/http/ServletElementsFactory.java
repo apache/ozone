@@ -21,6 +21,8 @@ import java.util.Map;
 import org.apache.hadoop.hdds.server.http.servletbridge.JavaxFilterBridge;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
+import org.apache.hadoop.security.http.CrossOriginFilter;
+import org.apache.hadoop.security.http.RestCsrfPreventionFilter;
 import org.eclipse.jetty.ee10.servlet.FilterHolder;
 import org.eclipse.jetty.ee10.servlet.FilterMapping;
 
@@ -48,22 +50,25 @@ public final class ServletElementsFactory {
     holder.setName(filterName);
     Class<?> filterClass = loadFilterClass(classname);
     if (javax.servlet.Filter.class.isAssignableFrom(filterClass)) {
-      // hadoop-auth based filters still implement javax.servlet.Filter; run
-      // them through the bridge so they work inside Jetty EE10 (jakarta). The
-      // bridge only carries the authenticated principal downstream (see
-      // JavaxFilterBridge); a javax filter that wraps the response or overrides
-      // non-principal request methods is not fully supported. Rather than run an
-      // arbitrary (e.g. operator-configured via ozone.http.filter.initializers)
-      // javax filter and silently drop its wrapping, reject anything outside the
-      // known hadoop-auth family with an actionable message.
+      // Some hadoop filters still implement javax.servlet.Filter; run them
+      // through the bridge so they work inside Jetty EE10 (jakarta). The bridge
+      // faithfully forwards everything a filter does to the same request and
+      // response objects (setting/adding headers, status, sendError) and lets a
+      // filter short-circuit the chain, but it does not carry a request or
+      // response the filter wraps and passes downstream (see JavaxFilterBridge).
+      // Rather than run an arbitrary (e.g. operator-configured via
+      // ozone.http.filter.initializers) javax filter and silently drop its
+      // wrapping, reject anything outside the known bridgeable set with an
+      // actionable message.
       if (!isBridgeableJavaxFilter(filterClass)) {
-        throw new IllegalArgumentException("Filter " + classname
+        throw new HttpServerConfigurationException("Filter " + classname
             + " implements javax.servlet.Filter, which Ozone only bridges into "
             + "Jetty EE10 (jakarta) for the hadoop-auth AuthenticationFilter "
-            + "family and StaticUserWebFilter. The bridge propagates only the "
-            + "authenticated principal; any request or response wrapping the "
-            + "filter adds would be silently dropped. Provide a "
-            + "jakarta.servlet.Filter instead.");
+            + "family, StaticUserWebFilter, CrossOriginFilter and "
+            + "RestCsrfPreventionFilter. The bridge does not propagate a request "
+            + "or response that a filter wraps and forwards downstream (for "
+            + "example XFrameOptionsFilter), so such a wrapper would be silently "
+            + "dropped. Provide a jakarta.servlet.Filter instead.");
       }
       holder.setFilter(new JavaxFilterBridge(newJavaxFilter(filterClass)));
     } else {
@@ -76,16 +81,23 @@ public final class ServletElementsFactory {
   }
 
   /**
-   * A javax filter is only bridged into the jakarta chain when it establishes
-   * an authenticated principal and nothing more, which is exactly what the
-   * hadoop-auth {@link AuthenticationFilter} family (SPNEGO, Kerberos,
-   * delegation token) and {@link StaticUserWebFilter} do. Any other javax
-   * filter would need request/response wrapping the bridge does not carry.
+   * A javax filter is bridged into the jakarta chain only when it acts on the
+   * same request and response objects it is given - establishing an
+   * authenticated principal, setting response headers, or short-circuiting the
+   * chain - which is what the hadoop-auth {@link AuthenticationFilter} family
+   * (SPNEGO, Kerberos, delegation token), {@link StaticUserWebFilter},
+   * {@link CrossOriginFilter} (CORS response headers) and
+   * {@link RestCsrfPreventionFilter} (rejects or forwards unchanged) all do.
+   * Filters that wrap the request or response and forward the wrapper downstream
+   * (for example {@code XFrameOptionsFilter}) are not bridgeable, because the
+   * bridge does not carry that wrapper into the jakarta chain.
    */
   private static boolean isBridgeableJavaxFilter(Class<?> filterClass) {
     return AuthenticationFilter.class.isAssignableFrom(filterClass)
         || StaticUserWebFilter.StaticUserFilter.class
-            .isAssignableFrom(filterClass);
+            .isAssignableFrom(filterClass)
+        || CrossOriginFilter.class.isAssignableFrom(filterClass)
+        || RestCsrfPreventionFilter.class.isAssignableFrom(filterClass);
   }
 
   private static Class<?> loadFilterClass(String classname) {
@@ -93,7 +105,7 @@ public final class ServletElementsFactory {
       return Class.forName(classname, false,
           Thread.currentThread().getContextClassLoader());
     } catch (ClassNotFoundException e) {
-      throw new IllegalArgumentException("Filter class not found: " + classname, e);
+      throw new HttpServerConfigurationException("Filter class not found: " + classname, e);
     }
   }
 
@@ -101,7 +113,7 @@ public final class ServletElementsFactory {
     try {
       return (javax.servlet.Filter) filterClass.getDeclaredConstructor().newInstance();
     } catch (ReflectiveOperationException e) {
-      throw new IllegalArgumentException(
+      throw new HttpServerConfigurationException(
           "Unable to instantiate filter: " + filterClass.getName(), e);
     }
   }
