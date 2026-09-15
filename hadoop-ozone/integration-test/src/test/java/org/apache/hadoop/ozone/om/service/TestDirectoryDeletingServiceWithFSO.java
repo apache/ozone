@@ -626,7 +626,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
         anyLong(), anyList(), anyList(), eq(null), anyLong(), any(),
         any(ReclaimableDirFilter.class), any(ReclaimableKeyFilter.class), anyMap(), any(),
-        anyLong(), any(AtomicInteger.class));
+        anyLong(), any(AtomicInteger.class), any());
 
     Mockito.doAnswer(i -> {
       store.createSnapshot(testVolumeName, testBucketName, snap2);
