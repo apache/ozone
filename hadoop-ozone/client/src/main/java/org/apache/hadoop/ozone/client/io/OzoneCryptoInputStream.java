@@ -18,10 +18,14 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.base.Preconditions;
+import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoStreamUtils;
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.scm.storage.PartInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +39,8 @@ public class OzoneCryptoInputStream extends CryptoInputStream
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneCryptoInputStream.class);
+
+  private static final int EOF = -1;
 
   private final long length;
   private final int bufferSize;
@@ -73,8 +79,18 @@ public class OzoneCryptoInputStream extends CryptoInputStream
     return bufferSize;
   }
 
+  /**
+   * {@link CryptoInputStream} does not synchronize its own methods, so every method moving the cursor of
+   * this stream is serialized here on the monitor of this stream. Otherwise a read or a seek could land in
+   * the middle of a positioned read and see (or undo) the cursor move that read does.
+   * This covers both the sequential-read API ({@link #read(byte[], int, int)}, {@link #read(ByteBuffer)},
+   * {@link #seek(long)}, {@link #getPos()}, {@link #skip(long)}) and all positioned-read overloads
+   * ({@link #read(long, ByteBuffer)}, {@link #readFully(long, ByteBuffer)},
+   * {@link #read(long, byte[], int, int)}, {@link #readFully(long, byte[], int, int)},
+   * {@link #readFully(long, byte[])}).
+   */
   @Override
-  public int read(byte[] b, int off, int len) throws IOException {
+  public synchronized int read(byte[] b, int off, int len) throws IOException {
     // CryptoInputStream reads hadoop.security.crypto.buffer.size number of
     // bytes (default 8KB) at a time. This needs to be taken into account
     // in calculating the numBytesToRead.
@@ -134,6 +150,133 @@ public class OzoneCryptoInputStream extends CryptoInputStream
       }
     }
     return numBytesRead;
+  }
+
+  @Override
+  public synchronized int read(ByteBuffer buf) throws IOException {
+    return super.read(buf);
+  }
+
+  @Override
+  public synchronized void seek(long pos) throws IOException {
+    super.seek(pos);
+  }
+
+  @Override
+  public synchronized long getPos() throws IOException {
+    return super.getPos();
+  }
+
+  @Override
+  public synchronized long skip(long n) throws IOException {
+    return super.skip(n);
+  }
+
+  @Override
+  public synchronized boolean seekToNewSource(long targetPos) throws IOException {
+    return super.seekToNewSource(targetPos);
+  }
+
+  /**
+   * Positioned read. Decryption can only happen at Crypto buffer boundaries, so this stream cannot read
+   * at an arbitrary position without moving its cursor. The read is serialized against the other reads:
+   * the cursor is moved to {@code position}, data is read via {@link #read(byte[], int, int)} (which
+   * handles the Crypto boundary adjustment), and the cursor is restored before the lock is released.
+   *
+   * <p>Returns -1 for {@code position >= length}. A read-only {@code dst} is rejected before any state
+   * is mutated. If any exception escapes the read loop the crypto-boundary adjustment fields are reset so
+   * the next sequential read does not fail the precondition in {@code getNumBytesToRead}.
+   */
+  @Override
+  public synchronized int read(long position, ByteBuffer dst) throws IOException {
+    if (!dst.hasRemaining()) {
+      return 0;
+    }
+    if (dst.isReadOnly()) {
+      throw new ReadOnlyBufferException();
+    }
+    if (position < 0 || position >= getLength()) {
+      return EOF;
+    }
+
+    final long oldPos = getPos();
+    final int readLength = (int) Math.min(dst.remaining(), getLength() - position);
+    final byte[] buffer = new byte[Math.min(readLength, getBufferSize())];
+    Throwable failure = null;
+    try {
+      seek(position);
+      int totalReadLen = 0;
+      while (totalReadLen < readLength) {
+        final int numBytesRead = read(buffer, 0,
+            Math.min(buffer.length, readLength - totalReadLen));
+        if (numBytesRead <= 0) {
+          break;
+        }
+        dst.put(buffer, 0, numBytesRead);
+        totalReadLen += numBytesRead;
+      }
+      return totalReadLen == 0 ? EOF : totalReadLen;
+    } catch (Throwable t) {
+      failure = t;
+      // Defensively reset crypto-boundary adjustment fields so that the next
+      // sequential read does not fail the precondition check in getNumBytesToRead.
+      readPositionAdjustedBy = 0;
+      readLengthAdjustedBy = 0;
+      throw t;
+    } finally {
+      try {
+        seek(oldPos);
+      } catch (IOException e) {
+        if (failure == null) {
+          throw e;
+        }
+        failure.addSuppressed(e);
+      }
+    }
+  }
+
+  @Override
+  public synchronized void readFully(long position, ByteBuffer dst) throws IOException {
+    int bytesRead;
+    for (int readCount = 0; dst.hasRemaining(); readCount += bytesRead) {
+      bytesRead = read(position + readCount, dst);
+      if (bytesRead < 0) {
+        throw new EOFException(FSExceptionMessages.EOF_IN_READ_FULLY);
+      }
+    }
+  }
+
+  /**
+   * Byte-array positioned read. Routes through {@link #read(long, ByteBuffer)} so that the
+   * seek-read-restore sequence is covered by the same monitor as all other cursor-moving operations.
+   * Guards against null buffer (IAE) and negative position (EOFException) before touching ByteBuffer,
+   * aligning with the {@link org.apache.hadoop.fs.PositionedReadable} contract.
+   */
+  @Override
+  public synchronized int read(long position, byte[] buffer, int offset, int len) throws IOException {
+    if (buffer == null) {
+      throw new IllegalArgumentException("Null buffer");
+    }
+    if (position < 0) {
+      throw new EOFException("position is negative: " + position);
+    }
+    return read(position, ByteBuffer.wrap(buffer, offset, len));
+  }
+
+  @Override
+  public synchronized void readFully(long position, byte[] buffer, int offset, int len) throws IOException {
+    if (buffer == null) {
+      throw new IllegalArgumentException("Null buffer");
+    }
+    if (position < 0) {
+      throw new EOFException("position is negative: " + position);
+    }
+    readFully(position, ByteBuffer.wrap(buffer, offset, len));
+  }
+
+  @Override
+  public synchronized void readFully(long position, byte[] buffer) throws IOException {
+    readFully(position, buffer, 0, buffer.length);
   }
 
   /**
