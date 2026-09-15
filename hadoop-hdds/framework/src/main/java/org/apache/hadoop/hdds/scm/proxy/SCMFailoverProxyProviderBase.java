@@ -111,7 +111,6 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
 
   /**
    * Construct SCMFailoverProxyProviderBase.
-   * Construct SCMContainerLocationFailoverProxyProvider.
    * <p>
    * If userGroupInformation is not null, use the passed ugi, else obtain
    * from {@link UserGroupInformation#getCurrentUser()}
