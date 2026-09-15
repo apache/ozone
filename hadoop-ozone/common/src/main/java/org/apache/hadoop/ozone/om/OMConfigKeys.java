@@ -55,6 +55,34 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT
       = -1;
 
+  public static final String OZONE_OM_SCM_LOCATION_CLIENT_RPC_TIMEOUT =
+      "ozone.om.scmclient.location.rpc.timeout";
+  public static final String OZONE_OM_SCM_LOCATION_CLIENT_RPC_TIMEOUT_DEFAULT =
+      "30s";
+  public static final String OZONE_OM_SCM_LOCATION_CLIENT_IPC_CONNECT_TIMEOUT =
+      "ozone.om.scmclient.location.ipc.connect.timeout";
+  public static final String
+      OZONE_OM_SCM_LOCATION_CLIENT_IPC_CONNECT_TIMEOUT_DEFAULT =
+      "5s";
+  public static final String
+      OZONE_OM_SCM_LOCATION_CLIENT_IPC_CONNECT_TIMEOUT_RETRIES =
+      "ozone.om.scmclient.location.ipc.connect.max.retries.on.timeouts";
+  public static final String
+      OZONE_OM_SCM_LOCATION_CLIENT_IPC_CONNECT_TIMEOUT_RETRIES_DEFAULT = "0";
+  public static final String OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_MAX_RETRY =
+      "ozone.om.scmclient.location.failover.max.retry";
+  public static final String
+      OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = "3";
+  public static final String OZONE_OM_SCM_LOCATION_CLIENT_MAX_RETRY_TIMEOUT =
+      "ozone.om.scmclient.location.max.retry.timeout";
+  public static final String
+      OZONE_OM_SCM_LOCATION_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT = "6s";
+  public static final String
+      OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL =
+      "ozone.om.scmclient.location.failover.retry.interval";
+  public static final String
+      OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL_DEFAULT = "2s";
+
   public static final String OZONE_OM_INTERNAL_SERVICE_ID =
       "ozone.om.internal.service.id";
 

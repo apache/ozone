@@ -73,6 +73,18 @@ public class TestScmClient {
         containerLocationProtocol, conf);
   }
 
+  @Test
+  void usesDedicatedBlockClientForKeyDeletion() {
+    ScmBlockLocationProtocol foregroundClient = mock(ScmBlockLocationProtocol.class);
+    ScmBlockLocationProtocol keyDeletionClient = mock(ScmBlockLocationProtocol.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ScmClient client = new ScmClient(foregroundClient,
+        containerLocationProtocol, conf, keyDeletionClient);
+
+    assertSame(foregroundClient, client.getBlockClient());
+    assertSame(keyDeletionClient, client.getBlockClientForKeyDeletion());
+  }
+
   private static Stream<Arguments> getContainerLocationsTestCases() {
     return Stream.of(
         Arguments.of("Existing keys",

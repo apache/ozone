@@ -165,6 +165,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.management.ObjectName;
+import javax.net.SocketFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
@@ -660,12 +661,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Honor property 'hadoop.security.token.service.use_ip'
     omRpcAddressTxt = new Text(SecurityUtil.buildTokenService(omNodeRpcAddr));
 
-    final StorageContainerLocationProtocol scmContainerClient = getScmContainerClient(configuration);
+    OzoneConfiguration scmLocationClientConfiguration =
+        OMScmLocationClientConfig.createScmClientConfiguration(configuration);
+    SocketFactory scmLocationSocketFactory =
+        OMScmLocationClientConfig.createSocketFactory(configuration);
+    StorageContainerLocationProtocol scmContainerClient =
+        getScmContainerClient(scmLocationClientConfiguration,
+            scmLocationSocketFactory);
     // verifies that the SCM info in the OM Version file is correct.
-    final ScmBlockLocationProtocol scmBlockClient = getScmBlockClient(configuration);
+    ScmBlockLocationProtocol scmBlockClient =
+        getScmBlockClient(scmLocationClientConfiguration,
+            scmLocationSocketFactory);
+    ScmBlockLocationProtocol keyDeletionScmBlockClient =
+        getScmBlockClient(configuration, null);
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
-        configuration);
+        configuration, keyDeletionScmBlockClient);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 
@@ -1512,13 +1523,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Create a scm block client, used by putKey() and getKey().
+   * Creates a scm block client.
    *
    * @return {@link ScmBlockLocationProtocol}
    */
   private static ScmBlockLocationProtocol getScmBlockClient(
-      OzoneConfiguration conf) {
-    return HAUtils.getScmBlockClient(conf);
+      OzoneConfiguration conf, SocketFactory socketFactory) {
+    return HAUtils.getScmBlockClient(conf, socketFactory);
   }
 
   /**
@@ -1527,8 +1538,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return {@link StorageContainerLocationProtocol}
    */
   private static StorageContainerLocationProtocol getScmContainerClient(
-      OzoneConfiguration conf) {
-    return HAUtils.getScmContainerClient(conf);
+      OzoneConfiguration conf, SocketFactory socketFactory) {
+    return HAUtils.getScmContainerClient(conf, null, socketFactory);
   }
 
   /**
