@@ -78,7 +78,7 @@
     <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
     <enforced.maven.version>[3.6.3,)</enforced.maven.version>
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
-    <errorprone.version>2.50.0</errorprone.version>
+    <errorprone.version>2.42.0</errorprone.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
     <excluded-test-groups>unhealthy | benchmark</excluded-test-groups>
     <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
