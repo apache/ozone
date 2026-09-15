@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketVersioningStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -100,6 +101,23 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // OBS (Object Store) buckets must follow strict S3 bucket naming rules.
     // FSO and LEGACY buckets are not strictly bound to S3 naming semantics.
     OmUtils.validateBucketName(bucketInfo.getBucketName(), strict);
+
+    // S3 has no way to create a bucket that is already in a versioning
+    // state; the state is set afterwards, through the transition checks in
+    // OMBucketSetPropertyRequest. versioningStatus is on BucketInfo because
+    // that message is also the bucket's on-disk record and the shape
+    // InfoBucket and ListBuckets return, not because a create needs it.
+    if (bucketInfo.hasVersioningStatus()) {
+      throw new OMException("Bucket versioning cannot be set while the bucket"
+          + " is being created; create the bucket first and then set its"
+          + " versioning status.", ResultCodes.INVALID_REQUEST);
+    }
+
+    if (bucketInfo.getVersioningStatus()
+        == BucketVersioningStatusProto.VERSIONING_ENABLED) {
+      OMBucketSetPropertyRequest.rejectIfLifecycleServiceIsDisabled(
+          ozoneManager);
+    }
 
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
