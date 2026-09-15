@@ -1506,6 +1506,8 @@ message DeleteKeyArgs {
     optional uint64 proposedVersionId = 5;
     // Entries of an S3 DeleteObjects that name a version: each permanently
     // deletes that version, as a DeleteKey with a versionId does.
+    // A key may also be in keys: its delete marker is put first, then the
+    // named version is deleted.
     repeated KeyVersion keyVersions = 6;
 }
 
