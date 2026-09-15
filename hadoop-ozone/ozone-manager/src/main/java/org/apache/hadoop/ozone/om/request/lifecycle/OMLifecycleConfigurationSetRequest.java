@@ -75,7 +75,7 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest omRequest = super.preExecute(ozoneManager);
+    final OMRequest omRequest = super.preExecute(ozoneManager);
     SetLifecycleConfigurationRequest request =
         omRequest.getSetLifecycleConfigurationRequest();
     LifecycleConfiguration lifecycleConfiguration =
