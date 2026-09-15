@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
@@ -52,12 +54,15 @@ import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteMarkerResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
@@ -1077,6 +1082,37 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertTrue(currentVersion().isDeleteMarker());
     assertNull(omMetadataManager.getVersionedKeyTable().getSkipCache(
         omMetadataManager.getVersionedOzoneKey(volumeName, bucketName, keyName, 300L)));
+  }
+
+  /**
+   * A plain key that fails on a versioned bucket is reported, rather than taken for deleted, while the other keys
+   * still get their delete markers.
+   */
+  @Test
+  public void testBatchDeleteReportsAPlainKeyThatFailsOnAVersionedBucket() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(300L);
+    String deniedKey = "denied-key";
+
+    OMClientResponse response = new OMKeysDeleteRequest(
+        batchDeleteRequest(Arrays.asList(keyName, deniedKey)), getBucketLayout()) {
+      @Override
+      protected void checkKeyAcls(OzoneManager om, String volume, String bucket, String key,
+          IAccessAuthorizer.ACLType aclType, OzoneObj.ResourceType resourceType, String volumeOwner)
+          throws IOException {
+        if (deniedKey.equals(key)) {
+          throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
+        }
+      }
+    }.validateAndUpdateCache(ozoneManager, 400L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.PARTIAL_DELETE, response.getOMResponse().getStatus());
+    List<DeleteKeyError> errors = response.getOMResponse().getDeleteKeysResponse().getErrorsList();
+    assertEquals(1, errors.size());
+    assertEquals(deniedKey, errors.get(0).getKey());
+    assertEquals(OMException.ResultCodes.ACCESS_DENIED.name(), errors.get(0).getErrorCode());
+    commit(response);
+    assertTrue(currentVersion().isDeleteMarker());
   }
 
   @Test

@@ -381,7 +381,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       if (markerInsertions != null) {
         omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
-            .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllErrors(versionErrors))
+            .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys)
+            .addAllErrors(toDeleteKeyErrors(keyToError, versionErrors)))
             .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus);
         omClientResponse = new OMKeysDeleteMarkerResponse(omResponse.build(),
             markerInsertions, versionDeletes, omBucketInfo.copyObject(), state);
@@ -510,6 +511,17 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     errors.add(error.build());
   }
 
+  /** Every error of the batch: the entries naming a version and the keys. */
+  private static List<DeleteKeyError> toDeleteKeyErrors(Map<String, ErrorInfo> keyToErrors,
+      List<DeleteKeyError> versionErrors) {
+    List<DeleteKeyError> deleteKeyErrors = new ArrayList<>(versionErrors);
+    for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
+      deleteKeyErrors.add(DeleteKeyError.newBuilder().setKey(key.getKey())
+          .setErrorCode(key.getValue().getCode()).setErrorMsg(key.getValue().getMessage()).build());
+    }
+    return deleteKeyErrors;
+  }
+
   @Nonnull
   @SuppressWarnings("parameternumber")
   protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,
@@ -520,11 +532,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmKeyInfo> openKeyInfoMap,
       OmLifecycleScanState scanState) {
     OMClientResponse omClientResponse;
-    List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>(versionErrors);
-    for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
-      deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyError.newBuilder().setKey(key.getKey())
-          .setErrorCode(key.getValue().getCode()).setErrorMsg(key.getValue().getMessage()).build());
-    }
+    List<DeleteKeyError> deleteKeyErrors = toDeleteKeyErrors(keyToErrors, versionErrors);
     omClientResponse = new OMKeysDeleteResponse(omResponse
         .setDeleteKeysResponse(
             DeleteKeysResponse.newBuilder().setStatus(deleteStatus)
