@@ -1533,7 +1533,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Returns am scm container client.
+   * Returns a scm container client.
    *
    * @return {@link StorageContainerLocationProtocol}
    */
