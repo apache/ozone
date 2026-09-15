@@ -269,7 +269,7 @@ public class TestXceiverClientGrpc {
             .setContainerID(1)
             .setLocalID(1)
             .setBlockCommitSequenceId(1)
-            .build()), null, client.getPipeline().getReplicaIndexes());
+            .build()), null, client.getPipeline());
   }
 
   private void invokeXceiverClientReadChunk(XceiverClientSpi client)

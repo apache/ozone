@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -268,24 +269,15 @@ public class BlockInputStream extends BlockExtendedInputStream {
           blockID.getContainerID());
     }
 
-    DatanodeBlockID.Builder blkIDBuilder =
-        DatanodeBlockID.newBuilder().setContainerID(blockID.getContainerID())
-            .setLocalID(blockID.getLocalID())
-            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
-
     int replicaIndex = pipeline.getReplicaIndex(xceiverClientShortCircuit.getDn());
-    if (replicaIndex > 0) {
-      blkIDBuilder.setReplicaIndex(replicaIndex);
-    }
-    DatanodeBlockID datanodeBlockID = blkIDBuilder.build();
-    ContainerProtos.GetBlockRequestProto.Builder readBlockRequest =
-        ContainerProtos.GetBlockRequestProto.newBuilder().setBlockID(datanodeBlockID)
-            .setRequestShortCircuitAccess(true);
+    final GetBlockRequestProto.Builder getBlockRequest = GetBlockRequestProto.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicaIndex))
+        .setRequestShortCircuitAccess(true);
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.GetBlock)
-            .setContainerID(datanodeBlockID.getContainerID())
-            .setGetBlock(readBlockRequest)
+            .setContainerID(blockID.getContainerID())
+            .setGetBlock(getBlockRequest)
             .setClientId(xceiverClientShortCircuit.getClientId())
             .setCallId(xceiverClientShortCircuit.getCallId());
     if (tokenRef.get() != null) {
@@ -294,13 +286,12 @@ public class BlockInputStream extends BlockExtendedInputStream {
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(xceiverClientShortCircuit,
         VALIDATORS, builder, xceiverClientShortCircuit.getDn());
 
-    blockFileInputStream = xceiverClientShortCircuit.getFileInputStream(
-        builder.getCallId(), datanodeBlockID.getLocalID());
+    blockFileInputStream = xceiverClientShortCircuit.getFileInputStream(builder.getCallId(), blockID.getLocalID());
     if (blockFileInputStream == null) {
-      throw new IOException("Failed to get file InputStream for block " + datanodeBlockID);
+      throw new IOException("Failed to get file InputStream for block " + blockID);
     } else {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Get the FileInputStream of block {}", datanodeBlockID);
+        LOG.debug("Get the FileInputStream of block {}", blockID);
       }
     }
     return response.getBlockData();
@@ -316,7 +307,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
 
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
-        xceiverClientGrpc, VALIDATORS, blockID, tokenRef.get(), pipeline.getReplicaIndexes());
+        xceiverClientGrpc, VALIDATORS, blockID, tokenRef.get(), pipeline);
     return response.getBlockData();
   }
 

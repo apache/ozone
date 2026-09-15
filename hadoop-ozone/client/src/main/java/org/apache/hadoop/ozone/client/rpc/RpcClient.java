@@ -129,11 +129,14 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -2507,14 +2510,17 @@ public class RpcClient implements ClientProtocol {
   }
 
   private OmKeyArgs prepareOmKeyArgs(String volumeName, String bucketName,
-      String keyName) {
-    return new OmKeyArgs.Builder()
+      String keyName, String listPrefix) {
+    final OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
-        .setLatestVersionLocation(getLatestVersionLocation)
-        .build();
+        .setLatestVersionLocation(getLatestVersionLocation);
+    if (listPrefix != null && !listPrefix.isEmpty()) {
+      builder.setListPrefix(listPrefix);
+    }
+    return builder.build();
   }
 
   @Override
@@ -2542,7 +2548,8 @@ public class RpcClient implements ClientProtocol {
   public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
       String keyName, boolean recursive, String startKey, long numEntries)
       throws IOException {
-    OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
+    final OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName,
+        null);
     return ozoneManagerClient
         .listStatus(keyArgs, recursive, startKey, numEntries);
   }
@@ -2551,23 +2558,25 @@ public class RpcClient implements ClientProtocol {
   public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
       String keyName, boolean recursive, String startKey,
       long numEntries, boolean allowPartialPrefixes) throws IOException {
-    OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
+    final OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName, null);
     return ozoneManagerClient
         .listStatus(keyArgs, recursive, startKey, numEntries,
             allowPartialPrefixes);
   }
 
   @Override
-  public List<OzoneFileStatusLight> listStatusLight(String volumeName,
-      String bucketName, String keyName, boolean recursive, String startKey,
-      long numEntries, boolean allowPartialPrefixes) throws IOException {
-    OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
+  public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
+      throws IOException {
+    final OmKeyArgs keyArgs = prepareOmKeyArgs(
+        options.getVolumeName(), options.getBucketName(), options.getKeyName(), options.getListPrefix());
     if (omVersion.compareTo(OzoneManagerVersion.LIGHTWEIGHT_LIST_STATUS) >= 0) {
-      return ozoneManagerClient.listStatusLight(keyArgs, recursive, startKey,
-          numEntries, allowPartialPrefixes);
+      return ozoneManagerClient.listStatusLight(
+          keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),
+          options.isAllowPartialPrefixes());
     } else {
-      return ozoneManagerClient.listStatus(keyArgs, recursive, startKey,
-              numEntries, allowPartialPrefixes)
+      return ozoneManagerClient.listStatus(
+          keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),
+              options.isAllowPartialPrefixes())
           .stream()
           .map(OzoneFileStatusLight::fromOzoneFileStatus)
           .collect(Collectors.toList());
@@ -3026,6 +3035,22 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .build();
     ozoneManagerClient.deleteObjectTagging(keyArgs);
+  }
+
+  @Override
+  public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy, String requestId) throws IOException {
+    return ozoneManagerClient.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy, requestId);
+  }
+
+  @Override
+  public CallerIdentityInfo getCallerIdentity() throws IOException {
+    return ozoneManagerClient.getCallerIdentity();
+  }
+
+  @Override
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException {
+    ozoneManagerClient.revokeSTSToken(originalAccessKeyId);
   }
 
   @Override

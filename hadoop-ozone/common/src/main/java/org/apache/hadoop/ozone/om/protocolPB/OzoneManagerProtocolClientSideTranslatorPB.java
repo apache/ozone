@@ -58,7 +58,9 @@ import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -264,6 +266,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.Time;
 
 /**
  * The client side implementation of OzoneManagerProtocol.
@@ -331,15 +334,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest.Builder  builder = OMRequest.newBuilder(omRequest);
     // Insert S3 Authentication information for each request.
     if (getThreadLocalS3Auth() != null) {
-      builder.setS3Authentication(
+      final S3Authentication.Builder s3AuthBuilder =
           S3Authentication.newBuilder()
               .setSignature(
                   threadLocalS3Auth.get().getSignature())
               .setStringToSign(
                   threadLocalS3Auth.get().getStringTosSign())
               .setAccessId(
-                  threadLocalS3Auth.get().getAccessID())
-              .build());
+                  threadLocalS3Auth.get().getAccessID());
+
+      // Include STS session token if present so OM can validate it
+      if (threadLocalS3Auth.get().getSessionToken() != null) {
+        s3AuthBuilder.setSessionToken(threadLocalS3Auth.get().getSessionToken());
+      }
+      if (threadLocalS3Auth.get().getS3Action() != null) {
+        s3AuthBuilder.setS3Action(threadLocalS3Auth.get().getS3Action());
+      }
+
+      builder.setS3Authentication(s3AuthBuilder.build());
     }
     if (s3AuthCheck && getThreadLocalS3Auth() == null) {
       throw new IllegalArgumentException("S3 Auth expected to " +
@@ -831,9 +843,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void commitKey(OmKeyArgs args, long clientId)
+  public long commitKey(OmKeyArgs args, long clientId)
           throws IOException {
-    updateKey(args, clientId, false, false);
+    return updateKeyAndGetModificationTime(args, clientId, false, false);
   }
 
   @Override
@@ -856,6 +868,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   private void updateKey(OmKeyArgs args, long clientId, boolean hsync, boolean recovery)
+      throws IOException {
+    // Preserve legacy behavior (ignore response payload).
+    updateKeyAndGetModificationTime(args, clientId, hsync, recovery);
+  }
+
+  private long updateKeyAndGetModificationTime(OmKeyArgs args, long clientId, boolean hsync, boolean recovery)
       throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
     List<OmKeyLocationInfo> locationInfoList = args.getLocationInfoList();
@@ -882,7 +900,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCommitKeyRequest(req)
         .build();
 
-    handleError(submitRequest(omRequest));
+    final OMResponse resp = handleError(submitRequest(omRequest));
+    if (resp.hasCommitKeyResponse() && resp.getCommitKeyResponse().hasModificationTime()) {
+      return resp.getCommitKeyResponse().getModificationTime();
+    }
+    return Time.now();
   }
 
   @Override
@@ -1809,10 +1831,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest))
         .getCommitMultiPartUploadResponse();
 
-    OmMultipartCommitUploadPartInfo info = new
-        OmMultipartCommitUploadPartInfo(response.getPartName(),
-          response.getETag());
-    return info;
+    final long modificationTime = response.hasModificationTime() ? response.getModificationTime() : Time.now();
+    return new OmMultipartCommitUploadPartInfo(response.getPartName(), response.getETag(), modificationTime);
   }
 
   @Override
@@ -2487,8 +2507,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
 
-    ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(keyArgs, recursive, startKey,
-        numEntries, allowPartialPrefixes);
+    final ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(
+        keyArgs, recursive, startKey, numEntries, allowPartialPrefixes);
 
     OMRequest omRequest = createOMRequest(Type.ListStatus)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2516,8 +2536,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setLatestVersionLocation(true)
         .build();
 
-    ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(keyArgs, recursive, startKey,
-        numEntries, allowPartialPrefixes);
+    final ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(
+        keyArgs, recursive, startKey, numEntries, allowPartialPrefixes);
+    final String listPrefix = args.getListPrefix();
+    if (listPrefix != null && !listPrefix.isEmpty()) {
+      listStatusRequestBuilder.setListPrefix(listPrefix);
+    }
 
     OMRequest omRequest = createOMRequest(Type.ListStatusLight)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2933,6 +2957,48 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.DeleteBucketTagging)
         .setDeleteBucketTaggingRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy, String requestId) throws IOException {
+    final OzoneManagerProtocolProtos.AssumeRoleRequest.Builder request =
+        OzoneManagerProtocolProtos.AssumeRoleRequest.newBuilder()
+            .setRoleArn(roleArn)
+            .setRoleSessionName(roleSessionName)
+            .setDurationSeconds(durationSeconds)
+            .setAwsIamSessionPolicy(awsIamSessionPolicy != null ? awsIamSessionPolicy : "")
+            .setRequestId(requestId);
+
+    final OMRequest omRequest = createOMRequest(Type.AssumeRole)
+        .setAssumeRoleRequest(request)
+        .build();
+
+    return AssumeRoleResponseInfo.fromProtobuf(
+        handleError(submitRequest(omRequest)).getAssumeRoleResponse());
+  }
+
+  @Override
+  public CallerIdentityInfo getCallerIdentity() throws IOException {
+    final OMRequest omRequest = createOMRequest(Type.GetCallerIdentity)
+        .setGetCallerIdentityRequest(OzoneManagerProtocolProtos.GetCallerIdentityRequest.newBuilder().build())
+        .build();
+
+    return CallerIdentityInfo.fromProtobuf(handleError(submitRequest(omRequest)).getGetCallerIdentityResponse());
+  }
+
+  @Override
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException {
+    final OzoneManagerProtocolProtos.RevokeSTSTokenRequest request =
+        OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
+            .setOriginalAccessKeyId(originalAccessKeyId)
+            .build();
+
+    final OMRequest omRequest = createOMRequest(Type.RevokeSTSToken)
+        .setRevokeSTSTokenRequest(request)
         .build();
 
     handleError(submitRequest(omRequest));
