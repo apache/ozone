@@ -1188,7 +1188,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         if (r.getResult() != ContainerProtos.Result.SUCCESS
             && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
             && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO
-            && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
+            && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY
+            && r.getResult() != ContainerProtos.Result.INVALID_ARGUMENT) {
           StorageContainerException sce =
               new StorageContainerException(r.getMessage(), r.getResult());
           LOG.error(
