@@ -104,6 +104,16 @@ public final class SignatureTestUtils {
     return DatatypeConverter.printHexBinary(hmac(signingKey, stringToSign)).toLowerCase(Locale.ROOT);
   }
 
+  /** Compute one SigV4 streaming trailer signature. */
+  public static String trailerSignature(byte[] signingKey, String dateTime, String credentialScope,
+      String previousSignature, String trailingHeaders) {
+    byte[] canonicalHeaders = (trailingHeaders + "\n").getBytes(UTF_8);
+    String trailingHeadersHash = sha256Hex(canonicalHeaders, 0, canonicalHeaders.length);
+    String stringToSign = String.join("\n", "AWS4-HMAC-SHA256-TRAILER", dateTime,
+        credentialScope, previousSignature, trailingHeadersHash);
+    return DatatypeConverter.printHexBinary(hmac(signingKey, stringToSign)).toLowerCase(Locale.ROOT);
+  }
+
   /** Build a one-data-chunk SigV4 streaming body, including the terminating zero-byte chunk. */
   public static String signedChunkedBody(byte[] signingKey, String dateTime, String credentialScope,
       String seedSignature, String content) {
@@ -124,5 +134,29 @@ public final class SignatureTestUtils {
 
   public static String signedChunkedBody(String content) {
     return signedChunkedBody(SIGNING_KEY, DATE_TIME, CREDENTIAL_SCOPE, SEED_SIGNATURE, content);
+  }
+
+  /** Build a one-data-chunk SigV4 body with one trailing header and its signature. */
+  public static String signedChunkedBodyWithTrailer(String content, String trailerName,
+      String trailerValue) {
+    byte[] payload = content.getBytes(UTF_8);
+    String previousSignature = SEED_SIGNATURE;
+    StringBuilder body = new StringBuilder();
+    if (payload.length > 0) {
+      previousSignature = chunkSignature(SIGNING_KEY, DATE_TIME, CREDENTIAL_SCOPE,
+          SEED_SIGNATURE, payload);
+      body.append(Integer.toHexString(payload.length))
+          .append(";chunk-signature=").append(previousSignature).append("\r\n")
+          .append(content).append("\r\n");
+    }
+    String finalSignature = chunkSignature(SIGNING_KEY, DATE_TIME, CREDENTIAL_SCOPE,
+        previousSignature, new byte[0]);
+    body.append("0;chunk-signature=").append(finalSignature).append("\r\n")
+        .append(trailerName).append(':').append(trailerValue).append("\r\n")
+        .append("x-amz-trailer-signature:")
+        .append(trailerSignature(SIGNING_KEY, DATE_TIME, CREDENTIAL_SCOPE, finalSignature,
+            trailerName + ":" + trailerValue))
+        .append("\r\n\r\n");
+    return body.toString();
   }
 }
