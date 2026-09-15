@@ -19,15 +19,21 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -39,6 +45,12 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -51,11 +63,15 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -67,6 +83,8 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This class is used to test OzoneContainer.
@@ -113,6 +131,68 @@ public class TestOzoneContainer {
     if (volumeSet != null) {
       volumeSet.shutdown();
       volumeSet = null;
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2})
+  void testConcurrentStartup(int failureType) throws Exception {
+    conf = SCMTestUtils.getConf(folder.toFile());
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT, true);
+    ContainerTestUtils.initializeDatanodeLayout(conf, datanodeDetails);
+    OzoneContainer container = spy(ContainerTestUtils.getOzoneContainer(datanodeDetails, conf));
+    CountDownLatch initializing = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch secondCaller = new CountDownLatch(1);
+    Exception failure = failureType == 1 ? new IOException("Cannot read container metadata")
+        : new IllegalStateException("Failed to initRaftLog", new IOException("Corrupt Raft log"));
+    ExecutorService executor = Executors.newFixedThreadPool(2,
+        new ThreadFactoryBuilder().setDaemon(true).build());
+    try {
+      doAnswer(invocation -> {
+        initializing.countDown();
+        assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+        if (failureType != 0) {
+          throw failure;
+        }
+        return invocation.callRealMethod();
+      }).when(container).buildContainerSet();
+      Future<?> first = executor.submit(() -> {
+        container.start(clusterId);
+        return null;
+      });
+      assertThat(initializing.await(10, TimeUnit.SECONDS)).isTrue();
+      // Full reports use the container monitor and must not wait for local service startup.
+      DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
+      when(datanode.getContainer()).thenReturn(container);
+      StateContext reportContext = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
+      assertThat(executor.submit(reportContext::getFullContainerReportDiscardPendingICR)
+          .get(5, TimeUnit.SECONDS).getReportsCount()).isZero();
+      Future<?> second = executor.submit(() -> {
+        secondCaller.countDown();
+        container.start(clusterId);
+        return null;
+      });
+      assertThat(secondCaller.await(10, TimeUnit.SECONDS)).isTrue();
+      assertThat(second.isDone()).isFalse();
+      release.countDown();
+      if (failureType == 0) {
+        first.get(10, TimeUnit.SECONDS);
+        second.get(10, TimeUnit.SECONDS);
+        container.start(clusterId);
+      } else {
+        assertThat(assertThrows(ExecutionException.class, () -> first.get(10, TimeUnit.SECONDS)))
+            .hasCause(failure);
+        assertThat(assertThrows(ExecutionException.class, () -> second.get(10, TimeUnit.SECONDS)).getCause())
+            .isInstanceOf(IOException.class).hasCause(failure);
+        assertThat(assertThrows(IOException.class, () -> container.start(clusterId))).hasCause(failure);
+      }
+      verify(container, times(1)).buildContainerSet();
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+      container.stop();
     }
   }
 
