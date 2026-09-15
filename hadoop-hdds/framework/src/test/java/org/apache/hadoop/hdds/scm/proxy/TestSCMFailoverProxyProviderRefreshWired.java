@@ -31,9 +31,11 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -56,6 +58,9 @@ public class TestSCMFailoverProxyProviderRefreshWired {
   private static final String SCM_NODE_1 = "scm1";
   private static final String SCM_NODE_2 = "scm2";
   private static final String SCM_NODE_3 = "scm3";
+  private static final String SCM_NODE_4 = "scm4";
+  private static final String SCM_NODE_5 = "scm5";
+  private static final String SCM_NODE_6 = "scm6";
 
   private OzoneConfiguration conf;
 
@@ -127,6 +132,34 @@ public class TestSCMFailoverProxyProviderRefreshWired {
         0, 0, false);
     assertEquals(0, provider.refreshCalls,
         "ServerNotLeaderException is application-level; refresh must NOT fire");
+  }
+
+  @Test
+  public void testRetryCountCoversAllConfiguredScmNodes() throws Exception {
+    RetryPolicy policy = newProvider(6, 3).getRetryPolicy();
+
+    assertEquals(RetryDecision.FAILOVER_AND_RETRY,
+        policy.shouldRetry(new IOException("failure"), 0, 5, false).action);
+    assertEquals(RetryDecision.FAIL,
+        policy.shouldRetry(new IOException("failure"), 0, 6, false).action);
+  }
+
+  @Test
+  public void testRetryCountIsUnchangedWhenItCoversScmNodes() throws Exception {
+    RetryPolicy policy = newProvider(3, 3).getRetryPolicy();
+
+    assertEquals(RetryDecision.FAIL,
+        policy.shouldRetry(new IOException("failure"), 0, 3, false).action);
+  }
+
+  @Test
+  public void testConfiguredRetryCountRemainsMinimum() throws Exception {
+    RetryPolicy policy = newProvider(3, 5).getRetryPolicy();
+
+    assertEquals(RetryDecision.FAILOVER_AND_RETRY,
+        policy.shouldRetry(new IOException("failure"), 0, 4, false).action);
+    assertEquals(RetryDecision.FAIL,
+        policy.shouldRetry(new IOException("failure"), 0, 5, false).action);
   }
 
   @Test
@@ -265,6 +298,25 @@ public class TestSCMFailoverProxyProviderRefreshWired {
         SCM_NODE_1 + "," + SCM_NODE_2 + "," + SCM_NODE_3);
     conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
         SCM_SERVICE_ID, SCM_NODE_3), "localhost");
+    return new SCMBlockLocationFailoverProxyProvider(conf);
+  }
+
+  private SCMBlockLocationFailoverProxyProvider newProvider(int nodeCount,
+      int retryCount) {
+    String[] nodeIds = {
+        SCM_NODE_1, SCM_NODE_2, SCM_NODE_3, SCM_NODE_4, SCM_NODE_5, SCM_NODE_6
+    };
+    conf.set(OZONE_SCM_NODES_KEY + "." + SCM_SERVICE_ID,
+        String.join(",", Arrays.copyOf(nodeIds, nodeCount)));
+    for (int i = 0; i < nodeCount; i++) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+          SCM_SERVICE_ID, nodeIds[i]), "localhost");
+    }
+    SCMClientConfig scmClientConfig = new SCMClientConfig();
+    scmClientConfig.setRetryCount(retryCount);
+    scmClientConfig.setMaxRetryTimeout(retryCount * 1000L);
+    scmClientConfig.setRetryInterval(1000L);
+    conf.setFromObject(scmClientConfig);
     return new SCMBlockLocationFailoverProxyProvider(conf);
   }
 

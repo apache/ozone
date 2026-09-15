@@ -156,7 +156,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
 
     scmClientConfig = conf.getObject(SCMClientConfig.class);
-    this.maxRetryCount = scmClientConfig.getRetryCount();
+    this.maxRetryCount = Math.max(scmClientConfig.getRetryCount(), scmNodeIds.size());
     this.retryInterval = scmClientConfig.getRetryInterval();
     this.resolveOnFailureEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
