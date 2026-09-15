@@ -60,6 +60,8 @@ public final class KeyLifecycleServiceMetrics {
   private MutableGaugeLong numDirRenamed;
   @Metric("Total size of keys deleted")
   private MutableGaugeLong sizeKeyDeleted;
+  @Metric("Total delete markers inserted in place of deleting an expired object")
+  private MutableGaugeLong numDeleteMarkersInserted;
   @Metric("Total size of keys renamed")
   private MutableGaugeLong sizeKeyRenamed;
   @Metric("Number of multipart uploads iterated")
@@ -124,6 +126,19 @@ public final class KeyLifecycleServiceMetrics {
 
   public void incrSizeKeyDeleted(long size) {
     sizeKeyDeleted.incr(size);
+  }
+
+  /**
+   * Expiring an object on a bucket that has ever been versioned inserts a
+   * delete marker; it deletes nothing and frees no space, so it is counted
+   * here rather than as a deletion.
+   */
+  public void incrNumDeleteMarkersInserted(long markerCount) {
+    numDeleteMarkersInserted.incr(markerCount);
+  }
+
+  public MutableGaugeLong getNumDeleteMarkersInserted() {
+    return numDeleteMarkersInserted;
   }
 
   public void incrSizeKeyRenamed(long size) {

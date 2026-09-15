@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 public final class OmLCExpiration implements OmLCAction {
   private final Integer days;
   private final String date;
+  private final boolean expiredObjectDeleteMarker;
   private ZonedDateTime zonedDateTime;
   private long daysInMilli;
   private static boolean test;
@@ -49,6 +50,7 @@ public final class OmLCExpiration implements OmLCAction {
   private OmLCExpiration(Builder builder) {
     this.days = builder.days;
     this.date = builder.date;
+    this.expiredObjectDeleteMarker = builder.expiredObjectDeleteMarker;
   }
 
   @Nullable
@@ -59,6 +61,14 @@ public final class OmLCExpiration implements OmLCAction {
   @Nullable
   public String getDate() {
     return date;
+  }
+
+  /**
+   * @return whether the action removes a delete marker that is the key's only
+   *     remaining version, rather than expiring an object by age.
+   */
+  public boolean isExpiredObjectDeleteMarker() {
+    return expiredObjectDeleteMarker;
   }
 
   public boolean isExpired(long timestamp) {
@@ -95,9 +105,14 @@ public final class OmLCExpiration implements OmLCAction {
     boolean hasDays = days != null;
     boolean hasDate = !StringUtils.isBlank(date);
 
-    if (hasDays == hasDate) {
-      throw new OMException("Invalid lifecycle configuration: Either 'days' or 'date' " +
-          "should be specified, but not both or neither.", OMException.ResultCodes.INVALID_REQUEST);
+    // ExpiredObjectDeleteMarker removes a marker rather than expiring an
+    // object by age, so it cannot be combined with either age.
+    int specified = (hasDays ? 1 : 0) + (hasDate ? 1 : 0)
+        + (expiredObjectDeleteMarker ? 1 : 0);
+    if (specified != 1) {
+      throw new OMException("Invalid lifecycle configuration: exactly one of "
+          + "'Days', 'Date' and 'ExpiredObjectDeleteMarker' should be "
+          + "specified.", OMException.ResultCodes.INVALID_REQUEST);
     }
     if (hasDays) {
       if (days <= 0) {
@@ -161,6 +176,9 @@ public final class OmLCExpiration implements OmLCAction {
     if (days != null) {
       builder.setDays(days);
     }
+    if (expiredObjectDeleteMarker) {
+      builder.setExpiredObjectDeleteMarker(true);
+    }
 
     return LifecycleAction.newBuilder().setExpiration(builder).build();
   }
@@ -170,6 +188,10 @@ public final class OmLCExpiration implements OmLCAction {
 
     if (lifecycleExpiration.hasDate()) {
       builder.setDate(lifecycleExpiration.getDate());
+    }
+    if (lifecycleExpiration.hasExpiredObjectDeleteMarker()) {
+      builder.setExpiredObjectDeleteMarker(
+          lifecycleExpiration.getExpiredObjectDeleteMarker());
     }
     if (lifecycleExpiration.hasDays()) {
       builder.setDays(lifecycleExpiration.getDays());
@@ -183,6 +205,7 @@ public final class OmLCExpiration implements OmLCAction {
     return "OmLCExpiration{" +
         "days=" + days +
         ", date='" + date + '\'' +
+        ", expiredObjectDeleteMarker=" + expiredObjectDeleteMarker +
         '}';
   }
 
@@ -192,6 +215,12 @@ public final class OmLCExpiration implements OmLCAction {
   public static class Builder {
     private Integer days = null;
     private String date = null;
+    private boolean expiredObjectDeleteMarker = false;
+
+    public Builder setExpiredObjectDeleteMarker(boolean removeMarker) {
+      this.expiredObjectDeleteMarker = removeMarker;
+      return this;
+    }
 
     public Builder setDays(int lcDays) {
       this.days = lcDays;

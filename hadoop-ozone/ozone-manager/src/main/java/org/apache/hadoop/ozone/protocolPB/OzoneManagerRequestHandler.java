@@ -655,6 +655,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     LookupKeyResponse.Builder resp =
         LookupKeyResponse.newBuilder();
     KeyArgs keyArgs = request.getKeyArgs();
+    OmKeyArgs.validateAddressedVersion(keyArgs);
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
@@ -662,6 +663,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
         .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
         .setHeadOp(keyArgs.getHeadOp())
+        .setVersionId(keyArgs.hasVersionId() ? keyArgs.getVersionId() : null)
+        .setNullVersion(keyArgs.getNullVersion())
         .build();
     OmKeyInfo keyInfo = impl.lookupKey(omKeyArgs);
 
@@ -673,6 +676,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private GetKeyInfoResponse getKeyInfo(GetKeyInfoRequest request,
                                         int clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
+    OmKeyArgs.validateAddressedVersion(keyArgs);
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
@@ -683,6 +687,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setForceUpdateContainerCacheFromSCM(
             keyArgs.getForceUpdateContainerCacheFromSCM())
         .setMultipartUploadPartNumber(keyArgs.getMultipartNumber())
+        .setVersionId(keyArgs.hasVersionId() ? keyArgs.getVersionId() : null)
+        .setNullVersion(keyArgs.getNullVersion())
         .build();
     KeyInfoWithVolumeContext keyInfo = impl.getKeyInfo(omKeyArgs,
         request.getAssumeS3Context());

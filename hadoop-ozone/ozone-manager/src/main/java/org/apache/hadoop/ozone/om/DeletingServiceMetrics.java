@@ -138,6 +138,17 @@ public final class DeletingServiceMetrics {
   @Metric("Last Purge Key transactionId on Active Object Store")
   private MutableGaugeLong lastAOSPurgeTransactionId;
 
+  /*
+   * Object version reclamation metrics. The submitted and reclaimed counts
+   * differ by the versions that were permanently deleted or promoted between
+   * the lifecycle scan selecting them and the request being applied.
+   */
+  @Metric("Total no. of object versions sent for reclamation")
+  private MutableGaugeLong numObjectVersionsSentForReclaim;
+
+  @Metric("Total no. of object versions reclaimed")
+  private MutableGaugeLong numObjectVersionsReclaimed;
+
   private DeletingServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
   }
@@ -346,6 +357,22 @@ public final class DeletingServiceMetrics {
       this.lastAOSPurgeTermId.set(transactionInfo.getTerm());
       this.lastAOSPurgeTransactionId.set(transactionInfo.getTransactionIndex());
     }
+  }
+
+  public void incrNumObjectVersionsSentForReclaim(long versions) {
+    this.numObjectVersionsSentForReclaim.incr(versions);
+  }
+
+  public MutableGaugeLong getNumObjectVersionsSentForReclaim() {
+    return numObjectVersionsSentForReclaim;
+  }
+
+  public MutableGaugeLong getNumObjectVersionsReclaimed() {
+    return numObjectVersionsReclaimed;
+  }
+
+  public void incrNumObjectVersionsReclaimed(long versions) {
+    this.numObjectVersionsReclaimed.incr(versions);
   }
 
   @VisibleForTesting
