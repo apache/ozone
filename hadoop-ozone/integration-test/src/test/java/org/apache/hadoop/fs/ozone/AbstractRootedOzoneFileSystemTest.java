@@ -742,6 +742,68 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   /**
+   * getFileStatus caches the bucket layout so a repeated call on the same
+   * bucket serves the layout from the cache and skips the InfoBucket RPC.
+   */
+  @Test
+  void testGetFileStatusSkipsBucketInfoOnCacheHit() throws IOException {
+    String volName = getRandomNonExistVolumeName();
+    objectStore.createVolume(volName);
+    OzoneVolume ozoneVolume = objectStore.getVolume(volName);
+    String buckName = uniqueObjectName("bucket-");
+    ozoneVolume.createBucket(buckName, BucketArgs.newBuilder()
+        .setBucketLayout(bucketLayout).build());
+    Path file = new Path("/" + volName + "/" + buckName + "/file1");
+    ContractTestUtils.touch(fs, file);
+
+    // First call populates the layout cache (one InfoBucket RPC).
+    fs.getFileStatus(file);
+    long bucketInfosBefore = getOMMetrics().getNumBucketInfos();
+    long getFileStatusBefore = getOMMetrics().getNumGetFileStatus();
+
+    // Second call is served from the cache: no additional InfoBucket RPC,
+    // but the getFileStatus RPC still happens.
+    fs.getFileStatus(file);
+    assertThat(getOMMetrics().getNumBucketInfos() - bucketInfosBefore)
+        .isEqualTo(0);
+    assertThat(getOMMetrics().getNumGetFileStatus() - getFileStatusBefore)
+        .isGreaterThanOrEqualTo(1);
+
+    fs.delete(file, false);
+    ozoneVolume.deleteBucket(buckName);
+    objectStore.deleteVolume(volName);
+  }
+
+  /**
+   * getFileStatus on an OBJECT_STORE bucket is rejected (no file system
+   * semantics), and the rejection is served from the cached layout on repeat
+   * without another InfoBucket RPC.
+   */
+  @Test
+  void testGetFileStatusOnObjectStoreBucketRejected() throws IOException {
+    String volName = getRandomNonExistVolumeName();
+    objectStore.createVolume(volName);
+    OzoneVolume ozoneVolume = objectStore.getVolume(volName);
+    String buckName = uniqueObjectName("obs-");
+    ozoneVolume.createBucket(buckName, BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.OBJECT_STORE).build());
+    Path key = new Path("/" + volName + "/" + buckName + "/key");
+
+    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        () -> fs.getFileStatus(key));
+    assertThat(ex.getMessage()).contains(BucketLayout.OBJECT_STORE.name());
+
+    long bucketInfosBefore = getOMMetrics().getNumBucketInfos();
+    assertThrows(IllegalArgumentException.class,
+        () -> fs.getFileStatus(key));
+    assertThat(getOMMetrics().getNumBucketInfos() - bucketInfosBefore)
+        .isEqualTo(0);
+
+    ozoneVolume.deleteBucket(buckName);
+    objectStore.deleteVolume(volName);
+  }
+
+  /**
    * OFS: Test non-recursive listStatus on root and volume.
    */
   @Test
