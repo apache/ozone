@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_MAX_RETRY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SCM_LOCATION_CLIENT_IPC_CONNECT_TIMEOUT;
@@ -152,6 +154,30 @@ class TestOMScmLocationClientConfig {
     assertEquals(2, scmClientConfiguration.getTimeDuration(
         OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_RETRY_INTERVAL,
         0, TimeUnit.SECONDS));
+  }
+
+  @Test
+  void boundsRetryCountByConfiguredScmNodes() {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    String scmServiceId = "scmservice";
+    configuration.set(OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
+    configuration.set(OZONE_SCM_NODES_KEY + "." + scmServiceId,
+        "scm1,scm2,scm3,scm4,scm5,scm6");
+    configuration.setInt(OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_MAX_RETRY, 3);
+
+    OzoneConfiguration scmClientConfiguration =
+        OMScmLocationClientConfig.createScmClientConfiguration(configuration);
+
+    assertEquals(6, scmClientConfiguration.getInt(
+        OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY, 0));
+    assertEquals(3, configuration.getInt(
+        OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_MAX_RETRY, 0));
+
+    configuration.setInt(OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_MAX_RETRY, 8);
+    scmClientConfiguration =
+        OMScmLocationClientConfig.createScmClientConfiguration(configuration);
+    assertEquals(8, scmClientConfiguration.getInt(
+        OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY, 0));
   }
 
   @Test

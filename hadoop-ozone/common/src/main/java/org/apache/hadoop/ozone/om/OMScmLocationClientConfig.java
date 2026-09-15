@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SCM_LOCATION_CLIE
 import java.util.concurrent.TimeUnit;
 import javax.net.SocketFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -40,24 +41,26 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 /**
  * Builds the configuration used by OM's SCM location clients.
  *
- * <p>The default effective retry limit is the larger of the configured retry
- * count and retry timeout divided by retry interval:
+ * <p>The default effective retry limit is the largest of the configured retry
+ * count, retry timeout divided by retry interval, and configured SCM node
+ * count:
  * <pre>
- * max(3, 6s / 2s) = 3
+ * R = max(3, 6s / 2s, SCM node count)
  * </pre>
- * For failures that always trigger failover, this allows four attempts. The
- * configured timeout envelopes are:
+ * For failures that always trigger failover, this allows {@code R + 1}
+ * attempts. The configured timeout envelopes are:
  * <pre>
- * established connection: 4 * 30s + 3 * 2s = 126s
- * including TCP connect:   4 * (5s + 30s) + 3 * 2s = 146s
+ * established connection: (R + 1) * 30s + R * 2s
+ * including TCP connect:   (R + 1) * (5s + 30s) + R * 2s
  * </pre>
  *
- * <p>Hadoop tracks retries and failovers separately. A sequence of three
- * retry-without-failover responses followed by three failover failures can
- * therefore make seven attempts. Its configured timeout envelopes are:
+ * <p>Hadoop tracks retries and failovers separately. A sequence of {@code R}
+ * retry-without-failover responses followed by {@code R} failover failures
+ * can therefore make {@code 2R + 1} attempts. Its configured timeout
+ * envelopes are:
  * <pre>
- * established connection: 7 * 30s + 6 * 2s = 222s
- * including TCP connect:   7 * (5s + 30s) + 6 * 2s = 257s
+ * established connection: (2R + 1) * 30s + 2R * 2s
+ * including TCP connect:   (2R + 1) * (5s + 30s) + 2R * 2s
  * </pre>
  * Actual calls can complete sooner. These calculations are not caller-side
  * deadlines and exclude time outside the configured connect and RPC waits.
@@ -87,6 +90,14 @@ public final class OMScmLocationClientConfig {
         OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_MAX_RETRY,
         OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_MAX_RETRY_DEFAULT,
         OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY);
+    String scmServiceId = HddsUtils.getScmServiceId(configuration);
+    int scmNodeCount = scmServiceId == null ? 1 :
+        HddsUtils.getSCMNodeIds(configuration, scmServiceId).size();
+    int retryCount = scmClientConfiguration.getInt(
+        OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY, 0);
+    scmClientConfiguration.setInt(
+        OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY,
+        Math.max(retryCount, scmNodeCount));
     copy(configuration, scmClientConfiguration,
         OZONE_OM_SCM_LOCATION_CLIENT_MAX_RETRY_TIMEOUT,
         OZONE_OM_SCM_LOCATION_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT,
