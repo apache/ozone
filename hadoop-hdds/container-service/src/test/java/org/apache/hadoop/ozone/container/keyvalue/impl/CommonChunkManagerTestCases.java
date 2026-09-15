@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMBINED_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -186,6 +187,23 @@ public abstract class CommonChunkManagerTestCases extends AbstractTestChunkManag
     } catch (StorageContainerException ex) {
       assertEquals(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, ex.getResult());
     }
+  }
+
+  @Test
+  public void testReadChunkWithMissingChunksDirectory() throws Exception {
+    ChunkManager chunkManager = createTestSubject();
+    KeyValueContainer container = getKeyValueContainer();
+    BlockID blockID = getBlockID();
+    ChunkInfo chunkInfo = getChunkInfo();
+
+    chunkManager.writeChunk(container, blockID, chunkInfo, getData(), COMBINED_STAGE);
+    chunkManager.finishWriteChunks(container, new BlockData(blockID));
+    chunkManager.readChunk(container, blockID, chunkInfo, null);
+    FileUtils.deleteDirectory(new File(getKeyValueContainerData().getChunksPath()));
+
+    assertThatThrownBy(() -> chunkManager.readChunk(container, blockID, chunkInfo, null))
+        .isInstanceOfSatisfying(StorageContainerException.class,
+            ex -> assertThat(ex.getResult()).isEqualTo(ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR));
   }
 
   @Test
