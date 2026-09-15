@@ -159,6 +159,90 @@ const deletingServiceMetrics = {
   NumKeysPurged: 1275,
 };
 
+// OM metrics bean (RPC operation counters + object counts). Values mirror a real
+// cluster's shape: Key has activity plus a couple of failures (one of them a
+// failure-only op — NumKeyLists is 0 but NumKeyListFails is not); Get/Volume/Bucket/
+// List have data; the remaining metric types are absent, so their dropdown options
+// are greyed out.
+const omMetrics = {
+  name: 'Hadoop:service=OzoneManager,name=OMMetrics',
+  modelerType: 'OMMetrics',
+  'tag.Context': 'ozone',
+  'tag.Hostname': 'node1.test.site.com',
+
+  // Object counts (summary cards).
+  NumVolumes: 1,
+  NumBuckets: 2,
+  NumKeys: 485,
+  TotalDataCommitted: 62259,
+
+  // Key — active, with a failing op (Delete) and a failure-only op (List).
+  NumKeyOps: 2895,
+  NumKeyAllocate: 965,
+  NumKeyAllocateFails: 0,
+  NumKeyCommits: 965,
+  NumKeyCommitFails: 0,
+  NumKeyDeletes: 965,
+  NumKeyDeleteFails: 5,
+  NumKeyHSyncs: 0,
+  NumKeyLists: 0,
+  NumKeyListFails: 100,
+  NumKeyLookup: 0,
+  NumKeyLookupFails: 0,
+  NumKeyRenames: 0,
+  NumKeyRenameFails: 0,
+
+  // Get.
+  NumGetServiceLists: 990,
+
+  // Volume.
+  NumVolumeOps: 24,
+  NumVolumeCreates: 1,
+  NumVolumeCreateFails: 0,
+  NumVolumeInfos: 20,
+  NumVolumeInfoFails: 0,
+  NumVolumeLists: 3,
+  NumVolumeListFails: 0,
+
+  // Bucket.
+  NumBucketOps: 60,
+  NumBucketCreates: 2,
+  NumBucketCreateFails: 0,
+  NumBucketInfos: 48,
+  NumBucketInfoFails: 0,
+  NumBucketLists: 10,
+  NumBucketListFails: 0,
+
+  // List.
+  NumListStatus: 45,
+  NumListStatusFails: 0,
+
+  // Snapshot — active, with a failing Create op.
+  NumSnapshotOps: 11,
+  NumSnapshotCreates: 8,
+  NumSnapshotCreateFails: 1,
+  NumSnapshotDeletes: 3,
+  NumSnapshotDeleteFails: 0,
+
+  // ACL operations (Add / Set / Remove).
+  NumAddAcl: 40,
+  NumAddAclFails: 0,
+  NumSetAcl: 15,
+  NumSetAclFails: 0,
+  NumRemoveAcl: 5,
+  NumRemoveAclFails: 0,
+
+  // Multipart upload (Initiate / Commit / Complete / Abort) — Commit is failing.
+  NumInitiateMultipartUploads: 20,
+  NumInitiateMultipartUploadFails: 0,
+  NumCommitMultipartUploadParts: 18,
+  NumCommitMultipartUploadPartFails: 2,
+  NumCompleteMultipartUploads: 18,
+  NumCompleteMultipartUploadFails: 0,
+  NumAbortMultipartUploads: 2,
+  NumAbortMultipartUploadFails: 0,
+};
+
 /**
  * Ordered match table. The mock server picks the first entry whose `test`
  * matches the requested `qry` and returns `{ beans }`.
@@ -169,5 +253,6 @@ module.exports = [
   { test: /service=RaftServer/i, beans: [ratisRaftServer] },
   { test: /electionCount/i, beans: [leaderElectionCount] },
   { test: /lastLeaderElectionElapsedTime/i, beans: [leaderElectionElapsed] },
+  { test: /name=OMMetrics/i, beans: [omMetrics] },
   { test: /DeletingServiceMetrics/i, beans: [deletingServiceMetrics] },
 ];

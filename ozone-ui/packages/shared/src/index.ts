@@ -66,6 +66,8 @@ export { default as Icon } from './components/Icon/Icon';
 export type { IconProps, IconName } from './components/Icon/Icon';
 export { default as SyncChip } from './components/SyncChip/SyncChip';
 export type { SyncChipProps, DbSyncConfig } from './components/SyncChip/SyncChip';
+export { default as StackedBar } from './components/StackedBar/StackedBar';
+export type { StackedBarProps, StackedBarSegment } from './components/StackedBar/StackedBar';
 
 // Data fetching (TanStack Query foundation)
 export { fetchJson, HttpError, NetworkError } from './data/fetchJson';

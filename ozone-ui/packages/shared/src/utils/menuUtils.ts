@@ -19,7 +19,7 @@ import React from 'react';
 
 export type MenuItem = {
   key?: string;
-  label?: string;
+  label?: React.ReactNode;
   path?: string;
   icon?: React.ReactNode;
   /** `group` renders a non-clickable section label; `divider` a separator line. */
@@ -52,7 +52,10 @@ export const findSelectedKey = (
 } => {
   for (const item of items) {
     if (item.path !== undefined && item.path === pathname) {
-      return { selectedKey: item.key ?? null, header: item.label ?? null };
+      return {
+        selectedKey: item.key ?? null,
+        header: typeof item.label === 'string' ? item.label : null,
+      };
     }
     if (item.children) {
       const result = findSelectedKey(item.children, pathname);
