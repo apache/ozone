@@ -546,8 +546,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     s3RevokedStsTokenTable = initializer.get(
         OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE_DEF, cacheType);
 
-    lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF, cacheType);
-    lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF, cacheType);
+    lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF);
+    lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF);
   }
 
   /**
