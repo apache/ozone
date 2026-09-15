@@ -17,7 +17,7 @@
  */
 
 import type { ThemeConfig } from 'antd';
-import { colors, fontFamilies, radius, semanticColors, spacing, textStyles } from './tokens';
+import { colors, fontFamilies, radius, semanticColors, textStyles } from './tokens';
 
 /**
  * Ant Design v5 theme derived from the Ozone UI design tokens.
@@ -100,7 +100,9 @@ export const ozoneTheme: ThemeConfig = {
       // pill rounds on the right only (the left edge carries the accent bar).
       itemBorderRadius: 0,
       itemMarginInline: 0,
-      itemMarginBlock: spacing.xs,
+      // Compact rows to match the design's dense navigation rail (~30px).
+      itemMarginBlock: 0,
+      itemHeight: 32,
       // Suppress Ant Design's built-in inline selection border.
       activeBarWidth: 0,
       activeBarBorderWidth: 0,

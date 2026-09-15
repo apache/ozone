@@ -120,6 +120,42 @@ export const colors = {
     800: 'rgb(48, 59, 3)',
     900: 'rgb(27, 34, 1)',
   },
+  mint: {
+    50: 'rgb(186, 255, 230)',
+    100: 'rgb(95, 255, 208)',
+    200: 'rgb(0, 230, 181)', // base
+    300: 'rgb(0, 200, 157)',
+    400: 'rgb(0, 167, 131)',
+    500: 'rgb(0, 138, 108)',
+    600: 'rgb(0, 110, 85)',
+    700: 'rgb(0, 84, 64)',
+    800: 'rgb(0, 56, 42)',
+    900: 'rgb(0, 33, 23)',
+  },
+  purple: {
+    50: 'rgb(248, 241, 255)',
+    100: 'rgb(240, 223, 255)',
+    200: 'rgb(227, 194, 255)',
+    300: 'rgb(215, 160, 255)',
+    400: 'rgb(205, 127, 255)',
+    500: 'rgb(195, 84, 255)', // base
+    600: 'rgb(175, 0, 238)',
+    700: 'rgb(130, 0, 178)',
+    800: 'rgb(92, 0, 127)',
+    900: 'rgb(53, 0, 75)',
+  },
+  pink: {
+    50: 'rgb(255, 236, 246)',
+    100: 'rgb(255, 216, 237)',
+    200: 'rgb(255, 178, 221)',
+    300: 'rgb(255, 132, 206)',
+    400: 'rgb(255, 71, 193)', // base
+    500: 'rgb(228, 0, 167)',
+    600: 'rgb(184, 0, 134)',
+    700: 'rgb(141, 0, 102)',
+    800: 'rgb(97, 0, 69)',
+    900: 'rgb(60, 0, 42)',
+  },
 } as const;
 
 /**
@@ -231,6 +267,31 @@ export const radius = {
   lg: 8,
   pill: 999,
 } as const;
+
+/**
+ * Categorical colour palette for charts (stacked bars, series legends, ...),
+ * drawn from the Cloudera Design Language data-visualization palette (Blue Nova,
+ * Mint, Purple, Amber, Pink, Pear) with a second, darker shade of each so a
+ * series with many categories stays separable. Cycled by index.
+ *
+ * Deliberately excludes red/green/orange — those carry semantic meaning
+ * (error / success / warning) elsewhere in the UI (e.g. the metrics status
+ * chips), so reusing them as categorical data colours would be ambiguous.
+ */
+export const chartPalette = [
+  colors.blueNova[600],
+  colors.mint[300],
+  colors.purple[500],
+  colors.amber[300],
+  colors.pink[400],
+  colors.pear[400],
+  colors.blueNova[800],
+  colors.mint[600],
+  colors.purple[700],
+  colors.amber[600],
+  colors.pink[700],
+  colors.pear[600],
+] as const;
 
 export type ColorFamily = keyof typeof colors;
 export type TextStyleName = keyof typeof textStyles;
