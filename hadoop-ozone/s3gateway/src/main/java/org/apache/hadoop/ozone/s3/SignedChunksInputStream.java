@@ -127,11 +127,11 @@ public class SignedChunksInputStream extends InputStream {
   }
 
   /**
-   * Creates a signed chunk stream.
+   * Creates a signed chunk stream. Supports one checksum trailer; comma-separated trailer names are not supported.
    *
    * @param inputStream the encoded request body
    * @param keyPath resource used in S3 errors
-   * @param trailerHeader the value of x-amz-trailer, or null when no trailer is expected
+   * @param trailerHeader a single supported x-amz-checksum-* header name, or null when no trailer is expected
    */
   public SignedChunksInputStream(InputStream inputStream, String keyPath, String trailerHeader) {
     originalStream = inputStream;
@@ -226,7 +226,7 @@ public class SignedChunksInputStream extends InputStream {
     }
     if (remainingData == 0) {
       // The final zero-byte chunk has no payload terminator when trailing headers follow it.
-      if (validator != null && trailerHeader == null) {
+      if (trailerHeader == null) {
         readChunkTerminator();
       }
       validateChunk();

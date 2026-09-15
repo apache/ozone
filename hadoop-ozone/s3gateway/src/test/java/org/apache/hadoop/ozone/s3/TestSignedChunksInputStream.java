@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 import org.apache.hadoop.ozone.s3.signature.SignatureTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -75,6 +76,26 @@ public class TestSignedChunksInputStream {
     try (InputStream is = wrapContent("0;chunk-signature"
         + "=23abb2bd920ddeeaac78a63ed808bc59fa6e7d3ef0e356474b82cdc2f8c93c40\r\n")) {
       assertEquals("", IOUtils.toString(is, UTF_8));
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  void consumesFinalChunkTerminatorWithoutValidator(boolean buffered, boolean empty) throws IOException {
+    String payload = empty ? "" : "data";
+    String body = (empty ? "" : "4;chunk-signature=" + FAKE_SIGNATURE + "\r\ndata\r\n")
+        + "0;chunk-signature=" + FAKE_SIGNATURE + "\r\n\r\n";
+    ByteArrayInputStream original = new ByteArrayInputStream(body.getBytes(UTF_8));
+    try (SignedChunksInputStream stream = new SignedChunksInputStream(original, KEY_PATH)) {
+      if (buffered) {
+        assertThat(IOUtils.toString(stream, UTF_8)).isEqualTo(payload);
+      } else {
+        for (char expected : payload.toCharArray()) {
+          assertThat(stream.read()).isEqualTo(expected);
+        }
+      }
+      assertThat(stream.read()).isEqualTo(-1);
+      assertThat(original.available()).isZero();
     }
   }
 
