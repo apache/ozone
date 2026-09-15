@@ -17,10 +17,14 @@
 
 package org.apache.hadoop.hdds.server.http;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.eclipse.jetty.server.ServerConnector;
 import org.junit.jupiter.api.Test;
 
@@ -49,5 +53,26 @@ public class TestHttpServer2 {
       // Check default value in ozone-default.xml
       assertEquals(60000, server.getIdleTimeout());
     }
+  }
+
+  /**
+   * When ozone.http.basedir is not set, the base dir must be created under the
+   * system temporary directory (java.io.tmpdir), not the process working
+   * directory, so startup does not fail when the CWD is not writable.
+   */
+  @Test
+  public void testSetHttpBaseDirUsesSystemTempDir() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.unset(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
+
+    HttpServer2.setHttpBaseDir(conf);
+
+    String baseDir = conf.get(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
+    assertThat(baseDir).isNotEmpty();
+    Path baseDirPath = Paths.get(baseDir).toAbsolutePath().normalize();
+    assertThat(baseDirPath).exists();
+    Path systemTmpDir = Paths.get(System.getProperty("java.io.tmpdir"))
+        .toAbsolutePath().normalize();
+    assertThat(baseDirPath.startsWith(systemTmpDir)).isTrue();
   }
 }
