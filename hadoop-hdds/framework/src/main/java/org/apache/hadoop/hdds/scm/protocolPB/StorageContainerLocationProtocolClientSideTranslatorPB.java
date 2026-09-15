@@ -74,6 +74,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenResponseProto;
@@ -340,6 +341,13 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
       long containerID, int clientVersion) throws IOException {
+    return getContainerReplicasResponse(containerID, clientVersion)
+        .getContainerReplicaList();
+  }
+
+  @Override
+  public GetContainerReplicasResponseProto getContainerReplicasResponse(
+      long containerID, int clientVersion) throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative");
 
@@ -351,7 +359,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     ScmContainerLocationResponse response =
         submitRequest(Type.GetContainerReplicas,
             (builder) -> builder.setGetContainerReplicasRequest(request));
-    return response.getGetContainerReplicasResponse().getContainerReplicaList();
+    return response.getGetContainerReplicasResponse();
   }
 
   /**

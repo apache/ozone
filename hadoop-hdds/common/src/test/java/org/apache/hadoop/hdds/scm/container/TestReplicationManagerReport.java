@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
@@ -115,6 +116,7 @@ class TestReplicationManagerReport {
     assertEquals(0, stats.get("OPEN_UNHEALTHY").longValue());
     assertEquals(0, stats.get("QUASI_CLOSED_STUCK").longValue());
     assertEquals(0, stats.get("OPEN_WITHOUT_PIPELINE").longValue());
+    assertEquals(0, stats.get("DATA_CHECKSUM_MISMATCH").longValue());
 
     JsonNode samples = json.get("samples");
     assertEquals(ARRAY, samples.get("UNDER_REPLICATED").getNodeType());
@@ -135,6 +137,20 @@ class TestReplicationManagerReport {
         report.getStat(ContainerHealthState.OVER_REPLICATED));
     assertEquals(0,
         report.getStat(ContainerHealthState.MIS_REPLICATED));
+  }
+
+  @Test
+  void testSampleByContainerIDDoesNotChangeContainerHealthState() {
+    ContainerID containerID = ContainerID.valueOf(1);
+    report.incrementAndSampleAdditionalState(
+        ContainerHealthState.DATA_CHECKSUM_MISMATCH, containerID);
+
+    assertEquals(1,
+        report.getStat(ContainerHealthState.DATA_CHECKSUM_MISMATCH));
+    assertEquals(Collections.singletonList(containerID),
+        report.getSample(ContainerHealthState.DATA_CHECKSUM_MISMATCH));
+    assertEquals(ContainerHealthState.HEALTHY,
+        report.getContainerHealthState());
   }
 
   @Test
