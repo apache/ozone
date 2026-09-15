@@ -2846,6 +2846,11 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public OzoneManagerVersion getOmVersion() {
+    return omVersion;
+  }
+
+  @Override
   public OzoneFsServerDefaults getServerDefaults() throws IOException {
     long now = Time.monotonicNow();
     if ((serverDefaults == null) ||
