@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3;
 
 import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 
+import jakarta.xml.bind.DatatypeConverter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
@@ -27,7 +28,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.ChunksValidator;

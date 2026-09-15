@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.s3secret;
 
-import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
-import static javax.ws.rs.core.Response.Status.NOT_FOUND;
-import static javax.ws.rs.core.Response.Status.OK;
+import static jakarta.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
+import static jakarta.ws.rs.core.Response.Status.NOT_FOUND;
+import static jakarta.ws.rs.core.Response.Status.OK;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.S3_SECRET_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,13 +30,14 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.MultivaluedHashMap;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.SecurityContext;
+import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
 import java.security.Principal;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.SecurityContext;
-import javax.ws.rs.core.UriInfo;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -112,6 +113,10 @@ public class TestSecretRevoke {
         .when(objectStore).revokeS3Secret(any());
     Response secondResponse = endpoint.revoke();
     assertEquals(NOT_FOUND.getStatusCode(), secondResponse.getStatus());
+    // The error code moved from the status line into the body, so the body
+    // must carry the code as an explicit plain-text media type.
+    assertEquals(S3_SECRET_NOT_FOUND.toString(), secondResponse.getEntity());
+    assertEquals(MediaType.TEXT_PLAIN_TYPE, secondResponse.getMediaType());
   }
 
   @Test

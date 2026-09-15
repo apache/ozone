@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;

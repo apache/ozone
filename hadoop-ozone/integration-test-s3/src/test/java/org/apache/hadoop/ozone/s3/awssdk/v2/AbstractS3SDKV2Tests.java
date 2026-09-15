@@ -37,13 +37,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static software.amazon.awssdk.core.sync.RequestBody.fromString;
 
+import jakarta.xml.bind.DatatypeConverter;
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
+import java.net.Socket;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -63,7 +67,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -84,6 +87,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
+import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
@@ -669,6 +673,75 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(S3ErrorTable.INVALID_URI.getErrorMessage(), exception.awsErrorDetails().errorMessage());
   }
 
+  /**
+   * An object key containing a backslash (e.g. "dir\\file.txt") is a legitimate
+   * S3 key that Jetty 9.4 passed through. The gateway runs with the relaxed
+   * (suspicious-character admitting) URI compliance, so such a key -- which the
+   * AWS SDK sends percent-encoded ("\\" as %5C) -- must round-trip through
+   * put/get/delete rather than being rejected with a 400 by the connector.
+   */
+  @Test
+  public void testPutGetDeleteKeyWithBackslash() {
+    final String bucketName = getBucketName("backslash-uri-key");
+    final String keyName = "dir\\file.txt";
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+    ResponseBytes<GetObjectResponse> objectBytes =
+        s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName));
+    assertEquals(content, objectBytes.asUtf8String());
+    s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName));
+    assertThrows(NoSuchKeyException.class,
+        () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  /**
+   * The relaxed URI compliance re-admits suspicious characters but still rejects
+   * genuinely illegal path characters (e.g. '[') and %2e%2e path traversal with a
+   * 400. The AWS SDK always percent-encodes keys -- and a percent-encoded '[' is
+   * admitted -- so the unencoded illegal character is put on the wire with a raw
+   * request sent straight to a single gateway's connector, bypassing the lenient
+   * LEGACY proxy in front of the gateways which would otherwise mask the
+   * rejection.
+   */
+  @Test
+  public void testGatewayRejectsIllegalUriPathCharacters() throws Exception {
+    String backendAddresses = cluster.getConf().get(MultiS3GatewayService.BACKEND_HTTP_ADDRESSES_KEY);
+    assertNotNull(backendAddresses,
+        "expected backend gateway addresses to be exposed by MultiS3GatewayService");
+    String[] hostPort = backendAddresses.split(",")[0].split(":");
+    String host = hostPort[0];
+    int port = Integer.parseInt(hostPort[1]);
+
+    // Unencoded illegal path character -> ILLEGAL_PATH_CHARACTERS.
+    assertEquals(SC_BAD_REQUEST, rawGetStatus(host, port, "/bucket/a[b]"));
+    // Encoded path traversal is outside the S3 key use case and stays rejected.
+    assertEquals(SC_BAD_REQUEST, rawGetStatus(host, port, "/bucket/%2e%2e/x"));
+  }
+
+  /**
+   * Sends a raw HTTP/1.1 GET with the request target verbatim (no URL
+   * normalization or percent-encoding, which HttpURLConnection would apply) and
+   * returns the response status code, so genuinely illegal unencoded path
+   * characters reach the connector as-is.
+   */
+  private static int rawGetStatus(String host, int port, String requestTarget) throws IOException {
+    try (Socket socket = new Socket(host, port)) {
+      socket.setSoTimeout(5000);
+      socket.getOutputStream().write(("GET " + requestTarget + " HTTP/1.1\r\n"
+          + "Host: " + host + ":" + port + "\r\n"
+          + "Connection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+      socket.getOutputStream().flush();
+      BufferedReader reader = new BufferedReader(
+          new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+      String statusLine = reader.readLine();
+      assertNotNull(statusLine, "expected an HTTP status line");
+      // e.g. "HTTP/1.1 400 Bad Request" -> 400
+      return Integer.parseInt(statusLine.split(" ")[1]);
+    }
+  }
+
   @Test
   public void testGetObjectTorrentNotImplemented() {
     final String bucketName = getBucketName();
@@ -704,6 +777,48 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         b -> b.bucket(bucketName).key(keyName).ifMatch(initialResponse.eTag()));
 
     assertEquals(Long.valueOf(content.length()), response.contentLength());
+  }
+
+  /**
+   * A stored object's Content-Type must come back on the wire exactly as it was
+   * put, without a charset appended. This asserts the stored-object path through
+   * the gateway's real filter chain (QuotingInputFilter then S3ContentTypeFilter
+   * as declared in web.xml): on Jetty 12 a bare Content-Type such as
+   * {@code binary/octet-stream} would otherwise go out as
+   * {@code binary/octet-stream;charset=utf-8}. The S3ContentTypeFilter unit
+   * tests only drive a Mockito response and cannot detect such a wire change.
+   */
+  @Test
+  public void testHeadObjectContentTypePreservedVerbatim() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName).contentType("binary/octet-stream"),
+        RequestBody.fromString(content));
+
+    HeadObjectResponse headObjectResponse =
+        s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals("binary/octet-stream", headObjectResponse.contentType());
+  }
+
+  /**
+   * A successful JAX-RS XML response (here ListBuckets) must carry a bare
+   * {@code application/xml} Content-Type on the wire, with no charset appended.
+   * This complements {@link #testHeadObjectContentTypePreservedVerbatim} (the
+   * stored-object path) and {@link #testCreateBucketAlreadyOwnedByYou}, which
+   * already asserts the same on the error-XML path: the success and error
+   * responses set the Content-Type through different code paths, but both flow
+   * through S3ContentTypeFilter. On Jetty 12 the bare value would otherwise go
+   * out as {@code application/xml;charset=utf-8}. The S3ContentTypeFilter unit
+   * tests only drive a Mockito response and cannot detect such a wire change.
+   */
+  @Test
+  public void testListBucketsContentTypePreservedVerbatim() {
+    ListBucketsResponse response = s3Client.listBuckets();
+    assertEquals("application/xml", response.sdkHttpResponse()
+        .firstMatchingHeader("Content-Type").orElse(null));
   }
 
   @Test

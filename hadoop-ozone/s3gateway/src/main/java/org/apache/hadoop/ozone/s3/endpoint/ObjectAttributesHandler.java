@@ -28,6 +28,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.OBJECT_ATTRIBUTES_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.PART_NUMBER_MARKER_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -36,8 +38,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.S3GAction;

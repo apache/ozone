@@ -21,16 +21,16 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_ACCESS_METADATA
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_ENTITY_PATH;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_ENTITY_TYPE;
 
+import jakarta.inject.Inject;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.util.List;
-import javax.inject.Inject;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
 import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;

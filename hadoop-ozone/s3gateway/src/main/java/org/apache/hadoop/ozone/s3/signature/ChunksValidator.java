@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.signature;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.SIGNATURE_DOES_NOT_MATCH;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 
+import jakarta.xml.bind.DatatypeConverter;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
@@ -27,7 +28,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 /**

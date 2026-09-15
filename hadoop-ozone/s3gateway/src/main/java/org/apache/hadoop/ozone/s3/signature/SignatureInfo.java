@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
-import javax.enterprise.context.RequestScoped;
+import jakarta.enterprise.context.RequestScoped;
 
 /**
  * Signature and related information.

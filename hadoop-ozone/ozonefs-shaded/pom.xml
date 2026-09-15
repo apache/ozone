@@ -239,12 +239,16 @@
                   <shadedPattern>${ozone.shaded.prefix}.javassist.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javax.xml.bind.</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.javax.xml.bind.</shadedPattern>
+                  <!-- The JAXB and Activation APIs moved from javax.* to jakarta.* at 4.0/2.1
+                       (jakarta.xml.bind-api, jakarta.activation-api). Relocate the jakarta.*
+                       packages so the shaded client jar does not carry an unrelocated JAXB API
+                       that would collide with a host application's own jakarta.xml.bind. -->
+                  <pattern>jakarta.xml.bind.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.jakarta.xml.bind.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javax.activation.</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.javax.activation.</shadedPattern>
+                  <pattern>jakarta.activation.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.jakarta.activation.</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>jakarta.annotation.</pattern>

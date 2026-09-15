@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import jakarta.enterprise.context.RequestScoped;
 import java.security.SecureRandom;
 import java.util.Random;
-import javax.enterprise.context.RequestScoped;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 

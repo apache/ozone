@@ -23,13 +23,13 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREA
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 import com.google.common.annotations.VisibleForTesting;
+import jakarta.annotation.Priority;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.container.PreMatching;
+import jakarta.ws.rs.ext.Provider;
 import java.io.IOException;
-import javax.annotation.Priority;
-import javax.inject.Inject;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.container.PreMatching;
-import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;

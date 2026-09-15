@@ -169,6 +169,7 @@ import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
+import org.apache.hadoop.hdds.server.http.HttpServerConfigurationException;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -1602,6 +1603,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     try {
       httpServer = new StorageContainerManagerHttpServer(configuration, this);
       httpServer.start();
+    } catch (HttpServerConfigurationException ex) {
+      // A filter/HTTP misconfiguration will never succeed on retry; fail fast
+      // instead of silently starting SCM without a web server.
+      throw ex;
     } catch (Exception ex) {
       // SCM HttpServer start-up failure should be non-fatal
       LOG.error("SCM HttpServer failed to start.", ex);

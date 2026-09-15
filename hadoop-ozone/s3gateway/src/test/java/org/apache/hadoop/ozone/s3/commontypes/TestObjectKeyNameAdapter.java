@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.s3.commontypes;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import javax.xml.bind.annotation.adapters.XmlAdapter;
+import jakarta.xml.bind.annotation.adapters.XmlAdapter;
 import org.junit.jupiter.api.Test;
 
 /**

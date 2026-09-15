@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.commontypes;
 
-import javax.ws.rs.core.MultivaluedMap;
+import jakarta.ws.rs.core.MultivaluedMap;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 /** Allow looking up query parameters as primitive types. */

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
-import javax.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestContext;
 import org.apache.hadoop.ozone.audit.AuditAction;
 
 /**
