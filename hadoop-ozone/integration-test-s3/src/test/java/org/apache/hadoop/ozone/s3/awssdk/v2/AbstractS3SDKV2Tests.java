@@ -1968,6 +1968,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       assertEquals(1, secondPage.objectParts().parts().size());
       assertEquals(3, secondPage.objectParts().parts().get(0).partNumber());
     } finally {
+      s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName));
       deleteFsoBucket(bucketName);
     }
   }
