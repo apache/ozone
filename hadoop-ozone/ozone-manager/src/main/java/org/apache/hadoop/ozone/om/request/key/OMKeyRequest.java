@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
@@ -56,10 +57,12 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -73,6 +76,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.NoncurrentVersions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -93,12 +97,16 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.VersionIdGenerator;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.response.key.OMKeyVersionDeleteResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -945,6 +953,30 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
+   * Returns the newest noncurrent version of the given key as a
+   * (dbKey, keyInfo) pair, or null if the key has no noncurrent version.
+   */
+  protected Pair<String, OmKeyInfo> getNewestNoncurrentVersion(
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName)
+      throws IOException {
+    return NoncurrentVersions.newestMatching(ozoneManager, omMetadataManager,
+        volumeName, bucketName, keyName, keyInfo -> true);
+  }
+
+  /**
+   * Returns the key's null version as a (dbKey, keyInfo) pair, or null if the
+   * key has no noncurrent null version. A key has at most one.
+   */
+  protected Pair<String, OmKeyInfo> getNoncurrentNullVersion(
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName)
+      throws IOException {
+    return NoncurrentVersions.nullVersion(ozoneManager, omMetadataManager,
+        volumeName, bucketName, keyName);
+  }
+
+  /**
    * Return bucket info for the specified bucket.
    * <p>
    * The returned {@link OmBucketInfo} is the cached instance, returned by
@@ -1013,11 +1045,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (dbKeyInfo != null) {
       // The key already exist, the new blocks will replace old ones
       // as new versions unless the bucket does not have versioning
-      // turned on.
-      dbKeyInfo.addNewVersion(locations, false,
-              omBucketInfo.getIsVersionEnabled());
+      // turned on. With S3-compatible versioning the previous current version
+      // is kept as its own record in the versionedKeyTable at commit time, so
+      // the in-record block version list is not used to accumulate object
+      // versions and always holds a single version.
+      boolean keepInRecordVersions = omBucketInfo.getIsVersionEnabled()
+          && !omBucketInfo.hasEverBeenVersioned();
+      dbKeyInfo.addNewVersion(locations, false, keepInRecordVersions);
       long newSize = size;
-      if (omBucketInfo.getIsVersionEnabled()) {
+      if (keepInRecordVersions) {
         newSize += dbKeyInfo.getDataSize();
       }
       // The modification time is set in preExecute. Use the same
@@ -1443,4 +1479,259 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .clearExpectedETag()
         .build();
   }
+
+  /**
+   * Supersedes the key's current version with a delete marker: a record with
+   * no data blocks that makes plain reads of the key return KEY_NOT_FOUND
+   * while every existing version stays readable by versionId. The superseded
+   * current version becomes a noncurrent version; a record written before
+   * versioning was enabled carries no versionId and becomes the key's null
+   * version. When the key does not exist the marker is still inserted, as S3
+   * does.
+   *
+   * <p>Applies everything to the table cache and to the bucket's quota, and
+   * returns what a response has to put into its WriteBatch. Shared so that a
+   * single delete and a batch delete insert the same marker.
+   *
+   * @param currentVersion the key's current version, or null if it has none
+   * @param proposedVersionId the id the request proposed for the marker
+   * @param modificationTime the time to stamp the marker with
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  protected DeleteMarkerInsertion insertDeleteMarker(OzoneManager ozoneManager,
+      OMMetadataManager omMetadataManager, OmBucketInfo omBucketInfo,
+      OmKeyInfo currentVersion, String objectKey, String keyName,
+      long proposedVersionId, long modificationTime, long trxnLogIndex,
+      long pendingNamespace)
+      throws IOException {
+
+    String volumeName = omBucketInfo.getVolumeName();
+    String bucketName = omBucketInfo.getBucketName();
+    // While versioning is suspended the marker is the key's null version, so
+    // it replaces whatever held that slot instead of superseding it.
+    final boolean suspended = omBucketInfo.isS3VersioningSuspended();
+    final boolean replacesCurrent = suspended && currentVersion != null
+        && currentVersion.isNullVersionRecord();
+
+    long markerVersionId = ozoneManager.getVersionIdAllocator().allocate(
+        proposedVersionId, currentVersion);
+
+    // Everything that can fail runs before the first cache entry is added: a
+    // request that throws here is answered with an OMKeyDeleteResponse, whose
+    // cleanup does not cover the versionedKeyTable, so a cache entry left
+    // behind would never be removed and would outlive the failed request.
+    // The null version the marker replaces is removed: the current one when
+    // the last write was also suspended, and a noncurrent one when versioning
+    // was enabled in between. Resolved before the quota check so that the
+    // check sees what the marker removes as well as what it adds.
+    final Pair<String, OmKeyInfo> noncurrentNullVersion =
+        suspended && !replacesCurrent
+            ? getNoncurrentNullVersion(ozoneManager,
+                omMetadataManager, volumeName, bucketName, keyName)
+            : null;
+    final OmKeyInfo replacedNullVersion = replacesCurrent ? currentVersion
+        : (noncurrentNullVersion == null
+            ? null : noncurrentNullVersion.getValue());
+    // The marker is a record of its own; it holds no blocks, so it consumes
+    // namespace but no space - unless it takes the null version slot, which
+    // replaces a record rather than adding one.
+    // The check also counts what earlier markers of the same request have
+    // claimed, which the bucket does not show yet.
+    final long addedNamespace = replacedNullVersion == null ? 1L : 0L;
+    checkBucketQuotaInNamespace(omBucketInfo,
+        pendingNamespace + addedNamespace);
+
+    // The marker is built from a stated set of fields rather than copied from
+    // the version it supersedes. It keeps the key's identity - objectID,
+    // owner, replication and ACLs - and holds nothing else: no blocks, no
+    // metadata or tags, no encryption info or checksum, which describe content
+    // a marker does not have. Listing the fields rather than copying and
+    // clearing also keeps a field added to OmKeyInfo off markers by default.
+    OmKeyInfo.Builder markerBuilder = new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+        .setDataSize(0L)
+        .setCreationTime(modificationTime)
+        .setModificationTime(modificationTime)
+        .setUpdateID(trxnLogIndex)
+        .setFile(true)
+        .setVersionId(markerVersionId)
+        .setDeleteMarker(true)
+        .setNullVersion(suspended);
+    if (currentVersion != null) {
+      markerBuilder
+          .setObjectID(currentVersion.getObjectID())
+          .setOwnerName(currentVersion.getOwnerName())
+          .setReplicationConfig(currentVersion.getReplicationConfig())
+          .setAcls(currentVersion.getAcls());
+    } else {
+      // S3 inserts a delete marker for a key that does not exist, so the
+      // marker has no identity to inherit and gets one of its own.
+      markerBuilder
+          .setObjectID(ozoneManager.getObjectIdFromTxId(trxnLogIndex))
+          .setOwnerName(omBucketInfo.getOwner())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(
+              ReplicationFactor.ONE));
+    }
+    OmKeyInfo deleteMarker = markerBuilder.build();
+
+    String movedVersionedKeyName = null;
+    OmKeyInfo movedVersionedKeyInfo = null;
+    if (currentVersion != null && !replacesCurrent) {
+      movedVersionedKeyInfo = currentVersion.getVersionId() != null
+          ? currentVersion
+          : currentVersion.toBuilder()
+              .setVersionId(VersionIdGenerator.UNSET_VERSION_ID)
+              .setNullVersion(true)
+              .build();
+      movedVersionedKeyName = omMetadataManager.getVersionedOzoneKey(
+          volumeName, bucketName, keyName,
+          movedVersionedKeyInfo.getVersionId());
+      omMetadataManager.getVersionedKeyTable().addCacheEntry(
+          movedVersionedKeyName, movedVersionedKeyInfo, trxnLogIndex);
+    }
+
+    String replacedNullVersionKey = null;
+    if (noncurrentNullVersion != null) {
+      replacedNullVersionKey = noncurrentNullVersion.getKey();
+      omMetadataManager.getVersionedKeyTable().addCacheEntry(
+          new CacheKey<>(replacedNullVersionKey),
+          CacheValue.get(trxnLogIndex));
+    }
+    Map<String, RepeatedOmKeyInfo> keysToDelete = null;
+    if (replacedNullVersion != null) {
+      keysToDelete = addKeyInfoToDeleteMap(ozoneManager, trxnLogIndex,
+          objectKey, omBucketInfo.getObjectID(),
+          replacedNullVersion.withCommittedKeyDeletedFlag(true), null);
+    }
+    // Released to the bucket by the caller, like the namespace, so that a
+    // batch failing on a later key leaves the cached bucket as it found it.
+    final long releasedBytes = replacedNullVersion == null ? 0L
+        : sumBlockLengths(replacedNullVersion);
+
+    omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+        objectKey, deleteMarker, trxnLogIndex);
+
+    // The namespace is left to the caller: the bucket is the cached instance,
+    // and a batch that fails on a later key must not have counted this one.
+    return new DeleteMarkerInsertion(deleteMarker, objectKey,
+        movedVersionedKeyName, movedVersionedKeyInfo, replacedNullVersionKey,
+        keysToDelete, addedNamespace, releasedBytes);
+  }
+
+  /**
+   * Permanently removes the addressed version: the only delete that destroys
+   * data on a versioned bucket. Removing the current version hands its keyTable
+   * place over to the next-newest version of the key, or removes the key
+   * outright when none survives. Shared so that a single delete and a batch
+   * delete remove a version the same way.
+   *
+   * @param currentVersion the key's current version, or null if it has none
+   * @param auditMap where to record the versions involved, or null
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  protected OMKeyVersionDeleteResponse deleteVersion(OzoneManager ozoneManager,
+      OMMetadataManager omMetadataManager,
+      OmBucketInfo omBucketInfo, OmKeyInfo currentVersion,
+      String volumeName, String bucketName, String keyName, long versionId,
+      boolean nullVersion, long trxnLogIndex,
+      OMResponse.Builder omResponse, Map<String, String> auditMap)
+      throws IOException {
+
+    boolean deletingCurrent = currentVersion != null && (nullVersion
+        ? currentVersion.isNullVersionRecord()
+        : Long.valueOf(versionId).equals(currentVersion.getVersionId()));
+
+    String objectKey =
+        omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+
+    // The dbKey the version is deleted from, in the keyTable when it is the
+    // current version and in the versionedKeyTable otherwise. Everything that
+    // can fail runs before the first cache entry is added, so that a failed
+    // request leaves no versionedKeyTable cache entry behind.
+    String deletedVersionKey;
+    OmKeyInfo version;
+    if (deletingCurrent) {
+      deletedVersionKey = objectKey;
+      version = currentVersion;
+    } else if (nullVersion) {
+      Pair<String, OmKeyInfo> nullSlot = getNoncurrentNullVersion(
+          ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
+      deletedVersionKey = nullSlot == null ? null : nullSlot.getKey();
+      version = nullSlot == null ? null : nullSlot.getValue();
+    } else {
+      deletedVersionKey = omMetadataManager.getVersionedOzoneKey(
+          volumeName, bucketName, keyName, versionId);
+      version =
+          omMetadataManager.getVersionedKeyTable().get(deletedVersionKey);
+    }
+    if (version == null) {
+      throw new OMException("Version not found for key " + keyName,
+          KEY_NOT_FOUND);
+    }
+
+    // Removing the current version leaves the key without one, so the newest
+    // noncurrent version is promoted to keep the invariant that keyTable holds
+    // the current version of every key that still has one. The record moves
+    // unchanged: promotion is positional, the version keeps its identity.
+    String promotedKey = null;
+    OmKeyInfo promoted = null;
+    if (deletingCurrent) {
+      Pair<String, OmKeyInfo> newest = getNewestNoncurrentVersion(
+          ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
+      if (newest != null) {
+        promotedKey = newest.getKey();
+        promoted = newest.getValue();
+      }
+    }
+
+    version = version.toBuilder().setUpdateID(trxnLogIndex).build();
+
+    if (deletingCurrent) {
+      if (promoted != null) {
+        omMetadataManager.getKeyTable(getBucketLayout())
+            .addCacheEntry(objectKey, promoted, trxnLogIndex);
+        omMetadataManager.getVersionedKeyTable().addCacheEntry(
+            new CacheKey<>(promotedKey), CacheValue.get(trxnLogIndex));
+      } else {
+        // no version survives, so the key disappears entirely
+        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+            new CacheKey<>(objectKey), CacheValue.get(trxnLogIndex));
+      }
+    } else {
+      omMetadataManager.getVersionedKeyTable().addCacheEntry(
+          new CacheKey<>(deletedVersionKey), CacheValue.get(trxnLogIndex));
+    }
+
+    if (auditMap != null) {
+      auditMap.put(OzoneConsts.DELETED_VERSION_ID,
+          String.valueOf(version.getVersionId()));
+      if (promoted != null) {
+        auditMap.put(OzoneConsts.PROMOTED_VERSION_ID,
+            String.valueOf(promoted.getVersionId()));
+      }
+    }
+
+    // A delete marker holds no blocks, so it releases namespace but no space.
+    long quotaReleased = sumBlockLengths(version);
+    boolean isVersionNonEmpty = !OmKeyInfo.isKeyEmpty(version);
+    omBucketInfo.decrUsedBytes(quotaReleased, isVersionNonEmpty);
+    omBucketInfo.decrUsedNamespace(1L, isVersionNonEmpty);
+
+    // Named by this transaction rather than the version's objectID: every
+    // version of a key carries the objectID of the record it overwrote, so two
+    // version deletes named by objectID would land on one deletedTable entry,
+    // and the later put would drop the earlier version's blocks for good.
+    String deletedTableKey = omMetadataManager.getOzoneDeletePathKey(
+        ozoneManager.getObjectIdFromTxId(trxnLogIndex), objectKey);
+
+    return new OMKeyVersionDeleteResponse(
+        omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
+        version, deletedVersionKey, deletingCurrent,
+        promotedKey, promoted, omBucketInfo.copyObject(), deletedTableKey);
+  }
+
 }

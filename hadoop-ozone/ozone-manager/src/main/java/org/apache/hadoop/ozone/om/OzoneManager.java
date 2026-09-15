@@ -87,6 +87,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VERSIONING_LOOKUP_WARNING_THRESHOLD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VERSIONING_LOOKUP_WARNING_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
@@ -424,6 +426,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManagerImpl prefixManager;
+  private final VersionIdAllocator versionIdAllocator;
+  /**
+   * Parsed once rather than per call: the noncurrent version lookup consults
+   * it on the write path, and reading it from the configuration each time
+   * costs a variable substitution and a parse.
+   */
+  private final long versioningLookupWarningThresholdMs;
   private final UpgradeFinalizer<OzoneManager> upgradeFinalizer;
   private ExecutorService edekCacheLoader = null;
 
@@ -576,6 +585,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
+    versionIdAllocator = new VersionIdAllocator(conf);
+    versioningLookupWarningThresholdMs = conf.getTimeDuration(
+        OZONE_OM_VERSIONING_LOOKUP_WARNING_THRESHOLD,
+        OZONE_OM_VERSIONING_LOOKUP_WARNING_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
     replicationConfigValidator =
         conf.getObject(ReplicationConfigValidator.class);
 
@@ -2404,6 +2418,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public long getObjectIdFromTxId(long trxnId) {
     return OmUtils.getObjectIdFromTxId(metadataManager.getOmEpoch(),
         trxnId);
+  }
+
+  /**
+   * Assigns the versionId of a version being committed, using the
+   * {@link org.apache.hadoop.ozone.om.helpers.VersionIdGenerator} configured
+   * for this cluster.
+   */
+  /**
+   * How long a noncurrent version lookup may take before it is worth logging,
+   * in milliseconds.
+   */
+  public long getVersioningLookupWarningThresholdMs() {
+    return versioningLookupWarningThresholdMs;
+  }
+
+  public VersionIdAllocator getVersionIdAllocator() {
+    return versionIdAllocator;
   }
 
   /**

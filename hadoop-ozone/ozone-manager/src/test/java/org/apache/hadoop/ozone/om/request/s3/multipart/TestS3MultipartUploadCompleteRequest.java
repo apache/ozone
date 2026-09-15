@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,6 +37,8 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -99,6 +103,111 @@ public class TestS3MultipartUploadCompleteRequest
     checkDeleteTableCount(volumeName, bucketName, keyName, 1, uploadId);
   }
 
+
+  /**
+   * Completing a multipart upload over an existing key on a versioned bucket
+   * creates a version like any other write: the version it supersedes has to
+   * be kept in the versionedKeyTable, not dropped from the keyTable and left
+   * out of the deletedTable.
+   */
+  @Test
+  public void testVersionedOverwriteKeepsPreviousVersion() throws Exception {
+    // versioning is only supported on OBJECT_STORE buckets
+    assumeFalse(getBucketLayout().isFileSystemOptimized());
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            // versioning is only allowed on OBJECT_STORE buckets; it shares
+            // the keyTable with LEGACY, so the request helpers still apply
+            .setBucketLayout(BucketLayout.OBJECT_STORE)
+            .setVersioningStatus(BucketVersioningStatus.ENABLED));
+
+    checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName,
+        new HashMap<>(), new HashMap<>(), 0L, 1L);
+    OmKeyInfo firstVersion = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName));
+    assertNotNull(firstVersion.getVersionId());
+
+    checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName,
+        new HashMap<>(), new HashMap<>(), 10L, 2L);
+
+    OmKeyInfo current = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName));
+    assertNotEquals(firstVersion.getVersionId(), current.getVersionId());
+
+    // the superseded version survives as a noncurrent version
+    OmKeyInfo noncurrent = omMetadataManager.getVersionedKeyTable().get(
+        omMetadataManager.getVersionedOzoneKey(volumeName, bucketName, keyName,
+            firstVersion.getVersionId()));
+    assertNotNull(noncurrent,
+        "the version the upload superseded was neither kept nor reclaimed");
+    assertEquals(firstVersion.getVersionId(), noncurrent.getVersionId());
+
+    // and its blocks were not queued for reclamation: the version record still
+    // refers to them, so reclaiming them would strand it
+    assertEquals(0, deletedEntriesFor(volumeName, bucketName, keyName),
+        "the superseded version's blocks were queued for deletion");
+  }
+
+  /**
+   * A completion while versioning is suspended follows the same rule a
+   * suspended PUT does: the new version takes the key's null slot, replacing
+   * whatever held it, so versions do not accumulate.
+   */
+  @Test
+  public void testSuspendedCompletionTakesTheNullSlot() throws Exception {
+    assumeFalse(getBucketLayout().isFileSystemOptimized());
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(BucketLayout.OBJECT_STORE)
+            .setVersioningStatus(BucketVersioningStatus.SUSPENDED));
+
+    checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName,
+        new HashMap<>(), new HashMap<>(), 0L, 1L);
+    OmKeyInfo firstNull = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName));
+    assertTrue(firstNull.isNullVersion());
+
+    checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName,
+        new HashMap<>(), new HashMap<>(), 10L, 1L);
+
+    OmKeyInfo current = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName));
+    assertTrue(current.isNullVersion());
+    assertNotEquals(firstNull.getVersionId(), current.getVersionId());
+
+    // the record it replaced is not kept as a noncurrent version
+    assertNull(omMetadataManager.getVersionedKeyTable().get(
+        omMetadataManager.getVersionedOzoneKey(volumeName, bucketName, keyName,
+            firstNull.getVersionId())),
+        "a suspended completion accumulated a version instead of replacing "
+            + "the null slot");
+  }
+
+  /** Records the deletedTable holds for this key, however they were filed. */
+  private int deletedEntriesFor(String volumeName, String bucketName,
+      String keyName) throws Exception {
+    int found = 0;
+    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> entries =
+             omMetadataManager.getDeletedTable().iterator()) {
+      while (entries.hasNext()) {
+        if (entries.next().getKey().contains(keyName)) {
+          found++;
+        }
+      }
+    }
+    return found;
+  }
+
   public void checkDeleteTableCount(String volumeName,
       String bucketName, String keyName, int count, String uploadId)
       throws Exception {
@@ -123,6 +232,21 @@ public class TestS3MultipartUploadCompleteRequest
 
   private String checkValidateAndUpdateCacheSuccess(String volumeName,
       String bucketName, String keyName, Map<String, String> metadata, Map<String, String> tags) throws Exception {
+    return checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName,
+        metadata, tags, 0L, getNamespaceCount());
+  }
+
+  /**
+   * @param trxnBase offset added to the transaction indexes, so that a test can
+   *     run the flow more than once: versionIds have to increase within a key.
+   * @param expectedNamespace the bucket's used namespace once the upload
+   *     completes; a versioned overwrite adds a record rather than replacing
+   *     one, so the count grows.
+   */
+  private String checkValidateAndUpdateCacheSuccess(String volumeName,
+      String bucketName, String keyName, Map<String, String> metadata,
+      Map<String, String> tags, long trxnBase, long expectedNamespace)
+      throws Exception {
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName, metadata, tags);
@@ -131,7 +255,7 @@ public class TestS3MultipartUploadCompleteRequest
         getS3InitiateMultipartUploadReq(initiateMPURequest);
 
     OMClientResponse omClientResponse =
-        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 1L);
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, trxnBase + 1L);
 
     long clientID = Time.now();
     String multipartUploadID = omClientResponse.getOMResponse()
@@ -146,7 +270,7 @@ public class TestS3MultipartUploadCompleteRequest
     // Add key to open key table.
     addKeyToTable(volumeName, bucketName, keyName, clientID);
 
-    s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager, 2L);
+    s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager, trxnBase + 2L);
 
     List<Part> partList = new ArrayList<>();
 
@@ -167,7 +291,7 @@ public class TestS3MultipartUploadCompleteRequest
         getS3MultipartUploadCompleteReq(completeMultipartRequest);
 
     omClientResponse =
-        s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager, 3L);
+        s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager, trxnBase + 3L);
 
     BatchOperation batchOperation
         = omMetadataManager.getStore().initBatchOperation();
@@ -202,8 +326,7 @@ public class TestS3MultipartUploadCompleteRequest
         .getCacheValue(new CacheKey<>(
             omMetadataManager.getBucketKey(volumeName, bucketName)))
         .getCacheValue();
-    assertEquals(getNamespaceCount(),
-        omBucketInfo.getUsedNamespace());
+    assertEquals(expectedNamespace, omBucketInfo.getUsedNamespace());
     return multipartUploadID;
   }
 
