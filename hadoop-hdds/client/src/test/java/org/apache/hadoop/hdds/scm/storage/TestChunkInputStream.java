@@ -261,7 +261,9 @@ public class TestChunkInputStream {
         ArgumentCaptor.forClass(ContainerCommandRequestProto.class);
     when(client.getPipeline())
         .thenAnswer(invocation -> pipelineRef.get());
-    when(client.sendCommand(requestCaptor.capture(), any()))
+    when(client.getDatanodesInOrder(any(), any()))
+        .thenAnswer(invocation -> pipelineRef.get().getNodes());
+    when(client.sendCommand(requestCaptor.capture(), any(), any()))
         .thenAnswer(invocation ->
             getReadChunkResponse(
                 requestCaptor.getValue(),
