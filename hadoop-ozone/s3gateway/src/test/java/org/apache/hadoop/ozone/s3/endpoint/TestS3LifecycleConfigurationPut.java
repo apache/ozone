@@ -142,10 +142,13 @@ public class TestS3LifecycleConfigurationPut {
       throws Exception {
     // OM also raises INVALID_REQUEST for conditions that are not rejected rule values, such as the
     // bucket layout mismatch in OMLifecycleConfigurationSetRequest. Those keep reporting
-    // InvalidRequest instead of being remapped to InvalidArgument.
-    assertUnhandledOMExceptionPropagated(
-        new OMException("Bucket layout mismatch", OMException.ResultCodes.INVALID_REQUEST),
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+    // InvalidRequest instead of being remapped to InvalidArgument, and OM's message is surfaced.
+    OMException omException = new OMException("Bucket layout mismatch", OMException.ResultCodes.INVALID_REQUEST);
+    OS3Exception ex = putLifecycleConfigurationThrowingOm(omException);
+    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+    assertEquals(INVALID_REQUEST.getCode(), ex.getCode());
+    assertEquals(omException.getMessage(), ex.getErrorMessage(),
+        "OM's detailed message should be surfaced for server-side INVALID_REQUEST");
   }
 
   @Test

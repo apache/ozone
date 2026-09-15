@@ -144,7 +144,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
       if (ex.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, bucketName, ex).withMessage(ex.getMessage());
       }
-      throw S3ErrorTable.newError(bucketName, ex).withMessage(ex.getMessage());
+      throw S3ErrorTable.newError(bucketName, ex);
     }
 
     try {
@@ -152,11 +152,10 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     } catch (OMException ex) {
       // OM raises INVALID_REQUEST for server-side conditions as well, such as a bucket layout
       // mismatch, so its result codes keep the shared translation instead of being remapped.
-      OS3Exception os3Exception = S3ErrorTable.newError(bucketName, ex);
       if (ex.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
-        os3Exception.withMessage(ex.getMessage());
+        throw S3ErrorTable.newError(bucketName, ex).withMessage(ex.getMessage());
       }
-      throw os3Exception;
+      throw S3ErrorTable.newError(bucketName, ex);
     }
     return Response.ok().build();
   }
