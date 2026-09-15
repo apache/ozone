@@ -510,7 +510,7 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   /**
    * @return list all LifecycleConfigurations.
    */
-  List<OmLifecycleConfiguration> listLifecycleConfigurations() throws OMException;
+  List<OmLifecycleConfiguration> listLifecycleConfigurations() throws IOException;
 
   /**
    * Fetches the lifecycle configuration by bucketName.

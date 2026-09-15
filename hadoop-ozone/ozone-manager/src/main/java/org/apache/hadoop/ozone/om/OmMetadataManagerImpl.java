@@ -1779,23 +1779,37 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @return list all LifecycleConfigurations.
    */
   @Override
-  public List<OmLifecycleConfiguration> listLifecycleConfigurations() {
+  public List<OmLifecycleConfiguration> listLifecycleConfigurations() throws IOException {
     List<OmLifecycleConfiguration> result = Lists.newArrayList();
+    Set<String> cachedKeys = new HashSet<>();
 
-    /* lifecycleConfigurationTable is full-cache, so we use cacheIterator. */
+    // lifecycleConfigurationTable uses partial cache, so cacheIterator() only returns
+    // entries that are currently in memory. Process cache entries first to handle
+    // any pending writes or pending deletes that have not yet been flushed to RocksDB.
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmLifecycleConfiguration>>>
         cacheIterator = getLifecycleConfigurationTable().cacheIterator();
-
-    OmLifecycleConfiguration lifecycleConfiguration;
     while (cacheIterator.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmLifecycleConfiguration>> entry =
           cacheIterator.next();
-      lifecycleConfiguration = entry.getValue().getCacheValue();
+      cachedKeys.add(entry.getKey().getCacheKey());
+      OmLifecycleConfiguration lifecycleConfiguration = entry.getValue().getCacheValue();
       if (lifecycleConfiguration == null) {
-        // lifecycleConfiguration null means it's a deleted.
+        // null means it's a pending delete.
         continue;
       }
       result.add(lifecycleConfiguration);
+    }
+
+    // Also iterate RocksDB to pick up entries that have been evicted from (or were
+    // never loaded into) the partial cache.
+    try (TableIterator<String, ? extends KeyValue<String, OmLifecycleConfiguration>>
+             iter = getLifecycleConfigurationTable().iterator()) {
+      while (iter.hasNext()) {
+        KeyValue<String, OmLifecycleConfiguration> kv = iter.next();
+        if (!cachedKeys.contains(kv.getKey())) {
+          result.add(kv.getValue());
+        }
+      }
     }
 
     return result;
