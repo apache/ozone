@@ -37,7 +37,9 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
  * The input stream for Ozone file system.
  *
  * TODO: Make inputStream generic for both rest and rpc clients
- * This class is not thread safe.
+ * Sequential reads are not thread safe. Positioned reads use a native
+ * stateless path when the underlying {@link ExtendedInputStream} supports it;
+ * otherwise they fall back to a synchronized seek-read-restore sequence.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -46,6 +48,7 @@ public class OzoneFSInputStream extends FSInputStream
 
   private final InputStream inputStream;
   private final Statistics statistics;
+  private final Object positionedReadLock = new Object();
 
   public OzoneFSInputStream(InputStream inputStream, Statistics statistics) {
     this.inputStream = inputStream;
@@ -180,6 +183,14 @@ public class OzoneFSInputStream extends FSInputStream
       }
     }
 
+    // Fallback: stateful seek-read-restore on the shared cursor.
+    synchronized (positionedReadLock) {
+      return readAtPositionSeekRestore(position, buf);
+    }
+  }
+
+  private int readAtPositionSeekRestore(long position, ByteBuffer buf)
+      throws IOException {
     long oldPos = this.getPos();
     int bytesRead;
     try {
@@ -209,6 +220,77 @@ public class OzoneFSInputStream extends FSInputStream
         // Still buffer has space to read but stream has already reached EOF
         throw new EOFException("End of file reached before reading fully.");
       }
+    }
+  }
+
+  /**
+   * Byte-array positioned read. Tries the native stateless {@link ExtendedInputStream#readFully}
+   * path first (via a zero-copy {@link ByteBuffer#wrap}). Falls back to a synchronized
+   * seek-read-restore using byte-array {@link #read(byte[], int, int)} so that the fallback
+   * works for any {@link Seekable} stream, not just those that also implement
+   * {@link org.apache.hadoop.fs.ByteBufferReadable}.
+   * <p>
+   * {@link FSInputStream} synchronizes its inherited implementation on {@code this}, a different
+   * monitor from {@code positionedReadLock}; without this override the two APIs can interleave.
+   */
+  @Override
+  public int read(long position, byte[] buffer, int offset, int length) throws IOException {
+    if (inputStream instanceof ExtendedInputStream) {
+      final ByteBuffer buf = ByteBuffer.wrap(buffer, offset, length);
+      try {
+        if (((ExtendedInputStream) inputStream).readFully(position, buf)) {
+          return length - buf.remaining();
+        }
+      } catch (EOFException e) {
+        return -1;
+      }
+    }
+    synchronized (positionedReadLock) {
+      return readAtPositionSeekRestoreByteArray(position, buffer, offset, length);
+    }
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
+    if (inputStream instanceof ExtendedInputStream) {
+      final ByteBuffer buf = ByteBuffer.wrap(buffer, offset, length);
+      try {
+        if (((ExtendedInputStream) inputStream).readFully(position, buf)) {
+          return;
+        }
+      } catch (EOFException e) {
+        throw e;
+      }
+    }
+    synchronized (positionedReadLock) {
+      int remaining = length;
+      int off = offset;
+      while (remaining > 0) {
+        int n = readAtPositionSeekRestoreByteArray(position + (length - remaining), buffer, off, remaining);
+        if (n < 0) {
+          throw new EOFException("End of file reached before reading fully.");
+        }
+        off += n;
+        remaining -= n;
+      }
+    }
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer) throws IOException {
+    readFully(position, buffer, 0, buffer.length);
+  }
+
+  private int readAtPositionSeekRestoreByteArray(long position, byte[] buffer, int offset, int length)
+      throws IOException {
+    final long oldPos = getPos();
+    try {
+      ((Seekable) inputStream).seek(position);
+      return read(buffer, offset, length);
+    } catch (EOFException e) {
+      return -1;
+    } finally {
+      ((Seekable) inputStream).seek(oldPos);
     }
   }
 }
