@@ -43,10 +43,29 @@ const CollapseIcon: React.FC<{ collapsed: boolean }> = ({ collapsed }) => (
   </svg>
 );
 
+/** A 4×20 rounded accent pill, vertically centred at the item's left edge. */
+const ActiveIndicator: React.FC = () => (
+  <span
+    aria-hidden
+    style={{
+      position: 'absolute',
+      left: 0,
+      top: '50%',
+      transform: 'translateY(-50%)',
+      width: 4,
+      height: 20,
+      borderRadius: radius.pill,
+      backgroundColor: semanticColors.navIndicator,
+    }}
+  />
+);
+
 /**
- * Mark the selected leaf item with a left accent bar and keep every other leaf
- * aligned with a matching transparent border, so selection reads as a small
- * indicator rather than a full-row highlight.
+ * Highlight the selected leaf item with the design-system accent pill. The
+ * indicator is injected into the item's label as a fragment so it anchors to the
+ * (position: relative) menu item and sits out of flow — no layout shift for the
+ * other items. The selected-row background comes from the Menu theme's
+ * `itemSelectedBg`; the pill/right-rounding here shape that highlight.
  */
 const decorateItems = (items: MenuItem[], selectedKey: string | null): MenuItem[] =>
   items.map((item) => {
@@ -59,10 +78,17 @@ const decorateItems = (items: MenuItem[], selectedKey: string | null): MenuItem[
     const isSelected = item.key != null && item.key === selectedKey;
     return {
       ...item,
+      label: isSelected ? (
+        <>
+          {item.label}
+          <ActiveIndicator />
+        </>
+      ) : (
+        item.label
+      ),
       style: {
-        // Square accent bar on the left, hover/selection pill rounded on the
-        // right only, with a small right inset so the rounding is visible.
-        borderLeft: `3px solid ${isSelected ? semanticColors.navIndicator : 'transparent'}`,
+        // Hover/selection highlight is a pill rounded on the right only, with a
+        // small right inset so the rounding is visible against the rail edge.
         borderRadius: `0 ${radius.lg}px ${radius.lg}px 0`,
         marginInlineEnd: spacing.sm,
         ...item.style,

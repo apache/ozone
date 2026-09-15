@@ -186,13 +186,15 @@ export const semanticColors = {
   bgTopbar: colors.pewter[25],
   bgSidebar: colors.pewter[25],
   // Navigation rail item colours (light theme).
-  navItemColor: colors.pewter[600],
+  navItemColor: colors.pewter[950],
   navItemColorSelected: colors.pewter[950],
-  navItemColorHover: colors.pewter[900],
+  navItemColorHover: colors.pewter[950],
   navItemBgHover: colors.pewter[50],
+  /** Background highlight of the selected navigation item. */
+  navItemBgSelected: colors.pewter[50],
   navIconColor: colors.pewter[400],
   navGroupTitleColor: colors.pewter[600],
-  /** The 3px accent bar marking the selected navigation item (brand primary). */
+  /** The accent pill marking the selected navigation item. */
   navIndicator: colors.green[500],
 } as const;
 

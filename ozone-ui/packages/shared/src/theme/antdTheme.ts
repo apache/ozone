@@ -90,7 +90,7 @@ export const ozoneTheme: ThemeConfig = {
       itemBg: 'transparent',
       subMenuItemBg: 'transparent',
       itemColor: semanticColors.navItemColor,
-      itemSelectedBg: 'transparent',
+      itemSelectedBg: semanticColors.navItemBgSelected,
       itemSelectedColor: semanticColors.navItemColorSelected,
       itemHoverBg: semanticColors.navItemBgHover,
       itemHoverColor: semanticColors.navItemColorHover,
