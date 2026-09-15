@@ -86,7 +86,7 @@ public class VersionEndpointTask implements
 
             // Start the container services after getting the version information
             ozoneContainer.start(clusterId);
-          } catch (Exception ex) {
+          } catch (Exception | Error ex) {
             // Handle this in the task: its caller may already have timed out waiting for startup.
             LOG.error("Failed to start required container services for SCM {}. Shutting down datanode.",
                 rpcEndPoint.getAddress(), ex);
