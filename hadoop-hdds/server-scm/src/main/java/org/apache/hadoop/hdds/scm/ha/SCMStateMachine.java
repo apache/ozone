@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -30,6 +31,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
@@ -82,6 +85,18 @@ public class SCMStateMachine extends BaseStateMachine {
   private final boolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
+  // Interval for the fallback retry that starts the deferred datanode-server on
+  // a follower (see retryStartDNServerUntilReady).
+  private static final Duration DN_SERVER_START_RETRY_INTERVAL =
+      Duration.ofSeconds(1);
+  private final Duration dnServerStartRetryInterval;
+
+  // Periodically retries the deferred datanode-server start on a follower so an
+  // idle cluster (no new transactions, only Ratis heartbeats) still exits safe
+  // mode once catch-up becomes observable.
+  private ScheduledExecutorService dnServerStartRetryExecutor;
+  private ScheduledFuture<?> dnServerStartRetryFuture;
+
   private DBCheckpoint installingDBCheckpoint = null;
   private List<ManagedSecretKey> installingSecretKeys = null;
 
@@ -95,10 +110,17 @@ public class SCMStateMachine extends BaseStateMachine {
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
+    this(scm, buffer, DN_SERVER_START_RETRY_INTERVAL);
+  }
+
+  @VisibleForTesting
+  SCMStateMachine(final StorageContainerManager scm,
+      SCMHADBTransactionBuffer buffer, Duration retryInterval) {
     this.scm = scm;
     this.invokers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
     this.metrics = scm.getMetrics();
+    this.dnServerStartRetryInterval = retryInterval;
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
     if (!latestTrxInfo.isDefault()) {
       updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
@@ -111,12 +133,18 @@ public class SCMStateMachine extends BaseStateMachine {
             .setNameFormat(scm.threadNamePrefix() + "SCMInstallSnapshot-%d")
             .build()
     );
+    this.dnServerStartRetryExecutor = HadoopExecutors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder()
+            .setNameFormat(scm.threadNamePrefix() + "SCMDNServerStartRetry-%d")
+            .setDaemon(true)
+            .build());
     isInitialized = true;
   }
 
   public SCMStateMachine() {
     isInitialized = false;
     this.metrics = null;
+    this.dnServerStartRetryInterval = DN_SERVER_START_RETRY_INTERVAL;
   }
 
   private void addRatisEvent(String message) {
@@ -301,6 +329,7 @@ public class SCMStateMachine extends BaseStateMachine {
         leaderCommitIndexOnStart = getLeaderCommitIndex();
       }
       tryStartDNServerAndRefreshSafeMode();
+      scheduleDNServerStartRetry();
       String message = "Leader changed to " + newLeaderId +
           ", current SCM " + scm.getScmId() + " is still follower.";
       LOG.info(message);
@@ -414,16 +443,75 @@ public class SCMStateMachine extends BaseStateMachine {
    * container reports are processed against the up-to-date container/pipeline
    * state rather than a stale, mid-replay snapshot.
    */
-  private void tryStartDNServerAndRefreshSafeMode() {
-    if (isStateMachineReady.get()) {
+  private synchronized void tryStartDNServerAndRefreshSafeMode() {
+    if (scm.isStopped() || isStateMachineReady.get()) {
       return;
     }
     if (scm.getScmContext().isLeader() || isFollowerCaughtUp()) {
       if (isStateMachineReady.compareAndSet(false, true)) {
+        // No further retry is needed. shutdown() lets the current retry, if
+        // this method was called by it, finish normally without cancellation.
+        dnServerStartRetryExecutor.shutdown();
         scm.getDatanodeProtocolServer().start();
         scm.getScmSafeModeManager().refreshAndValidate();
       }
     }
+  }
+
+  /**
+   * Periodic fallback for the deferred datanode-server start on a follower. The
+   * Ratis callbacks ({@code applyTransaction}, {@code notifyTermIndexUpdated},
+   * {@code notifyLeaderChanged}) only fire on new activity, so on an idle
+   * cluster a restarted follower can miss the moment the leader's committed
+   * index becomes observable (it is not yet known when {@code notifyLeaderChanged}
+   * fires) and never start its datanode server, leaving it stuck in safe mode.
+   * This re-checks until the server starts. Starting stays
+   * gated by the same {@link #tryStartDNServerAndRefreshSafeMode()} predicate, so
+   * it cannot start the server before genuine catch-up.
+   */
+  private void retryStartDNServerUntilReady() {
+    try {
+      if (!scm.isStopped() && !isStateMachineReady.get()) {
+        tryStartDNServerAndRefreshSafeMode();
+      }
+    } catch (Exception e) {
+      // Do not let a failed readiness check terminate the fallback. The
+      // finally block only schedules another attempt if startup is pending.
+      LOG.warn("Deferred datanode-server start retry failed", e);
+    } finally {
+      synchronized (this) {
+        dnServerStartRetryFuture = null;
+        scheduleDNServerStartRetry();
+      }
+    }
+  }
+
+  private synchronized void scheduleDNServerStartRetry() {
+    if (scm.isStopped() || isStateMachineReady.get() ||
+        dnServerStartRetryExecutor.isShutdown() || dnServerStartRetryFuture != null) {
+      return;
+    }
+    dnServerStartRetryFuture = dnServerStartRetryExecutor.schedule(
+        this::retryStartDNServerUntilReady,
+        dnServerStartRetryInterval.toMillis(), TimeUnit.MILLISECONDS);
+  }
+
+  public void stopDNServerStartRetry() {
+    synchronized (this) {
+      dnServerStartRetryExecutor.shutdownNow();
+      dnServerStartRetryFuture = null;
+    }
+    HadoopExecutors.shutdown(dnServerStartRetryExecutor, LOG, 5, TimeUnit.SECONDS);
+  }
+
+  @VisibleForTesting
+  boolean isDNServerStartRetryStopped() {
+    return dnServerStartRetryExecutor.isShutdown();
+  }
+
+  @VisibleForTesting
+  boolean isDNServerStartRetryTerminated() {
+    return dnServerStartRetryExecutor.isTerminated();
   }
 
   /**
@@ -569,6 +657,7 @@ public class SCMStateMachine extends BaseStateMachine {
       transactionBuffer.close();
       HadoopExecutors.
           shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+      stopDNServerStartRetry();
     } else if (!scm.isStopped()) {
       scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
     }
