@@ -117,6 +117,7 @@ public class MiniOzoneClusterProvider {
   private static final int PRE_CREATE_LIMIT = 1;
   private static final int EXPIRED_LIMIT = 4;
   private volatile boolean shutdown = false;
+  private volatile boolean shutdownRequested = false;
   private final int clusterLimit;
   private int consumedClusterCount = 0;
 
@@ -125,7 +126,7 @@ public class MiniOzoneClusterProvider {
   private final Thread reapThread;
 
   private final Set<MiniOzoneCluster> createdClusters = new HashSet<>();
-  private final BlockingQueue<MiniOzoneCluster> clusters
+  private final BlockingQueue<ClusterCreationResult> clusterResults
       = new ArrayBlockingQueue<>(PRE_CREATE_LIMIT);
   private final BlockingQueue<MiniOzoneCluster> expiredClusters
       = new ArrayBlockingQueue<>(EXPIRED_LIMIT);
@@ -152,10 +153,14 @@ public class MiniOzoneClusterProvider {
           + "been reached for this provider. Please increase the value set "
           + "in the constructor");
     }
-    MiniOzoneCluster cluster = clusters.poll(100, SECONDS);
-    if (cluster == null) {
+    ClusterCreationResult result = clusterResults.poll(100, SECONDS);
+    if (result == null) {
       throw new IOException("Failed to obtain available cluster in time");
     }
+    if (result.getFailure() != null) {
+      throw result.getFailure();
+    }
+    MiniOzoneCluster cluster = result.getCluster();
     createdClusters.add(cluster);
     consumedClusterCount++;
     return cluster;
@@ -169,6 +174,7 @@ public class MiniOzoneClusterProvider {
   }
 
   public synchronized void shutdown() throws InterruptedException {
+    shutdownRequested = true;
     createThread.interrupt();
     createThread.join();
     destroyRemainingClusters();
@@ -215,14 +221,27 @@ public class MiniOzoneClusterProvider {
           cluster = builder.build();
           cluster.waitForClusterToBeReady();
           createdCount++;
-          clusters.put(cluster);
+          if (!addClusterResult(ClusterCreationResult.success(cluster))) {
+            cluster.shutdown();
+            break;
+          }
         } catch (InterruptedException e) {
           if (cluster != null) {
             cluster.shutdown();
           }
           break;
         } catch (IOException | TimeoutException e) {
-          throw new RuntimeException("Unable to build cluster", e);
+          LOG.warn("Unable to build cluster", e);
+          if (cluster != null) {
+            cluster.shutdown();
+          }
+          try {
+            if (!addClusterResult(ClusterCreationResult.failure(e))) {
+              break;
+            }
+          } catch (InterruptedException interrupted) {
+            break;
+          }
         }
       }
     });
@@ -231,10 +250,21 @@ public class MiniOzoneClusterProvider {
     return t;
   }
 
+  private boolean addClusterResult(ClusterCreationResult result)
+      throws InterruptedException {
+    while (!shutdownRequested) {
+      if (clusterResults.offer(result, 1, SECONDS)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private void destroyRemainingClusters() {
-    while (!clusters.isEmpty()) {
+    while (!clusterResults.isEmpty()) {
       try {
-        MiniOzoneCluster cluster = clusters.poll();
+        ClusterCreationResult result = clusterResults.poll();
+        MiniOzoneCluster cluster = result == null ? null : result.getCluster();
         if (cluster != null) {
           destroy(cluster);
         }
@@ -256,6 +286,34 @@ public class MiniOzoneClusterProvider {
       }
     }
     createdClusters.clear();
+  }
+
+  private static final class ClusterCreationResult {
+    private final MiniOzoneCluster cluster;
+    private final IOException failure;
+
+    private ClusterCreationResult(MiniOzoneCluster cluster,
+        IOException failure) {
+      this.cluster = cluster;
+      this.failure = failure;
+    }
+
+    private static ClusterCreationResult success(MiniOzoneCluster cluster) {
+      return new ClusterCreationResult(cluster, null);
+    }
+
+    private static ClusterCreationResult failure(Exception failure) {
+      return new ClusterCreationResult(null,
+          new IOException("Unable to build cluster", failure));
+    }
+
+    private MiniOzoneCluster getCluster() {
+      return cluster;
+    }
+
+    private IOException getFailure() {
+      return failure;
+    }
   }
 
 }
