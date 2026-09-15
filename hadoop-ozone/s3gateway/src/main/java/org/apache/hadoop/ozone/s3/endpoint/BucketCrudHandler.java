@@ -41,15 +41,14 @@ import org.apache.http.HttpStatus;
  */
 public class BucketCrudHandler extends BucketOperationHandler {
 
-  /**
-   * Handle only plain PUT bucket (create bucket), not subresources.
-   */
+  /** Handle only plain bucket creation and deletion, not subresources. */
   private boolean shouldHandle() {
     return queryParams().get(QueryParams.ACL) == null
         && queryParams().get(QueryParams.UPLOADS) == null
         && queryParams().get(QueryParams.DELETE) == null
         && queryParams().get(QueryParams.TAGGING) == null
-        && queryParams().get(QueryParams.LIFECYCLE) == null;
+        && queryParams().get(QueryParams.LIFECYCLE) == null
+        && queryParams().get(QueryParams.PUBLIC_ACCESS_BLOCK) == null;
   }
 
   /**
