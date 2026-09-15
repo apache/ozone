@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anySet;
 import static org.mockito.Mockito.mock;
@@ -64,6 +65,7 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -93,6 +95,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Unit test key manager.
@@ -581,10 +585,265 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .getContainerWithPipelineBatch(containerIDs);
   }
 
+  private OmKeyInfo versionedKeyInfo(String volume, String bucket, String key,
+      long versionId, boolean nullVersion, boolean deleteMarker) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setKeyName(key)
+        .setOmKeyLocationInfos(Collections.emptyList())
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setDataSize(0)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
+        .setVersionId(versionId)
+        .setNullVersion(nullVersion)
+        .setDeleteMarker(deleteMarker)
+        .build();
+  }
+
+  @Test
+  public void testLookupKeyByVersionId() throws Exception {
+    String volume = "vol-ver";
+    String bucket = "buck-ver";
+    String key = "obj";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket, metadataManager,
+        BucketLayout.OBJECT_STORE);
+
+    // current version 30, one noncurrent version 20, and a null version 10
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        metadataManager.getOzoneKey(volume, bucket, key),
+        versionedKeyInfo(volume, bucket, key, 30L, false, false));
+    metadataManager.getVersionedKeyTable().put(
+        metadataManager.getVersionedOzoneKey(volume, bucket, key, 20L),
+        versionedKeyInfo(volume, bucket, key, 20L, false, false));
+    metadataManager.getVersionedKeyTable().put(
+        metadataManager.getVersionedOzoneKey(volume, bucket, key, 10L),
+        versionedKeyInfo(volume, bucket, key, 10L, true, false));
+
+    OmKeyArgs.Builder base = new OmKeyArgs.Builder()
+        .setVolumeName(volume).setBucketName(bucket).setKeyName(key)
+        .setHeadOp(true);
+
+    // no versionId addresses the current version
+    OmKeyArgs args = base.build();
+    assertEquals(30L, keyManager.lookupKey(args, resolveBucket(args), null)
+        .getVersionId());
+
+    // the current version can also be addressed by its id
+    args = base.setVersionId(30L).build();
+    assertEquals(30L, keyManager.lookupKey(args, resolveBucket(args), null)
+        .getVersionId());
+
+    // a noncurrent version resolves through the versionedKeyTable
+    args = base.setVersionId(20L).build();
+    assertEquals(20L, keyManager.lookupKey(args, resolveBucket(args), null)
+        .getVersionId());
+
+    // the null version slot is found by attribute, not by id
+    args = base.setNullVersion(true).build();
+    OmKeyInfo nullVersion =
+        keyManager.lookupKey(args, resolveBucket(args), null);
+    assertEquals(10L, nullVersion.getVersionId());
+    assertTrue(nullVersion.isNullVersion());
+
+    // an unknown versionId is a plain not-found
+    OmKeyArgs unknown = base.setVersionId(999L).build();
+    OMException ex = assertThrows(OMException.class,
+        () -> keyManager.lookupKey(unknown, resolveBucket(unknown), null));
+    assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
+  }
+
+  @Test
+  public void testNullVersionIsVisibleInTheCacheWindow() throws Exception {
+    String volume = "vol-ver-cache";
+    String bucket = "buck-ver-cache";
+    String key = "obj";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket, metadataManager,
+        BucketLayout.OBJECT_STORE);
+
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        metadataManager.getOzoneKey(volume, bucket, key),
+        versionedKeyInfo(volume, bucket, key, 30L, false, false));
+    // the null version was demoted by a transaction the double buffer has not
+    // flushed yet, so it exists in the cache only
+    String cachedNullVersion =
+        metadataManager.getVersionedOzoneKey(volume, bucket, key, 10L);
+    metadataManager.getVersionedKeyTable().addCacheEntry(cachedNullVersion,
+        versionedKeyInfo(volume, bucket, key, 10L, true, false), 1L);
+
+    OmKeyArgs.Builder base = new OmKeyArgs.Builder()
+        .setVolumeName(volume).setBucketName(bucket).setKeyName(key)
+        .setHeadOp(true);
+
+    OmKeyArgs args = base.setNullVersion(true).build();
+    OmKeyInfo nullVersion =
+        keyManager.lookupKey(args, resolveBucket(args), null);
+    assertEquals(10L, nullVersion.getVersionId());
+    assertTrue(nullVersion.isNullVersion());
+  }
+
+  @Test
+  public void testNullVersionDeletedInTheCacheWindowIsGone() throws Exception {
+    String volume = "vol-ver-tombstone";
+    String bucket = "buck-ver-tombstone";
+    String key = "obj";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket, metadataManager,
+        BucketLayout.OBJECT_STORE);
+
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        metadataManager.getOzoneKey(volume, bucket, key),
+        versionedKeyInfo(volume, bucket, key, 30L, false, false));
+    String flushedNullVersion =
+        metadataManager.getVersionedOzoneKey(volume, bucket, key, 10L);
+    metadataManager.getVersionedKeyTable().put(flushedNullVersion,
+        versionedKeyInfo(volume, bucket, key, 10L, true, false));
+    // removed by a transaction that is not flushed yet: the DB still has it
+    metadataManager.getVersionedKeyTable().addCacheEntry(
+        new CacheKey<>(flushedNullVersion), CacheValue.get(1L));
+
+    OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(volume).setBucketName(bucket).setKeyName(key)
+        .setHeadOp(true).setNullVersion(true).build();
+    OMException ex = assertThrows(OMException.class,
+        () -> keyManager.lookupKey(args, resolveBucket(args), null));
+    assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
+  }
+
+  @Test
+  public void testLookupOfDeleteMarkerIsDistinguishable() throws Exception {
+    String volume = "vol-marker";
+    String bucket = "buck-marker";
+    String key = "obj";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket, metadataManager,
+        BucketLayout.OBJECT_STORE);
+
+    // current version is a marker, with a readable version behind it
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        metadataManager.getOzoneKey(volume, bucket, key),
+        versionedKeyInfo(volume, bucket, key, 40L, false, true));
+    metadataManager.getVersionedKeyTable().put(
+        metadataManager.getVersionedOzoneKey(volume, bucket, key, 20L),
+        versionedKeyInfo(volume, bucket, key, 20L, false, false));
+
+    OmKeyArgs.Builder base = new OmKeyArgs.Builder()
+        .setVolumeName(volume).setBucketName(bucket).setKeyName(key)
+        .setHeadOp(true);
+
+    // without a versionId a current marker reads as absent
+    OmKeyArgs current = base.build();
+    OMException ex = assertThrows(OMException.class,
+        () -> keyManager.lookupKey(current, resolveBucket(current), null));
+    assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
+
+    // naming the marker's version is a different condition: S3 answers 405
+    OmKeyArgs marker = base.setVersionId(40L).build();
+    ex = assertThrows(OMException.class,
+        () -> keyManager.lookupKey(marker, resolveBucket(marker), null));
+    assertEquals(OMException.ResultCodes.KEY_IS_DELETE_MARKER, ex.getResult());
+
+    // the version behind the marker stays readable
+    OmKeyArgs behind = base.setVersionId(20L).build();
+    assertEquals(20L,
+        keyManager.lookupKey(behind, resolveBucket(behind), null).getVersionId());
+
+    // a marker that is no longer current is the same condition: the marker is
+    // addressable wherever it sits, and never has a body to return
+    metadataManager.getVersionedKeyTable().put(
+        metadataManager.getVersionedOzoneKey(volume, bucket, key, 30L),
+        versionedKeyInfo(volume, bucket, key, 30L, false, true));
+    OmKeyArgs noncurrentMarker = base.setVersionId(30L).build();
+    ex = assertThrows(OMException.class, () -> keyManager.lookupKey(
+        noncurrentMarker, resolveBucket(noncurrentMarker), null));
+    assertEquals(OMException.ResultCodes.KEY_IS_DELETE_MARKER, ex.getResult());
+  }
+
+  @Test
+  public void testCurrentVersionIsResolvedWithoutReadingVersionedKeyTable()
+      throws Exception {
+    String volume = "vol-cur";
+    String bucket = "buck-cur";
+    String key = "obj";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket, metadataManager,
+        BucketLayout.OBJECT_STORE);
+
+    // The current version and a decoy stored under the dbKey that version would
+    // occupy in the versionedKeyTable. Resolving to the current record proves
+    // the lookup answers from keyTable and never falls through to the scan.
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        metadataManager.getOzoneKey(volume, bucket, key),
+        versionedKeyInfo(volume, bucket, key, 30L, false, false));
+    metadataManager.getVersionedKeyTable().put(
+        metadataManager.getVersionedOzoneKey(volume, bucket, key, 30L),
+        versionedKeyInfo(volume, bucket, key, 30L, false, true));
+
+    OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(volume).setBucketName(bucket).setKeyName(key)
+        .setHeadOp(true).setVersionId(30L).build();
+
+    // the decoy is a delete marker, so reading it would have thrown
+    assertEquals(30L, keyManager.lookupKey(args, resolveBucket(args), null)
+        .getVersionId());
+  }
+
+  @Test
+  public void testNullVersionSlotCanBeTheCurrentVersion() throws Exception {
+    String volume = "vol-null";
+    String bucket = "buck-null";
+    String key = "obj";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket, metadataManager,
+        BucketLayout.OBJECT_STORE);
+
+    // A suspended PUT leaves the null version as the current one, with the
+    // versions accumulated while enabled behind it.
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).put(
+        metadataManager.getOzoneKey(volume, bucket, key),
+        versionedKeyInfo(volume, bucket, key, 50L, true, false));
+    metadataManager.getVersionedKeyTable().put(
+        metadataManager.getVersionedOzoneKey(volume, bucket, key, 20L),
+        versionedKeyInfo(volume, bucket, key, 20L, false, false));
+
+    OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(volume).setBucketName(bucket).setKeyName(key)
+        .setHeadOp(true).setNullVersion(true).build();
+
+    OmKeyInfo nullVersion = keyManager.lookupKey(args, resolveBucket(args), null);
+    assertEquals(50L, nullVersion.getVersionId());
+    assertTrue(nullVersion.isNullVersion());
+  }
+
+  /** Versions live in the OBJECT_STORE layout only; the others cannot hold one. */
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class,
+      names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
+  public void testVersionIdRejectedOnNonObjectStoreBucket(BucketLayout layout)
+      throws Exception {
+    String volume = "vol-" + layout.name().toLowerCase();
+    String bucket = "buck-" + layout.name().toLowerCase();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket, metadataManager,
+        layout);
+
+    OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(volume).setBucketName(bucket).setKeyName("obj")
+        .setHeadOp(true).setVersionId(1L).build();
+    ResolvedBucket resolved =
+        new ResolvedBucket(volume, bucket, volume, bucket, "", layout);
+
+    OMException ex = assertThrows(OMException.class,
+        () -> keyManager.lookupKey(args, resolved, null));
+    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION,
+        ex.getResult());
+  }
+
+  /**
+   * Resolves to OBJECT_STORE, the layout the versioning tests create their
+   * buckets with. BucketLayout.DEFAULT is LEGACY, which shares this lookup
+   * path but may not address a version.
+   */
   private ResolvedBucket resolveBucket(OmKeyArgs keyArgs) {
     return new ResolvedBucket(keyArgs.getVolumeName(), keyArgs.getBucketName(),
         keyArgs.getVolumeName(), keyArgs.getBucketName(), "",
-        BucketLayout.DEFAULT);
+        BucketLayout.OBJECT_STORE);
   }
 
   @Test

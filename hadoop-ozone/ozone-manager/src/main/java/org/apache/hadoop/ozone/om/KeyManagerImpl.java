@@ -622,15 +622,37 @@ public class KeyManagerImpl implements KeyManager {
           .validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(), keyName,
               bucketLayout);
 
+      // Only OBJECT_STORE buckets can hold versions, so addressing one
+      // anywhere else is refused rather than answered as a missing key: a
+      // LEGACY bucket reaches the same lookup path as OBJECT_STORE and would
+      // otherwise scan the versionedKeyTable and report the key not found.
+      if (args.addressesVersion()
+          && bucketLayout != BucketLayout.OBJECT_STORE) {
+        throw new OMException("Object versioning is only supported on "
+            + BucketLayout.OBJECT_STORE + " buckets",
+            ResultCodes.NOT_SUPPORTED_OPERATION);
+      }
+
       if (bucketLayout.isFileSystemOptimized()) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName, bucketLayout);
+        if (args.addressesVersion()) {
+          value = getAddressedVersion(args, volumeName, bucketName, keyName,
+              value);
+        }
         if (value != null) {
           // For Legacy & OBS buckets, any key is a file by default. This is to
           // keep getKeyInfo compatible with OFS clients.
           value.setFile(true);
         }
+      }
+      if (value != null && value.isDeleteMarker()) {
+        // Addressing a delete marker by version is answered with 405 by S3,
+        // while a request that lands on a current marker is a plain 404.
+        throw new OMException("Key: " + keyName + " is a delete marker",
+            args.addressesVersion()
+                ? ResultCodes.KEY_IS_DELETE_MARKER : ResultCodes.KEY_NOT_FOUND);
       }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
@@ -695,6 +717,38 @@ public class KeyManagerImpl implements KeyManager {
     return metadataManager
         .getKeyTable(bucketLayout)
         .get(keyBytes);
+  }
+
+  /**
+   * Resolves the version addressed by {@code args} for a key whose current
+   * version is {@code current}. The current version is checked first, so a
+   * request naming the current version costs no extra read; otherwise the
+   * version is looked up in the versionedKeyTable.
+   *
+   * @param current the key's current version, or null when the key has none
+   * @return the addressed version, or null when it does not exist
+   */
+  private OmKeyInfo getAddressedVersion(OmKeyArgs args, String volumeName,
+      String bucketName, String keyName, OmKeyInfo current) throws IOException {
+    if (args.isNullVersion()) {
+      if (current != null && current.isNullVersion()) {
+        return current;
+      }
+      // The null version carries a normally generated versionId, so no dbKey
+      // addresses it: it has to be searched for by attribute, in the cache as
+      // well as in the DB.
+      Pair<String, OmKeyInfo> nullVersion = NoncurrentVersions.nullVersion(
+          metadataManager, volumeName, bucketName, keyName);
+      return nullVersion == null ? null : nullVersion.getValue();
+    }
+
+    long versionId = args.getVersionId();
+    if (current != null && current.getVersionId() != null
+        && current.getVersionId() == versionId) {
+      return current;
+    }
+    return metadataManager.getVersionedKeyTable().get(metadataManager
+        .getVersionedOzoneKey(volumeName, bucketName, keyName, versionId));
   }
 
   /**

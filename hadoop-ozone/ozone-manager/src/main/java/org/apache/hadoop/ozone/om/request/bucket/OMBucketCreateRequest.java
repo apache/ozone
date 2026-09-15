@@ -101,6 +101,17 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // FSO and LEGACY buckets are not strictly bound to S3 naming semantics.
     OmUtils.validateBucketName(bucketInfo.getBucketName(), strict);
 
+    // S3 has no way to create a bucket that is already in a versioning
+    // state; the state is set afterwards, through the transition checks in
+    // OMBucketSetPropertyRequest. versioningStatus is on BucketInfo because
+    // that message is also the bucket's on-disk record and the shape
+    // InfoBucket and ListBuckets return, not because a create needs it.
+    if (bucketInfo.hasVersioningStatus()) {
+      throw new OMException("Bucket versioning cannot be set while the bucket"
+          + " is being created; create the bucket first and then set its"
+          + " versioning status.", ResultCodes.INVALID_REQUEST);
+    }
+
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
       try {
