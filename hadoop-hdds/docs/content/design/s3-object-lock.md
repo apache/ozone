@@ -337,7 +337,7 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
 1. **Protobuf Definitions (`OmClientProtocol.proto`)**:
    - Introduce retention domain messages:
      - `RetentionMode` enum (`GOVERNANCE = 1`, `COMPLIANCE = 2`).
-     - `Rule` message (`retentionMode`, `days`, `years`).
+     - `Rule` message (`retentionMode`, `timeUnit`, `duration`).
      - `EventHold` message (`enabled`, `rule`).
      - `RetentionConfig` message (`rule`, `eventHold`).
    - Extend `BucketInfo` (OBS buckets only):
@@ -346,11 +346,14 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
    - Extend `KeyInfo` & `KeyInfoProtoLight`:
      - `optional RetentionConfig retentionConfig = 23;`
      - `optional bool legalHold = 24 [default = false];`
+   - Introduce new class `RetentionExpiration` to encapsulate rules of retention:
+     - `fromProto` to convert from protobuf to java class.
+     - `toProto` to convert from java class to protobuf.
+     - `validate` to validate the retention configuration (e.g., duration > 0, valid time unit, valid retention mode).
 
 2. **Domain Models & Helpers (`hadoop-ozone/common`)**:
    - Update `OmBucketInfo` / `OmBucketInfo.Builder` with getters, setters, and protobuf translation.
    - Update `OmKeyInfo` / `OmKeyInfo.Builder` with getters, setters, and protobuf translation.
-   - Create domain helper `RetentionUtils` in `org.apache.hadoop.ozone.om.helpers` to calculate `RetainUntilDate` from days/years against creation timestamp and validate date boundaries.
    - Validate bucket layout: enforce that Object Lock can only be enabled on `OBJECT_STORE` (OBS) layout buckets; reject `FILE_SYSTEM_OPTIMIZED` (FSO) or `LEGACY` buckets.
 
 ---
@@ -427,7 +430,7 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
 #### 1. Check Lock on Put / Copy Operations (Item 9)
 - **Bucket Default Retention Inheritance**:
   - When creating a *new* key in an Object-Lock-enabled bucket:
-    - If bucket has `defaultRetention`, automatically calculate `RetainUntilDate = currentTime + duration` and attach `RetentionConfig` to the newly committed `OmKeyInfo`.
+    - If bucket has `defaultRetention`, automatically attach `RetentionConfig` to the newly committed `OmKeyInfo`.
     - If request provides explicit retention/legal hold headers (`x-amz-object-lock-*`), validate permissions and apply them on creation.
 - **Overwrite Protection (Two-Phase Validation)**:
   - **`OMKeyCreateRequest.preExecute`** (Fail-fast):
@@ -469,16 +472,12 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
 
 *Goal: Ensure end-to-end test coverage across unit, integration, and security acceptance suites.*
 
-1. **Unit & Contract Tests**:
-   - `TestOmBucketInfo` & `TestOmKeyInfo`: Serialization/deserialization of retention configs and legal hold flags.
-   - `TestOMKeyCreateRequest`, `TestOMKeyCommitRequest`, `TestOMKeyDeleteRequest`, `TestS3MultipartUploadCompleteRequest`: Validate fail-fast (`preExecute`) and linearizable (`validateAndUpdateCache`) WORM rejections.
-   - `TestS3GActionIamMapper` & `TestIamSessionPolicyResolver`: Verify IAM S3 action string translations and scope mappings.
-2. **Acceptance & Ranger Smoke Tests (Docker Compose)**:
-   - Add automated test suites under `hadoop-ozone/dist/src/main/smoketest/security/s3-object-lock.robot`.
-   - Run in `ozonesecure-ha` environment (`test-ranger.sh`):
-     - Test dual-gate access control: verify users with `WRITE`/`DELETE` permissions are blocked by active WORM status.
-     - Test compliance officer role with `PutObjectLegalHold` and `BypassGovernanceRetention`.
-     - Test compliance immutability against admin accounts.
+**Acceptance & Ranger Smoke Tests (Docker Compose)**:
+- Add automated test suites under `hadoop-ozone/dist/src/main/smoketest/security/s3-object-lock.robot`.
+- Run in `ozonesecure-ha` environment (`test-ranger.sh`):
+  - Test dual-gate access control: verify users with `WRITE`/`DELETE` permissions are blocked by active WORM status.
+  - Test compliance officer role with `PutObjectLegalHold` and `BypassGovernanceRetention`.
+  - Test compliance immutability against admin accounts.
 
 Once S3 Versioning support matures, future efforts will focus on ensuring compatibility with S3 multi-version object locking.
 
