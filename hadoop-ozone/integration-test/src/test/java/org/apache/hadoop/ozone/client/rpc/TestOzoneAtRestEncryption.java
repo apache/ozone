@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import com.google.common.cache.Cache;
@@ -63,6 +64,7 @@ import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -75,6 +77,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
@@ -96,6 +99,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -115,7 +119,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 
+/**
+ * End-to-end tests for Ozone encryption at rest.
+ *
+ * <p>This suite runs against a local jceks {@link JavaKeyStoreProvider}
+ * instead of {@code MiniKMS}. hadoop-kms embeds Jetty 9, which cannot coexist
+ * with the Jetty 12 runtime this build targets, so MiniKMS was removed from
+ * the integration-test classpath during the Jetty 12 migration (HDDS-8280).
+ * The jceks provider is a no-op for EDEK warm-up and exposes no KMS queue to
+ * observe, so warm-up on OM startup is asserted with a spy over the provider
+ * (see {@link #testWarmupEDEKCacheOnStartup()}) rather than by polling queue
+ * size. Restoring coverage against a real KMS is tracked as a follow-up JIRA.
+ * </p>
+ */
 class TestOzoneAtRestEncryption {
 
   private static MiniOzoneCluster cluster = null;
@@ -202,6 +220,33 @@ class TestOzoneAtRestEncryption {
   static void reInitClient() throws IOException {
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
+  }
+
+  @Test
+  public void testWarmupEDEKCacheOnStartup() throws Exception {
+    // A bucket with an encryption key so the OM has an EDEK to warm up.
+    createVolumeAndBucket(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), BucketLayout.OBJECT_STORE);
+
+    // The jceks provider cannot be restarted into a spy (the OM rebuilds it in
+    // its constructor), so swap in a spy over the live provider and re-trigger
+    // the startup warm-up path directly with a zero initial delay.
+    KeyProviderCryptoExtension original = ozoneManager.getKmsProvider();
+    KeyProviderCryptoExtension kmsSpy = spy(original);
+    HddsWhiteboxTestUtils.setInternalState(ozoneManager, "kmsProvider", kmsSpy);
+    try {
+      OzoneConfiguration warmupConf = new OzoneConfiguration(conf);
+      warmupConf.setInt(OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, 0);
+      ozoneManager.initializeEdekCache(warmupConf);
+      // The OM must discover the configured encryption key from the bucket
+      // table and hand it to the warm-up loader on startup. warmUpEncryptedKeys
+      // is varargs, so Mockito captures the key names as individual elements.
+      ArgumentCaptor<String> keysCaptor = ArgumentCaptor.forClass(String.class);
+      verify(kmsSpy, timeout(60000)).warmUpEncryptedKeys(keysCaptor.capture());
+      assertThat(keysCaptor.getAllValues()).contains(TEST_KEY);
+    } finally {
+      HddsWhiteboxTestUtils.setInternalState(ozoneManager, "kmsProvider", original);
+    }
   }
 
   @ParameterizedTest

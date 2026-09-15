@@ -706,6 +706,30 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(Long.valueOf(content.length()), response.contentLength());
   }
 
+  /**
+   * A stored object's Content-Type must come back on the wire exactly as it was
+   * put, without a charset appended. This asserts the stored-object path through
+   * the gateway's real filter chain (QuotingInputFilter then S3ContentTypeFilter
+   * as declared in web.xml): on Jetty 12 a bare Content-Type such as
+   * {@code binary/octet-stream} would otherwise go out as
+   * {@code binary/octet-stream;charset=utf-8}. The S3ContentTypeFilter unit
+   * tests only drive a Mockito response and cannot detect such a wire change.
+   */
+  @Test
+  public void testHeadObjectContentTypePreservedVerbatim() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName).contentType("binary/octet-stream"),
+        RequestBody.fromString(content));
+
+    HeadObjectResponse headObjectResponse =
+        s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals("binary/octet-stream", headObjectResponse.contentType());
+  }
+
   @Test
   public void testHeadObjectIfUnmodifiedSinceFail() {
     final String bucketName = getBucketName();

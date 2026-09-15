@@ -73,11 +73,6 @@ public class JavaxFilterBridge implements Filter {
     this.delegate = delegate;
   }
 
-  /** The wrapped javax filter, exposed for configuration by the registrar. */
-  public javax.servlet.Filter getDelegate() {
-    return delegate;
-  }
-
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {
     try {

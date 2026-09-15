@@ -173,6 +173,22 @@ public final class HttpServer2 implements FilterContainer {
   private static final int HTTP_IDLE_TIMEOUT_MS_DEFAULT = 60000;
   private static final String HTTP_TEMP_DIR_KEY = "hadoop.http.temp.dir";
 
+  /**
+   * URI compliance mode used when {@code allowAmbiguousUri} is set. S3 object
+   * keys and WebHDFS paths legitimately contain empty path segments ("//"),
+   * percent encodings ("%25") and encoded path separators, which Jetty 12
+   * rejects with 400 by default. Rather than Jetty's broad LEGACY mode -- which
+   * would also re-admit %2e/%2e%2e path traversal, UTF-16 and truncated UTF-8
+   * encodings, suspicious path characters and userinfo on the internet-facing
+   * S3 Gateway and HttpFS -- relax only those three violations the use case
+   * needs.
+   */
+  private static final UriCompliance OZONE_AMBIGUOUS_URI_COMPLIANCE =
+      UriCompliance.DEFAULT.with("OZONE",
+          UriCompliance.Violation.AMBIGUOUS_EMPTY_SEGMENT,
+          UriCompliance.Violation.AMBIGUOUS_PATH_ENCODING,
+          UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR);
+
   public static final String FILTER_INITIALIZER_PROPERTY
       = "ozone.http.filter.initializers";
 
@@ -516,7 +532,7 @@ public final class HttpServer2 implements FilterContainer {
       httpConfig.setResponseHeaderSize(responseHeaderSize);
       httpConfig.setSendServerVersion(false);
       if (allowAmbiguousUri) {
-        httpConfig.setUriCompliance(UriCompliance.LEGACY);
+        httpConfig.setUriCompliance(OZONE_AMBIGUOUS_URI_COMPLIANCE);
       }
 
       int backlogSize = conf.getInt(HTTP_SOCKET_BACKLOG_SIZE_KEY,

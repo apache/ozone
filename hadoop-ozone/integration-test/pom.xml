@@ -112,7 +112,6 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <!-- needed for MiniKMS -->
       <groupId>org.apache.curator</groupId>
       <artifactId>curator-framework</artifactId>
       <scope>test</scope>

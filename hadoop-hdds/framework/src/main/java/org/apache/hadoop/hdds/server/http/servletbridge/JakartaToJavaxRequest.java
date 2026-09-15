@@ -20,8 +20,10 @@ package org.apache.hadoop.hdds.server.http.servletbridge;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import javax.servlet.AsyncContext;
@@ -38,6 +40,8 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpUpgradeHandler;
 import javax.servlet.http.Part;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Exposes a {@link jakarta.servlet.http.HttpServletRequest} as a
@@ -53,14 +57,12 @@ import javax.servlet.http.Part;
  */
 public class JakartaToJavaxRequest implements HttpServletRequest {
 
+  private static final Logger LOG = LoggerFactory.getLogger(JakartaToJavaxRequest.class);
+
   private final jakarta.servlet.http.HttpServletRequest delegate;
 
   public JakartaToJavaxRequest(jakarta.servlet.http.HttpServletRequest delegate) {
     this.delegate = delegate;
-  }
-
-  jakarta.servlet.http.HttpServletRequest getDelegate() {
-    return delegate;
   }
 
   @Override
@@ -74,11 +76,20 @@ public class JakartaToJavaxRequest implements HttpServletRequest {
     if (source == null) {
       return null;
     }
-    Cookie[] result = new Cookie[source.length];
-    for (int i = 0; i < source.length; i++) {
-      result[i] = ServletBridgeUtils.toJavax(source[i]);
+    List<Cookie> result = new ArrayList<>(source.length);
+    for (jakarta.servlet.http.Cookie cookie : source) {
+      try {
+        result.add(ServletBridgeUtils.toJavax(cookie));
+      } catch (IllegalArgumentException e) {
+        // jakarta.servlet 6 (and Jetty 12's default RFC6265 parsing) accepts
+        // cookie names such as "$Version" or "Path" that the stricter
+        // javax.servlet 3.1 Cookie constructor rejects. Skip those cookies
+        // instead of failing the whole request, matching the lenient behaviour
+        // of Jetty 9.4's CookieCutter.
+        LOG.debug("Skipping cookie with javax-incompatible name '{}'", cookie.getName(), e);
+      }
     }
-    return result;
+    return result.toArray(new Cookie[0]);
   }
 
   @Override

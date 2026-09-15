@@ -47,7 +47,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.HddsConfServlet;
 import org.apache.hadoop.hdds.conf.HddsPrometheusConfig;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -144,9 +143,9 @@ public abstract class BaseHttpServer implements AutoCloseable {
 
       httpServer = builder.build();
 
-      // TODO move these to HttpServer2.addDefaultApps
+      // /conf is registered by HttpServer2.addDefaultServlets().
+      // TODO move /logstream there too.
       if (addDefaultApps) {
-        httpServer.addServlet("conf", "/conf", HddsConfServlet.class);
         httpServer.addServlet("logstream", "/logstream", LogStreamServlet.class);
       }
 
@@ -192,6 +191,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
         baseDir = getOzoneMetaDirPath(conf) + SERVER_DIR;
       }
       createDir(baseDir);
+      WebAppContext webAppContext = httpServer.getWebAppContext();
       // Jetty 9 used the "basetempdir" attribute, so each WebAppContext got its
       // own uniquely named temp subdirectory under baseDir. Jetty 12 uses the
       // temp directory as given, so point each server at its own subdirectory
@@ -199,14 +199,17 @@ public abstract class BaseHttpServer implements AutoCloseable {
       // WebAppContext in the process would share one scratch dir -- the S3
       // Gateway runs three servers (s3gateway, s3g-web, s3g-sts). Only Jetty
       // scratch (e.g. unpacked webapp resources) lives here, kept out of baseDir
-      // where operator data under the metadata directory resides.
-      File tempDir = new File(baseDir, name);
-      createDir(tempDir.getPath());
-      WebAppContext webAppContext = httpServer.getWebAppContext();
-      webAppContext.setTempDirectory(tempDir);
-      // Jetty 12 deletes a non-persistent temp directory on stop; keep it so the
-      // subdirectory is reused across restarts instead of being recreated.
-      webAppContext.setTempDirectoryPersistent(true);
+      // where operator data under the metadata directory resides. Skip this when
+      // an operator set hadoop.http.temp.dir (already applied by build()), so
+      // that explicit configuration still wins as it did before Jetty 12.
+      if (webAppContext.getTempDirectory() == null) {
+        File tempDir = new File(baseDir, name);
+        createDir(tempDir.getPath());
+        webAppContext.setTempDirectory(tempDir);
+        // Jetty 12 deletes a non-persistent temp directory on stop; keep it so
+        // the subdirectory is reused across restarts instead of being recreated.
+        webAppContext.setTempDirectoryPersistent(true);
+      }
       jettyBaseTmpDir = baseDir;
       LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
     }

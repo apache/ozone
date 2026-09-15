@@ -124,6 +124,11 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
         <configuration>
+          <!-- ratis-server-api here is a dependency:analyze false positive, not a real
+               dependency of this module: it repackages ozone-filesystem-shaded by unpacking it
+               into target/classes (see the unpack execution below), and analyze scans that output,
+               so the bundled shaded classes' Ratis references are reported as used-but-undeclared.
+               The module's own sources use no Ratis. -->
           <ignoredUsedUndeclaredDependencies>
             <ignoredUsedUndeclaredDependency>org.apache.ratis:ratis-server-api</ignoredUsedUndeclaredDependency>
           </ignoredUsedUndeclaredDependencies>

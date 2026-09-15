@@ -2224,6 +2224,15 @@
       to enable Kerberos authentication for Ozone HTTP web consoles
       is enabled using the SPNEGO protocol. When this property is
       set, ozone.security.http.kerberos.enabled should be set to true.
+      Filters registered by these initializers run inside a Jetty EE10
+      (jakarta.servlet) server. A filter that still implements the legacy
+      javax.servlet.Filter API is only supported for the hadoop-auth
+      authentication filters, which merely establish an authenticated
+      principal; such a filter is run through a bridge that propagates only
+      that principal, and any request or response wrapping it adds is not
+      carried downstream. A javax.servlet filter outside that family is
+      rejected at startup, so provide jakarta.servlet.Filter implementations
+      for any other filter.
     </description>
   </property>
   <property>
@@ -3832,12 +3841,12 @@
     <value/>
     <tag>OZONE, OM, SCM, MANAGEMENT</tag>
     <description>
-      The base dir for HTTP Jetty server to extract contents. If this property
-      is not configured, by default, Jetty will create a directory inside the
-      directory named by the ${ozone.metadata.dirs}/webserver. While in production environment,
-      it's strongly suggested instructing Jetty to use a different parent directory by
-      setting this property to the name of the desired parent directory. The value of the
-      property will be used to set Jetty context attribute 'org.eclipse.jetty.webapp.basetempdir'.
+      The base dir for the HTTP Jetty server. If this property is not configured,
+      by default the directory named by ${ozone.metadata.dirs}/webserver is used.
+      While in a production environment, it's strongly suggested to point this at a
+      different parent directory by setting this property. Under this directory Ozone
+      creates and reuses a per-server subdirectory (named after the server) as Jetty's
+      persistent temp directory; it is kept across restarts rather than deleted on stop.
       The directory named by this property must exist and be writeable.
     </description>
   </property>

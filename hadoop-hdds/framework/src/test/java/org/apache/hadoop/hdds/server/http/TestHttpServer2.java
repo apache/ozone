@@ -35,6 +35,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.IOUtils;
@@ -88,16 +89,80 @@ public class TestHttpServer2 {
   }
 
   /**
-   * With allowAmbiguousUri the connector uses the LEGACY compliance mode and
-   * the servlet layer decodes ambiguous URIs, accepting empty path segments as
-   * Jetty 9.4 did. The S3 Gateway needs this for object keys containing "//".
+   * With allowAmbiguousUri the connector relaxes only the ambiguous empty
+   * segments ("//"), percent encodings ("%25") and encoded path separators that
+   * S3 object keys and WebHDFS paths need, and the servlet layer decodes
+   * ambiguous URIs. Unlike Jetty's LEGACY mode it must not re-admit %2e/%2e%2e
+   * path traversal, UTF-16 or truncated UTF-8 encodings, suspicious path
+   * characters or userinfo.
    */
   @Test
-  public void testUriComplianceLegacyWhenAmbiguousAllowed() throws Exception {
+  public void testUriComplianceRelaxedWhenAmbiguousAllowed() throws Exception {
     HttpServer2 srv = buildServer(true);
-    assertSame(UriCompliance.LEGACY, uriComplianceOf(srv));
+    assertEquals(EnumSet.of(
+        UriCompliance.Violation.AMBIGUOUS_EMPTY_SEGMENT,
+        UriCompliance.Violation.AMBIGUOUS_PATH_ENCODING,
+        UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR),
+        uriComplianceOf(srv).getAllowed());
     assertTrue(srv.getWebAppContext().getServletHandler()
         .isDecodeAmbiguousURIs());
+  }
+
+  /**
+   * The relaxed compliance mode is enforced at the wire level on a running
+   * server: with allowAmbiguousUri the S3/WebHDFS use case (empty segments and
+   * percent encodings) reaches the servlet, while %2e%2e path traversal and %u
+   * UTF-16 encodings -- which Jetty's LEGACY mode would re-admit -- are still
+   * rejected with a 400.
+   */
+  @Test
+  public void testAmbiguousUriHardeningStillRejectsTraversal() throws Exception {
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .allowAmbiguousUri(true)
+        .build();
+    server.addServlet("echo", "/echo/*", OkServlet.class);
+    server.start();
+    try {
+      String base = "http://localhost:" + server.getConnectorAddress(0).getPort();
+      // Empty path segments ("//") and percent encodings ("%25") are the
+      // S3/WebHDFS use case: admitted and delivered to the servlet.
+      assertEquals(HttpURLConnection.HTTP_OK, statusOf(base + "/echo/a//b%25c"));
+      // Path traversal and UTF-16 encodings stay outside that use case: 400.
+      assertEquals(HttpURLConnection.HTTP_BAD_REQUEST,
+          statusOf(base + "/echo/%2e%2e/x"));
+      assertEquals(HttpURLConnection.HTTP_BAD_REQUEST,
+          statusOf(base + "/echo/%u002e"));
+    } finally {
+      server.stop();
+    }
+  }
+
+  /**
+   * The wire-level mirror of {@link #testAmbiguousUriHardeningStillRejectsTraversal}:
+   * without allowAmbiguousUri the very same S3/WebHDFS URL (empty segments plus a
+   * percent encoding) that the relaxed server admits is rejected by the connector
+   * with a 400 before it can reach the servlet -- which is why the opt-in knob
+   * exists.
+   */
+  @Test
+  public void testAmbiguousUriRejectedWhenNotAllowed() throws Exception {
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .build();
+    server.addServlet("echo", "/echo/*", OkServlet.class);
+    server.start();
+    try {
+      String base = "http://localhost:" + server.getConnectorAddress(0).getPort();
+      assertEquals(HttpURLConnection.HTTP_BAD_REQUEST,
+          statusOf(base + "/echo/a//b%25c"));
+    } finally {
+      server.stop();
+    }
   }
 
   /**
@@ -189,6 +254,15 @@ public class TestHttpServer2 {
    * with anonymous access disallowed: a request without a user is refused with
    * 401, and one carrying a user reaches the servlet with {@code getRemoteUser()}
    * bridged back onto the jakarta request.
+   *
+   * <p>hadoop-auth authenticates once and then relies on the signed
+   * {@code hadoop.auth} cookie it sets. Replaying only that cookie -- with no
+   * {@code user.name} -- must re-authenticate as the same user, which drives the
+   * bridge's {@link org.apache.hadoop.hdds.server.http.servletbridge.JakartaToJavaxRequest#getCookies()}
+   * read path on a real, Jetty-parsed cookie (the sole non-trivial conversion in
+   * the request bridge). A reserved-name cookie sent alongside it, which the
+   * javax {@code Cookie} constructor rejects, must be skipped in the same call
+   * without failing the request.
    */
   @Test
   public void testHadoopAuthFilterRunsThroughBridge() throws Exception {
@@ -222,6 +296,62 @@ public class TestHttpServer2 {
       accepted.setReadTimeout(5000);
       assertEquals(HttpURLConnection.HTTP_OK, accepted.getResponseCode());
       assertEquals("alice", readBody(accepted));
+
+      // Replay only the signed hadoop.auth cookie, with no user.name: the filter
+      // must re-authenticate as alice off the cookie, which flows through the
+      // request bridge's getCookies() on a real Jetty-parsed cookie. A reserved
+      // "$Version" cookie sent alongside it must be skipped, not fail the request.
+      String authCookie = authCookieOf(accepted);
+      assertNotNull(authCookie, "expected a hadoop.auth Set-Cookie");
+      HttpURLConnection replay =
+          (HttpURLConnection) new URL(base).openConnection();
+      replay.setConnectTimeout(5000);
+      replay.setReadTimeout(5000);
+      replay.setRequestProperty("Cookie", authCookie + "; $Version=1");
+      assertEquals(HttpURLConnection.HTTP_OK, replay.getResponseCode());
+      assertEquals("alice", readBody(replay));
+    } finally {
+      server.stop();
+    }
+  }
+
+  /**
+   * A client may send cookies whose names (e.g. {@code $Version}, {@code Path})
+   * are delivered as ordinary cookies by Jetty 12's default RFC6265 parsing and
+   * accepted by jakarta.servlet 6, but rejected by the stricter javax.servlet
+   * 3.1 {@code Cookie} constructor the bridge converts into. The bridge must
+   * skip such cookies rather than let hadoop-auth's {@code getCookies()} throw
+   * and end the request in a 500, matching Jetty 9.4's lenient cookie handling.
+   */
+  @Test
+  public void testReservedCookieNamesDoNotFailBridgedRequest() throws Exception {
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .build();
+
+    Map<String, String> params = new HashMap<>();
+    params.put("type", "simple");
+    params.put("simple.anonymous.allowed", "false");
+    params.put("signature.secret", "bridge-test-secret");
+    server.addGlobalFilter("auth",
+        "org.apache.hadoop.security.authentication.server.AuthenticationFilter",
+        params);
+    server.addServlet("whoami", "/whoami", RemoteUserServlet.class);
+    server.start();
+    try {
+      int port = server.getConnectorAddress(0).getPort();
+      HttpURLConnection accepted = (HttpURLConnection)
+          new URL("http://localhost:" + port + "/whoami?user.name=alice").openConnection();
+      accepted.setConnectTimeout(5000);
+      accepted.setReadTimeout(5000);
+      // Reserved cookie names that the javax Cookie constructor rejects. Without
+      // the bridge skipping them, getCookies() would throw and the request would
+      // fail with a 500 before pseudo auth ever runs.
+      accepted.setRequestProperty("Cookie", "$Version=1; Path=/");
+      assertEquals(HttpURLConnection.HTTP_OK, accepted.getResponseCode());
+      assertEquals("alice", readBody(accepted));
     } finally {
       server.stop();
     }
@@ -241,6 +371,33 @@ public class TestHttpServer2 {
   private static String readBody(HttpURLConnection conn) throws IOException {
     try (InputStream in = conn.getInputStream()) {
       return IOUtils.toString(in, StandardCharsets.UTF_8).trim();
+    }
+  }
+
+  /**
+   * Returns the {@code hadoop.auth="..."} name=value pair from the response's
+   * Set-Cookie headers (dropping attributes such as Path/Expires), or null if
+   * none was set.
+   */
+  private static String authCookieOf(HttpURLConnection conn) {
+    for (int i = 0; ; i++) {
+      String key = conn.getHeaderFieldKey(i);
+      String value = conn.getHeaderField(i);
+      if (key == null && value == null) {
+        return null;
+      }
+      if ("Set-Cookie".equalsIgnoreCase(key) && value != null
+          && value.startsWith("hadoop.auth=")) {
+        return value.split(";", 2)[0];
+      }
+    }
+  }
+
+  /** Servlet that returns 200 for any request, used to probe URI admission. */
+  public static class OkServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+      resp.setStatus(HttpServletResponse.SC_OK);
     }
   }
 

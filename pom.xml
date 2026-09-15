@@ -112,6 +112,7 @@
     <jdeb.version>1.14</jdeb.version>
     <jersey.version>1.19.4</jersey.version>
     <jersey2.version>3.1.12</jersey2.version>
+    <jetbrains-annotations.version>17.0.0</jetbrains-annotations.version>
     <jetty.version>12.0.38</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
@@ -1651,6 +1652,13 @@
         <version>${weld-servlet.version}</version>
       </dependency>
       <dependency>
+        <!-- Pinned so the dist ships a single annotations jar: orc-core brings
+             17.0.0 while kotlin-stdlib (via okhttp) brings 13.0 transitively. -->
+        <groupId>org.jetbrains</groupId>
+        <artifactId>annotations</artifactId>
+        <version>${jetbrains-annotations.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.jgrapht</groupId>
         <artifactId>jgrapht-core</artifactId>
         <version>${jgrapht.version}</version>
@@ -2344,6 +2352,8 @@
                 <ignoredNonTestScopedDependency>org.apache.commons:commons-compress:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.ozone:hdds-client:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.ozone:ozone-interface-client:jar</ignoredNonTestScopedDependency>
+                <!-- jetty-http is compile-scoped by httpfsgateway for the HttpServer2 runtime
+                     but referenced only by its test bytecode; see hadoop-ozone/httpfsgateway/pom.xml. -->
                 <ignoredNonTestScopedDependency>org.eclipse.jetty:jetty-http:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-common:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.rocksdb:rocksdbjni:jar</ignoredNonTestScopedDependency>

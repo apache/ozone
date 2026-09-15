@@ -188,6 +188,31 @@ class TestBaseHttpServer {
     }
   }
 
+  /**
+   * An operator-configured {@code hadoop.http.temp.dir} is applied by
+   * {@link HttpServer2} during build and must not be silently replaced by the
+   * per-server {@code <basedir>/<name>} subdirectory, preserving the
+   * pre-Jetty-12 precedence where the explicit setting wins.
+   */
+  @Test
+  void honoursOperatorConfiguredTempDir() throws Exception {
+    MutableConfigurationSource conf = newConfig(HttpConfig.Policy.HTTP_ONLY);
+    File operatorTempDir = new File(tempDir.toFile(), "operator-temp");
+    conf.set("hadoop.http.temp.dir", operatorTempDir.getAbsolutePath());
+    BaseHttpServer subject = new TestingHttpServer(conf);
+    try {
+      subject.start();
+      Field field = BaseHttpServer.class.getDeclaredField("httpServer");
+      field.setAccessible(true);
+      WebAppContext webAppContext =
+          ((HttpServer2) field.get(subject)).getWebAppContext();
+      assertEquals(operatorTempDir.getCanonicalFile(),
+          webAppContext.getTempDirectory().getCanonicalFile());
+    } finally {
+      subject.stop();
+    }
+  }
+
   private MutableConfigurationSource newConfig(HttpConfig.Policy policy) {
     MutableConfigurationSource conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR, tempDir.toString());

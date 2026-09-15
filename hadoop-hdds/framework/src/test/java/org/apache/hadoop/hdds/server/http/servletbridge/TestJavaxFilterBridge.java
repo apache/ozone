@@ -173,6 +173,28 @@ class TestJavaxFilterBridge {
     assertFalse(back.getName().isEmpty());
   }
 
+  @Test
+  void getCookiesSkipsNamesRejectedByJavax() {
+    // jakarta.servlet 6 accepts these reserved names; the javax 3.1 Cookie
+    // constructor the bridge converts into rejects them.
+    jakarta.servlet.http.Cookie reservedVersion =
+        new jakarta.servlet.http.Cookie("$Version", "1");
+    jakarta.servlet.http.Cookie valid =
+        new jakarta.servlet.http.Cookie("hadoop.auth", "signed");
+    jakarta.servlet.http.Cookie reservedPath =
+        new jakarta.servlet.http.Cookie("Path", "/");
+    HttpServletRequest jakartaRequest = mock(HttpServletRequest.class);
+    when(jakartaRequest.getCookies()).thenReturn(
+        new jakarta.servlet.http.Cookie[] {reservedVersion, valid, reservedPath});
+
+    javax.servlet.http.Cookie[] result =
+        new JakartaToJavaxRequest(jakartaRequest).getCookies();
+
+    assertEquals(1, result.length, "reserved-name cookies must be skipped");
+    assertEquals("hadoop.auth", result[0].getName());
+    assertEquals("signed", result[0].getValue());
+  }
+
   /** Minimal javax filter with no-op lifecycle so tests only override doFilter. */
   private abstract static class AbstractJavaxFilter implements javax.servlet.Filter {
     @Override
