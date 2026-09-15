@@ -42,6 +42,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -134,7 +135,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
                 // against the quota twice.
                 .clearKeys().addAllKeys(new LinkedHashSet<>(deleteKeysRequest.getDeleteKeys().getKeysList()))
                 .clearKeyVersions()
-                .addAllKeyVersions(new LinkedHashSet<>(deleteKeysRequest.getDeleteKeys().getKeyVersionsList()))
+                .addAllKeyVersions(deleteKeysRequest.getDeleteKeys().getKeyVersionsList().stream()
+                    .map(OMKeysDeleteRequest::canonicalKeyVersion).distinct().collect(Collectors.toList()))
                 .setProposedVersionId(
                     ozoneManager.getVersionIdAllocator().propose())))
         .build();
@@ -501,6 +503,17 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       String volumeName, String bucketName, String keyName) throws IOException {
     // implemented in child class
     return null;
+  }
+
+  /**
+   * The entry with only the fields that name its version, so that two entries naming the same version compare equal
+   * whatever else they set.
+   */
+  private static KeyVersion canonicalKeyVersion(KeyVersion keyVersion) {
+    KeyVersion.Builder canonical = KeyVersion.newBuilder().setKey(keyVersion.getKey());
+    return (keyVersion.hasVersionId()
+        ? canonical.setVersionId(keyVersion.getVersionId())
+        : canonical.setNullVersion(true)).build();
   }
 
   /** Records an entry naming a version that the batch could not delete. */

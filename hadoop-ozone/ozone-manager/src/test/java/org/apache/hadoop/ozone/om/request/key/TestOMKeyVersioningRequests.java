@@ -1252,6 +1252,15 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
     assertInstanceOf(OMKeyDeleteMarkerResponse.class, response);
   }
 
+  /** Entries naming the same version are kept once, however each names it. */
+  @Test
+  public void testPreExecuteDropsAVersionNamedTwice() throws Exception {
+    OMRequest request = new OMKeysDeleteRequest(batchDeleteRequest(Collections.emptyList(), version(1L),
+        version(1L).toBuilder().setNullVersion(false).build()), getBucketLayout()).preExecute(ozoneManager);
+    assertEquals(Collections.singletonList(version(1L)),
+        request.getDeleteKeysRequest().getDeleteKeys().getKeyVersionsList());
+  }
+
   /**
    * A key named twice in one batch is deleted once: one marker, counted once against the namespace quota.
    */
