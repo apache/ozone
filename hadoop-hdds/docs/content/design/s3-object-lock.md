@@ -86,6 +86,23 @@ stable rollout of baseline tamper-proof protection.
   * Get Object
   * Extend Retention Period
 
+#### Event Hold Trigger Workflow
+For enterprise governance workflows, the retention lifecycle often depends on specific business triggers rather than a static configuration at creation. The Event Hold mechanism handles this dynamic lifecycle through the following state transitions:
+
+```text
+object created
+      |
+event hold applied (indefinite WORM protection)
+      |
+business event occurs
+      |
+hold released
+      |
+retention timer starts (RetainUntilDate is calculated)
+      |
+WORM until timer expires
+```
+
 > _**Note**:
 > * Background & Root Cause: A prerequisite for enabling WORM (Write Once, Read Many) in AWS S3 is that Object Versioning must be enabled. Under S3 architecture, executing a Put on a locked object generates a new version without affecting the protected prior version; thus, S3 Object Lock primarily restricts Delete Object. 
 > * Ozone Implementation Status: Because Ozone's versioning feature is still under development, to guarantee absolute immutability during the lock period, Ozone will directly block and reject all overwrite operations (such as any form of Put or overwrite) on locked objects.
@@ -115,9 +132,14 @@ Two new fields: objectLockEnabled & defaultRetention.
   }
   
   message Rule {
-    optional RetentionMode retentionMode = 1;
-    optional uint64 days = 2;
-    optional uint64 years = 3;
+    required RetentionMode retentionMode = 1;
+    required TimeUnit timeUnit = 2;
+    required uint64 duration = 3;
+  }
+  
+  enum TimeUnit {
+    DAYS = 1;
+    YEARS = 2;
   }
   
   enum RetentionMode {
@@ -197,7 +219,7 @@ To ensure seamless integration with existing S3 clients (e.g., AWS CLI, Boto3) a
 * `PutBucketObjectLockConfiguration`: Maps to the new Ozone API to enable Object Lock for an existing bucket. Configuring default retention rules (DefaultRetention) is optional.
 
 **Object-Level APIs:**
-* `PutObjectRetention`: Places a retention configuration on an object, specifying the retention mode (COMPLIANCE or GOVERNANCE) and the `RetainUntilDate`.
+* `PutObjectRetention`: Places a retention configuration on an object, specifying the retention mode (COMPLIANCE or GOVERNANCE) and the retention duration (in days or years).
 * `GetObjectRetention`: Retrieves the current retention configuration applied to an object.
 * `PutObjectLegalHold`: Applies or removes a Legal Hold configuration to the specified object.
 * `GetObjectLegalHold`: Retrieves the current Legal Hold status of an object.
