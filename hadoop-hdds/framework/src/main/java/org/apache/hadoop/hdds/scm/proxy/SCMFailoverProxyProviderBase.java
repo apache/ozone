@@ -94,6 +94,8 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   @Nullable
   private final SocketFactory socketFactory;
 
+  private String updatedLeaderNodeID = null;
+
   /**
    * When true, on each connection-class failure the provider re-resolves
    * the cached SCM hostname and rebuilds the proxy if the IP has changed
@@ -101,8 +103,6 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
    * intent of HADOOP-17068 / HDFS-14118.
    */
   private final boolean resolveOnFailureEnabled;
-
-  private String updatedLeaderNodeID = null;
 
   public SCMFailoverProxyProviderBase(Class<T> protocol, ConfigurationSource conf,
       UserGroupInformation userGroupInformation) {
