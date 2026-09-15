@@ -20,7 +20,7 @@ setup() {
   export OUTPUT_DIR="${TEST_TMPDIR}/report"
   mkdir -p "${TEST_TMPDIR}/bin" "${OUTPUT_DIR}"
   echo 9 > "${OUTPUT_DIR}/failures"
-  export MAVEN_EXIT_CODE=1
+  export MAVEN_EXIT_CODE=0
 cat > "${TEST_TMPDIR}/bin/mvn" <<'EOF'
 #!/usr/bin/env bash
 rm -rf "${OUTPUT_DIR}"
@@ -48,6 +48,7 @@ teardown() {
   run hadoop-ozone/dev-support/checks/errorprone.sh
 
   [ "$status" -eq 1 ]
+  grep -q -- '-Dmaven.compiler.failOnError=false' "${TEST_TMPDIR}/mvn-args"
   grep -q -- '-DskipTests clean package' "${TEST_TMPDIR}/mvn-args"
   ! grep -q -- '-DskipShade' "${TEST_TMPDIR}/mvn-args"
   [ "$(wc -l < "${OUTPUT_DIR}/diagnostics.txt")" -eq 5 ]
@@ -84,6 +85,7 @@ EOF
 }
 
 @test "Error Prone reports an unknown Maven failure" {
+  export MAVEN_EXIT_CODE=1
   cat > "${TEST_TMPDIR}/bin/mvn" <<'EOF'
 #!/usr/bin/env bash
 rm -rf "${OUTPUT_DIR}"
