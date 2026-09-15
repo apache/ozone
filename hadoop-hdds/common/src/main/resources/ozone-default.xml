@@ -657,6 +657,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.scmclient.failover.retry.interval</name>
+    <value>2s</value>
+    <tag>OZONE, SCM, CLIENT</tag>
+    <description>
+      SCM Client timeout on waiting for the next connection retry to other SCM IP.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.http-address</name>
     <value>0.0.0.0:9874</value>
     <tag>OM, MANAGEMENT</tag>
