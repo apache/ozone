@@ -1253,6 +1253,26 @@ public class TestOMKeyVersioningRequests extends OMKeyRequestTests {
   }
 
   /**
+   * A key named twice in one batch is deleted once: one marker, counted once against the namespace quota.
+   */
+  @Test
+  public void testBatchDeleteOfAKeyNamedTwiceInsertsOneMarker() throws Exception {
+    setupVersionedBucket();
+    seedCurrentVersion(100L);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    long usedNamespace = omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+
+    OMRequest request = new OMKeysDeleteRequest(batchDeleteRequest(Arrays.asList(keyName, keyName)), getBucketLayout())
+        .preExecute(ozoneManager);
+    assertEquals(1, request.getDeleteKeysRequest().getDeleteKeys().getKeysCount());
+    OMClientResponse response = new OMKeysDeleteRequest(request, getBucketLayout())
+        .validateAndUpdateCache(ozoneManager, 200L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertEquals(usedNamespace + 1, omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
+  }
+
+  /**
    * A delete marker holds no blocks, so it consumes namespace but no space,
    * and the superseded version keeps its own usage.
    */

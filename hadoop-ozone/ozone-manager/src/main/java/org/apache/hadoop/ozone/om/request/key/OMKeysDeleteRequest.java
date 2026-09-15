@@ -38,6 +38,7 @@ import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -129,6 +130,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     return getOmRequest().toBuilder()
         .setDeleteKeysRequest(deleteKeysRequest.toBuilder()
             .setDeleteKeys(deleteKeysRequest.getDeleteKeys().toBuilder()
+                // A key or version named twice is deleted once: repeated, it would get a second marker and count
+                // against the quota twice.
+                .clearKeys().addAllKeys(new LinkedHashSet<>(deleteKeysRequest.getDeleteKeys().getKeysList()))
+                .clearKeyVersions()
+                .addAllKeyVersions(new LinkedHashSet<>(deleteKeysRequest.getDeleteKeys().getKeyVersionsList()))
                 .setProposedVersionId(
                     ozoneManager.getVersionIdAllocator().propose())))
         .build();
