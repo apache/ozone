@@ -533,6 +533,29 @@ public class TestHddsDispatcher {
   }
 
   @Test
+  public void testCreateContainerRejectsInvalidStorageType() throws IOException {
+    File diskVolume = Files.createTempDirectory(tempDir, "disk").toFile();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, diskVolume.getAbsolutePath());
+    DatanodeDetails dd = randomDatanodeDetails();
+    HddsDispatcher dispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+
+    ContainerCommandRequestProto writeChunkRequest =
+        getWriteChunkRequest(dd.getUuidString(), 1L, 1L, null);
+    WriteChunkRequestProto writeChunk = writeChunkRequest.getWriteChunk();
+    ContainerCommandRequestProto requestWithInvalidStorageType =
+        writeChunkRequest.toBuilder()
+            .setWriteChunk(writeChunk.toBuilder()
+                .setBlockID(writeChunk.getBlockID().toBuilder()
+                    .setStorageTypeID(999)))
+            .build();
+
+    ContainerCommandResponseProto response =
+        dispatcher.createContainer(requestWithInvalidStorageType);
+    assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, response.getResult());
+  }
+
+  @Test
   public void testInvalidStorageTypeDoesNotMarkContainerUnhealthy() throws IOException {
     File diskVolume = Files.createTempDirectory(tempDir, "disk").toFile();
     OzoneConfiguration conf = new OzoneConfiguration();
