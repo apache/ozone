@@ -1907,6 +1907,71 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertTrue(secondPage.objectParts().parts().isEmpty());
   }
 
+  /**
+   * Directory (FSO layout) buckets return per-part {@code Part} elements even when no additional
+   * checksum was stored at upload time, matching AWS S3 directory-bucket behavior.
+   */
+  @Test
+  public void testGetObjectAttrFsoMpuNoChecksum(@TempDir Path tempDir)
+      throws Exception {
+    final String bucketName = uniqueObjectName();
+    final String keyName = getKeyName();
+    final int partSize = (int) (5 * MB);
+
+    createFsoBucket(bucketName);
+    try {
+      File multipartUploadFile =
+          Files.createFile(tempDir.resolve("fso-get-object-attributes-mpu.txt")).toFile();
+      createFile(multipartUploadFile, (int) (15 * MB));
+      multipartUpload(bucketName, keyName, multipartUploadFile, partSize, new HashMap<>(),
+          Collections.emptyList());
+
+      GetObjectAttributesResponse attributesResponse = s3Client.getObjectAttributes(
+          GetObjectAttributesRequest.builder()
+              .bucket(bucketName)
+              .key(keyName)
+              .objectAttributes(ObjectAttributes.OBJECT_PARTS, ObjectAttributes.OBJECT_SIZE)
+              .build());
+
+      assertNotNull(attributesResponse.objectParts());
+      assertEquals(3, attributesResponse.objectParts().totalPartsCount());
+      assertFalse(attributesResponse.objectParts().isTruncated());
+      assertEquals(multipartUploadFile.length(), attributesResponse.objectSize());
+      assertEquals(3, attributesResponse.objectParts().parts().size());
+      for (int i = 0; i < 3; i++) {
+        assertEquals(i + 1, attributesResponse.objectParts().parts().get(i).partNumber());
+        assertEquals((long) partSize, attributesResponse.objectParts().parts().get(i).size());
+      }
+
+      GetObjectAttributesResponse firstPage = s3Client.getObjectAttributes(
+          GetObjectAttributesRequest.builder()
+              .bucket(bucketName)
+              .key(keyName)
+              .objectAttributes(ObjectAttributes.OBJECT_PARTS)
+              .maxParts(2)
+              .partNumberMarker(0)
+              .build());
+      assertTrue(firstPage.objectParts().isTruncated());
+      assertEquals(2, firstPage.objectParts().parts().size());
+      assertEquals(1, firstPage.objectParts().parts().get(0).partNumber());
+      assertEquals(2, firstPage.objectParts().parts().get(1).partNumber());
+
+      GetObjectAttributesResponse secondPage = s3Client.getObjectAttributes(
+          GetObjectAttributesRequest.builder()
+              .bucket(bucketName)
+              .key(keyName)
+              .objectAttributes(ObjectAttributes.OBJECT_PARTS)
+              .maxParts(2)
+              .partNumberMarker(2)
+              .build());
+      assertFalse(secondPage.objectParts().isTruncated());
+      assertEquals(1, secondPage.objectParts().parts().size());
+      assertEquals(3, secondPage.objectParts().parts().get(0).partNumber());
+    } finally {
+      deleteFsoBucket(bucketName);
+    }
+  }
+
   @Test
   public void testGetObjectAttributesNonContiguousMultipartObjectParts() throws Exception {
     final String bucketName = getBucketName();
@@ -3080,6 +3145,22 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     return uniqueObjectName();
   }
 
+  private void createFsoBucket(String bucketName) throws Exception {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
+      volume.createBucket(bucketName, BucketArgs.newBuilder()
+          .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+          .build());
+    }
+  }
+
+  private void deleteFsoBucket(String bucketName) throws Exception {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
+      volume.deleteBucket(bucketName);
+    }
+  }
+
   private String multipartUpload(String bucketName, String key, File file, int partSize,
                                  Map<String, String> userMetadata, List<Tag> tags) throws Exception {
     String uploadId = initiateMultipartUpload(bucketName, key, userMetadata, tags);
@@ -4226,22 +4307,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         assertThat(allBuckets).contains(fsoBucketName);
       } finally {
         deleteFsoBucket(fsoBucketName);
-      }
-    }
-
-    private void createFsoBucket(String bucketName) throws Exception {
-      try (OzoneClient ozoneClient = cluster.newClient()) {
-        OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
-        volume.createBucket(bucketName, BucketArgs.newBuilder()
-            .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-            .build());
-      }
-    }
-
-    private void deleteFsoBucket(String bucketName) throws Exception {
-      try (OzoneClient ozoneClient = cluster.newClient()) {
-        OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
-        volume.deleteBucket(bucketName);
       }
     }
   }

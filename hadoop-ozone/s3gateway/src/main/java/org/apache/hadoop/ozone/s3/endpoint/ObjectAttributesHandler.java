@@ -57,10 +57,10 @@ import org.slf4j.LoggerFactory;
  * <p>Returns selected metadata about an object without transferring the object body.
  * Supported attributes: {@code ETag}, {@code ObjectSize}, {@code StorageClass}, {@code ObjectParts}.
  *
- * <p>The {@code Checksum} attribute is not yet supported because Ozone does not store
- * non-MD5 checksum algorithms in key metadata. For general-purpose buckets, {@code Part}
- * elements under {@code ObjectParts} are omitted unless an additional checksum is stored
- * on the object, matching AWS S3 behavior. Object versioning ({@code versionId}) and
+ * <p>For general-purpose buckets, individual {@code Part} elements under {@code ObjectParts}
+ * are omitted unless an additional checksum is stored on the object, matching AWS S3 behavior.
+ * For FSO layout buckets (Ozone directory buckets), {@code Part} elements are always returned,
+ * matching AWS S3 directory-bucket behavior. Object versioning ({@code versionId}) and
  * SSE-C encryption headers are also not supported and are silently ignored.
  *
  * <p>See https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObjectAttributes.html
@@ -101,6 +101,15 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
     return false;
   }
 
+  /**
+   * Whether {@code ObjectParts} should include per-part {@code Part} elements in the response.
+   * Directory (FSO layout) buckets always include them; general-purpose buckets include them
+   * only when an additional checksum was stored at upload time.
+   */
+  static boolean shouldIncludePartElements(OzoneKey key, boolean directoryBucketLayout) {
+    return directoryBucketLayout || hasStoredAdditionalChecksum(key);
+  }
+
   @Override
   Response handleGetRequest(ObjectRequestContext context, String keyPath)
       throws IOException, OS3Exception {
@@ -137,8 +146,12 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
         throw ex;
       }
 
+      boolean directoryBucketLayout =
+          context.getBucket().getBucketLayout().isFileSystemOptimized();
+
       GetObjectAttributesResponse response =
-          buildResponse(keyPath, key, requestedAttributes, completedPartSizes);
+          buildResponse(keyPath, key, requestedAttributes, completedPartSizes,
+              directoryBucketLayout);
 
       Response.ResponseBuilder rb = Response.ok(response, MediaType.APPLICATION_XML_TYPE);
       ObjectEndpoint.addLastModifiedDate(rb, key);
@@ -177,7 +190,8 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
   }
 
   private GetObjectAttributesResponse buildResponse(String keyPath, OzoneKey key,
-      Set<String> requested, NavigableMap<Integer, Long> completedPartSizes)
+      Set<String> requested, NavigableMap<Integer, Long> completedPartSizes,
+      boolean directoryBucketLayout)
       throws IOException, OS3Exception {
     GetObjectAttributesResponse resp = new GetObjectAttributesResponse();
 
@@ -205,7 +219,7 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
         String partsCountStr = extractPartsCount(eTag);
         if (partsCountStr != null && completedPartSizes != null) {
           resp.setObjectParts(buildObjectParts(keyPath, Integer.parseInt(partsCountStr),
-              completedPartSizes, key));
+              completedPartSizes, key, directoryBucketLayout));
         }
       }
     }
@@ -228,10 +242,12 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
    *
    * <p>For general-purpose buckets, individual {@code Part} elements are returned only when the
    * object has a stored AWS additional checksum in key metadata; otherwise only {@code ObjectParts}
-   * summary and pagination fields are returned.
+   * summary and pagination fields are returned. For FSO layout (directory) buckets, {@code Part}
+   * elements are always returned.
    */
   private GetObjectAttributesResponse.ObjectParts buildObjectParts(String keyPath,
-      int totalPartsCount, NavigableMap<Integer, Long> partSizes, OzoneKey key)
+      int totalPartsCount, NavigableMap<Integer, Long> partSizes, OzoneKey key,
+      boolean directoryBucketLayout)
       throws OS3Exception {
     int maxParts = parseMaxPartsHeader(keyPath);
     int marker = parsePartNumberMarkerHeader(keyPath);
@@ -252,9 +268,7 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
 
     Iterator<Map.Entry<Integer, Long>> partIterator =
         partSizes.tailMap(marker, false).entrySet().iterator();
-    // TODO: For FSO (directory) buckets, always include Part entries per AWS
-    // directory-bucket GetObjectAttributes behavior, regardless of checksum metadata.
-    boolean includePartEntries = hasStoredAdditionalChecksum(key);
+    boolean includePartEntries = shouldIncludePartElements(key, directoryBucketLayout);
     Integer lastPartReturned = null;
     int partsOnPage = 0;
     while (partIterator.hasNext() && partsOnPage < maxParts) {

@@ -42,10 +42,14 @@ import java.util.List;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
@@ -60,6 +64,7 @@ public class TestObjectAttributesGet {
 
   private static final String CONTENT = "0123456789";
   private static final String BUCKET_NAME = "b1";
+  private static final String FSO_BUCKET_NAME = "fso-b1";
   private static final String KEY_NAME = "key1";
   private ObjectEndpoint rest;
   private OzoneBucket bucket;
@@ -299,13 +304,52 @@ public class TestObjectAttributesGet {
     assertEquals(partThreeContent.length(), paginatedParts.getParts().get(0).getSize());
   }
 
-  private void completeMultipartUploadWithParts(String key, String... partContents)
+  @Test
+  public void testGetObjectAttrFsoMPUPartsWithoutChecksum()
       throws IOException, OS3Exception {
-    String uploadID = initiateMultipartUpload(rest, BUCKET_NAME, key);
+    OzoneClient client = rest.getClient();
+    String volumeName = rest.getOzoneConfiguration().get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
+        OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
+    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    volume.createBucket(FSO_BUCKET_NAME, BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .build());
+
+    final String key = "fso-mpu-key";
+    completeMultipartUploadWithPartsInBucket(FSO_BUCKET_NAME, key, "part-one", "part-two");
+
+    Response response = getObjectAttributes(rest, FSO_BUCKET_NAME, key, "ObjectParts");
+
+    assertEquals(HTTP_OK, response.getStatus());
+    GetObjectAttributesResponse.ObjectParts objectParts =
+        ((GetObjectAttributesResponse) response.getEntity()).getObjectParts();
+    assertNotNull(objectParts);
+    assertEquals(2, objectParts.getPartsCount().intValue());
+    assertEquals(2, objectParts.getParts().size());
+    assertEquals(1, objectParts.getParts().get(0).getPartNumber());
+    assertEquals("part-one".length(), objectParts.getParts().get(0).getSize());
+    assertEquals(2, objectParts.getParts().get(1).getPartNumber());
+    assertEquals("part-two".length(), objectParts.getParts().get(1).getSize());
+  }
+
+  @Test
+  public void testShouldIncludePartElements() {
+    assertFalse(ObjectAttributesHandler.shouldIncludePartElements(null, false));
+    assertTrue(ObjectAttributesHandler.shouldIncludePartElements(null, true));
+  }
+
+  private void completeMultipartUploadWithPartsInBucket(String bucketName, String key,
+      String... partContents) throws IOException, OS3Exception {
+    String uploadID = initiateMultipartUpload(rest, bucketName, key);
     List<Part> partsList = new ArrayList<>();
     for (int i = 0; i < partContents.length; i++) {
-      partsList.add(uploadPart(rest, BUCKET_NAME, key, i + 1, uploadID, partContents[i]));
+      partsList.add(uploadPart(rest, bucketName, key, i + 1, uploadID, partContents[i]));
     }
-    completeMultipartUpload(rest, BUCKET_NAME, key, uploadID, partsList);
+    completeMultipartUpload(rest, bucketName, key, uploadID, partsList);
+  }
+
+  private void completeMultipartUploadWithParts(String key, String... partContents)
+      throws IOException, OS3Exception {
+    completeMultipartUploadWithPartsInBucket(BUCKET_NAME, key, partContents);
   }
 }
