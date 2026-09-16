@@ -17,15 +17,19 @@
 
 package org.apache.hadoop.ozone.om.response.upgrade;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TRANSACTION_INFO_TABLE;
+
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
  * Response for cancel prepare.
  */
+@CleanupTableInfo(cleanupTables = {TRANSACTION_INFO_TABLE})
 public class OMCancelPrepareResponse extends OMClientResponse {
   public OMCancelPrepareResponse(
       OzoneManagerProtocolProtos.OMResponse omResponse) {

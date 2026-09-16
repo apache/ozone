@@ -25,7 +25,7 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * Tracks table caches updated by the current thread.
- * Only one tracker should be active per thread.
+ * Only one tracker should be active per thread. This class is not thread-safe.
  */
 public final class TableCacheUpdateTracker implements UncheckedAutoCloseable {
   private static final ThreadLocal<TableCacheUpdateTracker> CURRENT = new ThreadLocal<>();

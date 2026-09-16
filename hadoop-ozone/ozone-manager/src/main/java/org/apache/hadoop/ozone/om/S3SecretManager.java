@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.List;
-import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
-import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,8 +100,6 @@ public interface S3SecretManager {
   default void updateCache(String accessId, S3SecretValue secret) {
     S3SecretCache cache = cache();
     if (cache != null) {
-      TableCacheUpdateTracker.recordCacheUpdate(
-          OMDBDefinition.S3_SECRET_TABLE_DEF.getName());
       LOG.info("Updating cache for accessId/user: {}.", accessId);
       cache.put(accessId, secret);
     }
@@ -112,8 +108,6 @@ public interface S3SecretManager {
   default void invalidateCacheEntry(String id) {
     S3SecretCache cache = cache();
     if (cache != null) {
-      TableCacheUpdateTracker.recordCacheUpdate(
-          OMDBDefinition.S3_SECRET_TABLE_DEF.getName());
       cache.invalidate(id);
     }
   }

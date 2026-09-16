@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.response;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -93,26 +92,16 @@ public abstract class OMClientResponse {
   }
 
   public Set<String> getCleanupTables() {
-    return cleanupTables;
+    return Collections.unmodifiableSet(cleanupTables);
   }
 
-  public void setCleanupTables(Collection<String> tables) {
-    cleanupTables = toCleanupTables(tables);
-  }
-
-  public void addCleanupTables(Collection<String> tables) {
+  public void addCleanupTables(Set<String> tables) {
     if (tables == null || tables.isEmpty()) {
       return;
     }
-    Set<String> merged = new LinkedHashSet<>(cleanupTables);
-    merged.addAll(tables);
-    cleanupTables = toCleanupTables(merged);
-  }
-
-  private static Set<String> toCleanupTables(Collection<String> tables) {
-    if (tables == null || tables.isEmpty()) {
-      return Collections.emptySet();
+    if (cleanupTables.isEmpty()) {
+      cleanupTables = new LinkedHashSet<>();
     }
-    return Collections.unmodifiableSet(new LinkedHashSet<>(tables));
+    cleanupTables.addAll(tables);
   }
 }

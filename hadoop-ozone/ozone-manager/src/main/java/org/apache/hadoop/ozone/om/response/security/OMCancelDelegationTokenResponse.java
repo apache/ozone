@@ -17,12 +17,15 @@
 
 package org.apache.hadoop.ozone.om.response.security;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELEGATION_TOKEN_TABLE;
+
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -31,6 +34,7 @@ import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 /**
  * Handle response for CancelDelegationToken request.
  */
+@CleanupTableInfo(cleanupTables = {DELEGATION_TOKEN_TABLE})
 public class OMCancelDelegationTokenResponse extends OMClientResponse {
   private OzoneTokenIdentifier ozoneTokenIdentifier;
 
