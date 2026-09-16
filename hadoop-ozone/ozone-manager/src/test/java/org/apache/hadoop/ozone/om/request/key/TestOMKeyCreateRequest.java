@@ -48,6 +48,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -1148,21 +1149,15 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
 
   @Test
   public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
-    Map<String, String> invalidKeyScenarios = new HashMap<String, String>() {
-      {
-        put(OM_SNAPSHOT_INDICATOR + "/" + keyName,
-            "Cannot create key under path reserved for snapshot: "
-                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
-        put(OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
-            "Cannot create key under path reserved for snapshot: "
-                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
-        put(OM_SNAPSHOT_INDICATOR + "/a/b" + keyName,
-            "Cannot create key under path reserved for snapshot: "
-                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
-        put(OM_SNAPSHOT_INDICATOR,
-            "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR);
-      }
-    };
+    Map<String, String> invalidKeyScenarios = ImmutableMap.of(
+        OM_SNAPSHOT_INDICATOR + "/" + keyName,
+        "Cannot create key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+        OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
+        "Cannot create key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+        OM_SNAPSHOT_INDICATOR + "/a/b" + keyName,
+        "Cannot create key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+        OM_SNAPSHOT_INDICATOR,
+        "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR);
 
     for (Map.Entry<String, String> entry : invalidKeyScenarios.entrySet()) {
       String invalidKeyName = entry.getKey();
@@ -1266,7 +1261,7 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     // Retrieve the committed key info
     OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(getOzoneKey());
     List<OzoneAcl> existingAcls = existingKeyInfo.getAcls();
-    assertThat(existingAcls.containsAll(acls));
+    assertThat(existingAcls.containsAll(acls)).isTrue();
 
     // Create a request with a generation which doesn't match the current key
     omRequest = createKeyRequest(false, 0, 100,

@@ -116,8 +116,6 @@ public class TestOMKeyPurgeRequestAndResponse extends OMKeyRequestTests {
     if (snapshotDbKey != null) {
       purgeKeysRequest.setSnapshotTableKey(snapshotDbKey);
     }
-    purgeKeysRequest.build();
-
     return OMRequest.newBuilder()
         .setPurgeKeysRequest(purgeKeysRequest)
         .setCmdType(Type.PurgeKeys)
