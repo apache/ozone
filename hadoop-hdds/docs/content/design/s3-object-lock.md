@@ -535,6 +535,18 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
 
 Once S3 Versioning support matures, future efforts will focus on ensuring compatibility with S3 multi-version object locking.
 
+### Phase 6: Future Considerations — S3 Versioning Support
+
+*Goal: Seamlessly transition to version-level Object Lock once Ozone supports S3 Versioning.*
+
+1. **Version State Transition & Lock Binding**:
+  - When Versioning is enabled, existing objects will immediately be treated as the **latest version**.
+  - Any pre-existing Retention and Legal Hold states on an object will bind directly to that specific version.
+
+2. **Version-Level WORM Enforcement**:
+  - **Version-Scoped Operations**: All operations will target a specific version; an action is blocked **only if that specific version is locked**.
+  - **Overwrites as New Versions**: `PUT` or `MPU` operations will no longer overwrite existing data in place. Instead, they will create a new version (which can have its own lock configuration), while the previous version and its lock status remain intact.
+
 ## References
 
 - [AWS S3 Object Lock User Guide](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html)
