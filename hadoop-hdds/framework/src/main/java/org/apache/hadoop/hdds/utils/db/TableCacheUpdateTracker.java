@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.ratis.util.Preconditions;
-import org.apache.ratis.util.UncheckedAutoCloseable;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * Tracks table caches updated by the current thread.
