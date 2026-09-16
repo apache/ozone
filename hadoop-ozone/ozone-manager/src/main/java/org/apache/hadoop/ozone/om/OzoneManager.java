@@ -4456,11 +4456,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // pending transactions in the buffer, they are discarded.
       omRatisServer.getOmStateMachine().pause();
     } catch (Exception e) {
+      LOG.error("Failed to stop/pause the services. Cannot proceed with installing the new checkpoint.", e);
       // Stop the checkpoint install process and restart the services.
       keyManager.start(configuration);
       startSecretManagerIfNecessary();
       startTrashEmptier(configuration);
-      throw newInstallCheckpointException(checkpointTrxnInfo, "stop/pause services", e);
+      throw new IOException("Failed to install checkpoint " + checkpointTrxnInfo + ": Cannot stop/pause services.", e);
     }
     File dbBackup = null;
     TermIndex termIndex = omRatisServer.getLastAppliedTermIndex();
@@ -4507,7 +4508,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         LOG.error("Failed to install Snapshot from {} as OM failed to replace" +
             " DB with downloaded checkpoint. Reloading old OM state.",
             leaderId, e);
-        installFailure = newInstallCheckpointException(checkpointTrxnInfo, "replace DB", e);
+        installFailure = new IOException("Failed to install checkpoint " + checkpointTrxnInfo
+            + ": Cannot replace DB.", e);
       }
     } else {
       LOG.warn("Cannot proceed with InstallSnapshot as OM is at TermIndex {} " +
@@ -4573,15 +4575,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to delete the backup of the original DB {}",
           dbBackup, e);
     }
-
-    throwIfInstallCheckpointFailed(installFailure);
-
+    if (installFailure != null) {
+      throw installFailure;
+    }
     if (lastAppliedIndex != checkpointTrxnInfo.getTransactionIndex()) {
-      // Install Snapshot failed and old state was reloaded. Return null to
-      // Ratis to indicate that installation failed.
+      // An older checkpoint was skipped. Return null to Ratis to indicate that no snapshot was installed.
       return null;
     }
-
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
     TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
@@ -4589,18 +4589,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         "Spend {} ms.", newTermIndex.getTerm(), newTermIndex.getIndex(),
         (Time.monotonicNow() - startTime));
     return newTermIndex;
-  }
-
-  private static IOException newInstallCheckpointException(TransactionInfo checkpointTrxnInfo,
-      String operation, Exception cause) {
-    return new IOException("Failed to install checkpoint " + checkpointTrxnInfo
-        + ": Cannot " + operation + '.', cause);
-  }
-
-  private static void throwIfInstallCheckpointFailed(IOException installFailure) throws IOException {
-    if (installFailure != null) {
-      throw installFailure;
-    }
   }
 
   private void buildDBCheckpointInstallAuditLog(String leaderId, long term, long lastAppliedIndex) {
