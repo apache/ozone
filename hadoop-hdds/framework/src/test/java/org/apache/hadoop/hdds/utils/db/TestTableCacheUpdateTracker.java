@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.junit.jupiter.api.Test;
 
 /**

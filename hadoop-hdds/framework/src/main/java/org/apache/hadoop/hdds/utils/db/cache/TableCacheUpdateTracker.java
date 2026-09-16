@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.utils.db.cache;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
