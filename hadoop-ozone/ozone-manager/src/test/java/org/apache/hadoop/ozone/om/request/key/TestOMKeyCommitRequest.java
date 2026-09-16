@@ -511,6 +511,32 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
     assertEquals(1000, thirdCommitUsedBytes - usedBytes);
   }
 
+  @Test
+  public void testCommitWithHsyncUsedNamespace() throws Exception {
+    BucketLayout bucketLayout = getBucketLayout();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, bucketLayout);
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
+
+    doKeyCommit(true, allocatedKeyLocationList.subList(0, 3));
+    doKeyCommit(true, allocatedKeyLocationList.subList(0, 6));
+    doKeyCommit(false, allocatedKeyLocationList);
+
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(1, bucketInfo.getUsedNamespace());
+
+    clientID = Time.now();
+    version += 1;
+    Map<String, RepeatedOmKeyInfo> keyToDeleteMap =
+        doKeyCommit(false, getKeyLocation(20).subList(10, 20));
+    assertThat(keyToDeleteMap).isNotEmpty();
+
+    bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(1, bucketInfo.getUsedNamespace());
+  }
+
   private Map<String, RepeatedOmKeyInfo> doKeyCommit(boolean isHSync,
       List<KeyLocation> keyLocations) throws Exception {
     // allocated block list
