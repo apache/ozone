@@ -3412,7 +3412,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
 
-      try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>> keyIter = snapshotInfoTable.iterator(tablePrefix)) {
+      try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>> keyIter =
+               snapshotInfoTable.iterator(tablePrefix)) {
         while (keyIter.hasNext()) {
           KeyValue<String, SnapshotInfo> entry = keyIter.next();
           if (cacheEntries.containsKey(entry.getKey())) {
@@ -3459,8 +3460,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private void addSnapshotToCount(SnapshotInfo snapshotInfo, BucketFilter parsedFilter, Map<String, Boolean> bucketAclCache,
-      Map<String, BucketSnapshotCount> bucketCounts) throws IOException {
+  private void addSnapshotToCount(SnapshotInfo snapshotInfo, BucketFilter parsedFilter,
+                                  Map<String, Boolean> bucketAclCache,
+                                  Map<String, BucketSnapshotCount> bucketCounts) throws IOException {
     String volumeName = snapshotInfo.getVolumeName();
     String bucketName = snapshotInfo.getBucketName();
     if (!parsedFilter.matches(volumeName, bucketName)) {
