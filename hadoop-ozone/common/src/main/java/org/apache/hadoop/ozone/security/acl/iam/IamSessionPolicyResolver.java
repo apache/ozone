@@ -1,0 +1,1231 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.security.acl.iam;
+
+import static java.util.Collections.singleton;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.security.acl.AssumeRoleRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+
+/**
+ * Resolves a limited subset of AWS IAM session policies into Ozone ACL grants,
+ * according to either the RangerOzoneAuthorizer or OzoneNativeAuthorizer constructs.
+ * <p>
+ * Here are some differences between the RangerOzoneAuthorizer and OzoneNativeAuthorizer:
+ *    - RangerOzoneAuthorizer doesn't currently use ResourceType.PREFIX, whereas OzoneNativeAuthorizer does.
+ *    - OzoneNativeAuthorizer doesn't allow wildcards in bucket names (ex. ResourceArn `arn:aws:s3:::*`,
+ *    `arn:aws:s3:::bucket*` or `*`), whereas RangerOzoneAuthorizer does.
+ *    - For OzoneNativeAuthorizer, certain object wildcards are accepted.   For example, ResourceArn
+ *    `arn:aws:s3:::myBucket/*` and `arn:aws:s3:::myBucket/folder/logs/*` are accepted but not
+ *    `arn:aws:s3:::myBucket/file*.txt`.
+ * <p>
+ * The only supported ResourceArn has prefix arn:aws:s3::: - all others will throw
+ * OMException with NOT_SUPPORTED_OPERATION.
+ * <p>
+ * The only supported Condition operators are StringEquals and StringLike - all others will throw
+ * OMException with NOT_SUPPORTED_OPERATION.  Furthermore, only one Condition is supported in a
+ * statement.  The value for both StringEquals and StringLike is case-sensitive per the
+ * <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_condition_operators.html">
+ * AWS spec</a>.
+ * <p>
+ * The only supported Condition key name is s3:prefix - all others will throw
+ * OMException with NOT_SUPPORTED_OPERATION.  s3:prefix is case-insensitive per the
+ * <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_condition.html">AWS spec</a>.
+ * <p>
+ * The only supported Effect is Allow - all others will throw OMException with NOT_SUPPORTED_OPERATION.  This
+ * value is case-sensitive per the
+ * <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_effect.html">AWS spec</a>.
+ * <p>
+ * The only supported Statement elements are Sid, Effect, Action, Resource, and Condition.  Duplicate JSON object keys
+ * and unsupported Statement elements will throw OMException with MALFORMED_POLICY_DOCUMENT.
+ * <p>
+ * If a (currently) unsupported S3 action is requested, such as s3:GetAccelerateConfiguration,
+ * it will be silently ignored.  Similarly, if an invalid S3 action is requested, it will be silently ignored.
+ * <p>
+ * Supported wildcard expansions in Actions are: s3:*, s3:Get*, s3:Put*, s3:List*,
+ * s3:Create*, and s3:Delete*.
+ */
+public final class IamSessionPolicyResolver {
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  private static final String AWS_S3_ARN_PREFIX = "arn:aws:s3:::";
+
+  // JSON length is limited per AWS policy.  See https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
+  // under Policy section.
+  private static final int MAX_JSON_LENGTH = 2048;
+
+  // Used to group actions into s3:Get*, s3:Put*, s3:List*, s3:Delete*, s3:Create*
+  private static final String[] S3_ACTION_PREFIXES = {"s3:Get", "s3:Put", "s3:List", "s3:Delete", "s3:Create"};
+
+  private static final String ERROR_PREFIX = "IAM session policy: ";
+  private static final String STRING_EQUALS = "StringEquals";
+  private static final String STRING_LIKE = "StringLike";
+
+  @VisibleForTesting
+  static final Map<String, Set<S3Action>> S3_ACTION_MAP_CI = buildCaseInsensitiveS3ActionMap();
+
+  private IamSessionPolicyResolver() {
+  }
+
+  /**
+   * Resolves an S3 IAM session policy in the form of a JSON String to a data structure comprising
+   * the IOzoneObjs and permissions that IAM policy grants (if any).
+   * <p>
+   * Each entry represents a path (such as /s3v/bucket1 or /s3v/bucket1/*) and a set of
+   * permissions (such as READ, LIST, CREATE).
+   * <p>
+   * The OzoneObj can be different depending on the AuthorizerType (see main Javadoc at top of file
+   * for examples).
+   * <p>
+   *
+   * @param policyJson     the IAM session policy
+   * @param volumeName     the volume under which the resource(s) live.  This may not be s3v in
+   *                       multi-tenant scenarios
+   * @param authorizerType whether the IOzoneObjs should be generated for use by the
+   *                       RangerOzoneAuthorizer or the OzoneNativeAuthorizer
+   * @return the data structure comprising the paths and permission pairings that
+   * the session policy grants (if any)
+   * @throws OMException if the policy JSON is invalid, malformed, or contains unsupported features
+   */
+  public static Set<AssumeRoleRequest.OzoneGrant> resolve(String policyJson, String volumeName,
+      AuthorizerType authorizerType) throws OMException {
+
+    validateInputParameters(policyJson, volumeName, authorizerType);
+
+    // Accumulate ACLs across ALL statements using a single map to allow
+    // cross-statement deduplication and ALL-permission collapsing.
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMap = new LinkedHashMap<>();
+    final Map<IOzoneObj, Set<String>> objToActionsMap = new LinkedHashMap<>();
+
+    // Parse JSON into set of statements
+    final Set<JsonNode> statements = parseJsonAndRetrieveStatements(policyJson);
+
+    for (JsonNode stmt : statements) {
+      validateSupportedStatementFields(stmt);
+      validateEffectInJsonStatement(stmt);
+
+      final Set<String> actions = readRequiredStringOrArray(stmt.get("Action"), "Action");
+      final Set<String> resources = readRequiredStringOrArray(stmt.get("Resource"), "Resource");
+
+      // Parse prefixes from conditions, if any
+      final Condition condition = parsePrefixesFromConditions(stmt);
+
+      // An empty s3:prefix array matches no prefixes and therefore grants no access (AWS behavior).
+      if (condition != null && condition.prefixes != null
+          && condition.prefixes.isEmpty()) {
+        continue;
+      }
+
+      // Map actions to S3Action enum if possible
+      final Set<S3Action> mappedS3Actions = mapPolicyActionsToS3Actions(actions);
+      if (mappedS3Actions.isEmpty()) {
+        // No actions recognized - no need to look at Resources for this Statement
+        continue;
+      }
+
+      // s3:prefix is only applicable to the ListBucket action because we don't support ListBucketVersions
+      // (see https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazons3.html and search for
+      // s3:prefix).  If a statement carries a Condition, non-ListBucket actions (ex GetObject, PutObject,
+      // ListBucketMultipartUploads, etc.) in that statement do not apply.
+      final Set<S3Action> filteredS3Actions = filterActionsWhenConditionPresent(mappedS3Actions, condition);
+      if (filteredS3Actions.isEmpty()) {
+        continue;
+      }
+
+      // Categorize resources according to bucket resource, object resource, etc
+      final Set<ResourceSpec> resourceSpecs = validateAndCategorizeResources(authorizerType, resources);
+
+      // For each action, map to Ozone objects (paths) and acls based on resource specs and prefixes
+      createPathsAndPermissions(
+          volumeName, authorizerType, filteredS3Actions, resourceSpecs, condition, objToAclsMap, objToActionsMap);
+    }
+
+    // Group accumulated objects by their ACL sets and S3 actions to create final result
+    return groupObjectsByAclsAndActions(objToAclsMap, objToActionsMap);
+  }
+
+  /**
+   * Ensures required input parameters are supplied.
+   */
+  private static void validateInputParameters(String policyJson, String volumeName,
+      AuthorizerType authorizerType) throws OMException {
+    if (StringUtils.isBlank(policyJson)) {
+      throw new OMException(ERROR_PREFIX + "The IAM session policy JSON is required", INTERNAL_ERROR);
+    }
+
+    if (StringUtils.isBlank(volumeName)) {
+      throw new OMException(ERROR_PREFIX + "The volume name is required", INTERNAL_ERROR);
+    }
+
+    Objects.requireNonNull(authorizerType, "The authorizer type is required");
+
+    if (policyJson.length() > MAX_JSON_LENGTH) {
+      throw new OMException(
+          ERROR_PREFIX + "Invalid policy JSON - exceeds maximum length of " + MAX_JSON_LENGTH + " characters",
+          MALFORMED_POLICY_DOCUMENT);
+    }
+  }
+
+  /**
+   * Parses IAM session policy and retrieve the statement(s).
+   */
+  private static Set<JsonNode> parseJsonAndRetrieveStatements(String policyJson) throws OMException {
+    // Jackson's tree model silently collapses duplicate keys (last value wins), which could let a caller smuggle
+    // broader permissions than intended.  Detect them up front so we can reject them with the exact field name.
+    checkForDuplicateFields(policyJson);
+
+    final JsonNode root;
+    try {
+      root = MAPPER.readTree(policyJson);
+    } catch (Exception e) {
+      throw new OMException(
+          ERROR_PREFIX + "Invalid policy JSON (most likely JSON structure is incorrect)", e, MALFORMED_POLICY_DOCUMENT);
+    }
+
+    final JsonNode statementsNode = root.path("Statement");
+    if (statementsNode.isMissingNode()) {
+      throw new OMException(ERROR_PREFIX + "Invalid policy JSON - missing Statement", MALFORMED_POLICY_DOCUMENT);
+    }
+
+    final Set<JsonNode> statements = new HashSet<>();
+
+    if (statementsNode.isArray()) {
+      statementsNode.forEach(statements::add);
+    } else {
+      statements.add(statementsNode);
+    }
+    if (statements.isEmpty()) {
+      throw new OMException(ERROR_PREFIX + "No Statement(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+    }
+    return statements;
+  }
+
+  /**
+   * Detects duplicate JSON object keys at any nesting level in a single streaming pass, reporting the offending
+   * field name directly.  Structural JSON problems are ignored here and surfaced by the subsequent tree parse.
+   */
+  private static void checkForDuplicateFields(String policyJson) throws OMException {
+    try (JsonParser parser = MAPPER.getFactory().createParser(policyJson)) {
+      checkForDuplicateFields(parser);
+    } catch (OMException e) {
+      throw e;
+    } catch (IOException e) {
+      // Structural JSON problems are surfaced by the subsequent tree parse with a clearer message.
+    }
+  }
+
+  private static void checkForDuplicateFields(JsonParser parser) throws IOException {
+    JsonToken token = parser.currentToken();
+    if (token == null) {
+      token = parser.nextToken();
+    }
+
+    if (token == JsonToken.START_OBJECT) {
+      final Set<String> fieldNames = new HashSet<>();
+      while (parser.nextToken() == JsonToken.FIELD_NAME) {
+        final String fieldName = parser.currentName();
+        if (!fieldNames.add(fieldName)) {
+          throw new OMException(
+              ERROR_PREFIX + "Duplicate field '" + fieldName + "' in session policy", MALFORMED_POLICY_DOCUMENT);
+        }
+        parser.nextToken();
+        checkForDuplicateFields(parser);
+      }
+    } else if (token == JsonToken.START_ARRAY) {
+      JsonToken element;
+      while ((element = parser.nextToken()) != null && element != JsonToken.END_ARRAY) {
+        checkForDuplicateFields(parser);
+      }
+    }
+  }
+
+  /**
+   * Ensures statements contain only the IAM policy elements supported by the STS session policy subset.
+   */
+  private static void validateSupportedStatementFields(JsonNode statement) throws OMException {
+    if (!statement.isObject()) {
+      throw new OMException(
+          ERROR_PREFIX + "Invalid Statement in JSON policy (must be an Object) - " + statement,
+          MALFORMED_POLICY_DOCUMENT);
+    }
+
+    final Iterator<String> fieldNames = statement.fieldNames();
+    while (fieldNames.hasNext()) {
+      final String fieldName = fieldNames.next();
+      if (!isSupportedStatementField(fieldName)) {
+        throw new OMException(
+            ERROR_PREFIX + "Unsupported statement element - " + fieldName, MALFORMED_POLICY_DOCUMENT);
+      }
+    }
+  }
+
+  private static boolean isSupportedStatementField(String fieldName) {
+    switch (fieldName) {
+    case "Sid":
+    case "Effect":
+    case "Action":
+    case "Resource":
+    case "Condition":
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  /**
+   * Parses Effect from IAM session policy and ensures it is valid and supported.
+   */
+  private static void validateEffectInJsonStatement(JsonNode statement) throws OMException {
+    final JsonNode effectNode = statement.get("Effect");
+    if (effectNode != null) {
+      if (effectNode.isTextual()) {
+        final String effect = effectNode.asText();
+        if (!"Allow".equals(effect)) {
+          throw new OMException(ERROR_PREFIX + "Unsupported Effect - " + effect, NOT_SUPPORTED_OPERATION);
+        }
+        return;
+      }
+
+      throw new OMException(
+          ERROR_PREFIX + "Invalid Effect in JSON policy (must be a String) - " + effectNode, MALFORMED_POLICY_DOCUMENT);
+    }
+
+    throw new OMException(ERROR_PREFIX + "Effect is missing from JSON policy", MALFORMED_POLICY_DOCUMENT);
+  }
+
+  /**
+   * Reads a required String or String array JSON policy element.
+   */
+  private static Set<String> readRequiredStringOrArray(JsonNode node, String fieldName) throws OMException {
+    if (node == null || node.isMissingNode() || node.isNull()) {
+      throw new OMException(ERROR_PREFIX + "No " + fieldName + "(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+    }
+    if (node.isTextual()) {
+      return Collections.singleton(node.asText());
+    }
+    if (node.isArray()) {
+      final Set<String> set = new HashSet<>();
+      for (JsonNode n : node) {
+        if (!n.isTextual()) {
+          throw invalidStringOrArray(fieldName, node);
+        }
+        set.add(n.asText());
+      }
+      if (set.isEmpty()) {
+        throw new OMException(ERROR_PREFIX + "No " + fieldName + "(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+      }
+      return set;
+    }
+
+    throw invalidStringOrArray(fieldName, node);
+  }
+
+  private static OMException invalidStringOrArray(String fieldName, JsonNode node) {
+    return new OMException(
+        ERROR_PREFIX + "Invalid " + fieldName + " in JSON policy (must be a String or Array of Strings) - " + node,
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  /**
+   * Reads and validates an s3:prefix condition value per AWS IAM session policy behavior.
+   * <p>
+   * Rejects {@code null}, objects (such as {@code {}}), and arrays whose elements are not all
+   * strings or not all numbers/booleans.  Scalar numbers and booleans are coerced to strings
+   * (for example {@code 123} becomes {@code "123"}).  An empty array matches no prefixes and
+   * causes the statement to grant no access.
+   */
+  private static Set<String> readConditionPrefixValue(JsonNode node) throws OMException {
+    if (node == null || node.isMissingNode() || node.isNull()) {
+      throw invalidConditionPrefixValue(node);
+    }
+    if (node.isTextual() || node.isNumber() || node.isBoolean()) {
+      return Collections.singleton(node.asText());
+    }
+    if (node.isArray()) {
+      if (node.isEmpty()) {
+        return Collections.emptySet();
+      }
+      boolean allTextual = true;
+      boolean allNumber = true;
+      boolean allBoolean = true;
+      for (final JsonNode element : node) {
+        if (!element.isTextual()) {
+          allTextual = false;
+        }
+        if (!element.isNumber()) {
+          allNumber = false;
+        }
+        if (!element.isBoolean()) {
+          allBoolean = false;
+        }
+      }
+      if (!allTextual && !allNumber && !allBoolean) {
+        throw invalidConditionPrefixValue(node);
+      }
+      final Set<String> prefixes = new HashSet<>();
+      node.forEach(n -> prefixes.add(n.asText()));
+      return prefixes;
+    }
+
+    throw invalidConditionPrefixValue(node);
+  }
+
+  private static OMException invalidConditionPrefixValue(JsonNode node) {
+    return new OMException(
+        ERROR_PREFIX + "Invalid s3:prefix in Condition (must be a String, Number, Boolean, or homogeneous " +
+        "Array of Strings, Numbers, or Booleans) - " + node,
+        MALFORMED_POLICY_DOCUMENT);
+  }
+
+  /**
+   * Parses and returns prefixes from Conditions (if any).  Also validates
+   * that if there is a Condition, there is only one and that the Condition
+   * operator and key name are supported.
+   * <p>
+   * Only the StringEquals and StringLike operators and s3:prefix key name are supported.
+   */
+  private static Condition parsePrefixesFromConditions(JsonNode stmt) throws OMException {
+    Condition condition = null;
+    final JsonNode cond = stmt.get("Condition");
+    if (cond != null && !cond.isMissingNode() && !cond.isNull()) {
+      if (cond.size() != 1) {
+        throw new OMException(ERROR_PREFIX + "Only one Condition is supported", NOT_SUPPORTED_OPERATION);
+      }
+
+      if (!cond.isObject()) {
+        throw new OMException(
+            ERROR_PREFIX + "Invalid Condition (must have operator " + STRING_EQUALS + " or " + STRING_LIKE +
+            " and key name s3:prefix) - " + cond, MALFORMED_POLICY_DOCUMENT);
+      }
+
+      final String operator = cond.fieldNames().next();
+      if (!STRING_EQUALS.equals(operator) && !STRING_LIKE.equals(operator)) {
+        throw new OMException(ERROR_PREFIX + "Unsupported Condition operator - " + operator, NOT_SUPPORTED_OPERATION);
+      }
+
+      final JsonNode operatorValue = cond.get(operator);
+      if ("null".equals(operatorValue.asText())) {
+        throw new OMException(
+            ERROR_PREFIX + "Missing Condition operator value for " + operator, MALFORMED_POLICY_DOCUMENT);
+      }
+
+      if (!operatorValue.isObject()) {
+        throw new OMException(
+            ERROR_PREFIX + "Invalid Condition operator value structure - " + operatorValue, MALFORMED_POLICY_DOCUMENT);
+      }
+
+      if (operatorValue.size() != 1) {
+        throw new OMException(
+            ERROR_PREFIX + "Only one Condition key is supported per operator", NOT_SUPPORTED_OPERATION);
+      }
+
+      final String keyName = operatorValue.fieldNames().next();
+      if (!"s3:prefix".equalsIgnoreCase(keyName)) {
+        throw new OMException(ERROR_PREFIX + "Unsupported Condition key name - " + keyName, NOT_SUPPORTED_OPERATION);
+      }
+
+      final Set<String> prefixes = readConditionPrefixValue(operatorValue.get(keyName));
+      condition = new Condition(operator, prefixes);
+    }
+
+    return condition;
+  }
+
+  /**
+   * Builds a case-insensitive S3Action map by lowercasing keys.  This map is used for mapping policy actions to
+   * S3Action enum values.  This map is built once and cached statically.
+   */
+  @VisibleForTesting
+  static Map<String, Set<S3Action>> buildCaseInsensitiveS3ActionMap() {
+    final Map<String, Set<S3Action>> ciMap = new LinkedHashMap<>();
+    for (S3Action sa : S3Action.values()) {
+      // Exact action mapping
+      ciMap.put(sa.name.toLowerCase(), singleton(sa));
+
+      // Group into s3:Get*, s3:Put*, s3:List*, s3:Delete*, s3:Create* based on action name prefix
+      for (String prefix : S3_ACTION_PREFIXES) {
+        if (sa.name.startsWith(prefix)) {
+          final String wildcardKey = (prefix + "*").toLowerCase();
+          ciMap.computeIfAbsent(wildcardKey, k -> new LinkedHashSet<>()).add(sa);
+          break;
+        }
+      }
+    }
+    return Collections.unmodifiableMap(ciMap);
+  }
+
+  /**
+   * Maps actions from JSON IAM policy to S3Action enum in order to determine what the
+   * permissions should be.
+   */
+  @VisibleForTesting
+  static Set<S3Action> mapPolicyActionsToS3Actions(Set<String> actions) {
+    if (actions == null || actions.isEmpty()) {
+      return Collections.emptySet();
+    }
+
+    // Map the actions from the IAM policy to S3Action
+    final Set<S3Action> mappedActions = new LinkedHashSet<>();
+    for (String action : actions) {
+      if ("s3:*".equalsIgnoreCase(action)) {
+        // Expand into all supported concrete actions
+        return EnumSet.allOf(S3Action.class);
+      }
+
+      // Unsupported actions are silently ignored
+      final Set<S3Action> s3Actions = S3_ACTION_MAP_CI.get(action.toLowerCase());
+      if (s3Actions != null) {
+        mappedActions.addAll(s3Actions);
+      }
+    }
+
+    return mappedActions;
+  }
+
+  /**
+   * Filters out actions when a Condition is present if the action is not ListBucket.
+   */
+  private static Set<S3Action> filterActionsWhenConditionPresent(Set<S3Action> mappedS3Actions, Condition condition) {
+    if (condition == null) {
+      return mappedS3Actions;
+    }
+
+    if (mappedS3Actions.contains(S3Action.LIST_BUCKET)) {
+      final Set<S3Action> filteredActions = new HashSet<>();
+      filteredActions.add(S3Action.LIST_BUCKET);
+      return filteredActions;
+    }
+
+    return Collections.emptySet();
+  }
+
+  /**
+   * Validates that wildcard bucket patterns are not used with native authorizer.
+   */
+  private static void validateNativeAuthorizerBucketPattern(AuthorizerType authorizerType, String bucket)
+      throws OMException {
+    if (authorizerType == AuthorizerType.NATIVE && bucket.contains("*")) {
+      throw new OMException(
+          ERROR_PREFIX + "Wildcard bucket patterns are not supported for Ozone native authorizer",
+          NOT_SUPPORTED_OPERATION);
+    }
+  }
+
+  /**
+   * Iterates over resources in IAM policy and determines whether it is a bucket resource,
+   * an object resource, a prefix or a wildcard.  The categorization can be different
+   * depending on whether the AuthorizerType is Ranger (for RangerOzoneAuthorizer) or
+   * native (for OzoneNativeAuthorizer).  See main Javadoc at top of file for more
+   * examples of these differences.
+   * <p>
+   * It also validates that the Resource Arn(s) are valid and supported.
+   */
+  @VisibleForTesting
+  static Set<ResourceSpec> validateAndCategorizeResources(AuthorizerType authorizerType,
+      Set<String> resources) throws OMException {
+    final Set<ResourceSpec> resourceSpecs = new HashSet<>();
+    if (resources.isEmpty()) {
+      throw new OMException(ERROR_PREFIX + "No Resource(s) found in policy", MALFORMED_POLICY_DOCUMENT);
+    }
+    for (String resource : resources) {
+      if ("*".equals(resource)) {
+        validateNativeAuthorizerBucketPattern(authorizerType, "*");
+        resourceSpecs.add(ResourceSpec.any());
+        continue;
+      }
+
+      if (!resource.startsWith(AWS_S3_ARN_PREFIX)) {
+        throw new OMException(ERROR_PREFIX + "Unsupported Resource Arn - " + resource, NOT_SUPPORTED_OPERATION);
+      }
+
+      final String suffix = resource.substring(AWS_S3_ARN_PREFIX.length());
+      if (suffix.isEmpty()) {
+        throw new OMException(ERROR_PREFIX + "Invalid Resource Arn - " + resource, MALFORMED_POLICY_DOCUMENT);
+      }
+
+      ResourceSpec spec = parseResourceSpec(suffix);
+
+      // This scenario can happen in the case of arn:aws:s3:::*/* or arn:aws:s3:::*/test.txt for
+      // examples
+      validateNativeAuthorizerBucketPattern(authorizerType, spec.bucket);
+
+      if (authorizerType == AuthorizerType.NATIVE && spec.type == S3ResourceType.OBJECT_PREFIX_WILDCARD) {
+        final String specPrefixExceptLastChar = spec.prefix.substring(0, spec.prefix.length() - 1);
+        if (spec.prefix.endsWith("*") && !specPrefixExceptLastChar.contains("*")) {
+          spec = ResourceSpec.objectPrefix(spec.bucket, specPrefixExceptLastChar);
+        } else {
+          throw new OMException(
+              ERROR_PREFIX + "Wildcard prefix patterns are not supported for Ozone native authorizer if " +
+              "wildcard is not at the end", NOT_SUPPORTED_OPERATION);
+        }
+      }
+      resourceSpecs.add(spec);
+    }
+    return resourceSpecs;
+  }
+
+  /**
+   * Iterates over all resources, finds applicable actions (if any) and constructs
+   * entries pairing sets of IOzoneObjs with the requisite permissions granted (if any).
+   */
+  @VisibleForTesting
+  static void createPathsAndPermissions(String volumeName, AuthorizerType authorizerType, Set<S3Action> mappedS3Actions,
+      Set<ResourceSpec> resourceSpecs, Condition condition, Map<IOzoneObj, Set<ACLType>> objToAclsMap,
+      Map<IOzoneObj, Set<String>> objToActionsMap) {
+    // Process each resource spec with the given actions
+    for (ResourceSpec resourceSpec : resourceSpecs) {
+      processResourceSpecWithActions(
+          volumeName, authorizerType, mappedS3Actions, resourceSpec, condition, objToAclsMap, objToActionsMap);
+    }
+  }
+
+  /**
+   * Groups objects by their ACL sets and S3 actions.
+   */
+  @VisibleForTesting
+  static Set<AssumeRoleRequest.OzoneGrant> groupObjectsByAclsAndActions(Map<IOzoneObj, Set<ACLType>> objToAclsMap,
+      Map<IOzoneObj, Set<String>> objToActionsMap) {
+
+    // Composite key to group by both ACLs and S3 actions
+    class GrantKey {
+      private final Set<ACLType> acls;
+      private final Set<String> actions;
+
+      GrantKey(Set<ACLType> acls, Set<String> actions) {
+        this.acls = acls;
+        this.actions = actions;
+      }
+
+      @Override
+      public boolean equals(Object o) {
+        if (this == o) {
+          return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+          return false;
+        }
+        GrantKey grantKey = (GrantKey) o;
+        return Objects.equals(acls, grantKey.acls) && Objects.equals(actions, grantKey.actions);
+      }
+
+      @Override
+      public int hashCode() {
+        return Objects.hash(acls, actions);
+      }
+    }
+
+    final Map<GrantKey, Set<IOzoneObj>> groupMap = new LinkedHashMap<>();
+
+    // Group objects by their ACL sets and S3 actions
+    objToAclsMap.forEach((obj, acls) -> {
+      Set<String> actions = objToActionsMap.getOrDefault(obj, Collections.emptySet());
+      if (actions.size() == S3Action.values().length) {
+        // An empty set of actions means all actions are allowed
+        actions = Collections.emptySet();
+      }
+      final GrantKey key = new GrantKey(acls, actions);
+      groupMap.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(obj);
+    });
+
+    // Convert to result format, filtering out entries with empty ACLs
+    final Set<AssumeRoleRequest.OzoneGrant> result = new LinkedHashSet<>();
+    groupMap.forEach((key, objs) -> {
+      if (!key.acls.isEmpty()) {
+        result.add(new AssumeRoleRequest.OzoneGrant(objs, key.acls, key.actions));
+      }
+    });
+
+    return result;
+  }
+
+  /**
+   * Processes a single ResourceSpec with given actions and adds resulting
+   * IOzoneObj to ACLType mappings to the provided map.
+   */
+  private static void processResourceSpecWithActions(String volumeName, AuthorizerType authorizerType,
+      Set<S3Action> mappedS3Actions, ResourceSpec resourceSpec, Condition condition,
+      Map<IOzoneObj, Set<ACLType>> objToAclsMap, Map<IOzoneObj, Set<String>> objToActionsMap) {
+
+    // Process based on ResourceSpec type
+    switch (resourceSpec.type) {
+    case ANY:
+      Preconditions.checkArgument(
+          authorizerType != AuthorizerType.NATIVE,
+          "ResourceSpec type ANY not supported for OzoneNativeAuthorizer");
+      processResourceTypeAny(volumeName, authorizerType, mappedS3Actions, condition, objToAclsMap, objToActionsMap);
+      break;
+    case BUCKET:
+      processBucketResource(
+          volumeName, mappedS3Actions, resourceSpec, condition, authorizerType, objToAclsMap, objToActionsMap);
+      break;
+    case BUCKET_WILDCARD:
+      Preconditions.checkArgument(
+          authorizerType != AuthorizerType.NATIVE,
+          "ResourceSpec type BUCKET_WILDCARD not supported for OzoneNativeAuthorizer");
+      processBucketResource(
+          volumeName, mappedS3Actions, resourceSpec, condition, authorizerType, objToAclsMap, objToActionsMap);
+      break;
+    case OBJECT_EXACT:
+      processObjectExactResource(volumeName, mappedS3Actions, resourceSpec, objToAclsMap, objToActionsMap);
+      break;
+    case OBJECT_PREFIX:
+      Preconditions.checkArgument(
+          authorizerType != AuthorizerType.RANGER,
+          "ResourceSpec type OBJECT_PREFIX not supported for RangerOzoneAuthorizer");
+      processObjectPrefixResource(
+          volumeName, authorizerType, mappedS3Actions, resourceSpec, objToAclsMap, objToActionsMap);
+      break;
+    case OBJECT_PREFIX_WILDCARD:
+      Preconditions.checkArgument(
+          authorizerType != AuthorizerType.NATIVE,
+          "ResourceSpec type OBJECT_PREFIX_WILDCARD not supported for OzoneNativeAuthorizer");
+      processObjectPrefixResource(
+          volumeName, authorizerType, mappedS3Actions, resourceSpec, objToAclsMap, objToActionsMap);
+      break;
+    default:
+      throw new IllegalStateException("Unexpected resourceSpec type found: " + resourceSpec.type);
+    }
+  }
+
+  /**
+   * Handles ResourceType.ANY (*).
+   * Example: "Resource": "*"
+   */
+  private static void processResourceTypeAny(String volumeName, AuthorizerType authorizerType,
+      Set<S3Action> mappedS3Actions, Condition condition, Map<IOzoneObj, Set<ACLType>> objToAclsMap,
+      Map<IOzoneObj, Set<String>> objToActionsMap) {
+    final IOzoneObj volumeObj = volumeObj(volumeName);
+    final IOzoneObj bucketObj = bucketObj(volumeName, "*");
+    final IOzoneObj keyObj = keyObj(volumeName, "*", "*");
+    for (S3Action action : mappedS3Actions) {
+      addAclsForObj(objToAclsMap, volumeObj, action.volumePerms);
+      addAclsForObj(objToAclsMap, bucketObj, action.bucketPerms);
+
+      if (condition != null && action == S3Action.LIST_BUCKET) {
+        // Ensure the volume and bucket get the action
+        addActionForKind(objToActionsMap, action, volumeObj, bucketObj, null);
+
+        if (condition.prefixes != null && !condition.prefixes.isEmpty()) {
+          for (String prefix : condition.prefixes) {
+            // If operator is StringEquals, ignore wildcard prefixes - this is AWS behavior
+            if (STRING_EQUALS.equals(condition.operator) && hasWildcard(prefix)) {
+              continue;
+            }
+
+            final IOzoneObj listObj = createObjectResourcesFromConditionPrefix(
+                volumeName, authorizerType, ResourceSpec.any(), prefix, objToAclsMap, EnumSet.of(READ));
+            addActionForKind(objToActionsMap, action, null, null, listObj);
+          }
+        }
+      } else if (condition == null) {
+        addAclsForObj(objToAclsMap, keyObj, action.objectPerms);
+        addActionForKind(objToActionsMap, action, volumeObj, bucketObj, keyObj);
+      }
+    }
+  }
+
+  /**
+   * Handles BUCKET and BUCKET_WILDCARD resource types.
+   * Example: "Resource": "arn:aws:s3:::my-bucket" or "Resource": "arn:aws:s3:::my-bucket*" or
+   *          "Resource": "arn:aws:s3:::*"
+   */
+  private static void processBucketResource(String volumeName, Set<S3Action> mappedS3Actions,
+      ResourceSpec resourceSpec, Condition condition, AuthorizerType authorizerType,
+      Map<IOzoneObj, Set<ACLType>> objToAclsMap, Map<IOzoneObj, Set<String>> objToActionsMap) {
+    final IOzoneObj volumeObj = volumeObj(volumeName);
+    final IOzoneObj bucketObj = bucketObj(volumeName, resourceSpec.bucket);
+    for (S3Action action : mappedS3Actions) {
+      // The s3:ListAllMyBuckets action can use either "*" or
+      // "arn:aws:s3:::*" as its Resource.  The former is already handled via the
+      // ResourceSpec.ANY path.  The latter is parsed as a BUCKET_WILDCARD with a
+      // bucket name of "*".  To align with AWS, make sure that in this
+      // specific case we also grant the volume-level permissions for volume-scoped
+      // actions (currently s3:ListAllMyBuckets).
+      if (action.kind == ActionKind.BUCKET ||
+          (action.kind == ActionKind.VOLUME && "*".equals(resourceSpec.bucket))) { // this handles s3:ListAllMyBuckets
+        addAclsForObj(objToAclsMap, volumeObj, action.volumePerms);
+        addAclsForObj(objToAclsMap, bucketObj, action.bucketPerms);
+        addActionForKind(objToActionsMap, action, volumeObj, bucketObj, null);
+      }
+
+      if (action == S3Action.LIST_BUCKET) {
+        // If condition prefixes are present, these would constrain the object permissions if the action
+        // is s3:ListBucket
+        if (condition != null && condition.prefixes != null && !condition.prefixes.isEmpty()) {
+          for (String prefix : condition.prefixes) {
+            // If operator is StringEquals, we should ignore any prefix containing wildcards - this is AWS behavior
+            if (STRING_EQUALS.equals(condition.operator) && hasWildcard(prefix)) {
+              continue;
+            }
+            final IOzoneObj listObj = createObjectResourcesFromConditionPrefix(
+                volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, EnumSet.of(READ));
+            // Add action for the key/prefix
+            addActionForKind(objToActionsMap, action, null, null, listObj);
+          }
+        } else if (condition == null) {
+          // No condition prefixes, but we need READ access to all objects, so use "*" as the prefix
+          final IOzoneObj readObj = createObjectResourcesFromConditionPrefix(
+              volumeName, authorizerType, resourceSpec, "*", objToAclsMap, EnumSet.of(READ));
+          // Add action for the key/prefix
+          addActionForKind(objToActionsMap, action, null, null, readObj);
+        }
+      }
+    }
+  }
+
+  /**
+   * Handles OBJECT_EXACT resource type.
+   * Example: "Resource": "arn:aws:s3:::my-bucket/file.txt"
+   */
+  private static void processObjectExactResource(String volumeName, Set<S3Action> mappedS3Actions,
+      ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap,
+      Map<IOzoneObj, Set<String>> objToActionsMap) {
+    final IOzoneObj volumeObj = volumeObj(volumeName);
+    final IOzoneObj bucketObj = bucketObj(volumeName, resourceSpec.bucket);
+    final IOzoneObj keyObj = keyObj(volumeName, resourceSpec.bucket, resourceSpec.key);
+    for (S3Action action : mappedS3Actions) {
+      if (action.kind == ActionKind.OBJECT) {
+        addAclsForObj(objToAclsMap, volumeObj, action.volumePerms);
+        addAclsForObj(objToAclsMap, bucketObj, action.bucketPerms);
+        addAclsForObj(objToAclsMap, keyObj, action.objectPerms);
+        addActionForKind(objToActionsMap, action, volumeObj, bucketObj, keyObj);
+      }
+    }
+  }
+
+  /**
+   * Handles OBJECT_PREFIX and OBJECT_PREFIX_WILDCARD resource types.
+   * Prefixes can be specified in the Resource itself as in the example below, or via an s3:prefix Condition.
+   * Example: "Resource": "arn:aws:s3:::my-bucket/path/folder"
+   */
+  private static void processObjectPrefixResource(String volumeName, AuthorizerType authorizerType,
+      Set<S3Action> mappedS3Actions, ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap,
+      Map<IOzoneObj, Set<String>> objToActionsMap) {
+    final IOzoneObj volumeObj = volumeObj(volumeName);
+    final IOzoneObj bucketObj = bucketObj(volumeName, resourceSpec.bucket);
+    for (S3Action action : mappedS3Actions) {
+      // Object actions apply to prefix/key resources - ensure to add the acls only for the appropriate action type
+      if (action.kind == ActionKind.OBJECT) {
+        addAclsForObj(objToAclsMap, volumeObj, action.volumePerms);
+        addAclsForObj(objToAclsMap, bucketObj, action.bucketPerms);
+        // Handle the resource prefix itself (e.g., my-bucket/*)
+        createObjectResourcesFromResourcePrefix(
+            volumeName, authorizerType, resourceSpec, objToAclsMap, objToActionsMap, action.objectPerms, action.name);
+        // Object-level action was already applied inside createObjectResourcesFromResourcePrefix.
+        addActionForKind(objToActionsMap, action, volumeObj, bucketObj, null);
+      }
+    }
+  }
+
+  /**
+   * Creates object resources from resource prefix (e.g., my-bucket/*).
+   */
+  private static void createObjectResourcesFromResourcePrefix(String volumeName, AuthorizerType authorizerType,
+      ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap,
+      Map<IOzoneObj, Set<String>> objToActionsMap, Set<ACLType> acls, String actionName) {
+    if (authorizerType == AuthorizerType.NATIVE) {
+      final IOzoneObj prefixObj = prefixObj(volumeName, resourceSpec.bucket, resourceSpec.prefix);
+      addAclsForObj(objToAclsMap, prefixObj, acls);
+      addActionForObj(objToActionsMap, prefixObj, actionName);
+    } else {
+      final IOzoneObj keyObj = keyObj(volumeName, resourceSpec.bucket, resourceSpec.prefix);
+      addAclsForObj(objToAclsMap, keyObj, acls);
+      addActionForObj(objToActionsMap, keyObj, actionName);
+    }
+  }
+
+  /**
+   * Creates object resources from condition prefixes (i.e. the s3:prefix conditions).
+   */
+  private static IOzoneObj createObjectResourcesFromConditionPrefix(String volumeName, AuthorizerType authorizerType,
+      ResourceSpec resourceSpec, String conditionPrefix, Map<IOzoneObj, Set<ACLType>> objToAclsMap, Set<ACLType> acls) {
+    if (authorizerType == AuthorizerType.NATIVE) {
+      // For native authorizer, use PREFIX resource type with normalized prefix.
+      // Map "x" in condition list prefix to "x". Map "x/*" in condition list prefix to "x/".
+      // Map "*" in condition list prefix to "".
+      final String normalizedPrefix;
+      if (conditionPrefix != null && conditionPrefix.endsWith("*")) {
+        normalizedPrefix = conditionPrefix.substring(0, conditionPrefix.length() - 1);
+      } else {
+        normalizedPrefix = conditionPrefix;
+      }
+      final IOzoneObj prefixObj = prefixObj(volumeName, resourceSpec.bucket, normalizedPrefix);
+      addAclsForObj(objToAclsMap, prefixObj, acls);
+      return prefixObj;
+    } else {
+      // For Ranger authorizer, use KEY resource type with original prefix
+      // Map "x" in condition list prefix to "x".  Map "x/*" in condition list prefix to "x/*".
+      // Map "* in condition list prefix to "*".
+      final IOzoneObj keyObj = keyObj(volumeName, resourceSpec.bucket, conditionPrefix);
+      addAclsForObj(objToAclsMap, keyObj, acls);
+      return keyObj;
+    }
+  }
+
+  private static void addActionForKind(Map<IOzoneObj, Set<String>> objToActionsMap, S3Action action,
+      IOzoneObj volumeObj, IOzoneObj bucketObj, IOzoneObj objectObj) {
+    if (action == null) {
+      return;
+    }
+    final ActionKind kind = action.kind;
+    if (kind == ActionKind.VOLUME) {
+      if (volumeObj != null) {
+        addActionForObj(objToActionsMap, volumeObj, action.name);
+      }
+      return;
+    }
+
+    if (volumeObj != null) {
+      addActionForObj(objToActionsMap, volumeObj, action.name);
+    }
+    if (bucketObj != null) {
+      addActionForObj(objToActionsMap, bucketObj, action.name);
+    }
+    if (objectObj != null) {
+      if (kind == ActionKind.OBJECT || action == S3Action.LIST_BUCKET) {
+        addActionForObj(objToActionsMap, objectObj, action.name);
+      }
+    }
+  }
+
+  /**
+   * Helper method to add ACLs for an IOzoneObj, merging with existing ACLs if present.
+   * If ALL permission is present, no other permissions are added.
+   */
+  private static void addAclsForObj(Map<IOzoneObj, Set<ACLType>> objToAclsMap, IOzoneObj obj, Set<ACLType> acls) {
+    if (acls != null && !acls.isEmpty()) {
+      final OzoneObj ozoneObj = (OzoneObj) obj;
+      final Set<ACLType> existingAcls = objToAclsMap.computeIfAbsent(ozoneObj, k -> EnumSet.noneOf(ACLType.class));
+
+      // If ALL is already present, don't add other permissions
+      if (existingAcls.contains(ACLType.ALL)) {
+        return;
+      }
+
+      // If we're about to add ALL, remove all other permissions first
+      if (acls.contains(ACLType.ALL)) {
+        existingAcls.clear();
+        existingAcls.add(ACLType.ALL);
+      } else {
+        // Only add permissions if ALL is not already present
+        existingAcls.addAll(acls);
+      }
+    }
+  }
+
+  /**
+   * Helper method to add an S3 action for an IOzoneObj.  It basically strips off
+   * the s3: prefix, such that s3:GetObject becomes GetObject.
+   */
+  private static String normalizeS3ActionForGrant(String action) {
+    if (action == null) {
+      return null;
+    }
+    if (action.isEmpty()) {
+      return action;
+    }
+    if (action.regionMatches(true, 0, "s3:", 0, 3)) {
+      return action.substring(3);
+    }
+    return action;
+  }
+
+  private static void addActionForObj(Map<IOzoneObj, Set<String>> objToActionsMap, IOzoneObj obj, String action) {
+    final String normalizedAction = normalizeS3ActionForGrant(action);
+    if (normalizedAction != null && !normalizedAction.isEmpty()) {
+      final OzoneObj ozoneObj = (OzoneObj) obj;
+      objToActionsMap.computeIfAbsent(ozoneObj, k -> new LinkedHashSet<>()).add(normalizedAction);
+    }
+  }
+
+  /**
+   * The authorizer type, whether for OzoneNativeAuthorizer or RangerOzoneAuthorizer.
+   * The IOzoneObjs generated differ in certain cases depending on the type.
+   * See main Javadoc at top of file for differences.
+   */
+  public enum AuthorizerType {
+    NATIVE,
+    RANGER
+  }
+
+  /**
+   * The type of resource the S3 action applies to.
+   */
+  private enum ActionKind {
+    VOLUME,
+    BUCKET,
+    OBJECT
+  }
+
+  /**
+   * The categorization possibilities of Resources in the IAM policy.
+   */
+  @VisibleForTesting
+  enum S3ResourceType {
+    ANY,                    // Ranger authorizer solely uses this
+    BUCKET,
+    BUCKET_WILDCARD,        // Ranger authorizer solely uses this
+    OBJECT_PREFIX,          // Native authorizer solely uses this
+    OBJECT_PREFIX_WILDCARD, // Ranger authorizer solely uses this. We initially categorize all resources with
+                            // wildcard (*) as OBJECT_PREFIX_WILDCARD, but if the wildcard is not at the end, and
+                            // Native authorizer is being used, an error is thrown.  If the wildcard is at the end,
+                            // then the categorization will use OBJECT_PREFIX for native authorizer instead and remove
+                            // the wildcard.
+    OBJECT_EXACT
+  }
+
+  /**
+   * Encapsulates the Condition operator and values.
+   */
+  @VisibleForTesting
+  public static final class Condition {
+    private final String operator;
+    private final Set<String> prefixes;
+
+    public Condition(String operator, Set<String> prefixes) {
+      this.operator = operator;
+      this.prefixes = prefixes;
+    }
+  }
+
+  /**
+   * Utility to help categorize IAM policy resources, whether for bucket, key, wildcards, etc.
+   */
+  @VisibleForTesting
+  static final class ResourceSpec {
+    private final S3ResourceType type;
+    private final String bucket;
+    private final String prefix; // for OBJECT_PREFIX or OBJECT_PREFIX_WILDCARD only, otherwise null
+    private final String key; // for OBJECT_EXACT only, otherwise null
+
+    @VisibleForTesting
+    ResourceSpec(S3ResourceType type, String bucket, String prefix, String key) {
+      this.type = type;
+      this.bucket = bucket;
+      this.prefix = prefix;
+      this.key = key;
+    }
+
+    static ResourceSpec any() {
+      return new ResourceSpec(S3ResourceType.ANY, "*", null, null);
+    }
+
+    static ResourceSpec bucket(String bucket) {
+      return new ResourceSpec(
+          bucket.contains("*") ? S3ResourceType.BUCKET_WILDCARD : S3ResourceType.BUCKET, bucket, null, null);
+    }
+
+    static ResourceSpec objectExact(String bucket, String key) {
+      return new ResourceSpec(S3ResourceType.OBJECT_EXACT, bucket, null, key);
+    }
+
+    static ResourceSpec objectPrefix(String bucket, String prefix) {
+      return new ResourceSpec(
+          prefix.contains("*") ? S3ResourceType.OBJECT_PREFIX_WILDCARD : S3ResourceType.OBJECT_PREFIX, bucket,
+          prefix, null);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      final ResourceSpec that = (ResourceSpec) o;
+      return type == that.type && Objects.equals(bucket, that.bucket) && Objects.equals(prefix, that.prefix) &&
+          Objects.equals(key, that.key);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(type, bucket, prefix, key);
+    }
+
+    @Override
+    public String toString() {
+      return "ResourceSpec{" + "type=" + type + ", bucket='" + bucket + '\'' + ", prefix='" + prefix + '\'' +
+          ", key='" + key + '\'' + '}';
+    }
+  }
+
+  /**
+   * Parses and categorizes the ResourceArn.
+   * <p>
+   * Suffix parameter can be:
+   * -> bucket
+   * -> bucket/* (prefix in OzoneNativeAuthorizer or wildcard key in RangerOzoneAuthorizer)
+   * -> bucket/deep/path/* (prefix in OzoneNativeAuthorizer or wildcard key in RangerOzoneAuthorizer)
+   * -> bucket/key or bucket/prefix/key (exact key)
+   */
+  private static ResourceSpec parseResourceSpec(String suffix) {
+
+    final int slashIndex = suffix.indexOf('/');
+    if (slashIndex < 0) {
+      return ResourceSpec.bucket(suffix);
+    }
+
+    final String bucket = suffix.substring(0, slashIndex);
+    final String rest = suffix.substring(slashIndex + 1);
+    if (rest.contains("*")) {
+      return ResourceSpec.objectPrefix(bucket, rest);
+    }
+
+    return ResourceSpec.objectExact(bucket, rest);
+  }
+
+  @VisibleForTesting
+  enum S3Action {
+    // Volume-scope
+    // Used for ListBuckets api
+    LIST_ALL_MY_BUCKETS("s3:ListAllMyBuckets", ActionKind.VOLUME, EnumSet.of(READ, LIST),
+        EnumSet.noneOf(ACLType.class), EnumSet.noneOf(ACLType.class)),
+
+    // Bucket-scope
+    CREATE_BUCKET("s3:CreateBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(CREATE),
+        EnumSet.noneOf(ACLType.class)),
+    DELETE_BUCKET("s3:DeleteBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(DELETE),
+        EnumSet.noneOf(ACLType.class)),
+    GET_BUCKET_ACL("s3:GetBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, READ_ACL),
+        EnumSet.noneOf(ACLType.class)),
+    // Used for HeadBucket, ListObjects and ListObjectsV2 apis
+    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST), EnumSet.of(READ)),
+    // Used for ListMultipartUploads API
+    LIST_BUCKET_MULTIPART_UPLOADS("s3:ListBucketMultipartUploads", ActionKind.BUCKET, EnumSet.of(READ),
+        EnumSet.of(READ, LIST), EnumSet.noneOf(ACLType.class)),
+    PUT_BUCKET_ACL("s3:PutBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, READ_ACL, WRITE_ACL),
+        EnumSet.noneOf(ACLType.class)),
+
+    // Object-scope
+    ABORT_MULTIPART_UPLOAD("s3:AbortMultipartUpload", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(WRITE)),
+    // Used for DeleteObject (when versionId parameter is not supplied),
+    // DeleteObjects (when versionId parameter is not supplied) APIs
+    DELETE_OBJECT("s3:DeleteObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(DELETE)),
+    DELETE_OBJECT_TAGGING("s3:DeleteObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(WRITE)),
+    // Used for HeadObject, CopyObject (for source bucket), GetObject (without versionId parameter) APIs
+    GET_OBJECT("s3:GetObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
+    GET_OBJECT_TAGGING("s3:GetObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
+    // Used for ListParts API
+    LIST_MULTIPART_UPLOAD_PARTS("s3:ListMultipartUploadParts", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(READ)),
+    // Used for CreateMultipartUpload, UploadPart, CompleteMultipartUpload,
+    // CopyObject (for destination bucket), PutObject APIs
+    PUT_OBJECT("s3:PutObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(CREATE, ACLType.WRITE)),
+    PUT_OBJECT_TAGGING("s3:PutObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(ACLType.WRITE));
+
+    private final String name;
+    private final ActionKind kind;
+    private final Set<ACLType> volumePerms;
+    private final Set<ACLType> bucketPerms;
+    private final Set<ACLType> objectPerms;
+
+    S3Action(String name, ActionKind kind, Set<ACLType> volumePerms, Set<ACLType> bucketPerms,
+        Set<ACLType> objectPerms) {
+      this.name = name;
+      this.kind = kind;
+      this.volumePerms = volumePerms;
+      this.bucketPerms = bucketPerms;
+      this.objectPerms = objectPerms;
+    }
+  }
+
+  /**
+   * Creates an OzoneObjInfo.Builder based on supplied parameters.
+   */
+  private static OzoneObjInfo.Builder obj(OzoneObj.ResourceType type, String volumeName, String bucketName) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(type)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName);
+  }
+
+  /**
+   * Creates IOzoneObj with ResourceType BUCKET.
+   */
+  private static IOzoneObj bucketObj(String volumeName, String bucketName) {
+    return obj(OzoneObj.ResourceType.BUCKET, volumeName, bucketName).build();
+  }
+
+  /**
+   * Creates IOzoneObj with ResourceType KEY.
+   */
+  private static IOzoneObj keyObj(String volumeName, String bucketName, String keyName) {
+    return obj(OzoneObj.ResourceType.KEY, volumeName, bucketName)
+        .setKeyName(keyName)
+        .build();
+  }
+
+  /**
+   * Creates IOzoneObj with ResourceType PREFIX.
+   */
+  private static IOzoneObj prefixObj(String volumeName, String bucketName, String prefixName) {
+    return obj(OzoneObj.ResourceType.PREFIX, volumeName, bucketName)
+        .setPrefixName(prefixName)
+        .build();
+  }
+
+  /**
+   * Creates IOzoneObj with ResourceType VOLUME.
+   */
+  private static IOzoneObj volumeObj(String volumeName) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.VOLUME)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .build();
+  }
+
+  private static boolean hasWildcard(String prefix) {
+    return ((prefix.contains("*") || prefix.contains("?")));
+  }
+}
