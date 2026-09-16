@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatu
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -87,6 +88,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
@@ -116,6 +118,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBuck
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCallerIdentityResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
@@ -174,11 +177,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantL
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -324,6 +329,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         GetS3VolumeContextResponse s3VolumeContextResponse =
             getS3VolumeContext();
         responseBuilder.setGetS3VolumeContextResponse(s3VolumeContextResponse);
+        break;
+      case GetCallerIdentity:
+        responseBuilder.setGetCallerIdentityResponse(getCallerIdentity());
         break;
       case TenantGetUserInfo:
         impl.checkS3MultiTenancyEnabled();
@@ -1144,7 +1152,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
   }
 
-  private RefetchSecretKeyResponse refetchSecretKey() {
+  private RefetchSecretKeyResponse refetchSecretKey() throws IOException {
     UUID uuid = impl.refetchSecretKey();
     RefetchSecretKeyResponse response =
         RefetchSecretKeyResponse.newBuilder()
@@ -1317,14 +1325,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private ListStatusLightResponse listStatusLight(
       ListStatusRequest request, int clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
-    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+    OmKeyArgs.Builder omKeyArgsBuilder = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
         .setSortDatanodesInPipeline(false)
         .setLatestVersionLocation(true)
-        .setHeadOp(keyArgs.getHeadOp())
-        .build();
+        .setHeadOp(keyArgs.getHeadOp());
+    if (request.hasListPrefix() && !request.getListPrefix().isEmpty()) {
+      omKeyArgsBuilder.setListPrefix(request.getListPrefix());
+    }
+    OmKeyArgs omKeyArgs = omKeyArgsBuilder.build();
     boolean allowPartialPrefixes =
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatusLight> statuses =
@@ -1468,6 +1479,22 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return impl.getS3VolumeContext().getProtobuf();
   }
 
+  private GetCallerIdentityResponse getCallerIdentity() throws OMException {
+    impl.checkS3STSEnabled();
+    if (OzoneManager.getS3Auth() == null) {
+      throw new OMException(
+          "GetCallerIdentity does not have S3 authentication", OMException.ResultCodes.INVALID_REQUEST);
+    }
+    final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
+    if (stsTokenIdentifier != null) {
+      return S3STSUtils.resolveCallerIdentityForStsCredentials(
+          stsTokenIdentifier.getAssumedRoleId(), stsTokenIdentifier.getAssumedRoleUserArn()).getProtobuf();
+    }
+    final String resolvedPrincipal = OzoneAclUtils.accessIdToUserPrincipal(OzoneManager.getS3AuthEffectiveAccessId());
+    final String kerberosShortName = UserGroupInformation.createRemoteUser(resolvedPrincipal).getShortUserName();
+    return S3STSUtils.resolveCallerIdentityForPermanentCredentials(resolvedPrincipal, kerberosShortName).getProtobuf();
+  }
+
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   private SnapshotDiffResponse snapshotDiff(
       SnapshotDiffRequest snapshotDiffRequest) throws IOException {
@@ -1504,6 +1531,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     if (response.getSnapshotDiffReport() != null) {
       builder.setSnapshotDiffReport(
           response.getSnapshotDiffReport().toProtobuf());
+    }
+    if (response.getSubStatus() != null) {
+      builder.setSubStatus(response.getSubStatus().toProtoBuf());
+      if (response.getSubStatus().hasProgress()) {
+        builder.setProgressPercent(response.getProgressPercent());
+      }
     }
 
     return builder.build();

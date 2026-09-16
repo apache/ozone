@@ -96,11 +96,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    DeleteKeysRequest deleteKeysRequest = super.preExecute(ozoneManager).getDeleteKeysRequest();
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+    DeleteKeysRequest deleteKeysRequest = omRequest.getDeleteKeysRequest();
     Objects.requireNonNull(deleteKeysRequest, "deleteKeysRequest == null");
 
     if (deleteKeysRequest.getSourceType() == RequestSource.LIFECYCLE && deleteKeysRequest.hasScanState()) {
-      if (ozoneManager.getAclsEnabled()) {
+      if (ozoneManager.isAdminAuthorizationEnabled()) {
         UserGroupInformation ugi = createUGIForApi();
         if (!ozoneManager.isAdmin(ugi)) {
           throw new OMException("Access denied for user " + ugi + ". "
@@ -110,7 +111,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
     }
 
-    return getOmRequest();
+    return omRequest;
   }
 
   @Override @SuppressWarnings("methodlength")
