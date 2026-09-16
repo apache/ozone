@@ -761,16 +761,17 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public void setThreadLocalReadConsistency(ReadConsistency readConsistency) {
-    this.readConsistency = readConsistency;
+  public void setThreadLocalReadConsistency(
+      ReadConsistency newReadConsistency) {
+    this.readConsistency = newReadConsistency;
     this.localLeaseLogLimit = null;
     this.localLeaseTimeMs = null;
   }
 
   @Override
-  public void setThreadLocalReadConsistency(ReadConsistency readConsistency,
+  public void setThreadLocalReadConsistency(ReadConsistency newReadConsistency,
       Long newLocalLeaseLogLimit, Long newLocalLeaseTimeMs) {
-    this.readConsistency = readConsistency;
+    this.readConsistency = newReadConsistency;
     this.localLeaseLogLimit = newLocalLeaseLogLimit;
     this.localLeaseTimeMs = newLocalLeaseTimeMs;
   }

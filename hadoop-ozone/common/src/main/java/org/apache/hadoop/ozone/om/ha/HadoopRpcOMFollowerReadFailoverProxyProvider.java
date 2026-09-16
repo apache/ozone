@@ -400,19 +400,24 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
       // Either all followers have failed, follower reads are disabled,
       // or this is a write request. In any case, forward the request to
       // the leader OM.
+      return invokeLeader(method, args);
+    }
+
+    private Object invokeLeader(Method method, Object[] args) throws Throwable {
       LOG.debug("Using leader-based failoverProxy to service {}", method.getName());
-      final OMProxyInfo<OzoneManagerProtocolPB> currentLeaderProxy = leaderProxy.getProxy();
-      Object retVal = null;
+      final OMProxyInfo<OzoneManagerProtocolPB> currentLeaderProxy =
+          leaderProxy.getProxy();
       try {
-        retVal = method.invoke(currentLeaderProxy.getProxy(), args);
+        Object retVal = method.invoke(currentLeaderProxy.getProxy(), args);
+        lastProxy = currentLeaderProxy;
+        return retVal;
       } catch (InvocationTargetException e) {
         LOG.debug("Exception thrown from leader-based failoverProxy", e.getCause());
         // This exception will be handled by the OMFailoverProxyProviderBase#getRetryPolicy
         // (see getRetryPolicy). This ensures that the leader-only failover should still work.
         throwServiceException(e.getCause());
+        return null;
       }
-      lastProxy = currentLeaderProxy;
-      return retVal;
     }
 
     @Override
