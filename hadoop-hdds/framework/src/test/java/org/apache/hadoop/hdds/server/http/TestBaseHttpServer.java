@@ -18,8 +18,11 @@
 package org.apache.hadoop.hdds.server.http;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.nio.file.Path;
 import org.apache.commons.lang3.NotImplementedException;
@@ -27,6 +30,7 @@ import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ozone.test.GenericTestUtils.PortAllocator;
+import org.eclipse.jetty.ee10.webapp.WebAppContext;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -155,6 +159,55 @@ class TestBaseHttpServer {
       if (policy.isHttpsEnabled()) {
         assertEquals(hostname + ":" + subject.getHttpsAddress().getPort(), conf.get(ADDRESS_HTTPS_KEY));
       }
+    } finally {
+      subject.stop();
+    }
+  }
+
+  /**
+   * Each server must use its own temp subdirectory (named after the server)
+   * under the base directory, so multiple WebAppContexts in one process do not
+   * share Jetty scratch space, and the subdirectory is kept persistent so Jetty
+   * does not delete operator data under the metadata directory on stop.
+   */
+  @Test
+  void usesPerServerTempSubdirectory() throws Exception {
+    MutableConfigurationSource conf = newConfig(HttpConfig.Policy.HTTP_ONLY);
+    BaseHttpServer subject = new TestingHttpServer(conf);
+    try {
+      subject.start();
+      Field field = BaseHttpServer.class.getDeclaredField("httpServer");
+      field.setAccessible(true);
+      WebAppContext webAppContext =
+          ((HttpServer2) field.get(subject)).getWebAppContext();
+      assertEquals(new File(tempDir.toFile(), "testing").getCanonicalFile(),
+          webAppContext.getTempDirectory().getCanonicalFile());
+      assertTrue(webAppContext.isTempDirectoryPersistent());
+    } finally {
+      subject.stop();
+    }
+  }
+
+  /**
+   * An operator-configured {@code hadoop.http.temp.dir} is applied by
+   * {@link HttpServer2} during build and must not be silently replaced by the
+   * per-server {@code <basedir>/<name>} subdirectory, preserving the
+   * pre-Jetty-12 precedence where the explicit setting wins.
+   */
+  @Test
+  void honoursOperatorConfiguredTempDir() throws Exception {
+    MutableConfigurationSource conf = newConfig(HttpConfig.Policy.HTTP_ONLY);
+    File operatorTempDir = new File(tempDir.toFile(), "operator-temp");
+    conf.set("hadoop.http.temp.dir", operatorTempDir.getAbsolutePath());
+    BaseHttpServer subject = new TestingHttpServer(conf);
+    try {
+      subject.start();
+      Field field = BaseHttpServer.class.getDeclaredField("httpServer");
+      field.setAccessible(true);
+      WebAppContext webAppContext =
+          ((HttpServer2) field.get(subject)).getWebAppContext();
+      assertEquals(operatorTempDir.getCanonicalFile(),
+          webAppContext.getTempDirectory().getCanonicalFile());
     } finally {
       subject.stop();
     }

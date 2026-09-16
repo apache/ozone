@@ -52,6 +52,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -59,9 +60,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
-import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
+import org.apache.hadoop.crypto.key.KeyProviderFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileChecksum;
@@ -103,7 +104,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -147,10 +147,10 @@ public class TestOzoneShellHA {
   private static java.nio.file.Path path;
   @TempDir
   private static File kmsDir;
+  private static final String ENCRYPTION_KEY_NAME = "shell-test-enckey";
   private static File testFile;
   private static String testFilePathString;
   private MiniOzoneHAClusterImpl cluster;
-  private static MiniKMS miniKMS;
   private OzoneClient client;
   private OzoneShell ozoneShell = null;
   private OzoneAdmin ozoneAdminShell = null;
@@ -174,14 +174,10 @@ public class TestOzoneShellHA {
   }
 
   @BeforeAll
-  static void startKMS() throws Exception {
+  static void initTestFile() throws Exception {
     testFilePathString = path + OZONE_URI_DELIMITER + "testFile";
     testFile = new File(testFilePathString);
     FileUtils.touch(testFile);
-
-    MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
-    miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
-    miniKMS.start();
   }
 
   static MiniOzoneHAClusterImpl startCluster(boolean followerReadEnabled) throws Exception {
@@ -194,7 +190,7 @@ public class TestOzoneShellHA {
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
-        getKeyProviderURI(miniKMS));
+        getKeyProviderURI());
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 10);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     conf.setInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT, 1);
@@ -210,6 +206,10 @@ public class TestOzoneShellHA {
     omRatisConfig.setReadOption(option.name());
     conf.setFromObject(omRatisConfig);
 
+    // Seed the encryption key into the jceks store before the OMs start, so
+    // every OM instance loads it when it constructs its KeyProvider.
+    seedEncryptionKey(conf);
+
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
@@ -220,13 +220,6 @@ public class TestOzoneShellHA {
   @AfterParameterizedClassInvocation
   public void shutdown() {
     IOUtils.closeQuietly(client, cluster);
-  }
-
-  @AfterAll
-  void stopKMS() {
-    if (miniKMS != null) {
-      miniKMS.stop();
-    }
   }
 
   @BeforeEach
@@ -1833,19 +1826,11 @@ public class TestOzoneShellHA {
         client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket0");
     assertNull(bucket.getEncryptionKeyName());
-    String newEncKey = uniqueObjectName("enckey");
-
-    KeyProvider provider = cluster.getOzoneManager().getKmsProvider();
-    KeyProvider.Options options = KeyProvider.options(cluster.getConf());
-    options.setDescription(newEncKey);
-    options.setBitLength(128);
-    provider.createKey(newEncKey, options);
-    provider.flush();
 
     args = new String[]{"bucket", "set-encryption-key", bucketPath, "-k",
-        newEncKey};
+        ENCRYPTION_KEY_NAME};
     execute(ozoneShell, args);
-    assertEquals(newEncKey, volume.getBucket("bucket0").getEncryptionKeyName());
+    assertEquals(ENCRYPTION_KEY_NAME, volume.getBucket("bucket0").getEncryptionKeyName());
   }
 
   @Test
@@ -2577,12 +2562,19 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
   }
 
-  private static String getKeyProviderURI(MiniKMS kms) {
-    if (kms == null) {
-      return "";
+  private static String getKeyProviderURI() {
+    File jks = new File(kmsDir, "kms.jks");
+    return JavaKeyStoreProvider.SCHEME_NAME + "://file" + jks.toURI().getPath();
+  }
+
+  private static void seedEncryptionKey(OzoneConfiguration conf) throws Exception {
+    KeyProvider provider = KeyProviderFactory.get(new URI(getKeyProviderURI()), conf);
+    if (provider.getMetadata(ENCRYPTION_KEY_NAME) == null) {
+      KeyProvider.Options options = KeyProvider.options(conf);
+      options.setBitLength(128);
+      provider.createKey(ENCRYPTION_KEY_NAME, options);
+      provider.flush();
     }
-    return KMSClientProvider.SCHEME_NAME + "://" +
-        kms.getKMSUrl().toExternalForm().replace("://", "@");
   }
 
   protected MiniOzoneHAClusterImpl getCluster() {

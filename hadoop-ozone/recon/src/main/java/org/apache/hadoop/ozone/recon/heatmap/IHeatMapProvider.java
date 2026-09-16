@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.heatmap;
 
+import jakarta.ws.rs.core.Response;
 import java.net.InetSocketAddress;
 import java.util.List;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;

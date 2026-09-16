@@ -40,9 +40,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import com.google.common.cache.Cache;
+import jakarta.xml.bind.DatatypeConverter;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -60,12 +62,11 @@ import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
-import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
-import org.apache.hadoop.crypto.key.kms.LoadBalancingKMSClientProvider;
-import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
+import org.apache.hadoop.crypto.key.KeyProviderFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -119,11 +120,28 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 
+/**
+ * End-to-end tests for Ozone encryption at rest.
+ *
+ * <p>This suite runs against a local jceks {@link JavaKeyStoreProvider}
+ * instead of {@code MiniKMS}. hadoop-kms embeds Jetty 9, which cannot coexist
+ * with the Jetty 12 runtime this build targets, so MiniKMS was removed from
+ * the integration-test classpath during the Jetty 12 migration (HDDS-8280).
+ * The jceks provider is a no-op for EDEK warm-up and exposes no KMS queue to
+ * observe, so warm-up on OM startup is covered in two ways that do not need a
+ * real KMS: {@link #testWarmupEDEKCacheOnStartup()} swaps a spy over the live
+ * provider and re-triggers the warm-up path directly to assert the exact key,
+ * and {@link #testWarmupEDEKCacheOnOmRestart()} restarts the OM to exercise the
+ * genuine startup trigger and asserts warm-up from the loader's log line.
+ * Restoring coverage against a real KMS is tracked as a follow-up JIRA
+ * (HDDS-16424).
+ * </p>
+ */
 class TestOzoneAtRestEncryption {
 
   private static MiniOzoneCluster cluster = null;
-  private static MiniKMS miniKMS;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
   private static OzoneManager ozoneManager;
@@ -147,14 +165,15 @@ class TestOzoneAtRestEncryption {
   static void init() throws Exception {
     File kmsDir = new File(testDir, UUID.randomUUID().toString());
     assertTrue(kmsDir.mkdirs());
-    MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
-    miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
-    miniKMS.start();
 
     OzoneManager.setTestSecureOmFlag(true);
     conf = new OzoneConfiguration();
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
-        getKeyProviderURI(miniKMS));
+        getKeyProviderURI(kmsDir));
+    // Seed the encryption key into the jceks store before the OM starts, so
+    // it is present when the OM constructs its KeyProvider at startup.
+    createKey(TEST_KEY,
+        KeyProviderFactory.get(new URI(getKeyProviderURI(kmsDir)), conf), conf);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -180,8 +199,6 @@ class TestOzoneAtRestEncryption {
     ozoneManager = cluster.getOzoneManager();
     ozoneManager.setMinMultipartUploadPartSize(MPU_PART_MIN_SIZE);
 
-    // create test key
-    createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
     eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
 
     final String rootPath = String.format("%s://%s/",
@@ -203,10 +220,6 @@ class TestOzoneAtRestEncryption {
     if (cluster != null) {
       cluster.shutdown();
     }
-
-    if (miniKMS != null) {
-      miniKMS.stop();
-    }
   }
 
   static void reInitClient() throws IOException {
@@ -216,30 +229,55 @@ class TestOzoneAtRestEncryption {
 
   @Test
   public void testWarmupEDEKCacheOnStartup() throws Exception {
+    // A bucket with an encryption key so the OM has an EDEK to warm up.
+    createVolumeAndBucket(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), BucketLayout.OBJECT_STORE);
 
-    createVolumeAndBucket("vol", "buck", BucketLayout.OBJECT_STORE);
-
-    @SuppressWarnings("unchecked") KMSClientProvider spy = getKMSClientProvider();
-    assertTrue(spy.getEncKeyQueueSize(TEST_KEY) > 0);
-
-    conf.setInt(OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, 0);
-    cluster.restartOzoneManager();
-
-    GenericTestUtils.waitFor(new BooleanSupplier() {
-      @Override
-      public boolean getAsBoolean() {
-        final KMSClientProvider kspy = getKMSClientProvider();
-        return kspy.getEncKeyQueueSize(TEST_KEY) > 0;
-      }
-    }, 1000, 60000);
+    // The jceks provider cannot be restarted into a spy (the OM rebuilds it in
+    // its constructor), so swap in a spy over the live provider and re-trigger
+    // the startup warm-up path directly with a zero initial delay.
+    KeyProviderCryptoExtension original = ozoneManager.getKmsProvider();
+    KeyProviderCryptoExtension kmsSpy = spy(original);
+    HddsWhiteboxTestUtils.setInternalState(ozoneManager, "kmsProvider", kmsSpy);
+    try {
+      OzoneConfiguration warmupConf = new OzoneConfiguration(conf);
+      warmupConf.setInt(OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, 0);
+      ozoneManager.initializeEdekCache(warmupConf);
+      // The OM must discover the configured encryption key from the bucket
+      // table and hand it to the warm-up loader on startup. warmUpEncryptedKeys
+      // is varargs, so Mockito captures the key names as individual elements.
+      ArgumentCaptor<String> keysCaptor = ArgumentCaptor.forClass(String.class);
+      verify(kmsSpy, timeout(60000)).warmUpEncryptedKeys(keysCaptor.capture());
+      assertThat(keysCaptor.getAllValues()).contains(TEST_KEY);
+    } finally {
+      HddsWhiteboxTestUtils.setInternalState(ozoneManager, "kmsProvider", original);
+    }
   }
 
-  private KMSClientProvider getKMSClientProvider() {
-    LoadBalancingKMSClientProvider lbkmscp =
-        (LoadBalancingKMSClientProvider) HddsWhiteboxTestUtils.getInternalState(
-            cluster.getOzoneManager().getKmsProvider(), "extension");
-    assert lbkmscp.getProviders().length == 1;
-    return lbkmscp.getProviders()[0];
+  @Test
+  public void testWarmupEDEKCacheOnOmRestart() throws Exception {
+    // A bucket with an encryption key so the OM has an EDEK to warm up. The
+    // encrypted bucket is persisted and survives the restart, so the genuine
+    // startup trigger (OzoneManagerStateMachine#notifyLeaderChanged ->
+    // initializeEdekCache) rediscovers it.
+    createVolumeAndBucket(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), BucketLayout.OBJECT_STORE);
+
+    // Unlike testWarmupEDEKCacheOnStartup, this restarts the OM to drive the real
+    // startup path rather than calling initializeEdekCache directly. The jceks
+    // provider cannot be spied across a restart, so warm-up is asserted from the
+    // EDEKCacheLoader's "Successfully warmed up" log line.
+    GenericTestUtils.LogCapturer omLogs =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.class);
+    try {
+      cluster.restartOzoneManager();
+      GenericTestUtils.waitFor(
+          (BooleanSupplier) () -> omLogs.getOutput().contains("Successfully warmed up"),
+          500, 60000);
+    } finally {
+      omLogs.stopCapturing();
+      reInitClient();
+    }
   }
 
   @ParameterizedTest
@@ -503,9 +541,9 @@ class TestOzoneAtRestEncryption {
     return true;
   }
 
-  private static String getKeyProviderURI(MiniKMS kms) {
-    return KMSClientProvider.SCHEME_NAME + "://" +
-        kms.getKMSUrl().toExternalForm().replace("://", "@");
+  private static String getKeyProviderURI(File dir) {
+    File jks = new File(dir, "kms.jks");
+    return JavaKeyStoreProvider.SCHEME_NAME + "://file" + jks.toURI().getPath();
   }
 
   private static void createKey(String keyName, KeyProvider

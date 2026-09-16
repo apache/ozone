@@ -17,6 +17,12 @@
 
 package org.apache.ozone.fs.http.server;
 
+import jakarta.servlet.Filter;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.FilterConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -25,10 +31,9 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Properties;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.server.http.servletbridge.JavaxFilterBridge;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.security.authentication.util.RandomSignerSecretProvider;
 import org.apache.hadoop.security.authentication.util.SignerSecretProvider;
@@ -37,107 +42,145 @@ import org.apache.hadoop.security.token.delegation.web.KerberosDelegationTokenAu
 import org.apache.ozone.hdfs.web.WebHdfsConstants;
 
 /**
- * Subclass of hadoop-auth <code>AuthenticationFilter</code> that obtains its
- * configuration from HttpFSServer's server configuration.
+ * Jakarta servlet filter that authenticates HttpFS requests using hadoop-auth.
+ *
+ * <p>hadoop-auth's {@link DelegationTokenAuthenticationFilter} is
+ * {@code javax.servlet}-based, so the actual authentication is performed by the
+ * nested {@link HadoopAuthDelegate} (a javax filter that obtains its
+ * configuration from HttpFSServer's server configuration) run through
+ * {@link JavaxFilterBridge} so it can be registered on HttpFS's Jetty EE10
+ * (jakarta) servlet chain.
  */
 @InterfaceAudience.Private
-public class HttpFSAuthenticationFilter
-    extends DelegationTokenAuthenticationFilter {
+public class HttpFSAuthenticationFilter implements Filter {
 
   static final String CONF_PREFIX = "httpfs.authentication.";
 
   static final String HADOOP_HTTP_CONF_PREFIX = "hadoop.http.authentication.";
 
-  private static final String SIGNATURE_SECRET_FILE = SIGNATURE_SECRET
-      + ".file";
+  private static final String SIGNATURE_SECRET_FILE =
+      AuthenticationFilter.SIGNATURE_SECRET + ".file";
+
+  private JavaxFilterBridge authFilterBridge;
+
+  @Override
+  public void init(FilterConfig filterConfig) throws ServletException {
+    authFilterBridge = new JavaxFilterBridge(new HadoopAuthDelegate());
+    authFilterBridge.init(filterConfig);
+  }
+
+  @Override
+  public void doFilter(ServletRequest request, ServletResponse response,
+      FilterChain chain) throws IOException, ServletException {
+    authFilterBridge.doFilter(request, response, chain);
+  }
+
+  @Override
+  public void destroy() {
+    if (authFilterBridge != null) {
+      authFilterBridge.destroy();
+    }
+  }
 
   /**
-   * Returns the hadoop-auth configuration from HttpFSServer's configuration.
-   * <p>
-   * It returns all HttpFSServer's configuration properties prefixed with
-   * <code>hadoop.http.authentication</code>. The
-   * <code>hadoop.http.authentication</code> prefix is removed from the
-   * returned property names.
-   *
-   * @param configPrefix parameter not used.
-   * @param filterConfig parameter not used.
-   *
-   * @return hadoop-auth configuration read from HttpFSServer's configuration.
+   * Subclass of hadoop-auth <code>AuthenticationFilter</code> that obtains its
+   * configuration from HttpFSServer's server configuration.
    */
-  @Override
-  protected Properties getConfiguration(String configPrefix,
-      FilterConfig filterConfig) throws ServletException {
-    Properties props = new Properties();
-    Configuration conf = HttpFSServerWebApp.get().getConfig();
+  private static final class HadoopAuthDelegate
+      extends DelegationTokenAuthenticationFilter {
 
-    props.setProperty(AuthenticationFilter.COOKIE_PATH, "/");
-    for (Map.Entry<String, String> entry : conf) {
-      String name = entry.getKey();
-      if (name.startsWith(HADOOP_HTTP_CONF_PREFIX)) {
-        name = name.substring(HADOOP_HTTP_CONF_PREFIX.length());
-        props.setProperty(name, entry.getValue());
-      }
-    }
+    /**
+     * Returns the hadoop-auth configuration from HttpFSServer's configuration.
+     * <p>
+     * It returns all HttpFSServer's configuration properties prefixed with
+     * <code>hadoop.http.authentication</code>. The
+     * <code>hadoop.http.authentication</code> prefix is removed from the
+     * returned property names.
+     *
+     * @param configPrefix parameter not used.
+     * @param filterConfig parameter not used.
+     *
+     * @return hadoop-auth configuration read from HttpFSServer's configuration.
+     */
+    @Override
+    protected Properties getConfiguration(String configPrefix,
+        javax.servlet.FilterConfig filterConfig)
+        throws javax.servlet.ServletException {
+      Properties props = new Properties();
+      Configuration conf = HttpFSServerWebApp.get().getConfig();
 
-    // Replace Hadoop Http Authentication Configs with HttpFS specific Configs
-    for (Map.Entry<String, String> entry : conf) {
-      String name = entry.getKey();
-      if (name.startsWith(CONF_PREFIX)) {
-        String value = conf.get(name);
-        name = name.substring(CONF_PREFIX.length());
-        props.setProperty(name, value);
-      }
-    }
-
-    String signatureSecretFile = props.getProperty(SIGNATURE_SECRET_FILE, null);
-    if (signatureSecretFile == null) {
-      throw new RuntimeException("Undefined property: "
-          + SIGNATURE_SECRET_FILE);
-    }
-
-    if (!isRandomSecret(filterConfig)) {
-      try (Reader reader = new InputStreamReader(Files.newInputStream(
-          Paths.get(signatureSecretFile)), StandardCharsets.UTF_8)) {
-        StringBuilder secret = new StringBuilder();
-        int c = reader.read();
-        while (c > -1) {
-          secret.append((char) c);
-          c = reader.read();
+      props.setProperty(AuthenticationFilter.COOKIE_PATH, "/");
+      for (Map.Entry<String, String> entry : conf) {
+        String name = entry.getKey();
+        if (name.startsWith(HADOOP_HTTP_CONF_PREFIX)) {
+          name = name.substring(HADOOP_HTTP_CONF_PREFIX.length());
+          props.setProperty(name, entry.getValue());
         }
-        props.setProperty(AuthenticationFilter.SIGNATURE_SECRET,
-            secret.toString());
-      } catch (IOException ex) {
-        throw new RuntimeException("Could not read HttpFS signature "
-            + "secret file: " + signatureSecretFile);
       }
-    }
-    setAuthHandlerClass(props);
-    String dtkind = WebHdfsConstants.WEBHDFS_TOKEN_KIND.toString();
-    if (conf.getBoolean(HttpFSServerWebServer.SSL_ENABLED_KEY, false)) {
-      dtkind = WebHdfsConstants.SWEBHDFS_TOKEN_KIND.toString();
-    }
-    props.setProperty(KerberosDelegationTokenAuthenticationHandler.TOKEN_KIND,
-                      dtkind);
-    return props;
-  }
 
-  @Override
-  protected Configuration getProxyuserConfiguration(FilterConfig filterConfig) {
-    Map<String, String> proxyuserConf = HttpFSServerWebApp.get().getConfig().
-        getValByRegex("httpfs\\.proxyuser\\.");
-    Configuration conf = new Configuration(false);
-    for (Map.Entry<String, String> entry : proxyuserConf.entrySet()) {
-      conf.set(entry.getKey().substring("httpfs.".length()), entry.getValue());
-    }
-    return conf;
-  }
+      // Replace Hadoop Http Authentication Configs with HttpFS specific Configs
+      for (Map.Entry<String, String> entry : conf) {
+        String name = entry.getKey();
+        if (name.startsWith(CONF_PREFIX)) {
+          String value = conf.get(name);
+          name = name.substring(CONF_PREFIX.length());
+          props.setProperty(name, value);
+        }
+      }
 
-  private boolean isRandomSecret(FilterConfig filterConfig) {
-    SignerSecretProvider secretProvider = (SignerSecretProvider) filterConfig
-        .getServletContext().getAttribute(SIGNER_SECRET_PROVIDER_ATTRIBUTE);
-    if (secretProvider == null) {
-      return false;
+      String signatureSecretFile =
+          props.getProperty(SIGNATURE_SECRET_FILE, null);
+      if (signatureSecretFile == null) {
+        throw new RuntimeException("Undefined property: "
+            + SIGNATURE_SECRET_FILE);
+      }
+
+      if (!isRandomSecret(filterConfig)) {
+        try (Reader reader = new InputStreamReader(Files.newInputStream(
+            Paths.get(signatureSecretFile)), StandardCharsets.UTF_8)) {
+          StringBuilder secret = new StringBuilder();
+          int c = reader.read();
+          while (c > -1) {
+            secret.append((char) c);
+            c = reader.read();
+          }
+          props.setProperty(AuthenticationFilter.SIGNATURE_SECRET,
+              secret.toString());
+        } catch (IOException ex) {
+          throw new RuntimeException("Could not read HttpFS signature "
+              + "secret file: " + signatureSecretFile);
+        }
+      }
+      setAuthHandlerClass(props);
+      String dtkind = WebHdfsConstants.WEBHDFS_TOKEN_KIND.toString();
+      if (conf.getBoolean(HttpFSServerWebServer.SSL_ENABLED_KEY, false)) {
+        dtkind = WebHdfsConstants.SWEBHDFS_TOKEN_KIND.toString();
+      }
+      props.setProperty(KerberosDelegationTokenAuthenticationHandler.TOKEN_KIND,
+                        dtkind);
+      return props;
     }
-    return secretProvider.getClass() == RandomSignerSecretProvider.class;
+
+    @Override
+    protected Configuration getProxyuserConfiguration(
+        javax.servlet.FilterConfig filterConfig) {
+      Map<String, String> proxyuserConf = HttpFSServerWebApp.get().getConfig().
+          getValByRegex("httpfs\\.proxyuser\\.");
+      Configuration conf = new Configuration(false);
+      for (Map.Entry<String, String> entry : proxyuserConf.entrySet()) {
+        conf.set(entry.getKey().substring("httpfs.".length()),
+            entry.getValue());
+      }
+      return conf;
+    }
+
+    private boolean isRandomSecret(javax.servlet.FilterConfig filterConfig) {
+      SignerSecretProvider secretProvider = (SignerSecretProvider) filterConfig
+          .getServletContext().getAttribute(SIGNER_SECRET_PROVIDER_ATTRIBUTE);
+      if (secretProvider == null) {
+        return false;
+      }
+      return secretProvider.getClass() == RandomSignerSecretProvider.class;
+    }
   }
 }

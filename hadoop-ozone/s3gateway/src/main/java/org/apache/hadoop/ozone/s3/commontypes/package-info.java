@@ -18,11 +18,11 @@
 /**
  * Common classes required for S3 rest API's.
  */
-@javax.xml.bind.annotation.XmlSchema(
+@jakarta.xml.bind.annotation.XmlSchema(
     namespace = S3Consts.S3_XML_NAMESPACE, elementFormDefault =
-    javax.xml.bind.annotation.XmlNsForm.QUALIFIED,
+    jakarta.xml.bind.annotation.XmlNsForm.QUALIFIED,
     xmlns = {
-        @javax.xml.bind.annotation.XmlNs(namespaceURI = S3Consts.S3_XML_NAMESPACE, prefix = "")})
+        @jakarta.xml.bind.annotation.XmlNs(namespaceURI = S3Consts.S3_XML_NAMESPACE, prefix = "")})
 package org.apache.hadoop.ozone.s3.commontypes;
 
 import org.apache.hadoop.ozone.s3.util.S3Consts;
