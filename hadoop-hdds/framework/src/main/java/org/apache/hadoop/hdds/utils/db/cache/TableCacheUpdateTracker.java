@@ -25,12 +25,13 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * Tracks table caches updated by the current thread.
+ * Only one tracker should be active per thread.
  */
 public final class TableCacheUpdateTracker implements UncheckedAutoCloseable {
   private static final ThreadLocal<TableCacheUpdateTracker> CURRENT = new ThreadLocal<>();
 
   public static TableCacheUpdateTracker track() {
-    TableCacheUpdateTracker tracker = new TableCacheUpdateTracker(CURRENT.get());
+    TableCacheUpdateTracker tracker = new TableCacheUpdateTracker();
     CURRENT.set(tracker);
     return tracker;
   }
@@ -43,12 +44,10 @@ public final class TableCacheUpdateTracker implements UncheckedAutoCloseable {
   }
 
   private final Thread thread = Thread.currentThread();
-  private final TableCacheUpdateTracker parent;
   private Set<String> tables = null;
   private boolean closed;
 
-  private TableCacheUpdateTracker(TableCacheUpdateTracker parent) {
-    this.parent = parent;
+  private TableCacheUpdateTracker() {
   }
 
   public Set<String> getUpdatedTables() {
@@ -64,16 +63,8 @@ public final class TableCacheUpdateTracker implements UncheckedAutoCloseable {
     if (closed) {
       return;
     }
-    TableCacheUpdateTracker activeParent = getActiveParent();
-    if (activeParent != null) {
-      activeParent.addTables(tables);
-    }
     if (CURRENT.get() == this) {
-      if (activeParent != null) {
-        CURRENT.set(activeParent);
-      } else {
-        CURRENT.remove();
-      }
+      CURRENT.remove();
     }
     closed = true;
   }
@@ -85,25 +76,6 @@ public final class TableCacheUpdateTracker implements UncheckedAutoCloseable {
         tables = new LinkedHashSet<>();
       }
       tables.add(tableName);
-    }
-  }
-
-  private TableCacheUpdateTracker getActiveParent() {
-    Preconditions.assertSame(thread, Thread.currentThread(), "thread");
-    TableCacheUpdateTracker current = parent;
-    while (current != null && current.closed) {
-      current = current.parent;
-    }
-    return current;
-  }
-
-  private void addTables(Set<String> tableNames) {
-    Preconditions.assertSame(thread, Thread.currentThread(), "thread");
-    if (!closed && tableNames != null && !tableNames.isEmpty()) {
-      if (tables == null) {
-        tables = new LinkedHashSet<>();
-      }
-      tables.addAll(tableNames);
     }
   }
 }
