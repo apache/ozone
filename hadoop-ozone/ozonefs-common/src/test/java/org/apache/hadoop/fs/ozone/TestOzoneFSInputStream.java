@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import java.io.ByteArrayInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -193,6 +195,20 @@ public class TestOzoneFSInputStream {
         return -1;
       }
     };
+  }
+
+  @Test
+  public void testByteBufferPositionedReadNegativePositionThrows() throws Exception {
+    // read(long, ByteBuffer) must throw EOFException for negative positions,
+    // aligning with the byte-array PositionedReadable behaviour.
+    final byte[] source = RandomUtils.secure().randomBytes(SOURCE_SIZE);
+    final InterleavingSeekableInputStream underlying =
+        new InterleavingSeekableInputStream(source);
+    try (OzoneFSInputStream subject = new OzoneFSInputStream(underlying,
+        new FileSystem.Statistics("test"))) {
+      ByteBuffer buf = ByteBuffer.allocate(16);
+      assertThrows(EOFException.class, () -> subject.read(-1L, buf));
+    }
   }
 
   @Test

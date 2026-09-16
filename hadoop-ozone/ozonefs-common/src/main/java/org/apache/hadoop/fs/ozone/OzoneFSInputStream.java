@@ -37,9 +37,9 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
  * The input stream for Ozone file system.
  *
  * TODO: Make inputStream generic for both rest and rpc clients
- * Sequential reads are not thread safe. Positioned reads use a native
- * stateless path when the underlying {@link ExtendedInputStream} supports it;
- * otherwise they fall back to a synchronized seek-read-restore sequence.
+ * Sequential reads are not thread safe. Positioned reads delegate to the
+ * underlying {@link ExtendedInputStream} when it supports them; otherwise they
+ * fall back to a synchronized seek-read-restore sequence.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -172,6 +172,9 @@ public class OzoneFSInputStream extends FSInputStream
     if (!buf.hasRemaining()) {
       return 0;
     }
+    if (position < 0) {
+      throw new EOFException("position is negative: " + position);
+    }
     if (inputStream instanceof ExtendedInputStream) {
       final int remainingBeforeRead = buf.remaining();
       try {
@@ -235,13 +238,30 @@ public class OzoneFSInputStream extends FSInputStream
    */
   @Override
   public int read(long position, byte[] buffer, int offset, int length) throws IOException {
+    // Validate before touching ByteBuffer so that null throws IAE (not NPE) and
+    // negative position propagates as EOFException rather than being swallowed.
+    validatePositionedReadArgs(position, buffer, offset, length);
+    if (length == 0) {
+      return 0;
+    }
     if (inputStream instanceof ExtendedInputStream) {
       final ByteBuffer buf = ByteBuffer.wrap(buffer, offset, length);
       try {
         if (((ExtendedInputStream) inputStream).readFully(position, buf)) {
-          return length - buf.remaining();
+          final int bytesRead = length - buf.remaining();
+          // readFullyStateless can return true with bytesRead==0 for pos==length.
+          // Convert that to -1 to comply with PositionedReadable contract.
+          if (bytesRead == 0) {
+            return -1;
+          }
+          if (statistics != null) {
+            statistics.incrementBytesRead(bytesRead);
+          }
+          return bytesRead;
         }
       } catch (EOFException e) {
+        // pos < 0 was already rejected by validatePositionedReadArgs above,
+        // so this EOFException means pos >= stream length → return -1.
         return -1;
       }
     }
@@ -252,10 +272,19 @@ public class OzoneFSInputStream extends FSInputStream
 
   @Override
   public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
+    validatePositionedReadArgs(position, buffer, offset, length);
+    if (length == 0) {
+      return;
+    }
     if (inputStream instanceof ExtendedInputStream) {
       final ByteBuffer buf = ByteBuffer.wrap(buffer, offset, length);
       try {
         if (((ExtendedInputStream) inputStream).readFully(position, buf)) {
+          // readFullyStateless returns true once bytesRead > 0, even if the
+          // buffer is only partially filled. Check that the buffer is full.
+          if (buf.hasRemaining()) {
+            throw new EOFException("End of file reached before reading fully.");
+          }
           return;
         }
       } catch (EOFException e) {
