@@ -276,6 +276,7 @@ class TestOzoneAtRestEncryption {
           500, 60000);
     } finally {
       omLogs.stopCapturing();
+      ozClient.close();
       reInitClient();
     }
   }
