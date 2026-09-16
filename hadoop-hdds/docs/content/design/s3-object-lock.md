@@ -405,18 +405,29 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
 
 *Goal: Enable fine-grained access control separating standard data mutating permissions from compliance actions.*
 
-1. **Ranger Service Definition & Access Types**:
-   - Register dedicated access types in Ranger Ozone service definition (`ranger-servicedef-ozone.json`):
-     - `get_bucket_object_lock_configuration`
-     - `put_bucket_object_lock_configuration`
-     - `get_object_retention`
-     - `put_object_retention`
-     - `get_object_legal_hold`
-     - `put_object_legal_hold`
-     - `bypass_governance_retention`
-   - Ensure these access types map directly to AWS IAM S3 action names without the `s3:` prefix.
+1. **Ranger Action Mapping & UI Validation (`ozone.json`)**:
+  - Do **NOT** create new underlying Ranger access types. Retain primitive access types (`READ`, `WRITE`, `DELETE`) and leverage the STS action-matching framework (`action-matches`).
+  - Register the 7 S3 Object Lock actions in `security-admin/src/main/webapp/react-webapp/src/utils/actionRequirements/ozone.json`:
+    - `GetBucketObjectLockConfiguration` (Bucket level: requires `READ`)
+    - `PutBucketObjectLockConfiguration` (Bucket level: requires `WRITE`)
+    - `GetObjectRetention` (Key level: requires `READ`)
+    - `PutObjectRetention` (Key level: requires `WRITE`)
+    - `GetObjectLegalHold` (Key level: requires `READ`)
+    - `PutObjectLegalHold` (Key level: requires `WRITE`)
+    - `BypassGovernanceRetention` (Key level: requires `WRITE` / `DELETE`)
+  - Enable design-time validation in Ranger React UI to ensure administrators cannot grant compliance actions without selecting their required primitive permissions.
 
-2. **S3 Gateway & IAM Action Resolution**:
+2. **Payload-Aware String Matcher Condition Evaluator**:
+  - Register a dedicated custom condition evaluator (e.g., `RangerOzoneValueMatcher`, extending `RangerAbstractConditionEvaluator`) in `ranger-servicedef-ozone.json` under `policyConditions`.
+  - Update `RangerOzoneAuthorizer` and request context handling to extract sensitive payload attributes and inject them into `RangerAccessRequest.getContext()`:
+    - `s3:object-lock-legal-hold`: Extracted from the request body (`ON` vs. `OFF`).
+    - `s3:object-lock-mode`: Extracted from the request body (`GOVERNANCE` vs. `COMPLIANCE`).
+    - `s3:x-amz-bypass-governance-retention`: Extracted from request headers (`true` vs. `false`).
+  - Implement runtime string matching within the evaluator to enforce value-level role segregation:
+    - Allow decoupling privileged operations (e.g., granting `PutObjectLegalHold` exclusively when `s3:object-lock-legal-hold == "ON"`, while restricting `OFF` to compliance officers).
+    - Prevent accidental or unauthorized lock lock-in by enforcing `s3:object-lock-mode == "GOVERNANCE"` for standard operators, denying `COMPLIANCE` configuration.
+
+3. **S3 Gateway & IAM Action Resolution**:
    - Update `S3GAction` in `hadoop-ozone/s3gateway`: add audit actions for all lock configuration operations.
    - Update `S3GActionIamMapper` in `hadoop-ozone/s3gateway`: map the new audit actions to standard IAM S3 actions (`GetBucketObjectLockConfiguration`, `PutBucketObjectLockConfiguration`, `GetObjectRetention`, `PutObjectRetention`, `GetObjectLegalHold`, `PutObjectLegalHold`, `BypassGovernanceRetention`).
    - Update `IamSessionPolicyResolver.S3Action` in `hadoop-ozone/common`: register the actions with their resource scopes (Bucket vs. Object) and base permissions (`READ`, `WRITE`).
