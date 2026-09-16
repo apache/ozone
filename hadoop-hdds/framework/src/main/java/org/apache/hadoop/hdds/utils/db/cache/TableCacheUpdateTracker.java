@@ -30,6 +30,10 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 public final class TableCacheUpdateTracker implements UncheckedAutoCloseable {
   private static final ThreadLocal<TableCacheUpdateTracker> CURRENT = new ThreadLocal<>();
 
+  private final Thread thread = Thread.currentThread();
+  private Set<String> tables = null;
+  private boolean closed;
+
   public static TableCacheUpdateTracker track() {
     TableCacheUpdateTracker tracker = new TableCacheUpdateTracker();
     CURRENT.set(tracker);
@@ -42,10 +46,6 @@ public final class TableCacheUpdateTracker implements UncheckedAutoCloseable {
       tracker.record(tableName);
     }
   }
-
-  private final Thread thread = Thread.currentThread();
-  private Set<String> tables = null;
-  private boolean closed;
 
   private TableCacheUpdateTracker() {
   }
