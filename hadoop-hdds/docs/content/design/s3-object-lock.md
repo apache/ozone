@@ -374,7 +374,7 @@ To achieve strict regulatory compliance (e.g., SEC 17a-4 or FINRA WORM requireme
 
 The implementation of S3 Object Lock in Apache Ozone is divided into five structured phases covering the 11 core functional requirements. This ensures incremental delivery, clean service boundaries, and testability at each stage.
 
-### Phase 1: Metadata Infrastructure & Schema Definitions (Item 1)
+### Phase 1: Metadata Infrastructure & Schema Definitions
 
 *Goal: Establish protobuf schemas, in-memory domain models, and RocksDB table serialization codecs.*
 
@@ -403,7 +403,7 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
 
 ---
 
-### Phase 2: Ranger Integration & Action Mapping (Item 2)
+### Phase 2: Ranger Integration & Action Mapping
 
 *Goal: Enable fine-grained access control separating standard data mutating permissions from compliance actions.*
 
@@ -437,23 +437,23 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
 
 ---
 
-### Phase 3: Object Lock Management APIs (Items 3 – 8)
+### Phase 3: Object Lock Management APIs
 
 *Goal: Implement S3 REST endpoints, OM client RPC protocols, and OM HA consensus handlers for configuring and querying locks.*
 
-#### 1. Bucket Object Lock Configuration (Items 3 & 6)
-- **`PutBucketObjectLockConfiguration` (Item 3)**:
+#### 1. Bucket Object Lock Configuration
+- **`PutBucketObjectLockConfiguration`**:
   - *S3G*: Route `PUT /{bucket}?object-lock`. Parse `ObjectLockConfiguration` XML (`ObjectLockEnabled`, optional `DefaultRetention`).
   - *RPC*: Add `SetBucketObjectLockConfigRequest` / `Response` in `OmClientProtocol.proto`.
   - *OM Handler (`OMBucketSetObjectLockConfigRequest`)*:
     - `preExecute`: Validate Ranger action `PutBucketObjectLockConfiguration`. Fail-fast on invalid parameters.
     - `validateAndUpdateCache`: Under bucket write lock, check bucket exists and layout is OBS. Ensure immutability: if `objectLockEnabled` is already `true`, it cannot be toggled to `false`. Set `objectLockEnabled` and update `defaultRetention`. Commit to `BucketTable`.
-- **`GetBucketObjectLockConfiguration` (Item 6)**:
+- **`GetBucketObjectLockConfiguration`**:
   - *S3G*: Route `GET /{bucket}?object-lock`. Return `ObjectLockConfiguration` XML.
   - *OM / Metadata Reader*: Authorize `GetBucketObjectLockConfiguration`. Read from `BucketTable`. Return `404 ObjectLockConfigurationNotFoundError` if Object Lock is not enabled.
 
-#### 2. Object Retention Management (Items 4 & 7)
-- **`PutObjectRetention` (Item 4)**:
+#### 2. Object Retention Management
+- **`PutObjectRetention`**:
   - *S3G*: Route `PUT /{bucket}/{key}?retention`. Parse `Retention` XML (`Mode`, `RetainUntilDate`). Parse header `x-amz-bypass-governance-retention`.
   - *RPC*: Add `SetObjectRetentionRequest` / `Response` in `OmClientProtocol.proto`.
   - *OM Handler (`OMKeySetRetentionRequest`)*:
@@ -462,28 +462,28 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
       - **Compliance Mode**: If existing key is in COMPLIANCE, the new `RetainUntilDate` MUST be >= existing `RetainUntilDate` (cannot shorten duration or switch mode).
       - **Governance Mode**: If shortening retention or removing, caller must have `BypassGovernanceRetention` permission and send the bypass flag.
       - Update `OmKeyInfo.retentionConfig` in `KeyTable`.
-- **`GetObjectRetention` (Item 7)**:
+- **`GetObjectRetention`**:
   - *S3G*: Route `GET /{bucket}/{key}?retention`. Return `Retention` XML.
   - *OM / Metadata Reader*: Authorize `GetObjectRetention`. Read from `KeyTable`. Return `404 NoSuchObjectLockConfiguration` if no retention policy is applied.
 
-#### 3. Object Legal Hold Management (Items 5 & 8)
-- **`PutObjectLegalHold` (Item 5)**:
+#### 3. Object Legal Hold Management
+- **`PutObjectLegalHold`**:
   - *S3G*: Route `PUT /{bucket}/{key}?legal-hold`. Parse `LegalHold` XML (`Status`: `ON` / `OFF`).
   - *RPC*: Add `SetObjectLegalHoldRequest` / `Response` in `OmClientProtocol.proto`.
   - *OM Handler (`OMKeySetLegalHoldRequest`)*:
     - `preExecute`: Authorize `PutObjectLegalHold`.
     - `validateAndUpdateCache`: Under key write lock, verify bucket has `objectLockEnabled == true`. Update `OmKeyInfo.legalHold` (`true` for `ON`, `false` for `OFF`) in `KeyTable`.
-- **`GetObjectLegalHold` (Item 8)**:
+- **`GetObjectLegalHold`**:
   - *S3G*: Route `GET /{bucket}/{key}?legal-hold`. Return `LegalHold` XML (`Status`: `ON` / `OFF`).
   - *OM / Metadata Reader*: Authorize `GetObjectLegalHold`. Read from `KeyTable`. Return `404 NoSuchObjectLockConfiguration` if unconfigured.
 
 ---
 
-### Phase 4: WORM Enforcement on Data Operations (Items 9 – 11)
+### Phase 4: WORM Enforcement on Data Operations
 
 *Goal: Enforce dual-gate WORM protection on all data-mutating operations to guarantee immutability on single-version OBS objects.*
 
-#### 1. Check Lock on Put / Copy Operations (Item 9)
+#### 1. Check Lock on Put / Copy Operations
 - **Bucket Default Retention Inheritance**:
   - When creating a *new* key in an Object-Lock-enabled bucket:
     - If bucket has `defaultRetention`, automatically attach `RetentionConfig` to the newly committed `OmKeyInfo`.
@@ -496,7 +496,7 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
     - Under bucket/key write lock, perform authoritative WORM check against committed `KeyTable`.
     - Reject commit if target is actively locked. Keys that fail to commit remain in `OpenKeyTable` and are reclaimed by background open-key cleanup.
 
-#### 2. Check Lock on Delete Operations (Item 10)
+#### 2. Check Lock on Delete Operations
 - **Single Delete (`DeleteObject`)**:
   - In `OMKeyDeleteRequest.validateAndUpdateCache` under key write lock:
     - Lookup target key in `KeyTable`. If absent, return standard idempotent success (`204 No Content`).
@@ -510,7 +510,7 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
   - In `S3BatchDeleteRequest` / `MultiDeleteEndpoint`: evaluate WORM status per key.
   - Locked keys return `<Error><Code>AccessDenied</Code><Message>Access Denied: Object is WORM protected</Message></Error>` in the multi-delete XML payload while allowing unlocked keys in the batch to proceed.
 
-#### 3. Check Lock on Multipart Upload Operations (Item 11)
+#### 3. Check Lock on Multipart Upload Operations
 - **`InitiateMultipartUpload` (`S3InitiateMultipartUploadRequest`)**:
   - `preExecute`: Perform fail-fast WORM check on destination key. If target exists and is locked, reject before creating MPU state in `multipartInfoTable`.
   - Carry forward default/specified retention parameters into MPU metadata.
