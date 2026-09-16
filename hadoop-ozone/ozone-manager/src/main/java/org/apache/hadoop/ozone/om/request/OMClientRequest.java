@@ -31,7 +31,6 @@ import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.TableCacheUpdateTracker;
-import org.apache.hadoop.hdds.utils.db.TableCacheUpdateTracker.Tracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -206,7 +205,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, long transactionLogIndex) {
     ExecutionContext context = ExecutionContext.of(transactionLogIndex,
         TransactionInfo.getTermIndex(transactionLogIndex));
-    try (Tracker tracker = TableCacheUpdateTracker.track()) {
+    try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
       OMClientResponse response = validateAndUpdateCache(ozoneManager, context);
       response.addCleanupTables(tracker.getUpdatedTables());
       return response;

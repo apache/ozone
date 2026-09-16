@@ -28,8 +28,7 @@ public class TestTableCacheUpdateTracker {
 
   @Test
   public void trackReturnsScopedTrackerWithUpdatedTables() {
-    try (TableCacheUpdateTracker.Tracker tracker =
-             TableCacheUpdateTracker.track()) {
+    try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
       TableCacheUpdateTracker.recordCacheUpdate("table1");
       TableCacheUpdateTracker.recordCacheUpdate("table2");
 
@@ -40,8 +39,7 @@ public class TestTableCacheUpdateTracker {
 
   @Test
   public void closedTrackerStopsRecordingUpdates() {
-    TableCacheUpdateTracker.Tracker tracker =
-        TableCacheUpdateTracker.track();
+    TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track();
     TableCacheUpdateTracker.recordCacheUpdate("table1");
 
     tracker.close();
@@ -52,12 +50,10 @@ public class TestTableCacheUpdateTracker {
 
   @Test
   public void nestedTrackerMergesUpdatesIntoParent() {
-    try (TableCacheUpdateTracker.Tracker parent =
-             TableCacheUpdateTracker.track()) {
+    try (TableCacheUpdateTracker parent = TableCacheUpdateTracker.track()) {
       TableCacheUpdateTracker.recordCacheUpdate("table1");
 
-      try (TableCacheUpdateTracker.Tracker child =
-               TableCacheUpdateTracker.track()) {
+      try (TableCacheUpdateTracker child = TableCacheUpdateTracker.track()) {
         TableCacheUpdateTracker.recordCacheUpdate("table2");
 
         assertThat(child.getUpdatedTables()).containsExactly("table2");

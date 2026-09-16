@@ -61,7 +61,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatu
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.TableCacheUpdateTracker;
-import org.apache.hadoop.hdds.utils.db.TableCacheUpdateTracker.Tracker;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -455,7 +454,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
-    try (Tracker tracker = TableCacheUpdateTracker.track()) {
+    try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
       OMClientResponse omClientResponse = captureLatencyNs(
           impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
           () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), context),

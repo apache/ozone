@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -24,89 +26,84 @@ import java.util.Set;
 /**
  * Tracks table caches updated by the current thread.
  */
-public final class TableCacheUpdateTracker {
+public final class TableCacheUpdateTracker implements UncheckedAutoCloseable {
+  private static final ThreadLocal<TableCacheUpdateTracker> CURRENT = new ThreadLocal<>();
 
-  private static final ThreadLocal<Tracker> CURRENT_TRACKER =
-      new ThreadLocal<>();
-  private static final Set<String> TRACKING = Collections.emptySet();
-
-  private TableCacheUpdateTracker() {
-  }
-
-  public static Tracker track() {
-    Tracker tracker = new Tracker(CURRENT_TRACKER.get());
-    CURRENT_TRACKER.set(tracker);
+  public static TableCacheUpdateTracker track() {
+    TableCacheUpdateTracker tracker = new TableCacheUpdateTracker(CURRENT.get());
+    CURRENT.set(tracker);
     return tracker;
   }
 
   public static void recordCacheUpdate(String tableName) {
-    Tracker tracker = CURRENT_TRACKER.get();
+    TableCacheUpdateTracker tracker = CURRENT.get();
     if (tracker != null) {
-      tracker.recordCacheUpdate(tableName);
+      tracker.record(tableName);
     }
   }
 
-  /**
-   * Tracks updated tables until the scope is closed.
-   */
-  public static final class Tracker implements AutoCloseable {
-    private final Tracker parent;
-    private Set<String> tables = TRACKING;
-    private boolean closed;
+  private final Thread thread = Thread.currentThread();
+  private final TableCacheUpdateTracker parent;
+  private Set<String> tables = null;
+  private boolean closed;
 
-    private Tracker(Tracker parent) {
-      this.parent = parent;
+  private TableCacheUpdateTracker(TableCacheUpdateTracker parent) {
+    this.parent = parent;
+  }
+
+  public Set<String> getUpdatedTables() {
+    if (tables == null || tables.isEmpty()) {
+      return Collections.emptySet();
     }
+    return Collections.unmodifiableSet(new LinkedHashSet<>(tables));
+  }
 
-    public Set<String> getUpdatedTables() {
-      if (tables == TRACKING || tables.isEmpty()) {
-        return Collections.emptySet();
-      }
-      return Collections.unmodifiableSet(new LinkedHashSet<>(tables));
+  @Override
+  public void close() {
+    Preconditions.assertSame(thread, Thread.currentThread(), "thread");
+    if (closed) {
+      return;
     }
-
-    @Override
-    public void close() {
-      if (!closed) {
-        Tracker activeParent = getActiveParent();
-        if (activeParent != null) {
-          activeParent.addTables(tables);
-        }
-        if (CURRENT_TRACKER.get() == this) {
-          if (activeParent != null) {
-            CURRENT_TRACKER.set(activeParent);
-          } else {
-            CURRENT_TRACKER.remove();
-          }
-        }
-        closed = true;
+    TableCacheUpdateTracker activeParent = getActiveParent();
+    if (activeParent != null) {
+      activeParent.addTables(tables);
+    }
+    if (CURRENT.get() == this) {
+      if (activeParent != null) {
+        CURRENT.set(activeParent);
+      } else {
+        CURRENT.remove();
       }
     }
+    closed = true;
+  }
 
-    private void recordCacheUpdate(String tableName) {
-      if (!closed && tableName != null && !tableName.isEmpty()) {
-        if (tables == TRACKING) {
-          tables = new LinkedHashSet<>();
-        }
-        tables.add(tableName);
+  private void record(String tableName) {
+    Preconditions.assertSame(thread, Thread.currentThread(), "thread");
+    if (!closed && tableName != null && !tableName.isEmpty()) {
+      if (tables == null) {
+        tables = new LinkedHashSet<>();
       }
+      tables.add(tableName);
     }
+  }
 
-    private Tracker getActiveParent() {
-      Tracker current = parent;
-      while (current != null && current.closed) {
-        current = current.parent;
-      }
-      return current;
+  private TableCacheUpdateTracker getActiveParent() {
+    Preconditions.assertSame(thread, Thread.currentThread(), "thread");
+    TableCacheUpdateTracker current = parent;
+    while (current != null && current.closed) {
+      current = current.parent;
     }
+    return current;
+  }
 
-    private void addTables(Set<String> tableNames) {
-      if (!closed && tableNames != TRACKING && !tableNames.isEmpty()) {
-        if (tables == TRACKING) {
-          tables = new LinkedHashSet<>();
-        }
-        tables.addAll(tableNames);
+  private void addTables(Set<String> tableNames) {
+    Preconditions.assertSame(thread, Thread.currentThread(), "thread");
+    if (!closed && tableNames != null && !tableNames.isEmpty()) {
+      if (tables == null) {
+        tables = new LinkedHashSet<>();
       }
+      tables.addAll(tableNames);
     }
   }
 }
