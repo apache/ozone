@@ -32,6 +32,8 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -84,6 +86,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   // Map to track commit index at every server
   private final ConcurrentHashMap<UUID, Long> commitInfoMap;
 
+  // Pre-built map from Ratis peer ID string to DatanodeDetails for the pipeline nodes,
+  // used to avoid UUID parsing on every sendCommandAsync reply.
+  private final Map<String, DatanodeDetails> peerIdToDatanode;
+
   private final XceiverClientMetrics metrics
       = XceiverClientManager.getXceiverClientMetrics();
   private final RaftProtos.ReplicationLevel watchType;
@@ -102,6 +108,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     this.rpcType = rpcType;
     this.retryPolicy = retryPolicy;
     commitInfoMap = new ConcurrentHashMap<>();
+    peerIdToDatanode = pipeline.getNodes().stream()
+        .collect(Collectors.toMap(DatanodeDetails::getUuidString, Function.identity()));
     this.tlsConfig = tlsConfig;
     this.ozoneConfiguration = configuration;
     try {
@@ -289,6 +297,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     reply.addDatanode(builder.build());
   }
 
+  private void addDatanodetoReply(String peerIdString, XceiverClientReply reply) {
+    reply.addDatanode(peerIdToDatanode.get(peerIdString));
+  }
+
   private XceiverClientReply newWatchReply(
       long watchIndex, Object reason, long replyIndex) {
     LOG.debug("watchForCommit({}) returns {} {}",
@@ -399,12 +411,11 @@ public final class XceiverClientRatis extends XceiverClientSpi {
             ContainerCommandResponseProto response =
                 ContainerCommandResponseProto
                     .parseFrom(reply.getMessage().getContent());
-            UUID serverId = RatisHelper.toDatanodeId(reply.getReplierId());
             if (response.getResult() == ContainerProtos.Result.SUCCESS) {
               updateCommitInfosMap(reply.getCommitInfos(), watchType);
             }
             asyncReply.setLogIndex(reply.getLogIndex());
-            addDatanodetoReply(serverId, asyncReply);
+            addDatanodetoReply(reply.getReplierId(), asyncReply);
             return response;
           } catch (InvalidProtocolBufferException e) {
             throw new CompletionException(e);
