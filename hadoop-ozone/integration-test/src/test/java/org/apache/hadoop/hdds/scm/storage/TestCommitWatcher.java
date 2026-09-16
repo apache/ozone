@@ -61,7 +61,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
@@ -129,10 +128,9 @@ public class TestCommitWatcher {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    // Wait for the RATIS THREE pipeline to reach OPEN state before any writes.
-    // A pipeline only opens once it is healthy, which requires an elected Ratis
-    // leader; otherwise the first write can race leader election and fail with
-    // NotLeaderException -> RaftRetryFailureException -> AlreadyClosedException.
+    // Make sure background pipeline creation has finished and a RATIS THREE
+    // pipeline is OPEN before allocating a container, so the write burst does
+    // not race on-demand pipeline creation inside allocateContainer.
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 60000);
     client = OzoneClientFactory.getRpcClient(conf);
     ObjectStore objectStore = client.getObjectStore();
@@ -163,22 +161,24 @@ public class TestCommitWatcher {
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
         assertEquals(1, xceiverClient.getRefcount());
         XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
-        // Ensure the freshly-allocated pipeline has an elected Ratis leader
-        // before the async write burst: register the Ratis group on the
-        // pipeline datanodes and commit a CreateContainer synchronously.
-        // Otherwise the first write races leader election and can fail with
-        // NotLeaderException -> RaftRetryFailureException -> AlreadyClosedException.
-        OzoneTestHelper.createPipelineOnDatanode(pipeline, cluster);
+        // Warm up the freshly-acquired Ratis client before the async write
+        // burst: create the container synchronously so the RaftClient discovers
+        // the leader and the container already exists. Otherwise the first async
+        // WriteChunk has to do leader discovery and lazy container creation under
+        // the aggressive request/no-retry timeouts and can flake with
+        // AlreadyClosedException.
         ratisClient.sendCommandAsync(
             ContainerTestHelper.getCreateContainerRequest(containerId, pipeline))
             .getResponse().get();
         CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
-        BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
         List<XceiverClientReply> replies = new ArrayList<>();
         long length = 0;
         List<CompletableFuture<ContainerCommandResponseProto>>
             futures = new ArrayList<>();
         for (int i = 0; i < capacity; i++) {
+          // Use a distinct block per iteration; a real client never rewrites the
+          // same blockID and offset with different data.
+          BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
           ContainerCommandRequestProto writeChunkRequest =
               ContainerTestHelper
                   .getWriteChunkRequest(pipeline, blockID, CHUNK_SIZE);
@@ -238,22 +238,24 @@ public class TestCommitWatcher {
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
         assertEquals(1, xceiverClient.getRefcount());
         XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
-        // Ensure the freshly-allocated pipeline has an elected Ratis leader
-        // before the async write burst: register the Ratis group on the
-        // pipeline datanodes and commit a CreateContainer synchronously.
-        // Otherwise the first write races leader election and can fail with
-        // NotLeaderException -> RaftRetryFailureException -> AlreadyClosedException.
-        OzoneTestHelper.createPipelineOnDatanode(pipeline, cluster);
+        // Warm up the freshly-acquired Ratis client before the async write
+        // burst: create the container synchronously so the RaftClient discovers
+        // the leader and the container already exists. Otherwise the first async
+        // WriteChunk has to do leader discovery and lazy container creation under
+        // the aggressive request/no-retry timeouts and can flake with
+        // AlreadyClosedException.
         ratisClient.sendCommandAsync(
             ContainerTestHelper.getCreateContainerRequest(containerId, pipeline))
             .getResponse().get();
         CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
-        BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
         List<XceiverClientReply> replies = new ArrayList<>();
         long length = 0;
         List<CompletableFuture<ContainerCommandResponseProto>>
             futures = new ArrayList<>();
         for (int i = 0; i < capacity; i++) {
+          // Use a distinct block per iteration; a real client never rewrites the
+          // same blockID and offset with different data.
+          BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
           ContainerCommandRequestProto writeChunkRequest =
               ContainerTestHelper
                   .getWriteChunkRequest(pipeline, blockID, CHUNK_SIZE);
