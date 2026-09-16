@@ -57,6 +57,7 @@ import com.amazonaws.services.s3.model.DeletePublicAccessBlockRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetBucketLifecycleConfigurationRequest;
 import com.amazonaws.services.s3.model.GetBucketTaggingConfigurationRequest;
+import com.amazonaws.services.s3.model.GetPublicAccessBlockRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectTaggingRequest;
 import com.amazonaws.services.s3.model.GetObjectTaggingResult;
@@ -72,6 +73,8 @@ import com.amazonaws.services.s3.model.ListObjectsV2Result;
 import com.amazonaws.services.s3.model.ListPartsRequest;
 import com.amazonaws.services.s3.model.MultipartUpload;
 import com.amazonaws.services.s3.model.MultipartUploadListing;
+import com.amazonaws.services.s3.model.PublicAccessBlockConfiguration;
+import com.amazonaws.services.s3.model.SetPublicAccessBlockRequest;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.ObjectTagging;
@@ -487,15 +490,31 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   }
 
   @Test
-  public void testDeletePublicAccessBlockDoesNotDeleteBucket() {
+  public void testPublicAccessBlockIsNotImplemented() {
     final String bucketName = getBucketName();
     s3Client.createBucket(bucketName);
 
-    AmazonServiceException exception = assertThrows(AmazonServiceException.class,
+    AmazonServiceException getException = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getPublicAccessBlock(
+            new GetPublicAccessBlockRequest().withBucketName(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, getException.getStatusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), getException.getErrorCode());
+
+    AmazonServiceException putException = assertThrows(AmazonServiceException.class,
+        () -> s3Client.setPublicAccessBlock(
+            new SetPublicAccessBlockRequest()
+                .withBucketName(bucketName)
+                .withPublicAccessBlockConfiguration(
+                    new PublicAccessBlockConfiguration()
+                        .withBlockPublicAcls(true))));
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, putException.getStatusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), putException.getErrorCode());
+
+    AmazonServiceException deleteException = assertThrows(AmazonServiceException.class,
         () -> s3Client.deletePublicAccessBlock(
             new DeletePublicAccessBlockRequest().withBucketName(bucketName)));
-    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, exception.getStatusCode());
-    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), exception.getErrorCode());
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, deleteException.getStatusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), deleteException.getErrorCode());
     assertTrue(s3Client.doesBucketExistV2(bucketName));
 
     s3Client.deleteBucket(bucketName);

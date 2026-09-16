@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -29,7 +27,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,14 +87,5 @@ public class TestBucketDelete {
       return;
     }
     fail("testDeleteWithBucketNotEmpty failed");
-  }
-
-  @Test
-  public void testDeletePublicAccessBlockDoesNotDeleteBucket() {
-    bucketEndpoint.queryParamsForTest().set(QueryParams.PUBLIC_ACCESS_BLOCK, "");
-
-    assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED,
-        () -> bucketEndpoint.delete(bucketName));
-    assertDoesNotThrow(() -> objectStoreStub.getS3Bucket(bucketName));
   }
 }
