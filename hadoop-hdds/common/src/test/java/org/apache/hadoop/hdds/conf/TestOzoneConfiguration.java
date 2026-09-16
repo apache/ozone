@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -51,6 +52,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -310,10 +312,13 @@ public class TestOzoneConfiguration {
     // Default resources provide a value, so Hadoop's get(key) is non-null.
     assertNotNull(subject.get(key));
     String fromDefaults = subject.get(key);
+    MutableConfigurationSource wrapped = MutableConfigurationSource.ifUnsetWrapper(subject);
+    assertThat(wrapped.isExplicitlySet(key)).isFalse();
 
     subject.setIfUnset(key, "20");
     assertEquals("20", subject.get(key));
     assertNotEquals(fromDefaults, subject.get(key));
+    assertThat(wrapped.isExplicitlySet(key)).isTrue();
 
     subject.set(key, "42");
     subject.setIfUnset(key, "20");
@@ -338,6 +343,22 @@ public class TestOzoneConfiguration {
 
     subject.setIfUnset(key, "20");
     assertEquals("99", subject.get(key));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void setIfUnsetAfterUnset(boolean wrapped) {
+    final String key = OZONE_SCM_HANDLER_COUNT_KEY;
+    conf.set(key, "42");
+    conf.unset(key);
+    assertThat(conf.get(key)).isNull();
+
+    MutableConfigurationSource target = wrapped ? MutableConfigurationSource.ifUnsetWrapper(conf) : conf;
+    assertThat(target.isExplicitlySet(key)).isFalse();
+    target.setIfUnset(key, "20");
+
+    assertThat(conf.get(key)).isEqualTo("20");
+    assertThat(target.isExplicitlySet(key)).isTrue();
   }
 
   @Test

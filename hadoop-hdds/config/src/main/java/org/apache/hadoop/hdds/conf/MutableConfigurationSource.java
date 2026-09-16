@@ -27,13 +27,21 @@ public interface MutableConfigurationSource
     extends ConfigurationSource, ConfigurationTarget {
 
   /**
+   * Returns whether a property has an explicitly configured value.
+   * By default, any non-null value is explicit; implementations may distinguish default resources.
+   */
+  default boolean isExplicitlySet(String key) {
+    return get(key) != null;
+  }
+
+  /**
    * Sets {@code value} for {@code key} only if the key is not already set.
    * Default implementation treats any non-null {@link #get(String)} result as set.
    * {@code OzoneConfiguration} (in hdds-common) overrides this to allow
    * overriding values that come only from default resources.
    */
   default void setIfUnset(String key, String value) {
-    if (get(key) == null) {
+    if (!isExplicitlySet(key)) {
       set(key, value);
     }
   }
@@ -82,6 +90,11 @@ public interface MutableConfigurationSource
     @Override
     public void setIfUnset(String key, String value) {
       wrapped.setIfUnset(key, value);
+    }
+
+    @Override
+    public boolean isExplicitlySet(String key) {
+      return wrapped.isExplicitlySet(key);
     }
   }
 }

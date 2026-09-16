@@ -468,7 +468,11 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
     }
   }
 
-  private boolean isExplicitlySet(String name) {
+  @Override
+  public synchronized boolean isExplicitlySet(String name) {
+    if (get(name) == null) {
+      return false;
+    }
     String[] sources = getPropertySources(name);
     if (sources == null) {
       return false;
