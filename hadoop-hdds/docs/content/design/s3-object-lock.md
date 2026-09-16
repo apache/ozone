@@ -161,7 +161,8 @@ Two new fields: retentionDate & legalHold.
   message KeyInfo {
   // ... existing fields
   optional string retentionDate = 23;
-  optional bool legalHold = 24 [default = false];
+  optional RetentionConfig retentionConfig = 24;
+  optional bool legalHold = 25 [default = false];
   }
 ```
 
