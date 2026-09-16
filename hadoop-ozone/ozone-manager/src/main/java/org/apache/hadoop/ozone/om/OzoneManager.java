@@ -144,6 +144,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -3396,25 +3397,46 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       BucketFilter parsedFilter = BucketFilter.parse(bucketFilter);
       Map<String, BucketSnapshotCount> bucketCounts = new LinkedHashMap<>();
       Map<String, Boolean> bucketAclCache = new LinkedHashMap<>();
+      String tablePrefix = parsedFilter.getSnapshotInfoPrefix();
+      Table<String, SnapshotInfo> snapshotInfoTable = metadataManager.getSnapshotInfoTable();
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> keyIter =
-               metadataManager.getSnapshotInfoTable().iterator()) {
+      Map<String, SnapshotInfo> cacheEntries = new LinkedHashMap<>();
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>>  cacheIter = snapshotInfoTable.cacheIterator();
+      while (cacheIter.hasNext()) {
+        Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> entry = cacheIter.next();
+        String key = entry.getKey().getCacheKey();
+        if (key.startsWith(tablePrefix)) {
+          CacheValue<SnapshotInfo> cacheValue = entry.getValue();
+          SnapshotInfo snapshotInfo = cacheValue != null ? cacheValue.getCacheValue() : null;
+          cacheEntries.put(key, snapshotInfo != null ? snapshotInfo.copyObject() : null);
+        }
+      }
+
+      try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>> keyIter = snapshotInfoTable.iterator(tablePrefix)) {
         while (keyIter.hasNext()) {
-          SnapshotInfo snapshotInfo = keyIter.next().getValue();
-          String volumeName = snapshotInfo.getVolumeName();
-          String bucketName = snapshotInfo.getBucketName();
-          if (!parsedFilter.matches(volumeName, bucketName)) {
+          KeyValue<String, SnapshotInfo> entry = keyIter.next();
+          if (cacheEntries.containsKey(entry.getKey())) {
             continue;
           }
+          addSnapshotToCount(entry.getValue(), parsedFilter, bucketAclCache, bucketCounts);
+        }
+      }
 
-          if (getAclsEnabled() && !hasListAccess(volumeName, bucketName, bucketAclCache)) {
-            continue;
-          }
+      for (SnapshotInfo snapshotInfo : cacheEntries.values()) {
+        if (snapshotInfo == null) {
+          continue;
+        }
+        addSnapshotToCount(snapshotInfo, parsedFilter, bucketAclCache, bucketCounts);
+      }
 
+      if (parsedFilter.isExactBucketPath()) {
+        String volumeName = parsedFilter.getVolumeName();
+        String bucketName = parsedFilter.getBucketName();
+        String bucketDbKey = metadataManager.getBucketKey(volumeName, bucketName);
+        boolean bucketExists = metadataManager.getBucketTable().get(bucketDbKey) != null;
+        if (bucketExists && (!getAclsEnabled() || hasListAccess(volumeName, bucketName, bucketAclCache))) {
           String bucketKey = volumeName + "/" + bucketName;
-          BucketSnapshotCount bucketCount =
-              bucketCounts.computeIfAbsent(bucketKey, unused -> new BucketSnapshotCount(volumeName, bucketName));
-          bucketCount.increment(snapshotInfo.getSnapshotStatus());
+          bucketCounts.computeIfAbsent(bucketKey, unused -> new BucketSnapshotCount(volumeName, bucketName));
         }
       }
 
@@ -3437,6 +3459,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  private void addSnapshotToCount(SnapshotInfo snapshotInfo, BucketFilter parsedFilter, Map<String, Boolean> bucketAclCache,
+      Map<String, BucketSnapshotCount> bucketCounts) throws IOException {
+    String volumeName = snapshotInfo.getVolumeName();
+    String bucketName = snapshotInfo.getBucketName();
+    if (!parsedFilter.matches(volumeName, bucketName)) {
+      return;
+    }
+
+    if (getAclsEnabled() && !hasListAccess(volumeName, bucketName, bucketAclCache)) {
+      return;
+    }
+
+    String bucketKey = volumeName + "/" + bucketName;
+    BucketSnapshotCount bucketCount =
+        bucketCounts.computeIfAbsent(bucketKey, unused -> new BucketSnapshotCount(volumeName, bucketName));
+    bucketCount.increment(snapshotInfo.getSnapshotStatus());
+  }
+
   private boolean hasListAccess(String volumeName, String bucketName, Map<String, Boolean> bucketAclCache)
       throws IOException {
     String bucketKey = volumeName + "/" + bucketName;
@@ -3450,7 +3490,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       bucketAclCache.put(bucketKey, true);
       return true;
     } catch (OMException ex) {
-      if (ex.getResult() == OMException.ResultCodes.ACCESS_DENIED) {
+      if (ex.getResult() == OMException.ResultCodes.PERMISSION_DENIED
+          || ex.getResult() == OMException.ResultCodes.ACCESS_DENIED) {
         bucketAclCache.put(bucketKey, false);
         return false;
       }
@@ -3461,21 +3502,28 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static final class BucketFilter {
     private final String volumeName;
     private final String bucketName;
+    private final boolean exactBucketPath;
 
-    private BucketFilter(String volumeName, String bucketName) {
+    private BucketFilter(String volumeName, String bucketName, boolean exactBucketPath) {
       this.volumeName = volumeName;
       this.bucketName = bucketName;
+      this.exactBucketPath = exactBucketPath;
     }
 
     static BucketFilter parse(String filter) throws OMException {
       if (StringUtils.isBlank(filter)) {
-        return new BucketFilter(null, null);
+        return new BucketFilter(null, null, false);
       }
 
       String normalized = StringUtils.strip(filter, "/");
       int slashIndex = normalized.indexOf('/');
       if (slashIndex < 0) {
-        return new BucketFilter(null, normalized);
+        return new BucketFilter(null, normalized, false);
+      }
+
+      if (normalized.indexOf('/', slashIndex + 1) >= 0) {
+        throw new OMException("Invalid --bucket filter. Use either <bucket> or <volume>/<bucket>.",
+            OMException.ResultCodes.INVALID_REQUEST);
       }
 
       String volume = normalized.substring(0, slashIndex);
@@ -3484,7 +3532,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         throw new OMException("Invalid --bucket filter. Use either <bucket> or <volume>/<bucket>.",
             OMException.ResultCodes.INVALID_REQUEST);
       }
-      return new BucketFilter(volume, bucket);
+      return new BucketFilter(volume, bucket, true);
     }
 
     boolean matches(String volume, String bucket) {
@@ -3495,6 +3543,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         return bucketName.equals(bucket);
       }
       return volumeName.equals(volume) && bucketName.equals(bucket);
+    }
+
+    String getSnapshotInfoPrefix() {
+      if (exactBucketPath) {
+        return OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX;
+      }
+      return OM_KEY_PREFIX;
+    }
+
+    boolean isExactBucketPath() {
+      return exactBucketPath;
+    }
+
+    String getVolumeName() {
+      return volumeName;
+    }
+
+    String getBucketName() {
+      return bucketName;
     }
   }
 

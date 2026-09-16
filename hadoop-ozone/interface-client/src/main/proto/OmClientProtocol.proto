@@ -336,7 +336,7 @@ message OMRequest {
   optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 156;
   optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 157;
   optional GetCallerIdentityRequest         getCallerIdentityRequest       = 158;
-  optional SnapshotCountRequest snapshotCountRequest = 154;
+  optional SnapshotCountRequest snapshotCountRequest = 159;
 }
 
 message OMResponse {
@@ -486,7 +486,7 @@ message OMResponse {
   optional RevokeSTSTokenResponse            revokeSTSTokenResponse         = 154;
   optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 155;
   optional GetCallerIdentityResponse         getCallerIdentityResponse      = 156;
-  optional SnapshotCountResponse snapshotCountResponse = 154;
+  optional SnapshotCountResponse snapshotCountResponse = 157;
 }
 
 enum Status {
