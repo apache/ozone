@@ -386,6 +386,16 @@ public class TestOmUtils {
   }
 
   @Test
+  public void testGetBucketDeletedBytesIsClassifiedAsReadOnlyAndFollowerEligible() {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.GetBucketDeletedBytes)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+    assertTrue(OmUtils.isReadOnly(request));
+    assertTrue(OmUtils.shouldSendToFollower(request));
+  }
+
+  @Test
   public void testResolveOmHostAcceptsIpv6Literal() {
     // A bracketed or bare IPv6 literal must parse into a host:port authority.
     // Before HDDS-15775 the bare form made createSocketAddr throw

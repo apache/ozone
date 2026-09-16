@@ -75,6 +75,7 @@ public class BucketDeletedDataCalculator {
           ozoneManager, snapshotChainManager, snapshotId);
       if (snapshotInfo == null
           || snapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE
+          || !snapshotInfo.isDeepCleanedDeletedDir()
           || !snapshotInfo.getVolumeName().equals(volume)
           || !snapshotInfo.getBucketName().equals(bucket)
           || !OmSnapshotManager.areSnapshotChangesFlushedToDB(

@@ -1952,6 +1952,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public BucketDeletedBytes getBucketDeletedBytes(String bucketPath)
       throws IOException {
+    checkAdminUserPrivilege("get bucket deleted bytes.");
     BucketDeletedDataCalculator.BucketDeletedBytesStats stats =
         calculateDeletedBytesForBucket(bucketPath);
     return new BucketDeletedBytes(
