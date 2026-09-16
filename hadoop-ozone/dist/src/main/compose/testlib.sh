@@ -304,6 +304,38 @@ execute_robot_test(){
   return ${rc}
 }
 
+## @description  Execute the S3 smoketest directory with AWS CLI v1 and v2.
+## @param        Name of the container in the docker-compose file
+## @param        robot arguments (same as execute_robot_test, except the test path is always s3)
+##               If -N PREFIX is given, result names use PREFIX-awscli-v1 and PREFIX-awscli-v2.
+execute_s3_smoketests(){
+  local container="$1"
+  shift
+  local v1_args=()
+  local v2_args=()
+  local has_name=false
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "-N" && -n "${2:-}" ]]; then
+      has_name=true
+      v1_args+=("-N" "$2-awscli-v1")
+      v2_args+=("-N" "$2-awscli-v2")
+      shift 2
+    else
+      v1_args+=("$1")
+      v2_args+=("$1")
+      shift
+    fi
+  done
+  if [[ "$has_name" == "false" ]]; then
+    v1_args=("-N" "s3-awscli-v1" "${v1_args[@]}")
+    v2_args=("-N" "s3-awscli-v2" "${v2_args[@]}")
+  fi
+  local -i rc=0
+  execute_robot_test "$container" -v AWS_CLI:aws "${v1_args[@]}" s3 || rc=$?
+  execute_robot_test "$container" -v AWS_CLI:aws2 "${v2_args[@]}" s3 || rc=$?
+  return ${rc}
+}
+
 ## @description Replace OM node order in config
 reorder_om_nodes() {
   local c new_order

@@ -32,8 +32,8 @@ ${RCLONE_VERBOSE_LEVEL}     2
 *** Keywords ***
 #   Export access key and secret to the environment
 Setup aws credentials
-    ${accessKey} =      Execute     aws configure get aws_access_key_id
-    ${secret} =         Execute     aws configure get aws_secret_access_key
+    ${accessKey} =      Execute     ${AWS_CLI} configure get aws_access_key_id
+    ${secret} =         Execute     ${AWS_CLI} configure get aws_secret_access_key
     Set Environment Variable        AWS_SECRET_ACCESS_KEY  ${secret}
     Set Environment Variable        AWS_ACCESS_KEY_ID  ${accessKey}
 

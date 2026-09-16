@@ -67,8 +67,8 @@ Test Multipart Upload Complete With Chunked Transfer Encoding
     ...                is sent with chunked transfer encoding (no Content-Length, as
     ...                e.g. the AWS C++ SDK does with Expect: 100-continue), it must
     ...                not be rejected as an empty part list (MalformedXML).
-    ${access_key} =     Execute    aws configure get aws_access_key_id
-    ${secret_key} =     Execute    aws configure get aws_secret_access_key
+    ${access_key} =     Execute    ${AWS_CLI} configure get aws_access_key_id
+    ${secret_key} =     Execute    ${AWS_CLI} configure get aws_secret_access_key
     ${key} =            Set Variable    ${PREFIX}/chunkedCompleteKey
     ${uploadID} =       Set Variable    ${EMPTY}
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${key}
@@ -315,7 +315,7 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
     ${result} =         Execute AWSS3APICli      head-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source
     ${lastModified} =   Execute and checkrc      echo '${result}' | jq -r '.LastModified'    0
                         Should contain           ${result}    ${LastModified}
-    ${lmDate} =         Convert Date 	 	 ${lastModified}  date_format=%a, %d %b %Y %H:%M:%S %Z
+    ${lmDate} =         Parse S3 LastModified    ${lastModified}
     ${afterCreate} =    Add Time To Date         ${lmDate}  3 seconds
     Wait Til Date Past  ${afterCreate}
 
