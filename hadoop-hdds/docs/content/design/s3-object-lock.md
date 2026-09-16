@@ -250,8 +250,8 @@ To support this without fragmenting AWS-compatible Action definitions, Ozone and
 > _**Warning**:
 > _Permanent Data Immutability in Compliance Mode_
 > 
-> Unlike AWS S3, where terminating the AWS root account can prematurely purge Compliance-locked data, Apache Ozone has no concept of a root account.
-> Once applied, a Compliance lock cannot be overridden or deleted by any admin or Ranger policy until the retention period expires. The only way to force-remove such data prior to expiration is by taking OM offline and directly modifying the underlying RocksDB via repair tools (ozone debug ldb). Use this mode with extreme caution.
+> Unlike AWS S3, where objects in Compliance mode cannot be deleted by any user (including root) and will only be destroyed if the entire AWS account itself is removed, Apache Ozone has no concept of a root or tenant account.
+> Once applied, a Compliance lock cannot be overridden or deleted by any admin or Ranger policy until the retention period expires. 
 
 ### New Ozone APIs
 
