@@ -423,8 +423,7 @@ public class UpgradeContainerSchema extends RepairTool {
         Table<byte[], byte[]> sourceTable, ContainerData containerData)
         throws IOException {
       long count = 0;
-      try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>>
-               iter = sourceTable.iterator()) {
+      try (TableIterator<byte[], Table.KeyValue<byte[], byte[]>> iter = sourceTable.iterator()) {
         while (iter.hasNext()) {
           count++;
           Table.KeyValue<byte[], byte[]> next = iter.next();

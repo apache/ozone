@@ -20,12 +20,15 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.util.Time;
+import org.rocksdb.ByteBufferGetStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,16 +102,16 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public boolean isExist(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyMayExistChecks();
-    final Supplier<byte[]> holder = db.keyMayExist(family, key);
-    if (holder == null) {
+    final Supplier<byte[]> valueSupplier = db.keyMayExist(family, key);
+    if (valueSupplier == null) {
       return false;  // definitely not exists
     }
-    final byte[] value = holder.get();
+    final byte[] value = valueSupplier.get();
     if (value != null) {
       return true; // definitely exists
     }
 
-    // inconclusive: the key may or may not exist
+    // keyMayExist could not return the value; confirm via point-get.
     final boolean exists = get(key) != null;
     if (!exists) {
       rdbMetrics.incNumDBKeyMayExistMisses();
@@ -122,8 +125,30 @@ class RDBTable implements Table<byte[], byte[]> {
     return db.get(family, key);
   }
 
+  @Override
+  public List<byte[]> multiGetSkipCache(List<byte[]> keys) throws RocksDatabaseException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    for (byte[] ignored : keys) {
+      rdbMetrics.incNumDBKeyGets();
+    }
+    return db.multiGet(family, keys);
+  }
+
   Integer get(ByteBuffer key, ByteBuffer outValue) throws RocksDatabaseException {
     return db.get(family, key, outValue);
+  }
+
+  List<ByteBufferGetStatus> multiGetSkipCache(List<ByteBuffer> keys, List<ByteBuffer> values)
+      throws RocksDatabaseException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    for (ByteBuffer ignored : keys) {
+      rdbMetrics.incNumDBKeyGets();
+    }
+    return db.multiGet(family, keys, values);
   }
 
   /**
@@ -141,15 +166,16 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public byte[] getIfExist(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
-    final Supplier<byte[]> value = db.keyMayExist(family, key);
-    if (value == null) {
+    final Supplier<byte[]> valueSupplier = db.keyMayExist(family, key);
+    if (valueSupplier == null) {
       return null; // definitely not exists
     }
-    if (value.get() != null) {
-      return value.get(); // definitely exists
+    final byte[] value = valueSupplier.get();
+    if (value != null) {
+      return value; // definitely exists
     }
 
-    // inconclusive: the key may or may not exist
+    // keyMayExist could not return the value; confirm via point-get.
     rdbMetrics.incNumDBKeyGetIfExistGets();
     final byte[] val = get(key);
     if (val == null) {
@@ -160,19 +186,24 @@ class RDBTable implements Table<byte[], byte[]> {
 
   Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
+    // Note: RocksDatabase.keyMayExist duplicates the key internally, so the caller's
+    // key buffer position is preserved for the fallback point-get below.
     final Supplier<Integer> value = db.keyMayExist(
         family, key, outValue.duplicate());
     if (value == null) {
       return null; // definitely not exists
     }
-    if (value.get() != null) {
+    final Integer length = value.get();
+    if (length != null) {
       // definitely exists, return value size.
-      return value.get();
+      return length;
     }
 
-    // inconclusive: the key may or may not exist
+    // keyMayExist could not return the value; confirm via point-get. get()
+    // advances the key position, so pass a duplicate to leave the caller's
+    // key buffer unchanged.
     rdbMetrics.incNumDBKeyGetIfExistGets();
-    final Integer val = get(key, outValue);
+    final Integer val = get(key.duplicate(), outValue);
     if (val == null) {
       rdbMetrics.incNumDBKeyGetIfExistMisses();
     }
@@ -292,12 +323,16 @@ class RDBTable implements Table<byte[], byte[]> {
       if (startKey == null) {
         it.seekToFirst();
       } else {
+        // seek() positions the iterator and returns the landing entry without
+        // consuming it, so the loop below still starts from startKey. Comparing
+        // the landing key to startKey avoids a separate point-get just to check
+        // that startKey exists.
+        final KeyValue<byte[], byte[]> seeked = it.seek(startKey);
         if ((prefix == null || startKey.length > prefix.length)
-            && get(startKey) == null) {
-          // Key not found, return empty list
+            && (seeked == null || !Arrays.equals(seeked.getKey(), startKey))) {
+          // start key not found, return empty list
           return result;
         }
-        it.seek(startKey);
       }
 
       while (it.hasNext() && result.size() < count) {

@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
  * a fixed-length one-byte-per-character encoding,
  * i.e. the serialized size equals to {@link String#length()}.
  */
-public final class FixedLengthStringCodec extends StringCodecBase {
+public final class FixedLengthStringCodec extends StringCodecBase.WithFallback {
 
   private static final FixedLengthStringCodec INSTANCE
       = new FixedLengthStringCodec();

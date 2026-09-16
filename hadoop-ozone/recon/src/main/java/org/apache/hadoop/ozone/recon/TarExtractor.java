@@ -34,10 +34,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -73,7 +72,7 @@ public class TarExtractor {
   public TarExtractor(int threadPoolSize, String threadNamePrefix) {
     this.threadPoolSize = threadPoolSize;
     this.threadFactory =
-        new ThreadFactoryBuilder().setNameFormat("FetchOMDBTar-%d" + threadNamePrefix)
+        new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "FetchOMDBTar-%d")
             .build();
   }
 
@@ -163,8 +162,7 @@ public class TarExtractor {
 
   public void start() {
     if (executorServiceStarted.compareAndSet(false, true)) {
-      this.executor =
-          new ThreadPoolExecutor(0, threadPoolSize, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), threadFactory);
+      this.executor = Executors.newFixedThreadPool(threadPoolSize, threadFactory);
     }
   }
 

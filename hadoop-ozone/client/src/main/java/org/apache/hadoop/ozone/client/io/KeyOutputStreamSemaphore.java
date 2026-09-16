@@ -49,9 +49,9 @@ public class KeyOutputStreamSemaphore {
   public void acquire() throws IOException {
     if (requestSemaphore != null) {
       try {
-        LOG.debug("Acquiring semaphore");
+        LOG.trace("Acquiring semaphore");
         requestSemaphore.acquire();
-        LOG.debug("Acquired semaphore");
+        LOG.trace("Acquired semaphore");
       } catch (InterruptedException e) {
         final String errMsg = "Write aborted. Interrupted waiting for KeyOutputStream semaphore: " + e.getMessage();
         LOG.error(errMsg);
@@ -63,9 +63,9 @@ public class KeyOutputStreamSemaphore {
 
   public void release() {
     if (requestSemaphore != null) {
-      LOG.debug("Releasing semaphore");
+      LOG.trace("Releasing semaphore");
       requestSemaphore.release();
-      LOG.debug("Released semaphore");
+      LOG.trace("Released semaphore");
     }
   }
 }

@@ -31,10 +31,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -53,6 +56,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.util.ServicePlugin;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -156,6 +160,27 @@ public class TestHddsDatanodeService {
         hddsVolume.getDeletedContainerDir().listFiles();
     assertNotNull(deletedContainersAfterShutdown);
     assertEquals(0, deletedContainersAfterShutdown.length);
+  }
+
+  @Test
+  public void testDatanodeUuidInMXBean() throws Exception {
+    try {
+      service.start(conf);
+
+      ObjectName bean = new ObjectName(
+          "Hadoop:service=HddsDatanodeService,"
+              + "name=HddsDatanodeServiceInfo,"
+              + "component=ServerRuntime");
+      MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+      String datanodeUuid = (String) mbs.getAttribute(bean, "DatanodeUuid");
+
+      assertEquals(service.getDatanodeDetails().getUuidString(), datanodeUuid);
+    } finally {
+      service.stop();
+      service.join();
+      service.close();
+      DefaultMetricsSystem.shutdown();
+    }
   }
 
   @ParameterizedTest

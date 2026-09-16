@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,8 +60,8 @@ public final class OmKeyInfo extends WithParentObjectId
     implements CopyObject<OmKeyInfo>, WithTags {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
 
-  private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
-  private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
+  private static final Codec<OmKeyInfo> CODEC = newCodec(true);
+  private static final Codec<OmKeyInfo> CODEC_KEY_TABLE = newCodec(false);
   /**
    * Metadata key flag to indicate whether a deleted key was a committed key.
    * The flag is set when a committed key is deleted from AOS but still held in
@@ -109,8 +110,7 @@ public final class OmKeyInfo extends WithParentObjectId
   // generation unchanged.
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
-  private Long expectedDataGeneration = null;
-  private String expectedETag;
+  private final Long expectedDataGeneration;
 
   private OmKeyInfo(Builder b) {
     super(b);
@@ -130,20 +130,41 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
-    this.expectedETag = b.expectedETag;
   }
 
-  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
+  /**
+   * Creates a new codec for OmKeyInfo.
+   *
+   * @param isOpenKey true for openKeyTable (includes expectedDataGeneration),
+   *                  false for keyTable (excludes these fields)
+   * @return the codec
+   */
+  private static Codec<OmKeyInfo> newCodec(boolean isOpenKey) {
     return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.getDefaultInstance()),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION),
+        k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION, isOpenKey),
         OmKeyInfo.class);
   }
 
-  public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
-    LOG.debug("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
-    return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
+  /**
+   * Gets the codec for openKeyTable. This codec includes expectedDataGeneration
+   * field during serialization.
+   *
+   * @return the codec for openKeyTable
+   */
+  public static Codec<OmKeyInfo> getOpenKeyTableCodec() {
+    return CODEC;
+  }
+
+  /**
+   * Gets the codec for keyTable. This codec excludes fields that are only
+   * meaningful for open keys.
+   *
+   * @return the codec for keyTable
+   */
+  public static Codec<OmKeyInfo> getKeyTableCodec() {
+    return CODEC_KEY_TABLE;
   }
 
   public String getVolumeName() {
@@ -183,20 +204,8 @@ public final class OmKeyInfo extends WithParentObjectId
     return fileName;
   }
 
-  public void setExpectedDataGeneration(Long generation) {
-    this.expectedDataGeneration = generation;
-  }
-
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
-  }
-
-  public void setExpectedETag(String eTag) {
-    this.expectedETag = eTag;
-  }
-
-  public String getExpectedETag() {
-    return expectedETag;
   }
 
   public String getOwnerName() {
@@ -343,12 +352,14 @@ public final class OmKeyInfo extends WithParentObjectId
     // the pipeline field by default and bcsId would be updated in Ratis mode.
     Map<ContainerBlockID, OmKeyLocationInfo> allocatedBlockLocations =
         new HashMap<>();
-    for (OmKeyLocationInfo existingLocationInfo : keyLocationInfoGroup.
-        getLocationList()) {
-      ContainerBlockID existingBlockID = existingLocationInfo.getBlockID().
-          getContainerBlockID();
-      // The case of overwriting value should never happen
-      allocatedBlockLocations.put(existingBlockID, existingLocationInfo);
+    for (List<OmKeyLocationInfo> existingLocationInfos :
+        keyLocationInfoGroup.getLocationLists()) {
+      for (OmKeyLocationInfo existingLocationInfo : existingLocationInfos) {
+        ContainerBlockID existingBlockID = existingLocationInfo.getBlockID().
+            getContainerBlockID();
+        // The case of overwriting value should never happen
+        allocatedBlockLocations.put(existingBlockID, existingLocationInfo);
+      }
     }
 
     List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
@@ -502,7 +513,6 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
-    private String expectedETag;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -525,12 +535,11 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
-      this.expectedETag = obj.expectedETag;
       this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
               new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
-                  keyLocationVersion.getLocationList(),
+                  keyLocationVersion.createLocationList(),
                   keyLocationVersion.isMultipartKey())));
     }
 
@@ -631,7 +640,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setAcls(List<OzoneAcl> listOfAcls) {
+    public Builder setAcls(Collection<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
         this.acls.set(listOfAcls);
       }
@@ -697,11 +706,6 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setExpectedETag(String eTag) {
-      this.expectedETag = eTag;
-      return this;
-    }
-
     @Override
     protected void validate() {
       super.validate();
@@ -755,7 +759,20 @@ public final class OmKeyInfo extends WithParentObjectId
    * @return KeyInfo
    */
   public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
-    return getProtobuf(ignorePipeline, null, clientVersion, false);
+    return getProtobuf(ignorePipeline, null, clientVersion, false, true);
+  }
+
+  /**
+   * Gets KeyInfo for persistence with control over fields only used in openKeyTable.
+   *
+   * @param ignorePipeline true for persist to DB, false for network transmit.
+   * @param clientVersion the client version
+   * @param isOpenKey true for openKeyTable, false for keyTable
+   * @return KeyInfo
+   */
+  public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion,
+                             boolean isOpenKey) {
+    return getProtobuf(ignorePipeline, null, clientVersion, false, isOpenKey);
   }
 
   /**
@@ -767,6 +784,22 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName,
                               int clientVersion, boolean latestVersionBlocks) {
+    return getProtobuf(ignorePipeline, fullKeyName, clientVersion, latestVersionBlocks, true);
+  }
+
+  /**
+   * Gets KeyInfo with all parameters.
+   *
+   * @param ignorePipeline   ignore pipeline flag
+   * @param fullKeyName user given key name
+   * @param clientVersion the client version
+   * @param latestVersionBlocks whether to include only latest version blocks
+   * @param isOpenKey true for openKeyTable, false for keyTable
+   * @return key info object
+   */
+  private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName,
+                              int clientVersion, boolean latestVersionBlocks,
+                              boolean isOpenKey) {
     long latestVersion = keyLocationVersions.isEmpty() ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
@@ -818,11 +851,8 @@ public final class OmKeyInfo extends WithParentObjectId
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
     kb.setIsFile(isFile);
-    if (expectedDataGeneration != null) {
+    if (isOpenKey && expectedDataGeneration != null) {
       kb.setExpectedDataGeneration(expectedDataGeneration);
-    }
-    if (expectedETag != null) {
-      kb.setExpectedETag(expectedETag);
     }
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
@@ -876,9 +906,6 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     if (keyInfo.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
-    }
-    if (keyInfo.hasExpectedETag()) {
-      builder.setExpectedETag(keyInfo.getExpectedETag());
     }
 
     if (keyInfo.hasOwnerName()) {

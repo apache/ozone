@@ -21,6 +21,7 @@ import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Arrays.asList;
 import static org.apache.hadoop.hdds.client.ReplicationConfig.fromTypeAndFactor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -28,6 +29,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,6 +44,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -106,9 +110,12 @@ public class TestScmClient {
       throws IOException {
 
     Map<Long, ContainerWithPipeline> actualLocations = new HashMap<>();
-
+    List<DatanodeDetails> dnList = new ArrayList<>();
+    for (int i = 0; i < 3; i++) {
+      dnList.add(randomDatanode());
+    }
     for (long containerId : prepopulatedIds) {
-      ContainerWithPipeline pipeline = createPipeline(containerId);
+      ContainerWithPipeline pipeline = createPipeline(containerId, dnList);
       actualLocations.put(containerId, pipeline);
     }
 
@@ -128,7 +135,7 @@ public class TestScmClient {
     if (!expectedScmCallIds.isEmpty()) {
       List<ContainerWithPipeline> scmLocations = new ArrayList<>();
       for (long containerId : expectedScmCallIds) {
-        ContainerWithPipeline pipeline = createPipeline(containerId);
+        ContainerWithPipeline pipeline = createPipeline(containerId, dnList);
         scmLocations.add(pipeline);
         actualLocations.put(containerId, pipeline);
       }
@@ -166,13 +173,51 @@ public class TestScmClient {
     assertEquals(runtimeException, actualRt.getCause());
   }
 
-  ContainerWithPipeline createPipeline(long containerId) {
+  @Test
+  public void testDatanodeDetailsCacheRecordsStats() {
+    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache =
+        ScmClient.createDatanodeDetailsCache(new OzoneConfiguration());
+
+    datanodeDetailsCache.getIfPresent(DatanodeID.randomID());
+
+    assertEquals(1, datanodeDetailsCache.stats().missCount());
+  }
+
+  @Test
+  public void testDatanodeDetailsCacheUpdatesIpAddressChange() {
+    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache =
+        CacheBuilder.newBuilder().build();
+    DatanodeDetails original = randomDatanode();
+    String originalIp = original.getIpAddress();
+    DatanodeDetails updated = DatanodeDetails.newBuilder()
+        .setDatanodeDetails(original)
+        .setIpAddress("updated-ip")
+        .build();
+
+    Pipeline originalPipeline = ScmClient.newPipelineWithDNCache(
+        createPipeline(1L, asList(original)).getPipeline(),
+        datanodeDetailsCache);
+    Pipeline refreshed = ScmClient.newPipelineWithDNCache(
+        createPipeline(2L, asList(updated)).getPipeline(),
+        datanodeDetailsCache);
+
+    assertSame(original, originalPipeline.getNodes().get(0));
+    assertEquals(originalIp, original.getIpAddress());
+    assertEquals(originalIp, originalPipeline.getNodes().get(0).getIpAddress());
+    DatanodeDetails refreshedNode = refreshed.getNodes().get(0);
+    assertSame(updated, refreshedNode);
+    assertEquals("updated-ip", refreshedNode.getIpAddress());
+    assertSame(updated, datanodeDetailsCache.getIfPresent(original.getID()));
+  }
+
+  ContainerWithPipeline createPipeline(long containerId,
+                                       List<DatanodeDetails> dnList) {
     ContainerInfo containerInfo = new ContainerInfo.Builder()
         .setContainerID(containerId)
         .build();
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setNodes(asList(randomDatanode(), randomDatanode()))
+        .setNodes(dnList)
         .setReplicationConfig(fromTypeAndFactor(
             ReplicationType.RATIS, ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)

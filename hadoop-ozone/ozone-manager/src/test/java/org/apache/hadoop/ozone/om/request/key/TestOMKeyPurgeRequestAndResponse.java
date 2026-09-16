@@ -59,7 +59,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests {@link OMKeyPurgeRequest} and {@link OMKeyPurgeResponse}.
  */
-public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
+public class TestOMKeyPurgeRequestAndResponse extends OMKeyRequestTests {
 
   private int numKeys = 10;
 

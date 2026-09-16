@@ -156,7 +156,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     }
 
     healthyNodes = filterNodesWithSpace(healthyNodes, nodesRequired,
-        metadataSizeRequired, dataSizeRequired);
+        metadataSizeRequired);
     boolean multipleRacks = multipleRacksAvailable(healthyNodes);
     int excludedNodesSize = 0;
     if (excludedNodes != null) {

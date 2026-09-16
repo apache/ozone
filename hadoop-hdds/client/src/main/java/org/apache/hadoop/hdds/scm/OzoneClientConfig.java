@@ -36,7 +36,35 @@ import org.slf4j.LoggerFactory;
 public class OzoneClientConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(OzoneClientConfig.class);
+  public static final String OZONE_READ_SHORT_CIRCUIT = "ozone.client.read.short-circuit";
+  public static final boolean OZONE_READ_SHORT_CIRCUIT_DEFAULT = false;
+  public static final String OZONE_DOMAIN_SOCKET_PATH = "ozone.domain.socket.path";
+  public static final String SHORT_CIRCUIT_PREFIX = OZONE_READ_SHORT_CIRCUIT + ".";
+  public static final short DATA_TRANSFER_VERSION = 28;
+  public static final byte DATA_TRANSFER_MAGIC_CODE = 99;
 
+  @Config(key = "ozone.client.read.short-circuit",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Whether read short-circuit is enabled or not",
+      tags = { ConfigTag.CLIENT, ConfigTag.DATANODE })
+  private boolean shortCircuitEnabled = OZONE_READ_SHORT_CIRCUIT_DEFAULT;
+
+  @Config(key = SHORT_CIRCUIT_PREFIX + "buffer.size",
+      defaultValue = "128KB",
+      type = ConfigType.SIZE,
+      description = "Buffer size of reader/writer.",
+      tags = { ConfigTag.CLIENT, ConfigTag.DATANODE })
+  private int shortCircuitBufferSize = 128 * 1024;
+
+  @Config(key = SHORT_CIRCUIT_PREFIX + "disable.interval",
+      defaultValue = "600",
+      type = ConfigType.LONG,
+      description = "If some unknown IO error happens on Domain socket read, short circuit read will be disabled " +
+          "temporarily for this period of time(seconds).",
+      tags = { ConfigTag.CLIENT })
+  private long shortCircuitReadDisableInterval = 60 * 10;
+  
   @Config(key = "ozone.client.stream.buffer.flush.size",
       defaultValue = "16MB",
       type = ConfigType.SIZE,
@@ -189,8 +217,11 @@ public class OzoneClientConfig {
 
   @Config(key = "ozone.client.max.ec.stripe.write.retries",
       defaultValue = "10",
-      description = "Ozone EC client to retry stripe to new block group on" +
-          " failures.",
+      description = "When EC stripe write failed, client will request to allocate new block group "
+          + "and write the failed stripe into new block group. If the same stripe failure "
+          + "continued in newly acquired block group also, then it will retry by requesting "
+          + "to allocate new block group again. This configuration is used to limit these "
+          + "number of retries. By default the number of retries are 10.",
       tags = ConfigTag.CLIENT)
   private int maxECStripeWriteRetries = 10;
 
@@ -244,8 +275,12 @@ public class OzoneClientConfig {
   @Config(key = "ozone.client.fs.default.bucket.layout",
       defaultValue = "FILE_SYSTEM_OPTIMIZED",
       type = ConfigType.STRING,
-      description = "The bucket layout used by buckets created using OFS. " +
-          "Valid values include FILE_SYSTEM_OPTIMIZED and LEGACY",
+      description =
+          "Default bucket layout value used when buckets are created using OFS. "
+          + "Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED. "
+          + "FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and "
+          + "also allows interoperability between S3 and FS APIs. Keys written via S3 API with a '/' delimiter "
+          + "will create intermediate directories.",
       tags = ConfigTag.CLIENT)
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
@@ -281,6 +316,14 @@ public class OzoneClientConfig {
               "Can be enabled only when ozone.client.hbase.enhancements.allowed = true",
           tags = ConfigTag.CLIENT)
   private boolean enablePutblockPiggybacking = false;
+
+  @Config(key = "ozone.client.datastream.putblock.on.close.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "When enabled, use StreamInitWithPutBlock so datanodes commit PutBlock " +
+          "when the Ratis data stream closes instead of via a separate WriteAsync PutBlock.",
+      tags = ConfigTag.CLIENT)
+  private boolean datastreamPutBlockOnCloseEnabled = false;
 
   @Config(key = "ozone.client.key.write.concurrency",
       defaultValue = "1",
@@ -393,6 +436,30 @@ public class OzoneClientConfig {
           streamReadTimeout, defaultTimeout);
       streamReadTimeout = defaultTimeout;
     }
+  }
+
+  public boolean isShortCircuitEnabled() {
+    return shortCircuitEnabled;
+  }
+
+  public void setShortCircuit(boolean enabled) {
+    shortCircuitEnabled = enabled;
+  }
+
+  public int getShortCircuitBufferSize() {
+    return shortCircuitBufferSize;
+  }
+
+  public void setShortCircuitBufferSize(int size) {
+    this.shortCircuitBufferSize = size;
+  }
+
+  public long getShortCircuitReadDisableInterval() {
+    return shortCircuitReadDisableInterval;
+  }
+
+  public void setShortCircuitReadDisableInterval(long value) {
+    shortCircuitReadDisableInterval = value;
   }
 
   public long getStreamBufferFlushSize() {
@@ -639,6 +706,14 @@ public class OzoneClientConfig {
     this.streamReadTimeout = streamReadTimeout;
   }
 
+  public boolean isDatastreamPutBlockOnCloseEnabled() {
+    return datastreamPutBlockOnCloseEnabled;
+  }
+
+  public void setDatastreamPutBlockOnCloseEnabled(boolean datastreamPutBlockOnCloseEnabled) {
+    this.datastreamPutBlockOnCloseEnabled = datastreamPutBlockOnCloseEnabled;
+  }
+
   /**
    * Enum for indicating what mode to use when combining chunk and block
    * checksums to define an aggregate FileChecksum. This should be considered
@@ -649,5 +724,23 @@ public class OzoneClientConfig {
   public enum ChecksumCombineMode {
     MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
     COMPOSITE_CRC  // Block/chunk-independent composite CRC
+  }
+
+  /**
+   * String keys for tests and grep.
+   */
+  public static final class Keys {
+    public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
+        "ozone.client.fs.default.bucket.layout";
+    public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES =
+        "ozone.client.max.ec.stripe.write.retries";
+  }
+
+  /**
+   * Default values for tests.
+   */
+  public static final class Defaults {
+    public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
+        OzoneConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED;
   }
 }

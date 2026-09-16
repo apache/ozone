@@ -27,13 +27,17 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -45,12 +49,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.shell.OzoneShell;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -67,6 +75,9 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Setting a timeout for every test method to 300 seconds.
  */
 class TestOzoneFsSnapshot {
+
+  private static final String SNAPSHOT_RENAME_NOT_ALLOWED_MESSAGE =
+      "Ozone snapshot rename feature is not allowed per Ozone Manager server config";
 
   private static MiniOzoneCluster cluster;
   private static final String OM_SERVICE_ID = "om-service-test1";
@@ -95,6 +106,8 @@ class TestOzoneFsSnapshot {
     conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, -1);
     conf.setInt(OmConfig.Keys.SERVER_LIST_MAX_SIZE, 20);
     conf.setInt(OZONE_FS_LISTING_PAGE_SIZE, 30);
+    // Explicitly disable snapshot rename for the test
+    conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY, false);
 
     // Start the cluster
     cluster = MiniOzoneCluster.newHABuilder(conf)
@@ -210,6 +223,44 @@ class TestOzoneFsSnapshot {
     // We can't use list or valid if snapshot directory exists because DB
     // transaction might not be flushed by the time.
     assertNotNull(snapshotInfo);
+  }
+
+  @Test
+  void testSnapshotRenameBlockedWhenConfigDisallows(@TempDir Path tempDir)
+      throws Exception {
+    assertFalse(cluster.getConf().getBoolean(
+        OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY,
+        OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_DEFAULT));
+
+    String oldSnapshotName = createSnapshot();
+    String newSnapshotName = "snap-" + counter.incrementAndGet();
+
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      OMException omException = assertThrows(OMException.class,
+          () -> ozoneClient.getObjectStore().renameSnapshot(
+              VOLUME, BUCKET, oldSnapshotName, newSnapshotName));
+      assertEquals(FEATURE_NOT_ENABLED, omException.getResult());
+      assertEquals(SNAPSHOT_RENAME_NOT_ALLOWED_MESSAGE,
+          omException.getMessage());
+    }
+
+    Path confPath = tempDir.resolve("ozone-site.xml");
+    try (OutputStream outputStream = Files.newOutputStream(confPath)) {
+      cluster.getConf().writeXml(outputStream);
+    }
+
+    try (GenericTestUtils.SystemErrCapturer capture =
+             new GenericTestUtils.SystemErrCapturer()) {
+      OzoneShell ozoneShell = new OzoneShell();
+      int res = ozoneShell.execute(new String[] {
+          "-conf", confPath.toString(), "snapshot", "rename",
+          "o3://" + OM_SERVICE_ID + BUCKET_PATH,
+          oldSnapshotName, newSnapshotName});
+
+      assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE, res);
+      assertThat(capture.getOutput()).contains(
+          SNAPSHOT_RENAME_NOT_ALLOWED_MESSAGE);
+    }
   }
 
   private static Stream<Arguments> createSnapshotFailureScenarios() {

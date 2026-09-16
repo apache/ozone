@@ -28,6 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -273,5 +274,32 @@ public final class StorageVolumeUtil {
     }
 
     return success;
+  }
+  
+  public static File resolveContainerCurrentDir(
+      File hddsRoot, String clusterId, File[] storageDirs)
+      throws InconsistentStorageStateException {
+
+    File clusterIdDir = new File(hddsRoot, clusterId);
+    //The subdirectory we should verify containers within.
+    // If this volume was formatted pre SCM HA, this will be the SCM ID.
+    // A cluster ID symlink will exist in this case only if this cluster is
+    // finalized for SCM HA.
+    // If the volume was formatted post SCM HA, this will be the cluster ID.
+    File idDir = clusterIdDir;
+
+    if (storageDirs.length == 1 && !clusterIdDir.exists()) {
+      // If the one directory is not the cluster ID directory, assume it is
+      // the old SCM ID directory used before SCM HA.
+      idDir = storageDirs[0];
+    } else if (!clusterIdDir.exists()) {
+      // There are 1 or more storage directories. We only care about the
+      // cluster ID directory.
+      throw new InconsistentStorageStateException(
+          "Volume " + hddsRoot + " is in an inconsistent state. Expected cluster ID directory "
+              + clusterIdDir + " not found.");
+    }
+
+    return new File(idDir, Storage.STORAGE_DIR_CURRENT);
   }
 }

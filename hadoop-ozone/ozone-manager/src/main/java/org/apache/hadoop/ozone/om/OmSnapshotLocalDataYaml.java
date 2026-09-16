@@ -56,6 +56,9 @@ public final class OmSnapshotLocalDataYaml {
   public static final Tag SNAPSHOT_VERSION_META_TAG = new Tag("VersionMeta");
   public static final Tag SST_FILE_INFO_TAG = new Tag("SstFileInfo");
   public static final String YAML_FILE_EXTENSION = ".yaml";
+  // Maximum number of Unicode code points the YAML parser will read (SnakeYAML code point limit).
+  // For the ASCII snapshot local data YAML this is effectively the maximum file size in bytes.
+  public static final int SNAPSHOT_LOCAL_DATA_YAML_CODE_POINT_LIMIT = 128 * 1024 * 1024;
 
   private OmSnapshotLocalDataYaml() {
   }
@@ -125,7 +128,7 @@ public final class OmSnapshotLocalDataYaml {
    */
   private static class SnapshotLocalDataConstructor extends SafeConstructor {
     SnapshotLocalDataConstructor() {
-      super(new LoaderOptions());
+      super(createLoaderOptions());
       //Adding our own specific constructors for tags.
       this.yamlConstructors.put(SNAPSHOT_YAML_TAG, new ConstructSnapshotLocalData());
       this.yamlConstructors.put(SNAPSHOT_VERSION_META_TAG, new ConstructVersionMeta());
@@ -136,6 +139,13 @@ public final class OmSnapshotLocalDataYaml {
       TypeDescription versionMetaDesc = new TypeDescription(VersionMeta.class);
       versionMetaDesc.putListPropertyType(OzoneConsts.OM_SLD_VERSION_META_SST_FILES, SstFileInfo.class);
       this.addTypeDescription(versionMetaDesc);
+    }
+
+    private static LoaderOptions createLoaderOptions() {
+      LoaderOptions options = new LoaderOptions();
+      // Snapshot local data is trusted local metadata, but keep a finite parser bound to avoid unbounded memory use.
+      options.setCodePointLimit(SNAPSHOT_LOCAL_DATA_YAML_CODE_POINT_LIMIT);
+      return options;
     }
 
     private final class ConstructSstFileInfo extends AbstractConstruct {
@@ -183,18 +193,15 @@ public final class OmSnapshotLocalDataYaml {
 
         // Set other fields from parsed YAML
         snapshotLocalData.setSstFiltered((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_IS_SST_FILTERED, false));
-
-        // Handle potential Integer/Long type mismatch from YAML parsing
-        Object lastDefragTimeObj = nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_DEFRAG_TIME, -1L);
-        long lastDefragTime;
-        if (lastDefragTimeObj instanceof Number) {
-          lastDefragTime = ((Number) lastDefragTimeObj).longValue();
-        } else {
+        Object lastDefragTimeObj = nodes.get(OzoneConsts.OM_SLD_LAST_DEFRAG_TIME);
+        if (lastDefragTimeObj == null) {
+          snapshotLocalData.setLastDefragTime(0L);
+        } else if (!(lastDefragTimeObj instanceof Number)) {
           throw new IllegalArgumentException("Invalid type for lastDefragTime: " +
               lastDefragTimeObj.getClass().getName() + ". Expected Number type.");
+        } else {
+          snapshotLocalData.setLastDefragTime(((Number) lastDefragTimeObj).longValue());
         }
-        snapshotLocalData.setLastDefragTime(lastDefragTime);
-
         snapshotLocalData.setNeedsDefrag((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_NEEDS_DEFRAG, false));
         Map<Integer, VersionMeta> versionMetaMap =
             (Map<Integer, VersionMeta>) nodes.get(OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO);

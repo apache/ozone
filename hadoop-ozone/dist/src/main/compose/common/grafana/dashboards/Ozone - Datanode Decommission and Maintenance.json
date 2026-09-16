@@ -1,0 +1,1243 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "panels": [],
+      "title": "SCM Node Decommission Overview",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 11,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "expr": "node_decommission_metrics_decommissioning_maintenance_nodes_total",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Nodes Decommissioning/Maintenance",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "blue", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 12,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "expr": "node_decommission_metrics_recommission_nodes_total",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Nodes Recommissioning",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "expr": "node_decommission_metrics_pipelines_waiting_to_close_total",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Pipelines Waiting to Close",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "expr": "node_decommission_metrics_containers_under_replicated_total",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Containers Under-Replicated",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "expr": "node_decommission_metrics_containers_un_closed_total",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Containers Unclosed",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "id": 16,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [ "lastNotNull" ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "expr": "node_decommission_metrics_containers_sufficiently_replicated_total",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Containers Suff. Replicated",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 2,
+      "panels": [],
+      "title": "Decommission Progress by Host",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 21,
+      "options": {
+        "legend": {
+          "calcs": [ "mean", "max", "last" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "descending"
+        }
+      },
+      "targets": [
+        {
+          "expr": "node_decommission_metrics_under_replicated_dn",
+          "legendFormat": "{{datanode}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Under-Replicated Containers by Host",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": [ "mean", "max", "last" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "descending"
+        }
+      },
+      "targets": [
+        {
+          "expr": "node_decommission_metrics_pipelines_waiting_to_close_dn",
+          "legendFormat": "{{datanode}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Pipelines Waiting to Close by Host",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "id": 23,
+      "options": {
+        "legend": {
+          "calcs": [ "mean", "max", "last" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "descending"
+        }
+      },
+      "targets": [
+        {
+          "expr": "node_decommission_metrics_unclosed_containers_dn",
+          "legendFormat": "{{datanode}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Unclosed Containers by Host",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": [ "mean", "max", "last" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "descending"
+        }
+      },
+      "targets": [
+        {
+          "expr": "node_decommission_metrics_sufficiently_replicated_dn",
+          "legendFormat": "{{datanode}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Sufficiently Replicated Containers by Host",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "id": 3,
+      "panels": [],
+      "title": "SCM Replication Manager Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "id": 31,
+      "options": {
+        "legend": {
+          "calcs": [ "mean", "max", "last" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "replication_manager_metrics_under_replicated_queue_size",
+          "legendFormat": "Under Replicated Queue",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "replication_manager_metrics_over_replicated_queue_size",
+          "legendFormat": "Over Replicated Queue",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Replication Manager Queue Sizes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "id": 32,
+      "options": {
+        "legend": {
+          "calcs": [ "mean", "max", "last" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "replication_manager_metrics_inflight_replication",
+          "legendFormat": "Inflight Replication",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "replication_manager_metrics_inflight_ec_replication",
+          "legendFormat": "Inflight EC Replication",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "expr": "replication_manager_metrics_inflight_deletion",
+          "legendFormat": "Inflight Deletion",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "expr": "replication_manager_metrics_inflight_ec_deletion",
+          "legendFormat": "Inflight EC Deletion",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Inflight Container Replication & Deletion Tasks",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "id": 33,
+      "options": {
+        "legend": {
+          "calcs": [ "sum", "max" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(replication_manager_metrics_replication_cmds_sent_total[$__rate_interval])",
+          "legendFormat": "Replication Cmds Sent/sec",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "rate(replication_manager_metrics_replicas_created_total[$__rate_interval])",
+          "legendFormat": "Replicas Created/sec",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "expr": "rate(replication_manager_metrics_replica_create_timeout_total[$__rate_interval])",
+          "legendFormat": "Replica Create Timeouts/sec",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Replication Command Rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "id": 34,
+      "options": {
+        "legend": {
+          "calcs": [ "sum", "max" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(replication_manager_metrics_replicate_container_cmds_deferred_total[$__rate_interval])",
+          "legendFormat": "Replicate Cmds Deferred/sec",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "rate(replication_manager_metrics_delete_container_cmds_deferred_total[$__rate_interval])",
+          "legendFormat": "Delete Cmds Deferred/sec",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "expr": "rate(replication_manager_metrics_ec_reconstruction_cmds_deferred_total[$__rate_interval])",
+          "legendFormat": "EC Reconstruction Deferred/sec",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Deferred Commands Rates (Overloaded Nodes)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
+      "id": 35,
+      "options": {
+        "legend": {
+          "calcs": [ "sum", "max" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(replication_manager_metrics_ec_reconstruction_cmds_sent_total[$__rate_interval])",
+          "legendFormat": "EC Reconstruction Cmds Sent/sec",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "rate(replication_manager_metrics_ec_replicas_created_total[$__rate_interval])",
+          "legendFormat": "EC Replicas Created/sec",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "expr": "rate(replication_manager_metrics_ec_partial_reconstruction_skipped_total[$__rate_interval])",
+          "legendFormat": "EC Partial Recon Skipped/sec",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "expr": "rate(replication_manager_metrics_ec_partial_reconstruction_critical_total[$__rate_interval])",
+          "legendFormat": "EC Partial Recon Critical/sec",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "EC Reconstruction Command Rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
+      "id": 36,
+      "options": {
+        "legend": {
+          "calcs": [ "sum", "max" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(replication_manager_metrics_ec_partial_replication_for_out_of_service_replicas_total[$__rate_interval])",
+          "legendFormat": "EC Out-Of-Service Partial Repl/sec",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "rate(replication_manager_metrics_partial_replication_total[$__rate_interval])",
+          "legendFormat": "Ratis Partial Repl/sec",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "expr": "rate(replication_manager_metrics_ec_partial_replication_for_mis_replication_total[$__rate_interval])",
+          "legendFormat": "EC Mis-Repl Partial/sec",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "expr": "rate(replication_manager_metrics_partial_replication_for_mis_replication_total[$__rate_interval])",
+          "legendFormat": "Ratis Mis-Repl Partial/sec",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Partial Replication Rates (Decommission/Maintenance)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+      "id": 4,
+      "panels": [],
+      "title": "DataNode Replication Supervisor",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "id": 41,
+      "options": {
+        "legend": {
+          "calcs": [ "mean", "max", "last" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "replication_supervisor_metrics_num_in_flight_replications",
+          "legendFormat": "Inflight Replications ({{hostname}})",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "replication_supervisor_metrics_num_queued_replications",
+          "legendFormat": "Queued Replications ({{hostname}})",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "expr": "replication_supervisor_metrics_num_requested_replications",
+          "legendFormat": "Requested Replications ({{hostname}})",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Supervisor Task Status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "id": 42,
+      "options": {
+        "legend": {
+          "calcs": [ "sum", "max" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(replication_supervisor_metrics_num_success_replications[$__rate_interval])",
+          "legendFormat": "Success Repl/sec ({{hostname}})",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "rate(replication_supervisor_metrics_num_failure_replications[$__rate_interval])",
+          "legendFormat": "Failure Repl/sec ({{hostname}})",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "expr": "rate(replication_supervisor_metrics_num_timeout_replications[$__rate_interval])",
+          "legendFormat": "Timeout Repl/sec ({{hostname}})",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "expr": "rate(replication_supervisor_metrics_num_skipped_replications[$__rate_interval])",
+          "legendFormat": "Skipped Repl/sec ({{hostname}})",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Supervisor Replication Completion Rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 56 },
+      "id": 43,
+      "options": {
+        "legend": {
+          "calcs": [ "max", "last" ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "replication_supervisor_metrics_max_replication_streams",
+          "legendFormat": "Max streams ({{hostname}})",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Max Concurrent Replication Streams Limit per Host",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 62 },
+      "id": 5,
+      "panels": [],
+      "title": "DataNode Replicator Performance (MeasuredReplicator)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 63 },
+      "id": 51,
+      "options": {
+        "legend": {
+          "calcs": [ "sum", "max" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(measured_replicator_success[$__rate_interval])",
+          "legendFormat": "Success/sec ({{hostname}})",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "rate(measured_replicator_failure[$__rate_interval])",
+          "legendFormat": "Failure/sec ({{hostname}})",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Replicator Operations Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 1,
+          "mappings": [],
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 63 },
+      "id": 52,
+      "options": {
+        "legend": {
+          "calcs": [ "sum", "max" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(measured_replicator_transferred_bytes[$__rate_interval])",
+          "legendFormat": "Transferred Bytes/sec ({{hostname}})",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "rate(measured_replicator_failure_bytes[$__rate_interval])",
+          "legendFormat": "Failure Bytes/sec ({{hostname}})",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Replicator Byte Transfer Rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 1,
+          "mappings": [],
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 71 },
+      "id": 53,
+      "options": {
+        "legend": {
+          "calcs": [ "mean", "max" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(measured_replicator_queue_time[$__rate_interval]) / rate(measured_replicator_success[$__rate_interval])",
+          "legendFormat": "Avg Queue Delay (ms) ({{hostname}})",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "rate(measured_replicator_success_time[$__rate_interval]) / rate(measured_replicator_success[$__rate_interval])",
+          "legendFormat": "Avg Success Exec Time (ms) ({{hostname}})",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "expr": "rate(measured_replicator_failure_time[$__rate_interval]) / rate(measured_replicator_failure[$__rate_interval])",
+          "legendFormat": "Avg Failure Exec Time (ms) ({{hostname}})",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Avg Queue Delay and Execution Latency",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "10s",
+  "schemaVersion": 40,
+  "tags": [ "ozone", "decommission", "maintenance" ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Ozone - Datanode Decommission and Maintenance",
+  "uid": "ozone_dn_decommission",
+  "version": 1,
+  "weekStart": ""
+}

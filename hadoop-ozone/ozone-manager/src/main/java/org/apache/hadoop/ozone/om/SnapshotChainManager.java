@@ -286,7 +286,7 @@ public class SnapshotChainManager {
   private boolean loadFromSnapshotInfoTable(OMMetadataManager metadataManager) {
     // read from snapshotInfo table to populate
     // snapshot chains - both global and local path
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (TableIterator<String, Table.KeyValue<String, SnapshotInfo>>
              keyIter = metadataManager.getSnapshotInfoTable().iterator()) {
       Map<UUID, SnapshotInfo> snaps = new HashMap<>();
       // Forward Linked list for snapshot chain.

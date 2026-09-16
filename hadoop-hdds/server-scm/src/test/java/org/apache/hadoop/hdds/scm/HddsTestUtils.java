@@ -89,6 +89,7 @@ public final class HddsTestUtils {
 
   public static final long CONTAINER_USED_BYTES_DEFAULT = 100L;
   public static final long CONTAINER_NUM_KEYS_DEFAULT = 2L;
+  public static final long ROLL_INTERVAL_MS_DEFAULT = 5 * 60 * 1000L; //TODO
 
   private HddsTestUtils() {
   }
@@ -163,7 +164,7 @@ public final class HddsTestUtils {
   public static NodeReportProto getRandomNodeReport(int numberOfStorageReport,
       int numberOfMetadataStorageReport) {
     DatanodeID nodeId = DatanodeID.randomID();
-    return getRandomNodeReport(nodeId, File.separator + nodeId.getID(),
+    return getRandomNodeReport(nodeId, File.separator + nodeId.getUuid(),
         numberOfStorageReport, numberOfMetadataStorageReport);
   }
 
@@ -545,8 +546,7 @@ public final class HddsTestUtils {
    * @throws IOException
    */
   public static void quasiCloseContainer(ContainerManager containerManager,
-       ContainerID id) throws IOException,
-      InvalidStateTransitionException, TimeoutException {
+       ContainerID id) throws IOException {
     containerManager.updateContainerState(
         id, HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(
@@ -849,7 +849,7 @@ public final class HddsTestUtils {
           int replicaIndex) {
 
     return ContainerReplicaProto.newBuilder()
-                    .setContainerID(containerId.getId())
+                    .setContainerID(containerId.getIdForTesting())
                     .setState(state)
                     .setOriginNodeId(originNodeId)
                     .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")

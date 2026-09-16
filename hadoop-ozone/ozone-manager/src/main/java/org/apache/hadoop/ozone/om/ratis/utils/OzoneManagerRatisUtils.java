@@ -26,6 +26,8 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -63,10 +65,19 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationDeleteRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationSetRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSaveScanStateRequest;
+import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSetServiceStatusRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.S3AssumeRoleRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.S3DeleteRevokedSTSTokensRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSTSTokenRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
+import org.apache.hadoop.ozone.om.request.s3.tagging.S3DeleteBucketTaggingRequest;
+import org.apache.hadoop.ozone.om.request.s3.tagging.S3PutBucketTaggingRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMSetRangerServiceVersionRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignAdminRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
@@ -113,6 +124,8 @@ import org.slf4j.LoggerFactory;
 public final class OzoneManagerRatisUtils {
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneManagerRatisUtils.class);
+
+  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
 
   private OzoneManagerRatisUtils() {
   }
@@ -193,6 +206,13 @@ public final class OzoneManagerRatisUtils {
       return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
+    case AssumeRole:
+      ozoneManager.checkS3STSEnabled();
+      return new S3AssumeRoleRequest(omRequest, CLOCK);
+    case RevokeSTSToken:
+      return new S3RevokeSTSTokenRequest(omRequest);
+    case DeleteRevokedSTSTokens:
+      return new S3DeleteRevokedSTSTokensRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
     case PurgeDirectories:
@@ -342,6 +362,18 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
+    case SetLifecycleConfiguration:
+      return new OMLifecycleConfigurationSetRequest(omRequest);
+    case DeleteLifecycleConfiguration:
+      return new OMLifecycleConfigurationDeleteRequest(omRequest);
+    case SetLifecycleServiceStatus:
+      return new OMLifecycleSetServiceStatusRequest(omRequest);
+    case SaveLifecycleScanState:
+      return new OMLifecycleSaveScanStateRequest(omRequest);
+    case PutBucketTagging:
+      return new S3PutBucketTaggingRequest(omRequest);
+    case DeleteBucketTagging:
+      return new S3DeleteBucketTaggingRequest(omRequest);
     default:
       throw new OMException("Unrecognized write command type request "
           + cmdType, OMException.ResultCodes.INVALID_REQUEST);

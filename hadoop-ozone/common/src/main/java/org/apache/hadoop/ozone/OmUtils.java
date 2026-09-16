@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.DOUBLE_SLASH_OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -237,6 +238,7 @@ public final class OmUtils {
     case FinalizeUpgradeProgress:
     case PrepareStatus:
     case GetS3VolumeContext:
+    case GetCallerIdentity:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
@@ -259,8 +261,12 @@ public final class OmUtils {
       // keeping it here for compatibility
     case GetSnapshotInfo:
     case GetObjectTagging:
+    case GetBucketTagging:
+      return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -280,6 +286,7 @@ public final class OmUtils {
     case CompleteMultiPartUpload:
     case AbortMultiPartUpload:
     case GetS3Secret:
+    case AssumeRole:
     case GetDelegationToken:
     case RenewDelegationToken:
     case CancelDelegationToken:
@@ -300,6 +307,7 @@ public final class OmUtils {
     case DeleteOpenKeys:
     case SetS3Secret:
     case RevokeS3Secret:
+    case RevokeSTSToken:
     case PurgeDirectories:
     case PurgePaths:
     case CreateTenant:
@@ -322,6 +330,14 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case DeleteRevokedSTSTokens:
+    case PutBucketTagging:
+    case DeleteBucketTagging:
+    case SetLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
+    case SaveLifecycleScanState:
+      return false;
     case UnknownCommand:
       return false;
     case EchoRPC:
@@ -368,6 +384,7 @@ public final class OmUtils {
     case FinalizeUpgradeProgress:
     case PrepareStatus:
     case GetS3VolumeContext:
+    case GetCallerIdentity:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
@@ -376,6 +393,10 @@ public final class OmUtils {
     case GetKeyInfo:
     case GetSnapshotInfo:
     case GetObjectTagging:
+    case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
+      return true;
+    case GetBucketTagging:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -437,6 +458,11 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case AssumeRole:
+    case RevokeSTSToken:
+    case DeleteRevokedSTSTokens:
+    case PutBucketTagging:
+    case DeleteBucketTagging:
     case ServiceList: // OM leader should have the most up-to-date OM service list info
     case RangerBGSync: // Ranger Background Sync task is only run on leader
     case SnapshotDiff:
@@ -452,6 +478,10 @@ public final class OmUtils {
     case GetQuotaRepairStatus:
       // Quota repair lifecycle request should be initiated by the leader
     case DBUpdates: // We are currently only interested on the leader DB info
+    case SetLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
+    case SaveLifecycleScanState:
     case UnknownCommand:
       return false;
     case EchoRPC:
@@ -472,7 +502,7 @@ public final class OmUtils {
           "This could possibly indicate a faulty JRE");
     }
   }
-
+  
   /**
    * Get a collection of all active omNodeIds (excluding decommissioned nodes)
    * for the given omServiceId.
@@ -1079,9 +1109,10 @@ public final class OmUtils {
   public static boolean isBucketSnapshotIndicator(String key) {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
-  
+
   public static List<List<String>> format(
-          List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
+      List<ServiceInfo> nodes, int port, String leaderId,
+      String localNodeId, String localLeaderStatus) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
@@ -1089,18 +1120,25 @@ public final class OmUtils {
         .sorted(Comparator.comparing(ServiceInfo::getHostname))
         .collect(Collectors.toList());
     for (ServiceInfo info : omNodes) {
-      // Printing only the OM's running
-      if (info.getNodeType() == HddsProtos.NodeType.OM) {
-        String role = info.getOmRoleInfo().getNodeId().equals(leaderId)
-                      ? "LEADER" : "FOLLOWER";
-        List<String> omInfo = new ArrayList<>();
-        omInfo.add(info.getHostname());
-        omInfo.add(info.getOmRoleInfo().getNodeId());
-        omInfo.add(String.valueOf(port));
-        omInfo.add(role);
-        omInfo.add(leaderReadiness);
-        omInfoList.add(omInfo);
+      String nodeId = info.getOmRoleInfo().getNodeId();
+      boolean isLeaderNode = nodeId.equals(leaderId);
+      boolean isLocalNode = nodeId.equals(localNodeId);
+      String role = info.getOmRoleInfo().getServerRole();
+
+      String displayValue;
+      if (isLeaderNode && isLocalNode) {
+        displayValue = localLeaderStatus;
+      } else {
+        displayValue = role;
       }
+
+      List<String> omInfo = new ArrayList<>();
+      omInfo.add(info.getHostname());
+      omInfo.add(nodeId);
+      omInfo.add(String.valueOf(port));
+      omInfo.add(role);
+      omInfo.add(displayValue);
+      omInfoList.add(omInfo);
     }
     return omInfoList;
   }
@@ -1114,7 +1152,10 @@ public final class OmUtils {
    */
   public static void resolveOmHost(String omHost, int omPort)
       throws IOException {
-    InetSocketAddress omHostAddress = NetUtils.createSocketAddr(omHost, omPort);
+    // Combine via getHostPortString so an IPv6 literal is bracketed; passing a
+    // bare ::1 to createSocketAddr fails with "not a valid host:port authority".
+    InetSocketAddress omHostAddress =
+        NetUtils.createSocketAddr(getHostPortString(omHost, omPort));
     if (omHostAddress.isUnresolved()) {
       throw new IOException(
           "Cannot resolve OM host " + omHost + " in the URI",

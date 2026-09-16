@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -51,13 +53,14 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  * OM database definitions.
  * <pre>
  * {@code
- * User, Token and Secret Tables:
+ * User, Token, Secret and Revoked STS Token Tables:
  * |------------------------------------------------------------------------|
- * |        Column Family |                 Mapping                         |
+ * |          Column Family |                 Mapping                       |
  * |------------------------------------------------------------------------|
- * |            userTable |             /user :- UserVolumeInfo             |
- * |          dTokenTable |      OzoneTokenID :- renew_time                 |
- * |        s3SecretTable | s3g_access_key_id :- s3Secret                   |
+ * |              userTable |             /user :- UserVolumeInfo           |
+ * |            dTokenTable |      OzoneTokenID :- renew_time               |
+ * |          s3SecretTable | s3g_access_key_id :- s3Secret                 |
+ * | s3RevokedStsTokenTable | originalAccessKeyId :- revocationTimeMillis   |
  * |------------------------------------------------------------------------|
  * }
  * </pre>
@@ -65,17 +68,18 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  * <pre>
  * {@code
  * Volume, Bucket, Prefix and Transaction Tables:
- * |------------------------------------------------------------------------|
- * |        Column Family |                 Mapping                         |
- * |------------------------------------------------------------------------|
- * |          volumeTable |           /volume :- VolumeInfo                 |
- * |          bucketTable |    /volume/bucket :- BucketInfo                 |
- * |------------------------------------------------------------------------|
- * |          prefixTable |            prefix :- PrefixInfo                 |
- * |------------------------------------------------------------------------|
- * | transactionInfoTable |  #TRANSACTIONINFO :- OMTransactionInfo          |
- * |            metaTable |       metaDataKey :- metaDataValue              |
- * |------------------------------------------------------------------------|
+ * |-------------------------------------------------------------------------|
+ * |        Column Family |                 Mapping                          |
+ * |-------------------------------------------------------------------------|
+ * |          volumeTable |           /volume :- VolumeInfo                  |
+ * |          bucketTable |    /volume/bucket :- BucketInfo                  |
+ * |-------------------------------------------------------------------------|
+ * |          prefixTable |            prefix :- PrefixInfo                  |
+ * |-------------------------------------------------------------------------|
+ * | transactionInfoTable |  #TRANSACTIONINFO :- OMTransactionInfo           |
+ * |            metaTable |       metaDataKey :- metaDataValue               |
+ * | lifecycleConfigurationTable | /volume/bucket :- OmLifecycleConfiguration|
+ * |-------------------------------------------------------------------------|
  * }
  * </pre>
  *
@@ -142,7 +146,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
 public final class OMDBDefinition extends DBDefinition.WithMap {
 
   //---------------------------------------------------------------------------
-  // User, Token and Secret Tables:
+  // User, Token, Secret and Revoked STS Token Tables:
   public static final String USER_TABLE = "userTable";
   /** userTable: /user :- UserVolumeInfo. */
   public static final DBColumnFamilyDefinition<String, PersistedUserVolumeInfo> USER_TABLE_DEF
@@ -163,6 +167,16 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
       = new DBColumnFamilyDefinition<>(S3_SECRET_TABLE,
           StringCodec.get(),
           S3SecretValue.getCodec());
+
+  public static final String S3_REVOKED_STS_TOKEN_TABLE = "s3RevokedStsTokenTable";
+  /**
+   * s3RevokedStsTokenTable: originalAccessKeyId :- revocationTimeMillis.
+   * The value is the revocation cutoff in milliseconds.
+   */
+  public static final DBColumnFamilyDefinition<String, Long> S3_REVOKED_STS_TOKEN_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(S3_REVOKED_STS_TOKEN_TABLE,
+          StringCodec.get(),
+          LongCodec.get());
 
   //---------------------------------------------------------------------------
   // Volume, Bucket, Prefix and Transaction Tables:
@@ -204,25 +218,25 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   //---------------------------------------------------------------------------
   // Object Store (OBS) Tables:
   public static final String KEY_TABLE = "keyTable";
-  /** keyTable: /volume/bucket/key :- KeyInfo. */
+  /** keyTable: /volume/bucket/key :- KeyInfo (excludes fields only used in openKeyTable). */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> KEY_TABLE_DEF
       = new DBColumnFamilyDefinition<>(KEY_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getKeyTableCodec());
 
   public static final String DELETED_TABLE = "deletedTable";
-  /** deletedTable: /volume/bucket/key :- RepeatedKeyInfo. */
+  /** deletedTable: /volume/bucket/key :- RepeatedKeyInfo (excludes fields only used in openKeyTable). */
   public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo> DELETED_TABLE_DEF
       = new DBColumnFamilyDefinition<>(DELETED_TABLE,
           StringCodec.get(),
-          RepeatedOmKeyInfo.getCodec(true));
+          RepeatedOmKeyInfo.getDeletedTableCodec(true));
 
   public static final String OPEN_KEY_TABLE = "openKeyTable";
   /** openKeyTable: /volume/bucket/key/id :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_KEY_TABLE_DEF
       = new DBColumnFamilyDefinition<>(OPEN_KEY_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getOpenKeyTableCodec());
 
   public static final String MULTIPART_INFO_TABLE = "multipartInfoTable";
   /** multipartInfoTable: /volume/bucket/key/uploadId :- parts. */
@@ -241,18 +255,18 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   //---------------------------------------------------------------------------
   // File System Optimized (FSO) Tables:
   public static final String FILE_TABLE = "fileTable";
-  /** fileTable: /volumeId/bucketId/parentId/fileName :- KeyInfo. */
+  /** fileTable: /volumeId/bucketId/parentId/fileName :- KeyInfo (excludes fields only used in openKeyTable). */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> FILE_TABLE_DEF
       = new DBColumnFamilyDefinition<>(FILE_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getKeyTableCodec());
 
   public static final String OPEN_FILE_TABLE = "openFileTable";
   /** openFileTable: /volumeId/bucketId/parentId/fileName/id :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_FILE_TABLE_DEF
       = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getOpenKeyTableCodec());
 
   public static final String DIRECTORY_TABLE = "directoryTable";
   /** directoryTable: /volumeId/bucketId/parentId/dirName :- DirInfo. */
@@ -262,11 +276,14 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           OmDirectoryInfo.getCodec());
 
   public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
-  /** deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo. */
+  /**
+   * deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo
+   * (excludes fields only used in openKeyTable).
+   */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> DELETED_DIR_TABLE_DEF
       = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getKeyTableCodec());
 
   //---------------------------------------------------------------------------
   // S3 Multi-Tenancy Tables
@@ -322,8 +339,22 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   /** compactionLogTable: dbTrxId-compactionTime :- compactionLogEntry. */
   public static final DBColumnFamilyDefinition<String, CompactionLogEntry> COMPACTION_LOG_TABLE_DEF
       = new DBColumnFamilyDefinition<>(COMPACTION_LOG_TABLE,
-          StringCodec.get(),
-          CompactionLogEntry.getCodec());
+      StringCodec.get(),
+      CompactionLogEntry.getCodec());
+
+  public static final String LIFECYCLE_CONFIGURATION_TABLE =
+      "lifecycleConfigurationTable";
+  public static final DBColumnFamilyDefinition<String, OmLifecycleConfiguration> LIFECYCLE_CONFIGURATION_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(LIFECYCLE_CONFIGURATION_TABLE,
+      StringCodec.get(),
+      OmLifecycleConfiguration.getCodec());
+
+  public static final String LIFECYCLE_SCAN_STATE_TABLE =
+      "lifecycleScanStateTable";
+  public static final DBColumnFamilyDefinition<String, OmLifecycleScanState> LIFECYCLE_SCAN_STATE_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(LIFECYCLE_SCAN_STATE_TABLE,
+      StringCodec.get(),
+      OmLifecycleScanState.getCodec());
 
   //---------------------------------------------------------------------------
   private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
@@ -350,7 +381,10 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           TENANT_STATE_TABLE_DEF,
           TRANSACTION_INFO_TABLE_DEF,
           USER_TABLE_DEF,
-          VOLUME_TABLE_DEF);
+          VOLUME_TABLE_DEF,
+          S3_REVOKED_STS_TOKEN_TABLE_DEF,
+          LIFECYCLE_CONFIGURATION_TABLE_DEF,
+          LIFECYCLE_SCAN_STATE_TABLE_DEF);
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 

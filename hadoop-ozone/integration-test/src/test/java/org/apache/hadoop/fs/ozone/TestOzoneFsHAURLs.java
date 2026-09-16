@@ -19,13 +19,13 @@ package org.apache.hadoop.fs.ozone;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.Optional;
 import java.util.OptionalInt;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
@@ -102,12 +102,12 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
 
     assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
-    volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    volumeName = uniqueObjectName("volume");
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
 
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
-    bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    bucketName = uniqueObjectName("bucket");
     retVolumeinfo.createBucket(bucketName);
 
     rootPath = String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,

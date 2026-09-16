@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.request.key.OMOpenKeysDeleteRequest;
-import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
  * Unit testing of cancel prepare request. Cancel prepare response does not
  * perform an action, so it has no unit testing.
  */
-public class TestOMCancelPrepareRequest extends TestOMKeyRequest {
+public class TestOMCancelPrepareRequest extends OMKeyRequestTests {
   private static final long LOG_INDEX = 1;
 
   @Test

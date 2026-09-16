@@ -25,9 +25,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Arrays;
 import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
@@ -35,6 +39,8 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarConstants;
+import org.apache.commons.compress.archivers.tar.TarUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -46,6 +52,9 @@ public final class Archiver {
 
   static final int MIN_BUFFER_SIZE = 8 * (int) OzoneConsts.KB; // same as IOUtils.DEFAULT_BUFFER_SIZE
   static final int MAX_BUFFER_SIZE = (int) OzoneConsts.MB;
+  private static final byte[] TAR_ZERO_BLOCK = new byte[TarConstants.DEFAULT_RCDSIZE];
+  private static final int TAR_SIZE_OFFSET = TarConstants.NAMELEN + TarConstants.MODELEN
+      + TarConstants.UIDLEN + TarConstants.GIDLEN;
   private static final Logger LOG = LoggerFactory.getLogger(Archiver.class);
 
   private Archiver() {
@@ -57,6 +66,49 @@ public final class Archiver {
     try (ArchiveOutputStream<TarArchiveEntry> out = tar(Files.newOutputStream(tarFile.toPath()))) {
       includePath(from, "", out);
     }
+  }
+
+  /**
+   * Opens a tarball for incremental appends. The stream stays open until
+   * {@link AppendableTar#close()} writes the end-of-archive marker.
+   */
+  public static AppendableTar openForAppend(File tarFile) throws IOException {
+    return new AppendableTar(tarFile);
+  }
+
+  /**
+   * Remove the tar end-of-archive marker so new entries can be appended.
+   */
+  private static void stripTarEofMarker(File tarFile) throws IOException {
+    try (RandomAccessFile raf = new RandomAccessFile(tarFile, "rw")) {
+      long position = 0;
+      long fileLength = raf.length();
+      byte[] header = new byte[TarConstants.DEFAULT_RCDSIZE];
+      while (position + TarConstants.DEFAULT_RCDSIZE <= fileLength) {
+        raf.seek(position);
+        raf.readFully(header);
+        if (Arrays.equals(header, TAR_ZERO_BLOCK)) {
+          raf.setLength(position);
+          return;
+        }
+        long entrySize = parseTarEntrySize(header);
+        position += TarConstants.DEFAULT_RCDSIZE + paddedTarEntrySize(entrySize);
+      }
+      throw new IOException("Invalid tar archive without an end-of-archive marker: " + tarFile);
+    }
+  }
+
+  private static long parseTarEntrySize(byte[] header) throws IOException {
+    try {
+      return TarUtils.parseOctalOrBinary(header, TAR_SIZE_OFFSET, TarConstants.SIZELEN);
+    } catch (IllegalArgumentException e) {
+      throw new IOException("Invalid tar entry size.", e);
+    }
+  }
+
+  private static long paddedTarEntrySize(long size) {
+    long recordSize = TarConstants.DEFAULT_RCDSIZE;
+    return ((size + recordSize - 1) / recordSize) * recordSize;
   }
 
   /** Extract {@code tarFile} to {@code dir}. */
@@ -79,12 +131,42 @@ public final class Archiver {
     return output.toByteArray();
   }
 
+  private static TarArchiveEntry createBasicTarArchiveEntry(File file, String entryName)
+      throws IOException {
+    final Path path = file.toPath();
+
+    final TarArchiveEntry entry;
+    if (Files.isDirectory(path)) {
+      final int nameLength = entryName.length();
+      final String dirName = nameLength == 0 || entryName.charAt(nameLength - 1) != '/'
+          ? entryName + "/"
+          : entryName;
+      entry = new TarArchiveEntry(dirName, TarConstants.LF_DIR);
+      entry.setMode(TarArchiveEntry.DEFAULT_DIR_MODE);
+    } else {
+      entry = new TarArchiveEntry(entryName);
+      entry.setMode(TarArchiveEntry.DEFAULT_FILE_MODE);
+      entry.setSize(Files.size(path));
+    }
+
+    try {
+      BasicFileAttributes attrs = Files.readAttributes(
+          file.toPath(), BasicFileAttributes.class);
+      entry.setLastModifiedTime(attrs.lastModifiedTime());
+      entry.setLastAccessTime(attrs.lastAccessTime());
+      entry.setCreationTime(attrs.creationTime());
+    } catch (IOException e) {
+      entry.setModTime(file.lastModified()); // fallback
+    }
+    return entry;
+  }
+
   public static void includePath(Path dir, String subdir,
       ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
 
     // Add a directory entry before adding files, in case the directory is
     // empty.
-    TarArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
+    TarArchiveEntry entry = createBasicTarArchiveEntry(dir.toFile(), subdir);
     archiveOutput.putArchiveEntry(entry);
     archiveOutput.closeArchiveEntry();
 
@@ -105,7 +187,7 @@ public final class Archiver {
   public static long includeFile(File file, String entryName,
       ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
     final long bytes;
-    TarArchiveEntry entry = archiveOutput.createArchiveEntry(file, entryName);
+    TarArchiveEntry entry = createBasicTarArchiveEntry(file, entryName);
     archiveOutput.putArchiveEntry(entry);
     try (InputStream input = Files.newInputStream(file.toPath())) {
       bytes = IOUtils.copy(input, archiveOutput, getBufferSize(file.length()));
@@ -138,7 +220,7 @@ public final class Archiver {
     long bytes = 0;
     try {
       Files.createLink(link.toPath(), file.toPath());
-      TarArchiveEntry entry = archiveOutput.createArchiveEntry(link, entryName);
+      TarArchiveEntry entry = createBasicTarArchiveEntry(link, entryName);
       archiveOutput.putArchiveEntry(entry);
       try (InputStream input = Files.newInputStream(link.toPath())) {
         bytes = IOUtils.copyLarge(input, archiveOutput);
@@ -186,6 +268,32 @@ public final class Archiver {
 
   static int getBufferSize(long fileSize) {
     return Math.toIntExact(Math.min(MAX_BUFFER_SIZE, Math.max(fileSize, MIN_BUFFER_SIZE)));
+  }
+
+  /** Incrementally append entries to a tarball. */
+  public static final class AppendableTar implements AutoCloseable {
+    private final ArchiveOutputStream<TarArchiveEntry> out;
+
+    private AppendableTar(File tarFile) throws IOException {
+      OutputStream fos;
+      if (tarFile.exists() && tarFile.length() > 0) {
+        stripTarEofMarker(tarFile);
+        fos = Files.newOutputStream(tarFile.toPath(), StandardOpenOption.WRITE, StandardOpenOption.APPEND);
+      } else {
+        fos = Files.newOutputStream(tarFile.toPath(), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+      }
+      out = tar(fos);
+    }
+
+    public void appendFile(File file, String entryName) throws IOException {
+      includeFile(file, entryName, out);
+    }
+
+    @Override
+    public void close() throws IOException {
+      out.finish();
+      out.close();
+    }
   }
 
 }

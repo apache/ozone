@@ -17,10 +17,13 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import java.util.List;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadAbortResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadAbortResponse;
@@ -50,13 +53,15 @@ public class S3MultipartUploadAbortRequestWithFSO
   protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,
       OmMultipartKeyInfo multipartKeyInfo, String multipartKey,
       String multipartOpenKey, OMResponse.Builder omResponse,
-      OmBucketInfo omBucketInfo) {
+      OmBucketInfo omBucketInfo, List<OmKeyInfo> partsKeyInfoToDelete,
+      List<OmMultipartPartKey> partsTableKeysToDelete) {
 
     OMClientResponse omClientResp = new S3MultipartUploadAbortResponseWithFSO(
         omResponse.setAbortMultiPartUploadResponse(
             MultipartUploadAbortResponse.newBuilder()).build(), multipartKey,
         multipartOpenKey, multipartKeyInfo,
-        omBucketInfo.copyObject(), getBucketLayout());
+        omBucketInfo.copyObject(), getBucketLayout(), partsKeyInfoToDelete,
+        partsTableKeysToDelete);
     return omClientResp;
   }
 }

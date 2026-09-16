@@ -17,13 +17,12 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 /**
- * The task to download a container from the sources.
+ * Task to push a container to a target datanode.
  */
 public class ReplicationTask extends AbstractReplicationTask {
 
@@ -44,26 +43,7 @@ public class ReplicationTask extends AbstractReplicationTask {
     setPriority(cmd.getPriority());
     this.cmd = cmd;
     this.replicator = replicator;
-    if (cmd.getTargetDatanode() != null) {
-      // Only push replication will have a target datanode set, and it must be
-      // sent to the source datanode to be executed. It is possible the source
-      // is out of service, so we need to set the flag to allow the command to
-      // run.
-      setShouldOnlyRunOnInServiceDatanodes(false);
-    }
     debugString = cmd.toString();
-  }
-
-  /**
-   * Intended to only be used in tests.
-   */
-  protected ReplicationTask(
-      long containerId,
-      List<DatanodeDetails> sources,
-      ContainerReplicator replicator
-  ) {
-    this(ReplicateContainerCommand.fromSources(containerId, sources),
-        replicator);
   }
 
   @Override
@@ -97,10 +77,6 @@ public class ReplicationTask extends AbstractReplicationTask {
   @Override
   public long getContainerId() {
     return cmd.getContainerID();
-  }
-
-  public List<DatanodeDetails> getSources() {
-    return cmd.getSourceDatanodes();
   }
 
   @Override

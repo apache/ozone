@@ -20,7 +20,7 @@ package org.apache.ozone.erasurecode.rawcoder;
 /**
  * Test pure Java XOR encoding and decoding.
  */
-public class TestXORRawCoder extends TestXORRawCoderBase {
+public class TestXORRawCoder extends XORRawCoderTests {
 
   public TestXORRawCoder() {
     super(XORRawErasureCoderFactory.class, XORRawErasureCoderFactory.class);

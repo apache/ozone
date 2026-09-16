@@ -26,6 +26,16 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 public interface ContainerReplicaPendingOpsSubscriber {
 
   /**
+   * Notifies that the specified op has been added for the specified
+   * containerID.
+   *
+   * @param op Add or Delete op
+   * @param containerID container on which the operation is being performed
+   */
+  default void opAdded(ContainerReplicaOp op, ContainerID containerID) {
+  }
+
+  /**
    * Notifies that the specified op has been completed for the specified
    * containerID. Might have completed normally or timed out.
    *

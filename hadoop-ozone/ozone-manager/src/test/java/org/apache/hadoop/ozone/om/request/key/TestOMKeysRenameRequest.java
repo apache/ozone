@@ -41,7 +41,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests RenameKey request.
  */
-public class TestOMKeysRenameRequest extends TestOMKeyRequest {
+public class TestOMKeysRenameRequest extends OMKeyRequestTests {
 
   private int count = 10;
   private String parentDir = "/test";

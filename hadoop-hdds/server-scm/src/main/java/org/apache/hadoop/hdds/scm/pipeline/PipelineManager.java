@@ -213,13 +213,15 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   void releaseWriteLock();
 
   /**
-   * Checks whether all Datanodes in the specified pipeline have greater than the specified space, containerSize.
-   * @param pipeline pipeline to check
-   * @param containerSize the required amount of space
-   * @return false if all the volumes on any Datanode in the pipeline have space less than equal to the specified
-   * containerSize, otherwise true
+   * Atomically checks if all datanodes in the pipeline have space for a new container
+   * and records the allocation if space is available. This prevents race conditions
+   * where multiple threads check space concurrently and over-allocate.
+   *
+   * @param pipeline the pipeline whose nodes will be checked and recorded
+   * @param containerID the container being allocated
+   * @return true if all nodes had space and allocation was recorded, false otherwise
    */
-  boolean hasEnoughSpace(Pipeline pipeline, long containerSize);
+  boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID);
 
   int openContainerLimit(List<DatanodeDetails> datanodes);
 

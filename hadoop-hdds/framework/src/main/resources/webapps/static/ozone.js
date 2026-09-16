@@ -252,6 +252,8 @@
   angular.module('ozone').component('navmenu', {
     bindings: {
       metrics: '<',
+      /** Optional list of {label, href} for extra top-level nav items (e.g. OM deletion dashboard). */
+      extraNavLinks: '<',
       iostatus: '<',
       ioLinkHref: '@',
       scanner: '<',

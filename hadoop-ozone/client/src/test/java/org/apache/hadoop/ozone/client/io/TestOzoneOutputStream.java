@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -26,8 +27,10 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.crypto.CryptoOutputStream;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,10 +42,10 @@ public class TestOzoneOutputStream {
    * Fake KeyOutputStream implementation for testing.
    * Uses the package-private KeyOutputStream() constructor.
    */
-  private static class FakeKeyOutputStream extends KeyOutputStream
-      implements KeyMetadataAware {
+  private static class FakeKeyOutputStream extends KeyOutputStream {
 
     private final Map<String, String> metadata;
+    private List<CheckedRunnable<IOException>> preCommits;
 
     FakeKeyOutputStream(Map<String, String> metadata) {
       super(); // VisibleForTesting constructor
@@ -52,6 +55,15 @@ public class TestOzoneOutputStream {
     @Override
     public Map<String, String> getMetadata() {
       return metadata;
+    }
+
+    @Override
+    public void setPreCommits(List<CheckedRunnable<IOException>> preCommits) {
+      this.preCommits = preCommits;
+    }
+
+    List<CheckedRunnable<IOException>> getPreCommits() {
+      return preCommits;
     }
 
     @Override
@@ -130,6 +142,35 @@ public class TestOzoneOutputStream {
     try (OzoneOutputStream ozone = new OzoneOutputStream(cipher, null)) {
       assertNotNull(ozone.getKeyOutputStream());
       assertEquals("v1", ozone.getMetadata().get("k1"));
+    }
+  }
+
+  @Test
+  public void testSetPreCommits() throws IOException {
+    FakeKeyOutputStream key =
+        new FakeKeyOutputStream(Collections.emptyMap());
+    List<CheckedRunnable<IOException>> preCommits =
+        Collections.singletonList(() -> { });
+
+    try (OzoneOutputStream ozone = new OzoneOutputStream(key, null)) {
+      ozone.setPreCommits(preCommits);
+    }
+
+    assertSame(preCommits, key.getPreCommits());
+  }
+
+  @Test
+  public void testSetPreCommitsRequiresKeyCommitOutput() throws IOException {
+    OutputStream stream = new OutputStream() {
+      @Override
+      public void write(int b) {
+
+      }
+    };
+
+    try (OzoneOutputStream ozone = new OzoneOutputStream(stream, null)) {
+      assertThrows(IllegalStateException.class,
+          () -> ozone.setPreCommits(Collections.emptyList()));
     }
   }
 

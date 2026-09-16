@@ -51,6 +51,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -784,8 +785,15 @@ public class BasicOzoneFileSystem extends FileSystem {
     try {
       if (!allUsers) {
         Path userTrash = new Path(trashRoot, userName);
-        if (exists(userTrash) && getFileStatus(userTrash).isDirectory()) {
-          ret.add(getFileStatus(userTrash));
+        // headOp: only the entry type is needed here. Fetch once instead of
+        // calling exists()/getFileStatus() repeatedly for the same path.
+        try {
+          FileStatus userTrashStatus = getFileStatus(userTrash, true);
+          if (userTrashStatus.isDirectory()) {
+            ret.add(userTrashStatus);
+          }
+        } catch (FileNotFoundException ignored) {
+          // No trash root for this user.
         }
       } else {
         if (exists(trashRoot)) {
@@ -833,6 +841,16 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
+    return getFileStatus(f, false);
+  }
+
+  /**
+   * @param headOp when true, requests a metadata-only (type) check so the OM
+   *               skips the pipeline refresh (SCM round-trip) and datanode
+   *               sorting. Used by {@link #isDirectory(Path)}/{@link #isFile(Path)},
+   *               which only need the entry type.
+   */
+  private FileStatus getFileStatus(Path f, boolean headOp) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
@@ -841,7 +859,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     FileStatus fileStatus = null;
     try {
       fileStatus = convertFileStatus(
-          adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
+          adapter.getFileStatus(key, uri, qualifiedPath, getUsername(), headOp));
     } catch (IOException ex) {
       if (ex instanceof OMException) {
         if (((OMException) ex).getResult()
@@ -863,6 +881,91 @@ public class BasicOzoneFileSystem extends FileSystem {
     } else {
       return super.getFileBlockLocations(fileStatus, start, len);
     }
+  }
+
+  @Override
+  public ContentSummary getContentSummary(Path f) throws IOException {
+    Path qualifiedPath = f.makeQualified(uri, workingDir);
+    String key = pathToKey(qualifiedPath);
+    FileStatusAdapter status;
+    try {
+      status = adapter.getFileStatus(key, uri, qualifiedPath, getUsername());
+    } catch (OMException ex) {
+      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND)) {
+        throw new FileNotFoundException("File not found. path:" + f);
+      }
+      throw ex;
+    }
+
+    if (status.isFile()) {
+      long length = status.getLength();
+      long spaceConsumed = status.getDiskConsumed();
+      ContentSummary.Builder builder = new ContentSummary.Builder().length(length).
+          fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed);
+      applyEcPolicy(builder, status.getErasureCodingPolicy());
+      return builder.build();
+    }
+
+    long[] summary = {0, 0, 0, 1};
+    for (FileStatusAdapter s : listStatusAdapter(f)) {
+      long length = s.getLength();
+      long spaceConsumed = s.getDiskConsumed();
+      ContentSummary c;
+      if (s.isDir()) {
+        c = getContentSummary(s.getPath());
+      } else {
+        ContentSummary.Builder childBuilder = new ContentSummary.Builder().length(length).
+            fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed);
+        applyEcPolicy(childBuilder, s.getErasureCodingPolicy());
+        c = childBuilder.build();
+      }
+
+      summary[0] += c.getLength();
+      summary[1] += c.getSpaceConsumed();
+      summary[2] += c.getFileCount();
+      summary[3] += c.getDirectoryCount();
+    }
+
+    ContentSummary.Builder builder = new ContentSummary.Builder().length(summary[0]).
+        fileCount(summary[2]).directoryCount(summary[3]).
+        spaceConsumed(summary[1]);
+    applyEcPolicy(builder, status.getErasureCodingPolicy());
+    return builder.build();
+  }
+
+  /**
+   * Apply the erasure coding policy on the {@link ContentSummary.Builder}.
+   * Default implementation is a no-op so that this class can compile and run
+   * against Hadoop 2, where {@code ContentSummary.Builder.erasureCodingPolicy}
+   * does not exist. The Hadoop 3 subclass overrides this to set the policy.
+   */
+  protected void applyEcPolicy(ContentSummary.Builder builder, String ecPolicy) {
+  }
+
+  private List<FileStatusAdapter> listStatusAdapter(Path f) throws IOException {
+    int numEntries = listingPageSize;
+    LinkedList<FileStatusAdapter> statuses = new LinkedList<>();
+    List<FileStatusAdapter> tmpStatusList;
+    String startKey = "";
+    int entriesAdded;
+    do {
+      tmpStatusList = adapter.listStatus(pathToKey(f), false, startKey,
+          numEntries, uri, workingDir, getUsername(), true);
+      entriesAdded = 0;
+      if (!tmpStatusList.isEmpty()) {
+        if (startKey.isEmpty() || !statuses.getLast().getPath().toString()
+            .equals(tmpStatusList.get(0).getPath().toString())) {
+          statuses.addAll(tmpStatusList);
+          entriesAdded += tmpStatusList.size();
+        } else {
+          statuses.addAll(tmpStatusList.subList(1, tmpStatusList.size()));
+          entriesAdded += tmpStatusList.size() - 1;
+        }
+        startKey = pathToKey(statuses.getLast().getPath());
+      }
+    } while (entriesAdded > 0);
+
+    return statuses;
   }
 
   @Override
@@ -928,17 +1031,25 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
-  @SuppressWarnings("deprecation")
   public boolean isDirectory(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_DIRECTORY);
-    return super.isDirectory(f);
+    try {
+      // headOp: only the entry type is needed, so skip the pipeline refresh.
+      return getFileStatus(f, true).isDirectory();
+    } catch (FileNotFoundException e) {
+      return false;
+    }
   }
 
   @Override
-  @SuppressWarnings("deprecation")
   public boolean isFile(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_FILE);
-    return super.isFile(f);
+    try {
+      // headOp: only the entry type is needed, so skip the pipeline refresh.
+      return getFileStatus(f, true).isFile();
+    } catch (FileNotFoundException e) {
+      return false;
+    }
   }
 
   @Override

@@ -113,7 +113,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param health - The health of the node
    * @return List of Datanodes that are Heartbeating SCM.
    */
-  List<DatanodeDetails> getNodes(
+  List<DatanodeInfo> getNodes(
       NodeOperationalState opState, NodeState health);
 
   /**
@@ -134,10 +134,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   int getNodeCount(
       NodeOperationalState opState, NodeState health);
 
-  /**
-   * @return all datanodes known to SCM.
-   */
-  List<? extends DatanodeDetails> getAllNodes();
+  /** @return a shadow copied list of all datanodes, sorted by {@link DatanodeID}. */
+  List<DatanodeInfo> getAllNodes();
 
   /** @return the number of datanodes. */
   default int getAllNodeCount() {
@@ -176,13 +174,40 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
 
   /**
-   * Get the datanode info of a specified datanode.
+   * Atomically checks if the datanode has space for a new container and records the allocation
+   * if space is available. This prevents race conditions where multiple threads check space
+   * concurrently and over-allocate.
    *
-   * @param dn the usage of which we want to get
-   * @return DatanodeInfo of the specified datanode
+   * @param datanodeInfo node info of the receiving the allocation
+   * @param containerID the container being allocated
+   * @return true if space was available and allocation was recorded, false otherwise
    */
-  @Nullable
-  DatanodeInfo getDatanodeInfo(DatanodeDetails dn);
+  boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID);
+
+  /**
+   * Records a container allocation on the given datanode.
+   * Unlike {@link #checkSpaceAndRecordAllocation}, this does not check for
+   * available space — it is called after the placement policy has already
+   * validated space and a replication command has been committed.
+   */
+  void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
+
+  /**
+   * Returns true if the datanode has at least one available container slot considering
+   * in-flight allocations tracked by PendingContainerTracker.
+   *
+   * @param datanodeInfo the datanode to check
+   * @return true if at least one slot is free
+   */
+  boolean hasAvailableSpace(DatanodeInfo datanodeInfo);
+
+  /**
+   * Removes a pending container allocation from a datanode.
+   *
+   * @param datanodeInfo info about the datanode
+   * @param containerID the container to remove from pending
+   */
+  void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
 
   /**
    * Return the node stat of the specified datanode.
@@ -368,7 +393,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   List<SCMCommand<?>> getCommandQueue(DatanodeID dnID);
 
   /** @return the datanode of the given id if it exists; otherwise, return null. */
-  @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
+  @Nullable DatanodeInfo getNode(@Nullable DatanodeID id);
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of
@@ -422,4 +447,9 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   }
 
   int openContainerLimit(List<DatanodeDetails> datanodes);
+
+  /**
+   * SCM-side tracker for container allocations not yet reported by datanodes.
+   */
+  PendingContainerTracker getPendingContainerTracker();
 }

@@ -27,11 +27,13 @@ public class DeletedBlock {
   private BlockID blockID;
   private long size;
   private long replicatedSize;
+  private long sizePerReplica;
 
-  public DeletedBlock(BlockID blockID, long size, long replicatedSize) {
+  public DeletedBlock(BlockID blockID, long size, long replicatedSize, long sizePerReplica) {
     this.blockID = blockID;
     this.size = size;
     this.replicatedSize = replicatedSize;
+    this.sizePerReplica = sizePerReplica;
   }
 
   public BlockID getBlockID() {
@@ -46,13 +48,18 @@ public class DeletedBlock {
     return this.replicatedSize;
   }
 
+  public long getSizePerReplica() {
+    return this.sizePerReplica;
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder(64);
     sb.append(" localID: ").append(blockID.getContainerBlockID().getLocalID())
         .append(" containerID: ").append(blockID.getContainerBlockID().getContainerID())
         .append(" size: ").append(size)
-        .append(" replicatedSize: ").append(replicatedSize);
+        .append(" replicatedSize: ").append(replicatedSize)
+        .append(" sizePerReplica: ").append(sizePerReplica);
     return sb.toString();
   }
 }

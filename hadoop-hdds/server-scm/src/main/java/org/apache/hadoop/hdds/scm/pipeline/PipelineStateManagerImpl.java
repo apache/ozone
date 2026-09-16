@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.invoker.PipelineStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.db.CodecException;
@@ -127,7 +128,7 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
       throws PipelineNotFoundException {
     lock.readLock().lock();
     try {
-      return pipelineStateMap.getPipeline(pipelineID);
+      return pipelineStateMap.getPipeline(pipelineID).getPipeline();
     } finally {
       lock.readLock().unlock();
     }
@@ -363,7 +364,7 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
           pipelineStore, nodeManager, transactionBuffer);
       pipelineStateManager.initialize();
 
-      return scmRatisServer.getProxyHandler(PipelineStateManager.class, pipelineStateManager);
+      return scmRatisServer.getProxyHandler(new PipelineStateManagerInvoker(pipelineStateManager, scmRatisServer));
     }
   }
 }

@@ -68,12 +68,10 @@ public abstract class BaseFileChecksumHelper {
   private long crcPerBlock = 0;
 
   // initialization
-  BaseFileChecksumHelper(
-      OzoneVolume volume, OzoneBucket bucket, String keyName,
-      long length,
+  public BaseFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
+      String keyName, long length,
       OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
-      ClientProtocol rpcClient) throws IOException {
-
+      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
     this.volume = volume;
     this.bucket = bucket;
     this.keyName = keyName;
@@ -81,18 +79,11 @@ public abstract class BaseFileChecksumHelper {
     this.combineMode = checksumCombineMode;
     this.rpcClient = rpcClient;
     this.xceiverClientFactory =
-        ((RpcClient)rpcClient).getXceiverClientManager();
+        ((RpcClient) rpcClient).getXceiverClientManager();
+    this.keyInfo = keyInfo;
     if (this.length > 0) {
       fetchBlocks();
     }
-  }
-
-  public BaseFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
-      String keyName, long length,
-      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
-      ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
-    this(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
-    this.keyInfo = keyInfo;
   }
 
   protected String getSrc() {

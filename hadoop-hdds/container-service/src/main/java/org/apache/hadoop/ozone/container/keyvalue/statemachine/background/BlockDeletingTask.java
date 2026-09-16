@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -67,7 +68,7 @@ public class BlockDeletingTask implements BackgroundTask {
 
   private final BlockDeletingServiceMetrics metrics;
   private final int priority;
-  private final KeyValueContainerData containerData;
+  private KeyValueContainerData containerData;
   private long blocksToDelete;
   private final OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
@@ -139,24 +140,39 @@ public class BlockDeletingTask implements BackgroundTask {
 
   private ContainerBackgroundTaskResult handleDeleteTask() throws Exception {
     ContainerBackgroundTaskResult crr;
-    final Container container = ozoneContainer.getContainerSet()
-        .getContainer(containerData.getContainerID());
-    container.writeLock();
-    File dataDir = new File(containerData.getChunksPath());
-    long startTime = Time.monotonicNow();
-    // Scan container's db and get list of under deletion blocks
-    try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
-      if (containerData.hasSchema(SCHEMA_V1)) {
-        crr = deleteViaSchema1(meta, container, dataDir, startTime);
-      } else if (containerData.hasSchema(SCHEMA_V2)) {
-        crr = deleteViaSchema2(meta, container, dataDir, startTime);
-      } else if (containerData.hasSchema(SCHEMA_V3)) {
-        crr = deleteViaSchema3(meta, container, dataDir, startTime);
-      } else {
-        throw new UnsupportedOperationException(
-            "Only schema version 1,2,3 are supported.");
+    ContainerSet cs = ozoneContainer.getContainerSet();
+    final long containerId = containerData.getContainerID();
+
+    Container<?> container = cs.getContainerWithWriteLock(containerId);
+    if (container == null) {
+      // null means container locking retries exhausted ;
+      // container not-found throws StorageContainerException.
+      LOG.info("Exceeded {} retries to lock container {}; Now DN will resend for delete with " +
+              "the current container replica", ContainerSet.maxContainerMapSwapRetries(),
+          containerId);
+      return new ContainerBackgroundTaskResult();
+    }
+    try {
+      // Always use ContainerData from the locked live Container so paths / RocksDB locations match deleteViaSchema*.
+      containerData = (KeyValueContainerData) container.getContainerData();
+
+      File dataDir = new File(containerData.getChunksPath());
+      long startTime = Time.monotonicNow();
+      // Scan container's db and get list of under deletion blocks
+      try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
+        if (containerData.hasSchema(SCHEMA_V1)) {
+          crr = deleteViaSchema1(meta, container, dataDir, startTime);
+        } else if (containerData.hasSchema(SCHEMA_V2)) {
+          crr = deleteViaSchema2(meta, container, dataDir, startTime);
+        } else if (containerData.hasSchema(SCHEMA_V3)) {
+          crr = deleteViaSchema3(meta, container, dataDir, startTime);
+        } else {
+          throw new UnsupportedOperationException(
+              "Only schema version 1,2,3 are supported.");
+        }
+        return crr;
+
       }
-      return crr;
     } finally {
       container.writeUnlock();
     }

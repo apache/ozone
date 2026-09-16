@@ -218,7 +218,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
           .append("No pipelines in cluster.")
           .append(System.lineSeparator());
     }
-    System.out.println("Datanode: " + datanode.getUuid().toString() +
+    System.out.println("Datanode: " + datanode.getID() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
         + "/" + datanode.getHostName() + "/" + relatedPipelineNum +
         " pipelines)");

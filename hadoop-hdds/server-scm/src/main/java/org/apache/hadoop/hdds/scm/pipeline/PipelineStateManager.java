@@ -114,4 +114,5 @@ public interface PipelineStateManager extends SCMHandler {
   default RequestType getType() {
     return RequestType.PIPELINE;
   }
+
 }

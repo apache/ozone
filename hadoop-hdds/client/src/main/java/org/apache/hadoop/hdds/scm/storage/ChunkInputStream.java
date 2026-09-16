@@ -297,11 +297,7 @@ public class ChunkInputStream extends InputStream
   private void updateDatanodeBlockId(Pipeline pipeline) throws IOException {
     DatanodeDetails closestNode = pipeline.getClosestNode();
     int replicaIdx = pipeline.getReplicaIndex(closestNode);
-    ContainerProtos.DatanodeBlockID.Builder builder = blockID.getDatanodeBlockIDProtobufBuilder();
-    if (replicaIdx > 0) {
-      builder.setReplicaIndex(replicaIdx);
-    }
-    datanodeBlockID = builder.build();
+    datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder(replicaIdx).build();
   }
 
   /**
@@ -412,7 +408,7 @@ public class ChunkInputStream extends InputStream
     adjustBufferPosition(startByteIndex - bufferOffsetWrtChunkData);
   }
 
-  private void readChunkDataIntoBuffers(ChunkInfo readChunkInfo)
+  protected void readChunkDataIntoBuffers(ChunkInfo readChunkInfo)
       throws IOException {
     buffers = readChunk(readChunkInfo);
     buffersSize = readChunkInfo.getLen();

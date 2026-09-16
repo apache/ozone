@@ -187,6 +187,28 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=false
 }
 
+@test "mini-cluster" {
+  run dev-support/ci/selective_ci_checks.sh f0388a195411e68aac360de8ab95735b2eb295de
+
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=false
+}
+
+@test "test-utils" {
+  run dev-support/ci/selective_ci_checks.sh 60e4ab121853c182e1272b04fd1a93d55b12cfc7
+
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=false
+}
+
 @test "native only" {
   run dev-support/ci/selective_ci_checks.sh 5b1319a8c2
 

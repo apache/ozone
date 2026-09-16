@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -25,6 +28,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -43,11 +47,18 @@ public class ResolvedBucket {
   private final String realBucket;
   private final String bucketOwner;
   private final BucketLayout bucketLayout;
+  private final Collection<Pair<String, String>> linkChain;
 
   public ResolvedBucket(String requestedVolume, String requestedBucket,
       OmBucketInfo resolved) {
+    this(requestedVolume, requestedBucket, resolved, Collections.emptyList());
+  }
+
+  public ResolvedBucket(String requestedVolume, String requestedBucket,
+      OmBucketInfo resolved, Collection<Pair<String, String>> linkChain) {
     this.requestedVolume = requestedVolume;
     this.requestedBucket = requestedBucket;
+    this.linkChain = unmodifiableLinkChain(linkChain);
     if (resolved != null) {
       this.realVolume = resolved.getVolumeName();
       this.realBucket = resolved.getBucketName();
@@ -64,12 +75,28 @@ public class ResolvedBucket {
   public ResolvedBucket(String requestedVolume, String requestedBucket,
       String realVolume, String realBucket, String bucketOwner,
       BucketLayout bucketLayout) {
+    this(requestedVolume, requestedBucket, realVolume, realBucket, bucketOwner, bucketLayout,
+        Collections.emptyList());
+  }
+
+  public ResolvedBucket(String requestedVolume, String requestedBucket,
+      String realVolume, String realBucket, String bucketOwner,
+      BucketLayout bucketLayout, Collection<Pair<String, String>> linkChain) {
     this.requestedVolume = requestedVolume;
     this.requestedBucket = requestedBucket;
     this.realVolume = realVolume;
     this.realBucket = realBucket;
     this.bucketOwner = bucketOwner;
     this.bucketLayout = bucketLayout;
+    this.linkChain = unmodifiableLinkChain(linkChain);
+  }
+
+  private static Collection<Pair<String, String>> unmodifiableLinkChain(
+      Collection<Pair<String, String>> linkChain) {
+    if (linkChain == null || linkChain.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return Collections.unmodifiableList(new ArrayList<>(linkChain));
   }
 
   public ResolvedBucket(Pair<String, String> requested,
@@ -103,6 +130,14 @@ public class ResolvedBucket {
     return bucketLayout;
   }
 
+  /**
+   * Ordered link buckets followed when resolving from the requested bucket to the real bucket.
+   * Each pair is {@code (volume, bucket)}. Empty when the requested bucket is not a link.
+   */
+  public Collection<Pair<String, String>> linkChain() {
+    return linkChain;
+  }
+
   public OmKeyArgs update(OmKeyArgs args) {
     return isLink()
         ? args.toBuilder()
@@ -113,6 +148,15 @@ public class ResolvedBucket {
   }
 
   public KeyArgs update(KeyArgs args) {
+    return isLink()
+        ? args.toBuilder()
+            .setVolumeName(realVolume())
+            .setBucketName(realBucket())
+            .build()
+        : args;
+  }
+
+  public BucketArgs update(BucketArgs args) {
     return isLink()
         ? args.toBuilder()
             .setVolumeName(realVolume())

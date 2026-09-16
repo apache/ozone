@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.s3.commontypes;
 
 import jakarta.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 
 /**
  * A converter to encode string if needed.
@@ -41,12 +40,12 @@ public final class EncodingTypeObject {
   }
 
   /**
-   * Create a EncodingTypeObject Object, if the parameter name is null.
+   * Create a EncodingTypeObject Object, if the parameter name is not null.
    * @return If name is null return null else return a EncodingTypeObject object
    */
   @Nullable public static EncodingTypeObject createNullable(
       @Nullable String name, @Nullable String encodingType) {
-    if (StringUtils.isEmpty(name)) {
+    if (name == null) {
       return null;
     }
     return new EncodingTypeObject(name, encodingType);

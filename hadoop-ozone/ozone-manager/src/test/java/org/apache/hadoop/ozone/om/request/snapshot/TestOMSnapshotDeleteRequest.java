@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createSnapshotRequest;
@@ -25,6 +26,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteSnapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -34,19 +36,22 @@ import static org.mockito.Mockito.when;
 
 import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotRequestAndResponseTests;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -57,7 +62,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Mostly mirrors TestOMSnapshotCreateRequest.
  * testEntryNotExist() and testEntryExists() are unique.
  */
-public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse {
+public class TestOMSnapshotDeleteRequest extends SnapshotRequestAndResponseTests {
 
   private String snapshotName;
 
@@ -160,6 +165,7 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
         new CacheKey<>(key),
         CacheValue.get(1L, snapshotInfo));
 
+    LogCapturer logCapturer = LogCapturer.captureLogs(OMSnapshotDeleteRequest.class);
     // Trigger validateAndUpdateCache
     OMClientResponse omClientResponse =
         omSnapshotDeleteRequest.validateAndUpdateCache(getOzoneManager(), 2L);
@@ -180,6 +186,9 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
     assertEquals(-1, getOmMetrics().getNumSnapshotActive());
     assertEquals(1, getOmMetrics().getNumSnapshotDeleted());
     assertEquals(0, getOmMetrics().getNumSnapshotDeleteFails());
+    assertThat(logCapturer.getOutput()).contains(String.format(
+        "Deleted snapshot '%s' (snapshotId='%s') under path '%s'",
+        snapshotName, snapshotInfo.getSnapshotId(), snapshotInfo.getSnapshotPath()));
   }
 
   /**
@@ -270,6 +279,51 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
     assertEquals(SNAPSHOT_DELETED, snapshotInfo.getSnapshotStatus());
     assertEquals(0, getOmMetrics().getNumSnapshotActive());
     assertEquals(1, getOmMetrics().getNumSnapshotDeleteFails());
+  }
+
+  /**
+   * Regression test for the flush-lag reclamation window. This is a companion to
+   * TestReclaimableKeyFilter#testKeyReclaimableWhenChainEmptyingPurgeUnflushedButDeleteFlushed.
+   *
+   * <p>Before OMSnapshotDeleteRequest stamped lastTransactionInfo, snapshot deletion updated only status and
+   * deletionTime. areSnapshotChangesFlushedToDB() therefore used the stale create-time stamp and reported an
+   * applied-but-unflushed deletion as flushed. SnapshotDeletingService#shouldIgnoreSnapshot relies on that method
+   * to defer processing until a snapshot's latest change is durable; the missing stamp allowed moveTableKeys and
+   * purge to be submitted before the double buffer flushed the deletion.
+   */
+  @Test
+  public void testSnapshotDeleteIsNotReportedFlushedUntilFlushed() throws Exception {
+    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+    String key = SnapshotInfo.getTableKey(getVolumeName(), getBucketName(), snapshotName);
+
+    // Create the snapshot at transaction index 1; validateAndUpdateCache stamps lastTransactionInfo.
+    OMRequest createRequest = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName);
+    OMSnapshotCreateRequest omSnapshotCreateRequest =
+        TestOMSnapshotCreateRequest.doPreExecute(createRequest, getOzoneManager());
+    omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 1L);
+    SnapshotInfo snapshotInfo = getOmMetadataManager().getSnapshotInfoTable().get(key);
+    assertNotNull(snapshotInfo);
+    assertNotNull(snapshotInfo.getLastTransactionInfo(), "sanity: create stamps lastTransactionInfo");
+
+    // The double buffer flushes through the create transaction: persist the create's transaction info as
+    // the OM's flushed marker. Sanity: the snapshot's changes are now reported flushed.
+    getOmMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
+        TransactionInfo.fromByteString(snapshotInfo.getLastTransactionInfo()));
+    assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(getOmMetadataManager(), key),
+        "sanity: the create transaction is flushed");
+
+    // Delete the snapshot at transaction index 2. The change is applied to the table cache only; the
+    // double buffer has NOT flushed it (the flushed marker still points at the create transaction).
+    OMSnapshotDeleteRequest omSnapshotDeleteRequest =
+        doPreExecute(deleteSnapshotRequest(getVolumeName(), getBucketName(), snapshotName));
+    omSnapshotDeleteRequest.validateAndUpdateCache(getOzoneManager(), 2L);
+    snapshotInfo = getOmMetadataManager().getSnapshotInfoTable().get(key);
+    assertEquals(SNAPSHOT_DELETED, snapshotInfo.getSnapshotStatus());
+
+    // The deletion (index 2) is not durable yet, so the snapshot's changes must not be reported as flushed.
+    // This verifies that lastTransactionInfo advanced from the create transaction to the delete transaction.
+    assertFalse(OmSnapshotManager.areSnapshotChangesFlushedToDB(getOmMetadataManager(), key),
+        "snapshot deletion at index 2 must remain unflushed while the marker is at the create transaction");
   }
 
   private OMSnapshotDeleteRequest doPreExecute(

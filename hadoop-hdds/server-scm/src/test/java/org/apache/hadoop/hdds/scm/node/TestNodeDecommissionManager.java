@@ -104,7 +104,7 @@ public class TestNodeDecommissionManager {
   private ContainerInfo getMockContainer(ReplicationConfig rep, ContainerID conId) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder()
         .setReplicationConfig(rep)
-        .setContainerID(conId.getId())
+        .setContainerID(conId.getIdForTesting())
         .setPipelineID(PipelineID.randomId())
         .setState(OPEN)
         .setOwner("admin");

@@ -596,18 +596,16 @@ public final class HttpServer2 implements FilterContainer {
     private void setEnabledProtocols(SslContextFactory sslContextFactory) {
       String enabledProtocols = conf.get(OzoneConfigKeys.OZONE_SSL_ENABLED_PROTOCOLS,
           conf.get(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT));
-      if (!enabledProtocols.equals(SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT)) {
-        List<String> originalExcludedProtocols = Arrays.asList(sslContextFactory.getExcludeProtocols());
-        String[] enabledProtocolsArray = StringUtils.getTrimmedStrings(enabledProtocols);
+      List<String> originalExcludedProtocols = Arrays.asList(sslContextFactory.getExcludeProtocols());
+      String[] enabledProtocolsArray = StringUtils.getTrimmedStrings(enabledProtocols);
 
-        List<String> finalExcludedProtocols = new ArrayList<>(originalExcludedProtocols);
-        finalExcludedProtocols.removeAll(Arrays.asList(enabledProtocolsArray));
+      List<String> finalExcludedProtocols = new ArrayList<>(originalExcludedProtocols);
+      finalExcludedProtocols.removeAll(Arrays.asList(enabledProtocolsArray));
 
-        sslContextFactory.setExcludeProtocols(finalExcludedProtocols.toArray(new String[0]));
-        LOG.info("Disabled protocols: {}", finalExcludedProtocols);
-        sslContextFactory.setIncludeProtocols(enabledProtocolsArray);
-        LOG.info("Enabled protocols: {}", enabledProtocols);
-      }
+      sslContextFactory.setExcludeProtocols(finalExcludedProtocols.toArray(new String[0]));
+      LOG.info("Disabled protocols: {}", finalExcludedProtocols);
+      sslContextFactory.setIncludeProtocols(enabledProtocolsArray);
+      LOG.info("Enabled protocols: {}", enabledProtocols);
     }
   }
 

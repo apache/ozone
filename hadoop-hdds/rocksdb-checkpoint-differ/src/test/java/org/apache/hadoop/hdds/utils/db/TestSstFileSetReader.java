@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.TestUtils;
+import org.apache.hadoop.hdds.utils.RocksTestUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
@@ -159,7 +159,7 @@ class TestSstFileSetReader {
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
-    List<Optional<String>> bounds = TestUtils.getTestingBounds(keys);
+    List<Optional<String>> bounds = RocksTestUtils.getTestingBounds(keys);
     for (Optional<String> lowerBound : bounds) {
       for (Optional<String> upperBound : bounds) {
         // Calculating the expected keys which lie in the given boundary.
@@ -202,7 +202,7 @@ class TestSstFileSetReader {
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
-    List<Optional<String>> bounds = TestUtils.getTestingBounds(keys);
+    List<Optional<String>> bounds = RocksTestUtils.getTestingBounds(keys);
     for (Optional<String> lowerBound : bounds) {
       for (Optional<String> upperBound : bounds) {
         // Calculating the expected keys which lie in the given boundary.

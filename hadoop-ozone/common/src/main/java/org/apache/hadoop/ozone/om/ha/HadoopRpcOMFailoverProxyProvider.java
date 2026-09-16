@@ -45,7 +45,30 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
   protected static final Logger LOG =
       LoggerFactory.getLogger(HadoopRpcOMFailoverProxyProvider.class);
 
-  private final Text delegationTokenService;
+  /**
+   * Aggregated delegation-token service identifier (the comma-joined
+   * list of per-OM service strings, sorted for stability). Mutable and
+   * volatile so that {@link #onAddressRefreshed(String)} can replace
+   * it in-place after a per-node DNS refresh; readers see either the
+   * old or the new fully-formed value, never a partial state. <p>
+   * Caveat for SECURE clusters with the default
+   * {@code hadoop.security.token.service.use_ip=true}: each per-OM
+   * service is built from the resolved IP, so after an IP refresh
+   * the new aggregate string and the token's frozen old aggregate
+   * string have no common per-OM substring for the refreshed peer.
+   * {@code OzoneDelegationTokenSelector} (substring match) then fails
+   * to select the token for that peer, and the SASL handshake on the
+   * fresh dial cannot present credentials. <p>
+   * Operators that enable {@code ozone.client.failover.resolve-needed}
+   * on a secure cluster MUST set {@code hadoop.security.token.service.use_ip=false}
+   * (in core-site.xml) so the per-OM service is hostname:port -- a
+   * stable identifier that survives any IP change. This is documented
+   * on the {@code ozone.client.failover.resolve-needed} entry in
+   * {@code ozone-default.xml}. <p>
+   * For new {@code RpcClient} instances constructed after a refresh,
+   * the volatile read here returns the up-to-date aggregate.
+   */
+  private volatile Text delegationTokenService;
 
   // HadoopRpcOMFailoverProxyProvider, on encountering certain exception,
   // tries each OM once in a round robin fashion. After that it waits
@@ -115,6 +138,18 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
 
   public Text getCurrentProxyDelegationToken() {
     return delegationTokenService;
+  }
+
+  /**
+   * After a per-node DNS refresh, the {@link OMProxyInfo#getDelegationTokenService()}
+   * for that node has been rewritten against the new resolved IP. The
+   * aggregated identifier built from the full peer set is therefore
+   * stale and must be recomputed. Volatile assignment ensures readers
+   * either see the old value in full or the new value in full.
+   */
+  @Override
+  protected void onAddressRefreshed(String nodeId) {
+    this.delegationTokenService = computeDelegationTokenService();
   }
 
   protected Text computeDelegationTokenService() {

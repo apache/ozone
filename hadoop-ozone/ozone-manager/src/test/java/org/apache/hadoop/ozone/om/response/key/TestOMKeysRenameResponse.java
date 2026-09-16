@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests OMKeyRenameResponse.
  */
-public class TestOMKeysRenameResponse extends TestOMKeyResponse {
+public class TestOMKeysRenameResponse extends OMKeyResponseTests {
   private OmRenameKeys omRenameKeys;
   private int count = 10;
   private String parentDir = "/test";

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import static org.apache.hadoop.hdds.scm.container.balancer.TestableCluster.RANDOM;
+import static org.apache.hadoop.hdds.scm.container.balancer.MockCluster.RANDOM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -58,7 +58,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -207,7 +206,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
   public void testCalculationOfUtilization(@Nonnull MockedSCM mockedSCM) {
-    TestableCluster cluster = mockedSCM.getCluster();
+    MockCluster cluster = mockedSCM.getCluster();
     DatanodeUsageInfo[] nodesInCluster = cluster.getNodesInCluster();
     double[] nodeUtilizations = cluster.getNodeUtilizationList();
     assertEquals(nodesInCluster.length, nodeUtilizations.length);
@@ -246,7 +245,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
-  @Flaky("HDDS-11093")
   public void testMetrics(@Nonnull MockedSCM mockedSCM) throws IOException, NodeNotFoundException {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set("hdds.datanode.du.refresh.period", "1ms");
@@ -265,7 +263,10 @@ public class TestContainerBalancerDatanodeNodeLimit {
     assertEquals(mockedSCM.getCluster().getUnBalancedNodes(config.getThreshold()).size(),
         metrics.getNumDatanodesUnbalanced());
     assertThat(metrics.getDataSizeMovedGBInLatestIteration()).isLessThanOrEqualTo(6);
-    assertThat(metrics.getDataSizeMovedGB()).isGreaterThan(0);
+    // On small clusters the random layout may allow only one move, which is the mocked failure, so data
+    // moved cannot be asserted to be positive. Each container is a whole number of GB, so the size moved
+    // must be at least 1 GB per completed move.
+    assertThat(metrics.getDataSizeMovedGB()).isGreaterThanOrEqualTo(metrics.getNumContainerMovesCompleted());
     assertEquals(1, metrics.getNumIterations());
     assertThat(metrics.getNumContainerMovesScheduledInLatestIteration()).isGreaterThan(0);
     assertEquals(metrics.getNumContainerMovesScheduled(), metrics.getNumContainerMovesScheduledInLatestIteration());
@@ -463,9 +464,16 @@ public class TestContainerBalancerDatanodeNodeLimit {
   @MethodSource("createMockedSCMs")
   public void balancerShouldOnlySelectConfiguredIncludeContainers(@Nonnull MockedSCM mockedSCM) {
     ContainerBalancerConfiguration config = new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
-    config.setIncludeContainers("1, 4, 5");
 
+    // The cluster layout is random, so a hardcoded include list may contain no movable container.
+    // Run the balancer once without restrictions to find a container that is movable in this layout;
+    // including it guarantees the restricted run below selects at least one container.
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
+    Set<ContainerID> movedContainers = task.getContainerToSourceMap().keySet();
+    assertThat(movedContainers).isNotEmpty();
+    config.setIncludeContainers(String.valueOf(movedContainers.iterator().next().getId()));
+
+    task = mockedSCM.startBalancerTask(config);
 
     Set<ContainerID> includeContainers = config.getIncludeContainers();
     assertThat(task.getContainerToSourceMap()).isNotEmpty();
@@ -553,10 +561,8 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
-  @Flaky("HDDS-11855")
   public void checkIterationResultException(@Nonnull MockedSCM mockedSCM)
       throws NodeNotFoundException, ContainerNotFoundException, TimeoutException, ContainerReplicaNotFoundException {
-    int nodeCount = mockedSCM.getNodeCount();
     ContainerBalancerConfiguration config = new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
     config.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
     config.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
@@ -565,7 +571,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
     CompletableFuture<MoveManager.MoveResult> future = new CompletableFuture<>();
     future.completeExceptionally(new RuntimeException("Runtime Exception"));
 
-    int expectedMovesFailed = (nodeCount > 6) ? 3 : 1;
     // Try the same test but with MoveManager instead of ReplicationManager.
     when(mockedSCM.getMoveManager()
         .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
@@ -575,7 +580,17 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
-    assertThat(task.getMetrics().getNumContainerMovesFailed()).isGreaterThanOrEqualTo(expectedMovesFailed);
+
+    // The random cluster layout decides how many moves get scheduled, so the exact number of failed moves
+    // cannot be asserted. Instead assert invariants that hold for any layout: every move is mocked to fail,
+    // so none can be counted as completed, and if any move was attempted it must be accounted as a failure
+    // or a timeout rather than silently dropped.
+    ContainerBalancerMetrics metrics = task.getMetrics();
+    assertEquals(0, metrics.getNumContainerMovesCompletedInLatestIteration());
+    if (!task.getContainerToSourceMap().isEmpty()) {
+      assertThat(metrics.getNumContainerMovesFailedInLatestIteration()
+          + metrics.getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(0);
+    }
   }
 
   public static List<DatanodeUsageInfo> getUnBalancedNodes(@Nonnull ContainerBalancerTask task) {
@@ -590,7 +605,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
   }
 
   public static @Nonnull MockedSCM getMockedSCM(int datanodeCount) {
-    return new MockedSCM(new TestableCluster(datanodeCount, STORAGE_UNIT));
+    return new MockedSCM(new MockCluster(datanodeCount, STORAGE_UNIT));
   }
 
   private static CompletableFuture<MoveManager.MoveResult> genCompletableFuture(int sleepMilSec) {

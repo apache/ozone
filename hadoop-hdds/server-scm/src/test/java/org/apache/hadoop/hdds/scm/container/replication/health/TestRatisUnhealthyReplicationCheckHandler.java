@@ -264,6 +264,24 @@ public class TestRatisUnhealthyReplicationCheckHandler {
   }
 
   @Test
+  public void testSufficientlyReplicatedWithAllUnhealthyReplicas() {
+    ContainerInfo container = createContainerInfo(repConfig, 1L, HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(), 
+        ContainerReplicaProto.State.UNHEALTHY, 0, 0, 0);
+    requestBuilder.setContainerInfo(container).setContainerReplicas(replicas);
+
+    ContainerHealthResult health = handler.checkReplication(requestBuilder.build());
+    assertEquals(ContainerHealthResult.HealthState.UNHEALTHY, health.getHealthState());
+
+    assertFalse(handler.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(ContainerHealthState.UNHEALTHY));
+    assertEquals(0, report.getStat(ContainerHealthState.UNHEALTHY_UNDER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.UNHEALTHY_OVER_REPLICATED));
+  }
+
+  @Test
   public void testOverReplicationWithAllUnhealthyReplicas() {
     ContainerInfo container =
         createContainerInfo(repConfig, 1L, HddsProtos.LifeCycleState.CLOSED);

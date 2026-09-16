@@ -42,6 +42,9 @@ abstract class StringCodecBase implements Codec<String> {
   private final Charset charset;
   private final boolean fixedLength;
   private final int maxBytesPerChar;
+  // CharsetEncoder/CharsetDecoder are stateful and not thread-safe: reuse one per thread.
+  private final ThreadLocal<CharsetEncoder> threadLocalEncoder = ThreadLocal.withInitial(this::newEncoder);
+  private final ThreadLocal<CharsetDecoder> threadLocalDecoder = ThreadLocal.withInitial(this::newDecoder);
 
   StringCodecBase(Charset charset) {
     this.charset = charset;
@@ -78,7 +81,7 @@ abstract class StringCodecBase implements Codec<String> {
    * <p>
    * For a fixed-length {@link Codec},
    * each character is encoded to the same number of bytes and
-   * {@link #getSerializedSizeUpperBound(String)} equals to the serialized size.
+   * {@code getSerializedSizeUpperBound(String)} equals to the serialized size.
    */
   public boolean isFixedLength() {
     return fixedLength;
@@ -97,7 +100,7 @@ abstract class StringCodecBase implements Codec<String> {
   private <E extends Exception> PutToByteBuffer<E> encode(
       String string, Integer serializedSize, Function<String, E> newE) {
     return buffer -> {
-      final CoderResult result = newEncoder().encode(
+      final CoderResult result = threadLocalEncoder.get().reset().encode(
           CharBuffer.wrap(string), buffer, true);
       if (result.isError()) {
         throw newE.apply("Failed to encode with " + charset + ": " + result
@@ -112,20 +115,29 @@ abstract class StringCodecBase implements Codec<String> {
     };
   }
 
-  String decode(ByteBuffer buffer) {
+  String decodeNoFallback(ByteBuffer buffer) throws CodecException {
+    try {
+      return threadLocalDecoder.get().decode(buffer.asReadOnlyBuffer()).toString();
+    } catch (Exception e) {
+      throw new CodecException("Failed to decode " + buffer, e);
+    }
+  }
+
+  String decodeWithFallback(ByteBuffer buffer) {
     Runnable error = null;
     try {
-      return newDecoder().decode(buffer.asReadOnlyBuffer()).toString();
+      return threadLocalDecoder.get().decode(buffer.asReadOnlyBuffer()).toString();
     } catch (Exception e) {
-      error = () -> LOG.warn("Failed to decode buffer with " + charset
-          + ", buffer = (hex) " + StringUtils.bytes2Hex(buffer), e);
+      error = () -> LOG.warn("Failed to decode buffer with {}, buffer = (hex) {}",
+          charset, StringUtils.bytes2Hex(buffer, 20), e);
 
       // For compatibility, try decoding using StringUtils.
       final String decoded = StringUtils.bytes2String(buffer, charset);
       // Decoded successfully, update error message.
-      error = () -> LOG.warn("Decode (hex) " + StringUtils.bytes2Hex(buffer, 20)
-          + "\n  Attempt failed : " + charset + " (see exception below)"
-          + "\n  Retry succeeded: decoded to " + decoded, e);
+      error = () -> LOG.warn("Decode (hex) {}" +
+              "\n  Attempt failed : {} (see exception below)" +
+              "\n  Retry succeeded: decoded to {}",
+          StringUtils.bytes2Hex(buffer, 20), charset, decoded, e);
       return decoded;
     } finally {
       if (error != null) {
@@ -177,8 +189,8 @@ abstract class StringCodecBase implements Codec<String> {
   }
 
   @Override
-  public String fromCodecBuffer(@Nonnull CodecBuffer buffer) {
-    return decode(buffer.asReadOnlyByteBuffer());
+  public String fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
+    return decodeNoFallback(buffer.asReadOnlyByteBuffer());
   }
 
   @Override
@@ -187,12 +199,28 @@ abstract class StringCodecBase implements Codec<String> {
   }
 
   @Override
-  public String fromPersistedFormat(byte[] bytes) {
-    return decode(ByteBuffer.wrap(bytes));
+  public String fromPersistedFormat(byte[] bytes) throws CodecException {
+    return decodeNoFallback(ByteBuffer.wrap(bytes));
   }
 
   @Override
   public String copyObject(String object) {
     return object;
+  }
+
+  static class WithFallback extends StringCodecBase {
+    WithFallback(Charset charset) {
+      super(charset);
+    }
+
+    @Override
+    public String fromCodecBuffer(@Nonnull CodecBuffer buffer) {
+      return decodeWithFallback(buffer.asReadOnlyByteBuffer());
+    }
+
+    @Override
+    public String fromPersistedFormat(byte[] bytes) {
+      return decodeWithFallback(ByteBuffer.wrap(bytes));
+    }
   }
 }

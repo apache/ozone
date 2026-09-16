@@ -34,10 +34,12 @@
                  volume.OzoneUsed = transform(volume.OzoneUsed);
                  volume.OzoneAvailable = transform(volume.OzoneAvailable);
                  volume.Reserved = transform(volume.Reserved);
-                 volume.TotalCapacity = transform(volume.TotalCapacity);
                  volume.FilesystemCapacity = transform(volume.FilesystemCapacity);
                  volume.FilesystemAvailable = transform(volume.FilesystemAvailable);
                  volume.FilesystemUsed = transform(volume.FilesystemUsed);
+                 volume.MinFreeSpace = transform(volume.MinFreeSpace);
+                 volume.HardMinFreeSpace = transform(volume.HardMinFreeSpace);
+                 volume.NonOzoneUsed = transform(volume.NonOzoneUsed);
                 })
                 });
 

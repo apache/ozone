@@ -26,6 +26,8 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponse;
@@ -71,11 +73,13 @@ public class S3MultipartUploadCommitPartRequestWithFSO
       OzoneManager ozoneManager,
       Map<String, RepeatedOmKeyInfo> keyToDeleteMap, String openKey,
       OmKeyInfo omKeyInfo, String multipartKey,
-      OmMultipartKeyInfo multipartKeyInfo,
+      OmMultipartKeyInfo multipartKeyInfo, OmMultipartPartKey multipartPartKey,
+      OmMultipartPartInfo multipartPartInfo,
       OzoneManagerProtocolProtos.OMResponse build, OmBucketInfo omBucketInfo, long bucketId) {
 
     return new S3MultipartUploadCommitPartResponseWithFSO(build, multipartKey,
-        openKey, multipartKeyInfo, keyToDeleteMap, omKeyInfo,
+        openKey, multipartKeyInfo, multipartPartKey, multipartPartInfo,
+        keyToDeleteMap, omKeyInfo,
         omBucketInfo, bucketId, getBucketLayout());
   }
 }

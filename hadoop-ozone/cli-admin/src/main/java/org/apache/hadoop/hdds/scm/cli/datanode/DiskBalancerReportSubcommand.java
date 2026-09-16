@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import static java.util.stream.Collectors.toList;
 
 import java.io.IOException;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -46,6 +48,13 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
   private final Map<String, DatanodeDiskBalancerInfoProto> reports =
       new ConcurrentHashMap<>();
 
+  private static final String PERCENT_FORMAT = "%.2f%%";
+
+  @Override
+  protected void resetCommandState() {
+    reports.clear();
+  }
+
   @Override
   protected Object executeCommand(String hostName) throws IOException {
     DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
@@ -55,7 +64,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
 
       // Only create JSON result object if JSON mode is enabled
       if (getOptions().isJson()) {
-        return toJson(report);
+        return toJson(hostName, report);
       }
       
       // For non-JSON mode, store the proto for later consolidation
@@ -83,37 +92,48 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
 
     // Display consolidated report for successful nodes
     if (!successNodes.isEmpty() && !reports.isEmpty()) {
-      List<DatanodeDiskBalancerInfoProto> reportList = new ArrayList<>(reports.values());
-      System.out.println(generateReport(reportList));
+      List<DatanodeDiskBalancerInfoProto> reportList = successNodes.stream()
+          .map(reports::get)
+          .collect(toList());
+      System.out.println(generateReport(successNodes, reportList));
     }
   }
 
-  private String generateReport(List<DatanodeDiskBalancerInfoProto> protos) {
-    protos.sort((a, b) ->
-        Double.compare(b.getCurrentVolumeDensitySum(), a.getCurrentVolumeDensitySum()));
+  private String generateReport(
+      List<String> successNodes, List<DatanodeDiskBalancerInfoProto> protos) {
+    List<Map.Entry<String, DatanodeDiskBalancerInfoProto>> entries = new ArrayList<>();
+    for (int i = 0; i < protos.size(); i++) {
+      entries.add(new AbstractMap.SimpleEntry<>(successNodes.get(i), protos.get(i)));
+    }
+    entries.sort((a, b) -> Double.compare(
+        b.getValue().getCurrentVolumeDensitySum(),
+        a.getValue().getCurrentVolumeDensitySum()));
 
     StringBuilder formatBuilder = new StringBuilder("Report result:%n");
     List<String> contentList = new ArrayList<>();
 
-    for (int i = 0; i < protos.size(); i++) {
-      DatanodeDiskBalancerInfoProto p = protos.get(i);
-      String dn = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(p.getNode());
+    for (int i = 0; i < entries.size(); i++) {
+      Map.Entry<String, DatanodeDiskBalancerInfoProto> entry = entries.get(i);
+      DatanodeDiskBalancerInfoProto p = entry.getValue();
+      String dn = formatDatanodeDisplayName(entry.getKey(), p.getNode());
 
       StringBuilder header = new StringBuilder();
       header.append("Datanode: ").append(dn).append(System.lineSeparator())
-          .append("Aggregate VolumeDataDensity: ").append(p.getCurrentVolumeDensitySum())
+          .append("Aggregate VolumeDataDensity: ")
+          .append(formatPercent(p.getCurrentVolumeDensitySum()))
           .append(System.lineSeparator());
 
       if (p.hasIdealUsage() && p.hasDiskBalancerConf()
           && p.getDiskBalancerConf().hasThreshold()) {
         double idealUsage = p.getIdealUsage();
         double threshold = p.getDiskBalancerConf().getThreshold();
-        double lt = idealUsage - threshold / 100.0;
-        double ut = idealUsage + threshold / 100.0;
-        header.append("IdealUsage: ").append(String.format("%.8f", idealUsage))
-            .append(" | Threshold: ").append(threshold).append('%')
-            .append(" | ThresholdRange: (").append(String.format("%.8f", lt))
-            .append(", ").append(String.format("%.8f", ut)).append(')')
+        double lt = Math.max(0.0, idealUsage - threshold / 100.0);
+        double ut = Math.min(1.0, idealUsage + threshold / 100.0);
+        header.append("IdealUsage: ").append(formatPercent(idealUsage))
+            .append(" | Threshold: ")
+            .append(String.format(Locale.ROOT, PERCENT_FORMAT, threshold))
+            .append(" | ThresholdRange: (").append(formatPercent(lt))
+            .append(", ").append(formatPercent(ut)).append(')')
             .append(System.lineSeparator())
             .append(System.lineSeparator())
             .append("Volume Details:").append(System.lineSeparator());
@@ -122,32 +142,34 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       contentList.add(header.toString());
 
       if (p.getVolumeInfoCount() > 0 && p.hasIdealUsage()) {
-        formatBuilder.append("%-45s %-40s %15s %15s %30s %20s %15s %15s%n");
+        formatBuilder.append("%-45s %-40s %15s %15s %15s %30s %20s %15s %15s%n");
         contentList.add("StorageID");
         contentList.add("StoragePath");
-        contentList.add("TotalCapacity");
-        contentList.add("UsedSpace");
-        contentList.add("Container Pre-AllocatedSpace");
+        contentList.add("OzoneCapacity");
+        contentList.add("OzoneAvailable");
+        contentList.add("OzoneUsed");
+        contentList.add("ContainerPreAllocatedSpace");
         contentList.add("EffectiveUsedSpace");
         contentList.add("Utilization");
         contentList.add("VolumeDensity");
 
         double ideal = p.getIdealUsage();
         for (VolumeReportProto v : p.getVolumeInfoList()) {
-          formatBuilder.append("%-45s %-40s %15s %15s %30s %20s %15s %15s%n");
+          formatBuilder.append("%-45s %-40s %15s %15s %15s %30s %20s %15s %15s%n");
           contentList.add(v.hasStorageId() ? v.getStorageId() : "-");
           contentList.add(v.hasStoragePath() ? v.getStoragePath() : "-");
           contentList.add(v.hasTotalCapacity() ? StringUtils.byteDesc(v.getTotalCapacity()) : "-");
+          contentList.add(v.hasOzoneAvailable() ? StringUtils.byteDesc(v.getOzoneAvailable()) : "-");
           contentList.add(v.hasUsedSpace() ? StringUtils.byteDesc(v.getUsedSpace()) : "-");
           contentList.add(StringUtils.byteDesc(v.getCommittedBytes()));
           contentList.add(v.hasEffectiveUsedSpace() ? StringUtils.byteDesc(v.getEffectiveUsedSpace()) : "-");
-          contentList.add(String.format("%.8f", v.getUtilization()));
-          contentList.add(String.format("%.8f", Math.abs(v.getUtilization() - ideal)));
+          contentList.add(formatPercent(v.getUtilization()));
+          contentList.add(formatPercent(Math.abs(v.getUtilization() - ideal)));
         }
         formatBuilder.append("%n");
       }
 
-      if (i < protos.size() - 1) {
+      if (i < entries.size() - 1) {
         formatBuilder.append("-------%n%n");
       }
     }
@@ -155,24 +177,32 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
     formatBuilder.append("%nNote:%n")
         .append("  - Aggregate VolumeDataDensity: Sum of per-volume density (deviation from ideal);")
         .append(" higher means more imbalance.%n")
-        .append("  - IdealUsage: Target utilization ratio (0-1) when volumes are evenly balanced.%n")
+        .append("  - IdealUsage: Target utilization (0-100%%) when volumes are evenly balanced.%n")
         .append("  - ThresholdRange: Acceptable deviation (percent); volumes within")
         .append(" IdealUsage +/- Threshold are considered balanced.%n")
         .append("  - VolumeDensity: Deviation of a particular volume's utilization from IdealUsage.%n")
-        .append("  - Utilization: Ratio of actual used space to capacity (0-1) for a particular volume.%n")
-        .append("  - TotalCapacity: Total volume capacity.%n")
-        .append("  - UsedSpace: Ozone used space.%n")
-        .append("  - Container Pre-AllocatedSpace: Space reserved for containers not yet written to disk.%n")
+        .append("  - Utilization: how much a particular volume is utilized ")
+        .append("(effectiveUsedSpace / ozoneCapacity) in %%.%n")
+        .append("  - OzoneCapacity: Ozone data volume capacity.%n")
+        .append("  - OzoneAvailable: Ozone data volume available space.%n")
+        .append("  - OzoneUsed: Ozone data volume used space.%n")
+        .append("  - ContainerPreAllocatedSpace: Space reserved for containers not yet written to disk.%n")
         .append("  - EffectiveUsedSpace: This is the actual used space of volume which is visible")
         .append(" to the diskBalancer : (ozoneCapacity minus ozoneAvailable) + containerPreAllocatedSpace + ")
-        .append("move delta for source volume.%n");
+        .append("move delta.%n")
+        .append("  - move delta: source volume space to be reclaimed after move completion;" +
+            " this value is reflected only when diskBalancer is running else it is 0.%n");
 
-    return String.format(formatBuilder.toString(), contentList.toArray(new String[0]));
+    return String.format(formatBuilder.toString(), contentList.toArray(new Object[0]));
   }
 
   @Override
   protected String getActionName() {
     return "report";
+  }
+
+  private static String formatPercent(double ratio) {
+    return String.format(Locale.US, PERCENT_FORMAT, ratio * 100.0);
   }
 
   /**
@@ -181,22 +211,23 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
    * @param report the DiskBalancer report proto
    * @return JSON result map
    */
-  private Map<String, Object> toJson(DatanodeDiskBalancerInfoProto report) {
+  private Map<String, Object> toJson(String hostName, DatanodeDiskBalancerInfoProto report) {
     Map<String, Object> result = new LinkedHashMap<>();
-    result.put("datanode", DiskBalancerSubCommandUtil.getDatanodeHostAndIp(report.getNode()));
+    result.put("datanode", formatDatanodeDisplayName(hostName, report.getNode()));
     result.put("action", "report");
     result.put("status", "success");
-    result.put("volumeDensity", report.getCurrentVolumeDensitySum());
+    result.put("volumeDensity", formatPercent(report.getCurrentVolumeDensitySum()));
 
     if (report.hasIdealUsage() && report.hasDiskBalancerConf()
         && report.getDiskBalancerConf().hasThreshold()) {
       double idealUsage = report.getIdealUsage();
       double threshold = report.getDiskBalancerConf().getThreshold();
-      double lt = idealUsage - threshold / 100.0;
-      double ut = idealUsage + threshold / 100.0;
-      result.put("idealUsage", String.format("%.8f", idealUsage));
-      result.put("threshold %", report.getDiskBalancerConf().getThreshold());
-      result.put("thresholdRange", String.format("(%.08f, %.08f)", lt, ut));
+      double lt = Math.max(0.0, idealUsage - threshold / 100.0);
+      double ut = Math.min(1.0, idealUsage + threshold / 100.0);
+      result.put("idealUsage", formatPercent(idealUsage));
+      result.put("threshold %", String.format(Locale.ROOT, PERCENT_FORMAT, threshold));
+      result.put("thresholdRange", String.format("(%s, %s)",
+          formatPercent(lt), formatPercent(ut)));
     }
 
     if (report.getVolumeInfoCount() > 0) {
@@ -206,13 +237,14 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         Map<String, Object> vm = new LinkedHashMap<>();
         vm.put("storageId", v.getStorageId());
         vm.put("storagePath", v.hasStoragePath() ? v.getStoragePath() : "-");
-        vm.put("totalCapacity", v.hasTotalCapacity() ? StringUtils.byteDesc(v.getTotalCapacity()) : "-");
-        vm.put("usedSpace", v.hasUsedSpace() ? StringUtils.byteDesc(v.getUsedSpace()) : "-");
+        vm.put("ozoneCapacity", v.hasTotalCapacity() ? StringUtils.byteDesc(v.getTotalCapacity()) : "-");
+        vm.put("ozoneAvailable", v.hasOzoneAvailable() ? StringUtils.byteDesc(v.getOzoneAvailable()) : "-");
+        vm.put("ozoneUsed", v.hasUsedSpace() ? StringUtils.byteDesc(v.getUsedSpace()) : "-");
         vm.put("containerPreAllocatedSpace", StringUtils.byteDesc(v.getCommittedBytes()));
         vm.put("effectiveUsedSpace", v.hasEffectiveUsedSpace() ?
             StringUtils.byteDesc(v.getEffectiveUsedSpace()) : "-");
-        vm.put("utilization", v.getUtilization());
-        vm.put("volumeDensity", Math.abs(v.getUtilization() - ideal));
+        vm.put("utilization", formatPercent(v.getUtilization()));
+        vm.put("volumeDensity", formatPercent(Math.abs(v.getUtilization() - ideal)));
         vols.add(vm);
       }
 

@@ -391,7 +391,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     writeLock();
     final State prevState = containerData.getState();
     try {
-      updateContainerState(UNHEALTHY);
+      if (!getContainerFile().getParentFile().exists()) {
+        // Metadata directory is absent (e.g. MISSING_METADATA_DIR detected by scanner).
+        // Attempting to write the .container file would fail
+        // The in-memory UNHEALTHY state is sufficient: SCM will receive it via ICR
+        // and schedule deletion without requiring a persisted .container file.
+        containerData.setState(UNHEALTHY);
+        LOG.debug("Skipping .container file update for container {} with missing metadata directory",
+            containerData.getContainerID());
+      } else {
+        updateContainerState(UNHEALTHY);
+      }
       clearPendingPutBlockCache();
     } finally {
       writeUnlock();
@@ -664,13 +674,22 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
         BlockUtils.removeContainerFromDB(containerData, config);
       }
-      FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
-      FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
-      FileUtils.deleteDirectory(new File(getContainerData().getContainerPath()));
+      File containerDir = new File(getContainerData().getContainerPath());
+      if (containerDir.exists()) {
+        KeyValueContainerUtil.moveToDeletedContainerDir(containerData,
+            containerData.getVolume());
+        deleteDirectory(KeyValueContainerUtil.getTmpDirectoryPath(containerData,
+            containerData.getVolume()).toFile());
+      }
     } catch (Exception ex) {
       LOG.error("Failed to cleanup destination directories for container {}",
           containerData.getContainerID(), ex);
     }
+  }
+
+  @VisibleForTesting
+  void deleteDirectory(File directory) throws IOException {
+    FileUtils.deleteDirectory(directory);
   }
 
   @Override

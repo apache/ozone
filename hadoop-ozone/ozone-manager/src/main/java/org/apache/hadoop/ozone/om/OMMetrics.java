@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.LinkedList;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -28,6 +30,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.ozone.om.snapshot.OMSnapshotDirectoryMetrics;
+import org.apache.hadoop.util.Time;
 
 /**
  * This class is for maintaining Ozone Manager statistics.
@@ -37,6 +40,9 @@ import org.apache.hadoop.ozone.om.snapshot.OMSnapshotDirectoryMetrics;
 public class OMMetrics implements OmMetadataReaderMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
+
+  private final LinkedList<String> ratisEvents = new LinkedList<>();
+  private final int maxRatisEvents;
 
   // OM request type op metrics
   private @Metric MutableCounterLong numVolumeOps;
@@ -60,6 +66,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyLookup;
   private @Metric MutableCounterLong numKeyRenames;
   private @Metric MutableCounterLong numKeyDeletes;
+  private @Metric MutableCounterLong numKeyLifecycleDeletes;
+  private @Metric MutableCounterLong numKeyTrashDeletes;
   private @Metric MutableCounterLong numBucketLists;
   private @Metric MutableCounterLong numKeyLists;
   private @Metric MutableCounterLong numVolumeLists;
@@ -130,6 +138,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyLookupFails;
   private @Metric MutableCounterLong numKeyRenameFails;
   private @Metric MutableCounterLong numKeyDeleteFails;
+  private @Metric MutableCounterLong numKeyLifecycleDeleteFails;
+  private @Metric MutableCounterLong numKeyTrashDeleteFails;
   private @Metric MutableCounterLong numBucketListFails;
   private @Metric MutableCounterLong numKeyListFails;
   private @Metric MutableCounterLong numVolumeListFails;
@@ -230,6 +240,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numTrashRenames;
   private @Metric MutableCounterLong numTrashDeletes;
   private @Metric MutableCounterLong numTrashListStatus;
+  private @Metric MutableCounterLong numTrashListKeys;
   private @Metric MutableCounterLong numTrashGetFileStatus;
   private @Metric MutableCounterLong numTrashGetTrashRoots;
   private @Metric MutableCounterLong numTrashExists;
@@ -256,15 +267,28 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private final DBCheckpointMetrics dbCheckpointMetrics;
   private OMSnapshotDirectoryMetrics snapshotDirectoryMetrics;
 
-  public OMMetrics() {
+  // Bucket Tagging Metrics
+  private @Metric MutableCounterLong numGetBucketTagging;
+  private @Metric MutableCounterLong numPutBucketTagging;
+  private @Metric MutableCounterLong numDeleteBucketTagging;
+  private @Metric MutableCounterLong numGetBucketTaggingFails;
+  private @Metric MutableCounterLong numPutBucketTaggingFails;
+  private @Metric MutableCounterLong numDeleteBucketTaggingFails;
+
+  public OMMetrics(int maxRatisEvents) {
     dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
+    this.maxRatisEvents = maxRatisEvents;
   }
 
-  public static OMMetrics create() {
+  public static OMMetrics create(ConfigurationSource conf) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
+    int maxRatisEvents = conf == null
+        ? OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
+        : conf.getInt(OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
     return ms.register(SOURCE_NAME,
         "Ozone Manager Metrics",
-        new OMMetrics());
+        new OMMetrics(maxRatisEvents));
   }
 
   public DBCheckpointMetrics getDBCheckpointMetrics() {
@@ -842,9 +866,40 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numKeyDeleteFails.incr();
   }
 
+  public void incNumKeyDeleteFails(int count) {
+    numKeyDeleteFails.incr(count);
+  }
+
+  public void incNumKeyLifecycleDeleteFails(int count) {
+    numKeyLifecycleDeleteFails.incr(count);
+  }
+
+  public void incNumKeyTrashDeleteFails(int count) {
+    numKeyTrashDeleteFails.incr(count);
+  }
+
   public void incNumKeyDeletes() {
     numKeyOps.incr();
     numKeyDeletes.incr();
+  }
+
+  public void incNumKeyDeletesInternal() {
+    numKeyDeletes.incr();
+  }
+
+  public void incNumKeyDeletes(int count) {
+    numKeyOps.incr();
+    numKeyDeletes.incr(count);
+  }
+
+  public void incNumKeyLifecycleDeletes(int count) {
+    numKeyOps.incr();
+    numKeyLifecycleDeletes.incr(count);
+  }
+
+  public void incNumKeyTrashDeletes(int count) {
+    numKeyOps.incr();
+    numKeyTrashDeletes.incr(count);
   }
 
   public void incNumKeyCommits() {
@@ -1187,8 +1242,28 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   @VisibleForTesting
+  public long getNumKeyLifecycleDeletes() {
+    return numKeyLifecycleDeletes.value();
+  }
+
+  @VisibleForTesting
+  public long getNumKeyTrashDeletes() {
+    return numKeyTrashDeletes.value();
+  }
+
+  @VisibleForTesting
   public long getNumKeyDeletesFails() {
     return numKeyDeleteFails.value();
+  }
+
+  @VisibleForTesting
+  public long getNumKeyLifecycleDeleteFails() {
+    return numKeyLifecycleDeleteFails.value();
+  }
+
+  @VisibleForTesting
+  public long getNumKeyTrashDeleteFails() {
+    return numKeyTrashDeleteFails.value();
   }
 
   @VisibleForTesting
@@ -1560,6 +1635,35 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     ecBucketCreateFailsTotal.incr();
   }
 
+  @Override
+  public void incNumGetBucketTagging() {
+    numGetBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  @Override
+  public void incNumGetBucketTaggingFails() {
+    numGetBucketTaggingFails.incr();
+  }
+
+  public void incNumPutBucketTagging() {
+    numPutBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  public void incNumPutBucketTaggingFails() {
+    numPutBucketTaggingFails.incr();
+  }
+
+  public void incNumDeleteBucketTagging() {
+    numDeleteBucketTagging.incr();
+    numBucketOps.incr();
+  }
+
+  public void incNumDeleteBucketTaggingFails() {
+    numDeleteBucketTaggingFails.incr();
+  }
+
   public void incNumRecoverLease() {
     numKeyOps.incr();
     numFSOps.incr();
@@ -1568,6 +1672,24 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumRecoverLeaseFails() {
     numRecoverLeaseFails.incr();
+  }
+
+  public void addRatisEvent(String event) {
+    synchronized (ratisEvents) {
+      if (ratisEvents.size() >= maxRatisEvents) {
+        ratisEvents.removeFirst();
+      }
+      ratisEvents.add(Time.formatTime(Time.now()) + "|" + event);
+    }
+  }
+
+  // Ratis state machine events are multi-line logs, which should not be
+  // published as time-series metrics to metrics systems like Prometheus.
+  // Instead, they are exposed via JMX / MXBean endpoints.
+  public String getRatisEvents() {
+    synchronized (ratisEvents) {
+      return String.join("\n", ratisEvents);
+    }
   }
 
   public void unRegister() {

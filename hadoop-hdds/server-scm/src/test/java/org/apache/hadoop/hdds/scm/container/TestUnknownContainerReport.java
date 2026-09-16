@@ -133,7 +133,7 @@ public class TestUnknownContainerReport {
         ContainerReportsProto.newBuilder();
     final ContainerReplicaProto replicaProto =
         ContainerReplicaProto.newBuilder()
-            .setContainerID(containerId.getId())
+            .setContainerID(containerId.getIdForTesting())
             .setState(state)
             .setOriginNodeId(originNodeId)
             .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")

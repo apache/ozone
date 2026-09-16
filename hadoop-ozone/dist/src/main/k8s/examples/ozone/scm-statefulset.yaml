@@ -68,6 +68,9 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /data
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Delete
+    whenScaled: Retain
   volumeClaimTemplates:
   - metadata:
       name: data

@@ -45,12 +45,17 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Background service to clean-up snapDiff jobs which are stable and
  * corresponding reports.
  */
 public class SnapshotDiffCleanupService extends BackgroundService {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SnapshotDiffCleanupService.class);
+
   // Use only a single thread for Snapshot Diff cleanup.
   // Multiple threads would read from the same table and can send deletion
   // requests for same snapshot diff job multiple times.
@@ -118,8 +123,11 @@ public class SnapshotDiffCleanupService extends BackgroundService {
     // In clean report table first and them move jobs to purge table approach,
     // assumption is that by the next cleanup run, there is no purged snapDiff
     // job reading from report table.
-    removeOlderJobReport();
-    moveOldSnapDiffJobsToPurgeTable();
+    long purgedReportJobs = removeOlderJobReport();
+    long movedJobsToPurgeTable = moveOldSnapDiffJobsToPurgeTable();
+    LOG.info("Snapshot diff cleanup run completed. Purged report jobs: {}, " +
+            "moved jobs to purge table: {}.",
+        purgedReportJobs, movedJobsToPurgeTable);
   }
 
   @VisibleForTesting
@@ -144,7 +152,7 @@ public class SnapshotDiffCleanupService extends BackgroundService {
    * than the {@link SnapshotDiffCleanupService#maxAllowedTime}.
    * `maxAllowedTime` is the time, a snapDiff job and its report is persisted.
    */
-  private void moveOldSnapDiffJobsToPurgeTable() {
+  private long moveOldSnapDiffJobsToPurgeTable() {
     try (ManagedRocksIterator iterator =
              new ManagedRocksIterator(db.get().newIterator(snapDiffJobCfh));
          ManagedWriteBatch writeBatch = new ManagedWriteBatch();
@@ -175,35 +183,34 @@ public class SnapshotDiffCleanupService extends BackgroundService {
       }
 
       db.get().write(writeOptions, writeBatch);
+      return purgeJobCount;
     } catch (IOException | RocksDBException e) {
       // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(e);
     }
   }
 
-  private void removeOlderJobReport() {
+  private long removeOlderJobReport() {
     try (ManagedRocksIterator rocksIterator = new ManagedRocksIterator(
         db.get().newIterator(snapDiffPurgedJobCfh));
          ManagedWriteBatch writeBatch = new ManagedWriteBatch();
          ManagedWriteOptions writeOptions = new ManagedWriteOptions()) {
+      long purgedReportJobs = 0;
       rocksIterator.get().seekToFirst();
       while (rocksIterator.get().isValid()) {
         byte[] key = rocksIterator.get().key();
-        byte[] value = rocksIterator.get().value();
         rocksIterator.get().next();
         String prefix = codecRegistry.asObject(key, String.class);
-        long totalNumberOfEntries = codecRegistry.asObject(value, Long.class);
-
-        if (totalNumberOfEntries > 0) {
-          byte[] beginKey = codecRegistry.asRawData(prefix + DELIMITER + 0);
-          byte[] endKey = codecRegistry.asRawData(StringUtils.getLexicographicallyHigherString(prefix + DELIMITER));
-          // Delete Range excludes the endKey.
-          writeBatch.deleteRange(snapDiffReportCfh, beginKey, endKey);
-        }
+        byte[] beginKey = codecRegistry.asRawData(prefix + DELIMITER + 0);
+        byte[] endKey = codecRegistry.asRawData(StringUtils.getLexicographicallyHigherString(prefix + DELIMITER));
+        // Delete Range excludes the endKey.
+        writeBatch.deleteRange(snapDiffReportCfh, beginKey, endKey);
         // Finally, remove the entry from the purged job table.
         writeBatch.delete(snapDiffPurgedJobCfh, key);
+        purgedReportJobs++;
       }
       db.get().write(writeOptions, writeBatch);
+      return purgedReportJobs;
     } catch (IOException | RocksDBException e) {
       // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(e);

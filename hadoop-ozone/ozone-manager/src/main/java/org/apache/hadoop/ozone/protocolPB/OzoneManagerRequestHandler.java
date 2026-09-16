@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.TableCacheUpdateTracker;
 import org.apache.hadoop.hdds.utils.db.TableCacheUpdateTracker.Tracker;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -76,9 +77,11 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
@@ -86,6 +89,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
@@ -102,6 +106,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -110,10 +115,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPC
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCallerIdentityResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
@@ -165,11 +176,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantL
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -310,6 +323,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             getS3VolumeContext();
         responseBuilder.setGetS3VolumeContextResponse(s3VolumeContextResponse);
         break;
+      case GetCallerIdentity:
+        responseBuilder.setGetCallerIdentityResponse(getCallerIdentity());
+        break;
       case TenantGetUserInfo:
         impl.checkS3MultiTenancyEnabled();
         TenantGetUserInfoResponse getUserInfoResponse = tenantGetUserInfo(
@@ -399,6 +415,24 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerProtocolProtos.GetObjectTaggingResponse getObjectTaggingResponse =
             getObjectTagging(request.getGetObjectTaggingRequest());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
+        break;
+      case GetLifecycleConfiguration:
+        GetLifecycleConfigurationResponse getLifecycleConfigurationResponse =
+            infoLifecycleConfiguration(
+                request.getGetLifecycleConfigurationRequest());
+        responseBuilder.setGetLifecycleConfigurationResponse(
+            getLifecycleConfigurationResponse);
+        break;
+      case GetLifecycleServiceStatus:
+        GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse =
+            impl.getLifecycleServiceStatus();
+        responseBuilder.setGetLifecycleServiceStatusResponse(
+            getLifecycleServiceStatusResponse);
+        break;
+      case GetBucketTagging:
+        GetBucketTaggingResponse getBucketTaggingResponse =
+            getBucketTagging(request.getGetBucketTaggingRequest());
+        responseBuilder.setGetBucketTaggingResponse(getBucketTaggingResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1071,10 +1105,21 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
+        .setHeadOp(keyArgs.getHeadOp())
         .build();
 
     GetFileStatusResponse.Builder rb = GetFileStatusResponse.newBuilder();
-    rb.setStatus(impl.getFileStatus(omKeyArgs).getProtobuf(clientVersion));
+    OzoneFileStatusProto status =
+        impl.getFileStatus(omKeyArgs).getProtobuf(clientVersion);
+    if (keyArgs.getHeadOp() && status.hasKeyInfo()) {
+      // A head op only needs the entry type. The block locations are not
+      // refreshed for a head op (they carry no pipeline) and the caller does
+      // not use them, so drop them to keep the response small (HDDS-15678).
+      status = status.toBuilder()
+          .setKeyInfo(status.getKeyInfo().toBuilder().clearKeyLocationList())
+          .build();
+    }
+    rb.setStatus(status);
 
     return rb.build();
   }
@@ -1087,7 +1132,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
   }
 
-  private RefetchSecretKeyResponse refetchSecretKey() {
+  private RefetchSecretKeyResponse refetchSecretKey() throws IOException {
     UUID uuid = impl.refetchSecretKey();
     RefetchSecretKeyResponse response =
         RefetchSecretKeyResponse.newBuilder()
@@ -1260,14 +1305,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private ListStatusLightResponse listStatusLight(
       ListStatusRequest request, int clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
-    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+    OmKeyArgs.Builder omKeyArgsBuilder = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
         .setSortDatanodesInPipeline(false)
         .setLatestVersionLocation(true)
-        .setHeadOp(keyArgs.getHeadOp())
-        .build();
+        .setHeadOp(keyArgs.getHeadOp());
+    if (request.hasListPrefix() && !request.getListPrefix().isEmpty()) {
+      omKeyArgsBuilder.setListPrefix(request.getListPrefix());
+    }
+    OmKeyArgs omKeyArgs = omKeyArgsBuilder.build();
     boolean allowPartialPrefixes =
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatusLight> statuses =
@@ -1389,9 +1437,42 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setCurrentTxnIndex(prepareState.getIndex()).build();
   }
 
+  private GetLifecycleConfigurationResponse infoLifecycleConfiguration(
+      GetLifecycleConfigurationRequest request) throws IOException {
+
+    GetLifecycleConfigurationResponse.Builder resp =
+        GetLifecycleConfigurationResponse.newBuilder();
+
+    String volume = request.getVolumeName();
+    String bucket = request.getBucketName();
+
+    OmLifecycleConfiguration omLifecycleConfiguration =
+        impl.getLifecycleConfiguration(volume, bucket);
+
+    resp.setLifecycleConfiguration(omLifecycleConfiguration.getProtobuf());
+
+    return resp.build();
+  }
+
   private GetS3VolumeContextResponse getS3VolumeContext()
       throws IOException {
     return impl.getS3VolumeContext().getProtobuf();
+  }
+
+  private GetCallerIdentityResponse getCallerIdentity() throws OMException {
+    impl.checkS3STSEnabled();
+    if (OzoneManager.getS3Auth() == null) {
+      throw new OMException(
+          "GetCallerIdentity does not have S3 authentication", OMException.ResultCodes.INVALID_REQUEST);
+    }
+    final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
+    if (stsTokenIdentifier != null) {
+      return S3STSUtils.resolveCallerIdentityForStsCredentials(
+          stsTokenIdentifier.getAssumedRoleId(), stsTokenIdentifier.getAssumedRoleUserArn()).getProtobuf();
+    }
+    final String resolvedPrincipal = OzoneAclUtils.accessIdToUserPrincipal(OzoneManager.getS3AuthEffectiveAccessId());
+    final String kerberosShortName = UserGroupInformation.createRemoteUser(resolvedPrincipal).getShortUserName();
+    return S3STSUtils.resolveCallerIdentityForPermanentCredentials(resolvedPrincipal, kerberosShortName).getProtobuf();
   }
 
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
@@ -1430,6 +1511,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     if (response.getSnapshotDiffReport() != null) {
       builder.setSnapshotDiffReport(
           response.getSnapshotDiffReport().toProtobuf());
+    }
+    if (response.getSubStatus() != null) {
+      builder.setSubStatus(response.getSubStatus().toProtoBuf());
+      if (response.getSubStatus().hasProgress()) {
+        builder.setProgressPercent(response.getProgressPercent());
+      }
     }
 
     return builder.build();
@@ -1589,6 +1676,20 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         GetObjectTaggingResponse.newBuilder();
 
     Map<String, String> result = impl.getObjectTagging(omKeyArgs);
+
+    resp.addAllTags(KeyValueUtil.toProtobuf(result));
+    return resp.build();
+  }
+
+  private GetBucketTaggingResponse getBucketTagging(GetBucketTaggingRequest request)
+      throws IOException {
+    BucketArgs bucketArgs = request.getBucketArgs();
+    OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
+
+    GetBucketTaggingResponse.Builder resp =
+        GetBucketTaggingResponse.newBuilder();
+
+    Map<String, String> result = impl.getBucketTagging(omBucketArgs);
 
     resp.addAllTags(KeyValueUtil.toProtobuf(result));
     return resp.build();

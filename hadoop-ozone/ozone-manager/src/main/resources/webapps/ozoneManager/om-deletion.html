@@ -1,0 +1,186 @@
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+
+<h1>Deletion services</h1>
+
+<div class="alert alert-info" ng-show="$ctrl.role && ($ctrl.role.Role || '').trim() !== 'LEADER'">
+    <p class="m-0">
+        <strong>This node is not the OM leader.</strong>
+        Key and directory deletion services run on the leader only; deletion settings and the metrics
+        on this page reflect the process where you are connected, not live leader work.
+        Open the <strong>Ozone Manager</strong> web UI on the <strong>leader</strong> OM to view
+        current deletion configuration and metrics.
+    </p>
+</div>
+
+<div ng-show="!$ctrl.role || ($ctrl.role.Role || '').trim() === 'LEADER'">
+<h2>Effective configuration (DELETION tag)</h2>
+<p class="text-muted small">Properties tagged <code>DELETION</code> in <code>ozone-default.xml</code>, loaded via <code>conf?cmd=getPropertyByTag&amp;tags=DELETION</code>.</p>
+<p class="text-muted" ng-show="!$ctrl.deletionConfigs.length">No matching deletion-related properties found, or configuration is still loading.</p>
+<table class="table table-bordered table-striped" ng-show="$ctrl.deletionConfigs.length">
+    <thead>
+    <tr>
+        <th class="col-md-3">Property</th>
+        <th class="col-md-2">Value</th>
+        <th class="col-md-7">Description</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr ng-repeat="c in $ctrl.deletionConfigs">
+        <td style="word-break: break-all;">{{c.name}}</td>
+        <td style="word-break: break-all;">{{c.value}}</td>
+        <td>{{c.description}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Service iteration latency (last run)</h2>
+<p class="text-muted" ng-show="!$ctrl.perf">OMPerformanceMetrics JMX bean not available.</p>
+<table class="table table-bordered table-striped" ng-show="$ctrl.perf">
+    <tbody>
+    <tr>
+        <td>KeyDeletingService (ms)</td>
+        <td>{{$ctrl.perf.KeyDeletingServiceLatencyMs != null ? $ctrl.perf.KeyDeletingServiceLatencyMs : 'N/A'}}</td>
+    </tr>
+    <tr>
+        <td>DirectoryDeletingService (ms)</td>
+        <td>{{$ctrl.perf.DirectoryDeletingServiceLatencyMs != null ? $ctrl.perf.DirectoryDeletingServiceLatencyMs : 'N/A'}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<div ng-show="!$ctrl.del" class="text-muted">DeletingServiceMetrics JMX bean not available.</div>
+<div ng-show="$ctrl.del">
+    <h2>Deletion Progress [{{$ctrl.del.MetricsResetTimeStamp ? 'since ' + ($ctrl.del.MetricsResetTimeStamp * 1000 | date:'yyyy-MM-dd HH:mm:ss') : 'Initializing'}}]
+        &nbsp;&nbsp;&bull;&nbsp;&nbsp;
+        <b>Size Reclaimed:</b> {{$ctrl.formatBytes($ctrl.del.ReclaimedSizeInInterval)}}
+        &nbsp;&nbsp;&bull;&nbsp;&nbsp;
+        <b>Keys Reclaimed:</b> {{$ctrl.del.KeysReclaimedInInterval || 0}}
+    </h2>
+    <h3>KeyDeletingService (last run)</h3>
+    <div class="mt-3">
+        <div class="row mb-2" ng-if="$ctrl.del.KdsCurRunTimestamp">
+            <div class="col-md-3"><b>Current Run Started:</b></div>
+            <div class="col-md-9">{{$ctrl.convertMsToTime($ctrl.Date.now() - $ctrl.del.KdsCurRunTimestamp)}} ago</div>
+        </div>
+        <div class="row mb-2" ng-if="$ctrl.del.KdsLastRunTimestamp">
+            <div class="col-md-3"><b>Last Run:</b></div>
+            <div class="col-md-9">{{$ctrl.convertMsToTime($ctrl.Date.now() - $ctrl.del.KdsLastRunTimestamp)}} ago</div>
+        </div>
+    </div>
+    <div style="margin-bottom: 2px;"></div>
+    <table class="table table-sm table-bordered mt-2">
+        <thead>
+        <tr>
+            <th>Store</th>
+            <th>Reclaimed Size</th>
+            <th>#Reclaimed Keys</th>
+            <th>#Iterated Keys</th>
+            <th>#NotReclaimable Keys (Referred by Snapshots)</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>Active Object Store</td>
+            <td>{{$ctrl.formatBytes($ctrl.del.AosReclaimedSizeLast)}}</td>
+            <td>{{$ctrl.del.AosKeysReclaimedLast || 0}}</td>
+            <td>{{$ctrl.del.AosKeysIteratedLast || 0}}</td>
+            <td>{{$ctrl.del.AosKeysNotReclaimableLast || 0}}</td>
+        </tr>
+        <tr>
+            <td>Snapshots</td>
+            <td>{{$ctrl.formatBytes($ctrl.del.SnapReclaimedSizeLast)}}</td>
+            <td>{{$ctrl.del.SnapKeysReclaimedLast || 0}}</td>
+            <td>{{$ctrl.del.SnapKeysIteratedLast || 0}}</td>
+            <td>{{$ctrl.del.SnapKeysNotReclaimableLast || 0}}</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <h3>DirectoryDeletingService (last run)</h3>
+    <div class="mt-3">
+        <div class="row mb-2" ng-if="$ctrl.del.DdsCurRunTimestamp">
+            <div class="col-md-3"><b>Current Run Started:</b></div>
+            <div class="col-md-9">{{$ctrl.convertMsToTime($ctrl.Date.now() - $ctrl.del.DdsCurRunTimestamp)}} ago</div>
+        </div>
+        <div class="row mb-2" ng-if="$ctrl.del.DdsLastRunTimestamp">
+            <div class="col-md-3"><b>Last Completed Run Started:</b></div>
+            <div class="col-md-9">{{$ctrl.convertMsToTime($ctrl.Date.now() - $ctrl.del.DdsLastRunTimestamp)}} ago</div>
+        </div>
+    </div>
+    <table class="table table-sm table-bordered mt-2">
+        <thead>
+        <tr>
+            <th>Store</th>
+            <th>Dirs sent for purge</th>
+            <th>Sub-dirs</th>
+            <th>Sub-files</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>Active Object Store</td>
+            <td>{{$ctrl.del.DdsAosDirsSentForPurgeLast || 0}}</td>
+            <td>{{$ctrl.del.DdsAosSubDirsLast || 0}}</td>
+            <td>{{$ctrl.del.DdsAosSubFilesLast || 0}}</td>
+        </tr>
+        <tr>
+            <td>Snapshots</td>
+            <td>{{$ctrl.del.DdsSnapDirsSentForPurgeLast || 0}}</td>
+            <td>{{$ctrl.del.DdsSnapSubDirsLast || 0}}</td>
+            <td>{{$ctrl.del.DdsSnapSubFilesLast || 0}}</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <h3>DirectoryDeletingService (cumulative since OM restart)</h3>
+    <table class="table table-bordered table-striped table-condensed">
+        <tbody>
+        <tr><td>Deleted directories sent for purge</td><td>{{$ctrl.del.NumDirsSentForPurge || 0}}</td></tr>
+        <tr><td>Sub-directories sent for purge</td><td>{{$ctrl.del.NumSubDirsSentForPurge || 0}}</td></tr>
+        <tr><td>Sub-files sent for purge</td><td>{{$ctrl.del.NumSubFilesSentForPurge || 0}}</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Directory purge handling</h3>
+    <table class="table table-bordered table-striped table-condensed">
+        <tbody>
+        <tr><td>Directories purged</td><td>{{$ctrl.del.NumDirsPurged || 0}}</td></tr>
+        <tr><td>Sub-files moved to deletedTable</td><td>{{$ctrl.del.NumSubFilesMovedToDeletedTable || 0}}</td></tr>
+        <tr><td>Sub-directories moved to deletedDirTable</td><td>{{$ctrl.del.NumSubDirsMovedToDeletedDirTable || 0}}</td></tr>
+        </tbody>
+    </table>
+
+    <h3>KeyDeletingService (cumulative since OM restart)</h3>
+    <table class="table table-bordered table-striped table-condensed">
+        <tbody>
+        <tr><td>Keys processed</td><td>{{$ctrl.del.NumKeysProcessed || 0}}</td></tr>
+        <tr><td>Deleted keys sent for purge</td><td>{{$ctrl.del.NumKeysSentForPurge || 0}}</td></tr>
+        <tr><td>Keys purged</td><td>{{$ctrl.del.NumKeysPurged || 0}}</td></tr>
+        <tr><td>Rename entries purged</td><td>{{$ctrl.del.NumRenameEntriesPurged || 0}}</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Purge coordination (AOS)</h3>
+    <table class="table table-bordered table-striped table-condensed">
+        <tbody>
+        <tr><td>Last purge term index</td><td>{{$ctrl.del.LastAOSPurgeTermId != null ? $ctrl.del.LastAOSPurgeTermId : 'N/A'}}</td></tr>
+        <tr><td>Last purge transaction index</td><td>{{$ctrl.del.LastAOSPurgeTransactionId != null ? $ctrl.del.LastAOSPurgeTransactionId : 'N/A'}}</td></tr>
+        </tbody>
+    </table>
+</div>
+</div>

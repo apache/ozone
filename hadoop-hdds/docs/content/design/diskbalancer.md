@@ -69,7 +69,8 @@ Administrators use the `ozone admin datanode diskbalancer` CLI to manage and mon
   - Update configuration parameters
   - Query DiskBalancer status and volume density reports
 * Each datanode performs its own **authentication** (via RPC) and **authorization** checks (using `OzoneAdmins` based on `ozone.administrators` configuration).
-* For batch operations, clients can use the `--in-service-datanodes` flag to automatically query SCM for all IN_SERVICE datanodes and execute commands on all of them.
+* For batch operations, clients can use the `--in-service-datanodes` flag to automatically query SCM for all IN_SERVICE and HEALTHY datanodes and execute commands on all of them.
+* When `--node-id` is used, the CLI resolves the datanode UUID to the CLIENT_RPC address through SCM before issuing the datanode RPC.
 
 **DN - DiskBalancer Service:**
 
@@ -81,8 +82,10 @@ A daemon thread, the **Scheduler**, runs periodically on each Datanode.
 from the most over-utilized disk (source) to the least utilized disk (destination).
 3.  The scheduler dispatches these move tasks to a pool of **Worker** threads for parallel execution.
 
-**Note:** SCM is used **only** for datanode discovery when using the `--in-service-datanodes` flag. SCM provides a list of IN_SERVICE datanodes for batch operations but
-does **not** participate in DiskBalancer control operations (start/stop/update/status/report). All DiskBalancer operations are performed directly between client and datanode.
+**Note:** SCM is used for datanode discovery when using the `--in-service-datanodes` flag and to resolve
+`--node-id` UUIDs to CLIENT_RPC addresses. SCM provides a list of IN_SERVICE and HEALTHY datanodes for
+batch operations and node metadata for UUID lookup, but does **not** participate in DiskBalancer control operations
+(start/stop/update/status/report). All DiskBalancer operations are performed directly between client and datanode.
 
 ## Container Move Process
 
@@ -104,6 +107,8 @@ D1     ----> C1-CLOSED  --- (5) ---> C1-DELETED
 D2      ----> Temp C1-CLOSED  --- (2) ---> Temp C1-RECOVERING --- (3) ---> C1-RECOVERING --- (4) ---> C1-CLOSED
 ```
 
+**Note:** By default, `hdds.datanode.disk.balancer.container.states` includes **CLOSED** and **QUASI_CLOSED**. The same move process applies for any state listed there.
+
 ### Lazy Deletion of Source Container Replica
 
 The source container on D1 is **not** deleted immediately after the move completes. Instead, it is scheduled for deletion after a configurable delay using config `hdds.datanode.disk.balancer.replica.deletion.delay`, **default: 5 minutes**.
@@ -123,7 +128,7 @@ are configurable, but the default implementations provide robust and safe behavi
 *   **`DefaultContainerChoosingPolicy`**: This is the default policy that consolidates both volume selection and container
 selection into a single operation. It identifies the most over-utilized volume as the source and the most under-utilized
 volume with sufficient space as the destination, then iterates through containers on the source to pick the first one
-that is in a **CLOSED** state and is not already being moved. It caches the list of containers for each volume which auto expires after one hour.
+that is movable (per `hdds.datanode.disk.balancer.container.states`, default **CLOSED** and **QUASI_CLOSED**) and is not already being moved. It caches the list of containers for each volume which auto expires after one hour.
 
 ## Security Design
 DiskBalancer follows the same security model as other services:
@@ -147,10 +152,11 @@ The DiskBalancer CLI provides five main commands that communicate directly with 
 5. **report** - Retrieves volume density report showing imbalance analysis.
 
 The CLI supports:
-- **Direct datanode addressing**: Commands can target specific datanodes by hostname or IP address
+- **Direct datanode addressing**: Commands can target specific datanodes by hostname or IP address as positional arguments
+- **UUID targeting**: `--node-id` resolves datanode UUIDs to CLIENT_RPC addresses through SCM; resolution failures are reported per node
 - **Batch operations**: The `--in-service-datanodes` flag queries SCM for all IN_SERVICE and HEALTHY datanodes and executes commands on all of them
 - **Flexible input**: Datanode addresses can be provided as positional arguments or read from stdin
-- **Output formats**: Results can be displayed in human-readable format or JSON for programmatic access
+- **Output formats**: Results can be displayed in human-readable format or JSON for programmatic access; hostname targets show `hostname (ip:port)`, `--node-id` targets show the UUID
 
 ### Operational State Awareness
 
@@ -163,7 +169,7 @@ This ensures DiskBalancer respects datanode lifecycle management and does not in
 
 ## Feature Flag
 
-The DiskBalancer feature is gated behind a feature flag (`hdds.datanode.disk.balancer.enabled`) to allow controlled rollout. By default, the feature is disabled. When disabled, the DiskBalancer service is not initialized on datanodes, and the CLI commands are hidden from the main help output to prevent accidental usage.
+The DiskBalancer feature is gated behind a feature flag (`hdds.datanode.disk.balancer.enabled`) to allow controlled rollout. By default, the feature is enabled. When disabled, the DiskBalancer service is not initialized on datanodes, and the CLI commands refuse to run until the flag is set back to true.
 
 ## DiskBalancer Metrics
 

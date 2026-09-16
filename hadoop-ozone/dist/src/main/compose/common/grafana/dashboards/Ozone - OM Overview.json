@@ -1,0 +1,2796 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Ozone Manager OM `/prom`: **Operations** pairs **`om_metrics` rate rows** with **`OmClientProtocol`** latency (**`OmClientProtocol.proto` `Type` enums**) via **`rate(time)/rate(counter)`**. **Legends**: **right**, **mean** / **max** per series (**table** legend on time series panels); non-JVM series use **`{{instance}}`** in legend text (scraped target; avoids repeating **`hostname`** when it matches the host portion of **`instance`**). JVM rows keep **`{{hostname}}`** without **`instance`** where metrics omit duplicate identity. Bucket utilization **→** `bucket_utilization_metrics_*`, HA, JVM. Metric normalization per `PrometheusMetricsSinkUtil`.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "panels": [],
+      "title": "JVM",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "**Note:** OM **CPU gauges** (`CpuMetrics` → record `JvmMetricsCpu`) generally **do not** carry `processname=\"OzoneManager\"` (only `instance` scrape labels). Omit that filter.",
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_cpu_jvm_load{instance=~\"$instance\"}",
+          "legendFormat": "JVM · {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_cpu_system_load{instance=~\"$instance\"}",
+          "legendFormat": "system · {{hostname}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "JVM CPU load",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "decmbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_heap_used_m{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "used · {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_heap_committed_m{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "committed · {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_heap_max_m{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "max · {{hostname}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Heap — used / committed / max",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "decmbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_non_heap_used_m{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "used · {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_non_heap_committed_m{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "committed · {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_mem_non_heap_max_m{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "max · {{hostname}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Non-heap (native / metaspace) — used / committed / max",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "increase(jvm_metrics_gc_time_millis{instance=~\"$instance\",processname=\"OzoneManager\"}[1m]) / 60000",
+          "legendFormat": "total · {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "increase(jvm_metrics_gc_time_millis_g1_young_generation{instance=~\"$instance\",processname=\"OzoneManager\"}[1m]) / 60000",
+          "legendFormat": "G1 young · {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "increase(jvm_metrics_gc_time_millis_g1_old_generation{instance=~\"$instance\",processname=\"OzoneManager\"}[1m]) / 60000",
+          "legendFormat": "G1 old · {{hostname}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "GC time (fraction of wall per minute)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(jvm_metrics_gc_count{instance=~\"$instance\",processname=\"OzoneManager\"}[$__rate_interval])",
+          "legendFormat": "total · {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(jvm_metrics_gc_count_g1_young_generation{instance=~\"$instance\",processname=\"OzoneManager\"}[$__rate_interval])",
+          "legendFormat": "G1 young · {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(jvm_metrics_gc_count_g1_old_generation{instance=~\"$instance\",processname=\"OzoneManager\"}[$__rate_interval])",
+          "legendFormat": "G1 old · {{hostname}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "GC count rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "**Note:** **`NettyMetrics`** does **not** set `processname`; filter **only `instance`** (same CPU panel rationale). Direct memory counters come from OM Ratis/Netty use.",
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "netty_metrics_used_direct_mem{instance=~\"$instance\"}",
+          "legendFormat": "used · {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "netty_metrics_max_direct_mem{instance=~\"$instance\"}",
+          "legendFormat": "max · {{hostname}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Netty direct memory — used / max",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 55,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "axisLabel": "Thread count"
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_new{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "new · {{hostname}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_runnable{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "runnable · {{hostname}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_blocked{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "blocked · {{hostname}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_waiting{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "waiting · {{hostname}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_timed_waiting{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "timed_waiting · {{hostname}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "jvm_metrics_threads_terminated{instance=~\"$instance\",processname=\"OzoneManager\"}",
+          "legendFormat": "terminated · {{hostname}}",
+          "range": true,
+          "refId": "F"
+        }
+      ],
+      "title": "Thread count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 1,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisLabel": "Threads (live / idle / max)",
+            "axisPlacement": "auto"
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Queued tasks (waiting)"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(http_server2_metrics_http_server_thread_count{instance=~\"$instance\",server_name=~\"ozoneManager\"} or http_server2_metrics_http_server_thread_count{instance=~\"$instance\",servername=~\"ozoneManager\"})",
+          "legendFormat": "threads (live) · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(http_server2_metrics_http_server_idle_thread_count{instance=~\"$instance\",server_name=~\"ozoneManager\"} or http_server2_metrics_http_server_idle_thread_count{instance=~\"$instance\",servername=~\"ozoneManager\"})",
+          "legendFormat": "idle · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(http_server2_metrics_http_server_max_thread_count{instance=~\"$instance\",server_name=~\"ozoneManager\"} or http_server2_metrics_http_server_max_thread_count{instance=~\"$instance\",servername=~\"ozoneManager\"})",
+          "legendFormat": "max · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(http_server2_metrics_http_server_thread_queue_waiting_task_count{instance=~\"$instance\",server_name=~\"ozoneManager\"} or http_server2_metrics_http_server_thread_queue_waiting_task_count{instance=~\"$instance\",servername=~\"ozoneManager\"})",
+          "legendFormat": "queue (waiting) · {{instance}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Jetty http server threads",
+      "description": "OM Jetty pools: **`HttpServer2Metrics`** tags **`server_name=ozoneManager`** (camelCase). Some Hadoop stacks only expose **`servername`**. Prometheus **cannot** OR label keys inside one `{...}`; use **`series{...} or series{...}`** as written. If panels stay empty but JFR shows Jetty threads, broaden to **`{instance=~\"$instance\"}`** only (one pool per OM).",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 71
+      },
+      "id": 10,
+      "panels": [],
+      "title": "Operations",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 72
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (\n  rate(om_client_protocol_counter{instance=~\"$instance\",type=~\"^(CreateVolume|SetVolumeProperty|CheckVolumeAccess|InfoVolume|DeleteVolume|ListVolume)$\"}[$__rate_interval])\n)",
+          "legendFormat": "volume tier · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (\n  rate(om_client_protocol_counter{instance=~\"$instance\",type=~\"^(CreateBucket|InfoBucket|SetBucketProperty|DeleteBucket|ListBuckets|ServiceList|GetS3VolumeContext)$\"}[$__rate_interval])\n)",
+          "legendFormat": "bucket tier · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (\n  rate(om_client_protocol_counter{instance=~\"$instance\",type=~\"^(CreateKey|LookupKey|RenameKey|DeleteKey|ListKeys|CommitKey|AllocateBlock|DeleteKeys|RenameKeys|GetKeyInfo|ListKeysLight|InitiateMultiPartUpload|CommitMultiPartUpload|CompleteMultiPartUpload|AbortMultiPartUpload|ListMultiPartUploadParts|ListMultipartUploads|ListOpenFiles|PutObjectTagging|GetObjectTagging|DeleteObjectTagging)$\"}[$__rate_interval])\n)",
+          "legendFormat": "key tier · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (\n  rate(om_client_protocol_counter{instance=~\"$instance\",type=~\"^(GetFileStatus|CreateDirectory|CreateFile|LookupFile|ListStatus|ListStatusLight|RecoverLease)$\"}[$__rate_interval])\n)",
+          "legendFormat": "fs tier · {{instance}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Aggregate tiers — rate",
+      "type": "timeseries",
+      "description": "Tier **`rate(om_client_protocol_counter)`**/s (**4** aggregates). Pair: **Aggregate tiers — latency** (tier-weighted mean ms)."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "Tier **`latency`** (**`rate(time)`/`rate(counter)`**, ms); **4** series matching legend names on **Aggregate tiers — rate**.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 81
+      },
+      "id": 401,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=~\"^(CreateVolume|SetVolumeProperty|CheckVolumeAccess|InfoVolume|DeleteVolume|ListVolume)$\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance) (\n    clamp_min(rate(om_client_protocol_counter{instance=~\"$instance\",type=~\"^(CreateVolume|SetVolumeProperty|CheckVolumeAccess|InfoVolume|DeleteVolume|ListVolume)$\"}[$__rate_interval]), 1e-12)\n  )\n)",
+          "legendFormat": "volume tier · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=~\"^(CreateBucket|InfoBucket|SetBucketProperty|DeleteBucket|ListBuckets|ServiceList|GetS3VolumeContext)$\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance) (\n    clamp_min(rate(om_client_protocol_counter{instance=~\"$instance\",type=~\"^(CreateBucket|InfoBucket|SetBucketProperty|DeleteBucket|ListBuckets|ServiceList|GetS3VolumeContext)$\"}[$__rate_interval]), 1e-12)\n  )\n)",
+          "legendFormat": "bucket tier · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=~\"^(CreateKey|LookupKey|RenameKey|DeleteKey|ListKeys|CommitKey|AllocateBlock|DeleteKeys|RenameKeys|GetKeyInfo|ListKeysLight|InitiateMultiPartUpload|CommitMultiPartUpload|CompleteMultiPartUpload|AbortMultiPartUpload|ListMultiPartUploadParts|ListMultipartUploads|ListOpenFiles|PutObjectTagging|GetObjectTagging|DeleteObjectTagging)$\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance) (\n    clamp_min(rate(om_client_protocol_counter{instance=~\"$instance\",type=~\"^(CreateKey|LookupKey|RenameKey|DeleteKey|ListKeys|CommitKey|AllocateBlock|DeleteKeys|RenameKeys|GetKeyInfo|ListKeysLight|InitiateMultiPartUpload|CommitMultiPartUpload|CompleteMultiPartUpload|AbortMultiPartUpload|ListMultiPartUploadParts|ListMultipartUploads|ListOpenFiles|PutObjectTagging|GetObjectTagging|DeleteObjectTagging)$\"}[$__rate_interval]), 1e-12)\n  )\n)",
+          "legendFormat": "key tier · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=~\"^(GetFileStatus|CreateDirectory|CreateFile|LookupFile|ListStatus|ListStatusLight|RecoverLease)$\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance) (\n    clamp_min(rate(om_client_protocol_counter{instance=~\"$instance\",type=~\"^(GetFileStatus|CreateDirectory|CreateFile|LookupFile|ListStatus|ListStatusLight|RecoverLease)$\"}[$__rate_interval]), 1e-12)\n  )\n)",
+          "legendFormat": "fs tier · {{instance}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Aggregate tiers — latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 90
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_volume_creates{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "volume creates · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_volume_deletes{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "volume deletes · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_volume_updates{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "volume updates · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_volume_infos{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "volume info · {{instance}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_volume_lists{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "volume list · {{instance}}",
+          "range": true,
+          "refId": "E"
+        }
+      ],
+      "title": "Volume mutations & listings — rate",
+      "type": "timeseries",
+      "description": "**Volume mutations & listings — rate** pair: **`om_metrics`** **`rate(...)`**/s (**5**). Legends match **… — latency**."
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "**Volume mutations & listings — latency**: **OmClientProtocol** (**5** **`latency`** queries). Legends match rate panel.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 99
+      },
+      "id": 402,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"CreateVolume\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"CreateVolume\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "volume creates · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"DeleteVolume\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"DeleteVolume\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "volume deletes · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"SetVolumeProperty\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"SetVolumeProperty\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "volume updates · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"InfoVolume\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"InfoVolume\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "volume info · {{instance}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"ListVolume\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"ListVolume\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "volume list · {{instance}}",
+          "range": true,
+          "refId": "E"
+        }
+      ],
+      "title": "Volume mutations & listings — latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 108
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (\n  (\n      rate(om_metrics_num_bucket_creates{instance=~\"$instance\"}[$__rate_interval])\n    + \n      rate(om_metrics_num_fso_bucket_creates{instance=~\"$instance\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "bucket creates · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (\n  (\n      rate(om_metrics_num_bucket_deletes{instance=~\"$instance\"}[$__rate_interval])\n    + \n      rate(om_metrics_num_fso_bucket_deletes{instance=~\"$instance\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "bucket deletes · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_bucket_updates{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "bucket updates · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_bucket_infos{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "bucket info · {{instance}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_bucket_lists{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "bucket list · {{instance}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (\n  rate(om_client_protocol_counter{instance=~\"$instance\",type=\"ServiceList\"}[$__rate_interval])\n)",
+          "legendFormat": "service list · {{instance}}",
+          "range": true,
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (\n  rate(om_client_protocol_counter{instance=~\"$instance\",type=\"GetS3VolumeContext\"}[$__rate_interval])\n)",
+          "legendFormat": "GetS3VolumeContext · {{instance}}",
+          "range": true,
+          "refId": "G"
+        }
+      ],
+      "title": "Buckets & layouts — rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "**Paired legends** match **Buckets & layouts — rate** (seven series). OBS+FSO create/delete **`om_metrics`** rows are summed on the rate side. **`service list`** is **OmClient ServiceList RPC** (**`om_client_protocol_*`** rate/latency), not **`om_metrics_num_bucket_s3_lists`** (that counter has no callers in OM). **`GetS3VolumeContext`** likewise uses **`om_client_protocol_*`**.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 117
+      },
+      "id": 403,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"CreateBucket\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"CreateBucket\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "bucket creates · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"DeleteBucket\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"DeleteBucket\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "bucket deletes · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"SetBucketProperty\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"SetBucketProperty\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "bucket updates · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"InfoBucket\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"InfoBucket\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "bucket info · {{instance}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"ListBuckets\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"ListBuckets\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "bucket list · {{instance}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"ServiceList\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"ServiceList\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "service list · {{instance}}",
+          "range": true,
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"GetS3VolumeContext\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"GetS3VolumeContext\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "GetS3VolumeContext · {{instance}}",
+          "range": true,
+          "refId": "G"
+        }
+      ],
+      "title": "Buckets & layouts — latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 128
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_key_allocate{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "allocate · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_key_commits{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "commit · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_key_h_syncs{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "hsync · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_key_deletes{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "delete · {{instance}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_key_lists{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "key list · {{instance}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_key_lookup{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "lookup · {{instance}}",
+          "range": true,
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_key_renames{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "rename · {{instance}}",
+          "range": true,
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_block_allocations{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "block alloc · {{instance}}",
+          "range": true,
+          "refId": "H"
+        }
+      ],
+      "title": "Keys, commits & block alloc — rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "**Paired legends** match **Keys … — rate** (eight series). **`CommitKey`** OmClient latency is **shared**, while **`om_metrics_num_key_commits`** vs **`om_metrics_num_key_h_syncs`** **partition** **`CommitKey`** RPCs (**`hsync`** flag vs normal close); **commit** / **hsync** latency multiply that aggregate latency by **`(rate(counter) >bool 0)`** on **their paired counter**, so **hsync latency stays zero when only non-hsync closes run** (**aligns with hsync rate zero**). **`allocate`** vs **`block alloc`** mirror **`AllocateBlock`**; **`key list`** blends **`ListKeys`** + **`ListKeysLight`**.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 137
+      },
+      "id": 404,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"AllocateBlock\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"AllocateBlock\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "allocate · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  (\n    sum by (hostname, instance) (\n      rate(om_client_protocol_time{instance=~\"$instance\",type=\"CommitKey\"}[$__rate_interval])\n    )\n    /\n    sum by (hostname, instance) (\n      rate(om_client_protocol_counter{instance=~\"$instance\",type=\"CommitKey\"}[$__rate_interval])\n    )\n  )\n  *\n  (\n    sum by (hostname, instance) (\n      rate(om_metrics_num_key_commits{instance=~\"$instance\"}[$__rate_interval])\n    ) > bool 0\n  )\n)",
+          "legendFormat": "commit · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  (\n    sum by (hostname, instance) (\n      rate(om_client_protocol_time{instance=~\"$instance\",type=\"CommitKey\"}[$__rate_interval])\n    )\n    /\n    sum by (hostname, instance) (\n      rate(om_client_protocol_counter{instance=~\"$instance\",type=\"CommitKey\"}[$__rate_interval])\n    )\n  )\n  *\n  (\n    sum by (hostname, instance) (\n      rate(om_metrics_num_key_h_syncs{instance=~\"$instance\"}[$__rate_interval])\n    ) > bool 0\n  )\n)",
+          "legendFormat": "hsync · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"DeleteKey\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"DeleteKey\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "delete · {{instance}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  (\n    sum by (hostname, instance) (\n      rate(om_client_protocol_time{instance=~\"$instance\",type=~\"ListKeys|ListKeysLight\"}[$__rate_interval])\n    )\n  )\n  /\n  (\n    sum by (hostname, instance) (\n      rate(om_client_protocol_counter{instance=~\"$instance\",type=~\"ListKeys|ListKeysLight\"}[$__rate_interval])\n    )\n  )\n)",
+          "legendFormat": "key list · {{instance}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"LookupKey\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"LookupKey\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "lookup · {{instance}}",
+          "range": true,
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"RenameKey\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"RenameKey\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "rename · {{instance}}",
+          "range": true,
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"AllocateBlock\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"AllocateBlock\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "block alloc · {{instance}}",
+          "range": true,
+          "refId": "H"
+        }
+      ],
+      "title": "Keys, commits & block alloc — latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 148
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_get_file_status{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "getFileStatus · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_create_directory{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "mkdir · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_create_file{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "create file · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_lookup_file{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "lookup file · {{instance}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_metrics_num_list_status{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "listStatus · {{instance}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_client_protocol_counter{instance=~\"$instance\",type=\"ListStatusLight\"}[$__rate_interval]))",
+          "legendFormat": "listStatusLight · {{instance}}",
+          "range": true,
+          "refId": "F"
+        }
+      ],
+      "title": "FS/OFS primitives — rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "description": "**Paired legends** match **FS/OFS primitives — rate** (six series). **`listStatus`** **rate** uses **`om_metrics_num_list_status`**, incremented for **either** **`ListStatus`** **or** **`ListStatusLight`** (**`OmMetadataReader.listStatusLight`** delegates into **`listStatus`**). **`listStatus`** **latency** therefore blends **`om_client_protocol_*`** for **`ListStatus|ListStatusLight`**. **`listStatusLight`** **rate** stays **`om_client_protocol_counter{type=\"ListStatusLight\"}`**; **`listStatusLight`** **latency** is **`OmClient`** **`type=\"ListStatusLight\"`** **only**.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 157
+      },
+      "id": 405,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"GetFileStatus\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"GetFileStatus\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "getFileStatus · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"CreateDirectory\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"CreateDirectory\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "mkdir · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"CreateFile\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"CreateFile\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "create file · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"LookupFile\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"LookupFile\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "lookup file · {{instance}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  (\n    sum by (hostname, instance) (\n      rate(om_client_protocol_time{instance=~\"$instance\",type=~\"ListStatus|ListStatusLight\"}[$__rate_interval])\n    )\n  )\n  /\n  (\n    sum by (hostname, instance) (\n      rate(om_client_protocol_counter{instance=~\"$instance\",type=~\"ListStatus|ListStatusLight\"}[$__rate_interval])\n    )\n  )\n)",
+          "legendFormat": "listStatus · {{instance}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_time{instance=~\"$instance\",type=\"ListStatusLight\"}[$__rate_interval])\n  )\n  /\n  sum by (hostname, instance, type) (\n    rate(om_client_protocol_counter{instance=~\"$instance\",type=\"ListStatusLight\"}[$__rate_interval])\n  )\n)",
+          "legendFormat": "listStatusLight · {{instance}}",
+          "range": true,
+          "refId": "F"
+        }
+      ],
+      "title": "FS/OFS primitives — latency",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 167
+      },
+      "id": 18,
+      "panels": [],
+      "title": "Deleting Service Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "E"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Bps"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 168
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(deleting_service_metrics_num_keys_processed{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "keys processed · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(deleting_service_metrics_num_keys_purged{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "keys purged · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(deleting_service_metrics_num_dirs_purged{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "dirs purged · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(deleting_service_metrics_keys_reclaimed_in_interval{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "keys reclaimed (interval counter) · {{instance}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(deleting_service_metrics_reclaimed_size_in_interval{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "reclaimed logical volume · {{instance}}",
+          "range": true,
+          "refId": "E"
+        }
+      ],
+      "title": "Deletion pipeline",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 177
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "om_performance_metrics_key_deleting_service_latency_ms{instance=~\"$instance\"}",
+          "legendFormat": "KeyDeletingService · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "om_performance_metrics_directory_deleting_service_latency_ms{instance=~\"$instance\"}",
+          "legendFormat": "DirectoryDeletingService · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "om_performance_metrics_open_key_cleanup_service_latency_ms{instance=~\"$instance\"}",
+          "legendFormat": "OpenKeyCleanup · {{instance}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Per-iteration OM deletion service timings (milliseconds)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 185
+      },
+      "id": 21,
+      "panels": [],
+      "title": "OM Ratis",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 186
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_performance_metrics_pre_execute_latency_ns_num_ops{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "preExecute · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_performance_metrics_submit_to_ratis_latency_ns_num_ops{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "submitToRatis · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_performance_metrics_validate_response_latency_ns_num_ops{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "validateResponse · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (rate(om_performance_metrics_create_om_response_latency_ns_num_ops{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "createOmResponse · {{instance}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Ratis Operations rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 195
+      },
+      "id": 23,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (om_performance_metrics_pre_execute_latency_ns_avg_time{instance=~\"$instance\"} / 1e6)",
+          "legendFormat": "preExecute · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (om_performance_metrics_submit_to_ratis_latency_ns_avg_time{instance=~\"$instance\"} / 1e6)",
+          "legendFormat": "submitToRatis · {{instance}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (om_performance_metrics_validate_response_latency_ns_avg_time{instance=~\"$instance\"} / 1e6)",
+          "legendFormat": "validateResponse · {{instance}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (om_performance_metrics_create_om_response_latency_ns_avg_time{instance=~\"$instance\"} / 1e6)",
+          "legendFormat": "createOmResponse · {{instance}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Ratis Operations latency",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 204
+      },
+      "id": 24,
+      "panels": [],
+      "title": "HA",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Follower"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Leader"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 205
+      },
+      "id": 25,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "omha_metrics_ozone_manager_ha_leader_state{instance=~\"$instance\"}",
+          "legendFormat": "{{nodeid}} · {{instance}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "OM HA leader state (1 = leader, 0 = follower)",
+      "description": "`omha_metrics_ozone_manager_ha_leader_state`; tag exposes OM `node_id` from OMHAMetrics.",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 211
+      },
+      "id": 26,
+      "panels": [],
+      "title": "Storage Utilization",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 212
+      },
+      "id": 27,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (bucket_utilization_metrics_bucket_used_bytes{instance=~\"$instance\"})",
+          "legendFormat": "used logical bytes · {{instance}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance) (bucket_utilization_metrics_bucket_snapshot_used_bytes{instance=~\"$instance\"})",
+          "legendFormat": "snapshot-held bytes · {{instance}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Total logical used bytes across all buckets (instantaneous sum)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "bytes",
+          "decimals": null,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 220
+      },
+      "id": 28,
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": false,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "topk(10, sum by (hostname, volumename, instance) (bucket_utilization_metrics_bucket_used_bytes{instance=~\"$instance\"}))",
+          "legendFormat": "{{volumename}} · {{instance}}",
+          "range": false,
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Top 10 volumes by summed bucket-used bytes",
+      "description": "Buckets per volume are summed; tag `volumename` originates from OM bucket utilization Metrics2 export.",
+      "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 230
+      },
+      "id": 29,
+      "panels": [],
+      "title": "RPC handlers",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 231
+      },
+      "id": 30,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, instance, type) (rate(om_client_protocol_counter{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{type}} · {{instance}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "RPC rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 241
+      },
+      "id": 31,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (hostname, instance, type) (rate(om_client_protocol_time{instance=~\"$instance\"}[$__rate_interval]))\n  /\n  sum by (hostname, instance, type) (rate(om_client_protocol_counter{instance=~\"$instance\"}[$__rate_interval]))\n)",
+          "legendFormat": "{{type}} · {{instance}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "Mean handler milliseconds per protobuf RPC type ≈ **`rate(sum duration) / rate(count)`**. **Duration** increments use monotonic millis from `ProtocolMessageMetrics` (same clock as Hadoop `Time.monotonicNow()`). Series disappear when denominators drop to zero; **+Inf** gaps are omitted by Grafana.",
+      "title": "RPC latency",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "ozone",
+    "om",
+    "overview",
+    "jvm",
+    "prometheus",
+    "metrics2"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus"
+        },
+        "definition": "label_values(jvm_metrics_mem_heap_used_m{processname=\"OzoneManager\"},instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "OM instance",
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "query": "label_values(jvm_metrics_mem_heap_used_m{processname=\"OzoneManager\"},instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Ozone - OM Overview",
+  "uid": "ozone-om-overview",
+  "version": 22,
+  "weekStart": ""
+}

@@ -274,8 +274,22 @@ public class TestStorageVolumeChecker {
     final List<HddsVolume> volumes = makeVolumes(3, expectedVolumeHealth);
 
     FakeTimer timer = new FakeTimer();
+    // Configure diskCheckTimeout=0 so checkAllVolumes uses latch.await(0, ...) which
+    // returns immediately once the synchronous checks below have already fired the latch.
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    DatanodeConfiguration dnConf = testConf.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeout(Duration.ZERO);
+    testConf.setFromObject(dnConf);
     final StorageVolumeChecker checker =
-        new StorageVolumeChecker(new OzoneConfiguration(), timer, "");
+        new StorageVolumeChecker(testConf, timer, "");
+    // Use a synchronous (direct-executor) ThrottledAsyncChecker so that
+    // completedChecks is always fully updated before checkAllVolumes returns,
+    // eliminating the race between async callback completion and timer.advance().
+    checker.setDelegateChecker(new ThrottledAsyncChecker<>(
+        timer,
+        dnConf.getDiskCheckMinGap().toMillis(),
+        0L,
+        MoreExecutors.newDirectExecutorService()));
 
     VolumeInfoMetrics metrics1 = new VolumeInfoMetrics("test-volume-1", volumes.get(0));
     VolumeInfoMetrics metrics2 = new VolumeInfoMetrics("test-volume-2", volumes.get(1));

@@ -31,11 +31,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
@@ -137,7 +139,7 @@ public class StorageContainerServiceProviderImpl
       try {
         List<String> ratisRoles = scmClient.getScmInfo().getPeerRoles();
         for (String ratisRole : ratisRoles) {
-          String[] role = ratisRole.split(":");
+          String[] role = HddsUtils.parseRatisRoleString(ratisRole);
           if (role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
             String hostAddress = role[4].trim();
             int grpcPort = configuration.getInt(
@@ -189,5 +191,20 @@ public class StorageContainerServiceProviderImpl
       ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
     return scmClient.getListOfContainerIDs(startContainerID, count, state);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Delegates to {@code SCM.listContainer(startId, count, state)} which
+   * already has server-side pagination support. This reuses the existing RPC
+   * without requiring a new protobuf message definition.
+   */
+  @Override
+  public List<ContainerInfo> getListOfContainerInfos(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scmClient.listContainer(
+        startContainerID.getId(), count, state).getContainerInfoList();
   }
 }

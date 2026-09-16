@@ -48,7 +48,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * faster than a full data scan.
  */
 class TestBackgroundContainerMetadataScannerIntegration
-    extends TestContainerScannerIntegrationAbstract {
+    extends ContainerScannerIntegrationTests {
 
   private final GenericTestUtils.LogCapturer logCapturer =
       GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);

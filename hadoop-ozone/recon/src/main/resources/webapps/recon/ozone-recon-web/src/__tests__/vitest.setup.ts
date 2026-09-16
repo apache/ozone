@@ -58,4 +58,6 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })),
-})
+});
+
+window.Element.prototype.scrollIntoView = vi.fn();

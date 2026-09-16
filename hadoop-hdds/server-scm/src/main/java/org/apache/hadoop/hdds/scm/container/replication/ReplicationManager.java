@@ -85,7 +85,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
@@ -702,22 +701,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
       long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
 
-      if (rcc.getTargetDatanode() == null) {
-        /*
-        This means the target will pull a replica from a source, so the
-        op's target Datanode should be the Datanode this command is being
-        sent to.
-         */
-        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targetDatanode,
-            rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
-      } else {
-        /*
-        This means the source will push replica to the target, so the op's
-        target Datanode should be the Datanode the replica will be pushed to.
-         */
-        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), rcc.getTargetDatanode(),
-            rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
-      }
+      containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), rcc.getTargetDatanode(),
+          rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
 
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcReplicationCmdsSentTotal();
@@ -737,7 +722,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
                                    HddsProtos.LifeCycleEvent event) {
     try {
       containerManager.updateContainerState(containerID, event);
-    } catch (IOException | InvalidStateTransitionException e) {
+    } catch (IOException e) {
       LOG.error("Failed to update the state of container {}, update Event {}",
           containerID, event, e);
     }
@@ -1215,16 +1200,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int maintenanceRemainingRedundancy = 1;
 
-    @Config(key = "hdds.scm.replication.push",
-        type = ConfigType.BOOLEAN,
-        defaultValue = "true",
-        tags = { SCM, DATANODE },
-        description = "If false, replication happens by asking the target to " +
-            "pull from source nodes.  If true, the source node is asked to " +
-            "push to the target node."
-    )
-    private boolean push = true;
-
     @Config(key = "hdds.scm.replication.datanode.replication.limit",
         type = ConfigType.INT,
         defaultValue = "20",
@@ -1393,10 +1368,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public void setMaintenanceReplicaMinimum(int replicaCount) {
       this.maintenanceReplicaMinimum = replicaCount;
-    }
-
-    public boolean isPush() {
-      return push;
     }
 
     public int getContainerSampleLimit() {

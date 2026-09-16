@@ -75,7 +75,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
+    final DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
         .getDeleteKeyRequest();
     Objects.requireNonNull(deleteKeyRequest, "deleteKeyRequest == null");
 
@@ -145,6 +145,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       if (omKeyInfo == null) {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
+
+      validateIfMatchETag(keyArgs, omKeyInfo);
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()

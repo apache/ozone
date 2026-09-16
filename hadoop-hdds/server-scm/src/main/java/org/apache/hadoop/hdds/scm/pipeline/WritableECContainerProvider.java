@@ -187,7 +187,7 @@ public class WritableECContainerProvider
     int volumeBasedCount = 0;
     if (factor > 0) {
       int volumes = nodeManager.totalHealthyVolumeCount();
-      volumeBasedCount = (int) factor * volumes / repConfig.getRequiredNodes();
+      volumeBasedCount = (int) (factor * volumes / repConfig.getRequiredNodes());
     }
     return Math.max(volumeBasedCount, providerConfig.getMinimumPipelines());
   }

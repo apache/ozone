@@ -35,8 +35,8 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -73,7 +73,6 @@ public class TestBCSID {
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
             .build();
     cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "bcsid";
@@ -92,7 +91,7 @@ public class TestBCSID {
 
   @Test
   public void testBCSID() throws Exception {
-    TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
+    DataTestUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
         "ratis", ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
             ReplicationFactor.ONE), "ratis".getBytes(UTF_8));
 

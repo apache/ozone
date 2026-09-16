@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
  * Tests RenameKey request.
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
-public class TestOMKeyRenameRequest extends TestOMKeyRequest {
+public class TestOMKeyRenameRequest extends OMKeyRequestTests {
   protected OmKeyInfo fromKeyInfo;
   protected String fromKeyName;
   protected String toKeyName;

@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
@@ -42,8 +43,9 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
       @Nonnull List<OmKeyInfo> keyDeleteList,
       @Nonnull List<OmKeyInfo> dirDeleteList,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volId,
-      @Nonnull Map<String, OmKeyInfo> openKeyInfoMap) {
-    super(omResponse, keyDeleteList, omBucketInfo, openKeyInfoMap);
+      @Nonnull Map<String, OmKeyInfo> openKeyInfoMap,
+      OmLifecycleScanState scanState) {
+    super(omResponse, keyDeleteList, omBucketInfo, openKeyInfoMap, scanState);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;
   }
@@ -90,6 +92,12 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
         omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
             batchOperation, entry.getKey(), entry.getValue());
       }
+    }
+
+    OmLifecycleScanState scanState = getScanState();
+    if (scanState != null) {
+      omMetadataManager.getLifecycleScanStateTable().putWithBatch(
+          batchOperation, scanState.getBucketKey(), scanState);
     }
   }
 

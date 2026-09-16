@@ -125,7 +125,8 @@ public class TestDeletedBlocksTxnShell {
       List<DeletedBlock> blocks = new ArrayList<>();
       for (int j = 0; j < BLOCKS_PER_TX; j++)  {
         long localID = localIDBase + j;
-        blocks.add(new DeletedBlock(new BlockID(containerID, localID), BLOCK_SIZE, BLOCK_REPLICATED_SIZE));
+        blocks.add(new DeletedBlock(new BlockID(containerID, localID),
+            BLOCK_SIZE, BLOCK_REPLICATED_SIZE, BLOCK_SIZE));
       }
       blockMap.put(containerID, blocks);
     }

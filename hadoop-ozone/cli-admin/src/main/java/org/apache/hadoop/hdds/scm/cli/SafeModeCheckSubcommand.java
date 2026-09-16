@@ -18,16 +18,17 @@
 package org.apache.hadoop.hdds.scm.cli;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.List;
-import java.util.Map;
+import java.util.OptionalInt;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
@@ -104,16 +105,21 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     try {
       List<String> roles = scmClient.getScmRoles();
       for (String role : roles) {
-        String[] parts = role.split(":");
-        if (parts.length < 3 || !"LEADER".equalsIgnoreCase(parts[2])) {
+        String[] parts;
+        try {
+          parts = HddsUtils.parseRatisRoleString(role);
+        } catch (IllegalArgumentException e) {
+          continue;
+        }
+        if (!"LEADER".equalsIgnoreCase(parts[2])) {
           continue;
         }
         String leaderHost = parts[0];
-        String leaderIp = parts.length >= 5 ? parts[4] : null;
+        String leaderIp = parts[4];
         for (SCMNodeInfo node : nodes) {
-          String nodeHost = node.getScmClientAddress().split(":")[0];
+          String nodeHost = HddsUtils.getHostName(node.getScmClientAddress()).orElse("");
 
-          if (matchesAddress(leaderHost, nodeHost) || (leaderIp != null && !leaderIp.isEmpty() &&
+          if (matchesAddress(leaderHost, nodeHost) || (!leaderIp.isEmpty() &&
                   matchesAddress(leaderIp, nodeHost))) {
             return node;
           }
@@ -122,7 +128,7 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
 
       return null;
     } catch (IOException e) {
-      throw new IOException("Could not determine leader node", e);
+      throw new IOException("Could not determine leader node. " + e.getMessage(), e);
     }
   }
 
@@ -165,20 +171,22 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
       }
 
       if (isVerbose()) {
-        Map<String, Pair<Boolean, String>> rules = scmClient.getSafeModeRuleStatuses();
+        List<SafeModeRuleStatusProto> rules = scmClient.getSafeModeRuleStatuses();
         if (rules != null && !rules.isEmpty()) {
-          printSafeModeRules(rules);
+          for (SafeModeRuleStatusProto r : rules) {
+            System.out.printf("validated:%s, %s, %s%n", r.getValidate(), r.getRuleName(), r.getStatusText());
+          }
         }
       }
     } catch (Exception e) {
-      System.out.printf("%s [%s]: ERROR: Failed to get safe mode status for SCM node: %s%n",
-          node.getScmClientAddress(), nodeId, e.getMessage());
+      rootCommand().printError(e);
     }
   }
 
   /**
-   * Check if the given SCMNodeInfo matches the target address.
-   * Tries to match by direct string comparison and by resolved address.
+   * Check if the given addresses match by comparing host portions and ports.
+   * Inputs may be bare hosts or host:port strings. Handles IPv6 equivalence
+   * (e.g. 2001:db8::1 vs 2001:db8:0:0:0:0:0:1) by resolving to InetAddress.
    */
   private boolean matchesAddress(String address1, String address2) {
     if (address1.equalsIgnoreCase(address2)) {
@@ -186,35 +194,28 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     }
 
     try {
-      // Parse both addresses into host:port components
-      String[] parts1 = address1.split(":", 2);
-      String[] parts2 = address2.split(":", 2);
+      String host1 = HddsUtils.getHostName(address1).orElse(address1);
+      String host2 = HddsUtils.getHostName(address2).orElse(address2);
 
-      String host1 = parts1[0];
-      String host2 = parts2[0];
-      
-      // Hostnames must match
-      if (!host1.equalsIgnoreCase(host2)) {
+      boolean hostsMatch = host1.equalsIgnoreCase(host2);
+      if (!hostsMatch) {
+        InetAddress inet1 = InetAddress.getByName(host1);
+        InetAddress inet2 = InetAddress.getByName(host2);
+        hostsMatch = inet1.equals(inet2);
+      }
+      if (!hostsMatch) {
         return false;
       }
 
-      // If both have ports specified, they must match
-      if (parts1.length > 1 && parts2.length > 1) {
-        return parts1[1].equals(parts2[1]);
+      OptionalInt port1 = HddsUtils.getHostPort(address1);
+      OptionalInt port2 = HddsUtils.getHostPort(address2);
+      if (port1.isPresent() && port2.isPresent()) {
+        return port1.getAsInt() == port2.getAsInt();
       }
-
       return true;
     } catch (Exception e) {
       // If address resolution fails, no match
       return false;
-    }
-  }
-  
-  private void printSafeModeRules(Map<String, Pair<Boolean, String>> rules) {
-    for (Map.Entry<String, Pair<Boolean, String>> entry : rules.entrySet()) {
-      Pair<Boolean, String> value = entry.getValue();
-      System.out.printf("validated:%s, %s, %s%n",
-          value.getLeft(), entry.getKey(), value.getRight());
     }
   }
 }

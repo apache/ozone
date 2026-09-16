@@ -126,7 +126,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
       LOG.info("Successfully untar the downloaded snapshot {} at {}.",
           targetFile, unTarredDb.toAbsolutePath());
       if (ratisSnapshotComplete(unTarredDb)) {
-        LOG.info("Ratis snapshot transfer is complete.");
+        LOG.info("DB snapshot transfer is complete.");
         return getCheckpointFromUntarredDb(unTarredDb);
       }
     }

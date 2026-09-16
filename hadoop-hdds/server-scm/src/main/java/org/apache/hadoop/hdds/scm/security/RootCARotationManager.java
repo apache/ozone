@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.security;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_PROGRESS_SUFFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DIR_NAME_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CERTIFICATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -55,7 +54,9 @@ import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.ha.StatefulService;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceDefinition;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -80,6 +81,9 @@ public class RootCARotationManager extends StatefulService<CertInfoProto> {
 
   private static final String SERVICE_NAME =
       RootCARotationManager.class.getSimpleName();
+
+  public static final StatefulServiceDefinition<CertInfoProto> SERVICE_DEFINITION =
+      new StatefulServiceDefinition<>(SERVICE_NAME, CertInfoProto.parser());
 
   private final StorageContainerManager scm;
   private final OzoneConfiguration ozoneConf;
@@ -137,7 +141,7 @@ public class RootCARotationManager extends StatefulService<CertInfoProto> {
    *   (4) Rotation Committed
    */
   public RootCARotationManager(StorageContainerManager scm) {
-    super(scm.getStatefulServiceStateManager(), CertInfoProto.getDefaultInstance().getParserForType());
+    super(scm.getStatefulServiceStateManager(), SERVICE_DEFINITION);
     this.scm = scm;
     this.ozoneConf = scm.getConfiguration();
     this.secConf = new SecurityConfig(ozoneConf);
@@ -378,7 +382,7 @@ public class RootCARotationManager extends StatefulService<CertInfoProto> {
           CertificateServer newRootCAServer = null;
           BigInteger newId = BigInteger.ONE;
           try {
-            newId = BigInteger.valueOf(sequenceIdGen.getNextId(CERTIFICATE_ID));
+            newId = BigInteger.valueOf(sequenceIdGen.getNextId(SequenceIdType.CertificateId));
             newRootCAServer =
                 HASecurityUtils.initializeRootCertificateServer(secConf,
                     scm.getCertificateStore(), scmStorageConfig, newId,

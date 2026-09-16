@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
@@ -165,9 +166,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       blockDeletionResults = new ArrayList<>();
       LOG.info("Skipping SCM call as all {} keys are empty", keyBlocksList.size());
     } else {
-      blockDeletionResults =
-          scmClient.deleteKeyBlocks(nonEmptyKeyBlocksList.values().stream()
-              .map(PurgedKey::getBlockGroup).collect(Collectors.toList()));
+      blockDeletionResults = TracingUtil.executeInNewSpan(
+          "deleteKeyBlocks",
+          () -> scmClient.deleteKeyBlocks(nonEmptyKeyBlocksList.values().stream()
+              .map(PurgedKey::getBlockGroup).collect(Collectors.toList())));
     }
 
     if (keyBlocksList.size() != nonEmptyKeyBlocksList.size()) {
@@ -558,7 +560,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
      * @param keyManager KeyManager of the underlying store.
      */
     private void processDeletedKeysForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
-        int remainNum) throws IOException, InterruptedException {
+        UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot, int remainNum)
+        throws IOException, InterruptedException {
       String volume = null, bucket = null, snapshotTableKey = null;
       if (currentSnapshotInfo != null) {
         volume = currentSnapshotInfo.getVolumeName();
@@ -601,6 +604,16 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               ? keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum)
               : keyManager.getPendingDeletionKeys(volume, bucket, null, reclaimableKeyFilter, remainNum);
           Map<String, PurgedKey> purgedKeys = pendingKeysDeletion.getPurgedKeys();
+
+          // Keep the snapshot GC locks until the OM requests below complete, but release all snapshot DB read locks
+          // first. Otherwise the synchronous Ratis submission can wait for the double buffer while the double buffer
+          // waits for a colliding snapshot DB write lock.
+          reclaimableKeyFilter.closeSnapshotDbHandles();
+          renameEntryFilter.closeSnapshotDbHandles();
+          if (currentSnapshot != null) {
+            currentSnapshot.close();
+          }
+
           //submit purge requests if there are renamed entries to be purged or keys to be purged.
           if (!renamedTableEntries.isEmpty() || purgedKeys != null && !purgedKeys.isEmpty()) {
             // Validating if the previous snapshot is still the same before purging the blocks.
@@ -700,7 +713,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   snapInfo.getName())) {
             KeyManager keyManager = snapInfo == null ? getOzoneManager().getKeyManager()
                 : omSnapshot.get().getKeyManager();
-            processDeletedKeysForStore(snapInfo, keyManager, remainNum);
+            processDeletedKeysForStore(snapInfo, keyManager, omSnapshot, remainNum);
           }
         } catch (IOException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",

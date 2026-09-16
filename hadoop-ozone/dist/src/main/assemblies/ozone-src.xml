@@ -68,6 +68,13 @@
       </includes>
     </fileSet>
     <fileSet>
+      <directory>.devcontainer</directory>
+      <includes>
+        <include>**/*</include>
+      </includes>
+      <useDefaultExcludes>true</useDefaultExcludes>
+    </fileSet>
+    <fileSet>
       <directory>.run</directory>
       <includes>
         <include>**/*</include>

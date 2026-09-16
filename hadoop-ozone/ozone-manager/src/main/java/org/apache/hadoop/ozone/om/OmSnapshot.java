@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -132,12 +133,13 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException {
-
-    List<OzoneFileStatus> ozoneFileStatuses =
-        listStatus(args, recursive, startKey, numEntries, allowPartialPrefixes);
+    List<OzoneFileStatusLight> ozoneFileStatuses = omMetadataReader
+        .listStatusLight(normalizeOmKeyArgs(args),
+            recursive, normalizeKeyName(startKey), numEntries,
+            allowPartialPrefixes);
 
     return ozoneFileStatuses.stream()
-        .map(OzoneFileStatusLight::fromOzoneFileStatus)
+        .map(this::denormalizeOzoneFileStatusLight)
         .collect(Collectors.toList());
   }
 
@@ -188,6 +190,15 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   @Override
   public Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException {
     return omMetadataReader.getObjectTagging(normalizeOmKeyArgs(args));
+  }
+
+  @Override
+  public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
+    if (args == null) {
+      return null;
+    }
+
+    return omMetadataReader.getBucketTagging(args);
   }
 
   private OzoneObj normalizeOzoneObj(OzoneObj o) {
@@ -273,6 +284,29 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     }
     return new OzoneFileStatus(
         omKeyInfo, fileStatus.getBlockSize(), fileStatus.isDirectory());
+  }
+
+  private OzoneFileStatusLight denormalizeOzoneFileStatusLight(
+      OzoneFileStatusLight fileStatus) {
+    if (fileStatus == null || fileStatus.getKeyInfo() == null) {
+      return fileStatus;
+    }
+    BasicOmKeyInfo keyInfo = fileStatus.getKeyInfo();
+    BasicOmKeyInfo denormalized = new BasicOmKeyInfo.Builder()
+        .setVolumeName(keyInfo.getVolumeName())
+        .setBucketName(keyInfo.getBucketName())
+        .setKeyName(denormalizeKeyName(keyInfo.getKeyName()))
+        .setDataSize(keyInfo.getDataSize())
+        .setCreationTime(keyInfo.getCreationTime())
+        .setModificationTime(keyInfo.getModificationTime())
+        .setReplicationConfig(keyInfo.getReplicationConfig())
+        .setIsFile(keyInfo.isFile())
+        .setETag(keyInfo.getETag())
+        .setOwnerName(keyInfo.getOwnerName())
+        .setIsEncrypted(keyInfo.isEncrypted())
+        .build();
+    return new OzoneFileStatusLight(
+        denormalized, fileStatus.getBlockSize(), fileStatus.isDirectory());
   }
 
   private KeyInfoWithVolumeContext denormalizeKeyInfoWithVolumeContext(

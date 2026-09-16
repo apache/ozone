@@ -17,7 +17,7 @@
  */
 
 import React, { useState } from 'react';
-import { Alert, Button, Tooltip } from 'antd';
+import { Alert, Button, Modal, Tooltip } from 'antd';
 import { InfoCircleFilled, ReloadOutlined, } from '@ant-design/icons';
 import { ValueType } from 'react-select';
 
@@ -50,54 +50,157 @@ const DEFAULT_NU_RESPONSE: NUResponse = {
   sizeDirectKey: 0
 };
 
+const getSafeNumber = (value: unknown, defaultValue = 0): number => (
+  typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : defaultValue
+);
+
+const normalizeNamespacePath = (path: string): string => {
+  const trimmedPath = path.trim();
+  if (!trimmedPath) {
+    return '';
+  }
+  return trimmedPath.startsWith('/')
+    ? trimmedPath
+    : `/${trimmedPath}`;
+};
+
+const getSafeNamespaceUsageResponse = (
+  data: NUResponse | null | undefined,
+  fallbackPath: string
+): NUResponse => {
+  const safeSubPaths = Array.isArray(data?.subPaths)
+    ? data.subPaths.filter((subPath): subPath is NUResponse['subPaths'][number] => (
+      Boolean(subPath && typeof subPath.path === 'string')
+    ))
+    : [];
+
+  return {
+    status: data?.status ?? '',
+    path: normalizeNamespacePath(data?.path ?? fallbackPath) || '/',
+    subPathCount: getSafeNumber(data?.subPathCount, safeSubPaths.length),
+    size: getSafeNumber(data?.size),
+    sizeWithReplica: getSafeNumber(data?.sizeWithReplica),
+    subPaths: safeSubPaths,
+    sizeDirectKey: getSafeNumber(data?.sizeDirectKey)
+  };
+};
+
 const NamespaceUsage: React.FC<{}> = () => {
   const [limit, setLimit] = useState<Option>(LIMIT_OPTIONS[1]);
   const [currentPath, setCurrentPath] = useState<string>('/');
+  const [showRootPathModal, setShowRootPathModal] = useState<boolean>(false);
+  const [isRootPathUsageEnabled, setIsRootPathUsageEnabled] = useState<boolean>(false);
+  const normalizedCurrentPath = normalizeNamespacePath(currentPath) || '/';
+  const shouldFetchNamespaceUsage = normalizedCurrentPath !== '/' || isRootPathUsageEnabled;
+  const showRootPathLoadPrompt = normalizedCurrentPath === '/' && !isRootPathUsageEnabled;
 
   // Use the modern hooks pattern
   const namespaceUsageData = useApiData<NUResponse>(
-    `/api/v1/namespace/usage?path=${currentPath}&files=true&sortSubPaths=true`,
+    shouldFetchNamespaceUsage
+      ? `/api/v1/namespace/usage?path=${normalizedCurrentPath}&files=true&sortSubPaths=true`
+      : '',
     DEFAULT_NU_RESPONSE,
     {
+      initialFetch: shouldFetchNamespaceUsage,
       retryAttempts: 2,
       onError: (error) => showDataFetchError(error)
     }
   );
 
+  const duResponse = React.useMemo(() => {
+    if (!shouldFetchNamespaceUsage) {
+      return {
+        ...DEFAULT_NU_RESPONSE,
+        path: normalizedCurrentPath,
+        subPaths: []
+      };
+    }
+    return getSafeNamespaceUsageResponse(namespaceUsageData.data, normalizedCurrentPath);
+  }, [namespaceUsageData.data, normalizedCurrentPath, shouldFetchNamespaceUsage]);
+
   // Process data when it changes
   React.useEffect(() => {
-    if (namespaceUsageData.data) {
-      const duResponse = namespaceUsageData.data;
-      const status = duResponse.status;
-      
-      if (status === 'PATH_NOT_FOUND') {
-        showDataFetchError(`Invalid Path: ${currentPath}`);
-        return;
-      }
-
-      if (status === 'INITIALIZING') {
-        showInfoNotification("Information being initialized", "Namespace Summary is being initialized, please wait.")
-        return;
-      }
+    if (!shouldFetchNamespaceUsage || namespaceUsageData.loading) {
+      return;
     }
-  }, [namespaceUsageData.data, currentPath]);
+
+    if (duResponse.status === 'PATH_NOT_FOUND') {
+      showDataFetchError(`Invalid Path: ${normalizedCurrentPath}`);
+      return;
+    }
+
+    if (duResponse.status === 'INITIALIZING') {
+      showInfoNotification("Information being initialized", "Namespace Summary is being initialized, please wait.");
+    }
+  }, [duResponse.status, normalizedCurrentPath, namespaceUsageData.loading, shouldFetchNamespaceUsage]);
+
+  const handleApiRequestFailure = (error: unknown) => {
+    showDataFetchError(error);
+  };
+
+  const requestRootPathLoad = () => {
+    if (normalizedCurrentPath !== '/') {
+      setIsRootPathUsageEnabled(false);
+    }
+    setCurrentPath('/');
+    setShowRootPathModal(true);
+  };
+
+  const handleReload = () => {
+    if (normalizedCurrentPath === '/') {
+      requestRootPathLoad();
+      return;
+    }
+    void namespaceUsageData.refetch().catch(handleApiRequestFailure);
+  };
+
+  const handleRootPathLoadConfirm = () => {
+    setShowRootPathModal(false);
+    if (!isRootPathUsageEnabled) {
+      setIsRootPathUsageEnabled(true);
+      return;
+    }
+    void namespaceUsageData.refetch().catch(handleApiRequestFailure);
+  };
 
   const loadData = (path: string) => {
-    setCurrentPath(path);
+    const normalizedPath = normalizeNamespacePath(path);
+    if (!normalizedPath) {
+      showDataFetchError('Invalid Path: Path cannot be empty');
+      return;
+    }
+
+    if (normalizedPath === '/') {
+      requestRootPathLoad();
+      return;
+    }
+    setShowRootPathModal(false);
+    setIsRootPathUsageEnabled(false);
+    setCurrentPath(normalizedPath);
   };
 
   function handleLimitChange(selected: ValueType<Option, false>) {
     setLimit(selected as Option);
   }
 
-  const duResponse = namespaceUsageData.data || DEFAULT_NU_RESPONSE;
-  const loading = namespaceUsageData.loading;
+  const loading = shouldFetchNamespaceUsage && namespaceUsageData.loading;
 
   return (
     <>
       <div className='page-header-v2'>
         Namespace Usage
       </div>
+      <Modal
+        centered={true}
+        title='Confirm Root Path Usage Load'
+        visible={showRootPathModal}
+        onOk={handleRootPathLoadConfirm}
+        onCancel={() => setShowRootPathModal(false)}>
+        <p>Root path usage calculation is an expensive operation in large deployments.</p>
+        <p><strong>Are you sure you want to continue?</strong></p>
+      </Modal>
       <div className='data-container'>
         <Alert
           className='du-alert-message'
@@ -107,6 +210,16 @@ const NamespaceUsage: React.FC<{}> = () => {
           icon={<InfoCircleFilled />}
           showIcon={true}
           closable={false} />
+        {
+          currentPath == '/' && (
+            <Alert
+              className='du-alert-message'
+              message='Root path usage can be expensive in large deployments. Enter an exact path to load usage directly.'
+              type='warning'
+              showIcon={true}
+              closable={false} />
+          )
+        }
         <div className='content-div'>
           <div
             style={{
@@ -122,7 +235,7 @@ const NamespaceUsage: React.FC<{}> = () => {
               <Button
                 type='primary'
                 icon={<ReloadOutlined />}
-                onClick={() => loadData(duResponse.path)} />
+                onClick={handleReload} />
             </Tooltip>
           </div>
           <div className='du-table-header-section'>
@@ -133,15 +246,28 @@ const NamespaceUsage: React.FC<{}> = () => {
               onChange={handleLimitChange} />
           </div>
           <div className='du-content'>
-            <NUPieChart
-              loading={loading}
-              limit={Number.parseInt(limit.value)}
-              path={duResponse.path}
-              subPathCount={duResponse.subPathCount}
-              subPaths={duResponse.subPaths}
-              sizeWithReplica={duResponse.sizeWithReplica}
-              size={duResponse.size} />
-            <NUMetadata path={currentPath} />
+            {showRootPathLoadPrompt ? (
+              <div className='du-root-path-load-container'>
+                <p>Root path usage is not loaded by default.</p>
+                <Button
+                  type='primary'
+                  onClick={requestRootPathLoad}>
+                  Load usage
+                </Button>
+              </div>
+            ) : (
+              <>
+                <NUPieChart
+                  loading={loading}
+                  limit={Number.parseInt(limit.value)}
+                  path={duResponse.path}
+                  subPathCount={duResponse.subPathCount}
+                  subPaths={duResponse.subPaths}
+                  sizeWithReplica={duResponse.sizeWithReplica}
+                  size={duResponse.size} />
+                <NUMetadata path={normalizedCurrentPath} />
+              </>
+            )}
           </div>
         </div>
       </div>

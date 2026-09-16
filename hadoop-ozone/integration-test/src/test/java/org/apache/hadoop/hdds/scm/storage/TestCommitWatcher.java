@@ -128,7 +128,6 @@ public class TestCommitWatcher {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(VOLUME_NAME);

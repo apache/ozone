@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Class to test OMKeysDeleteResponse.
  */
-public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
+public class TestOMKeysDeleteResponse extends OMKeyResponseTests {
 
   private List<OmKeyInfo> omKeyInfoList = new ArrayList<>();
   private List<String> ozoneKeys = new ArrayList<>();
@@ -101,7 +101,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
   protected OMClientResponse getOmKeysDeleteResponse(OMResponse omResponse,
       OmBucketInfo omBucketInfo) {
     return new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, omBucketInfo, Collections.emptyMap());
+        omResponse, omKeyInfoList, omBucketInfo, Collections.emptyMap(), null);
   }
 
   @Test

@@ -38,10 +38,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfiguratio
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
-import org.apache.hadoop.ipc_.ProtocolMetaInterface;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
 import org.apache.hadoop.ipc_.RPC;
-import org.apache.hadoop.ipc_.RpcClientUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -51,7 +49,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class DiskBalancerProtocolClientSideTranslatorPB
-    implements DiskBalancerProtocol, ProtocolMetaInterface, ProtocolTranslator {
+    implements DiskBalancerProtocol, ProtocolTranslator {
 
   private static final RpcController NULL_CONTROLLER = null;
 
@@ -173,13 +171,4 @@ public class DiskBalancerProtocolClientSideTranslatorPB
   public void close() throws IOException {
     RPC.stopProxy(rpcProxy);
   }
-
-  @Override
-  public boolean isMethodSupported(String methodName) throws IOException {
-    return RpcClientUtil.isMethodSupported(rpcProxy, DiskBalancerProtocolPB.class,
-        RPC.RpcKind.RPC_PROTOCOL_BUFFER,
-        RPC.getProtocolVersion(DiskBalancerProtocolPB.class), methodName);
-  }
 }
-
-

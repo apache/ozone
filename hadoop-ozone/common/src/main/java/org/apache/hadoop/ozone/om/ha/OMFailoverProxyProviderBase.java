@@ -24,15 +24,17 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.RemoteException;
@@ -88,6 +90,14 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
   private final UserGroupInformation ugi;
 
+  /**
+   * When true, on each connection-class failure the provider re-resolves
+   * the cached OM hostname for the current proxy and discards the cached
+   * proxy if the IP has changed (Kubernetes pod-IP-change recovery).
+   * Off by default. Mirrors the design intent of HADOOP-17068.
+   */
+  private final boolean resolveOnFailureEnabled;
+
   public OMFailoverProxyProviderBase(ConfigurationSource configuration,
                                      UserGroupInformation ugi,
                                      String omServiceId,
@@ -104,6 +114,9 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     this.omProxies = new OMProxyInfo.OrderedMap<>(initOmProxiesFromConfigs(conf, omServiceId));
     nextProxyIndex = 0;
     currentProxyIndex = 0;
+    this.resolveOnFailureEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT);
   }
 
   /**
@@ -241,6 +254,26 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
         if (!shouldFailover(exception)) {
           return RetryAction.FAIL; // do not retry
+        }
+
+        // Before advancing failover index, give the cached OM address a
+        // chance to be re-resolved -- the same nodeId may have been
+        // rescheduled to a new IP (Kubernetes pod-IP-change recovery).
+        // Restricted to connection-class exceptions so we don't add DNS
+        // load on application-level errors.
+        if (resolveOnFailureEnabled
+            && ConnectionFailureUtils.isConnectionFailure(exception)
+            && maybeRefreshCurrentOmAddress()) {
+          // Pin nextProxyIndex back to the current nodeId so that the
+          // RetryInvocationHandler's subsequent performFailover() call
+          // does NOT advance to a different peer. Without this,
+          // performFailover() would read whatever nextProxyIndex was
+          // last set to (often already advanced from prior retries) and
+          // bypass the freshly-fixed peer for up to N-1 attempts in an
+          // N-OM HA cluster -- defeating the purpose of the refresh.
+          // Mirrors the OMLeaderNotReady "retry same OM" pattern above.
+          setNextOmProxy(omNodeId);
+          return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
         }
 
         // Prepare the next OM to be tried. This will help with calculation
@@ -476,5 +509,59 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
   protected ConfigurationSource getConf() {
     return conf;
+  }
+
+  /**
+   * Asks the current proxy's {@link OMProxyInfo} to re-resolve its
+   * configured hostname. If DNS now returns a different IP, the
+   * OMProxyInfo replaces its cached address and discards the cached
+   * proxy so the next dial happens against the new IP.
+   * <p>
+   * Calls {@link #onAddressRefreshed(String)} when a swap occurs so
+   * subclasses (specifically {@code HadoopRpcOMFailoverProxyProvider})
+   * can refresh derived state such as the aggregated delegation-token
+   * service identifier.
+   * <p>
+   * The DNS lookup performed inside {@link OMProxyInfo#refreshAddressIfChanged}
+   * is run OUTSIDE this provider's monitor. {@link OMProxyInfo} maintains
+   * its own monitor for the swap commit; if we held the provider monitor
+   * across the resolve, a slow / dead resolver would freeze every
+   * concurrent caller of synchronized provider methods (e.g.
+   * {@link #performFailover}, {@link #selectNextOmProxy}). The provider
+   * monitor is only re-acquired briefly to invoke the refresh hook.
+   *
+   * @return true if a swap actually happened.
+   */
+  @VisibleForTesting
+  boolean maybeRefreshCurrentOmAddress() {
+    // getCurrentProxyOMNodeId() is synchronized and omProxies is an
+    // unmodifiable map populated once at construction, so neither read
+    // needs the provider monitor; both values are always present.
+    final String nodeId = Objects.requireNonNull(getCurrentProxyOMNodeId(),
+        "Current proxy node id is null");
+    final OMProxyInfo<T> info = Objects.requireNonNull(omProxies.get(nodeId),
+        "Current proxy info is null");
+    // refreshAddressIfChanged handles its own locking and performs the
+    // DNS lookup outside its entry monitor.
+    boolean swapped = info.refreshAddressIfChanged();
+    if (swapped) {
+      synchronized (this) {
+        onAddressRefreshed(nodeId);
+      }
+    }
+    return swapped;
+  }
+
+  /**
+   * Hook called immediately after a successful per-node DNS refresh.
+   * Default implementation is a no-op. Subclasses override to refresh
+   * any state derived from the cached set of OM addresses (e.g. the
+   * aggregated delegation-token service in
+   * {@code HadoopRpcOMFailoverProxyProvider}).
+   *
+   * @param nodeId the OM nodeId whose address was just refreshed.
+   */
+  protected void onAddressRefreshed(String nodeId) {
+    // no-op by default
   }
 }

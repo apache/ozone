@@ -25,7 +25,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_K
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
-import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.getPerfMetrics;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -108,7 +107,7 @@ public class SCMBlockProtocolServer implements
   public SCMBlockProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
-    this.perfMetrics = getPerfMetrics();
+    this.perfMetrics = scm.getPerfMetrics();
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
@@ -269,10 +268,8 @@ public class SCMBlockProtocolServer implements
     for (BlockGroup bg : keyBlocksInfoList) {
       totalBlocks += bg.getDeletedBlocks().size();
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
+    LOG.info("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
           keyBlocksInfoList.size(), totalBlocks);
-    }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
@@ -284,9 +281,8 @@ public class SCMBlockProtocolServer implements
       perfMetrics.updateDeleteKeySuccessStats(keyBlocksInfoList.size(), startNanos);
       resultCode = ScmBlockLocationProtocolProtos.
           DeleteScmBlockResult.Result.success;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Total number of blocks ACK by SCM in this cycle: " + totalBlocks);
-      }
+      LOG.info("Total number of blocks ACK by SCM in this cycle: " + totalBlocks);
+
     } catch (IOException ioe) {
       e = ioe;
       perfMetrics.updateDeleteKeyFailedBlocks(totalBlocks);

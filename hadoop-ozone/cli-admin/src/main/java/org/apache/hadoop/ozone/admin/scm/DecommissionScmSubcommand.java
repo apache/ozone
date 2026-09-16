@@ -39,7 +39,7 @@ public class DecommissionScmSubcommand extends ScmSubcommand {
   @CommandLine.ParentCommand
   private ScmAdmin parent;
 
-  @CommandLine.Option(names = {"-nodeid", "--nodeid"},
+  @CommandLine.Option(names = {"--nodeid"},
       description = "NodeID of the SCM to be decommissioned.",
       required = true)
   private String nodeId;

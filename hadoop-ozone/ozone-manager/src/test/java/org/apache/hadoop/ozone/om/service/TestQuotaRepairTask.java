@@ -20,6 +20,10 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -27,31 +31,49 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.request.volume.OMQuotaRepairRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMQuotaRepairResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Test class for quota repair.
  */
-public class TestQuotaRepairTask extends TestOMKeyRequest {
+@Timeout(120)
+public class TestQuotaRepairTask extends OMKeyRequestTests {
+
+  /** Seconds; must match {@link Timeout} on this class. */
+  private static final int REPAIR_TEST_TIMEOUT_SECONDS = 120;
+
+  private static Boolean awaitRepair(CompletableFuture<Boolean> repair) throws Exception {
+    return repair.get(REPAIR_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+  }
 
   @Test
   public void testQuotaRepair() throws Exception {
@@ -110,7 +132,7 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     
     QuotaRepairTask quotaRepairTask = new QuotaRepairTask(ozoneManager);
     CompletableFuture<Boolean> repair = quotaRepairTask.repair();
-    Boolean repairStatus = repair.get();
+    Boolean repairStatus = awaitRepair(repair);
     assertTrue(repairStatus);
 
     OMQuotaRepairRequest omQuotaRepairRequest = new OMQuotaRepairRequest(ref.get());
@@ -170,7 +192,7 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
 
     QuotaRepairTask quotaRepairTask = new QuotaRepairTask(ozoneManager);
     CompletableFuture<Boolean> repair = quotaRepairTask.repair();
-    Boolean repairStatus = repair.get();
+    Boolean repairStatus = awaitRepair(repair);
     assertTrue(repairStatus);
 
     OMQuotaRepairRequest omQuotaRepairRequest = new OMQuotaRepairRequest(ref.get());
@@ -187,6 +209,132 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     assertEquals(-1, volArgsVerify.getQuotaInNamespace());
   }
 
+  @Test
+  public void testQuotaRepairDeletedTableSnapshotQuota() throws Exception {
+    OzoneManagerProtocolProtos.OMResponse respMock = mock(OzoneManagerProtocolProtos.OMResponse.class);
+    when(respMock.getSuccess()).thenReturn(true);
+    OzoneManagerRatisServer ratisServerMock = mock(OzoneManagerRatisServer.class);
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> ref = new AtomicReference<>();
+    doAnswer(invocation -> {
+      ref.set(invocation.getArgument(0, OzoneManagerProtocolProtos.OMRequest.class));
+      return respMock;
+    }).when(ratisServerMock).submitRequest(any(), any(), anyLong());
+    when(ozoneManager.getOmRatisServer()).thenReturn(ratisServerMock);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+
+    String keyName = "/user/snapKey";
+    OMRequestTestUtils.addKeyToTableAndCache(volumeName, bucketName,
+        keyName, -1, RatisReplicationConfig.getInstance(THREE), 1L, omMetadataManager);
+
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    long bucketObjId = bucketInfo.getObjectID();
+
+    OMRequestTestUtils.deleteKey(ozoneKey, bucketObjId, omMetadataManager, 2L);
+
+    RepeatedOmKeyInfo deletedEntry = omMetadataManager.getDeletedTable().get(ozoneKey);
+    long expectedSnapNs = deletedEntry.getOmKeyInfoList().size();
+
+    bucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    OmBucketInfo corruptedSnapshot = bucketInfo.toBuilder()
+        .setSnapshotUsedBytes(7L)
+        .setSnapshotUsedNamespace(99L)
+        .build();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    omMetadataManager.getBucketTable().put(bucketKey, corruptedSnapshot);
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(bucketKey), CacheValue.get(3L, corruptedSnapshot));
+
+    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(ozoneManager);
+    CompletableFuture<Boolean> repair = quotaRepairTask.repair();
+    assertTrue(awaitRepair(repair));
+
+    OMQuotaRepairRequest omQuotaRepairRequest = new OMQuotaRepairRequest(ref.get());
+    OMClientResponse omClientResponse = omQuotaRepairRequest.validateAndUpdateCache(ozoneManager, 1);
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    ((OMQuotaRepairResponse) omClientResponse).addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(0, repaired.getUsedBytes());
+    assertEquals(0, repaired.getUsedNamespace());
+    assertEquals(expectedSnapNs, repaired.getSnapshotUsedNamespace());
+    assertTrue(repaired.getSnapshotUsedBytes() > 0,
+        "Snapshot pending-delete bytes must be recomputed from deletedTable");
+  }
+
+  @Test
+  public void testQuotaRepairSnapshotDbDeletedTableQuota() throws Exception {
+    OzoneManagerProtocolProtos.OMResponse respMock = mock(OzoneManagerProtocolProtos.OMResponse.class);
+    when(respMock.getSuccess()).thenReturn(true);
+    OzoneManagerRatisServer ratisServerMock = mock(OzoneManagerRatisServer.class);
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> ref = new AtomicReference<>();
+    doAnswer(invocation -> {
+      ref.set(invocation.getArgument(0, OzoneManagerProtocolProtos.OMRequest.class));
+      return respMock;
+    }).when(ratisServerMock).submitRequest(any(), any(), anyLong());
+    when(ozoneManager.getOmRatisServer()).thenReturn(ratisServerMock);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+
+    String keyName = "/user/snapKey";
+    OMRequestTestUtils.addKeyToTableAndCache(volumeName, bucketName,
+        keyName, -1, RatisReplicationConfig.getInstance(THREE), 1L, omMetadataManager);
+
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).get(ozoneKey);
+    long keyBytes = omKeyInfo.getReplicatedSize();
+
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    OMRequestTestUtils.deleteKey(ozoneKey, bucketInfo.getObjectID(), omMetadataManager, 2L);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo afterDelete = bucketInfo.toBuilder()
+        .setUsedBytes(0)
+        .setUsedNamespace(0)
+        .setSnapshotUsedBytes(keyBytes)
+        .setSnapshotUsedNamespace(1)
+        .build();
+    omMetadataManager.getBucketTable().put(bucketKey, afterDelete);
+
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(RatisReplicationConfig.getInstance(THREE));
+    createSnapshot("snap1");
+
+    assertNull(omMetadataManager.getDeletedTable().get(ozoneKey),
+        "Deleted key should move out of active deletedTable after snapshot");
+    assertEquals(0, omMetadataManager.countRowsInTable(omMetadataManager.getDeletedTable()));
+
+    OmBucketInfo corrupted = afterDelete.toBuilder()
+        .setSnapshotUsedBytes(7L)
+        .build();
+    omMetadataManager.getBucketTable().put(bucketKey, corrupted);
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(bucketKey), CacheValue.get(3L, corrupted));
+
+    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(ozoneManager);
+    CompletableFuture<Boolean> repair = quotaRepairTask.repair();
+    assertTrue(awaitRepair(repair));
+
+    OMQuotaRepairRequest omQuotaRepairRequest = new OMQuotaRepairRequest(ref.get());
+    OMClientResponse omClientResponse = omQuotaRepairRequest.validateAndUpdateCache(ozoneManager, 1);
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    ((OMQuotaRepairResponse) omClientResponse).addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(0, repaired.getUsedBytes());
+    assertEquals(0, repaired.getUsedNamespace());
+    assertEquals(keyBytes, repaired.getSnapshotUsedBytes());
+    assertEquals(1, repaired.getSnapshotUsedNamespace());
+  }
+
   private void zeroOutBucketUsedBytes(String volumeName, String bucketName,
                                       long trxnLogIndex)
       throws IOException {
@@ -197,5 +345,108 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
         .addCacheEntry(new CacheKey<>(dbKey),
             CacheValue.get(trxnLogIndex, bucketInfo));
     omMetadataManager.getBucketTable().put(dbKey, bucketInfo);
+  }
+
+  @Test
+  public void testScanTableInBatchesFailsFastOnWorkerFailure() throws Exception {
+    int totalEntries = QuotaRepairTask.BATCH_SIZE * 8;
+    AtomicInteger remaining = new AtomicInteger(totalEntries);
+    @SuppressWarnings("unchecked")
+    Table.KeyValueIterator<String, OmKeyInfo> keyIter = mock(Table.KeyValueIterator.class);
+    when(keyIter.hasNext()).thenAnswer(inv -> remaining.get() > 0);
+    when(keyIter.next()).thenAnswer(inv -> {
+      remaining.decrementAndGet();
+      return Table.newKeyValue("/vol/bucket/key", null);
+    });
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    try {
+      UncheckedExecutionException ex = assertThrows(UncheckedExecutionException.class,
+          () -> QuotaRepairTask.scanTableInBatches(executor, keyIter, "worker failure test", kv -> {
+            throw new UncheckedIOException(new IOException("injected worker failure"));
+          }));
+      assertInstanceOf(UncheckedIOException.class, ex.getCause().getCause());
+      // no worker may outlive the scan
+      executor.shutdown();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testScanTableInBatchesFailsOnProducerInterrupt() throws Exception {
+    @SuppressWarnings("unchecked")
+    Table.KeyValueIterator<String, OmKeyInfo> keyIter = mock(Table.KeyValueIterator.class);
+    when(keyIter.hasNext()).thenReturn(true);
+    when(keyIter.next()).thenAnswer(inv -> Table.newKeyValue("/vol/bucket/key", null));
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    AtomicReference<Throwable> thrown = new AtomicReference<>();
+    Thread producer = new Thread(() -> {
+      try {
+        QuotaRepairTask.scanTableInBatches(executor, keyIter, "interrupt test", kv -> { });
+      } catch (Throwable t) {
+        thrown.set(t);
+      }
+    });
+    try {
+      producer.start();
+      producer.interrupt();
+      producer.join(TimeUnit.SECONDS.toMillis(60));
+      assertFalse(producer.isAlive());
+      UncheckedExecutionException ex = assertInstanceOf(UncheckedExecutionException.class, thrown.get());
+      assertInstanceOf(InterruptedException.class, ex.getCause());
+      executor.shutdown();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testInterruptedScanStillAwaitsWorkers() throws Exception {
+    AtomicInteger remaining = new AtomicInteger(QuotaRepairTask.BATCH_SIZE);
+    @SuppressWarnings("unchecked")
+    Table.KeyValueIterator<String, OmKeyInfo> keyIter = mock(Table.KeyValueIterator.class);
+    when(keyIter.hasNext()).thenAnswer(inv -> remaining.get() > 0);
+    when(keyIter.next()).thenAnswer(inv -> {
+      remaining.decrementAndGet();
+      return Table.newKeyValue("/vol/bucket/key", null);
+    });
+    CountDownLatch workerStarted = new CountDownLatch(1);
+    CountDownLatch releaseWorker = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    AtomicReference<Throwable> thrown = new AtomicReference<>();
+    Thread producer = new Thread(() -> {
+      try {
+        QuotaRepairTask.scanTableInBatches(executor, keyIter, "await workers test", kv -> {
+          workerStarted.countDown();
+          try {
+            releaseWorker.await();
+          } catch (InterruptedException ex) {
+            throw new IllegalStateException(ex);
+          }
+        });
+      } catch (Throwable t) {
+        thrown.set(t);
+      }
+    });
+    try {
+      producer.start();
+      assertTrue(workerStarted.await(30, TimeUnit.SECONDS));
+      producer.interrupt();
+      // the interrupted producer must keep waiting for the blocked worker instead of exiting
+      producer.join(TimeUnit.SECONDS.toMillis(1));
+      assertTrue(producer.isAlive());
+      releaseWorker.countDown();
+      producer.join(TimeUnit.SECONDS.toMillis(60));
+      assertFalse(producer.isAlive());
+      UncheckedExecutionException ex = assertInstanceOf(UncheckedExecutionException.class, thrown.get());
+      assertInstanceOf(InterruptedException.class, ex.getCause());
+      executor.shutdown();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    } finally {
+      releaseWorker.countDown();
+      executor.shutdownNow();
+    }
   }
 }

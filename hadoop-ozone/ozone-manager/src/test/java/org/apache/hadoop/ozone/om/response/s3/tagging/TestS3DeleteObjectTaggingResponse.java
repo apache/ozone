@@ -29,14 +29,14 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.response.key.TestOMKeyResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeyResponseTests;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test delete object tagging response.
  */
-public class TestS3DeleteObjectTaggingResponse extends TestOMKeyResponse {
+public class TestS3DeleteObjectTaggingResponse extends OMKeyResponseTests {
 
   @Test
   public void testAddToBatch() throws Exception {

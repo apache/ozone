@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestWithFSO;
-import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
@@ -63,7 +63,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests OMRecoverLeaseRequest.
  */
-public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
+public class TestOMRecoverLeaseRequest extends OMKeyRequestTests {
 
   private long parentId;
   private boolean forceRecovery = false;

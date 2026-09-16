@@ -48,14 +48,14 @@ function ozone_debug
 ## @replaceable yes
 function ozone_validate_classpath_usage
 {
-  description=$'The --validate flag validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present\n\n'
-  usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop csi|datanode|om|recon|s3g|scm\n\n'
+  description=$'The --validate flag checks that all jars required for the command are present on the classpath\n\n'
+  usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop datanode|om|recon|s3g|scm\n\n'
   options=$'  OPTIONS is none or any of:\n\ncontinue\tcommand execution shall continue even if validation fails'
   ozone_error "${description}${usage_text}${options}"
   exit 1
 }
 
-## @description Validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present
+## @description Validates that all jars required for the command are present on the classpath
 ## @audience private
 ## @stability evolving
 ## @replaceable yes
@@ -636,7 +636,7 @@ function ozone_bootstrap
   export HDDS_LIB_JARS_DIR="${OZONE_HOME}/share/ozone/lib"
 
   export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
-  export OZONE_OPTS=${OZONE_OPTS:-"-Djava.net.preferIPv4Stack=true"}
+  export OZONE_OPTS=${OZONE_OPTS:-}
   ozone_using_envvar OZONE_OPTS
   JSVC_HOME=${JSVC_HOME:-"/usr/bin"}
 
@@ -890,6 +890,8 @@ function ozone_basic_init
   OZONE_PID_DIR=${OZONE_PID_DIR:-/tmp}
   OZONE_ROOT_LOGGER=${OZONE_ROOT_LOGGER:-${OZONE_LOGLEVEL},console}
   OZONE_DAEMON_ROOT_LOGGER=${OZONE_DAEMON_ROOT_LOGGER:-${OZONE_LOGLEVEL},RFA}
+  OZONE_HTTP_REQUEST_LOGGER=${OZONE_HTTP_REQUEST_LOGGER:-INFO,console}
+  OZONE_DAEMON_HTTP_REQUEST_LOGGER=${OZONE_DAEMON_HTTP_REQUEST_LOGGER:-INFO,HttpAccess}
   OZONE_SECURITY_LOGGER=${OZONE_SECURITY_LOGGER:-INFO,NullAppender}
   OZONE_SSH_OPTS=${OZONE_SSH_OPTS-"-o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10s"}
   OZONE_SECURE_LOG_DIR=${OZONE_SECURE_LOG_DIR:-${OZONE_LOG_DIR}}
@@ -1325,6 +1327,23 @@ function ozone_add_to_classpath_userpath
   fi
 }
 
+function ozone_update_native_symlink
+{
+  if [ -z "$TARGET_FILE" ]; then
+    echo "Error: libhadoop doesn't support platform combination ($OS_TYPE / $ARCH_TYPE)." >&2
+    return 1
+  elif pushd "${OZONE_HOME}/lib/native" > /dev/null 2>&1; then
+    # Check if it already exists but points to the wrong target
+    if [ -L "$LINK_FILE" ] && [ "$(readlink "$LINK_FILE")" != "$TARGET_FILE" ]; then
+      # Forcefully recreate it so it points to the correct target file
+      ln -sf "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
+    fi
+    popd > /dev/null
+  else
+    return 1
+  fi
+}
+
 ## @description  Routine to configure any OS-specific settings.
 ## @audience     public
 ## @stability    stable
@@ -1332,9 +1351,8 @@ function ozone_add_to_classpath_userpath
 ## @return       may exit on failure conditions
 function ozone_os_tricks
 {
-  local bindv6only
-
   OZONE_IS_CYGWIN=false
+  ARCH_TYPE=$(uname -m)
   case ${OZONE_OS_TYPE} in
     Darwin)
       if [[ -z "${JAVA_HOME}" ]]; then
@@ -1346,6 +1364,15 @@ function ozone_os_tricks
           export JAVA_HOME
         fi
       fi
+
+      if [ "$ARCH_TYPE" = "arm64" ]; then
+        TARGET_FILE="libhadoop_osx_aarch_64.dylib"
+      fi
+
+      LINK_FILE="libhadoop.dylib"
+      if ozone_update_native_symlink; then
+        export DYLD_LIBRARY_PATH="${OZONE_HOME}/lib/native":$DYLD_LIBRARY_PATH
+      fi
     ;;
     Linux)
 
@@ -1354,24 +1381,16 @@ function ozone_os_tricks
       # with the many threads that we use in Hadoop. Tune the variable
       # down to prevent vmem explosion.
       export MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX:-4}
-      # we put this in QA test mode off so that non-Linux can test
-      if [[ "${QATESTMODE}" = true ]]; then
-        return
+
+      if [ "$ARCH_TYPE" = "aarch64" ]; then
+        TARGET_FILE="libhadoop_linux_aarch_64.so"
+      elif [ "$ARCH_TYPE" = "x86_64" ]; then
+        TARGET_FILE="libhadoop_linux_x86_64.so"
       fi
 
-      # NOTE! OZONE_ALLOW_IPV6 is a developer hook.  We leave it
-      # undocumented in ozone-env.sh because we don't want users to
-      # shoot themselves in the foot while devs make IPv6 work.
-
-      bindv6only=$(/sbin/sysctl -n net.ipv6.bindv6only 2> /dev/null)
-
-      if [[ -n "${bindv6only}" ]] &&
-         [[ "${bindv6only}" -eq "1" ]] &&
-         [[ "${OZONE_ALLOW_IPV6}" != "yes" ]]; then
-        ozone_error "ERROR: \"net.ipv6.bindv6only\" is set to 1 "
-        ozone_error "ERROR: Hadoop networking could be broken. Aborting."
-        ozone_error "ERROR: For more info: http://wiki.apache.org/hadoop/HadoopIPv6"
-        exit 1
+      LINK_FILE="libhadoop.so"
+      if ozone_update_native_symlink; then
+        export LD_LIBRARY_PATH="${OZONE_HOME}/lib/native":$LD_LIBRARY_PATH
       fi
     ;;
     CYGWIN*)
@@ -1420,6 +1439,17 @@ function ozone_java_setup
     RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true ${RATIS_OPTS}"
   fi
 
+  # Opt-in caps on Netty's pooled direct-memory arena (HDDS-11234). Two
+  # properties are needed because Ozone runs both the unshaded io.netty
+  # *and* the Ratis-shaded copy in the same JVM, each with its own
+  # independent ceiling.
+  if [[ -n "${OZONE_NETTY_MAX_DIRECT_MEMORY:-}" ]]; then
+    OZONE_OPTS="-Dio.netty.maxDirectMemory=${OZONE_NETTY_MAX_DIRECT_MEMORY} ${OZONE_OPTS}"
+  fi
+  if [[ -n "${OZONE_RATIS_NETTY_MAX_DIRECT_MEMORY:-}" ]]; then
+    RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.maxDirectMemory=${OZONE_RATIS_NETTY_MAX_DIRECT_MEMORY} ${RATIS_OPTS}"
+  fi
+
   ozone_set_module_access_args
 }
 
@@ -1434,6 +1464,15 @@ function ozone_set_module_access_args
   fi
 
   # populate JVM args based on java version
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 24 ]]; then
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --enable-native-access=ALL-UNNAMED"
+  fi
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 23 ]]; then
+    # allow sun.misc.Unsafe until protobuf-java moves away from it
+    # see: https://github.com/protocolbuffers/protobuf/issues/20760
+    # see: https://openjdk.org/jeps/471
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --sun-misc-unsafe-memory-access=allow"
+  fi
   if [[ "${JAVA_MAJOR_VERSION}" -ge 17 ]]; then
     OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
     OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-exports java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
@@ -1588,6 +1627,7 @@ function ozone_finalize_opts
   ozone_add_param OZONE_OPTS hadoop.home.dir "-Dhadoop.home.dir=${OZONE_HOME}"
   ozone_add_param OZONE_OPTS hadoop.id.str "-Dhadoop.id.str=${OZONE_IDENT_STRING}"
   ozone_add_param OZONE_OPTS hadoop.root.logger "-Dhadoop.root.logger=${OZONE_ROOT_LOGGER}"
+  ozone_add_param OZONE_OPTS ozone.http.request.logger "-Dozone.http.request.logger=${OZONE_HTTP_REQUEST_LOGGER}"
   ozone_add_param OZONE_OPTS hadoop.policy.file "-Dhadoop.policy.file=${OZONE_POLICYFILE}"
   ozone_add_param OZONE_OPTS hadoop.security.logger "-Dhadoop.security.logger=${OZONE_SECURITY_LOGGER}"
 }
@@ -2719,6 +2759,7 @@ function ozone_generic_java_subcmd_handler
   # if yes, use the daemon logger and the appropriate log file.
   if [[ "${OZONE_DAEMON_MODE}" != "default" ]]; then
     OZONE_ROOT_LOGGER="${OZONE_DAEMON_ROOT_LOGGER}"
+    OZONE_HTTP_REQUEST_LOGGER="${OZONE_DAEMON_HTTP_REQUEST_LOGGER}"
     if [[ "${OZONE_SUBCMD_SECURESERVICE}" = true ]]; then
       OZONE_LOGFILE="ozone-${OZONE_SECURE_USER}-${OZONE_IDENT_STRING}-${OZONE_SUBCMD}-${HOSTNAME}.log"
     else

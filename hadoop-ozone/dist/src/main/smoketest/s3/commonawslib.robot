@@ -143,11 +143,24 @@ Setup s3 tests
     Set Global Variable  ${OZONE_S3_TESTS_SET_UP}    ${TRUE}
 
 Setup links for S3 tests
-    ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
+    ${exists} =        Bucket Exists    s3v/link
     Return From Keyword If    ${exists}
-    Execute            ozone sh volume create o3://${OM_SERVICE_ID}/legacy
-    Execute            ozone sh bucket create --layout ${BUCKET_LAYOUT} o3://${OM_SERVICE_ID}/legacy/source-bucket
+    Ensure legacy source bucket
     Create link        link
+
+Ensure legacy source bucket
+    ${source_exists} =    Bucket Exists    legacy/source-bucket
+    Return From Keyword If    ${source_exists}
+    ${rc}    ${output} =    Run And Return Rc And Output    ozone sh volume create legacy
+    Run Keyword If    ${rc} != 0    Should Contain    ${output}    VOLUME_ALREADY_EXISTS
+    Execute    ozone sh bucket create --layout ${BUCKET_LAYOUT} legacy/source-bucket
+
+Setup link bucket for tagging
+    [Arguments]    ${link_bucket_name}=link-bucket-tagging
+    ${exists} =    Bucket Exists    s3v/${link_bucket_name}
+    Return From Keyword If    ${exists}
+    Ensure legacy source bucket
+    Create link    ${link_bucket_name}
 
 Create generated bucket
     [Arguments]          ${layout}=OBJECT_STORE
@@ -162,7 +175,7 @@ Create encrypted bucket
 
 Create link
     [arguments]       ${bucket}
-    Execute           ozone sh bucket link o3://${OM_SERVICE_ID}/legacy/source-bucket o3://${OM_SERVICE_ID}/s3v/${bucket}
+    Execute           ozone sh bucket link legacy/source-bucket s3v/${bucket}
     [return]          ${bucket}
 
 Create EC bucket

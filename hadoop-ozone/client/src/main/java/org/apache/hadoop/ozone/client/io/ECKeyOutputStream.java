@@ -74,14 +74,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private final Future<Boolean> flushFuture;
   private final AtomicLong flushCheckpoint;
 
-  /**
-   * Indicates if an atomic write is required. When set to true,
-   * the amount of data written must match the declared size during the commit.
-   * A mismatch will prevent the commit from succeeding.
-   * This is essential for operations like S3 put to ensure atomicity.
-   */
-  private boolean atomicKeyCreation;
-
   private volatile boolean closed;
   private volatile boolean closing;
   // how much of data is actually written yet to underlying stream
@@ -130,7 +122,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
       return flushStripeFromQueue();
     });
     this.flushCheckpoint = new AtomicLong(0);
-    this.atomicKeyCreation = builder.getAtomicKeyCreation();
   }
 
   @Override
@@ -489,12 +480,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
         Preconditions.checkArgument(writeOffset == offset,
             "Expected writeOffset= " + writeOffset
                 + " Expected offset=" + offset);
-        if (atomicKeyCreation) {
-          long expectedSize = blockOutputStreamEntryPool.getDataSize();
-          Preconditions.checkState(expectedSize == offset, String.format(
-              "Expected: %d and actual %d write sizes do not match",
-                  expectedSize, offset));
-        }
         for (CheckedRunnable<IOException> preCommit : preCommits) {
           preCommit.run();
         }
