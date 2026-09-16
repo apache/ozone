@@ -389,15 +389,16 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
    - Extend `KeyInfo` & `KeyInfoProtoLight`:
      - `optional RetentionConfig retentionConfig = 23;`
      - `optional bool legalHold = 24 [default = false];`
-   - Introduce new class `RetentionExpiration` to encapsulate rules of retention:
-     - `fromProto` to convert from protobuf to java class.
-     - `toProto` to convert from java class to protobuf.
-     - `validate` to validate the retention configuration (e.g., duration > 0, valid time unit, valid retention mode).
 
 2. **Domain Models & Helpers (`hadoop-ozone/common`)**:
    - Update `OmBucketInfo` / `OmBucketInfo.Builder` with getters, setters, and protobuf translation.
    - Update `OmKeyInfo` / `OmKeyInfo.Builder` with getters, setters, and protobuf translation.
-   - Validate bucket layout: enforce that Object Lock can only be enabled on `OBJECT_STORE` (OBS) layout buckets; reject `FILE_SYSTEM_OPTIMIZED` (FSO) or `LEGACY` buckets.
+   - Introduce new class `Retention` to encapsulate bucket rules of retention:
+     - `fromProto` to convert from protobuf to java class.
+     - `toProto` to convert from java class to protobuf.
+   - Introduce `RetentionUtil` to provide utility methods for retention calculations:
+     - Calculate `RetainUntilDate` based on `RetentionConfig` and current system time.
+     - Validate retention rules (e.g., duration > 0, valid time unit, etc.).
 
 ---
 
