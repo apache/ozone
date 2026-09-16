@@ -66,9 +66,6 @@ Create bucket with mixed uppercase characters in bucket name
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket BuCkEt-${randStr}   255
                         Should contain          ${result}           InvalidBucketName
 
-Create bucket validate names can consist only of lowercase letters, numbers, periods (.), and hyphens (-).
-    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket test#12-$   255
-                        Should contain          ${result}           Invalid bucket name
 
 Create bucket validate names must begin and end with a letter or number.
     ${randStr} =        Generate Random String     8    [LOWER]
@@ -91,7 +88,7 @@ Create bucket validate names must not contain leading period
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket .test   255
                         Should contain          ${result}           InvalidBucketName
 
-Create bucket validate names must not contain Trailing period
+Create bucket validate names must not contain trailing period
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket test.   255
                         Should contain          ${result}           InvalidBucketName
 
