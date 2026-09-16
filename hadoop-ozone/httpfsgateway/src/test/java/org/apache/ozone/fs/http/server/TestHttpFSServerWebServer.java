@@ -52,7 +52,8 @@ public class TestHttpFSServerWebServer {
    * contain characters ('%' arrives as %25) or empty segments ("//") which
    * Jetty 12 rejects with 400 by default. The HttpFS web server must allow such
    * ambiguous URIs, which relaxes the connector's URI compliance to admit
-   * empty path segments, percent encodings and encoded path separators (but not
+   * empty path segments, percent encodings, encoded path separators and
+   * suspicious path characters (a decoded backslash or control byte) (but not
    * %2e path traversal or UTF-16 encodings). {@code TestHttpServer2} covers that
    * this mode also decodes ambiguous URIs in the servlet layer.
    */
@@ -67,7 +68,8 @@ public class TestHttpFSServerWebServer {
     assertEquals(EnumSet.of(
         UriCompliance.Violation.AMBIGUOUS_EMPTY_SEGMENT,
         UriCompliance.Violation.AMBIGUOUS_PATH_ENCODING,
-        UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR),
+        UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR,
+        UriCompliance.Violation.SUSPICIOUS_PATH_CHARACTERS),
         connector.getConnectionFactory(HttpConnectionFactory.class)
             .getHttpConfiguration().getUriCompliance().getAllowed());
   }
