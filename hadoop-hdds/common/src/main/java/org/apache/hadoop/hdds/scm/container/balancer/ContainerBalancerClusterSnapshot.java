@@ -37,6 +37,9 @@ public final class ContainerBalancerClusterSnapshot {
   private final int targetCount;
   private final long totalOverUtilizedBytes;
   private final long totalUnderUtilizedBytes;
+
+  // Same value as totalOverUtilizedBytes. The analyzer sets it once via
+  // setTotalOverUtilizedBytes(); bytesToMove is assigned here for assessment output.
   private final long bytesToMove;
   private final double imbalance;
   private final List<NodeUtilization> topSourceNodes;
