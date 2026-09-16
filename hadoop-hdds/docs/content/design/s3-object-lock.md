@@ -169,34 +169,89 @@ Two new fields: retentionDate & legalHold.
 
 ### Ranger Access Control
 
-Ozone Object Lock enforces a dual-gate mechanism combining **Ranger authorization checks** and **underlying WORM state validation**:
+Ozone Object Lock enforces a dual-gate protection mechanism combining **Ranger policy-based authorization** and **underlying OM WORM state validation**:
 
-* **Standard Data Operations (Put / Delete)**: Even if a user is granted standard Ranger `WRITE` or `DELETE` permissions, the operation is immediately denied with a `403 Access Denied` (`WORMProtectionException`) if the target object is actively locked by an unexpired retention period or an active Legal Hold.
-* **Lock Management and Action Authorization**: Following the Ranger action-matching model introduced via the [STS](ozone-sts.md), Object Lock actions map directly to AWS S3 action names (without the `s3:` prefix). Access control separates underlying Ranger permissions (e.g., `READ`, `WRITE`) from fine-grained compliance actions:
-  * `GetBucketObjectLockConfiguration`
-  * `PutBucketObjectLockConfiguration`
-  * `GetObjectRetention`
-  * `PutObjectRetention`
-  * `GetObjectLegalHold`
-  * `PutObjectLegalHold`
-  * `BypassGovernanceRetention`
+* **Standard Data Operations (Put / Delete)**: Even if a principal has valid Ranger `WRITE` or `DELETE` access, any attempt to mutate, overwrite, or delete an object under an active Legal Hold or an unexpired Retention period is immediately rejected with `403 Access Denied` (`WORMProtectionException`).
+* **Fine-Grained S3 Action Matching**: Object Lock management integrates with the action-matching authorization framework introduced via STS. S3 Object Lock actions map 1:1 to AWS S3 action names. See [AWS STS Design for Ozone S3](ozone-sts.md) for details.
 
-#### 1. Legal Hold Access Control
+---
 
-Authorization is decoupled from the payload value being set, aligning strictly with AWS S3 specifications:
+#### 1. Configuration & Component Updates
 
-* **`GetObjectLegalHold`**: Allows querying the current Legal Hold status of an object.
-* **`PutObjectLegalHold`**: Governs both setting and clearing Legal Hold status (status ON or OFF). Users must be granted the `PutObjectLegalHold` action (along with `WRITE` permission) in Ranger to toggle the hold.
+To enable action-level authorization and onboard Object Lock actions into the Ozone & Ranger ecosystem, the following updates are required:
 
-#### 2. Retention Access Control and Governance Mode Bypass
+**Prerequisite: Feature Flag Activation**:
+* Enable the Ranger action matcher condition in the Ozone configuration:
+  ```properties
+  ranger.servicedef.ozone.enableActionMatcherInPoliciesCondition=true
+  ```
+* When enabled, Ozone S3 Gateway (S3G) intercepts the high-level S3 API operation and populates the S3 action name into the `RangerAccessRequest`, allowing Ranger's `RangerActionMatcher` to evaluate policy conditions against incoming requests.
 
-For object retention, the interaction with Ranger policies depends on the configured Retention Mode:
+1. **UI & Metadata Registration**:
+  * Update `security-admin/src/main/webapp/react-webapp/src/utils/actionRequirements/ozone.json` in Apache Ranger:
+    Register the 7 new Object Lock actions along with their prerequisite primitive permissions (e.g., `READ`, `WRITE`) mapped by resource level (Bucket vs. Key). This enforces design-time validation in the Ranger React UI, preventing administrators from creating invalid policy items.
 
-* **Compliance Mode**: Serves as the strictest compliance tier. Until the retention period expires, **no role or Ranger permission can bypass or overwrite the lock**, including cluster administrators.
-* **Governance Mode and `BypassGovernanceRetention`**:
-  * **Mechanism**: Governance Mode allows authorized users to overwrite, delete, or alter the retention duration of a locked object before its expiration date.
-  * **Authorization Binding**: Evaluated at the **Key level** via the **`BypassGovernanceRetention`** action.
-  * **Enforcement Flow**: While regular users are strictly blocked from mutating locked objects in Governance Mode, any request attempting to overwrite or delete such objects requires explicit `BypassGovernanceRetention` entitlement in Ranger for that key. Without this permission, even administrators using standard client tools cannot modify or remove the locked object.
+2. **S3 Gateway & STS Mapping**:
+  * Update **`S3GActionIamMapper`**: Map incoming HTTP request context and sub-resources (e.g., `?legal-hold`, `?retention`, `?object-lock`) to the corresponding action string.
+  * Update **`IamSessionPolicyResolver`**: Ensure session-scoped policies (STS AssumeRole / federation tokens) recognize and evaluate the new Object Lock action strings.
+
+---
+
+#### 2. Action to Ranger Access Type Mapping
+
+Following the declarative contract in `ozone.json`, each S3 action requires a baseline primitive Ranger permission at the designated resource hierarchy:
+
+| S3 Action | Resource Level | Required Ranger Access Type | Description |
+| :--- | :--- | :--- | :--- |
+| **`GetBucketObjectLockConfiguration`** | Bucket | `READ` | Retrieve default Object Lock settings on a bucket. |
+| **`PutBucketObjectLockConfiguration`** | Bucket | `WRITE` | Configure default retention mode and period on a bucket. |
+| **`GetObjectRetention`** | Key | `READ` | Read the retention mode and Retain-Until date of an object version. |
+| **`PutObjectRetention`** | Key | `WRITE` | Set or extend object retention mode and duration. |
+| **`GetObjectLegalHold`** | Key | `READ` | Query the current Legal Hold status (`ON` or `OFF`). |
+| **`PutObjectLegalHold`** | Key | `WRITE` | Toggle the Legal Hold state (`ON` or `OFF`). |
+| **`BypassGovernanceRetention`** | Key | `WRITE` / `DELETE` | Privileged entitlement to bypass retention in Governance Mode. |
+
+---
+
+#### 3. Value-Level Authorization & Ranger Condition Evaluator
+
+While API invocation is controlled by the S3 Action (e.g., granting `PutObjectLegalHold`), real-world governance often requires **role segregation based on request values** (e.g., Compliance Officers can toggle `ON`, but only external Auditors can toggle `OFF`; or preventing operators from setting `COMPLIANCE` mode).
+
+To support this without fragmenting AWS-compatible Action definitions, Ozone and Ranger introduce a payload-aware **String Matcher Condition Evaluator**:
+
+1. **Context Extraction in Ozone S3G**:
+  * During request interception, S3G inspects the request body/headers and injects target attributes into the `RangerAccessRequest.getContext()`:
+    * `s3:object-lock-legal-hold`: Extracted from the XML body (`ON` or `OFF`).
+    * `s3:object-lock-mode`: Extracted from the XML body (`GOVERNANCE` or `COMPLIANCE`).
+
+2. **Ranger Custom Condition Evaluator**:
+  * Implement a dedicated condition evaluator extending `RangerAbstractConditionEvaluator` (registered in `ranger-servicedef-ozone.json`):
+    * Evaluates `s3:object-lock-legal-hold` against configured policy criteria (`ON` vs. `OFF`).
+    * Evaluates `s3:object-lock-mode` against configured policy criteria (`GOVERNANCE` vs. `COMPLIANCE`).
+  * Enables fine-grained policies such as:
+    * *Policy A (Evidence Preservation)*: Allow `PutObjectLegalHold` **ONLY IF** `s3:object-lock-legal-hold == "ON"`.
+    * *Policy B (Safe Retention)*: Allow `PutObjectRetention` **ONLY IF** `s3:object-lock-mode == "GOVERNANCE"`.
+
+---
+
+#### 4. Retention Modes & Governance Bypass Enforcement
+
+* **Compliance Mode**:
+  * The strictest WORM protection tier.
+  * Once applied, the lock is immutable. **No role, administrator, or Ranger permission** (including `BypassGovernanceRetention`) can overwrite, shorten, or delete the object version until the retention period expires.
+* **Governance Mode & `BypassGovernanceRetention`**:
+  * Protects objects from accidental deletion by general users while retaining operational flexibility for authorized personnel.
+  * **Dual-Check Enforcement**:
+    1. **Client Declaration**: The client must explicitly specify the `x-amz-bypass-governance-retention: true` header in the delete or overwrite request.
+    2. **Ranger Action Entitlement**: Ozone checks whether the principal has the **`BypassGovernanceRetention`** action granted in Ranger for the target key resource.
+    3. If either check fails, the request is aborted with `403 Access Denied`.
+
+
+> _**Warning**:
+> _Permanent Data Immutability in Compliance Mode_
+> 
+> Unlike AWS S3, where terminating the AWS root account can prematurely purge Compliance-locked data, Apache Ozone has no concept of a root account.
+> Once applied, a Compliance lock cannot be overridden or deleted by any admin or Ranger policy until the retention period expires. The only way to force-remove such data prior to expiration is by taking OM offline and directly modifying the underlying RocksDB via repair tools (ozone debug ldb). Use this mode with extreme caution.
 
 ### New Ozone APIs
 
@@ -313,21 +368,6 @@ To achieve strict regulatory compliance (e.g., SEC 17a-4 or FINRA WORM requireme
      Native ACLs allow object creators or bucket owners to adjust permissions. If lock controls were exposed through Native ACLs, standard bucket administrators or key owners could modify or override lock-related ACLs locally. Centralizing lock authorization exclusively in **Apache Ranger** ensures that compliance policies are managed from a unified pane of glass, preventing local policy drift or accidental misconfigurations.
   3. **Operational Complexity**:
      Supporting dual authorization models (Ranger + Native ACLs) for critical compliance features introduces unnecessary complexity, potential security loopholes, and ambiguous resolution hierarchies during audits. Excluding Native ACLs ensures clean boundary enforcement.
-
-### 2. Why Introduce Dedicated Ranger Actions Instead of Reusing Existing Permissions (e.g., WRITE / DELETE)?
-
-* **Proposal**:
-  Reuse standard data mutating permissions—such as granting users with `WRITE` or `ALL` the right to set Legal Holds and configure Retention, or allowing users with `DELETE` to bypass Governance mode.
-
-* **Why Rejected**:
-  1. **Violation of Separation of Duties (SoD)**:
-     Object Lock is fundamentally an identity- and role-bound compliance mechanism, not merely a flag toggled on an object. Its primary objective is to protect critical data against accidental deletion, ransomware, or malicious overwrites—**specifically from actors who already possess standard `WRITE` or `DELETE` permissions** (e.g., operational scripts, ETL pipelines, compromised credentials, or everyday developers).
-  2. **Renders Lock Protection Ineffective (Self-Unlock & Delete)**:
-     If lock management is trivially bound to existing `WRITE` or `DELETE` permissions, any user authorized to modify the data could simply remove the Legal Hold or retention and proceed to delete or overwrite it. In such a design, the lock mechanism loses its entire defensive value.
-  3. **Enforcing Independent Privileged Roles**:
-     To achieve true tamper-proofing, we must block users who have standard `WRITE` permissions from modifying locked data, while reserving lock overrides exclusively for independent roles:
-  - **Decoupled Lifecycle Actions**: Managing a Legal Hold (`PutObjectLegalHold`, which controls setting status to ON or OFF per AWS S3 semantics) or bypassing retention (`BypassGovernanceRetention`) are high-privilege compliance actions that must be governed independently from routine data mutation.
-  - **Dual-Gate WORM Enforcement**: Routine data writers operate with standard `WRITE` / `DELETE`, but once a lock is active, they are completely blocked. Only security or compliance personas explicitly granted the dedicated Object Lock actions can intervene.
 
 ## Plan
 
