@@ -497,14 +497,21 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         throw ex;
       }
 
-      return CompletableFuture.supplyAsync(() -> {
-            try {
-              return runCommand(request, termIndex);
-            } finally {
-              exitApplyTransaction();
-            }
-          }, executorService)
-          .thenApply(this::processResponse);
+      final CompletableFuture<OMResponse> runFuture;
+      try {
+        runFuture = CompletableFuture.supplyAsync(() -> {
+              try {
+                return runCommand(request, termIndex);
+              } finally {
+                exitApplyTransaction();
+              }
+            }, executorService);
+      } catch (RuntimeException ex) {
+        exitApplyTransaction();
+        throw ex;
+      }
+
+      return runFuture.thenApply(this::processResponse);
     } catch (Exception e) {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();

@@ -47,6 +47,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -371,6 +372,32 @@ public class TestOzoneManagerStateMachine {
       assertTrue(handlerInvoked.await(2, TimeUnit.SECONDS),
           "apply should continue after state machine unpause");
       assertNotNull(future.get(2, TimeUnit.SECONDS));
+    } finally {
+      testSm.stop();
+    }
+  }
+
+  @Test
+  public void testApplyTransactionExecutorRejectDoesNotBlockPause() throws Exception {
+    ExecutorService rejectedExecutor = Executors.newSingleThreadExecutor();
+    rejectedExecutor.shutdownNow();
+    OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
+        om, doubleBuffer, handler, rejectedExecutor, null);
+    try {
+      OMRequest request = sampleWriteRequest();
+      TransactionContext trx = mockTrx(request, 1, 5);
+
+      CompletableFuture<Message> future = testSm.applyTransaction(trx);
+      ExecutionException ex = assertThrows(ExecutionException.class, future::get);
+      assertInstanceOf(RejectedExecutionException.class, ex.getCause());
+
+      ExecutorService pauseExecutor = Executors.newSingleThreadExecutor();
+      try {
+        Future<?> pauseFuture = pauseExecutor.submit(testSm::pause);
+        pauseFuture.get(2, TimeUnit.SECONDS);
+      } finally {
+        pauseExecutor.shutdownNow();
+      }
     } finally {
       testSm.stop();
     }
