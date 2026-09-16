@@ -128,10 +128,6 @@ public class TestCommitWatcher {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    // Make sure background pipeline creation has finished and a RATIS THREE
-    // pipeline is OPEN before allocating a container, so the write burst does
-    // not race on-demand pipeline creation inside allocateContainer.
-    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 60000);
     client = OzoneClientFactory.getRpcClient(conf);
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(VOLUME_NAME);
@@ -161,12 +157,10 @@ public class TestCommitWatcher {
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
         assertEquals(1, xceiverClient.getRefcount());
         XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
-        // Warm up the freshly-acquired Ratis client before the async write
-        // burst: create the container synchronously so the RaftClient discovers
-        // the leader and the container already exists. Otherwise the first async
-        // WriteChunk has to do leader discovery and lazy container creation under
-        // the aggressive request/no-retry timeouts and can flake with
-        // AlreadyClosedException.
+        // Commit one request synchronously before the async write burst so the
+        // Ratis client is fully established and the container already exists.
+        // Issuing the burst directly on a freshly-acquired client was seen to
+        // fail intermittently with AlreadyClosedException (HDDS-16398).
         ratisClient.sendCommandAsync(
             ContainerTestHelper.getCreateContainerRequest(containerId, pipeline))
             .getResponse().get();
@@ -238,12 +232,10 @@ public class TestCommitWatcher {
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
         assertEquals(1, xceiverClient.getRefcount());
         XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
-        // Warm up the freshly-acquired Ratis client before the async write
-        // burst: create the container synchronously so the RaftClient discovers
-        // the leader and the container already exists. Otherwise the first async
-        // WriteChunk has to do leader discovery and lazy container creation under
-        // the aggressive request/no-retry timeouts and can flake with
-        // AlreadyClosedException.
+        // Commit one request synchronously before the async write burst so the
+        // Ratis client is fully established and the container already exists.
+        // Issuing the burst directly on a freshly-acquired client was seen to
+        // fail intermittently with AlreadyClosedException (HDDS-16398).
         ratisClient.sendCommandAsync(
             ContainerTestHelper.getCreateContainerRequest(containerId, pipeline))
             .getResponse().get();
