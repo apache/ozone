@@ -152,12 +152,15 @@ Two new fields: objectLockEnabled & defaultRetention.
 
 **Key Table**
 
-Two new fields: retentionConfig & legalHold.
+* **retentionDate**: Represents the expiration timestamp of the retention lock. While clients or API calls specify retention duration in terms of days or years, Ozone calculates the definitive expiration date upon applying the rule and persists it as a timestamp into key table.
+* **legalHold**: Indicates whether an explicit legal hold is active on the key.
+
+Two new fields: retentionDate & legalHold.
 
 ```protobuf
   message KeyInfo {
   // ... existing fields
-  optional RetentionConfig retentionConfig = 23;
+  optional string retentionDate = 23;
   optional bool legalHold = 24 [default = false];
   }
 ```
