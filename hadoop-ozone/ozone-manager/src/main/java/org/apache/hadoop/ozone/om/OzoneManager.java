@@ -598,7 +598,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (scmServiceId != null) {
       reconfigurationHandler
           .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId))
-          .register(OZONE_SCM_NODES_KEY + "." + scmServiceId, this::reconfScmNodes);
+          .register(OZONE_SCM_NODES_KEY + "." + scmServiceId, this::reconfScmNodes)
+          .registerCompleteCallback(this::reloadScmProxiesOnReconfig);
     }
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
@@ -6098,16 +6099,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Reload the block and container SCM failover proxies after the SCM node list
-   * ({@code ozone.scm.nodes.<serviceId>}) is reconfigured, so the OM can reach a
-   * newly added SCM without a restart. The per-node address keys
-   * ({@code ozone.scm.address.<serviceId>.<nodeId>}) must already be present for
-   * the involved nodes.
+   * Validate and publish a reconfigured SCM node list
+   * ({@code ozone.scm.nodes.<serviceId>}) and reload the block and container SCM
+   * failover proxies so the OM can reach a newly added SCM without a restart.
    *
-   * Scope: only the block and container proxies are reloaded here. Changing an
-   * address key alone does not trigger a reload; touch the node list to apply
-   * it. The secure-mode SCM security and secret-key proxy providers are not
-   * reloaded and continue to use the node list captured at startup.
+   * <p>The reload reads the node list and the per-node address keys
+   * ({@code ozone.scm.address.<serviceId>.<nodeId>}) from the same live
+   * configuration. If the node list is reconfigured before a newly added SCM's
+   * address, the reload here cannot resolve that node and is deferred: the new
+   * list is kept and {@link #reloadScmProxiesOnReconfig} reloads once the whole
+   * reconfiguration batch (including the address key) has been applied, so a
+   * single {@code reconfig start} adds the node regardless of key order.
+   *
+   * <p>Scope: only the block and container proxies are reloaded. The secure-mode
+   * SCM security and secret-key proxy providers are not reloaded and continue to
+   * use the node list captured at startup.
    */
   private String reconfScmNodes(String value) {
     if (StringUtils.isBlank(value)) {
@@ -6117,26 +6123,48 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // ReconfigurableBase stores the new value into the configuration only after
     // this callback returns, but reloadScmNodes() rebuilds the SCM proxies from
     // that same live configuration. Publish the new node list first so the
-    // reload sees the intended membership, and roll it back if the reload fails
-    // (e.g. a newly added SCM's address is not set yet) so the property is not
-    // left naming a node set the proxies never adopted; that also lets the
-    // reconfiguration be retried once both keys are updated.
+    // reload sees the intended membership.
     String scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY,
         HddsUtils.getScmServiceId(configuration));
-    String previousValue = configuration.get(scmNodesKey);
     configuration.set(scmNodesKey, value);
     try {
       scmClient.reloadScmNodes();
-    } catch (RuntimeException e) {
-      if (previousValue == null) {
-        configuration.unset(scmNodesKey);
-      } else {
-        configuration.set(scmNodesKey, previousValue);
-      }
-      throw e;
+      LOG.info("Reloaded SCM proxy configuration for {} : {}", OZONE_SCM_NODES_KEY, value);
+    } catch (ConfigurationException e) {
+      // A newly added SCM's address key is not set yet. Keep the new node list
+      // and let reloadScmProxiesOnReconfig complete the reload once the address
+      // key is also applied, rather than rolling back and forcing a second pass.
+      LOG.info("Deferring SCM proxy reload for {} until the reconfiguration batch completes "
+          + "(a referenced SCM address is not set yet): {}", scmNodesKey, e.getMessage());
     }
-    LOG.info("Reloaded SCM proxy configuration for {} : {}", OZONE_SCM_NODES_KEY, value);
     return value;
+  }
+
+  /**
+   * Reconfiguration-complete callback that reloads the block and container SCM
+   * failover proxies once a batch that touched the SCM node list or any per-node
+   * SCM address has been fully applied. Because it runs after every property in
+   * the batch is stored, an address-only change takes effect (the per-property
+   * path only fires for the node list), and a node added with its address key
+   * listed before or after the node list is picked up in a single reconfiguration.
+   */
+  @VisibleForTesting
+  public void reloadScmProxiesOnReconfig(Map<String, Boolean> changedProperties,
+      Configuration newConf) {
+    String scmServiceId = HddsUtils.getScmServiceId(configuration);
+    if (scmServiceId == null || scmClient == null) {
+      return;
+    }
+    String scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+    String scmAddressPrefix =
+        ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId) + ".";
+    boolean scmProxyKeyChanged = changedProperties.keySet().stream()
+        .anyMatch(key -> key.equals(scmNodesKey) || key.startsWith(scmAddressPrefix));
+    if (scmProxyKeyChanged) {
+      scmClient.reloadScmNodes();
+      LOG.info("Reloaded SCM failover proxies after reconfiguration of {} / {}*",
+          scmNodesKey, scmAddressPrefix);
+    }
   }
 
   private String reconfOzoneAdmins(String newVal) {
