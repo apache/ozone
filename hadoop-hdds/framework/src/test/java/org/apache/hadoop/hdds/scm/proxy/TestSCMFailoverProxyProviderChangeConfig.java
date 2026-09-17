@@ -21,6 +21,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -84,8 +86,16 @@ public class TestSCMFailoverProxyProviderChangeConfig {
 
     SCMBlockLocationFailoverProxyProvider provider =
         new SCMBlockLocationFailoverProxyProvider(conf);
-    // Point the current proxy at the node that is about to be removed.
-    provider.changeCurrentProxy("scm3");
+
+    // changeCurrentProxy advances to the *next* node in the ring, so pass the
+    // node immediately before scm3 to land the current proxy on scm3 -- the node
+    // about to be removed -- and confirm it before reloading so the removal path
+    // is actually exercised.
+    List<String> before = provider.getSCMNodeIds();
+    int size = before.size();
+    int scm3Index = before.indexOf("scm3");
+    provider.changeCurrentProxy(before.get((scm3Index - 1 + size) % size));
+    assertEquals("scm3", provider.getCurrentProxySCMNodeId());
 
     conf.set(ConfUtils.addSuffix(OZONE_SCM_NODES_KEY, SERVICE_ID), "scm1,scm2");
     provider.changeConfig();
@@ -96,6 +106,30 @@ public class TestSCMFailoverProxyProviderChangeConfig {
     assertTrue(nodeIds.contains("scm2"));
     // The current proxy pointer must fall back to a still-configured node.
     assertTrue(nodeIds.contains(provider.getCurrentProxySCMNodeId()));
+  }
+
+  @Test
+  public void testAddressChangeEvictsCachedProxy() {
+    OzoneConfiguration conf = haConf("scm1,scm2");
+    setAddress(conf, "scm1", "127.0.0.1");
+    setAddress(conf, "scm2", "127.0.0.2");
+
+    SCMBlockLocationFailoverProxyProvider provider =
+        new SCMBlockLocationFailoverProxyProvider(conf);
+
+    String current = provider.getCurrentProxySCMNodeId();
+    Object first = provider.getProxy();
+    // With no configuration change the cached proxy is reused.
+    assertSame(first, provider.getProxy());
+
+    // Change the current node's address. changeConfig must evict the stale proxy
+    // so the next getProxy() rebuilds against the new endpoint. This is the
+    // provider-level guarantee behind dynamic SCM reconfiguration; the wrapping
+    // RetryInvocationHandler still re-fetches only on failover.
+    setAddress(conf, current, "127.0.0.3");
+    provider.changeConfig();
+
+    assertNotSame(first, provider.getProxy());
   }
 
   @Test
