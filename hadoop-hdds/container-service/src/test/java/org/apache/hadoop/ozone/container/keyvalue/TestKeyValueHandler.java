@@ -1203,6 +1203,8 @@ public class TestKeyValueHandler {
   public void testReadBlockErrorOnTheStreamClosesTheBlockFile() throws Exception {
     try (StreamFixture fixture = new StreamFixture()) {
       fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      assertResponses(fixture.read(0, BLOCK_SIZE), 0, BLOCK_SIZE);
+      assertTrue(fixture.blockFile.isOpen(), "block file stays open on the stream after a successful read");
       assertOutOfRange(fixture.read(BLOCK_SIZE, 1024), BLOCK_SIZE);
       assertFalse(fixture.blockFile.isOpen(), "block file closed after OUT_OF_RANGE");
     }
