@@ -194,20 +194,6 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   }
 
   @Test
-  void testLinearizableAllowFollowerReadUsesLeaderConsistencyWithSingleOm()
-      throws Exception {
-    setupProxyProvider(1);
-    omNodeAnswers[0].isLeader = true;
-
-    doRead(ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER);
-
-    assertHandledBy(0);
-    assertEquals(ReadConsistency.DEFAULT, ReadConsistency.fromProto(
-        omNodeAnswers[0].lastRequest.getReadConsistencyHint()
-            .getReadConsistency()));
-  }
-
-  @Test
   void testLocalLeaseReadSticksToFollowerBeforeLeader()
       throws Exception {
     setupProxyProvider(3);

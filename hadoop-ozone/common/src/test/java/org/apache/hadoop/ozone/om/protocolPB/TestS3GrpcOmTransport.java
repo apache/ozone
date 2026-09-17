@@ -314,31 +314,6 @@ public class TestS3GrpcOmTransport {
   }
 
   @Test
-  public void testLinearizableFollowerReadUsesLeaderConsistencyWithSingleOm() throws Exception {
-    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
-    configureHaOmService("om0");
-
-    AtomicInteger requestCount = new AtomicInteger();
-    AtomicReference<OMRequest> request = new AtomicReference<>();
-    client = new GrpcOmTransport(conf, ugi, omServiceId);
-    client.startClient("om0", createNodeChannel("om0", requestCount, request));
-    client.changeLeaderProxyForTest("om0");
-    client.changeFollowerReadInitialProxy("om0");
-
-    client.submitRequest(OMRequest.newBuilder()
-        .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
-        .setClientId("test")
-        .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
-            .setReadConsistency(ReadConsistencyProto.LINEARIZABLE_ALLOW_FOLLOWER))
-        .build());
-
-    assertEquals(1, requestCount.get());
-    assertEquals(ReadConsistencyProto.DEFAULT,
-        request.get().getReadConsistencyHint().getReadConsistency());
-  }
-
-  @Test
   public void testFollowerReadDoesNotRouteWriteRequestToFollower() throws Exception {
     conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
     configureHaOmService("om0", "om1");

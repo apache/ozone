@@ -208,14 +208,6 @@ public class GrpcOmTransport implements OmTransport {
 
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
-    if (omFailoverProxyProvider.getOMProxyMap().getNodeIds().size() == 1
-        && payload.hasReadConsistencyHint()
-        && ReadConsistency.fromProto(payload.getReadConsistencyHint()
-            .getReadConsistency()) == ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER) {
-      payload = payload.toBuilder()
-          .setReadConsistencyHint(leaderReadConsistency)
-          .build();
-    }
     if (shouldUseFollowerRead(payload)) {
       return submitRequestWithFollowerRead(payload);
     }
