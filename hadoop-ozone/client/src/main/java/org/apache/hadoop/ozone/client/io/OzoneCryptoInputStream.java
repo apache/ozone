@@ -83,8 +83,9 @@ public class OzoneCryptoInputStream extends CryptoInputStream
    * {@link CryptoInputStream} does not synchronize its own methods, so every method moving the cursor of
    * this stream is serialized here on the monitor of this stream. Otherwise a read or a seek could land in
    * the middle of a positioned read and see (or undo) the cursor move that read does.
-   * This covers both the sequential-read API ({@link #read(byte[], int, int)}, {@link #read(ByteBuffer)},
-   * {@link #seek(long)}, {@link #getPos()}, {@link #skip(long)}) and all positioned-read overloads
+   * This covers both the sequential-read API ({@link #read()}, {@link #read(byte[], int, int)},
+   * {@link #read(ByteBuffer)}, {@link #seek(long)}, {@link #getPos()}, {@link #skip(long)}) and all
+   * positioned-read overloads
    * ({@link #read(long, ByteBuffer)}, {@link #readFully(long, ByteBuffer)},
    * {@link #read(long, byte[], int, int)}, {@link #readFully(long, byte[], int, int)},
    * {@link #readFully(long, byte[])}).
@@ -177,6 +178,11 @@ public class OzoneCryptoInputStream extends CryptoInputStream
     return super.seekToNewSource(targetPos);
   }
 
+  @Override
+  public synchronized int read() throws IOException {
+    return super.read();
+  }
+
   /**
    * Positioned read. Decryption can only happen at Crypto buffer boundaries, so this stream cannot read
    * at an arbitrary position without moving its cursor. The read is serialized against the other reads:
@@ -195,7 +201,10 @@ public class OzoneCryptoInputStream extends CryptoInputStream
     if (dst.isReadOnly()) {
       throw new ReadOnlyBufferException();
     }
-    if (position < 0 || position >= getLength()) {
+    if (position < 0) {
+      throw new EOFException("The given position is negative: " + position);
+    }
+    if (position >= getLength()) {
       return EOF;
     }
 

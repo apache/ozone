@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.BUFFER_SIZE;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.ITERATIONS;
 import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.THREAD_COUNT;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,7 +32,14 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.CryptoCodec;
@@ -309,20 +319,50 @@ public class TestOzoneCryptoInputStream {
   @Test
   @Timeout(value = 30)
   void testConcurrentSkipAndPositionedRead() throws Exception {
-    // A concurrent skip must not slip between a positioned read's seek and
-    // restore and corrupt the sequential cursor or the read result.
+    // Verifies that skip() is serialized on the same monitor as positioned reads.
+    // Half the threads continuously seek-then-skip (cursor-moving sequential ops).
+    // The other half do positioned readFully and assert correctness. If skip() could
+    // slip between the positioned read's internal seek and read, the read would
+    // consume data from the wrong offset and assertArrayEquals would fail.
     byte[] plaintext = RandomUtils.secure().randomBytes(SOURCE_SIZE);
     try (OzoneCryptoInputStream s = buildStream(plaintext)) {
-      PositionedReadTestHelper.runConcurrentPositionedReads(plaintext, (offset, buf) -> {
-        if ((offset & 1) == 0) {
-          s.readFully(offset, buf);
-        } else {
-          // Interleave skip(0) — a no-op skip that still acquires the monitor —
-          // to exercise the happens-before between skip and positioned reads.
-          s.skip(0);
-          s.readFully(offset, buf);
+      ExecutorService pool = Executors.newFixedThreadPool(THREAD_COUNT);
+      try {
+        List<Future<?>> futures = new ArrayList<>();
+
+        // Cursor-moving workers: seek back to 0, then skip a large stride.
+        for (int i = 0; i < THREAD_COUNT / 2; i++) {
+          futures.add(pool.submit((Callable<Void>) () -> {
+            for (int j = 0; j < ITERATIONS; j++) {
+              s.seek(0);
+              s.skip(SOURCE_SIZE / 4);
+            }
+            return null;
+          }));
         }
-      });
+
+        // Positioned-read workers: read at fixed offsets and verify data.
+        for (int i = THREAD_COUNT / 2; i < THREAD_COUNT; i++) {
+          final int t = i;
+          futures.add(pool.submit((Callable<Void>) () -> {
+            for (int j = 0; j < ITERATIONS; j++) {
+              int offset = (t * 1000 + j * 17) % (SOURCE_SIZE - BUFFER_SIZE);
+              byte[] buf = new byte[BUFFER_SIZE];
+              s.readFully(offset, buf);
+              assertArrayEquals(
+                  Arrays.copyOfRange(plaintext, offset, offset + BUFFER_SIZE),
+                  buf, "thread " + t + " offset " + offset);
+            }
+            return null;
+          }));
+        }
+
+        for (Future<?> f : futures) {
+          f.get(1, TimeUnit.MINUTES);
+        }
+      } finally {
+        pool.shutdownNow();
+      }
     }
   }
 
