@@ -57,53 +57,45 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Benchmark for the OFS getFileStatus bucket-layout cache (HDDS-15925).
+ * Benchmark for OFS {@code getFileStatus} on non-snapshot paths (HDDS-15925).
  *
- * <p>Runs a cache-hit-heavy getFileStatus workload against one
+ * <p>Runs a repeated-access getFileStatus workload against one
  * {@link MiniOzoneCluster} using the default client configuration, and reports
  * the InfoBucket RPCs, getFileStatus RPCs, per-call latency (mean/p50/p90/p99/
  * max) and throughput measured by OM. The workload touches {@link #NUM_BUCKETS}
- * buckets {@link #ACCESSES_PER_BUCKET} times each, so exactly one access per
- * bucket is a cold miss and the rest would hit a per-bucket layout cache — a
- * 90% cache-hit workload.
+ * buckets {@link #ACCESSES_PER_BUCKET} times each in a shuffled order, the way a
+ * real workload repeatedly stats files across many buckets.
  *
- * <p>This benchmark makes no assumption about whether the cache exists, so the
- * identical test runs on both the optimized branch and the baseline
+ * <p>The identical test runs on both this branch and the baseline
  * ({@code master}) code. The before/after comparison is what OM reports for the
  * same workload:
  * <ul>
- *   <li>baseline (no cache): two RPCs per getFileStatus (InfoBucket +
- *       getFileStatus), one InfoBucket RPC per call ({@link #TOTAL_CALLS});</li>
- *   <li>optimized (cache on by default): one RPC per cache hit, so one
- *       InfoBucket RPC per distinct bucket ({@link #NUM_BUCKETS});</li>
- *   <li>server-side (HDDS-15925 -alt): getFileStatus talks to OM directly, so
- *       the InfoBucket RPC is removed entirely (zero for the workload).</li>
+ *   <li>baseline: two RPCs per getFileStatus (InfoBucket + getFileStatus), one
+ *       InfoBucket RPC per call ({@link #TOTAL_CALLS});</li>
+ *   <li>this branch (HDDS-15925): getFileStatus validates the bucket layout
+ *       server-side, so the redundant InfoBucket RPC is removed entirely (zero
+ *       for the workload).</li>
  * </ul>
  * The getFileStatus RPC count is identical either way, showing the optimization
  * removes only the redundant InfoBucket RPC and changes no behaviour; the
  * latency percentiles show the effect of dropping that RPC per call.
  *
  * <p>A second test runs the same workload single-threaded and then across
- * {@link #CONCURRENT_THREADS} client threads sharing one {@code FileSystem} (and
- * thus one layout cache), and logs the two side by side. It confirms the atomic
- * get-or-load holds the InfoBucket RPC count at one per bucket under concurrency
- * — concurrent cold misses on the same bucket collapse to a single RPC instead
- * of stampeding — while throughput scales with the added client threads.
+ * {@link #CONCURRENT_THREADS} client threads sharing one {@code FileSystem}, and
+ * logs the two side by side, confirming the InfoBucket RPC removal holds under
+ * concurrency while throughput scales with the added client threads.
  */
 @Tag("benchmark")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestOfsGetFileStatusCacheBenchmark {
+public class TestOfsGetFileStatusBenchmark {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestOfsGetFileStatusCacheBenchmark.class);
+      LoggerFactory.getLogger(TestOfsGetFileStatusBenchmark.class);
 
-  /** Distinct buckets in the working set (each is one cold miss). */
+  /** Distinct buckets in the working set. */
   private static final int NUM_BUCKETS = 200;
-  /** getFileStatus calls per bucket: 1 miss + (N-1) hits. */
+  /** getFileStatus calls per bucket. */
   private static final int ACCESSES_PER_BUCKET = 10;
-  /** (ACCESSES_PER_BUCKET - 1) / ACCESSES_PER_BUCKET = 0.90. */
-  private static final double TARGET_HIT_RATIO =
-      (ACCESSES_PER_BUCKET - 1) / (double) ACCESSES_PER_BUCKET;
   private static final int TOTAL_CALLS = NUM_BUCKETS * ACCESSES_PER_BUCKET;
   private static final long SHUFFLE_SEED = 20250831L;
   /** Client threads issuing getFileStatus in the concurrent comparison. */
@@ -162,7 +154,7 @@ public class TestOfsGetFileStatusCacheBenchmark {
   }
 
   @Test
-  void benchmarkCacheHitWorkflow() throws Exception {
+  void benchmarkGetFileStatusWorkflow() throws Exception {
     // Prime OM-side state and the JVM so the measured run pays no cold-start.
     runWorkload(1);
 
@@ -175,10 +167,9 @@ public class TestOfsGetFileStatusCacheBenchmark {
   @Test
   void benchmarkConcurrentVsSingleThreaded() throws Exception {
     // Warm the JVM/OM, then measure the same workload single-threaded and again
-    // across CONCURRENT_THREADS client threads sharing one FileSystem (and thus
-    // one bucket-layout cache). The atomic get-or-load keeps the InfoBucket RPC
-    // count at one per bucket in both cases: concurrent cold misses on the same
-    // bucket collapse to a single InfoBucket RPC rather than stampeding.
+    // across CONCURRENT_THREADS client threads sharing one FileSystem. The
+    // InfoBucket RPC removal holds under concurrency, so the getFileStatus RPC
+    // count and InfoBucket RPC count match the single-threaded run.
     runWorkload(1);
 
     Result single = runWorkload(1);
@@ -206,11 +197,11 @@ public class TestOfsGetFileStatusCacheBenchmark {
   }
 
   /**
-   * Invariants that hold on the baseline, the client-cache and the server-side
-   * (-alt) code, so the identical benchmark passes in every worktree: every
-   * getFileStatus still issues its getFileStatus RPC, and the InfoBucket RPCs
-   * lie between the best case (zero — the server-side path removes the RPC) and
-   * the no-cache worst case (one per call).
+   * Invariants that hold on both the baseline and this branch, so the identical
+   * benchmark passes in either worktree: every getFileStatus still issues its
+   * getFileStatus RPC, and the InfoBucket RPCs lie between the best case (zero —
+   * the server-side path removes the RPC) and the baseline worst case (one per
+   * call).
    */
   private void assertWorkloadInvariants(Result r) {
     assertThat(r.getFileStatusRpcs).isEqualTo(TOTAL_CALLS);
@@ -219,18 +210,17 @@ public class TestOfsGetFileStatusCacheBenchmark {
   }
 
   private void logResult(String label, Result r) {
-    double achievedHitRatio =
+    double infoBucketEliminated =
         (TOTAL_CALLS - r.infoBucketRpcs) / (double) TOTAL_CALLS;
     LOG.info(String.format("%n"
-            + "OFS getFileStatus bucket-layout cache benchmark (HDDS-15925) — %s%n"
+            + "OFS getFileStatus RPC benchmark (HDDS-15925) — %s%n"
             + "  buckets=%d, accesses/bucket=%d, total getFileStatus=%d, "
             + "threads=%d%n"
-            + "  target cache-hit ratio      : %.0f%%%n"
             + "  ------------------------------------------------------------%n"
             + "  InfoBucket RPCs             : %d%n"
             + "  getFileStatus RPCs          : %d%n"
             + "  InfoBucket RPCs per call    : %.2f%n"
-            + "  cache-hit ratio achieved    : %.0f%%%n"
+            + "  InfoBucket RPCs eliminated  : %.0f%%%n"
             + "  ------------------------------------------------------------%n"
             + "  latency mean                : %.3f ms%n"
             + "  latency p50                 : %.3f ms%n"
@@ -239,10 +229,9 @@ public class TestOfsGetFileStatusCacheBenchmark {
             + "  latency max                 : %.3f ms%n"
             + "  throughput                  : %.1f getFileStatus/s%n",
         label, NUM_BUCKETS, ACCESSES_PER_BUCKET, TOTAL_CALLS, r.threads,
-        TARGET_HIT_RATIO * 100,
         r.infoBucketRpcs, r.getFileStatusRpcs,
         r.infoBucketRpcs / (double) TOTAL_CALLS,
-        achievedHitRatio * 100,
+        infoBucketEliminated * 100,
         millis(r.mean()), millis(r.percentile(0.50)),
         millis(r.percentile(0.90)), millis(r.percentile(0.99)),
         millis(r.max()), r.opsPerSecond()));
