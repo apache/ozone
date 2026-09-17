@@ -1546,9 +1546,19 @@
     <value>30d</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
-      Controls how long multipart upload is considered active. Specifically, if a multipart info
-      has been ongoing longer than the value of this config entry, that multipart info is considered as
-      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+      Controls how long a multipart upload is considered active before MultipartUploadCleanupService
+      treats it as stale and aborts it. If a multipart upload has been ongoing longer than this
+      threshold (e.g. due to a client crash), it will be cleaned up automatically.
+      Unit can be specified with a postfix (ns, ms, s, m, h, d).
+
+      Interaction with S3 lifecycle AbortIncompleteMultipartUpload rules:
+      When a bucket lifecycle rule specifies an AbortIncompleteMultipartUpload action, its
+      daysAfterInitiation value must be strictly less than this threshold. If
+      daysAfterInitiation is greater than or equal to this threshold, MultipartUploadCleanupService
+      will abort the upload before the lifecycle rule fires, silently making the rule ineffective.
+      Ozone enforces this constraint at lifecycle configuration creation time and will reject
+      configurations that violate it. To use a longer daysAfterInitiation value, increase this
+      threshold accordingly.
     </description>
   </property>
 
@@ -2106,6 +2116,54 @@
       will be used for http authentication.
     </description>
   </property>
+
+  <property>
+    <name>ozone.s3g.sts.http.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The boolean which enables the Ozone S3Gateway STS endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.http-bind-host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The bind host for the S3 Gateway STS HTTP server.
+      If this optional address is set, it overrides only the hostname portion of
+      ozone.s3g.sts.http-address.
+      If not set, the value of ozone.s3g.http-bind-host is used.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.http-address</name>
+    <value>0.0.0.0:9880</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The HTTP address for the S3 Gateway STS endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.https-bind-host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The bind host for the S3 Gateway STS HTTPS server.
+      If this optional address is set, it overrides only the hostname portion of
+      ozone.s3g.sts.http-address.
+      If not set, the value of ozone.s3g.https-bind-host is used.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.https-address</name>
+    <value>0.0.0.0:9881</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The HTTPS address for the S3 Gateway STS endpoint.
+    </description>
+  </property>
+
   <property>
     <name>ozone.s3g.metrics.percentiles.intervals.seconds</name>
     <value>60</value>
@@ -2183,7 +2241,16 @@
     <value>30s</value>
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
-      Timeout for ozone grpc client during read.
+      Timeout for ozone grpc and short-circuit client during read.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.write.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone short-circuit client during write.
     </description>
   </property>
 
@@ -4007,6 +4074,16 @@
   </property>
 
   <property>
+    <name>hdds.heartbeat.address.refresh.missed-count-threshold</name>
+    <value>3</value>
+    <tag>OZONE, DATANODE, HA</tag>
+    <description>Consecutive heartbeat failures the DataNode tolerates
+      against one SCM endpoint before re-resolving its hostname. Only
+      consulted when ozone.client.failover.resolve-needed is true.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
@@ -4926,6 +5003,16 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.diff.max.in.memory.entries.per.job</name>
+    <value>1000000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of diff-candidate object IDs a snapshot diff job may retain
+      in memory before spilling to a temporary RocksDB column family.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.secret.key.file.name</name>
     <value>secret_keys.json</value>
     <tag>SCM, SECURITY</tag>
@@ -5173,6 +5260,27 @@
   </property>
 
   <property>
+    <name>ozone.om.sts.token.cleanup.service.interval</name>
+    <value>3h</value>
+    <tag>OZONE, OM, PERFORMANCE, SECURITY</tag>
+    <description>
+      A background service that periodically scans the s3RevokedStsTokenTable and deletes
+      revocation entries whose cutoff is older than the maximum STS token lifetime (12 hours).
+      This property controls how often the cleanup service runs. Unit could be defined with
+      postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.sts.token.cleanup.service.timeout</name>
+    <value>15m</value>
+    <tag>OZONE, OM, PERFORMANCE, SECURITY</tag>
+    <description>
+      A timeout value for the revoked STS token cleanup service. If this is set
+      greater than 0, the service will stop waiting for the deletion
+      completion after this time. Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.ratis.events.max.limit</name>
     <value>100</value>
     <tag>OZONE, RATIS, SCM</tag>
@@ -5240,6 +5348,21 @@
     <description>Maximum number of multipart upload parts (rounded up to complete uploads)
       to abort in a single task when processing AbortIncompleteMultipartUpload
       lifecycle rules.
+    </description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.state.save.interval.ms</name>
+    <value>300000</value>
+    <tag>OZONE</tag>
+    <description>The interval of bucket scan task saves its pointer to DB. Default is 5 mins.</description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.state.save.keys.processed</name>
+    <value>100000</value>
+    <tag>OZONE</tag>
+    <description>Bucket scan task will save its pointer to DB by default every 100000 keys are scanned. Bucket scan
+      pointer save will happen when either ozone.lifecycle.service.state.save.interval.ms or
+      ozone.lifecycle.service.state.save.keys.processed is satisfied.
     </description>
   </property>
 </configuration>

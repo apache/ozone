@@ -184,6 +184,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
+      CreateKeyResponse.Builder createKeyResponseBuilder =
+          getResponseBuilderWithDerivedKey(getOmRequest(), ozoneManager, createKeyRequest);
       perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       omBucketInfo.incrUsedNamespace(numKeysCreated);
 
@@ -202,11 +204,11 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.
       int clientVersion = getOmRequest().getVersion();
-      omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
-              .setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
+      createKeyResponseBuilder.setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
                   keyArgs.getLatestVersionLocation()))
               .setID(clientID)
-              .setOpenVersion(openVersion).build())
+              .setOpenVersion(openVersion);
+      omResponse.setCreateKeyResponse(createKeyResponseBuilder.build())
               .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(omResponse.build(),
               omFileInfo, missingParentInfos, clientID,

@@ -61,10 +61,10 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -352,7 +352,7 @@ public class TestOmMetrics {
     long initialNumDeleteObjectTaggingFails = getLongCounter("NumDeleteObjectTaggingFails", omMetrics);
 
     // see HDDS-10078 for making this work with FILE_SYSTEM_OPTIMIZED layout
-    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
+    DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
     OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs); // This will perform 7 different operations on the key
@@ -483,7 +483,7 @@ public class TestOmMetrics {
     String bucketName = UUID.randomUUID().toString();
 
     // create bucket with different layout in each ParameterizedTest
-    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, bucketLayout);
+    DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName, bucketLayout);
 
     // Create bucket with 2 nested directories.
     String rootPath = String.format("%s://%s/",

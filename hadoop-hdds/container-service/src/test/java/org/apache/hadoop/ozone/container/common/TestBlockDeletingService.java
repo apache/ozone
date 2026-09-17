@@ -134,10 +134,12 @@ public class TestBlockDeletingService {
   private String schemaVersion;
   private int blockLimitPerInterval;
   private MutableVolumeSet volumeSet;
+  private BlockDeletingServiceTestImpl blockDeletingService;
   private static final int BLOCK_CHUNK_SIZE = 100;
 
   @BeforeEach
   public void init() throws IOException {
+    blockDeletingService = null;
     CodecBuffer.enableLeakDetection();
     scmId = UUID.randomUUID().toString();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
@@ -150,6 +152,10 @@ public class TestBlockDeletingService {
 
   @AfterEach
   public void cleanup() throws IOException {
+    if (blockDeletingService != null) {
+      // Wait for deletion tasks to release container DB references before cleanup.
+      blockDeletingService.shutdown();
+    }
     BlockUtils.shutdownCache(conf);
     CodecBuffer.assertNoLeaks();
   }
@@ -568,11 +574,10 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
-    BlockDeletingServiceTestImpl svc =
-        getBlockDeletingService(containerSet, conf, keyValueHandler);
-    svc.start();
-    BlockDeletingServiceMetrics deletingServiceMetrics = svc.getMetrics();
-    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+    createBlockDeletingService(containerSet, conf, keyValueHandler);
+    blockDeletingService.start();
+    BlockDeletingServiceMetrics deletingServiceMetrics = blockDeletingService.getMetrics();
+    GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
 
     // Ensure 1 container was created
     List<ContainerData> containerData = Lists.newArrayList();
@@ -615,7 +620,7 @@ public class TestBlockDeletingService {
       assertThat(containerSpace).isGreaterThan(0);
 
       // An interval will delete 1 * 2 blocks
-      deleteAndWait(svc, 1);
+      deleteAndWait(blockDeletingService, 1);
 
       // Make sure that deletions for each container were recorded in the checksum tree file.
       containerData.forEach(c -> assertDeletionsInChecksumFile(c, 2));
@@ -645,7 +650,7 @@ public class TestBlockDeletingService {
       assertEquals(3 * BLOCK_CHUNK_SIZE,
           deletingServiceMetrics.getTotalPendingBlockBytes());
 
-      deleteAndWait(svc, 2);
+      deleteAndWait(blockDeletingService, 2);
 
       containerData.forEach(c -> assertDeletionsInChecksumFile(c, 3));
 
@@ -681,7 +686,7 @@ public class TestBlockDeletingService {
       assertEquals(BLOCK_CHUNK_SIZE,
           deletingServiceMetrics.getTotalPendingBlockBytes());
     }
-    svc.shutdown();
+    blockDeletingService.shutdown();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -701,10 +706,9 @@ public class TestBlockDeletingService {
     BlockDeletingServiceMetrics blockDeletingServiceMetrics = BlockDeletingServiceMetrics.create();
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
-    BlockDeletingServiceTestImpl svc =
-        getBlockDeletingService(containerSet, conf, keyValueHandler);
-    svc.start();
-    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+    createBlockDeletingService(containerSet, conf, keyValueHandler);
+    blockDeletingService.start();
+    GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
 
     // Ensure 1 container was created
     List<ContainerData> containerData = Lists.newArrayList();
@@ -714,19 +718,19 @@ public class TestBlockDeletingService {
 
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       //Execute fist delete to update metrics
-      deleteAndWait(svc, 1);
+      deleteAndWait(blockDeletingService, 1);
 
       assertEquals(3, blockDeletingServiceMetrics.getTotalPendingBlockCount());
       assertEquals(3 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
 
       //Execute the second delete to check whether metrics values decreased
-      deleteAndWait(svc, 2);
+      deleteAndWait(blockDeletingService, 2);
 
       assertEquals(2, blockDeletingServiceMetrics.getTotalPendingBlockCount());
       assertEquals(2 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
 
       //Execute the third delete to check whether metrics values decreased
-      deleteAndWait(svc, 3);
+      deleteAndWait(blockDeletingService, 3);
 
       assertEquals(1, blockDeletingServiceMetrics.getTotalPendingBlockCount());
       assertEquals(1 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
@@ -760,10 +764,9 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
-    BlockDeletingServiceTestImpl svc =
-        getBlockDeletingService(containerSet, conf, keyValueHandler);
-    svc.start();
-    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+    createBlockDeletingService(containerSet, conf, keyValueHandler);
+    blockDeletingService.start();
+    GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
 
     // Ensure 2 container was created
     List<ContainerData> containerData = Lists.newArrayList();
@@ -825,11 +828,11 @@ public class TestBlockDeletingService {
     // Totally 2 container * 3 blocks + 4 unrecorded block = 10 blocks
     // So we shall experience 5 rounds to delete all blocks
     // Unrecorded blocks should not affect the actual NumPendingDeletionBlocks
-    deleteAndWait(svc, 1);
-    deleteAndWait(svc, 2);
-    deleteAndWait(svc, 3);
-    deleteAndWait(svc, 4);
-    deleteAndWait(svc, 5);
+    deleteAndWait(blockDeletingService, 1);
+    deleteAndWait(blockDeletingService, 2);
+    deleteAndWait(blockDeletingService, 3);
+    deleteAndWait(blockDeletingService, 4);
+    deleteAndWait(blockDeletingService, 5);
     GenericTestUtils.waitFor(() -> ctr2.getNumPendingDeletionBlocks() == 0,
         200, 2000);
 
@@ -848,7 +851,7 @@ public class TestBlockDeletingService {
       assertFalse(f.exists());
     }
 
-    svc.shutdown();
+    blockDeletingService.shutdown();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -864,18 +867,17 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
-    BlockDeletingServiceTestImpl service =
-        getBlockDeletingService(containerSet, conf, keyValueHandler);
-    service.start();
-    GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+    createBlockDeletingService(containerSet, conf, keyValueHandler);
+    blockDeletingService.start();
+    GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
 
     // Run some deleting tasks and verify there are threads running
-    service.runDeletingTasks();
-    GenericTestUtils.waitFor(() -> service.getThreadCount() > 0, 100, 1000);
+    blockDeletingService.runDeletingTasks();
+    GenericTestUtils.waitFor(() -> blockDeletingService.getThreadCount() > 0, 100, 1000);
 
     // Shutdown service and verify all threads are stopped
-    service.shutdown();
-    GenericTestUtils.waitFor(() -> service.getThreadCount() == 0, 100, 1000);
+    blockDeletingService.shutdown();
+    GenericTestUtils.waitFor(() -> blockDeletingService.getThreadCount() == 0, 100, 1000);
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -946,12 +948,13 @@ public class TestBlockDeletingService {
     svc.shutdown();
   }
 
-  private BlockDeletingServiceTestImpl getBlockDeletingService(
+  private void createBlockDeletingService(
       ContainerSet containerSet, ConfigurationSource config,
       KeyValueHandler keyValueHandler) {
     OzoneContainer ozoneContainer =
         mockDependencies(containerSet, keyValueHandler);
-    return new BlockDeletingServiceTestImpl(ozoneContainer, 1000, config);
+    blockDeletingService =
+        new BlockDeletingServiceTestImpl(ozoneContainer, 1000, config);
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,
@@ -997,18 +1000,17 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
-    BlockDeletingServiceTestImpl service =
-        getBlockDeletingService(containerSet, conf, keyValueHandler);
-    service.start();
+    createBlockDeletingService(containerSet, conf, keyValueHandler);
+    blockDeletingService.start();
     List<ContainerData> containerData = Lists.newArrayList();
     containerSet.listContainer(0L, containerCount, containerData);
     try {
-      GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+      GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
 
       // Deleting one of the two containers and its single block.
       // Hence, space used by the container of whose block has been
       // deleted should be zero.
-      deleteAndWait(service, 1);
+      deleteAndWait(blockDeletingService, 1);
 
       GenericTestUtils.waitFor(() ->
               (containerData.get(0).getBytesUsed() == 0 ||
@@ -1020,14 +1022,14 @@ public class TestBlockDeletingService {
 
       // Deleting the second container. Hence, space used by both the
       // containers should be zero.
-      deleteAndWait(service, 2);
+      deleteAndWait(blockDeletingService, 2);
 
       GenericTestUtils.waitFor(() ->
               (containerData.get(0).getBytesUsed() ==
                   0 && containerData.get(1).getBytesUsed() == 0),
           100, 3000);
     } finally {
-      service.shutdown();
+      blockDeletingService.shutdown();
     }
   }
 
@@ -1052,14 +1054,13 @@ public class TestBlockDeletingService {
         chunksPerBlock);
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
-    BlockDeletingServiceTestImpl service =
-        getBlockDeletingService(containerSet, conf, keyValueHandler);
-    service.start();
+    createBlockDeletingService(containerSet, conf, keyValueHandler);
+    blockDeletingService.start();
     List<ContainerData> containerData = Lists.newArrayList();
     containerSet.listContainer(0L, containerCount, containerData);
     try {
-      GenericTestUtils.waitFor(service::isStarted, 100, 3000);
-      deleteAndWait(service, 1);
+      GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
+      deleteAndWait(blockDeletingService, 1);
       GenericTestUtils.waitFor(() ->
               (containerData.get(0).getBytesUsed() == 0),
           100, 3000);
@@ -1074,7 +1075,7 @@ public class TestBlockDeletingService {
             StringUtils.countMatches(log.getOutput(), "Max lock hold time"));
       }
     } finally {
-      service.shutdown();
+      blockDeletingService.shutdown();
     }
   }
 
@@ -1114,16 +1115,15 @@ public class TestBlockDeletingService {
     createToDeleteBlocks(containerSet, containerCount,
         blocksPerContainer, 1);
 
-    BlockDeletingServiceTestImpl service =
-        getBlockDeletingService(containerSet, conf, keyValueHandler);
-    service.start();
+    createBlockDeletingService(containerSet, conf, keyValueHandler);
+    blockDeletingService.start();
     List<ContainerData> containerData = Lists.newArrayList();
     containerSet.listContainer(0L, containerCount, containerData);
     long blockSpace = containerData.get(0).getBytesUsed() / blocksPerContainer;
     long totalContainerSpace =
         containerCount * containerData.get(0).getBytesUsed();
     try {
-      GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+      GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
       // Total blocks = 3 * 5 = 15
       // blockLimitPerInterval = 10
       // each interval will at most runDeletingTasks = 10 blocks
@@ -1133,7 +1133,7 @@ public class TestBlockDeletingService {
 
       // Deleted space of 10 blocks should be equal to (initial total space
       // of container - current total space of container).
-      deleteAndWait(service, 1);
+      deleteAndWait(blockDeletingService, 1);
 
       GenericTestUtils.waitFor(() ->
               blockLimitPerInterval * blockSpace ==
@@ -1147,7 +1147,7 @@ public class TestBlockDeletingService {
       // be equal to (initial total space of container
       // - current total space of container(it will be zero as all blocks
       // in all the containers are deleted)).
-      deleteAndWait(service, 2);
+      deleteAndWait(blockDeletingService, 2);
 
       long totalContainerBlocks = blocksPerContainer * containerCount;
       GenericTestUtils.waitFor(() ->
@@ -1157,7 +1157,7 @@ public class TestBlockDeletingService {
               100, 3000);
 
     } finally {
-      service.shutdown();
+      blockDeletingService.shutdown();
     }
   }
 
@@ -1179,10 +1179,9 @@ public class TestBlockDeletingService {
     KeyValueContainerData contData = createToDeleteBlocks(containerSet, numBlocks, 4);
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
-    BlockDeletingServiceTestImpl svc =
-        getBlockDeletingService(containerSet, conf, keyValueHandler);
-    svc.start();
-    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+    createBlockDeletingService(containerSet, conf, keyValueHandler);
+    blockDeletingService.start();
+    GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
 
     // Remove all the block files from the disk, as if they were deleted previously but the system failed before
     // doing any metadata updates or removing the transaction of to-delete block IDs from the DB.
@@ -1197,7 +1196,7 @@ public class TestBlockDeletingService {
     assertNotNull(blockFilesRemaining);
     assertEquals(0, blockFilesRemaining.length);
 
-    deleteAndWait(svc, 1);
+    deleteAndWait(blockDeletingService, 1);
 
     assertDeletionsInChecksumFile(contData, numBlocks);
   }

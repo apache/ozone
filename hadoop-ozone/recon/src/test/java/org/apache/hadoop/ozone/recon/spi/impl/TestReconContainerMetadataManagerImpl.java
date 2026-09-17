@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -153,6 +154,27 @@ public class TestReconContainerMetadataManagerImpl {
 
     assertEquals(0, reconContainerMetadataManager
         .getCountForContainerKeyPrefix(ckp1).intValue());
+  }
+
+  @Test
+  public void testReinitWithUninitializedTables() throws Exception {
+    ReconContainerMetadataManagerImpl manager =
+        (ReconContainerMetadataManagerImpl) reconContainerMetadataManager;
+    setFieldToNull(manager, "containerKeyTable");
+    setFieldToNull(manager, "keyContainerTable");
+    setFieldToNull(manager, "containerKeyCountTable");
+
+    manager.reinitWithNewContainerDataFromOm(null);
+
+    assertNotNull(manager.getContainerKeyTableForTesting());
+    assertNotNull(manager.getKeyContainerTable());
+    assertEquals(0, manager.getKeyCountForContainer(1L));
+  }
+
+  private static void setFieldToNull(ReconContainerMetadataManagerImpl manager, String fieldName) throws Exception {
+    Field field = ReconContainerMetadataManagerImpl.class.getDeclaredField(fieldName);
+    field.setAccessible(true);
+    field.set(manager, null);
   }
 
   @Test

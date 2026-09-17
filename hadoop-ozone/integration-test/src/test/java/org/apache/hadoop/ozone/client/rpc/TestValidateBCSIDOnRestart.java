@@ -53,7 +53,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -159,10 +159,10 @@ public class TestValidateBCSIDOnRestart {
           groupOutputStream.getLocationInfoList();
       assertEquals(1, locationInfoList.size());
       omKeyLocationInfo = locationInfoList.get(0);
-      dn = TestHelper.getDatanodeService(omKeyLocationInfo,
+      dn = OzoneTestHelper.getDatanodeService(omKeyLocationInfo,
           cluster);
       ContainerData containerData =
-          TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
+          OzoneTestHelper.getDatanodeService(omKeyLocationInfo, cluster)
               .getDatanodeStateMachine()
               .getContainer().getContainerSet()
               .getContainer(omKeyLocationInfo.getContainerID())
@@ -182,7 +182,7 @@ public class TestValidateBCSIDOnRestart {
             .getContainer();
     ozoneContainer.getContainerSet().removeContainer(containerID);
     ContainerStateMachine stateMachine =
-        (ContainerStateMachine) TestHelper.getStateMachine(cluster.
+        (ContainerStateMachine) OzoneTestHelper.getStateMachine(cluster.
                 getHddsDatanodes().get(index),
             omKeyLocationInfo.getPipeline());
     SimpleStateMachineStorage storage =
@@ -212,7 +212,7 @@ public class TestValidateBCSIDOnRestart {
       assertEquals(1, locationInfoList.size());
       omKeyLocationInfo = locationInfoList.get(0);
       containerID = omKeyLocationInfo.getContainerID();
-      dn = TestHelper.getDatanodeService(omKeyLocationInfo,
+      dn = OzoneTestHelper.getDatanodeService(omKeyLocationInfo,
           cluster);
       ContainerData containerData = dn.getDatanodeStateMachine()
           .getContainer().getContainerSet()

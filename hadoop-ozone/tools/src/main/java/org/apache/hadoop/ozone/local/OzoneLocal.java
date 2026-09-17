@@ -17,32 +17,39 @@
 
 package org.apache.hadoop.ozone.local;
 
+import java.io.PrintWriter;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.TimeDurationUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ITypeConverter;
 import picocli.CommandLine.Option;
 
 /**
- * Internal CLI entry point for local Ozone cluster commands.
+ * CLI entry point for local single-node Ozone.
  */
 @Command(name = "ozone local",
-    hidden = true,
-    description = "Internal commands for local Ozone cluster runtime",
+    description = "Run a single-node local Ozone cluster",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     subcommands = {
         OzoneLocal.RunCommand.class
     })
 public class OzoneLocal extends GenericCli {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneLocal.class);
 
   static final String ENV_DATA_DIR = "OZONE_LOCAL_DATA_DIR";
   static final String ENV_FORMAT = "OZONE_LOCAL_FORMAT";
@@ -103,13 +110,59 @@ public class OzoneLocal extends GenericCli {
     super(factory);
   }
 
+  @Override
+  public void setConfigurationPath(String configPath) {
+    // Configuration records a classpath resource by its bare name and LocalOzoneCluster#userConfiguredSource
+    // compares names exactly, so a scheme-less path is absolutized: ./ozone-default.xml must stay a user
+    // choice. A scheme (file:, hdfs:) cannot collide and java.nio would mangle it into a literal path, so
+    // it passes through. fs.Path does the scheme check because it also rejects an empty value at parse.
+    if (new org.apache.hadoop.fs.Path(configPath).toUri().getScheme() == null) {
+      configPath = Paths.get(configPath).toAbsolutePath().normalize().toString();
+    }
+    super.setConfigurationPath(configPath);
+  }
+
+  @Override
+  public void printError(Throwable error) {
+    if (!(error instanceof StartupFailureException)) {
+      super.printError(error);
+      return;
+    }
+
+    super.printError(error.getCause());
+    String hint = startupFailureHint(LOG.isInfoEnabled(), isVerbose());
+    if (hint != null) {
+      err().println(hint);
+    }
+  }
+
+  static String startupFailureHint(boolean infoEnabled, boolean verbose) {
+    if (infoEnabled && verbose) {
+      return null;
+    }
+    if (!infoEnabled && !verbose) {
+      return "For more detail, re-run with `ozone --loglevel INFO local run` for service logs,"
+          + " or add --verbose for the full stack trace.";
+    }
+    if (!infoEnabled) {
+      return "For service logs, re-run with `ozone --loglevel INFO local run`.";
+    }
+    return "For the full stack trace, add --verbose.";
+  }
+
   public static void main(String[] args) {
     new OzoneLocal().run(args);
   }
 
+  private static final class StartupFailureException extends Exception {
+
+    private StartupFailureException(Throwable cause) {
+      super(cause);
+    }
+  }
+
   @Command(name = "run",
-      hidden = true,
-      description = "Resolve configuration for local Ozone runtime startup")
+      description = "Start SCM, OM, and datanodes in one local process")
   static class RunCommand extends AbstractSubcommand implements Callable<Void> {
 
     @Option(names = "--data-dir",
@@ -189,9 +242,63 @@ public class OzoneLocal extends GenericCli {
     private String s3Region;
 
     @Override
-    public Void call() {
-      resolveConfig();
+    public Void call() throws Exception {
+      LocalOzoneClusterConfig config = resolveConfig();
+      try (LocalOzoneRuntime runtime = createRuntime(config, getOzoneConf())) {
+        start(runtime);
+        printSummary(runtime, config);
+        awaitShutdown(runtime);
+      }
       return null;
+    }
+
+    /** Wraps startup failures so {@link OzoneLocal#printError} can print the cause and then the hint. */
+    private void start(LocalOzoneRuntime runtime) throws Exception {
+      try {
+        runtime.start();
+      } catch (Exception ex) {
+        throw new StartupFailureException(ex);
+      }
+    }
+
+    LocalOzoneRuntime createRuntime(LocalOzoneClusterConfig config, OzoneConfiguration seedConfiguration) {
+      return new LocalOzoneCluster(config, seedConfiguration);
+    }
+
+    private void printSummary(LocalOzoneRuntime runtime, LocalOzoneClusterConfig config) {
+      PrintWriter writer = out();
+      writer.println("Local Ozone is running from " + config.getDataDir());
+      writer.println("SCM RPC: " + runtime.getDisplayHost() + ":" + runtime.getScmPort());
+      writer.println("OM RPC: " + runtime.getDisplayHost() + ":" + runtime.getOmPort());
+      writer.println("Press Ctrl+C to stop.");
+      writer.flush();
+    }
+
+    /**
+     * Blocks until the JVM is asked to shut down (for example by Ctrl+C), closing the runtime from
+     * the shutdown hook before the JVM exits.
+     */
+    void awaitShutdown(LocalOzoneRuntime runtime) throws InterruptedException {
+      CountDownLatch stopped = new CountDownLatch(1);
+      Thread shutdownHook = new Thread(() -> {
+        try {
+          runtime.close();
+        } catch (Exception ex) {
+          LOG.warn("Failed to close ozone local runtime", ex);
+        } finally {
+          stopped.countDown();
+        }
+      }, "ozone-local-shutdown");
+      Runtime.getRuntime().addShutdownHook(shutdownHook);
+      try {
+        stopped.await();
+      } finally {
+        try {
+          Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        } catch (IllegalStateException ignored) {
+          // JVM shutdown is already in progress.
+        }
+      }
     }
 
     LocalOzoneClusterConfig resolveConfig() {
@@ -243,8 +350,9 @@ public class OzoneLocal extends GenericCli {
         try {
           return LocalOzoneClusterConfig.FormatMode.fromString(value);
         } catch (IllegalArgumentException ex) {
-          throw new CommandLine.TypeConversionException(
-              "Expected one of: if-needed, always, never.");
+          // picocli's wrapper names the option but not the value, which may come from OZONE_LOCAL_FORMAT.
+          throw new CommandLine.TypeConversionException("Invalid format mode '" + value
+              + "'. Expected one of: if-needed, always, never.");
         }
       }
     }
@@ -254,19 +362,25 @@ public class OzoneLocal extends GenericCli {
 
       @Override
       public Duration convert(String value) {
+        String trimmed = value.trim();
         try {
-          return Duration.parse(value.trim());
+          return Duration.parse(trimmed);
         } catch (DateTimeParseException ignored) {
-          return parseHadoopStyleDuration(value);
+          return parseHadoopStyleDuration(trimmed);
         }
       }
 
       private static Duration parseHadoopStyleDuration(String value) {
+        if (LocalOzoneCluster.lacksTimeUnit(value)) {
+          throw new CommandLine.TypeConversionException("Missing time unit in '" + value
+              + "'. " + durationMessage());
+        }
         try {
           return TimeDurationUtil.getDuration("--startup-timeout", value,
               TimeUnit.MILLISECONDS);
         } catch (RuntimeException ex) {
-          throw new CommandLine.TypeConversionException(durationMessage());
+          throw new CommandLine.TypeConversionException("Invalid duration '" + value
+              + "'. " + durationMessage());
         }
       }
 

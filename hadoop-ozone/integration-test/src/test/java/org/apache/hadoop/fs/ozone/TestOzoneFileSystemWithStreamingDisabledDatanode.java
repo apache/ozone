@@ -35,8 +35,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -85,7 +85,7 @@ public class TestOzoneFileSystemWithStreamingDisabledDatanode {
     cluster.waitForClusterToBeReady();
 
     client = cluster.newClient();
-    bucket = TestDataUtil.createVolumeAndBucket(client, layout);
+    bucket = DataTestUtil.createVolumeAndBucket(client, layout);
   }
 
   @AfterAll

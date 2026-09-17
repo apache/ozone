@@ -88,6 +88,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -115,10 +116,10 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -146,6 +147,7 @@ import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
@@ -262,7 +264,7 @@ public abstract class OmSnapshotTests {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBucket);
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBucket);
     if (createLinkedBucket) {
       this.linkedBuckets.put(ozoneBucket.getName(), ozoneBucket.getSourceBucket());
     }
@@ -283,7 +285,7 @@ public abstract class OmSnapshotTests {
     if (createLinkedBucket) {
       String sourceBucketName = linkedBuckets.computeIfAbsent(bucketVal, (k) -> bucketVal + counter.incrementAndGet());
       volume.createBucket(sourceBucketName);
-      TestDataUtil.createLinkedBucket(client, volume.getName(), sourceBucketName, bucketVal);
+      DataTestUtil.createLinkedBucket(client, volume.getName(), sourceBucketName, bucketVal);
       this.linkedBuckets.put(bucketVal, sourceBucketName);
     } else {
       volume.createBucket(bucketVal);
@@ -528,6 +530,31 @@ public abstract class OmSnapshotTests {
     OzoneFileStatus ozoneFileStatus = writeClient.getFileStatus(keyArgs);
     assertEquals(ozoneFileStatus.getKeyInfo().getKeyName(),
         snapshotKeyPrefix + key1);
+  }
+
+  @Test
+  public void testSnapshotListStatusLightReturnsDenormalizedKeyName()
+      throws Exception {
+    String key = "light-list/" + "key-" + counter.incrementAndGet();
+    createFileKey(ozoneBucket, key);
+
+    String snapshotName = "snap-light-" + counter.incrementAndGet();
+    String snapshotKeyPrefix = createSnapshot(volumeName, bucketName,
+        snapshotName);
+    String snapshotKey = snapshotKeyPrefix + key;
+
+    OmKeyArgs keyArgs = genKeyArgs(snapshotKey);
+
+    List<OzoneFileStatus> fullStatuses =
+        writeClient.listStatus(keyArgs, false, "", 1, false);
+    List<OzoneFileStatusLight> lightStatuses =
+        writeClient.listStatusLight(keyArgs, false, "", 1, false);
+
+    assertEquals(1, fullStatuses.size());
+    assertEquals(1, lightStatuses.size());
+
+    assertEquals(snapshotKey, fullStatuses.get(0).getKeyInfo().getKeyName());
+    assertEquals(snapshotKey, lightStatuses.get(0).getKeyInfo().getKeyName());
   }
 
   @Test
@@ -3261,18 +3288,21 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         regularPartsKey, regularPart.length, 1, regularMpuInfo.getUploadID())) {
       stream.write(regularPart);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(regularPart));
     }
 
     byte[] streamPart = "stream data".getBytes(UTF_8);
     try (OzoneDataStreamOutput streamOut = bucket.createMultipartStreamKey(
         streamPartsKey, streamPart.length, 1, streamMpuInfo.getUploadID())) {
       streamOut.write(streamPart);
+      streamOut.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(streamPart));
     }
 
     byte[] mixedPart = "mixed data".getBytes(UTF_8);
     try (OzoneOutputStream mixedStream = bucket.createMultipartKey(
         mixedPartsKey, mixedPart.length, 1, mixedMpuInfo.getUploadID())) {
       mixedStream.write(mixedPart);
+      mixedStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(mixedPart));
     }
 
     assertEquals(1,
@@ -3322,14 +3352,17 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream part1Stream = bucket.createMultipartKey(
         partialAbortKey, part1Data.length, 1, partialInfo.getUploadID())) {
       part1Stream.write(part1Data);
+      part1Stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part1Data));
     }
     try (OzoneOutputStream part2Stream = bucket.createMultipartKey(
         partialAbortKey, part2Data.length, 2, partialInfo.getUploadID())) {
       part2Stream.write(part2Data);
+      part2Stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part2Data));
     }
     try (OzoneDataStreamOutput part3Stream = bucket.createMultipartStreamKey(
         partialAbortKey, part3Data.length, 3, partialInfo.getUploadID())) {
       part3Stream.write(part3Data);
+      part3Stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part3Data));
     }
 
     OzoneMultipartUploadPartListParts partsList = bucket.listParts(
@@ -3348,10 +3381,12 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         multiAbortKey1, part1Data.length, 1, multiInfo1.getUploadID())) {
       stream.write(part1Data);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part1Data));
     }
     try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
         multiAbortKey2, part2Data.length, 1, multiInfo2.getUploadID())) {
       stream.write(part2Data);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part2Data));
     }
 
     bucket.abortMultipartUpload(multiAbortKey1, multiInfo1.getUploadID());
@@ -3398,10 +3433,12 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         mpuKey1, regularData1.length, 1, mpuInfo1.getUploadID())) {
       stream.write(regularData1);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(regularData1));
     }
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         mpuKey1, regularData2.length, 2, mpuInfo1.getUploadID())) {
       stream.write(regularData2);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(regularData2));
     }
 
     byte[] streamData1 = "Stream multipart data 1".getBytes(UTF_8);
@@ -3410,10 +3447,12 @@ public abstract class OmSnapshotTests {
     try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
         mpuKey2, streamData1.length, 1, mpuInfo2.getUploadID())) {
       stream.write(streamData1);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(streamData1));
     }
     try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
         mpuKey2, streamData2.length, 2, mpuInfo2.getUploadID())) {
       stream.write(streamData2);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(streamData2));
     }
 
 
@@ -3423,10 +3462,12 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream stream = bucket.createMultipartKey(
         mpuKey3, mixedRegular.length, 1, mpuInfo3.getUploadID())) {
       stream.write(mixedRegular);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(mixedRegular));
     }
     try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
         mpuKey3, mixedStream.length, 2, mpuInfo3.getUploadID())) {
       stream.write(mixedStream);
+      stream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(mixedStream));
     }
 
     assertEquals(2,
@@ -3470,6 +3511,7 @@ public abstract class OmSnapshotTests {
     byte[] partData = createLargePartData(data, MIN_PART_SIZE);
     OzoneOutputStream partStream = bucket.createMultipartKey(keyName, partData.length, 1, uploadId);
     partStream.write(partData);
+    partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     partStream.close();
 
     OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 100);
@@ -3491,6 +3533,7 @@ public abstract class OmSnapshotTests {
       try (OzoneOutputStream partStream = bucket.createMultipartKey(
           keyName, partData.length, partNum, uploadId)) {
         partStream.write(partData);
+        partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
       }
     }
 
@@ -3514,12 +3557,14 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream partStream = bucket.createMultipartKey(
         keyName, part1Data.length, 1, uploadId)) {
       partStream.write(part1Data);
+      partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part1Data));
     }
 
     byte[] part2Data = createLargePartData(streamData, MIN_PART_SIZE);
     try (OzoneDataStreamOutput partStream = bucket.createMultipartStreamKey(
         keyName, part2Data.length, 2, uploadId)) {
       partStream.write(part2Data);
+      partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(part2Data));
     }
 
     OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 2);
@@ -3547,6 +3592,7 @@ public abstract class OmSnapshotTests {
     try (OzoneOutputStream partStream = bucket.createMultipartKey(
         keyName, partData.length, 1, uploadId)) {
       partStream.write(partData);
+      partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     }
 
     OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 1);
@@ -3566,6 +3612,7 @@ public abstract class OmSnapshotTests {
     byte[] partData = createLargePartData("MPU with metadata and tags", MIN_PART_SIZE);
     OzoneOutputStream partStream = bucket.createMultipartKey(keyName, partData.length, 1, uploadId);
     partStream.write(partData);
+    partStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(partData));
     partStream.close();
 
     OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 100);

@@ -223,7 +223,15 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         // Add this part information in to multipartKeyInfo.
         multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
       } else {
-        validateSplitPartInfo(omKeyInfo, partNumber);
+        // an ETag is MANDATORY for every committed part in the split parts-table schema,
+        // enforced server-side for ALL clients (S3 gateway and native Ozone client alike).
+        // The S3 gateway computes the MD5 ETag on upload; any other client must also supply one.
+        // Reject the commit early with a clear INVALID_REQUEST if it is missing,
+        if (StringUtils.isBlank(omKeyInfo.getMetadata().get(OzoneConsts.ETAG))) {
+          throw new OMException(
+              "Missing ETag for multipart upload part " + partNumber,
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
         multipartPartInfo = OmMultipartPartInfo.from(partName, partNumber, omKeyInfo);
         omMetadataManager.getMultipartPartsTable().addCacheEntry(
             new CacheKey<>(multipartPartKey),
@@ -304,6 +312,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       if (eTag != null) {
         commitResponseBuilder.setETag(eTag);
       }
+      commitResponseBuilder.setModificationTime(keyArgs.getModificationTime());
       omResponse.setCommitMultiPartUploadResponse(commitResponseBuilder);
       omClientResponse =
           getOmClientResponse(ozoneManager, keyVersionsToDeleteMap, openKey,
@@ -408,14 +417,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       String keyName, OMMetadataManager omMetadataManager, String uploadID) {
     return omMetadataManager.getMultipartKey(volumeName, bucketName,
         keyName, uploadID);
-  }
-
-  private void validateSplitPartInfo(OmKeyInfo omKeyInfo, int partNumber)
-      throws OMException {
-    if (StringUtils.isBlank(omKeyInfo.getMetadata().get(OzoneConsts.ETAG))) {
-      throw new OMException("Missing ETag for multipart upload part "
-          + partNumber, OMException.ResultCodes.INVALID_REQUEST);
-    }
   }
 
   @RequestFeatureValidator(

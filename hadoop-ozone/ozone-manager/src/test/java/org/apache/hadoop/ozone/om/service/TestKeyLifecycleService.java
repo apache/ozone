@@ -22,11 +22,24 @@ import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.OzoneTrashPolicy.CURRENT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
@@ -44,10 +57,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.security.PrivilegedExceptionAction;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -55,9 +77,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -66,11 +91,17 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.BackgroundTask;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -79,6 +110,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.FaultInjectorImpl;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneTrash;
@@ -99,16 +131,20 @@ import org.apache.hadoop.ozone.om.helpers.OmLCFilter;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleRuleAndOperator;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -125,11 +161,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -146,6 +185,8 @@ import org.slf4j.event.Level;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
+@ParameterizedClass
+@MethodSource("stateSaveConfiguration")
 class TestKeyLifecycleService extends OzoneTestBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyLifecycleService.class);
@@ -153,6 +194,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
   private static final AtomicInteger OBJECT_ID_COUNTER = new AtomicInteger();
   private static final int KEY_COUNT = 2;
   private static final int EXPIRE_SECONDS = 2;
+  // Date-based expiration compares the key's modificationTime against the date, so tests that rename or
+  // update a key after it was scanned need a date that stays in the future for the whole test.
+  private static final int LONG_EXPIRE_SECONDS = 600;
   private static final int SERVICE_INTERVAL = 300;
   private static final int WAIT_CHECK_INTERVAL = 50;
 
@@ -167,6 +211,22 @@ class TestKeyLifecycleService extends OzoneTestBase {
   private ScmBlockLocationTestingClient scmBlockTestingClient;
   private KeyLifecycleServiceMetrics metrics;
   private long bucketObjectID;
+  private final List<FaultInjectorImpl> installedInjectors = new ArrayList<>();
+  private final Set<String> createdLifecyclePolicies = new HashSet<>();
+
+  @Parameter(0)
+  private long stateSaveInternal;
+
+  @Parameter(1)
+  private long maxKeysProcessedPerState;
+
+  static Stream<Arguments> stateSaveConfiguration() {
+    return Stream.of(
+        Arguments.of(-1, -1),
+        Arguments.of(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS_DEFAULT,
+            OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED_DEFAULT)
+    );
+  }
 
   @BeforeAll
   void setup() {
@@ -184,7 +244,10 @@ class TestKeyLifecycleService extends OzoneTestBase {
     conf.setInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE, 50);
     conf.setQuietMode(false);
     conf.setBoolean(ENABLE_FILESYSTEM_PATHS, false);
+    conf.setLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_INTERVAL_MS, stateSaveInternal);
+    conf.setLong(OZONE_KEY_LIFECYCLE_SERVICE_STATE_SAVE_KEYS_PROCESSED, maxKeysProcessedPerState);
     OmLCExpiration.setTest(true);
+    KeyLifecycleService.setTest(true);
   }
 
   private void createSubject() throws Exception {
@@ -218,9 +281,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
 
     @AfterEach
-    void resume() {
-      keyLifecycleService.setOzoneTrash(null);
-      keyLifecycleService.setMoveToTrashEnabled(true);
+    void resume() throws Exception {
+      cleanUpService();
     }
 
     @AfterAll
@@ -251,12 +313,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
         TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      String prefix = "key";
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       // create keys
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
       // check there are keys in keyTable
       assertEquals(KEY_COUNT, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
@@ -265,9 +328,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
       if (createPrefix) {
-        createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       } else {
-        OmLCFilter.Builder filter = getOmLCFilterBuilder(prefix, null, null);
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
       }
 
@@ -279,16 +342,618 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     @ParameterizedTest
     @MethodSource("parameters1")
-    void testOneKeyExpired(BucketLayout bucketLayout, boolean createPrefix) throws IOException,
+    void testScanStatePiggybackedOnDelete(BucketLayout bucketLayout, boolean createPrefix) throws IOException,
         TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      String prefix = "key";
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       // create keys
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
+      // check there are keys in keyTable
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+      // create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      
+      if (createPrefix) {
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
+      } else {
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
+      }
+
+      // Wait for deletion
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
+
+      // Verify that scan state was updated through the DeleteKeysRequest
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+          return scanState != null && scanState.getScanEndTime() != null;
+        } catch (IOException e) {
+          return false;
+        }
+      }, WAIT_CHECK_INTERVAL, 10000);
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
+    void testPeriodicStateSave(BucketLayout bucketLayout) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(bucketLayout);
+      long initialNumKeyDeleted = metrics.getNumKeyDeleted().value();
+      long initialNumKeyIterated = metrics.getNumKeyIterated().value();
+      int testKeyCount = 5;
+
+      // Suspend service so it doesn't process immediately after we create the policy
+      keyLifecycleService.suspend();
+
+      // create keys
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, bucketLayout, testKeyCount, 1, keyPrefix, null);
+      assertEquals(testKeyCount, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == testKeyCount,
+          WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(bucketLayout, volumeName, bucketName);
+
+      // Inject spy to LifecycleScanStateTable to count put operations
+      Field tableField = OmMetadataManagerImpl.class.getDeclaredField("lifecycleScanStateTable");
+      tableField.setAccessible(true);
+      Table<String, OmLifecycleScanState> originalTable =
+          (Table<String, OmLifecycleScanState>) tableField.get(metadataManager);
+      Table<String, OmLifecycleScanState> spyTable = spy(originalTable);
+      tableField.set(metadataManager, spyTable);
+
+      try {
+        // create Lifecycle configuration
+        ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+        ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
+
+        // Resume the service
+        keyLifecycleService.resume();
+
+        // Wait for deletion
+        GenericTestUtils.waitFor(() ->
+            (getDeletedKeyCount() - initialDeletedKeyCount) == testKeyCount, WAIT_CHECK_INTERVAL, 10000);
+        assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
+
+        String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+
+        if (stateSaveInternal == -1) {
+          // With 5 keys and stateSaveIntervalMs = -1, it should save on every key iteration.
+          // It will save at least 5 times (one for each key).
+          verify(spyTable, atLeast(5))
+              .addCacheEntry(argThat(k -> k.getCacheKey().equals(bucketKey)), any());
+        } else {
+          // With 5 keys and maxKeysProcessedPerState = 100000, there is 1 save piggybacked in KeysDelete request.
+          verify(spyTable, atLeast(1))
+              .addCacheEntry(argThat(k -> k.getCacheKey().equals(bucketKey)), any());
+        }
+        GenericTestUtils.waitFor(() ->
+            (getDeletedKeyCount() - initialDeletedKeyCount) == testKeyCount, WAIT_CHECK_INTERVAL, 5000);
+        GenericTestUtils.waitFor(() ->
+            (getDeletedKeyCount() - initialDeletedKeyCount) == testKeyCount, WAIT_CHECK_INTERVAL, 5000);
+        GenericTestUtils.waitFor(() ->
+            (metrics.getNumKeyDeleted().value() - initialNumKeyDeleted) == testKeyCount, WAIT_CHECK_INTERVAL, 5000);
+        GenericTestUtils.waitFor(() ->
+            (metrics.getNumKeyIterated().value() - initialNumKeyIterated) == testKeyCount, WAIT_CHECK_INTERVAL, 5000);
+      } finally {
+        deleteLifecyclePolicy(volumeName, bucketName);
+      }
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters1")
+    void testBucketScanResume(BucketLayout bucketLayout, boolean createPrefix) throws IOException,
+        TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(bucketLayout);
+      int testKeyCount = 5;
+
+      // Suspend service so it doesn't process immediately after we create the policy
+      keyLifecycleService.suspend();
+
+      // create keys
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, bucketLayout, testKeyCount, 1, keyPrefix, null);
+      assertEquals(testKeyCount, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == testKeyCount,
+          WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(bucketLayout, volumeName, bucketName);
+
+      // determine db keys
+      List<String> dbKeys = new ArrayList<>();
+      long bucketId =
+          metadataManager.getBucketTable().get(metadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
+      long volumeId = metadataManager.getVolumeTable().get(metadataManager.getVolumeKey(volumeName)).getObjectID();
+
+      for (OmKeyArgs args : keyList) {
+        if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+          dbKeys.add(metadataManager.getOzonePathKey(volumeId, bucketId, bucketId, args.getKeyName()));
+        } else {
+          dbKeys.add(metadataManager.getOzoneKey(volumeName, bucketName, args.getKeyName()));
+        }
+      }
+      Collections.sort(dbKeys);
+      String lastScannedDbKey = dbKeys.get(2); // The 3rd key
+
+      // create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      if (createPrefix) {
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
+      } else {
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
+      }
+
+      // inject the resume state
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+
+      OmLifecycleConfiguration policy = metadataManager.getLifecycleConfiguration(volumeName, bucketName);
+      OmLifecycleScanState.Builder stateBuilder = new OmLifecycleScanState.Builder()
+          .setBucketKey(bucketKey)
+          .setBucketObjID(bucketId)
+          .setLifecycleConfigurationUpdateID(policy.getUpdateID())
+          .setScanStartTime(System.currentTimeMillis());
+
+      if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        stateBuilder.setLastScannedKey(lastScannedDbKey);
+        stateBuilder.setLastScannedDir("");
+        stateBuilder.setLastScannedDirKey("");
+      } else {
+        stateBuilder.setLastScannedKey(lastScannedDbKey);
+      }
+      OmLifecycleScanState scanState = stateBuilder.build();
+      metadataManager.getLifecycleScanStateTable().put(bucketKey, scanState);
+      metadataManager.getLifecycleScanStateTable().addCacheEntry(new CacheKey<>(bucketKey),
+          CacheValue.get(1L, scanState));
+      OmLifecycleScanState state = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+      assertNotNull(state);
+
+      // resume the service
+      runSingleLifecycleScan(volumeName, bucketName);
+
+      // it should skip the first 3 keys (index 0, 1, 2) since we set lastScannedDbKey as index 2.
+      // So it deletes only the last 2 keys (index 3 and 4).
+      int expectedDeleted = 2;
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeleted, WAIT_CHECK_INTERVAL, 10000);
+      
+      // confirm it hasn't deleted all keys
+      assertEquals(testKeyCount - expectedDeleted, getKeyCount(bucketLayout) - initialKeyCount);
+    }
+
+    @Test
+    void testInFlightClearedWhenTaskSkipsRun() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      keyLifecycleService.suspend();
+      createVolumeAndBucket(volumeName, bucketName, BucketLayout.OBJECT_STORE,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, BucketLayout.OBJECT_STORE, "key", null, date.toString(), true);
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+
+      try {
+        // Schedule the task manually. The service's own scheduler may win the registration and run
+        // the task to completion; in that case getTasks() returns nothing, so retry until this
+        // thread holds the scheduled task.
+        keyLifecycleService.resume();
+        BackgroundTaskQueue queue = keyLifecycleService.getTasks();
+        for (int i = 0; queue.isEmpty() && i < 200; i++) {
+          Thread.sleep(WAIT_CHECK_INTERVAL);
+          queue = keyLifecycleService.getTasks();
+        }
+        assertFalse(queue.isEmpty());
+
+        // Suspend before the scheduled task executes, then run it: call() skips the scan because
+        // shouldRun() is false, but must still clear the in-flight registration, otherwise the
+        // bucket is never scheduled again.
+        keyLifecycleService.suspend();
+        for (BackgroundTask task = queue.poll(); task != null; task = queue.poll()) {
+          task.call();
+        }
+        assertFalse(keyLifecycleService.status().getRunningBucketsList().contains(bucketKey));
+      } finally {
+        keyLifecycleService.resume();
+        deleteLifecyclePolicy(volumeName, bucketName);
+      }
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters1")
+    void testAbortedScanDoesNotMarkScanComplete(BucketLayout bucketLayout, boolean createPrefix)
+        throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
+      int testKeyCount = 3;
+
+      keyLifecycleService.setListMaxSize(1);
+      FaultInjectorImpl taskStart = new FaultInjectorImpl();
+      installInjectors(taskStart);
+
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, bucketLayout, testKeyCount, 1, keyPrefix, null);
+      assertEquals(testKeyCount, keyList.size());
+
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      if (createPrefix) {
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
+      } else {
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
+      }
+
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      // The in-flight list is filled when the task is scheduled, so wait on the injector instead:
+      // suspending before the task actually starts makes it skip its run and never pause here.
+      taskStart.awaitPaused(10000);
+
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+          LoggerFactory.getLogger(KeyLifecycleService.class));
+      keyLifecycleService.suspend();
+      taskStart.release();
+      GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+          WAIT_CHECK_INTERVAL, 10000);
+
+      OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+      assertNotNull(scanState);
+      assertNull(scanState.getScanEndTime(),
+          "Aborted scan must not persist scanEndTime so a new leader can resume");
+      assertTrue(logCapturer.getOutput().contains("KeyLifecycleService is suspended, disabled, or leader not ready"));
+      keyLifecycleService.resume();
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters1")
+    void testBucketScanWithScanEndTime(BucketLayout bucketLayout, boolean createPrefix) throws IOException,
+        TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(bucketLayout);
+      int testKeyCount = 5;
+
+      // Suspend service so it doesn't process immediately after we create the policy
+      keyLifecycleService.suspend();
+
+      // create keys
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, bucketLayout, testKeyCount, 1, keyPrefix, null);
+      assertEquals(testKeyCount, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == testKeyCount,
+          WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(bucketLayout, volumeName, bucketName);
+
+      // determine db keys
+      List<String> dbKeys = new ArrayList<>();
+      long bucketId =
+          metadataManager.getBucketTable().get(metadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
+      long volumeId = metadataManager.getVolumeTable().get(metadataManager.getVolumeKey(volumeName)).getObjectID();
+
+      for (OmKeyArgs args : keyList) {
+        if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+          dbKeys.add(metadataManager.getOzonePathKey(volumeId, bucketId, bucketId, args.getKeyName()));
+        } else {
+          dbKeys.add(metadataManager.getOzoneKey(volumeName, bucketName, args.getKeyName()));
+        }
+      }
+      Collections.sort(dbKeys);
+      String lastScannedDbKey = dbKeys.get(2); // The 3rd key
+
+      // create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      if (createPrefix) {
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
+      } else {
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
+      }
+
+      // inject the resume state but with ScanEndTime set!
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      OmLifecycleConfiguration policy = metadataManager.getLifecycleConfiguration(volumeName, bucketName);
+      OmLifecycleScanState.Builder stateBuilder = new OmLifecycleScanState.Builder()
+          .setBucketKey(bucketKey)
+          .setBucketObjID(bucketId)
+          .setLifecycleConfigurationUpdateID(policy.getUpdateID())
+          .setScanStartTime(System.currentTimeMillis())
+          .setScanEndTime(System.currentTimeMillis()); // Scan finished previously
+
+      if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        stateBuilder.setLastScannedKey(lastScannedDbKey);
+        stateBuilder.setLastScannedDir("");
+      } else {
+        stateBuilder.setLastScannedKey(lastScannedDbKey);
+      }
+      OmLifecycleScanState scanState = stateBuilder.build();
+      metadataManager.getLifecycleScanStateTable().put(bucketKey, scanState);
+      metadataManager.getLifecycleScanStateTable().addCacheEntry(new CacheKey<>(bucketKey),
+          CacheValue.get(1L, scanState));
+
+      // resume the service
+      keyLifecycleService.resume();
+
+      // wait for it to process
+      // Since ScanEndTime is set, it will ignore the lastScannedKey and start from the beginning!
+      // So it should delete ALL 5 keys.
+      int expectedDeleted = 5;
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) >= expectedDeleted, WAIT_CHECK_INTERVAL, 10000);
+      
+      // confirm it has deleted all keys
+      assertEquals(testKeyCount - expectedDeleted, getKeyCount(bucketLayout) - initialKeyCount);
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters1")
+    void testScanEmptyBucket(BucketLayout bucketLayout, boolean moveToTrash) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      
+      keyLifecycleService.setMoveToTrashEnabled(moveToTrash);
+      
+      // Create empty bucket
+      createVolumeAndBucket(volumeName, bucketName, bucketLayout,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+          
+      // create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      OmLCFilter.Builder filter = bucketLayout == FILE_SYSTEM_OPTIMIZED ? getOmLCFilterBuilder("", null, null) :
+          getOmLCFilterBuilder("key", null, null);
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
+
+      // Wait until scan completes. Since the bucket is empty, it will scan immediately.
+      // We check if the scanEndTime is set.
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      
+      GenericTestUtils.waitFor(() -> {
+        try {
+          OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+          return scanState != null && scanState.getScanEndTime() != null;
+        } catch (IOException e) {
+          return false;
+        }
+      }, WAIT_CHECK_INTERVAL, 10000);
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters1")
+    void testScanStateFailureDoesNotImpactScan(BucketLayout bucketLayout, boolean createPrefix) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(bucketLayout);
+      // create keys
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      // Inject failure to LifecycleScanStateTable
+      Field tableField = OmMetadataManagerImpl.class.getDeclaredField("lifecycleScanStateTable");
+      tableField.setAccessible(true);
+      Table<String, OmLifecycleScanState> originalTable =
+          (Table<String, OmLifecycleScanState>) tableField.get(metadataManager);
+      Table<String, OmLifecycleScanState> spyTable = spy(originalTable);
+      doThrow(new RocksDatabaseException("Injected exception for testing")).when(spyTable).get(any());
+      doThrow(new RocksDatabaseException("Injected exception for testing")).when(spyTable).put(any(), any());
+      tableField.set(metadataManager, spyTable);
+
+      try {
+        // create Lifecycle configuration
+        ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+        ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+        if (createPrefix) {
+          createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
+        } else {
+          OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
+          createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
+        }
+
+        // Even though reading scan state fails, the deletion should still proceed normally.
+        GenericTestUtils.waitFor(() ->
+            (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
+        assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
+
+        deleteLifecyclePolicy(volumeName, bucketName);
+      } finally {
+        // Restore original table
+        tableField.set(metadataManager, originalTable);
+      }
+    }
+
+    public Stream<Arguments> parameters12() {
+      return Stream.of(
+          arguments(FILE_SYSTEM_OPTIMIZED, 2),
+          arguments(FILE_SYSTEM_OPTIMIZED, 3),
+          arguments(FILE_SYSTEM_OPTIMIZED, 7),
+          arguments(BucketLayout.OBJECT_STORE, 2),
+          arguments(BucketLayout.OBJECT_STORE, 3),
+          arguments(BucketLayout.OBJECT_STORE, 7)
+      );
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters12")
+    void testNestedFSODirectoryScanResume(BucketLayout bucketLayout, int maxSize) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String prefix = "";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(bucketLayout);
+      long keyIterated = metrics.getNumKeyIterated().value();
+      int testKeyCount = 8;
+
+      keyLifecycleService.setListMaxSize(maxSize);
+      // Suspend service so it doesn't process immediately after we create the policy
+      keyLifecycleService.suspend();
+
+      createVolumeAndBucket(volumeName, bucketName, bucketLayout,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+      /**
+       *  Create nested directory and 8 keys inside
+       *               /
+       *    dir1  dir2  dir3  dir30
+       *    / \          / \
+       *  dir4  dir5   dir6 dir7
+       *               / \
+       *             dir8 dir9
+       *
+       *  MaxSize = 2, lastScannedDir is dir9, lastScannedKey is key8
+       *  MaxSize = 3, lastScannedDir is dir8, lastScannedKey is key6
+       *  MaxSize = 7, lastScannedDir is dir5, lastScannedKey is key3
+       */
+      List<OmKeyArgs> keyList = new ArrayList<>();
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir1/dir4/key0", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir1/dir4/key1", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir1/dir5/key2", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir1/dir5/key3", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir3/dir6/dir8/key5", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir3/dir6/dir8/key6", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir3/dir6/dir9/key7", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir3/dir6/dir9/key8", 1, null));
+      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+        createDirectory(volumeName, bucketName, "dir2");
+        createDirectory(volumeName, bucketName, "dir3/dir7");
+        createDirectory(volumeName, bucketName, "dir30");
+      }
+
+      assertEquals(testKeyCount, keyList.size());
+      GenericTestUtils.waitFor(
+          () -> getKeyCount(bucketLayout) - initialKeyCount == testKeyCount, WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(bucketLayout, volumeName, bucketName);
+      awaitDirCacheDrained(volumeName, bucketName);
+
+      // Create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
+
+      // Inject to cause resume case for FSO with nested directory
+      FaultInjectorImpl firstTaskStart = new FaultInjectorImpl();
+      FaultInjectorImpl firstDelete = new FaultInjectorImpl();
+      FaultInjectorImpl lastFaultInjector = new FaultInjectorImpl();
+      lastFaultInjector.setException(new IOException("Injected exception for testing"));
+      installInjectors(firstTaskStart, firstDelete, lastFaultInjector);
+      // Resume the service
+      keyLifecycleService.resume();
+      // Returns once the aborted task is past its start, so it keeps using the injectors below
+      firstTaskStart.awaitPaused(10000);
+      firstTaskStart.release();
+      // Hold the follow-up task at its start, otherwise it overwrites the scan state asserted below
+      FaultInjectorImpl nextTaskStart = new FaultInjectorImpl();
+      installInjectors(nextTaskStart, firstDelete, lastFaultInjector);
+      firstDelete.awaitPaused(10000);
+      firstDelete.release();
+      // BackgroundService waits for the previous batch, so the follow-up task reaching its start means
+      // the first task is done
+      nextTaskStart.awaitPaused(10000);
+
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      try {
+        GenericTestUtils.waitFor(() -> {
+          try {
+            OmLifecycleScanState state = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+            if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+              return state != null && state.getLastScannedDir() != null && state.getLastScannedKey() != null;
+            } else {
+              return state != null && state.getLastScannedKey() != null;
+            }
+          } catch (IOException e) {
+            return false;
+          }
+        }, WAIT_CHECK_INTERVAL, 10000);
+
+        OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+        if (stateSaveInternal != -1) {
+          if (maxSize == 2) {
+            if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+              assertEquals("dir3/dir6/dir9", scanState.getLastScannedDir());
+              assertTrue(scanState.getLastScannedKey().endsWith("key8"));
+            } else {
+              assertTrue(scanState.getLastScannedKey().endsWith("key1"));
+            }
+          } else if (maxSize == 3) {
+            if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+              assertEquals("dir3/dir6/dir8", scanState.getLastScannedDir());
+              assertTrue(scanState.getLastScannedKey().endsWith("key6"));
+            } else {
+              assertTrue(scanState.getLastScannedKey().endsWith("key2"));
+            }
+          } else {
+            if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+              assertEquals("dir1/dir5", scanState.getLastScannedDir());
+              assertTrue(scanState.getLastScannedKey().endsWith("key3"));
+            } else {
+              assertTrue(scanState.getLastScannedKey().endsWith("key7"));
+            }
+          }
+        }
+      } finally {
+        nextTaskStart.release();
+      }
+
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == testKeyCount, WAIT_CHECK_INTERVAL, 10000);
+      // Confirm all keys are deleted
+      assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
+      // Confirm iterated key number
+      GenericTestUtils.waitFor(() ->
+          testKeyCount == metrics.getNumKeyIterated().value() - keyIterated, WAIT_CHECK_INTERVAL, 5000);
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters1")
+    void testOneKeyExpired(BucketLayout bucketLayout, boolean createPrefix) throws IOException,
+        TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String keyPrefix = "key";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(bucketLayout);
+      // create keys
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
       // check there are keys in keyTable
       assertEquals(KEY_COUNT, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
@@ -297,17 +962,267 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
       int keyIndex = ThreadLocalRandom.current().nextInt(KEY_COUNT - 1);
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyList.get(keyIndex).getKeyName();
       if (createPrefix) {
-        createLifecyclePolicy(volumeName, bucketName, bucketLayout,
-            keyList.get(keyIndex).getKeyName(), null, date.toString(), true);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       } else {
-        OmLCFilter.Builder filter = getOmLCFilterBuilder(keyList.get(keyIndex).getKeyName(), null, null);
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
       }
 
-      GenericTestUtils.waitFor(() -> (getDeletedKeyCount() - initialDeletedKeyCount) == 1, WAIT_CHECK_INTERVAL, 10000);
-      assertEquals(KEY_COUNT - 1, getKeyCount(bucketLayout) - initialKeyCount);
+      int expectedDeleteCount = bucketLayout == FILE_SYSTEM_OPTIMIZED ? KEY_COUNT : 1;
+      GenericTestUtils.waitFor(() -> (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeleteCount,
+          WAIT_CHECK_INTERVAL, 5000);
+      assertEquals(KEY_COUNT - expectedDeleteCount, getKeyCount(bucketLayout) - initialKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    public Stream<Arguments> parameters13() {
+      return Stream.of(
+          arguments("dirC", null, 3),
+          arguments("dirC/dir3", null, 3),
+          arguments("dirB", new String[]{"dirC"}, 2),
+          arguments("dirB/dir2", new String[]{"dirC"}, 2),
+          arguments("dirA", new String[]{"dirC", "dirB"}, 1),
+          arguments("dirA/dir1", new String[]{"dirC", "dirB"}, 1)
+      );
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters13")
+    void testDirectorySkippedAfterResume(String lastScannedDir, String[] skippedDir, int expectedDeleted)
+        throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String prefix = "";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      keyLifecycleService.setListMaxSize(1);
+      // Suspend service so it doesn't process immediately after we create the policy
+      keyLifecycleService.suspend();
+
+      createVolumeAndBucket(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      // Create 3 directories: dirA/dir1, dirB/dir2, dirC/dir3
+      // Inside each directory, create 1 keys.
+      int testKeyCount = 3;
+      List<OmKeyArgs> keyList = new ArrayList<>();
+
+      int i = 0;
+      for (String dir : Arrays.asList("dirA/dir1", "dirB/dir2", "dirC/dir3")) {
+        String keyName = dir + "/key" + i++;
+        keyList.add(createAndCommitKey(volumeName, bucketName, keyName, 1, null));
+      }
+
+      assertEquals(testKeyCount, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(BucketLayout.FILE_SYSTEM_OPTIMIZED) - initialKeyCount == testKeyCount,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      // Determine DB keys for the files
+      long bucketId =
+          metadataManager.getBucketTable().get(metadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
+      long volumeId = metadataManager.getVolumeTable().get(metadataManager.getVolumeKey(volumeName)).getObjectID();
+
+      // Find dirB/dir2's objectID and its table key
+      String dirBKey = metadataManager.getOzonePathKey(volumeId, bucketId, bucketId, lastScannedDir);
+
+      // Create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED, prefix,
+          null, date.toString(), true);
+
+      // Inject the resume state for FSO where lastScannedDir is dirB
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      OmLifecycleConfiguration policy = metadataManager.getLifecycleConfiguration(volumeName, bucketName);
+      OmLifecycleScanState.Builder stateBuilder = new OmLifecycleScanState.Builder()
+          .setBucketKey(bucketKey)
+          .setBucketObjID(bucketId)
+          .setLifecycleConfigurationUpdateID(policy.getUpdateID())
+          .setScanStartTime(System.currentTimeMillis())
+          .setLastScannedDir(lastScannedDir)
+          .setLastScannedDirKey(dirBKey);
+
+      OmLifecycleScanState scanState = stateBuilder.build();
+      metadataManager.getLifecycleScanStateTable().put(bucketKey, scanState);
+      metadataManager.getLifecycleScanStateTable().addCacheEntry(new CacheKey<>(bucketKey),
+          CacheValue.get(1L, scanState));
+
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+          LoggerFactory.getLogger(KeyLifecycleService.class));
+      // Resume the service
+      runSingleLifecycleScan(volumeName, bucketName);
+
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeleted, WAIT_CHECK_INTERVAL, 10000);
+      
+      // Confirm it hasn't deleted dirA's keys
+      assertEquals(testKeyCount - expectedDeleted, getKeyCount(BucketLayout.FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+      if (skippedDir != null) {
+        Arrays.stream(skippedDir).forEach(
+            d -> assertTrue(logCapturer.getOutput().contains("Skip " + d)));
+        logCapturer.clearOutput();
+      }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testLastScannedKeySeek(boolean keyBelongToDir) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String prefix = "";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      long keyIterated = metrics.getNumKeyIterated().value();
+
+      keyLifecycleService.suspend();
+
+      createVolumeAndBucket(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      List<OmKeyArgs> keyList = new ArrayList<>();
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir1/key1", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir1/key2", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir2/key3", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "dir2/key4", 1, null));
+      
+      assertEquals(4, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(BucketLayout.FILE_SYSTEM_OPTIMIZED) - initialKeyCount == 4,
+          WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(BucketLayout.FILE_SYSTEM_OPTIMIZED, volumeName, bucketName);
+
+      long bucketId =
+          metadataManager.getBucketTable().get(metadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
+      long volumeId = metadataManager.getVolumeTable().get(metadataManager.getVolumeKey(volumeName)).getObjectID();
+
+      String dir1Key = metadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "dir1");
+      long dir1Id = metadataManager.getDirectoryTable().get(
+          metadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "dir1")).getObjectID();
+      long dir2Id = metadataManager.getDirectoryTable().get(
+          metadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "dir2")).getObjectID();
+
+      // key2 is under dir1
+      String key2DbKey = metadataManager.getOzonePathKey(volumeId, bucketId, dir1Id, "key2");
+      // key3 is under dir2
+      String key3DbKey = metadataManager.getOzonePathKey(volumeId, bucketId, dir2Id, "key3");
+
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      OmLCFilter.Builder filter = getOmLCFilterBuilder(prefix, null, null);
+      createLifecyclePolicy(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED, null,
+          filter.build(), date.toString(), true);
+
+      // Set lastScannedDir to dir1, but lastScannedKey to key3 (which is in dir2)
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      OmLifecycleConfiguration policy = metadataManager.getLifecycleConfiguration(volumeName, bucketName);
+      OmLifecycleScanState.Builder stateBuilder = new OmLifecycleScanState.Builder()
+          .setBucketKey(bucketKey)
+          .setBucketObjID(bucketId)
+          .setLifecycleConfigurationUpdateID(policy.getUpdateID())
+          .setScanStartTime(System.currentTimeMillis());
+
+      if (keyBelongToDir) {
+        stateBuilder.setLastScannedDir("dir1").setLastScannedDirKey(dir1Key).setLastScannedKey(key2DbKey);
+      } else {
+        stateBuilder.setLastScannedDir("dir1").setLastScannedDirKey(dir1Key).setLastScannedKey(key3DbKey);
+      }
+
+      OmLifecycleScanState scanState = stateBuilder.build();
+      metadataManager.getLifecycleScanStateTable().put(bucketKey, scanState);
+      metadataManager.getLifecycleScanStateTable().addCacheEntry(new CacheKey<>(bucketKey),
+          CacheValue.get(1L, scanState));
+
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+          LoggerFactory.getLogger(KeyLifecycleService.class));
+      runSingleLifecycleScan(volumeName, bucketName);
+
+      // dir2 is skipped since dir2 > dir1. dir1 is fully evaluated only when lastScannedKey does not
+      // belong to it, otherwise the scan seeks past its last key and nothing is left to expire.
+      int expectedDeleted = keyBelongToDir ? 0 : 2;
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeleted, WAIT_CHECK_INTERVAL, 5000);
+      assertEquals(keyList.size() - expectedDeleted, getKeyCount(BucketLayout.FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+      // The task drops the bucket from the in-flight list before it updates the metrics
+      GenericTestUtils.waitFor(() ->
+          expectedDeleted == metrics.getNumKeyIterated().value() - keyIterated, WAIT_CHECK_INTERVAL, 5000);
+      // dir2 sorts after the resumed dir1, so it is skipped in both cases
+      assertTrue(logCapturer.getOutput().contains("Skip dir2"));
+      if (keyBelongToDir) {
+        assertTrue(logCapturer.getOutput().contains("Seek to key"));
+      } else {
+        assertFalse(logCapturer.getOutput().contains("Seek to key"));
+      }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
+    void testBucketRootScannedDirResume(BucketLayout layout) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String prefix = "";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(layout);
+      long keyIterated = metrics.getNumKeyIterated().value();
+
+      keyLifecycleService.suspend();
+
+      createVolumeAndBucket(volumeName, bucketName, layout,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      List<OmKeyArgs> keyList = new ArrayList<>();
+      keyList.add(createAndCommitKey(volumeName, bucketName, "key1", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "key2", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, "key3", 1, null));
+      
+      assertEquals(3, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(layout) - initialKeyCount == 3,
+          WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(layout, volumeName, bucketName);
+
+      long bucketId =
+          metadataManager.getBucketTable().get(metadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
+      long volumeId = metadataManager.getVolumeTable().get(metadataManager.getVolumeKey(volumeName)).getObjectID();
+
+      // key2 in bucket root
+      String key2DbKey = layout == FILE_SYSTEM_OPTIMIZED ?
+          metadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "key2") :
+          metadataManager.getOzoneKey(volumeName, bucketName, "key2");
+
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      OmLCFilter.Builder filter = getOmLCFilterBuilder(prefix, null, null);
+      createLifecyclePolicy(volumeName, bucketName, layout, null,
+          filter.build(), date.toString(), true);
+
+      // Set lastScannedDir to "" (bucket root) and lastScannedKey to key2
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      OmLifecycleConfiguration policy = metadataManager.getLifecycleConfiguration(volumeName, bucketName);
+      OmLifecycleScanState.Builder stateBuilder = new OmLifecycleScanState.Builder()
+          .setBucketKey(bucketKey)
+          .setBucketObjID(bucketId)
+          .setLifecycleConfigurationUpdateID(policy.getUpdateID())
+          .setScanStartTime(System.currentTimeMillis())
+          .setLastScannedDir("")
+          .setLastScannedDirKey("")
+          .setLastScannedKey(key2DbKey);
+
+      OmLifecycleScanState scanState = stateBuilder.build();
+      metadataManager.getLifecycleScanStateTable().put(bucketKey, scanState);
+      metadataManager.getLifecycleScanStateTable().addCacheEntry(new CacheKey<>(bucketKey),
+          CacheValue.get(1L, scanState));
+          
+      runSingleLifecycleScan(volumeName, bucketName);
+
+      // It should seek to key2. key1 is skipped, key2 is skipped too.
+      // So key1 and key2 are skipped, key3 is deleted.
+      int expectedDeleted = 1;
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeleted, WAIT_CHECK_INTERVAL, 10000);
+      
+      assertEquals(2, getKeyCount(layout) - initialKeyCount);
+      GenericTestUtils.waitFor(() ->
+          expectedDeleted == metrics.getNumKeyIterated().value() - keyIterated, WAIT_CHECK_INTERVAL, 5000);
     }
 
     @ParameterizedTest
@@ -328,11 +1243,11 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyArg.getKeyName();
       if (createPrefix) {
-        createLifecyclePolicy(volumeName, bucketName, bucketLayout,
-            keyArg.getKeyName(), null, date.toString(), true);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       } else {
-        OmLCFilter.Builder filter = getOmLCFilterBuilder(keyArg.getKeyName(), null, null);
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
       }
 
@@ -414,13 +1329,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
         TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      String prefix = "key";
+      String keyPrefix = "key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       Map<String, String> tags = ImmutableMap.of("app", "spark", "user", "ozone");
       // create keys
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, prefix, tags);
+          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, tags);
       // check there are keys in keyTable
       assertEquals(KEY_COUNT, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
@@ -428,7 +1343,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
-      OmLifecycleRuleAndOperator andOperator = getOmLCAndOperatorBuilder(prefix, tags).build();
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
+      OmLifecycleRuleAndOperator andOperator = getOmLCAndOperatorBuilder(rulePrefix, tags).build();
       OmLCFilter.Builder filter = getOmLCFilterBuilder(null, null, andOperator);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
 
@@ -445,15 +1361,15 @@ class TestKeyLifecycleService extends OzoneTestBase {
       int keyCount = KEY_COUNT;
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      String prefix = "key";
+      String keyPrefix = "key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       Map<String, String> tags = ImmutableMap.of("app", "spark", "user", "ozone");
       // create keys without tags
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, keyCount, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, keyCount, 1, keyPrefix, null);
       // create one more key with tag
-      final String keyName = uniqueObjectName(prefix);
+      final String keyName = uniqueObjectName(keyPrefix);
       // Create the key
       OmKeyArgs keyArg = createAndCommitKey(volumeName, bucketName, keyName, 1, tags);
       keyList.add(keyArg);
@@ -466,7 +1382,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
-      OmLifecycleRuleAndOperator andOperator = getOmLCAndOperatorBuilder(prefix, tags).build();
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
+      OmLifecycleRuleAndOperator andOperator = getOmLCAndOperatorBuilder(rulePrefix, tags).build();
       OmLCFilter.Builder filter = getOmLCFilterBuilder(null, null, andOperator);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
 
@@ -573,10 +1490,12 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @MethodSource("parameters1")
     void testSlashPrefix(BucketLayout bucketLayout, boolean createPrefix)
         throws IOException, TimeoutException, InterruptedException {
-      assumeTrue(bucketLayout != FILE_SYSTEM_OPTIMIZED);
+      // FSO bucket must end with "/". "/" is also invalid prefix for FSO.
+      assumeTrue(bucketLayout == OBJECT_STORE);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String keyPrefix = "key";
+      String rulePrefix = "/" + keyPrefix;
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       // create keys
@@ -590,9 +1509,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
       if (createPrefix) {
-        createLifecyclePolicy(volumeName, bucketName, bucketLayout, "/" + keyPrefix, null, date.toString(), true);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       } else {
-        OmLCFilter.Builder filter = getOmLCFilterBuilder("/" + keyPrefix, null, null);
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(rulePrefix, null, null);
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
       }
 
@@ -612,6 +1531,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @MethodSource("parameters1")
     void testSlashKey(BucketLayout bucketLayout, boolean createPrefix)
         throws IOException, TimeoutException, InterruptedException {
+      // FSO bucket doesn't allow "//" in prefix.
       assumeTrue(bucketLayout != FILE_SYSTEM_OPTIMIZED);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
@@ -645,6 +1565,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
     void testSlashKeyWithAndOperator(BucketLayout bucketLayout)
         throws IOException, TimeoutException, InterruptedException {
+      // FSO bucket doesn't allow "//" in prefix.
       assumeTrue(bucketLayout != FILE_SYSTEM_OPTIMIZED);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
@@ -676,6 +1597,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
     void testSlashPrefixWithAndOperator(BucketLayout bucketLayout)
         throws IOException, InterruptedException, TimeoutException {
+      // FSO bucket must end with "/". "/" is also invalid prefix for FSO.
       assumeTrue(bucketLayout != FILE_SYSTEM_OPTIMIZED);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
@@ -709,14 +1631,14 @@ class TestKeyLifecycleService extends OzoneTestBase {
         TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      String prefix = "dir1/dir2/dir3/key";
+      String keyPrefix = "dir1/dir2/dir3/key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       long initialNumDeletedKey = metrics.getNumKeyDeleted().value();
       long initialSizeDeletedKey = metrics.getSizeKeyDeleted().value();
       // create keys
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
       // check there are keys in keyTable
       assertEquals(KEY_COUNT, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
@@ -724,7 +1646,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "dir1/dir2/dir3/" : keyPrefix;
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
 
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
@@ -741,7 +1664,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String keyPrefix = "dir1/dir2/dir3/key";
-      String filterPrefix = "dir1/dir2/dir4/key";
+      String filterPrefix = "dir1/dir2/dir4/";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       // create keys
@@ -769,12 +1692,12 @@ class TestKeyLifecycleService extends OzoneTestBase {
         TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      String prefix = "dir1/dir2/dir3/key";
+      String keyPrefix = "dir1/dir2/dir3/key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       // create keys
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
       // check there are keys in keyTable
       assertEquals(KEY_COUNT, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
@@ -788,7 +1711,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "dir1/dir2/dir3/" : keyPrefix;
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
 
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
@@ -799,8 +1723,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
     public Stream<Arguments> parameters3() {
       return Stream.of(
           arguments("dir1/dir2/dir3/key", "dir1/dir2/dir3/", "dir1/dir2/dir3"),
-          arguments("dir1/dir2/dir3/key", "dir1/dir2/dir3", "dir1/dir2/dir3"),
-          arguments("dir1/key", "dir1", "dir1"),
           arguments("dir1/key", "dir1/", "dir1"));
     }
 
@@ -825,8 +1747,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
 
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -856,55 +1777,21 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     public Stream<Arguments> parameters4() {
       return Stream.of(
-          arguments("dir1/dir2/dir3", "dir1/dir2/dir3", 3, 0, true, false),
-          arguments("dir1/dir2/dir3", "dir1/dir2/dir3", 3, 0, false, true),
-          arguments("/dir1/dir2/dir3", "dir1/dir2/dir3", 3, 1, true, false),
-          arguments("/dir1/dir2/dir3", "dir1/dir2/dir3", 3, 1, false, true),
-          arguments("/dir1/dir2/dir3/", "dir1/dir2/dir3/", 3, 0, true, false),
-          arguments("/dir1/dir2/dir3/", "dir1/dir2/dir3/", 3, 0, false, true),
-          arguments("/dir1//dir2//dir3//", "dir1/dir2/dir3/", 3, 0, true, false),
-          arguments("/dir1//dir2//dir3//", "dir1/dir2/dir3/", 3, 0, false, true),
-          arguments("/dir1//dir2/dir3/", "dir1/dir2/dir", 3, 1, true, false),
-          arguments("/dir1//dir2/dir3/", "dir1/dir2/dir", 3, 1, false, true),
-          arguments("/dir1//dir2/dir3/", "dir1/dir2/dir/", 3, 0, true, false),
-          arguments("/dir1//dir2/dir3/", "dir1/dir2/dir/", 3, 0, false, true),
-          arguments("dir1/dir2", "dir1/dir2/", 2, 0, true, false),
-          arguments("dir1/dir2", "dir1/dir2/", 2, 0, false, true),
-          arguments("/dir1/dir2", "dir1/dir2", 2, 1, true, false),
-          arguments("/dir1/dir2", "dir1/dir2", 2, 1, false, true),
-          arguments("/dir1/dir2/", "dir1/dir2", 2, 1, true, false),
-          arguments("/dir1/dir2/", "dir1/dir2", 2, 1, false, true),
-          arguments("/dir1//dir2//", "dir1/dir2/", 2, 0, true, false),
-          arguments("/dir1//dir2//", "dir1/dir2/", 2, 0, false, true),
-          arguments("/dir1//dir2//", "dir1/dir", 2, 1, true, false),
-          arguments("/dir1//dir2//", "dir1/dir", 2, 1, false, true),
-          arguments("/dir1//dir2//", "dir1/dir/", 2, 0, true, false),
-          arguments("/dir1//dir2//", "dir1/dir/", 2, 0, false, true),
-          arguments("dir1", "dir1/", 1, 0, true, false),
-          arguments("dir1", "dir1/", 1, 0, false, true),
-          arguments("/dir1", "dir1", 1, 1, true, false),
-          arguments("/dir1", "dir1", 1, 1, false, true),
-          arguments("/dir1/", "dir1", 1, 1, true, false),
-          arguments("/dir1/", "dir1", 1, 1, false, true),
-          arguments("/dir1//", "dir1/", 1, 0, true, false),
-          arguments("/dir1//", "dir1/", 1, 0, false, true),
-          arguments("/dir1//", "dir", 1, 1, true, false),
-          arguments("/dir1//", "dir", 1, 1, false, true),
-          arguments("/dir1//", "dir/", 1, 0, true, false),
-          arguments("/dir1//", "dir/", 1, 0, false, true)
+          arguments("dir1/dir2/dir3//", "dir1/dir2/dir3/", true, false),
+          arguments("dir1/dir2/dir3//", "dir1/dir2/dir3/", false, true),
+          arguments("dir1/dir2//", "dir1/dir2/", true, false),
+          arguments("dir1/dir2//", "dir1/dir2/", false, true),
+          arguments("dir1//", "dir1/", true, false),
+          arguments("dir1//", "dir1/", false, true)
       );
     }
 
     @ParameterizedTest
     @MethodSource("parameters4")
-    void testExpireOnlyDirectory(String dirName, String prefix, int dirDepth, int deletedDirCount,
-        boolean createPrefix, boolean createFilterPrefix) throws IOException,
-        TimeoutException, InterruptedException {
+    void testPrefixDirectoryNotExpired(String dirName, String prefix, boolean createPrefix,
+        boolean createFilterPrefix) throws IOException, TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      long initialDeletedDirCount = getDeletedDirectoryCount();
-      long initialDirCount = getDirCount();
-      long initialNumDeletedDir = metrics.getNumDirDeleted().value();
 
       // Create the directory
       createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
@@ -913,8 +1800,10 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
       Thread.sleep(SERVICE_INTERVAL);
-      assertEquals(dirDepth, getDirCount() - initialDirCount);
-      assertEquals(0, getDeletedDirectoryCount() - initialDeletedDirCount);
+
+      GenericTestUtils.LogCapturer log =
+          GenericTestUtils.LogCapturer.captureLogs(
+              LoggerFactory.getLogger(KeyLifecycleService.class));
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -928,11 +1817,170 @@ class TestKeyLifecycleService extends OzoneTestBase {
             null, filter.build(), date.toString(), true);
       }
 
-      GenericTestUtils.waitFor(
-          () -> (getDeletedDirectoryCount() - initialDeletedDirCount) == deletedDirCount, WAIT_CHECK_INTERVAL, 10000);
-      assertEquals(dirDepth - deletedDirCount, getDirCount() - initialDirCount);
-      assertEquals(deletedDirCount, metrics.getNumDirDeleted().value() - initialNumDeletedDir);
+      GenericTestUtils.waitFor(() -> log.getOutput().contains("Prefix directory " + prefix + " doesn't get expired"),
+          WAIT_CHECK_INTERVAL, 10000);
+      // getKeyInfo resolves the whole path, so this fails if any level of the directory was expired
+      assertFalse(getDirectory(volumeName, bucketName, dirName).getKeyInfo().isFile());
       deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @Test
+    void testConsolidatedPrefixNotHappen() throws IOException, TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      String dir1 = "dir/dir1/dir2/";
+      String dir2 = "log/log1/log2/";
+
+      // Create the directories
+      createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+      createDirectory(volumeName, bucketName, dir1);
+      createDirectory(volumeName, bucketName, dir2);
+      KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dir1);
+      assertFalse(keyInfo.getKeyInfo().isFile());
+      keyInfo = getDirectory(volumeName, bucketName, dir2);
+      assertFalse(keyInfo.getKeyInfo().isFile());
+      List<OmKeyArgs> keyList = new ArrayList<>();
+      keyList.add(createAndCommitKey(volumeName, bucketName, dir1 + "key1", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, dir2 + "key2", 1, null));
+
+      Thread.sleep(SERVICE_INTERVAL);
+
+      // create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      List<OmLCRule> ruleList = new ArrayList<>();
+      String ruleID1 = String.valueOf(OBJECT_ID_COUNTER.getAndIncrement());
+      String ruleID2 = String.valueOf(OBJECT_ID_COUNTER.getAndIncrement());
+      ruleList.add(new OmLCRule.Builder().setId(ruleID1)
+          .setEnabled(true).setPrefix(dir1)
+          .setAction(new OmLCExpiration.Builder().setDate(date.toString()).build())
+          .build());
+      ruleList.add(new OmLCRule.Builder().setId(ruleID2)
+          .setEnabled(true).setPrefix(dir2)
+          .setAction(new OmLCExpiration.Builder().setDate(date.toString()).build())
+          .build());
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, ruleList);
+
+      GenericTestUtils.waitFor(() -> getDeletedKeyCount() - initialDeletedKeyCount == keyList.size(),
+          WAIT_CHECK_INTERVAL, 5000);
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    public Stream<Arguments> parameters41() {
+      return Stream.of(
+          arguments("dir/dir1/", "dir/dir1/dir2/", null, null, true,
+              "Prefix directory dir/dir1/dir2/ doesn't get expired", 1, "dir/dir1/", null),
+          arguments("dir/dir1/", "dir/dir2/", null, null, false,
+              "Prefix directory dir/dir2/ doesn't get expired", 2, "dir/dir2/", null),
+          arguments("dir1/dir2/", "log1/log2/", null, null, false,
+              "Prefix directory dir1/dir2/ doesn't get expired", 2, "log1/log2/", null),
+          arguments("dir/dir1/", "dir/dir1/dir2/", "dir/", null, true,
+              "Prefix directory dir/dir1/dir2/ doesn't get expired", 1, "dir/", null),
+          arguments("dir/dir1/dir2/", "dir/", "dir/dir1/", null, true,
+              "Prefix directory dir/dir1/dir2/ doesn't get expired", 1, "dir/", null),
+          arguments("dir/", "dir/dir1/", "dir/dir1/dir2/", null, true,
+              "Prefix directory dir/dir1/dir2/ doesn't get expired", 1, "dir/", null),
+          arguments("dir/dir1/", "log/log1/", "dir/dir1/dir2/", null, true,
+              "Prefix directory dir/dir1/dir2/ doesn't get expired", 2, "log/log1/", "dir/dir1/"),
+          arguments("dir/dir1/", "log/log1/", "data/data1/", "log/log1/log2/", true,
+              "Prefix directory data/data1/ doesn't get expired", 3, "log/log1/", "data/data1/")
+      );
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters41")
+    @SuppressWarnings("parameternumber")
+    void testConsolidatedPrefixDirectoryNotExpired(String dir1, String dir2, String dir3, String dir4,
+        boolean shouldConsolidateRule, String expectedLog, int consolidatedRuleListSize,
+        String firstConsolidatedPrefix, String lastConsolidatedPrefix)
+        throws IOException, TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyIterated = metrics.getNumKeyIterated().value();
+      long initialKeyDeleted = metrics.getNumKeyDeleted().value();
+
+      // Create the directories
+      createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+      createDirectory(volumeName, bucketName, dir1);
+      createDirectory(volumeName, bucketName, dir2);
+      KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dir1);
+      assertFalse(keyInfo.getKeyInfo().isFile());
+      keyInfo = getDirectory(volumeName, bucketName, dir2);
+      assertFalse(keyInfo.getKeyInfo().isFile());
+      List<OmKeyArgs> keyList = new ArrayList<>();
+      keyList.add(createAndCommitKey(volumeName, bucketName, dir1 + "key1", 1, null));
+      keyList.add(createAndCommitKey(volumeName, bucketName, dir2 + "key2", 1, null));
+
+      Thread.sleep(SERVICE_INTERVAL);
+      KeyLifecycleService.setTest(true);
+      KeyLifecycleService.reSetConsolidatedRuleList();
+
+      GenericTestUtils.LogCapturer log =
+          GenericTestUtils.LogCapturer.captureLogs(
+              LoggerFactory.getLogger(KeyLifecycleService.class));
+
+      // create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      List<OmLCRule> ruleList = new ArrayList<>();
+      String ruleID1 = String.valueOf(OBJECT_ID_COUNTER.getAndIncrement());
+      String ruleID2 = String.valueOf(OBJECT_ID_COUNTER.getAndIncrement());
+      ruleList.add(new OmLCRule.Builder().setId(ruleID1)
+          .setEnabled(true).setPrefix(dir1)
+          .setAction(new OmLCExpiration.Builder().setDate(date.toString()).build())
+          .build());
+      ruleList.add(new OmLCRule.Builder().setId(ruleID2)
+          .setEnabled(true).setPrefix(dir2)
+          .setAction(new OmLCExpiration.Builder().setDate(date.toString()).build())
+          .build());
+      if (dir3 != null) {
+        String ruleID3 = String.valueOf(OBJECT_ID_COUNTER.getAndIncrement());
+        ruleList.add(new OmLCRule.Builder().setId(ruleID3)
+            .setEnabled(true).setPrefix(dir3)
+            .setAction(new OmLCExpiration.Builder().setDate(date.toString()).build())
+            .build());
+        keyList.add(createAndCommitKey(volumeName, bucketName, dir3 + "key3", 1, null));
+      }
+      if (dir4 != null) {
+        String ruleID4 = String.valueOf(OBJECT_ID_COUNTER.getAndIncrement());
+        ruleList.add(new OmLCRule.Builder().setId(ruleID4)
+            .setEnabled(true).setPrefix(dir4)
+            .setAction(new OmLCExpiration.Builder().setDate(date.toString()).build())
+            .build());
+        keyList.add(createAndCommitKey(volumeName, bucketName, dir4 + "key4", 1, null));
+      }
+      awaitKeyCacheDrained(FILE_SYSTEM_OPTIMIZED, volumeName, bucketName);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, ruleList);
+
+      try {
+        if (shouldConsolidateRule) {
+          GenericTestUtils.waitFor(() -> log.getOutput().contains("Consolidate"), WAIT_CHECK_INTERVAL, 5000);
+        }
+        if (expectedLog != null) {
+          GenericTestUtils.waitFor(() -> log.getOutput().contains(expectedLog), WAIT_CHECK_INTERVAL, 5000);
+        }
+        GenericTestUtils.waitFor(() -> getDeletedKeyCount() - initialDeletedKeyCount == keyList.size(),
+            WAIT_CHECK_INTERVAL, 5000);
+        GenericTestUtils.waitFor(() -> keyList.size() == metrics.getNumKeyIterated().value() - initialKeyIterated,
+            WAIT_CHECK_INTERVAL, 5000);
+        GenericTestUtils.waitFor(() -> keyList.size() == metrics.getNumKeyDeleted().value() - initialKeyDeleted,
+            WAIT_CHECK_INTERVAL, 5000);
+        GenericTestUtils.waitFor(() -> {
+          List<KeyLifecycleService.RuleListWithDirectoryList> list = KeyLifecycleService.getConsolidatedRuleList();
+          boolean sizeMatch = list != null && list.size() == consolidatedRuleListSize;
+          boolean firstPrefixMatch = list != null &&
+              firstConsolidatedPrefix.equals(list.get(0).getConsolidatedPrefix());
+          boolean lastPrefixMatch = lastConsolidatedPrefix == null ? true :
+              list != null && lastConsolidatedPrefix.equals(list.get(list.size() - 1).getConsolidatedPrefix());
+          return sizeMatch && firstPrefixMatch && lastPrefixMatch;
+        }, WAIT_CHECK_INTERVAL, 5000);
+      } finally {
+        deleteLifecyclePolicy(volumeName, bucketName);
+      }
     }
 
     @ParameterizedTest
@@ -962,7 +2010,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, bucketLayout, "dir1/dir2/dir4", null, date.toString(), true);
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, "dir1/dir2/dir4/", null, date.toString(), true);
 
       Thread.sleep(EXPIRE_SECONDS);
 
@@ -1007,12 +2055,12 @@ class TestKeyLifecycleService extends OzoneTestBase {
         throws IOException, InterruptedException, TimeoutException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      String prefix = "key";
+      String keyPrefix = "key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       // create keys
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
       // check there are keys in keyTable
       assertEquals(KEY_COUNT, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
@@ -1021,12 +2069,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
       List<OmLCRule> ruleList = new ArrayList<>();
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
       ruleList.add(new OmLCRule.Builder().setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
-          .setEnabled(false).setPrefix(prefix)
+          .setEnabled(false).setPrefix(rulePrefix)
           .setAction(new OmLCExpiration.Builder().setDate(date.toString()).build())
           .build());
       ruleList.add(new OmLCRule.Builder().setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
-          .setEnabled(true).setPrefix(prefix)
+          .setEnabled(true).setPrefix(rulePrefix)
           .setAction(new OmLCExpiration.Builder().setDate(date.toString()).build())
           .build());
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, ruleList);
@@ -1041,6 +2090,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
     void testKeyUpdatedShouldNotGetDeleted(BucketLayout bucketLayout)
         throws IOException, InterruptedException, TimeoutException {
+      assumeTrue(stateSaveInternal != -1);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       GenericTestUtils.LogCapturer log =
@@ -1049,20 +2099,20 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.LogCapturer requestLog =
           GenericTestUtils.LogCapturer.captureLogs(
               LoggerFactory.getLogger(OMKeysDeleteRequest.class));
-      String prefix = "key";
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       // create keys
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
 
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
+      ZonedDateTime date = now.plusSeconds(LONG_EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       Thread.sleep(SERVICE_INTERVAL);
       KeyLifecycleService.getInjector(0).resume();
 
@@ -1090,10 +2140,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
           key.getBucketName() + "/" + key.getKeyName() + " whose updateID not match or null";
       GenericTestUtils.waitFor(() -> requestLog.getOutput().contains(expectedString), WAIT_CHECK_INTERVAL, 10000);
 
-      // rename will change object's modificationTime. But since expiration action is an absolute timestamp, so
-      // the renamed key will expire in next evaluation task
-      GenericTestUtils.waitFor(() -> log.getOutput().contains("1 expired keys and 0 expired dirs found"),
-          WAIT_CHECK_INTERVAL, 10000);
+      // How many candidates a task reports depends on whether the in-flight delete has landed when it
+      // starts, so assert on the outcome instead.
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == 0, WAIT_CHECK_INTERVAL, 10000);
       assertEquals(KEY_COUNT, getDeletedKeyCount() - initialDeletedKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
@@ -1130,7 +2178,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         throws IOException, InterruptedException, TimeoutException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      String prefix = "key";
+      String keyPrefix = "key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       long initialKeyDeleted = metrics.getNumKeyDeleted().value();
@@ -1139,7 +2187,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       final int keyCount = 10;
       // create keys
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, keyCount, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, keyCount, 1, keyPrefix, null);
       // check there are keys in keyTable
       assertEquals(keyCount, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == keyCount,
@@ -1148,12 +2196,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
       List<OmLCRule> ruleList = new ArrayList<>();
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
       ruleList.add(new OmLCRule.Builder().setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
-          .setEnabled(false).setPrefix(prefix)
+          .setEnabled(false).setPrefix(rulePrefix)
           .setAction(new OmLCExpiration.Builder().setDate(date.toString()).build())
           .build());
       ruleList.add(new OmLCRule.Builder().setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
-          .setEnabled(true).setPrefix(prefix)
+          .setEnabled(true).setPrefix(rulePrefix)
           .setAction(new OmLCExpiration.Builder().setDate(date.toString()).build())
           .build());
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, ruleList);
@@ -1251,9 +2300,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.waitFor(() -> metrics.getNumKeyDeleted().value() - initialKeyDeleted == keyCount,
           WAIT_CHECK_INTERVAL, 5000);
       assertEquals(0, metrics.getNumDirIterated().value() - initialDirIterated);
-      GenericTestUtils.waitFor(() ->
-              metrics.getNumDirDeleted().value() - initialDirDeleted == (bucketLayout == FILE_SYSTEM_OPTIMIZED ? 1 : 0),
-          WAIT_CHECK_INTERVAL, 10000);
+      GenericTestUtils.waitFor(() -> metrics.getNumDirDeleted().value() - initialDirDeleted == 0,
+          WAIT_CHECK_INTERVAL, 5000);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
@@ -1273,7 +2321,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
-      String prefix = "key";
+      String keyPrefix = "key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
@@ -1282,7 +2330,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       keyLifecycleService.setListMaxSize(maxListSize);
       // create keys
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, keyCount, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, keyCount, 1, keyPrefix, null);
       // check there are keys in keyTable
       Thread.sleep(SERVICE_INTERVAL);
       assertEquals(keyCount, keyList.size());
@@ -1305,7 +2353,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
 
       if (enableTrash && bucketLayout != OBJECT_STORE) {
         GenericTestUtils.waitFor(() ->
@@ -1316,9 +2365,11 @@ class TestKeyLifecycleService extends OzoneTestBase {
             (getDeletedKeyCount() - initialDeletedKeyCount) == keyCount, WAIT_CHECK_INTERVAL, 5000);
         assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
       }
-      GenericTestUtils.waitFor(() ->
-          log.getOutput().contains("LimitedSizeList has reached maximum size " + maxListSize),
-          WAIT_CHECK_INTERVAL, 5000);
+      if (stateSaveInternal != -1) {
+        GenericTestUtils.waitFor(() ->
+                log.getOutput().contains("LimitedSizeList has reached maximum size " + maxListSize),
+            WAIT_CHECK_INTERVAL, 5000);
+      }
       GenericTestUtils.setLogLevel(KeyLifecycleService.getLog(), Level.INFO);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
@@ -1364,67 +2415,98 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, "", null, date.toString(), true);
 
-      GenericTestUtils.waitFor(() ->
-          (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 50000);
-      assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
-      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
-        // Legacy bucket doesn't have dir concept
+      try {
         GenericTestUtils.waitFor(() ->
-                metrics.getNumDirRenamed().value() - initialRenamedDirCount == (prefix.contains(OM_KEY_PREFIX) ? 1 : 0),
-            WAIT_CHECK_INTERVAL, 5000);
-      }
-      deleteLifecyclePolicy(volumeName, bucketName);
-      // verify trash directory has the right native ACLs
-      List<KeyInfoWithVolumeContext> dirList = new ArrayList<>();
-      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
-        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX));
-        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner));
-        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner +
-            OM_KEY_PREFIX + CURRENT));
-      } else {
-        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX));
-        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner + OM_KEY_PREFIX));
-        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner +
-            OM_KEY_PREFIX + CURRENT + OM_KEY_PREFIX));
-      }
-      for (KeyInfoWithVolumeContext dir : dirList) {
-        List<OzoneAcl> aclList = dir.getKeyInfo().getAcls();
-        for (OzoneAcl acl : aclList) {
-          if (acl.getType() == IAccessAuthorizer.ACLIdentityType.USER ||
-              acl.getType() == IAccessAuthorizer.ACLIdentityType.GROUP) {
-            assertEquals(bucketOwner, acl.getName());
-            assertTrue(acl.getAclList().contains(ALL));
+            (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 5000);
+        assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
+        if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+          // Legacy bucket doesn't have dir concept
+          GenericTestUtils.waitFor(() ->
+                  metrics.getNumDirRenamed().value() - initialRenamedDirCount == (prefix.contains(OM_KEY_PREFIX) ?
+                      1 : 0), WAIT_CHECK_INTERVAL, 5000);
+        }
+
+        // verify that trash directory has the right native ACLs
+        List<KeyInfoWithVolumeContext> dirList = new ArrayList<>();
+        if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+          dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX));
+          dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner));
+          dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner +
+              OM_KEY_PREFIX + CURRENT));
+        } else {
+          dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX));
+          dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner + OM_KEY_PREFIX));
+          dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner +
+              OM_KEY_PREFIX + CURRENT + OM_KEY_PREFIX));
+        }
+        for (KeyInfoWithVolumeContext dir : dirList) {
+          List<OzoneAcl> aclList = dir.getKeyInfo().getAcls();
+          for (OzoneAcl acl : aclList) {
+            if (acl.getType() == IAccessAuthorizer.ACLIdentityType.USER ||
+                acl.getType() == IAccessAuthorizer.ACLIdentityType.GROUP) {
+              assertEquals(bucketOwner, acl.getName());
+              assertTrue(acl.getAclList().contains(ALL));
+            }
           }
         }
-      }
 
-      GenericTestUtils.LogCapturer log =
-          GenericTestUtils.LogCapturer.captureLogs(
-              LoggerFactory.getLogger(KeyLifecycleService.class));
-
-      // keys under trash directory is counted in getKeyCount()
-      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
-        assertEquals(KEY_COUNT, getKeyCount(bucketLayout) - initialKeyCount);
-      } else {
-        // For legacy bucket, trash directories along .Trash/user-test/Current are in key table too.
-        assertEquals(KEY_COUNT + (prefix.contains(OM_KEY_PREFIX) ? 4 : 3), getKeyCount(bucketLayout) - initialKeyCount);
+        // keys under trash directory is counted in getKeyCount()
+        if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+          assertEquals(KEY_COUNT, getKeyCount(bucketLayout) - initialKeyCount);
+        } else {
+          // For legacy bucket, trash directories along .Trash/user-test/Current are in key table too.
+          assertEquals(KEY_COUNT + (prefix.contains(OM_KEY_PREFIX) ? 4 : 3),
+              getKeyCount(bucketLayout) - initialKeyCount);
+        }
+      } finally {
+        deleteLifecyclePolicy(volumeName, bucketName);
       }
-      // create new policy to test rule with prefix ".Trash/" is ignored during lifecycle evaluation
-      now = ZonedDateTime.now(ZoneOffset.UTC);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters7")
+    void testMoveToTrashWithTrashPrefix(BucketLayout bucketLayout, String prefix) throws IOException,
+        TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialKeyCount = getKeyCount(bucketLayout);
+      // create keys
+      String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, bucketLayout, bucketOwner, KEY_COUNT, 1, prefix, null);
+      // check there are keys in keyTable
+      Thread.sleep(SERVICE_INTERVAL);
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      // enabled trash
+      final float trashInterval = 0.5f; // 30 seconds, 0.5 * (60 * 1000) ms
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>)
+              () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+
+      // create a new policy to test rule with prefix ".Trash/" is ignored during lifecycle evaluation
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       final String expiredDate = now.plusSeconds(EXPIRE_SECONDS).toString();
       assertThrowsExactly(OMException.class, () -> createLifecyclePolicy(
           volumeName, bucketName, bucketLayout, TRASH_PREFIX + OM_KEY_PREFIX, null, expiredDate, true));
 
-      // create new policy to test rule with prefix ".Trash" is ignored during lifecycle evaluation
+      // create a new policy to test rule with prefix ".Trash" is ignored during lifecycle evaluation
       assertThrowsExactly(OMException.class, () -> createLifecyclePolicy(
           volumeName, bucketName, bucketLayout, TRASH_PREFIX,
           null, expiredDate, true));
 
-      // create new policy to test rule with prefix ".Tras" is ignored during lifecycle evaluation
+      // create a new policy to test rule with prefix ".Tras/" is ignored during lifecycle evaluation
       now = ZonedDateTime.now(ZoneOffset.UTC);
-      date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, ".Tras", null, date.toString(), true);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, ".Tras/", null, date.toString(), true);
 
+      GenericTestUtils.LogCapturer log =
+          GenericTestUtils.LogCapturer.captureLogs(
+              LoggerFactory.getLogger(KeyLifecycleService.class));
       GenericTestUtils.waitFor(
           () -> log.getOutput().contains("No expired keys/dirs found/remained for bucket"), WAIT_CHECK_INTERVAL, 5000);
       deleteLifecyclePolicy(volumeName, bucketName);
@@ -1442,23 +2524,27 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     public Stream<Arguments> parameters8() {
       return Stream.of(
-          arguments("dir1/dir2/dir3/key", null, "dir1/dir", "dir1/dir2/dir3", KEY_COUNT, 2, false),
-          arguments("dir1/dir2/dir3/key", null, "dir1/dir", "dir1/dir2/dir3", KEY_COUNT, 0, true),
-          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "dir1/dir", "dir1/dir2/dir3", KEY_COUNT * 2, 4, false),
-          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "dir1/dir", "dir1/dir2/dir3", KEY_COUNT * 2, 2, true),
-          arguments("dir1/dir2/dir3/key", "dir1/dir22/dir5/key", "dir1/dir2/", "dir1/dir2/dir3", KEY_COUNT, 2, false),
-          arguments("dir1/dir2/dir3/key", "dir1/dir22/dir5/key", "dir1/dir2/", "dir1/dir2/dir3", KEY_COUNT, 0, true),
-          arguments("dir1/dir2/dir3/key", "dir1/dir22/dir5/key", "dir1/dir2", "dir1/dir2/dir3",
-              KEY_COUNT * 2, 4, false),
-          arguments("dir1/dir2/dir3/key", "dir1/dir22/dir5/key", "dir1/dir2", "dir1/dir2/dir3", KEY_COUNT * 2, 2, true),
-          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "dir", "dir1/dir2/dir3", KEY_COUNT * 2, 5, false),
-          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "dir", "dir1/dir2/dir3", KEY_COUNT * 2, 2, true),
-          arguments("dir1/dir2/dir3/key", "dir11/dir4/dir5/key", "dir1/", "dir1/dir2/dir3", KEY_COUNT, 3, false),
-          arguments("dir1/dir2/dir3/key", "dir11/dir4/dir5/key", "dir1/", "dir1/dir2/dir3", KEY_COUNT, 0, true),
-          arguments("dir1/dir2/dir3/key", "dir11/dir4/dir5/key", "dir1", "dir1/dir2/dir3", KEY_COUNT * 2, 6, false),
-          arguments("dir1/dir2/dir3/key", "dir11/dir4/dir5/key", "dir1", "dir1/dir2/dir3", KEY_COUNT * 2, 3, true),
+          // dir3 and keys under dir3 deleted
+          arguments("dir1/dir2/dir3/key", null, "dir1/dir2/", "dir1/dir2/dir3/", KEY_COUNT, 1, false),
+          // no dir, but keys under dir3 deleted
+          arguments("dir1/dir2/dir3/key", null, "dir1/dir2/", "dir1/dir2/dir3/", KEY_COUNT, 0, true),
+          // dir3 dir5, and all keys under dir3 and dir5 deleted
+          arguments("dir1/dir2/dir3/key", "dir1/dir2/dir5/key", "dir1/dir2/", "dir1/dir2/dir3",
+              KEY_COUNT * 2, 2, false),
+          // dir5, and all keys under dir3 and dir5 deleted
+          arguments("dir1/dir2/dir3/key", "dir1/dir2/dir5/key", "dir1/dir2/", "dir1/dir2/dir3", KEY_COUNT * 2, 1, true),
+          // dir2 dir3 dir4 dir5, and all keys under dir3 and dir5 deleted
+          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "dir1/", "dir1/dir2/dir3", KEY_COUNT * 2, 4, false),
+          // dir4 dir5, and all keys under dir3 and dir5 deleted
+          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "dir1/", "dir1/dir2/dir3", KEY_COUNT * 2, 2, true),
+          // dir1 - dir5, and all keys deleted
           arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "", "dir1/dir2/dir3", KEY_COUNT * 2, 5, false),
-          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "", "dir1/dir2/dir3", KEY_COUNT * 2, 2, true));
+          // dir4 dir5, and all keys deleted
+          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "", "dir1/dir2/dir3", KEY_COUNT * 2, 2, true),
+          // dir4 dir5, and all keys under dir5 deleted
+          arguments("dir11/dir4/dir5/key", "dir1/dir2/dir3/key", "dir11/", "dir11/dir4/dir5", KEY_COUNT, 2, false),
+          // no dir, but all keys under dir11 deleted
+          arguments("dir11/dir4/dir5/key", "dir1/dir2/dir3/key", "dir11/", "dir11/dir4/dir5", KEY_COUNT, 0, true));
     }
 
     @ParameterizedTest
@@ -1496,8 +2582,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
 
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -1506,7 +2591,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       LOG.info("expiry date {}", date.toInstant());
 
       ZonedDateTime endDate = date.plus(SERVICE_INTERVAL, ChronoUnit.MILLIS);
-      GenericTestUtils.waitFor(() -> endDate.isBefore(ZonedDateTime.now(ZoneOffset.UTC)), WAIT_CHECK_INTERVAL, 10000);
+      GenericTestUtils.waitFor(() -> endDate.isBefore(ZonedDateTime.now(ZoneOffset.UTC)), WAIT_CHECK_INTERVAL, 5000);
 
       // rename a key under directory to change directory's Modification time
       if (updateDirModificationTime) {
@@ -1514,6 +2599,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         LOG.info("Dir {} refreshes its modification time", dirName);
         KeyInfoWithVolumeContext keyInfo2 = getDirectory(volumeName, bucketName, dirName);
         assertNotEquals(keyInfo.getKeyInfo().getModificationTime(), keyInfo2.getKeyInfo().getModificationTime());
+        awaitDirCacheDrained(volumeName, bucketName);
       }
 
       // resume KeyLifecycleService bucket scan
@@ -1553,9 +2639,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // Create and inject for test
       createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, KEY_COUNT, 1, prefix, null);
       ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
-      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, prefix, null, date.toString(), true);
+      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
       Thread.sleep(SERVICE_INTERVAL + 100);
       
       // Verify service is running and processing the bucket
@@ -1611,6 +2696,74 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(initialRenamedKeyCount, metrics.getNumKeyRenamed().value());
       assertEquals(0, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @Test
+    void testMoveToTrashAbortTaskWhenTrashRootPrepareFails() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String keyPrefix = "key";
+      String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
+      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+
+      List<OmKeyArgs> createdKeys =
+          createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, 1, 1, keyPrefix, null);
+      assertEquals(1, createdKeys.size());
+      Thread.sleep(SERVICE_INTERVAL);
+      GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == 1,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      keyLifecycleService.setMoveToTrashEnabled(true);
+      final float trashInterval = 0.5f;
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>)
+              () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+
+      OmLifecycleConfiguration policy = new OmLifecycleConfiguration.Builder()
+          .setVolume(volumeName)
+          .setBucket(bucketName)
+          .setBucketLayout(FILE_SYSTEM_OPTIMIZED)
+          .setBucketObjectID(bucketObjectID)
+          .setRules(Collections.singletonList(new OmLCRule.Builder()
+              .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
+              .setEnabled(true)
+              .setPrefix("")
+              .setAction(new OmLCExpiration.Builder()
+                  .setDate(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS).toString())
+                  .build())
+              .build()))
+          .build();
+
+      String expectedTrashRoot = new Path(TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner, CURRENT).toString();
+      OzoneManager omSpy = spy(om);
+      doThrow(new IOException("Injected trash root prepare failure"))
+          .when(omSpy).getFileStatus(argThat(key ->
+              key != null
+                  && volumeName.equals(key.getVolumeName())
+                  && bucketName.equals(key.getBucketName())
+                  && expectedTrashRoot.equals(key.getKeyName())));
+
+      Field ozoneManagerField = KeyLifecycleService.class.getDeclaredField("ozoneManager");
+      ozoneManagerField.setAccessible(true);
+      ozoneManagerField.set(keyLifecycleService, omSpy);
+
+      GenericTestUtils.LogCapturer log =
+          GenericTestUtils.LogCapturer.captureLogs(LoggerFactory.getLogger(KeyLifecycleService.class));
+      try {
+        KeyLifecycleService.LifecycleActionTask task = keyLifecycleService.new LifecycleActionTask(policy);
+        task.call();
+
+        assertTrue(log.getOutput().contains("Failed to prepare trash root"));
+        assertTrue(log.getOutput().contains("Failed to evaluate lifecycle configuration for bucket"));
+        // Verify local bucket state instead of global lifecycle metrics, which are shared across parameterized runs.
+        assertNotNull(writeClient.getKeyInfo(createdKeys.get(0), false));
+        assertEquals(1, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+      } finally {
+        ozoneManagerField.set(keyLifecycleService, om);
+        log.stopCapturing();
+      }
     }
 
     @Test
@@ -1863,6 +3016,125 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
+    /**
+     * An MPU whose open key entry is missing (orphan) should still be aborted when a lifecycle
+     * rule matches by age and prefix alone (no tag filter). The abort request handler already
+     * tolerates a missing open key.
+     */
+    @Test
+    void testOrphanMpuAbortedByAgeAndPrefixRule() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+      long initialMpuCount = getMultipartUploadCount(volumeName, bucketName);
+
+      // Create two MPUs: one normal (has open key), one will become an orphan.
+      OmMultipartInfo normalMpu = createTestMultipartUpload(volumeName, bucketName, "data/normal", owner);
+      OmMultipartInfo orphanMpu = createTestMultipartUpload(volumeName, bucketName, "data/orphan", owner);
+
+      // Age both MPUs past the threshold.
+      long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "data/normal",
+          normalMpu.getUploadID(), oldCreationTime);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "data/orphan",
+          orphanMpu.getUploadID(), oldCreationTime);
+
+      // Simulate orphan: delete the open key entry for "data/orphan" directly from the table.
+      // Use the same helper the service uses so the key format matches exactly.
+      String resolvedOrphanOpenKey = OMMultipartUploadUtils
+          .getMultipartOpenKey(volumeName, bucketName, "data/orphan", orphanMpu.getUploadID(),
+              metadataManager, OBJECT_STORE);
+      metadataManager.getOpenKeyTable(OBJECT_STORE).delete(resolvedOrphanOpenKey);
+
+      // Rule: abort all MPUs under "data/" after 1 day — no tag filter.
+      OmLCRule rule = new OmLCRule.Builder()
+          .setId("abort-data-prefix")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder().setPrefix("data/").build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
+              .setDaysAfterInitiation(1)
+              .build())
+          .build();
+
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, Collections.singletonList(rule));
+
+      // Both MPUs should be aborted: normal one (open key present) and orphan (open key missing).
+      GenericTestUtils.waitFor(() ->
+          getMultipartUploadCount(volumeName, bucketName) - initialMpuCount == 0,
+          WAIT_CHECK_INTERVAL, 10000);
+
+      String normalKey = metadataManager.getMultipartKey(volumeName, bucketName,
+          "data/normal", normalMpu.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(normalKey),
+          "Normal MPU should be aborted");
+
+      String orphanKey = metadataManager.getMultipartKey(volumeName, bucketName,
+          "data/orphan", orphanMpu.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(orphanKey),
+          "Orphan MPU (no open key) should be aborted when a tag-free rule matches");
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    /**
+     * An MPU whose open key is missing (orphan) must NOT be aborted when the only matching
+     * lifecycle rule requires a tag filter, because the tag metadata is unavailable.
+     */
+    @Test
+    void testOrphanMpuNotAbortedByTagOnlyRule() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+      long initialMpuCount = getMultipartUploadCount(volumeName, bucketName);
+
+      OmMultipartInfo orphanMpu = createTestMultipartUpload(volumeName, bucketName, "file.txt", owner);
+
+      // Age past the threshold.
+      long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "file.txt",
+          orphanMpu.getUploadID(), oldCreationTime);
+
+      // Simulate orphan by removing its open key.
+      String resolvedOrphanOpenKey = OMMultipartUploadUtils
+          .getMultipartOpenKey(volumeName, bucketName, "file.txt", orphanMpu.getUploadID(),
+              metadataManager, OBJECT_STORE);
+      metadataManager.getOpenKeyTable(OBJECT_STORE).delete(resolvedOrphanOpenKey);
+
+      // Rule requires tag match — cannot evaluate without open key.
+      OmLCRule tagRule = new OmLCRule.Builder()
+          .setId("abort-by-tag")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder().setTag("env", "test").build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
+              .setDaysAfterInitiation(1)
+              .build())
+          .build();
+
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, Collections.singletonList(tagRule));
+
+      // Wait long enough for the service to run at least once.
+      Thread.sleep(SERVICE_INTERVAL * 2);
+
+      // Orphan MPU must remain: the tag rule cannot evaluate without open key metadata.
+      String orphanKey = metadataManager.getMultipartKey(volumeName, bucketName,
+          "file.txt", orphanMpu.getUploadID());
+      assertNotNull(metadataManager.getMultipartInfoTable().get(orphanKey),
+          "Orphan MPU should NOT be aborted when only tag-requiring rules exist");
+
+      assertEquals(initialMpuCount + 1, getMultipartUploadCount(volumeName, bucketName),
+          "MPU count should not change");
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
   }
 
   /**
@@ -1883,7 +3155,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
 
     @AfterEach
-    void resume() {
+    void resume() throws Exception {
+      cleanUpService();
     }
 
     @AfterAll
@@ -1927,7 +3200,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
 
       FaultInjectorImpl injector = new FaultInjectorImpl();
-      KeyLifecycleService.setInjectors(Arrays.asList(injector));
+      installInjectors(injector);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, "", null, date.toString(), true);
 
       Thread.sleep(1000);
@@ -1959,6 +3232,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @MethodSource("parameters1")
     void testKeyDeletedOrRenamed(BucketLayout bucketLayout, boolean deleted)
         throws IOException, InterruptedException, TimeoutException {
+      assumeTrue(stateSaveInternal != -1);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       GenericTestUtils.LogCapturer log =
@@ -1967,26 +3241,27 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.LogCapturer requestLog =
           GenericTestUtils.LogCapturer.captureLogs(
               LoggerFactory.getLogger(OMKeysDeleteRequest.class));
-      String prefix = "key";
+      String keyPrefix = "key";
+      String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
       // create keys
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, KEY_COUNT, 1, keyPrefix, null);
 
-      KeyLifecycleService.setInjectors(
-          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
+      ZonedDateTime date = now.plusSeconds(LONG_EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       Thread.sleep(SERVICE_INTERVAL);
       KeyLifecycleService.getInjector(0).resume();
 
       GenericTestUtils.waitFor(
           () -> log.getOutput().contains(KEY_COUNT + " expired keys and 0 expired dirs found"),
           WAIT_CHECK_INTERVAL, 10000);
+
       OmKeyArgs key = keyList.get(ThreadLocalRandom.current().nextInt(1, keyList.size()));
       // delete/rename another key before send deletion requests
       if (deleted) {
@@ -2001,11 +3276,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       String expectedString = "Received a request to delete a Key does not exist /" + key.getVolumeName() + "/" +
           key.getBucketName() + "/" + key.getKeyName();
       GenericTestUtils.waitFor(() -> requestLog.getOutput().contains(expectedString), WAIT_CHECK_INTERVAL, 10000);
-      if (!deleted) {
-        // Since expiration action is an absolute timestamp, so the renamed key will expire in next evaluation task
-        GenericTestUtils.waitFor(() -> log.getOutput().contains("1 expired keys and 0 expired dirs found"),
-            SERVICE_INTERVAL, 10000);
-      }
+      // How many candidates a task reports depends on whether the in-flight delete has landed when it
+      // starts, so assert on the outcome instead.
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == 0, WAIT_CHECK_INTERVAL, 10000);
       assertEquals(KEY_COUNT, getDeletedKeyCount() - initialDeletedKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
@@ -2125,13 +3397,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       }
       throw e;
     }
-    String key = "/" + volume + "/" + bucket;
-    LifecycleConfiguration lcProto = lcc.getProtobuf();
-    OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcProto);
-    canonicalLcc.valid();
-    metadataManager.getLifecycleConfigurationTable().put(key, lcc);
-    metadataManager.getLifecycleConfigurationTable().addCacheEntry(
-        new CacheKey<>(key), CacheValue.get(1L, canonicalLcc));
+    putLifecyclePolicy(volume, bucket, lcc, true);
   }
 
   private void createLifecyclePolicy(String volume, String bucket, BucketLayout layout, List<OmLCRule> ruleList)
@@ -2151,20 +3417,132 @@ class TestKeyLifecycleService extends OzoneTestBase {
       }
       throw e;
     }
-    String key = "/" + volume + "/" + bucket;
-    LifecycleConfiguration lcProto = lcc.getProtobuf();
-    OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcProto);
+    putLifecyclePolicy(volume, bucket, lcc, false);
+  }
+
+  private void putLifecyclePolicy(String volume, String bucket, OmLifecycleConfiguration lcc, boolean validate)
+      throws IOException {
+    String key = metadataManager.getBucketKey(volume, bucket);
+    OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcc.getProtobuf());
+    if (validate) {
+      canonicalLcc.valid();
+    }
     metadataManager.getLifecycleConfigurationTable().put(key, lcc);
     metadataManager.getLifecycleConfigurationTable().addCacheEntry(
         new CacheKey<>(key), CacheValue.get(1L, canonicalLcc));
+    createdLifecyclePolicies.add(key);
   }
 
   private void deleteLifecyclePolicy(String volume, String bucket)
       throws IOException {
-    String key = "/" + volume + "/" + bucket;
-    metadataManager.getLifecycleConfigurationTable().delete(key);
+    deleteLifecyclePolicy(metadataManager.getBucketKey(volume, bucket));
+  }
+
+  private void deleteLifecyclePolicy(String policyKey) throws IOException {
+    metadataManager.getLifecycleConfigurationTable().delete(policyKey);
     metadataManager.getLifecycleConfigurationTable().addCacheEntry(
-        new CacheKey<>(key), CacheValue.get(1L));
+        new CacheKey<>(policyKey), CacheValue.get(1L));
+    createdLifecyclePolicies.remove(policyKey);
+  }
+
+  // A scan reads keys still in the cache from an unordered map and skips them in the sorted table
+  // iterator without counting them, so lastScannedKey and numKeyIterated are unstable until they drain.
+  private void awaitKeyCacheDrained(BucketLayout layout, String volume, String bucket)
+      throws TimeoutException, InterruptedException {
+    Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(layout);
+    GenericTestUtils.waitFor(() -> {
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter = keyTable.cacheIterator();
+      while (cacheIter.hasNext()) {
+        OmKeyInfo key = cacheIter.next().getValue().getCacheValue();
+        if (key != null && volume.equals(key.getVolumeName()) && bucket.equals(key.getBucketName())) {
+          return false;
+        }
+      }
+      return true;
+    }, WAIT_CHECK_INTERVAL, 10000);
+  }
+
+  // getSubDirectory evaluates directories still in the cache and adds them again from the table iterator,
+  // so a scan sees them twice until they drain.
+  private void awaitDirCacheDrained(String volume, String bucket)
+      throws IOException, TimeoutException, InterruptedException {
+    long volumeId = metadataManager.getVolumeTable().get(metadataManager.getVolumeKey(volume)).getObjectID();
+    long bucketId = metadataManager.getBucketTable().get(metadataManager.getBucketKey(volume, bucket)).getObjectID();
+    String bucketPrefix = OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
+    Table<String, OmDirectoryInfo> dirTable = metadataManager.getDirectoryTable();
+    GenericTestUtils.waitFor(() -> {
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>> cacheIter = dirTable.cacheIterator();
+      while (cacheIter.hasNext()) {
+        if (cacheIter.next().getKey().getCacheKey().startsWith(bucketPrefix)) {
+          return false;
+        }
+      }
+      return true;
+    }, WAIT_CHECK_INTERVAL, 10000);
+  }
+
+  private void awaitMultipartCacheDrained(String dbKey) throws TimeoutException, InterruptedException {
+    Table<String, OmMultipartKeyInfo> mpuTable = metadataManager.getMultipartInfoTable();
+    GenericTestUtils.waitFor(() -> {
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>> cacheIter = mpuTable.cacheIterator();
+      while (cacheIter.hasNext()) {
+        if (dbKey.equals(cacheIter.next().getKey().getCacheKey())) {
+          return false;
+        }
+      }
+      return true;
+    }, WAIT_CHECK_INTERVAL, 10000);
+  }
+
+  // Tracks every injector installed, not just the current set, so a replaced one is still released
+  private void installInjectors(FaultInjectorImpl... injectors) {
+    installedInjectors.addAll(Arrays.asList(injectors));
+    KeyLifecycleService.setInjectors(new ArrayList<FaultInjector>(Arrays.asList(injectors)));
+  }
+
+  // A task parked in an injector blocks every following cycle, and a policy left behind keeps its bucket
+  // scanned, so both have to be cleared for the next test to start from a quiet service.
+  private void cleanUpService() throws Exception {
+    try {
+      // Suspending first closes the window where a cycle has already read the policies but has not
+      // registered its task yet, which would let that task run into the next test.
+      keyLifecycleService.suspend();
+      installedInjectors.forEach(FaultInjectorImpl::release);
+      GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+          WAIT_CHECK_INTERVAL, 30000);
+    } finally {
+      try {
+        for (String policyKey : new ArrayList<>(createdLifecyclePolicies)) {
+          deleteLifecyclePolicy(policyKey);
+        }
+      } finally {
+        installedInjectors.clear();
+        KeyLifecycleService.setInjectors(null);
+        keyLifecycleService.setOzoneTrash(null);
+        keyLifecycleService.setMoveToTrashEnabled(true);
+        keyLifecycleService.setListMaxSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
+            OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
+        keyLifecycleService.resume();
+      }
+    }
+  }
+
+  // Runs exactly one scan: without dropping the policy first, the next scan starts SERVICE_INTERVAL
+  // later and deletes the objects the caller expects to remain.
+  private void runSingleLifecycleScan(String volume, String bucket)
+      throws IOException, TimeoutException, InterruptedException {
+    FaultInjectorImpl taskStart = new FaultInjectorImpl();
+    FaultInjectorImpl firstDelete = new FaultInjectorImpl();
+    // The third injector is only read for an injected exception, but the scan expects it to exist
+    installInjectors(taskStart, firstDelete, new FaultInjectorImpl());
+    keyLifecycleService.resume();
+    // The in-flight list is filled at schedule time, so wait for the task to reach the injector
+    taskStart.awaitPaused(10000);
+    deleteLifecyclePolicy(volume, bucket);
+    taskStart.release();
+    firstDelete.release();
+    GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+        WAIT_CHECK_INTERVAL, 10000);
   }
 
   private void createVolumeAndBucket(String volumeName,
@@ -2296,11 +3674,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
   }
 
-  private long getDirCount() throws IOException {
-    final Table<String, OmDirectoryInfo> table = metadataManager.getDirectoryTable();
-    return metadataManager.countRowsInTable(table);
-  }
-
   private long getKeyCount(BucketLayout layout) {
     final Table<String, OmKeyInfo> table = metadataManager.getKeyTable(layout);
     try {
@@ -2333,8 +3706,12 @@ class TestKeyLifecycleService extends OzoneTestBase {
   }
 
   private void updateMultipartUploadCreationTime(String volumeName, String bucketName,
-      String keyName, String uploadId, long newCreationTime) throws IOException {
+      String keyName, String uploadId, long newCreationTime)
+      throws IOException, TimeoutException, InterruptedException {
     String dbKey = metadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadId);
+    // The create is flushed to the DB asynchronously, and that flush would overwrite the new creation
+    // time, leaving the upload looking fresh. Wait for the entry to leave the cache first.
+    awaitMultipartCacheDrained(dbKey);
     OmMultipartKeyInfo existingInfo = metadataManager.getMultipartInfoTable().get(dbKey);
     if (existingInfo == null) {
       fail("Multipart upload not found: " + dbKey);
@@ -2375,5 +3752,205 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
   public static String uniqueObjectName(String prefix) {
     return prefix + OBJECT_COUNTER.getAndIncrement();
+  }
+
+  @Test
+  public void testPartCountIoExceptionSkipsUploadContinuesBucket(@TempDir File tempDir)
+      throws Exception {
+    OzoneConfiguration omConf = new OzoneConfiguration();
+    omConf.set(OZONE_OM_DB_DIRS, tempDir.getAbsolutePath());
+    OMMetadataManager realMetadataManager = new OmMetadataManagerImpl(omConf, null);
+    try {
+      String uploadA = OMMultipartUploadUtils.getMultipartUploadId();
+      String uploadB = OMMultipartUploadUtils.getMultipartUploadId();
+      String uploadC = OMMultipartUploadUtils.getMultipartUploadId();
+
+      addSplitSchemaPart(realMetadataManager, uploadA, 1);
+      addSplitSchemaPart(realMetadataManager, uploadA, 2);
+      addSplitSchemaPart(realMetadataManager, uploadC, 1);
+
+      // Spy only the lightweight parts table and inject an IOException for
+      // uploadB's prefix scan to simulate a corrupt read; uploadA and uploadC
+      // fall through to the real table with real data. doThrow(...).when(...)
+      // is used (not when(...).thenThrow(...)) so the real iterator() is not
+      // invoked during stubbing, which would leak a native RocksDB iterator
+      // and block getStore().close().
+      Table<OmMultipartPartKey, OmMultipartPartInfo> spyPartsTable =
+          Mockito.spy(realMetadataManager.getMultipartPartsTable());
+      Mockito.doThrow(new RocksDatabaseException("simulated corruption"))
+          .when(spyPartsTable).iterator(eq(OmMultipartPartKey.prefix(uploadB)));
+
+      OMMetadataManager mockMM = Mockito.mock(OMMetadataManager.class);
+      when(mockMM.getMultipartPartsTable()).thenReturn(spyPartsTable);
+
+      assertEquals(2, OMMultipartUploadUtils.countParts(mockMM, uploadA));
+      assertEquals(1, OMMultipartUploadUtils.countParts(mockMM, uploadC));
+      assertThrows(IOException.class,
+          () -> OMMultipartUploadUtils.countParts(mockMM, uploadB));
+
+      KeyLifecycleService.PartCountLimitedList list =
+          new KeyLifecycleService.PartCountLimitedList(10);
+      for (String uploadId : Arrays.asList(uploadA, uploadB, uploadC)) {
+        try {
+          int partCount = OMMultipartUploadUtils.countParts(mockMM, uploadId);
+          list.add(new OmMultipartUpload("v", "b", "k", uploadId), partCount);
+        } catch (IOException e) {
+          // per-MPU skip — bucket loop continues
+        }
+      }
+      // A (2 parts) and C (1 part) are added; B is skipped due to IOException
+      assertEquals(2, list.size()); // uploadA and uploadC only
+      assertEquals(3, list.getPartCount()); // 2 (uploadA) + 1 (uploadC)
+    } finally {
+      realMetadataManager.getStore().close();
+    }
+  }
+
+  @Test
+  public void testPartCountLimitedListBoundaryBehavior() {
+    // Zero-parts upload is addable and does not fill the list
+    KeyLifecycleService.PartCountLimitedList list =
+        new KeyLifecycleService.PartCountLimitedList(5);
+    list.add(new OmMultipartUpload("v", "b", "k", "id1"), 0);
+    assertEquals(1, list.size());
+    assertEquals(0, list.getPartCount());
+    assertFalse(list.isFull());
+    assertFalse(list.isEmpty());
+
+    // Exact boundary: partCount == maxPartCount triggers isFull
+    KeyLifecycleService.PartCountLimitedList exactList =
+        new KeyLifecycleService.PartCountLimitedList(5);
+    exactList.add(new OmMultipartUpload("v", "b", "k", "id2"), 5);
+    assertEquals(1, exactList.size());
+    assertEquals(5, exactList.getPartCount());
+    assertTrue(exactList.isFull());
+
+    // Over boundary: cumulative parts exceed max
+    KeyLifecycleService.PartCountLimitedList overList =
+        new KeyLifecycleService.PartCountLimitedList(5);
+    overList.add(new OmMultipartUpload("v", "b", "k", "id3"), 3);
+    assertFalse(overList.isFull());
+    overList.add(new OmMultipartUpload("v", "b", "k", "id4"), 3);
+    assertTrue(overList.isFull());
+    assertEquals(2, overList.size());
+    assertEquals(6, overList.getPartCount());
+
+    // clear() resets all state
+    overList.clear();
+    assertTrue(overList.isEmpty());
+    assertFalse(overList.isFull());
+    assertEquals(0, overList.size());
+    assertEquals(0, overList.getPartCount());
+  }
+
+  /**
+   * Tests when security is enabled.
+   */
+  @Nested
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  class WithAclsEnabled {
+
+    @BeforeAll
+    void setup(@TempDir File testDir) throws Exception {
+      scmBlockTestingClient = new ScmBlockLocationTestingClient(null, null, 0);
+      createConfig(testDir);
+      conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
+      conf.setBoolean(OZONE_ACL_ENABLED, true);
+      conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+      conf.setStrings(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+      createSubject();
+      keyDeletingService.suspend();
+      directoryDeletingService.suspend();
+    }
+
+    @AfterEach
+    void resume() throws Exception {
+      cleanUpService();
+    }
+
+    @AfterAll
+    void cleanup() {
+      if (om != null) {
+        om.stop();
+        om.join();
+      }
+    }
+
+    @Test
+    void testLifecycleDeleteSucceedsWithAclsEnabled()
+        throws IOException, TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(OBJECT_STORE);
+
+      List<OmKeyArgs> keyList = createKeys(volumeName, bucketName, OBJECT_STORE,
+          KEY_COUNT, 1, "key", null);
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(
+          () -> getKeyCount(OBJECT_STORE) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, "key", null, date.toString(), true);
+
+      GenericTestUtils.waitFor(
+          () -> (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(0, getKeyCount(OBJECT_STORE) - initialKeyCount,
+          "Keys should be deleted by lifecycle service but were not — "
+              + "possible UNAUTHORIZED from missing userInfo in DeleteKeys request");
+    }
+
+    @Test
+    void testMoveToTrashWithAclsEnabled()
+        throws IOException, TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, KEY_COUNT, 1, "key", null);
+      assertEquals(KEY_COUNT, keyList.size());
+      final float trashInterval = 0.5f;
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>) () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
+      GenericTestUtils.waitFor(
+          () -> (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
+    }
+  }
+
+  private static void addSplitSchemaPart(OMMetadataManager omMetadataManager,
+      String uploadId, int partNumber) throws IOException {
+    OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(1L, partNumber))
+        .setLength(100)
+        .build();
+    OmKeyLocationInfoGroup locationGroup = new OmKeyLocationInfoGroup(0,
+        Collections.singletonList(locationInfo));
+    String partName = "part-" + partNumber;
+    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setVolumeName("v")
+        .setBucketName("b")
+        .setKeyName("k")
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setDataSize(100L)
+        .setCreationTime(System.currentTimeMillis())
+        .setModificationTime(System.currentTimeMillis())
+        .setObjectID(partNumber)
+        .setUpdateID(partNumber)
+        .addOmKeyLocationInfoGroup(locationGroup)
+        .addMetadata(ETAG, "etag-" + partNumber)
+        .build();
+    OmMultipartPartInfo partInfo = OmMultipartPartInfo.from(partName, partNumber, keyInfo);
+    omMetadataManager.getMultipartPartsTable().put(
+        OmMultipartPartKey.of(uploadId, partNumber), partInfo);
   }
 }

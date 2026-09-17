@@ -18,19 +18,28 @@
 package org.apache.hadoop.ozone.local;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.IDefaultValueProvider;
@@ -45,21 +54,21 @@ import picocli.CommandLine.ParameterException;
 class TestOzoneLocal {
 
   @Test
-  void localCommandMetadataIsPresentAndHidden() {
+  void localCommandMetadataIsPresentAndPublic() {
     Command command = OzoneLocal.class.getAnnotation(Command.class);
 
     assertNotNull(command);
     assertEquals("ozone local", command.name());
-    assertTrue(command.hidden());
+    assertFalse(command.hidden());
   }
 
   @Test
-  void runCommandMetadataIsPresentAndHidden() {
+  void runCommandMetadataIsPresentAndPublic() {
     Command command = OzoneLocal.RunCommand.class.getAnnotation(Command.class);
 
     assertNotNull(command);
     assertEquals("run", command.name());
-    assertTrue(command.hidden());
+    assertFalse(command.hidden());
   }
 
   @Test
@@ -70,7 +79,7 @@ class TestOzoneLocal {
   }
 
   @Test
-  void rootHelpHidesRunCommand() throws Exception {
+  void rootHelpListsRunCommand() throws Exception {
     OzoneLocal local = new OzoneLocal();
     CommandLine commandLine = local.getCmd();
     ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -85,27 +94,143 @@ class TestOzoneLocal {
     String help = out.toString(UTF_8.name());
     assertEquals(0, exitCode);
     assertTrue(help.contains("Usage: ozone local"));
-    assertFalse(help.matches("(?s).*\\R\\s+run\\b.*"), help);
+    assertTrue(help.matches("(?s).*\\R\\s+run\\b.*"), help);
     assertEquals("", err.toString(UTF_8.name()));
   }
 
   @Test
-  void runCommandResolvesConfigurationQuietlyUntilRuntimeStartup()
-      throws Exception {
-    OzoneLocal local = new OzoneLocal();
-    CommandLine commandLine = local.getCmd();
+  void runCommandStartsRuntimeAndPrintsStartupSummary() throws Exception {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
-    ByteArrayOutputStream err = new ByteArrayOutputStream();
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862);
+    TestableRunCommand command = new TestableRunCommand(runtime);
+    CommandLine commandLine = new CommandLine(command);
     commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
         true));
-    commandLine.setErr(new PrintWriter(new OutputStreamWriter(err, UTF_8),
-        true));
 
-    int exitCode = local.execute(new String[] {"run"});
+    int exitCode = commandLine.execute();
 
     assertEquals(0, exitCode);
-    assertEquals("", out.toString(UTF_8.name()));
+    assertTrue(runtime.started);
+    assertTrue(runtime.closed);
+    String text = out.toString(UTF_8.name());
+    assertTrue(text.contains("Local Ozone is running from"), text);
+    assertTrue(text.contains("SCM RPC: localhost:9860"), text);
+    assertTrue(text.contains("OM RPC: localhost:9862"), text);
+    assertFalse(text.contains("Datanodes:"), text);
+    assertTrue(text.contains("Press Ctrl+C to stop."), text);
+  }
+
+  @Test
+  void runCommandClosesRuntimeWhenStartupFails() {
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862);
+    runtime.failStart = true;
+    TestableRunCommand command = new TestableRunCommand(runtime);
+
+    int exitCode = new CommandLine(command).execute();
+
+    assertEquals(1, exitCode);
+    assertTrue(runtime.closed);
+  }
+
+  @Test
+  void runCommandPreservesStartupFailureAsTheCause() throws Exception {
+    ByteArrayOutputStream err = new ByteArrayOutputStream();
+    StubRuntime runtime = new StubRuntime("localhost", 9860, 9862);
+    runtime.failStart = true;
+    TestableRunCommand command = new TestableRunCommand(runtime);
+    CommandLine commandLine = new CommandLine(command);
+    commandLine.setErr(new PrintWriter(new OutputStreamWriter(err, UTF_8), true));
+    commandLine.parseArgs();
+
+    Exception error = assertThrows(Exception.class, command::call);
+
+    assertTrue(error.getCause() instanceof IllegalStateException, error.toString());
+    assertEquals("startup failed", error.getCause().getMessage());
     assertEquals("", err.toString(UTF_8.name()));
+    assertTrue(runtime.closed);
+  }
+
+  /** Preemptive timeout: execute() otherwise blocks in awaitShutdown() until a JVM shutdown hook fires. */
+  @Test
+  void conflictingConfigReachesStderrThroughGenericCli(@TempDir Path dataDir) throws Exception {
+    ByteArrayOutputStream err = new ByteArrayOutputStream();
+    OzoneLocal ozoneLocal = new OzoneLocal();
+    ozoneLocal.getCmd().setErr(new PrintWriter(new OutputStreamWriter(err, UTF_8), true));
+
+    int exitCode = assertTimeoutPreemptively(Duration.ofSeconds(30),
+        () -> ozoneLocal.execute(new String[] {"-D", OZONE_REPLICATION + "=THREE",
+            "run", "--data-dir", dataDir.toString()}));
+
+    assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE, exitCode);
+    String[] lines = err.toString(UTF_8.name()).trim().split("\n");
+    assertEquals(2, lines.length, err.toString(UTF_8.name()));
+    assertTrue(lines[0].contains(OZONE_REPLICATION), lines[0]);
+    assertTrue(lines[0].contains("THREE"), lines[0]);
+    assertTrue(lines[1].contains("--verbose"), lines[1]);
+  }
+
+  @Test
+  void relativeDefaultNamedConfigFileCountsAsUserConfig(@TempDir Path tempDir) throws Exception {
+    Path customConfig = tempDir.resolve("ozone-default.xml").toAbsolutePath();
+    Files.write(customConfig, ("<configuration><property><name>" + OZONE_REPLICATION
+        + "</name><value>THREE</value></property></configuration>").getBytes(UTF_8));
+    Path relativeConfig = Paths.get("").toAbsolutePath().relativize(customConfig);
+    OzoneLocal ozoneLocal = new OzoneLocal();
+
+    ozoneLocal.getCmd().parseArgs("--conf", relativeConfig.toString(), "run");
+
+    OzoneConfiguration seed = ozoneLocal.getOzoneConf();
+    assertEquals("THREE", seed.get(OZONE_REPLICATION));
+    String[] sources = seed.getPropertySources(OZONE_REPLICATION);
+    String source = sources[sources.length - 1];
+    assertEquals(customConfig.normalize().toString(), source);
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+        tempDir.resolve("local-ozone")).build();
+
+    IOException error = assertThrows(IOException.class, () -> {
+      try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, seed)) {
+        cluster.prepareConfiguration();
+      }
+    });
+
+    assertTrue(error.getMessage().contains(source), error.getMessage());
+  }
+
+  @Test
+  void fileUriConfigPathLoadsTheNamedFile(@TempDir Path tempDir) throws Exception {
+    Path customConfig = tempDir.resolve("my-ozone-site.xml").toAbsolutePath();
+    Files.write(customConfig, ("<configuration><property><name>" + OZONE_REPLICATION
+        + "</name><value>THREE</value></property></configuration>").getBytes(UTF_8));
+    OzoneLocal ozoneLocal = new OzoneLocal();
+
+    ozoneLocal.getCmd().parseArgs("--conf", customConfig.toUri().toString(), "run");
+
+    assertEquals("THREE", ozoneLocal.getOzoneConf().get(OZONE_REPLICATION));
+  }
+
+  @Test
+  void emptyConfigPathIsRejectedAtParse() {
+    OzoneLocal ozoneLocal = new OzoneLocal();
+
+    assertThrows(CommandLine.ParameterException.class,
+        () -> ozoneLocal.getCmd().parseArgs("--conf", "", "run"));
+  }
+
+  @Test
+  void startupFailureHintOnlySuggestsMissingDetail() {
+    String noDetail = OzoneLocal.startupFailureHint(false, false);
+    assertTrue(noDetail.contains("--loglevel INFO"), noDetail);
+    assertTrue(noDetail.contains("--verbose"), noDetail);
+
+    String logsEnabled = OzoneLocal.startupFailureHint(true, false);
+    assertFalse(logsEnabled.contains("--loglevel INFO"), logsEnabled);
+    assertTrue(logsEnabled.contains("--verbose"), logsEnabled);
+
+    String verboseEnabled = OzoneLocal.startupFailureHint(false, true);
+    assertTrue(verboseEnabled.contains("--loglevel INFO"), verboseEnabled);
+    assertFalse(verboseEnabled.contains("--verbose"), verboseEnabled);
+
+    assertNull(OzoneLocal.startupFailureHint(true, true));
   }
 
   @Test
@@ -215,7 +340,7 @@ class TestOzoneLocal {
 
   @Test
   void resolveConfigRejectsInvalidFormat() {
-    assertParseError("--format", "sometimes", "--format");
+    assertParseError("--format", "sometimes", "sometimes");
   }
 
   @Test
@@ -235,12 +360,24 @@ class TestOzoneLocal {
 
   @Test
   void resolveConfigRejectsInvalidDuration() {
-    assertParseError("--startup-timeout", "forever", "--startup-timeout");
+    assertParseError("--startup-timeout", "forever", "Invalid duration 'forever'");
   }
 
   @Test
   void resolveConfigRejectsNonPositiveDuration() {
     assertConfigError("--startup-timeout", "0s", "--startup-timeout");
+  }
+
+  /** Without the unit check "120" parsed as 120 milliseconds; the quotes are asserted because "120s" is in the hint. */
+  @Test
+  void resolveConfigRejectsDurationWithoutTimeUnit() {
+    assertParseError("--startup-timeout", "120", "Missing time unit in '120'");
+  }
+
+  @Test
+  void resolveConfigAcceptsHadoopStyleMinutes() {
+    assertEquals(Duration.ofMinutes(2), resolve("--startup-timeout", "2m")
+        .getStartupTimeout());
   }
 
   @Test
@@ -321,6 +458,79 @@ class TestOzoneLocal {
 
     assertEquals("${env:" + environmentVariable + ":-" + fallback + "}",
         defaultValue);
+  }
+
+  private static final class TestableRunCommand extends OzoneLocal.RunCommand {
+
+    private final LocalOzoneRuntime runtime;
+
+    private TestableRunCommand(LocalOzoneRuntime runtime) {
+      this.runtime = runtime;
+    }
+
+    @Override
+    LocalOzoneRuntime createRuntime(LocalOzoneClusterConfig config, OzoneConfiguration seedConfiguration) {
+      return runtime;
+    }
+
+    @Override
+    void awaitShutdown(LocalOzoneRuntime localRuntime) {
+      // Return immediately instead of blocking until JVM shutdown.
+    }
+  }
+
+  private static final class StubRuntime implements LocalOzoneRuntime {
+
+    private final String displayHost;
+    private final int scmPort;
+    private final int omPort;
+    private boolean failStart;
+    private boolean started;
+    private boolean closed;
+
+    private StubRuntime(String displayHost, int scmPort, int omPort) {
+      this.displayHost = displayHost;
+      this.scmPort = scmPort;
+      this.omPort = omPort;
+    }
+
+    @Override
+    public void start() {
+      if (failStart) {
+        throw new IllegalStateException("startup failed");
+      }
+      started = true;
+    }
+
+    @Override
+    public String getDisplayHost() {
+      return displayHost;
+    }
+
+    @Override
+    public int getScmPort() {
+      return scmPort;
+    }
+
+    @Override
+    public int getOmPort() {
+      return omPort;
+    }
+
+    @Override
+    public int getS3gPort() {
+      return 0;
+    }
+
+    @Override
+    public String getS3Endpoint() {
+      return "";
+    }
+
+    @Override
+    public void close() {
+      closed = true;
+    }
   }
 
   private static final class RunCommandFallbackDefaults

@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
@@ -47,8 +49,11 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
@@ -108,11 +113,28 @@ public class S3MultipartRequestTests {
               args.getVolumeName(), args.getBucketName(),
               "owner", BucketLayout.DEFAULT);
         });
+    // MPU request tests default to a pre-finalized layout version, i.e. a
+    // cluster that has not finalized MPU_PARTS_TABLE_SPLIT. Newly initiated
+    // uploads therefore use the legacy (schema 0) inline parts layout. Tests
+    // that need the finalized behaviour (split parts table, schema 1) opt in
+    // by calling finalizeMpuPartsTableSplit().
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
+  }
+
+  /**
+   * Simulate a cluster that has finalized the multipart parts-table split
+   * layout feature, so newly initiated uploads resolve to the split (schema 1)
+   * parts-table layout. This stubs the exact signal the request path checks
+   * ({@code isAllowed(MPU_PARTS_TABLE_SPLIT)}) rather than the metadata layout
+   * version, which the MPU schema gate does not read directly.
+   */
+  protected void finalizeMpuPartsTableSplit() {
+    when(ozoneManager.getVersionManager()
+        .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)).thenReturn(true);
   }
 
   @AfterEach
@@ -300,6 +322,46 @@ public class S3MultipartRequestTests {
 
     return modifiedRequest;
 
+  }
+
+  /**
+   * Initiate an MPU and optionally rewrite the stored multipart metadata to a
+   * specific schema version.
+   *
+   * <p>The schema version rewrite lets tests emulate post-finalization MPU
+   * entries without needing the rest of the upgrade pipeline.</p>
+   */
+  protected String initiateMultipartUploadWithSchemaVersion(
+      String volumeName, String bucketName, String keyName,
+      int schemaVersion) throws Exception {
+    OMRequest initiateMPURequest =
+        doPreExecuteInitiateMPU(volumeName, bucketName, keyName);
+
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
+        getS3InitiateMultipartUploadReq(initiateMPURequest);
+
+    OMClientResponse omClientResponse =
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
+            1L);
+
+    String multipartUploadID = omClientResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    if (schemaVersion != 0) {
+      String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+          bucketName, keyName, multipartUploadID);
+      OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
+          .getMultipartInfoTable().get(multipartKey);
+      assertNotNull(multipartKeyInfo);
+
+      omMetadataManager.getMultipartInfoTable().addCacheEntry(
+          new CacheKey<>(multipartKey),
+          CacheValue.get(2L, multipartKeyInfo.toBuilder()
+              .setSchemaVersion(schemaVersion)
+              .build()));
+    }
+
+    return multipartUploadID;
   }
 
   /**

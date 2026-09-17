@@ -68,6 +68,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -109,6 +110,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -178,6 +180,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, TransactionInfo> transactionInfoTable;
   private Table<String, String> metaTable;
   private Table<String, OmLifecycleConfiguration> lifecycleConfigurationTable;
+  private Table<String, OmLifecycleScanState> lifecycleScanStateTable;
 
   // Tables required for multi-tenancy
   private Table<String, OmDBAccessIdInfo> tenantAccessIdTable;
@@ -187,6 +190,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, SnapshotInfo> snapshotInfoTable;
   private Table<String, String> snapshotRenamedTable;
   private Table<String, CompactionLogEntry> compactionLogTable;
+
+  private Table<String, Long> s3RevokedStsTokenTable;
 
   private OzoneManager ozoneManager;
 
@@ -536,7 +541,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
 
+    // originalAccessKeyId -> revocationTimeMillis
+    // FULL_CACHE keeps revocations in memory as there are not expected to be many
+    s3RevokedStsTokenTable = initializer.get(
+        OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE_DEF, cacheType);
+
     lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF, cacheType);
+    lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF, cacheType);
   }
 
   /**
@@ -987,6 +998,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
     return result;
+  }
+
+  @Override
+  public Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+      getVolumeIterator() {
+    return volumeTable.cacheIterator();
   }
 
   @Override
@@ -1475,7 +1492,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           final String clientIdString
               = dbOpenKeyName.substring(lastPrefix + 1);
 
-          final boolean isHsync = java.util.Optional.of(openKeyInfo)
+          final boolean isHsync = Optional.of(openKeyInfo)
               .map(WithMetadata::getMetadata)
               .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
               .filter(id -> id.equals(clientIdString))
@@ -1500,10 +1517,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .setBucketName(info.getBucketName())
                 .setKeyName(openKeyInfo.getKeyName())
                 .setDataSize(info.getDataSize());
-            java.util.Optional.ofNullable(info.getLatestVersionLocations())
-                .map(OmKeyLocationInfoGroup::getLocationList)
+            Optional.ofNullable(info.getLatestVersionLocations())
+                .map(OmKeyLocationInfoGroup::getLocationLists)
                 .map(Collection::stream)
                 .orElseGet(Stream::empty)
+                .flatMap(List::stream)
                 .map(loc -> loc.getProtobuf(ClientVersion.CURRENT_VERSION))
                 .forEach(keyArgs::addKeyLocations);
 
@@ -1556,8 +1574,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           expiredMPUs.get(mapKey)
               .addMultipartUploads(builder.setName(dbMultipartInfoKey)
                   .build());
-          numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
-          // TODO: Add the expired part handling from the new table when the complete flow is done
+
+          if (omMultipartKeyInfo.getSchemaVersion()
+              == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+            numParts += OMMultipartUploadUtils.countParts(this, expiredMultipartUpload.getUploadId());
+          } else {
+            numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
+          }
         }
 
       }
@@ -1738,8 +1761,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public Table<String, Long> getS3RevokedStsTokenTable() {
+    return s3RevokedStsTokenTable;
+  }
+
+  @Override
   public Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable() {
     return lifecycleConfigurationTable;
+  }
+
+  @Override
+  public Table<String, OmLifecycleScanState> getLifecycleScanStateTable() {
+    return lifecycleScanStateTable;
   }
 
   /**
@@ -1946,7 +1979,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     for (OmKeyInfo info : omKeyInfo.cloneOmKeyInfoList()) {
       for (OmKeyLocationInfoGroup keyLocations :
           info.getKeyLocationVersions()) {
-        List<DeletedBlock> item = keyLocations.getLocationList().stream()
+        List<DeletedBlock> item = keyLocations.getLocationLists().stream()
+            .flatMap(List::stream)
             .map(b -> new DeletedBlock(
                 new BlockID(b.getContainerID(), b.getLocalID()),
                 b.getLength(),

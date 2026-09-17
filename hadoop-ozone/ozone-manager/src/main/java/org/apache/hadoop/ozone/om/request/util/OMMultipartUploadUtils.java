@@ -165,6 +165,16 @@ public final class OMMultipartUploadUtils {
     return parts;
   }
 
+  /**
+   * Count the multipart parts belonging to a given upload in the split
+   * multipartPartsTable, honouring cache tombstones and pending commits. The
+   * count therefore matches the set of parts a subsequent abort/cleanup would
+   * process, which makes it suitable for batch sizing.
+   */
+  public static int countParts(OMMetadataManager omMetadataManager, String uploadId) throws IOException {
+    return scanParts(omMetadataManager, uploadId).size();
+  }
+
   public static List<OmMultipartPartKey> getPartKeys(String uploadId,
       SortedMap<Integer, OmMultipartPartInfo> parts) {
     List<OmMultipartPartKey> partKeys = new ArrayList<>(parts.size());

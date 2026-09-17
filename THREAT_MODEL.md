@@ -26,9 +26,8 @@ and acts as the cluster's **internal Certificate Authority** (root of service
 identity); **Datanodes** store data in containers, replicate via **Ratis
 (Raft)**, and enforce block/container tokens when enabled; the **S3 Gateway**
 exposes an S3-compatible REST API to (potentially internet-facing) clients; **Recon** is a
-read-only management/monitoring service; a **CSI driver** provisions Kubernetes
-volumes. Clients reach it via the S3 API or the `ofs://`/`o3fs://` Hadoop
-filesystem over Hadoop RPC.
+read-only management/monitoring service. Clients reach Ozone via the S3 API or
+the `ofs://`/`o3fs://` Hadoop filesystem over Hadoop RPC.
 
 ## §2 Scope and intended use
 
@@ -56,7 +55,6 @@ library. There is no single "caller"; the roles split:
 | SCM (blocks + internal CA) | Hadoop RPC + cert server | services + admin | **Yes** (CA = root of trust) |
 | Datanode (block store, Ratis) | block protocol + Ratis | token-gated clients where enabled + DN peers | **Yes** |
 | Recon | read-only HTTP/RPC | operators | **Yes** (read path) |
-| CSI driver | gRPC (kubelet) | in-cluster | **No — §3** |
 | `ofs`/`o3fs` client libs | in-process in the caller's app | as the caller | client-side (§10) |
 | test/integration modules | test | n/a | No — §3 |
 
@@ -82,9 +80,6 @@ library. There is no single "caller"; the roles split:
   anonymous access by design, which would be a documented opt-in exception.)*
 - **Compromise of the SCM CA root key.** If the SCM CA private key is stolen, all
   service identity collapses by design; protecting it is operational (§10/§7).
-- **The CSI driver.** Not production-ready; excluded from security inspection.
-  Recon, by contrast, **is** in scope — treat it as part of the production
-  cluster. *(maintainer — jojochuang, 2026-06-25.)*
 - Test/integration modules (`integration-test-*`, `*TestImpl`).
 
 ## §4 Trust boundaries and data flow
@@ -395,9 +390,10 @@ list. *(requested by jojochuang, 2026-06-25.)*
 
 **Wave 3 — scope & coexistence.**
 
-- **Q-csi / Q-recon.** *(Answered — maintainer, jojochuang 2026-06-25: CSI driver
-  is out of scope because it is not production-ready; Recon is in scope as part
-  of the production cluster. Folded into §2/§3.)*
+- **Q-csi / Q-recon.** *(Answered — maintainer, jojochuang 2026-06-25: the CSI
+  driver was out of scope because it was not production-ready and was later
+  removed by [HDDS-15876](https://issues.apache.org/jira/browse/HDDS-15876).
+  Recon remains in scope as part of the production cluster. Folded into §2.)*
 - **Q-doc.** This adds `THREAT_MODEL.md` + `AGENTS.md` alongside your existing
   `SECURITY.md` (preserved, pointer added). Confirm, and whether the model
   should become canonical. (§1/§15.)

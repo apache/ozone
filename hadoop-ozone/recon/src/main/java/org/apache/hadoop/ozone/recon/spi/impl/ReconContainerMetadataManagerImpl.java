@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.KEY_CONTAINER;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY_V2;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -127,9 +126,15 @@ public class ReconContainerMetadataManagerImpl
                                      containerKeyPrefixCounts)
       throws IOException {
     // clear and re-init all container-related tables
-    truncateTable(this.containerKeyTable);
-    truncateTable(this.keyContainerTable);
-    truncateTable(this.containerKeyCountTable);
+    if (containerKeyTable != null) {
+      containerKeyTable.clear();
+    }
+    if (keyContainerTable != null) {
+      keyContainerTable.clear();
+    }
+    if (containerKeyCountTable != null) {
+      containerKeyCountTable.clear();
+    }
     initializeTables();
 
     if (containerKeyPrefixCounts != null) {
@@ -511,7 +516,7 @@ public class ReconContainerMetadataManagerImpl
     if (null != omKeyInfo) {
       omKeyInfo.getKeyLocationVersions().stream().map(
           omKeyLocationInfoGroup ->
-              omKeyLocationInfoGroup.getLocationList()
+              omKeyLocationInfoGroup.createLocationList()
                   .stream().map(omKeyLocationInfo -> pipelines.add(
                       omKeyLocationInfo.getPipeline())));
     }

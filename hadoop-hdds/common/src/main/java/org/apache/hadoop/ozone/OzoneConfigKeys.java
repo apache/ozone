@@ -463,8 +463,12 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 8 * 1024;
 
   public static final String OZONE_CLIENT_READ_TIMEOUT
-          = "ozone.client.read.timeout";
+      = "ozone.client.read.timeout";
   public static final String OZONE_CLIENT_READ_TIMEOUT_DEFAULT = "30s";
+  public static final String OZONE_CLIENT_WRITE_TIMEOUT
+      = "ozone.client.write.timeout";
+  public static final String OZONE_CLIENT_WRITE_TIMEOUT_DEFAULT = "30s";
+
   public static final String OZONE_ACL_AUTHORIZER_CLASS =
       "ozone.acl.authorizer.class";
   public static final String OZONE_ACL_AUTHORIZER_CLASS_DEFAULT =
@@ -723,6 +727,10 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE =
       "ozone.client.elastic.byte.buffer.pool.max.size";
   public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT = "16GB";
+  
+  public static final String OZONE_S3G_STS_HTTP_ENABLED_KEY =
+      "ozone.s3g.sts.http.enabled";
+  public static final boolean OZONE_S3G_STS_HTTP_ENABLED_DEFAULT = false;
 
   /**
    * There is no need to instantiate this class.

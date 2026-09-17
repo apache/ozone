@@ -35,7 +35,9 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -793,6 +795,40 @@ public class ObjectStore {
       String prevSnapshotDiffJob
   ) throws IOException {
     return new SnapshotDiffJobIterator(volumeName, bucketName, jobStatus, listAllStatus, prevSnapshotDiffJob);
+  }
+
+  /**
+   * Process the AssumeRole operation.
+   *
+   * @param roleArn                 The ARN of the role to assume
+   * @param roleSessionName         The session name (should be unique) for this operation
+   * @param durationSeconds         The duration in seconds for the token validity
+   * @param awsIamSessionPolicy     The AWS IAM JSON session policy
+   * @param requestId               The requestId from the STS endpoint
+   * @return AssumeRoleResponseInfo The AssumeRole response information containing temporary credentials
+   * @throws IOException            if an error occurs during the AssumeRole operation
+   */
+  public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy, String requestId) throws IOException {
+    return proxy.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy, requestId);
+  }
+
+  /**
+   * Returns the caller identity for the current S3-authenticated request.
+   * @return CallerIdentityInfo containing account, arn, and userId
+   * @throws IOException if an error occurs during the GetCallerIdentity operation
+   */
+  public CallerIdentityInfo getCallerIdentity() throws IOException {
+    return proxy.getCallerIdentity();
+  }
+
+  /**
+   * Revokes STS tokens for the given original access key ID.
+   * @param originalAccessKeyId     The original long-lived access key ID whose STS tokens to revoke
+   * @throws IOException            if an error occurs while revoking the STS token
+   */
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException  {
+    proxy.revokeSTSToken(originalAccessKeyId);
   }
 
   /**

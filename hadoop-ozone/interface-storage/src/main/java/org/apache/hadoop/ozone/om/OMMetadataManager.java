@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -500,6 +501,13 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable();
 
   /**
+   * Gets the LifecycleScanStateTable.
+   *
+   * @return Table
+   */
+  Table<String, OmLifecycleScanState> getLifecycleScanStateTable();
+
+  /**
    * @return list all LifecycleConfigurations.
    */
   List<OmLifecycleConfiguration> listLifecycleConfigurations() throws OMException;
@@ -519,6 +527,14 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return meta table reference.
    */
   Table<String, String> getMetaTable();
+
+  /**
+   * Gets the S3RevokedStsTokenTable.
+   *
+   * @return Table.
+   */
+  Table<String, Long> getS3RevokedStsTokenTable();
+
 
   /**
    * Returns number of rows in a table.  This should not be used for very
@@ -576,6 +592,9 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return table names in OM DB.
    */
   Set<String> listTableNames();
+
+  Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+      getVolumeIterator();
 
   Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
       getBucketIterator();

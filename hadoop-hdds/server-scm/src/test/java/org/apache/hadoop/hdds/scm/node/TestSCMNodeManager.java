@@ -43,6 +43,7 @@ import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -63,6 +64,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -342,6 +344,81 @@ public class TestSCMNodeManager {
 
     assertEquals(expectedResult, cmd.getError());
     return cmd.getDatanode();
+  }
+
+  private static DatanodeDetails.Builder datanodeWithoutDatastream(UUID uuid) {
+    return DatanodeDetails.newBuilder()
+        .setUuid(uuid)
+        .setHostName("host-" + uuid)
+        .setIpAddress("127.0.0.1")
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.STANDALONE, 9859))
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.RATIS, 9858));
+  }
+
+  private void registerNode(SCMNodeManager nodeManager, DatanodeDetails dn) {
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
+        dn.getID(), dn.getNetworkFullPath(), Long.MAX_VALUE);
+    MetadataStorageReportProto metadataStorageReport =
+        HddsTestUtils.createMetadataStorageReport(
+            dn.getNetworkFullPath(), Long.MAX_VALUE);
+    RegisteredCommand cmd = nodeManager.register(dn,
+        HddsTestUtils.createNodeReport(Arrays.asList(storageReport),
+            Arrays.asList(metadataStorageReport)),
+        getRandomPipelineReports(), UpgradeUtils.defaultLayoutVersionProto());
+    assertEquals(success, cmd.getError());
+  }
+
+  /**
+   * A datanode that re-registers with the same identity but now exposes the
+   * RATIS_DATASTREAM port (e.g. Ratis DataStream was enabled) must have its
+   * stored record refreshed so the new port is visible (HDDS-15799).
+   */
+  @Test
+  public void testRegisterRefreshesPortsOnPortChange()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      final UUID uuid = UUID.randomUUID();
+
+      // First registration: streaming disabled, no RATIS_DATASTREAM port.
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid).build());
+      DatanodeDetails stored = nodeManager.getNode(
+          datanodeWithoutDatastream(uuid).build().getID());
+      assertFalse(stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+
+      // Re-registration (same id/ip/host/version) now exposing the port.
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid)
+          .addPort(DatanodeDetails.newPort(
+              DatanodeDetails.Port.Name.RATIS_DATASTREAM, 9855))
+          .build());
+      stored = nodeManager.getNode(
+          datanodeWithoutDatastream(uuid).build().getID());
+      assertTrue(stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM),
+          "stored node should be refreshed with the RATIS_DATASTREAM port");
+    }
+  }
+
+  /**
+   * Re-registering a datanode with an unchanged port set must not disturb the
+   * stored record (the port-refresh branch is skipped).
+   */
+  @Test
+  public void testRegisterKeepsPortsWhenUnchanged()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      final UUID uuid = UUID.randomUUID();
+
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid).build());
+      // Re-register with the identical port set.
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid).build());
+
+      final DatanodeDetails stored = nodeManager.getNode(
+          datanodeWithoutDatastream(uuid).build().getID());
+      assertTrue(stored.hasPort(DatanodeDetails.Port.Name.STANDALONE));
+      assertTrue(stored.hasPort(DatanodeDetails.Port.Name.RATIS));
+      assertFalse(stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+    }
   }
 
   private void assertPipelineClosedAfterLayoutHeartbeat(

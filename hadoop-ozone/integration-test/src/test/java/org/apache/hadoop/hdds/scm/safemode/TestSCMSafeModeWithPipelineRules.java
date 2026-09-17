@@ -45,9 +45,9 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
@@ -186,11 +186,11 @@ public class TestSCMSafeModeWithPipelineRules {
     waitForRatis3NodePipelines(1);
 
     try (OzoneClient client = cluster.newClient()) {
-      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
-      TestDataUtil.createKey(bucket, "ec-key",
+      OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client);
+      DataTestUtil.createKey(bucket, "ec-key",
           new ECReplicationConfig("rs-3-2-1024k"),
           "ec-data".getBytes(UTF_8));
-      TestDataUtil.createKey(bucket, "ratis3-key",
+      DataTestUtil.createKey(bucket, "ratis3-key",
           RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
           "ratis-data".getBytes(UTF_8));
     }

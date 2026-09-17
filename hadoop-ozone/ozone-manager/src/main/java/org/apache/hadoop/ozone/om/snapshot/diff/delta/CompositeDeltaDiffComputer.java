@@ -86,6 +86,9 @@ public class CompositeDeltaDiffComputer extends FileLinkDeltaFileComputer {
         updateActivity(SnapshotDiffResponse.SubStatus.SST_FILE_DELTA_DAG_WALK);
         deltaFiles = differComputer.computeDeltaFiles(fromSnapshotInfo, toSnapshotInfo, tablesToLookup,
             tablePrefixInfo).orElse(null);
+        if (deltaFiles == null) {
+          LOG.warn("DAG diff returned no result for tables {}, falling back to full diff.", tablesToLookup);
+        }
       }
     } catch (Exception e) {
       LOG.warn("Falling back to full diff.", e);

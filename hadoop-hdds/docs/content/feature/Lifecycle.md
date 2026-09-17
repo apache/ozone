@@ -132,19 +132,22 @@ For FILE_SYSTEM_OPTIMIZED (FSO) buckets, the Prefix must be a normalized and val
 - Cannot start with `/`. FSO bucket prefixes are relative to the bucket root and do not need a leading slash.
 - Cannot contain consecutive slashes `//`.
 - Path components cannot contain `.` (current directory), `..` (parent directory), or `:`.
+- Must end with "/", or "" for root.
 
 The following table shows examples of valid and invalid prefixes:
 
 | Prefix | Valid for FSO Bucket | Reason |
-|--------|----------------------|--------|
+|----|----------------------|--|
 | `logs/` | Valid | Normalized directory prefix |
 | `data/2024/` | Valid | Multi-level directory prefix |
-| `archive` | Valid | Simple prefix without slash |
+| `archive` | Invalid | Without tailing slash |
 | `/logs/` | Invalid | Cannot start with `/`, use `logs/` instead |
 | `data//backup/` | Invalid | Contains consecutive slashes `//`, use `data/backup/` instead |
 | `data/../secret/` | Invalid | Contains `..`, parent directory references are not allowed |
 | `data/./logs/` | Invalid | Contains `.`, current directory references are not allowed |
 | `.Trash/` | Invalid | Cannot point to trash directories |
+| `` | Valid | Point to Bucket's root directory |
+| `/` | Invalid | It doesn't point to Bucket's root directory. Use "" instead |
 
 ## S3 Gateway API
 
@@ -354,9 +357,9 @@ ozone admin om lifecycle resume [-id=<omServiceId>] [-host=<omHost>]
 In an OM HA deployment, the lifecycle service only runs on the leader OM. When a Transfer Leader operation is performed:
 
 1. The lifecycle evaluation tasks running on the old leader will be interrupted.
-2. After the new leader is elected, the lifecycle service restarts from the beginning. Previously evaluated buckets are not skipped, and the task starts over from the first bucket.
+2. After the new leader is elected, the lifecycle service will skip the previously evaluated buckets/bucket contents, starting from the interrupted bucket.
 
-Therefore, in scenarios with frequent leader transfers, it is recommended to monitor the actual execution of the lifecycle service to ensure expired objects are cleaned up in a timely manner.
+In scenarios with frequent leader transfers, it is recommended to monitor the actual execution of the lifecycle service to ensure expired objects are cleaned up in a timely manner.
 
 ### Impact of Mass Key Expiration on Metadata Performance
 

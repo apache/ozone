@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -158,6 +159,11 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       defaultValue = "1")
   private int numOfValidateThreads = 1;
 
+  @Option(names = {"--validation-channel"},
+      description = "grpc or short-circuit.",
+      defaultValue = "grpc")
+  private String validationChannel = "grpc";
+
   @Option(
       names = {"--buffer-size"},
       description = "Specifies the buffer size while writing.",
@@ -210,6 +216,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private AtomicLong bucketCreationTime;
   private AtomicLong keyCreationTime;
   private AtomicLong keyWriteTime;
+  private AtomicLong keyReadTime;
 
   private AtomicLong totalBytesWritten;
 
@@ -318,6 +325,21 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       validateWrites = false;
     }
     validateCounts();
+    OzoneClientConfig clientConfig = ozoneConfiguration.getObject(OzoneClientConfig.class);
+    if (validationChannel.equalsIgnoreCase("grpc")) {
+      clientConfig.setShortCircuit(false);
+      ozoneConfiguration.setFromObject(clientConfig);
+    } else if (validationChannel.equalsIgnoreCase("short-circuit")) {
+      boolean shortCircuit = clientConfig.isShortCircuitEnabled();
+      if (!shortCircuit) {
+        LOG.error("Short-circuit read is not enabled");
+        return null;
+      }
+    } else {
+      LOG.error("'--validate-channel={}' is not supported", validationChannel);
+      return null;
+    }
+
     init(ozoneConfiguration);
 
     replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
@@ -362,6 +384,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       totalWritesValidated = new AtomicLong();
       writeValidationSuccessCount = new AtomicLong();
       writeValidationFailureCount = new AtomicLong();
+      keyReadTime = new AtomicLong();
 
       validationQueue = new LinkedBlockingQueue<>();
       validateExecutor = Executors.newFixedThreadPool(numOfValidateThreads);
@@ -392,11 +415,13 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     } else {
       progressbar.shutdown();
     }
+    LOG.info("Data generation is completed");
 
     if (validateExecutor != null) {
       while (!validationQueue.isEmpty()) {
         Thread.sleep(CHECK_INTERVAL_MILLIS);
       }
+      LOG.info("Data validation is completed");
       validateExecutor.shutdown();
       validateExecutor.awaitTermination(Integer.MAX_VALUE,
           TimeUnit.MILLISECONDS);
@@ -522,6 +547,13 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
           writeValidationSuccessCount);
       out.println("Unsuccessful validation: " +
           writeValidationFailureCount);
+
+      long averageKeyReadTime =
+          TimeUnit.NANOSECONDS.toMillis(keyReadTime.get()) / numOfValidateThreads;
+      String prettyAverageKeyReadTime = DurationFormatUtils
+          .formatDuration(averageKeyReadTime, DURATION_FORMAT);
+      out.println(
+          "Average Time spent in key read and validation: " + prettyAverageKeyReadTime);
     }
     out.println("Total Execution time: " + execTime);
     out.println("***************************************************");
@@ -1242,6 +1274,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
         try {
           KeyValidate kv = validationQueue.poll(5, TimeUnit.SECONDS);
           if (kv != null) {
+            long validationStartTime = System.nanoTime();
             try (OzoneInputStream is = kv.bucket.readKey(kv.keyName)) {
               dig.getMessageDigest().reset();
               byte[] curDigest = dig.digest(is);
@@ -1255,6 +1288,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
                 LOG.warn("Expected checksum: {}, Actual checksum: {}",
                     kv.digest, curDigest);
               }
+              keyReadTime.addAndGet(System.nanoTime() - validationStartTime);
             }
           }
         } catch (IOException ex) {

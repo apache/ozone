@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
@@ -70,6 +69,10 @@ public final class OmMultipartPartInfo {
     if (b.partNumber <= 0) {
       throw new IllegalArgumentException("partNumber is required and > 0");
     }
+    // An ETag is MANDATORY for every multipart part stored in the split parts-table schema,
+    // for ALL clients. The S3 gateway already computes the MD5 ETag, any other client must also supply one.
+    // This mirrors the AWS S3 contract where UploadPart always yields an ETag that CompleteMultipartUpload requires,
+    // and lets the ETag be used for part validation and returned by listParts.
     if (StringUtils.isBlank(b.eTag)) {
       throw new IllegalArgumentException("eTag is required");
     }
@@ -158,8 +161,7 @@ public final class OmMultipartPartInfo {
       return this;
     }
 
-    public Builder setKeyLocationInfos(
-        List<OmKeyLocationInfoGroup> keyLocationInfos) {
+    public Builder setKeyLocationInfos(List<OmKeyLocationInfoGroup> keyLocationInfos) {
       this.keyLocationInfos = new ArrayList<>(keyLocationInfos);
       return this;
     }
@@ -179,38 +181,33 @@ public final class OmMultipartPartInfo {
     }
   }
 
-  public static OmMultipartPartInfo getFromProto(
-      MultipartPartInfo multipartPartInfo) {
+  public static OmMultipartPartInfo getFromProto(MultipartPartInfo multipartPartInfo) {
     validateRequiredProtoFields(multipartPartInfo);
     Builder builder = new Builder()
         .setPartName(multipartPartInfo.getPartName())
         .setPartNumber(multipartPartInfo.getPartNumber())
         .setDataSize(multipartPartInfo.getDataSize())
         .setModificationTime(multipartPartInfo.getModificationTime())
-        .setETag(multipartPartInfo.getETag())
         .setKeyLocationInfos(getKeyLocationInfosFromProto(multipartPartInfo))
+        .setETag(multipartPartInfo.getETag())
         .setEncInfo(null);
 
     if (!multipartPartInfo.hasObjectID()) {
-      LOG.warn("MultipartPartInfo missing objectID for part {}",
-          multipartPartInfo.getPartNumber());
+      LOG.warn("MultipartPartInfo missing objectID for part {}", multipartPartInfo.getPartNumber());
     }
     builder.setObjectID(multipartPartInfo.getObjectID());
 
     if (!multipartPartInfo.hasUpdateID()) {
-      LOG.warn("MultipartPartInfo missing updateID for part {}",
-          multipartPartInfo.getPartNumber());
+      LOG.warn("MultipartPartInfo missing updateID for part {}", multipartPartInfo.getPartNumber());
     }
     builder.setUpdateID(multipartPartInfo.getUpdateID());
 
     if (multipartPartInfo.hasFileEncryptionInfo()) {
-      builder.setEncInfo(
-          OMPBHelper.convert(multipartPartInfo.getFileEncryptionInfo()));
+      builder.setEncInfo(OMPBHelper.convert(multipartPartInfo.getFileEncryptionInfo()));
     }
 
     if (multipartPartInfo.hasFileChecksum()) {
-      builder.setFileChecksum(
-          OMPBHelper.convert(multipartPartInfo.getFileChecksum()));
+      builder.setFileChecksum(OMPBHelper.convert(multipartPartInfo.getFileChecksum()));
     }
 
     return builder.build();
@@ -232,6 +229,10 @@ public final class OmMultipartPartInfo {
     if (keyLocationInfos == null || keyLocationInfos.isEmpty()) {
       throw new IllegalArgumentException("keyLocationList is required");
     }
+    if (StringUtils.isBlank(eTag)) {
+      throw new IllegalArgumentException("eTag is required");
+    }
+
     MultipartPartInfo.Builder builder = MultipartPartInfo.newBuilder()
         .setPartName(partName)
         .setPartNumber(partNumber)
@@ -240,7 +241,7 @@ public final class OmMultipartPartInfo {
         .setModificationTime(modificationTime)
         .setObjectID(objectID)
         .setUpdateID(updateID)
-        .setETag(Objects.requireNonNull(eTag, "eTag is required"));
+        .setETag(eTag);
 
     if (encInfo != null) {
       builder.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
@@ -355,6 +356,7 @@ public final class OmMultipartPartInfo {
     if (!partInfo.hasPartNumber()) {
       throw new IllegalArgumentException("MultipartPartInfo missing partNumber");
     }
+
     if (!partInfo.hasETag() || StringUtils.isBlank(partInfo.getETag())) {
       throw new IllegalArgumentException("MultipartPartInfo missing eTag");
     }

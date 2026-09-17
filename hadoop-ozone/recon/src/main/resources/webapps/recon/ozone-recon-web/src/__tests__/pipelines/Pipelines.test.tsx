@@ -18,7 +18,7 @@
 
 import React from 'react';
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
-import {rest} from 'msw';
+import {http, HttpResponse} from 'msw';
 import {vi} from 'vitest';
 
 import Pipelines from '@/v2/pages/pipelines/pipelines';
@@ -43,7 +43,23 @@ vi.mock('@/v2/components/select/multiSelect.tsx', () => ({
   ),
 }));
 
+vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
+  return {
+    ...actual,
+    useApiData: <T,>(url: string, defaultValue: T, options = {}) =>
+      actual.useApiData(url, defaultValue, {
+        ...options,
+        retryAttempts: 0,
+        retryDelay: 0,
+      }),
+  };
+});
+
 describe('Pipelines Component', () => {
+  beforeEach(() => {
+    vi.mocked(commonUtils.showDataFetchError).mockClear();
+  });
   // Start and stop MSW server before and after all tests
   beforeAll(() => pipelineServer.listen());
   afterEach(async () => pipelineServer.resetHandlers());
@@ -81,8 +97,8 @@ describe('Pipelines Component', () => {
 
   test('Displays no data message if the pipelines API returns an empty array', async () => {
     pipelineServer.use(
-      rest.get('api/v1/pipelines', (req, res, ctx) => {
-        return res(ctx.status(200), ctx.json({ totalCount: 0, pipelines: [] }));
+      http.get('/api/v1/pipelines', () => {
+        return HttpResponse.json({ totalCount: 0, pipelines: [] });
       })
     );
 
@@ -122,8 +138,8 @@ describe('Pipelines Component', () => {
   test('Handles API errors gracefully by showing error message', async () => {
     // Set up MSW to return an error for the datanode API
     pipelineServer.use(
-      rest.get('api/v1/pipelines', (req, res, ctx) => {
-        return res(ctx.status(500), ctx.json({ error: 'Internal Server Error' }));
+      http.get('/api/v1/pipelines', () => {
+        return HttpResponse.json({ error: 'Internal Server Error' }, { status: 500 });
       })
     );
 
@@ -131,7 +147,9 @@ describe('Pipelines Component', () => {
 
     // Wait for the error to be handled
     await waitFor(() =>
-      expect(commonUtils.showDataFetchError).toHaveBeenCalledWith('AxiosError: Request failed with status code 500')
+      expect(commonUtils.showDataFetchError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Request failed with status code 500' })
+      )
     );
   });
 });

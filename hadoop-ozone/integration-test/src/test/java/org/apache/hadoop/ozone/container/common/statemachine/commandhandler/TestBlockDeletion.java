@@ -79,7 +79,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -272,7 +272,7 @@ public class TestBlockDeletion {
         .getDatanodeStateMachine().getContainer().getContainerSet();
     GenericTestUtils.waitFor(() -> {
       return !(omKeyLocationInfoGroupList.stream().anyMatch((group) ->
-        group.getLocationList().stream().anyMatch((info) ->
+        group.createLocationList().stream().anyMatch((info) ->
           containerSet.getContainer(info.getContainerID()).getContainerData()
               .getState() != ContainerProtos.ContainerDataProto.State.CLOSED
         )
@@ -492,11 +492,11 @@ public class TestBlockDeletion {
 
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     // Wait for container to close
-    TestHelper.waitForContainerClose(cluster,
+    OzoneTestHelper.waitForContainerClose(cluster,
         containerIdList.toArray(new Long[0]));
     // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      List<OmKeyLocationInfo> locationInfo = group.createLocationList();
       locationInfo.forEach(
           (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
               .getContainer().getContainerSet()
@@ -622,11 +622,11 @@ public class TestBlockDeletion {
 
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     // Wait for container to close
-    TestHelper.waitForContainerClose(cluster,
+    OzoneTestHelper.waitForContainerClose(cluster,
         containerIdList.toArray(new Long[0]));
     // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      List<OmKeyLocationInfo> locationInfo = group.createLocationList();
       locationInfo.forEach(
           (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
               .getContainer().getContainerSet()

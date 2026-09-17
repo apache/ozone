@@ -24,18 +24,27 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATAS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
@@ -52,6 +61,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -81,12 +91,14 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientUtils;
@@ -104,12 +116,16 @@ import org.apache.hadoop.ozone.s3.commontypes.RequestParameters;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
+import org.apache.hadoop.ozone.s3.util.S3GActionIamMapper;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.ratis.util.function.CheckedRunnable;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,17 +134,35 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class EndpointBase {
 
-  protected static final String ETAG_CUSTOM = "etag-custom";
-  protected static final String CONTENT_TYPE_CUSTOM = "content-type-custom";
+  protected static final String ETAG_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "etag";
+  protected static final String CONTENT_TYPE_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-type";
+  protected static final String CACHE_CONTROL_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "cache-control";
+  protected static final String EXPIRES_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "expires";
+  protected static final String CONTENT_ENCODING_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-encoding";
+  protected static final String CONTENT_LANGUAGE_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-language";
+  protected static final String CONTENT_DISPOSITION_CUSTOM =
+      RESERVED_USER_METADATA_KEY_PREFIX + "content-disposition";
 
   // System metadata key -> custom key. A user x-amz-meta-{etag,content-type}
   // collides with the system ETag / Content-Type stored under the same key, so
   // it is remapped on write and rebuilt on read; the system value is returned
   // via its own ETag / Content-Type response header.
   private static final Map<String, String> RESERVED_METADATA_KEYS =
-      ImmutableMap.of(
-          ETAG, ETAG_CUSTOM,
-          HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM);
+      ImmutableMap.<String, String>builder()
+          .put(ETAG, ETAG_CUSTOM)
+          .put(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM)
+          .put(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_CUSTOM)
+          .put(HttpHeaders.EXPIRES, EXPIRES_CUSTOM)
+          .put(HttpHeaders.CONTENT_ENCODING, CONTENT_ENCODING_CUSTOM)
+          .put(HttpHeaders.CONTENT_LANGUAGE, CONTENT_LANGUAGE_CUSTOM)
+          .put(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION_CUSTOM)
+          .build();
 
   // Custom key -> lower-cased header, to rebuild remapped user metadata on read.
   private static final Map<String, String> REBUILT_RESERVED_KEYS =
@@ -173,6 +207,7 @@ public abstract class EndpointBase {
   private int chunkSize;
   private boolean datastreamEnabled;
   private long datastreamMinLength;
+  private boolean s3StsEnabled;
 
   @Context
   private ContainerRequestContext context;
@@ -213,6 +248,10 @@ public abstract class EndpointBase {
     s3Auth = new S3Auth(signatureInfo.getStringToSign(),
         signatureInfo.getSignature(),
         signatureInfo.getAwsAccessId(), signatureInfo.getAwsAccessId());
+    if (signatureInfo.getSessionToken() != null &&
+        !signatureInfo.getSessionToken().isEmpty()) {
+      s3Auth.setSessionToken(signatureInfo.getSessionToken());
+    }
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
     ClientProtocol clientProtocol =
         getClient().getObjectStore().getClientProxy();
@@ -232,6 +271,10 @@ public abstract class EndpointBase {
         OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
         OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT, StorageUnit.BYTES);
 
+    s3StsEnabled = getOzoneConfiguration().getBoolean(
+        OZONE_S3G_STS_HTTP_ENABLED_KEY,
+        OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
+
     init();
   }
 
@@ -239,8 +282,70 @@ public abstract class EndpointBase {
     // hook method
   }
 
+  /**
+   * Sets the IAM S3 action on thread-local {@link S3Auth} for fine-grained STS authorization.
+   * Called when the handler resolves the {@link S3GAction}.
+   */
+  protected void applyS3Action(S3GAction action) {
+    if (s3Auth != null && s3StsEnabled) {
+      s3Auth.setS3Action(S3GActionIamMapper.toS3ActionString(action));
+    }
+  }
+
+  /**
+   * Temporarily override the S3 action string set on {@link S3Auth} for authorization.
+   * <p>
+   * This does not change S3G auditing (which is based on {@link S3GAction}).
+   * The action string is the IAM-style S3 action name without the {@code s3:} prefix (for example
+   * {@code GetObject}, {@code PutObject}, {@code GetObjectTagging}).
+   * This is used for special case APIs like CopyObject that don't have a 1-1 s3 action mapping, but
+   * requires GetObject on the source file and PutObject on the destination file.
+   */
+  protected <T, E extends Exception> T runWithS3ActionString(String s3Action, CheckedSupplier<T, E> checkedSupplier)
+      throws E {
+    if (s3Auth == null || !s3StsEnabled) {
+      return checkedSupplier.get();
+    }
+    final String originalS3Action = s3Auth.getS3Action();
+    s3Auth.setS3Action(s3Action);
+    try {
+      return checkedSupplier.get();
+    } finally {
+      s3Auth.setS3Action(originalS3Action);
+    }
+  }
+
   protected OzoneVolume getVolume() throws IOException {
     return client.getObjectStore().getS3Volume();
+  }
+
+  /**
+   * Maps a duplicate bucket create to the S3 error expected by AWS when the
+   * requester already owns the bucket name.
+   */
+  protected OS3Exception newDuplicateBucketError(String bucketName, OMException cause) {
+    try {
+      OzoneBucket existingBucket = getVolume().getBucket(bucketName);
+      if (isSameBucketOwner(existingBucket.getOwner())) {
+        return newError(BUCKET_ALREADY_OWNED_BY_YOU, bucketName, cause);
+      }
+    } catch (IOException ex) {
+      LOG.debug("Could not resolve duplicate bucket owner for {}", bucketName, ex);
+    }
+    return newError(BUCKET_ALREADY_EXISTS, bucketName, cause);
+  }
+
+  private boolean isSameBucketOwner(String bucketOwner) {
+    String requestOwner = getRequestOwner();
+    return requestOwner != null && requestOwner.equals(bucketOwner);
+  }
+
+  private String getRequestOwner() {
+    if (s3Auth == null || s3Auth.getUserPrincipal() == null) {
+      return null;
+    }
+    return UserGroupInformation.createRemoteUser(s3Auth.getUserPrincipal())
+        .getShortUserName();
   }
 
   /**
@@ -280,22 +385,33 @@ public abstract class EndpointBase {
       OzoneVolume volume = getVolume();
       ownerSetter.accept(volume);
       return query.apply(volume);
-    } catch (OMException e) {
-      if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-        return Collections.emptyIterator();
-      } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            "listBuckets", e);
-      } else if (e.getResult() == ResultCodes.INVALID_TOKEN) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            s3Auth.getAccessID(), e);
-      } else if (e.getResult() == ResultCodes.TIMEOUT ||
-          e.getResult() == ResultCodes.INTERNAL_ERROR) {
-        throw newError(S3ErrorTable.INTERNAL_ERROR,
-            "listBuckets", e);
-      } else {
-        throw e;
+    } catch (RuntimeException e) {
+      if (e.getCause() instanceof OMException) {
+        return handleOMException((OMException) e.getCause());
       }
+      throw e;
+    } catch (OMException e) {
+      return handleOMException(e);
+    }
+  }
+
+  private Iterator<OzoneBucket> handleOMException(OMException e) throws OMException {
+    if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+      return Collections.emptyIterator();
+    } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
+      throw newError(S3ErrorTable.ACCESS_DENIED,
+          "listBuckets", e);
+    } else if (isExpiredToken(e)) {
+      throw newError(S3ErrorTable.EXPIRED_TOKEN, s3Auth.getAccessID(), e);
+    } else if (e.getResult() == ResultCodes.INVALID_TOKEN) {
+      throw newError(S3ErrorTable.ACCESS_DENIED,
+          s3Auth.getAccessID(), e);
+    } else if (e.getResult() == ResultCodes.TIMEOUT ||
+        e.getResult() == ResultCodes.INTERNAL_ERROR) {
+      throw newError(S3ErrorTable.INTERNAL_ERROR,
+          "listBuckets", e);
+    } else {
+      throw e;
     }
   }
 
@@ -323,6 +439,13 @@ public abstract class EndpointBase {
       for (String key : customMetadataKeys) {
         String mapKey =
             key.substring(CUSTOM_METADATA_HEADER_PREFIX.length());
+        if (mapKey.regionMatches(true, 0, RESERVED_USER_METADATA_KEY_PREFIX, 0,
+            RESERVED_USER_METADATA_KEY_PREFIX.length())) {
+          OS3Exception ex = newError(INVALID_ARGUMENT, key);
+          ex.setErrorMessage("User metadata keys must not start with the reserved prefix "
+              + RESERVED_USER_METADATA_KEY_PREFIX);
+          throw ex;
+        }
         List<String> values = requestHeaders.get(key);
         String value = StringUtils.join(values, ",");
         sizeInBytes += mapKey.getBytes(UTF_8).length;
@@ -369,7 +492,7 @@ public abstract class EndpointBase {
       if (RESERVED_METADATA_KEYS.containsKey(metadataKey)) {
         continue;
       }
-      // Rebuild a remapped user value (e.g. content-type-custom -> content-type).
+      // Rebuild a remapped user value (e.g. ozone-s3-internal-content-type -> content-type).
       metadataKey = REBUILT_RESERVED_KEYS.getOrDefault(metadataKey, metadataKey);
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
@@ -614,7 +737,28 @@ public abstract class EndpointBase {
   protected static boolean isAccessDenied(OMException ex) {
     ResultCodes result = ex.getResult();
     return result == ResultCodes.PERMISSION_DENIED
-        || result == ResultCodes.INVALID_TOKEN;
+        || result == ResultCodes.INVALID_TOKEN
+        || result == ResultCodes.REVOKED_TOKEN;
+  }
+
+  protected boolean isExpiredToken(OMException ex) {
+    return ex.getResult() == ResultCodes.TOKEN_EXPIRED;
+  }
+
+  /**
+   * Reject object keys that cannot be represented in a valid URI. AWS S3 returns
+   * InvalidURI for keys containing malformed UTF-8 or ISO control characters.
+   */
+  protected void validateObjectKeyUri(String keyPath) throws OS3Exception {
+    if (keyPath == null || keyPath.indexOf('\uFFFD') >= 0) {
+      throw newError(INVALID_URI, keyPath);
+    }
+
+    for (int i = 0; i < keyPath.length(); i++) {
+      if (Character.isISOControl(keyPath.charAt(i))) {
+        throw newError(INVALID_URI, keyPath);
+      }
+    }
   }
 
   protected ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket) throws OS3Exception {
@@ -678,7 +822,7 @@ public abstract class EndpointBase {
       if (hasUnsignedPayload(amzContentSha256Header)) {
         chunkInputStream = new UnsignedChunksInputStream(body);
       } else {
-        chunkInputStream = new SignedChunksInputStream(body);
+        chunkInputStream = new SignedChunksInputStream(body, keyPath);
       }
       effectiveLength = Long.parseLong(amzDecodedLength);
     } else {
@@ -699,7 +843,57 @@ public abstract class EndpointBase {
     }
     MultiDigestInputStream multiDigestInputStream =
         new MultiDigestInputStream(chunkInputStream, digests);
-    return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength);
+    // Header auth only: for a presigned (query) request the payload hash is not part of the signed
+    // canonical request, so its seed signature cannot start the chunk signature chain.
+    boolean verifyChunkSignature = signatureInfo.isSignPayload()
+        && STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header);
+    return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength, verifyChunkSignature);
+  }
+
+  /**
+   * Enable chunk-signature verification on a signed multi-chunk payload, using
+   * the signing key OM derived (HDDS-15140). Called after the key is opened
+   * (when the derived key is available) and before the payload is read.
+   *
+   * <p>In secure mode OM always returns the derived key for a signed upload, so
+   * a missing key is treated as a server-side anomaly and the request is
+   * rejected rather than stored unverified. In non-secure mode there is no
+   * secret to verify against, so verification is skipped.
+   */
+  protected void attachChunkValidator(S3ChunkInputStreamInfo info, String keyPath, ByteBuffer derivedKey)
+      throws OS3Exception {
+    if (!info.isChunkSignatureVerificationRequired()) {
+      return;
+    }
+    SignedChunksInputStream signed = SignedChunksInputStream.unwrap(info.getMultiDigestInputStream());
+    if (signed == null) {
+      // Unreachable today: verification is only required for a payload that getS3ChunkInputStreamInfo
+      // wrapped in a SignedChunksInputStream. Fail rather than store the payload unverified.
+      throw internalError(keyPath,
+          "chunk-signature verification requested but the body is not a signed chunked stream");
+    }
+    if (derivedKey == null) {
+      if (OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())) {
+        throw internalError(keyPath,
+            "chunk-signature verification requested but no derived key was returned");
+      }
+      return;
+    }
+    ByteBuffer key = derivedKey.duplicate();
+    byte[] signingKey = new byte[key.remaining()];
+    key.get(signingKey);
+    signed.attachValidator(new ChunksValidator(signingKey,
+        signatureInfo.getDateTime(), signatureInfo.getCredentialScope(),
+        signatureInfo.getSignature(), keyPath));
+  }
+
+  private static OS3Exception internalError(String keyPath, String message) {
+    // OS3Exception logs itself from its constructor, before setErrorMessage can replace the generic
+    // enum text, so the specific reason has to be logged here to reach the operator.
+    LOG.error("Internal Error for {}: {}", keyPath, message);
+    OS3Exception ex = newError(S3ErrorTable.INTERNAL_ERROR, keyPath);
+    ex.setErrorMessage(message);
+    return ex;
   }
 
   public boolean isDatastreamEnabled() {
@@ -735,6 +929,23 @@ public abstract class EndpointBase {
     };
   }
 
+  /**
+   * Rejects FSO directory keys when the request path omits the trailing slash.
+   *
+   * <p>Necessary for directories in buckets with FSO layout. Intended for apps which use Hadoop S3A
+   * (e.g. Trino through the Hive connector).
+   */
+  protected void validateFileKey(String keyPath, OzoneKey key) throws OMException {
+    boolean isFsoDirCreationEnabled = getOzoneConfiguration()
+        .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
+            OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT);
+    if (isFsoDirCreationEnabled &&
+        !key.isFile() &&
+        !keyPath.endsWith("/")) {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
   protected static String extractPartsCount(String eTag) {
     if (eTag.contains("-")) {
       String[] parts = eTag.replace("\"", "").split("-");
@@ -762,10 +973,13 @@ public abstract class EndpointBase {
   protected static final class S3ChunkInputStreamInfo {
     private final MultiDigestInputStream multiDigestInputStream;
     private final long effectiveLength;
+    private final boolean chunkSignatureVerificationRequired;
 
-    S3ChunkInputStreamInfo(MultiDigestInputStream multiDigestInputStream, long effectiveLength) {
+    S3ChunkInputStreamInfo(MultiDigestInputStream multiDigestInputStream, long effectiveLength,
+        boolean chunkSignatureVerificationRequired) {
       this.multiDigestInputStream = multiDigestInputStream;
       this.effectiveLength = effectiveLength;
+      this.chunkSignatureVerificationRequired = chunkSignatureVerificationRequired;
     }
 
     public MultiDigestInputStream getMultiDigestInputStream() {
@@ -774,6 +988,10 @@ public abstract class EndpointBase {
 
     public long getEffectiveLength() {
       return effectiveLength;
+    }
+
+    public boolean isChunkSignatureVerificationRequired() {
+      return chunkSignatureVerificationRequired;
     }
   }
 }

@@ -145,7 +145,7 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     OmKeyInfo key = codec.fromPersistedFormat(rawData);
     System.out.println("Chunk number = " + chunkNum +
         ", Serialized key size without pipeline = " + rawData.length);
-    assertNull(key.getLatestVersionLocations().getLocationList().get(0)
+    assertNull(key.getLatestVersionLocations().createLocationList().get(0)
         .getPipeline());
     assertNotNull(key.getFileChecksum());
     assertEquals(key.getFileChecksum(), checksum);

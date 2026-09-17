@@ -21,6 +21,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
@@ -124,6 +125,24 @@ public class TestS3LifecycleConfigurationGet {
         .getDaysAfterInitiation().intValue());
   }
 
+  @Test
+  public void testGetLifecycleWithDateBasedExpiration() throws Exception {
+    String bucketName = "bucket1";
+    bucketEndpoint.put(bucketName, getBodyWithDateExpiration());
+    Response r = bucketEndpoint.get(bucketName);
+
+    assertEquals(HTTP_OK, r.getStatus());
+    S3LifecycleConfiguration lcc = (S3LifecycleConfiguration) r.getEntity();
+    assertEquals(1, lcc.getRules().size());
+    S3LifecycleConfiguration.Rule rule = lcc.getRules().get(0);
+
+    assertEquals("expire-on-date", rule.getId());
+    assertEquals("prefix/", rule.getPrefix());
+    assertEquals("Enabled", rule.getStatus());
+    assertEquals("2044-01-19T00:00:00+00:00", rule.getExpiration().getDate());
+    assertNull(rule.getExpiration().getDays());
+  }
+
   private static InputStream getBody() {
     String xml = ("<LifecycleConfiguration xmlns=\"http://s3.amazonaws" +
         ".com/doc/2006-03-01/\">" +
@@ -147,6 +166,19 @@ public class TestS3LifecycleConfigurationGet {
         "<AbortIncompleteMultipartUpload>" +
         "<DaysAfterInitiation>7</DaysAfterInitiation>" +
         "</AbortIncompleteMultipartUpload>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream getBodyWithDateExpiration() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>expire-on-date</ID>" +
+        "<Prefix>prefix/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration><Date>2044-01-19T00:00:00+00:00</Date></Expiration>" +
         "</Rule>" +
         "</LifecycleConfiguration>";
 

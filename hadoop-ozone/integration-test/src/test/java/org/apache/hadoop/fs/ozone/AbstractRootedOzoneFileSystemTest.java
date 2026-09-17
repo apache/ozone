@@ -97,12 +97,12 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -196,7 +196,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   void createVolumeAndBucket() throws IOException {
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        DataTestUtil.createVolumeAndBucket(client, bucketLayout);
     volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
     bucketName = bucket.getName();
@@ -304,7 +304,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     String key = "object-dir/object-name1";
 
     // write some test data into bucket
-    TestDataUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
+    DataTestUtil.createKey(objectStore.getVolume(volumeName).getBucket(bucketName),
         key, new ECReplicationConfig("RS-3-2-1024k"),
         RandomUtils.secure().randomBytes(1));
 
@@ -1251,7 +1251,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
 
       // add key in source bucket
       final String key = "object-dir/object-name1";
-      TestDataUtil.createKey(objectStore.getVolume(srcVolume).getBucket(srcBucket),
+      DataTestUtil.createKey(objectStore.getVolume(srcVolume).getBucket(srcBucket),
           key, RandomUtils.secure().randomBytes(1));
       assertEquals(key, objectStore.getVolume(srcVolume)
           .getBucket(srcBucket).getKey(key).getName());
@@ -1299,7 +1299,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
 
       // add key to srcBucket
       final String key = "object-dir/object-name1";
-      TestDataUtil.createKey(objectStore.getVolume(srcVolume).getBucket(srcBucket),
+      DataTestUtil.createKey(objectStore.getVolume(srcVolume).getBucket(srcBucket),
           key, RandomUtils.secure().randomBytes(1));
       assertEquals(key, objectStore.getVolume(srcVolume).
           getBucket(srcBucket).getKey(key).getName());
@@ -1535,7 +1535,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
 
     // Create a new volume and a new bucket
     OzoneBucket bucket3 =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        DataTestUtil.createVolumeAndBucket(client, bucketLayout);
     OzoneVolume volume3 = objectStore.getVolume(bucket3.getVolumeName());
     // Need to setOwner to current test user so it has permission to list vols
     volume3.setOwner(username);
@@ -1596,7 +1596,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     }
     // create second bucket and write a key in it.
     OzoneBucket bucket2 =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        DataTestUtil.createVolumeAndBucket(client, bucketLayout);
     String volumeName2 = bucket2.getVolumeName();
     Path volumePath2 = new Path(OZONE_URI_DELIMITER, volumeName2);
     String bucketName2 = bucket2.getName();
@@ -1790,7 +1790,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     BucketArgs omBucketArgs = builder.build();
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
-    final OzoneBucket bucket100 = TestDataUtil
+    final OzoneBucket bucket100 = DataTestUtil
         .createVolumeAndBucket(client, vol, buck,
             omBucketArgs);
     assertEquals(ReplicationType.STAND_ALONE.name(), bucket100.getReplicationConfig().getReplicationType().name());
@@ -1819,7 +1819,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     BucketArgs omBucketArgs = builder.build();
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
-    final OzoneBucket bucket101 = TestDataUtil
+    final OzoneBucket bucket101 = DataTestUtil
         .createVolumeAndBucket(client, vol, buck,
             omBucketArgs);
     assertEquals(ReplicationType.EC.name(), bucket101.getReplicationConfig().getReplicationType().name());
@@ -1869,7 +1869,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     Path bucketPathTest = new Path(volPathTest, bucketName);
 
     // write some test data into bucket
-    TestDataUtil.createKey(objectStore.getVolume(volumeName).
+    DataTestUtil.createKey(objectStore.getVolume(volumeName).
             getBucket(bucketName), key, new ECReplicationConfig("RS-3-2-1024k"),
         RandomUtils.secure().randomBytes(1));
     // make sure the disk usage matches the expected value
@@ -1897,10 +1897,10 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     OzoneBucket bucket = objectStore.getVolume(volumeName).getBucket(bucketName);
     String ratisRelKey = "ec-policy-mixed/" + ratisKey;
     String ecRelKey = "ec-policy-mixed/" + ecKey;
-    TestDataUtil.createKey(bucket, ratisRelKey,
+    DataTestUtil.createKey(bucket, ratisRelKey,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
         new byte[]{0});
-    TestDataUtil.createKey(bucket, ecRelKey, ecConfig,
+    DataTestUtil.createKey(bucket, ecRelKey, ecConfig,
         new byte[]{0});
 
     try {
@@ -1942,7 +1942,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     Path filePathTest = new Path(bucketPathTest, key);
 
     // write some test data into bucket
-    TestDataUtil.createKey(objectStore.
+    DataTestUtil.createKey(objectStore.
         getVolume(volumeName).getBucket(bucketName), key,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
         RandomUtils.secure().randomBytes(1));
@@ -2019,7 +2019,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
     final OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(client, vol, buck, omBucketArgs);
+        DataTestUtil.createVolumeAndBucket(client, vol, buck, omBucketArgs);
     Path volume = new Path(OZONE_URI_DELIMITER, bucket.getVolumeName());
     return new Path(volume, bucket.getName());
   }
@@ -2028,7 +2028,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   void testSnapshotRead() throws Exception {
     // Init data
     OzoneBucket bucket1 =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        DataTestUtil.createVolumeAndBucket(client, bucketLayout);
     Path volume1Path = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
     Path bucket1Path = new Path(volume1Path, bucket1.getName());
     Path file1 = new Path(bucket1Path, "key1");
@@ -2038,7 +2038,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     ContractTestUtils.touch(fs, file2);
 
     OzoneBucket bucket2 =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        DataTestUtil.createVolumeAndBucket(client, bucketLayout);
     Path volume2Path = new Path(OZONE_URI_DELIMITER, bucket2.getVolumeName());
     Path bucket2Path = new Path(volume2Path, bucket2.getName());
 
@@ -2071,7 +2071,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testSnapshotDiff() throws Exception {
     OzoneBucket bucket1 =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        DataTestUtil.createVolumeAndBucket(client, bucketLayout);
     Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
     Path bucketPath1 = new Path(volumePath1, bucket1.getName());
     Path snap1 = fs.createSnapshot(bucketPath1);
@@ -2133,7 +2133,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testSetTimes() throws Exception {
     OzoneBucket bucket1 =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        DataTestUtil.createVolumeAndBucket(client, bucketLayout);
     Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
     Path bucketPath1 = new Path(volumePath1, bucket1.getName());
     setTimes(bucketPath1);
@@ -2143,7 +2143,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   public void testSetTimesForLinkedBucketPath() throws Exception {
     // Create a file
     OzoneBucket sourceBucket =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        DataTestUtil.createVolumeAndBucket(client, bucketLayout);
     Path volumePath1 =
         new Path(OZONE_URI_DELIMITER, sourceBucket.getVolumeName());
     Path sourceBucketPath = new Path(volumePath1, sourceBucket.getName());
