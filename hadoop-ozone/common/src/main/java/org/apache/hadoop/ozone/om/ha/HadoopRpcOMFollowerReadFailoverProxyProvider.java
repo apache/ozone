@@ -267,11 +267,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
       OMRequest omRequest = parseOMRequest(args);
 
       // Apply default consistency hint once, before any routing decision.
-      // Requests with explicit hints (for example S3 read consistency headers)
-      // can narrow routing below, such as forcing leader-only reads.
       boolean isReadRequest = OmUtils.shouldSendToFollower(omRequest);
-      boolean isExplicitFollowerRead = omRequest.hasReadConsistencyHint()
-          && allowFollowerRead(omRequest);
       if (!omRequest.hasReadConsistencyHint()) {
         final ReadConsistencyHint defaultReadConsistency = useFollowerRead
             && followerReadEnabled && isReadRequest
@@ -283,6 +279,10 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
           args[1] = omRequest;
         }
       }
+      // Requests with explicit hints (for example S3 read consistency headers)
+      // can narrow routing below, such as forcing leader-only reads.
+      boolean isExplicitFollowerRead = omRequest.hasReadConsistencyHint()
+          && allowFollowerRead(omRequest);
       boolean isFollowerReadEligible = useFollowerRead && isReadRequest
           && (followerReadEnabled || isExplicitFollowerRead);
       ReadConsistency readConsistency = getReadConsistency(omRequest);
