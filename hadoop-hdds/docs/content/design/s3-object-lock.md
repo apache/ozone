@@ -160,7 +160,6 @@ Two new fields: retentionDate & legalHold.
 ```protobuf
   message KeyInfo {
   // ... existing fields
-  optional string retentionDate = 23;
   optional RetentionConfig retentionConfig = 24;
   optional bool legalHold = 25 [default = false];
   }
