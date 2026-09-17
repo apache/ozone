@@ -97,7 +97,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     doWrite();
 
     assertHandledBy(2);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
     // Although the write request is forwarded to the leader,
     // the follower read proxy provider should still point to first OM follower
     assertEquals(proxyProvider.getCurrentProxy().getNodeId(), omNodeIds[0]);
@@ -125,7 +125,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         "Write operation finished earlier than expected");
 
     assertHandledBy(0);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
   }
 
   @Test
@@ -162,7 +162,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     doRead();
 
     assertHandledBy(0);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
   }
 
   @Test
@@ -216,7 +216,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     doRead(ReadConsistency.LINEARIZABLE_LEADER_ONLY);
 
     assertHandledBy(0);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
     assertEquals(proxyProvider.getCurrentProxy().getNodeId(), omNodeIds[0]);
   }
 
@@ -229,7 +229,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
 
     // Follower read can still read from OM leader
     assertHandledBy(0);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
   }
 
   @Test
@@ -254,7 +254,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         "Read operation finished earlier than expected");
 
     assertHandledBy(0);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
   }
 
   @Test
@@ -271,7 +271,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     assertHandledBy(1);
     // Since OMNotLeaderException is thrown during follower read, the
     // proxy will keep sending reads from the leader from now on
-    assertFalse(proxyProvider.isUseFollowerRead());
+    assertFalse(proxyProvider.isOmServiceSupportsFollowerRead());
 
     // Try to simulate leader change
     omNodeAnswers[1].isLeader = false;
@@ -280,7 +280,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     doRead();
     assertHandledBy(2);
 
-    assertFalse(proxyProvider.isUseFollowerRead());
+    assertFalse(proxyProvider.isOmServiceSupportsFollowerRead());
   }
 
   @Test
@@ -494,12 +494,12 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         };
 
     // Wrap the leader-based failover proxy provider with follower read proxy provider
-    boolean followerReadEnabled = config.getBoolean(
+    boolean defaultFollowerReadEnabled = config.getBoolean(
         OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
     proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(
         underlyingProxyProvider, ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER,
-        ReadConsistency.DEFAULT, followerReadEnabled);
-    assertTrue(proxyProvider.isUseFollowerRead());
+        ReadConsistency.DEFAULT, defaultFollowerReadEnabled);
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
     // Wrap the follower read proxy provider in retry proxy to allow automatic failover
     retryProxy = (OzoneManagerProtocolPB) RetryProxy.create(
         OzoneManagerProtocolPB.class, proxyProvider,

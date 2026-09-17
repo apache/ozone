@@ -99,8 +99,8 @@ public class GrpcOmTransport implements OmTransport {
   private RetryPolicy retryPolicy;
   private final GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
       omFailoverProxyProvider;
-  private final boolean followerReadEnabled;
-  private volatile boolean useFollowerRead;
+  private final boolean defaultFollowerReadEnabled;
+  private volatile boolean omServiceSupportsFollowerRead;
   private final ReadConsistencyHint followerReadConsistency;
   private final ReadConsistencyHint leaderReadConsistency;
   private int currentFollowerReadIndex = -1;
@@ -129,10 +129,10 @@ public class GrpcOmTransport implements OmTransport {
         omServiceId,
         OzoneManagerProtocolPB.class);
 
-    this.followerReadEnabled = conf.getBoolean(
+    this.defaultFollowerReadEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT);
-    this.useFollowerRead = true;
+    this.omServiceSupportsFollowerRead = true;
     String defaultFollowerReadConsistencyStr = conf.get(
         OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_DEFAULT
@@ -216,10 +216,10 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   private boolean shouldUseFollowerRead(OMRequest payload) {
-    if (!useFollowerRead || !OmUtils.shouldSendToFollower(payload)) {
+    if (!omServiceSupportsFollowerRead || !OmUtils.shouldSendToFollower(payload)) {
       return false;
     }
-    return followerReadEnabled || payload.hasReadConsistencyHint()
+    return defaultFollowerReadEnabled || payload.hasReadConsistencyHint()
         && ReadConsistency.fromProto(payload.getReadConsistencyHint()
             .getReadConsistency()).allowFollowerRead();
   }
@@ -245,7 +245,7 @@ public class GrpcOmTransport implements OmTransport {
         if (OMFailoverProxyProviderBase.getNotLeaderException(unwrapped) != null) {
           LOG.debug("Encountered OMNotLeaderException from {}. Disable OM follower read and retry OM leader directly.",
               followerHost);
-          useFollowerRead = false;
+          omServiceSupportsFollowerRead = false;
           break;
         }
         if (OMFailoverProxyProviderBase.getLeaderNotReadyException(unwrapped) != null) {
