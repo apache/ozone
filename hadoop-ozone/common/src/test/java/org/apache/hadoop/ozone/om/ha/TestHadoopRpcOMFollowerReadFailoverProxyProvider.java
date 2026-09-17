@@ -583,8 +583,6 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     private volatile boolean isFollowerReadSupported = true;
     private volatile boolean isThrowReadIndexException = false;
     private volatile boolean isThrowReadException = false;
-    private volatile OMRequest lastRequest;
-
     private OMProtocolAnswer clientAnswer = new OMProtocolAnswer();
 
     private class OMProtocolAnswer implements Answer<OMResponse> {
@@ -599,7 +597,6 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
           Thread.sleep(SLOW_RESPONSE_SLEEP_TIME);
         }
         OMRequest omRequest = invocationOnMock.getArgument(1);
-        lastRequest = omRequest;
         switch (omRequest.getCmdType()) {
         case CreateKey:
           if (!isLeader) {
