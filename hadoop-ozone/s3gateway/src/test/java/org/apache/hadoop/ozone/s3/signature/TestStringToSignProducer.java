@@ -149,7 +149,8 @@ public class TestStringToSignProducer {
    * A client reaching the gateway over IPv6 signs the bracketed Host header as
    * it sent it, so the string to sign has to carry that value through
    * unchanged: splitting the address on its colons would produce a different
-   * canonical request and reject every request.
+   * canonical request and reject every request. Nothing in the signing path
+   * reads the Host today, so this pins that rather than guarding a change.
    */
   @ParameterizedTest
   @ValueSource(strings = {"[::1]:9878", "[2001:db8::1]:9878", "[::1]"})

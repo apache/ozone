@@ -250,6 +250,23 @@ public class TestVirtualHostStyleFilter {
   }
 
   /**
+   * An IPv4 domain reached over IPv6 is still the same gateway: a dual stack
+   * client may write the configured address as an IPv4-mapped IPv6 literal.
+   */
+  @Test
+  public void testPathStyleWithIPv4MappedHost() throws Exception {
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME, "192.168.1.10");
+    VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
+    virtualHostStyleFilter.setConfiguration(conf);
+
+    ContainerRequestContext requestContext = mock(ContainerRequestContext.class);
+    when(requestContext.getHeaderString(HttpHeaders.HOST))
+        .thenReturn("[::ffff:192.168.1.10]:9878");
+    virtualHostStyleFilter.filter(requestContext);
+    verify(requestContext, never()).setRequestUri(any(URI.class), any(URI.class));
+  }
+
+  /**
    * An IPv6 literal cannot carry a bucket prefix, so an address that merely
    * ends with the configured domain is a different host, not a virtual host
    * style request for a bucket named after the leading segments. A zone must not
