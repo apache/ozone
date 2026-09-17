@@ -885,9 +885,9 @@ class TestContainerBalancerSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
-    parseSubcommand(dryRunCmd, "-t", "100");
+    parseSubcommand(dryRunCmd, "-t", "-1");
     IOException ex = assertThrows(IOException.class, () -> dryRunCmd.execute(scmClient));
-    assertThat(ex.getMessage()).contains("No over-utilized datanodes (sources) found.");
+    assertThat(ex.getMessage()).contains("Threshold should be specified in the range [0.0, 100.0).");
   }
 
   @Test
@@ -897,7 +897,8 @@ class TestContainerBalancerSubCommand {
         .thenReturn(buildImbalancedCluster());
     parseSubcommand(dryRunCmd, "-d", "0");
     IOException ex = assertThrows(IOException.class, () -> dryRunCmd.execute(scmClient));
-    assertThat(ex.getMessage()).contains("at least 2 are required");
+    assertThat(ex.getMessage()).contains(
+        "Max Datanodes Percentage To Involve Per Iteration should be specified in the range (0, 100]");
   }
 
   @Test
@@ -908,7 +909,7 @@ class TestContainerBalancerSubCommand {
     parseSubcommand(dryRunCmd, "-s", "0");
     IOException ex = assertThrows(IOException.class, () -> dryRunCmd.execute(scmClient));
     assertThat(ex.getMessage()).contains(
-        "max-size-entering-target must be less than or equal to max-size-to-move-per-iteration.");
+        "Max Size To Move Per Iteration In GB must be positive.");
   }
 
   @Test

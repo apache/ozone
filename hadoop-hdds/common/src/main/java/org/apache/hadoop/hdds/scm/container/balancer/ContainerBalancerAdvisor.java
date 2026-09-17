@@ -57,9 +57,11 @@ public final class ContainerBalancerAdvisor {
 
     ContainerBalancerConfiguration balancerConfig = conf.getObject(ContainerBalancerConfiguration.class);
 
-    double thresholdRatio = request.thresholdPercent != null
-        ? request.thresholdPercent / 100.0
-        : balancerConfig.getThresholdAsRatio();
+    double thresholdPercent = request.thresholdPercent != null
+        ? request.thresholdPercent
+        : balancerConfig.getThreshold();
+    validateThresholdPercent(thresholdPercent);
+    double thresholdRatio = thresholdPercent / 100.0;
     Set<String> includeNodes = request.includeNodes != null
         ? request.includeNodes
         : balancerConfig.getIncludeNodes();
@@ -116,7 +118,9 @@ public final class ContainerBalancerAdvisor {
         .setBalancingIntervalMillis(balancingIntervalMillis);
 
     try {
+      validateMaxDatanodesPercentageToInvolvePerIteration(maxDatanodesPercentage);
       validateMoveTimeouts(conf, moveReplicationTimeoutMillis, moveTimeoutMillis);
+      validateBalancingIntervalMillis(balancingIntervalMillis);
       validateResolvedMoveLimits(conf, maxSizeEnteringTarget, maxSizeLeavingSource, maxSizeToMovePerIteration);
 
       int eligibleDatanodeCount = snapshot.getTotalEligibleDatanodes();
@@ -274,15 +278,24 @@ public final class ContainerBalancerAdvisor {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
 
+    if (maxSizeEnteringTarget <= 0) {
+      throw new IllegalArgumentException("Max Size Entering Target must be greater than zero.");
+    }
     if (maxSizeEnteringTarget <= containerSizeBytes) {
       throw new IllegalArgumentException(
           "max-size-entering-target must be greater than ozone.scm.container.size ("
               + containerSizeBytes + " bytes).");
     }
+    if (maxSizeLeavingSource <= 0) {
+      throw new IllegalArgumentException("Max Size Leaving Source must be greater than zero.");
+    }
     if (maxSizeLeavingSource <= containerSizeBytes) {
       throw new IllegalArgumentException(
           "max-size-leaving-source must be greater than ozone.scm.container.size ("
               + containerSizeBytes + " bytes).");
+    }
+    if (maxSizeToMovePerIteration <= 0) {
+      throw new IllegalArgumentException("Max Size To Move Per Iteration In GB must be positive.");
     }
     if (maxSizeEnteringTarget > maxSizeToMovePerIteration) {
       throw new IllegalArgumentException(
@@ -298,6 +311,12 @@ public final class ContainerBalancerAdvisor {
 
   private static void validateMoveTimeouts(OzoneConfiguration conf, long moveReplicationTimeoutMillis,
       long moveTimeoutMillis) {
+    if (moveTimeoutMillis <= 0) {
+      throw new IllegalArgumentException("Move Timeout must be greater than zero.");
+    }
+    if (moveReplicationTimeoutMillis <= 0) {
+      throw new IllegalArgumentException("Move Replication Timeout must be greater than zero.");
+    }
     if (moveReplicationTimeoutMillis >= moveTimeoutMillis) {
       throw new IllegalArgumentException("hdds.container.balancer.move.replication.timeout should " +
           "be less than hdds.container.balancer.move.timeout.");
@@ -314,6 +333,25 @@ public final class ContainerBalancerAdvisor {
           moveReplicationTimeoutMillis,
           datanodeOffsetMillis);
       throw new IllegalArgumentException(msg);
+    }
+  }
+
+  private static void validateThresholdPercent(double thresholdPercent) {
+    if (thresholdPercent < 0d || thresholdPercent >= 100d) {
+      throw new IllegalArgumentException("Threshold should be specified in the range [0.0, 100.0).");
+    }
+  }
+
+  private static void validateMaxDatanodesPercentageToInvolvePerIteration(int percentage) {
+    if (percentage <= 0 || percentage > 100) {
+      throw new IllegalArgumentException("Max Datanodes Percentage To Involve Per Iteration "
+          + "should be specified in the range (0, 100]");
+    }
+  }
+
+  private static void validateBalancingIntervalMillis(long balancingIntervalMillis) {
+    if (balancingIntervalMillis <= 0) {
+      throw new IllegalArgumentException("Balancing Interval must be greater than zero.");
     }
   }
 

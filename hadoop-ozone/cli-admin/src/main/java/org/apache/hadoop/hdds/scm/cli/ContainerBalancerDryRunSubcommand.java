@@ -41,8 +41,8 @@ import picocli.CommandLine.Option;
 @Command(
     name = "dry-run",
     description = "Estimate container balancer bytes to move, iterations, per iteration bytes " +
-        "and upper-bound duration without starting it. Limits and default profile presets are read from " +
-        "local ozone-site.xml, datanode usage is fetched from SCM.",
+        "and upper-bound duration without starting it. Balancer limits and profile presets are read from " +
+        "the local Ozone configuration (including ozone-site.xml), datanode usage is fetched from SCM.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
