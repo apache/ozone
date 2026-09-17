@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestCount;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -65,6 +67,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
@@ -410,6 +413,37 @@ class TestOpenKeyCleanupService {
     waitForOpenKeyCleanup(false, BucketLayout.DEFAULT);
     waitForOpenKeyCleanup(false, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     assertAtLeast(numOpenKeysCleaned + partCount, metrics.getNumOpenKeysCleaned());
+  }
+
+  /**
+   * Cleaning up expired open keys submits an internal {@code DeleteOpenKeys} request, which should
+   * be counted in the OmClientProtocol per-type metrics just like a client request.
+   */
+  @Test
+  public void testCleanupIncrementsDeleteOpenKeysMetric() throws Exception {
+    OpenKeyCleanupService openKeyCleanupService =
+        (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
+
+    openKeyCleanupService.suspend();
+    // wait for submitted tasks to complete
+    Thread.sleep(SERVICE_INTERVAL);
+
+    final long beforeCount = getRequestCount(om.getOmClientProtocolMetrics(), Type.DeleteOpenKeys);
+    final long beforeTime = getRequestTime(om.getOmClientProtocolMetrics(), Type.DeleteOpenKeys);
+
+    createOpenKeys(5, false, BucketLayout.DEFAULT, false, false);
+
+    // wait for open keys to expire
+    Thread.sleep(EXPIRE_THRESHOLD_MS);
+    assertExpiredOpenKeys(false, false, BucketLayout.DEFAULT);
+
+    openKeyCleanupService.resume();
+    waitForOpenKeyCleanup(false, BucketLayout.DEFAULT);
+
+    assertThat(getRequestCount(om.getOmClientProtocolMetrics(), Type.DeleteOpenKeys))
+        .isGreaterThan(beforeCount);
+    assertThat(getRequestTime(om.getOmClientProtocolMetrics(), Type.DeleteOpenKeys))
+        .isGreaterThan(beforeTime);
   }
 
   private static void assertAtLeast(long expectedMinimum, long actual) {

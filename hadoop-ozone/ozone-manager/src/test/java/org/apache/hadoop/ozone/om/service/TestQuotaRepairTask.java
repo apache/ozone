@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestCount;
+import static org.apache.hadoop.ozone.om.ratis.utils.ProtocolMessageMetricsTestUtils.getRequestTime;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -333,6 +336,42 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     assertEquals(0, repaired.getUsedNamespace());
     assertEquals(keyBytes, repaired.getSnapshotUsedBytes());
     assertEquals(1, repaired.getSnapshotUsedNamespace());
+  }
+
+  /**
+   * The QuotaRepairTask submits an internal {@code QuotaRepair} request, which should be counted in
+   * the OmClientProtocol per-type metrics just like a client request.
+   */
+  @Test
+  public void testQuotaRepairIncrementsMetric() throws Exception {
+    OzoneManagerProtocolProtos.OMResponse respMock = mock(OzoneManagerProtocolProtos.OMResponse.class);
+    when(respMock.getSuccess()).thenReturn(true);
+    OzoneManagerRatisServer ratisServerMock = mock(OzoneManagerRatisServer.class);
+    // Sleep briefly inside the submission so the measured latency is reliably greater than zero.
+    doAnswer(invocation -> {
+      Thread.sleep(2);
+      return respMock;
+    }).when(ratisServerMock).submitRequest(any(), any(), anyLong());
+    when(ozoneManager.getOmRatisServer()).thenReturn(ratisServerMock);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    OMRequestTestUtils.addKeyToTableAndCache(volumeName, bucketName,
+        "/user/key0", -1, RatisReplicationConfig.getInstance(THREE), 1L, omMetadataManager);
+
+    // The metrics source is created fresh for each test, so no QuotaRepair call is recorded yet.
+    assertEquals(0, getRequestCount(ozoneManager.getOmClientProtocolMetrics(),
+        OzoneManagerProtocolProtos.Type.QuotaRepair));
+    assertEquals(0, getRequestTime(ozoneManager.getOmClientProtocolMetrics(),
+        OzoneManagerProtocolProtos.Type.QuotaRepair));
+
+    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(ozoneManager);
+    assertTrue(awaitRepair(quotaRepairTask.repair()));
+
+    assertThat(getRequestCount(ozoneManager.getOmClientProtocolMetrics(),
+        OzoneManagerProtocolProtos.Type.QuotaRepair)).isGreaterThan(0L);
+    assertThat(getRequestTime(ozoneManager.getOmClientProtocolMetrics(),
+        OzoneManagerProtocolProtos.Type.QuotaRepair)).isGreaterThan(0L);
   }
 
   private void zeroOutBucketUsedBytes(String volumeName, String bucketName,
