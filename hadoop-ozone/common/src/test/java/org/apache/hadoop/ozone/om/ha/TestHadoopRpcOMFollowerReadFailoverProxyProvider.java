@@ -194,6 +194,20 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   }
 
   @Test
+  void testLinearizableAllowFollowerReadUsesLeaderConsistencyWithSingleOm()
+      throws Exception {
+    setupProxyProvider(1);
+    omNodeAnswers[0].isLeader = true;
+
+    doRead(ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER);
+
+    assertHandledBy(0);
+    assertEquals(ReadConsistency.DEFAULT, ReadConsistency.fromProto(
+        omNodeAnswers[0].lastRequest.getReadConsistencyHint()
+            .getReadConsistency()));
+  }
+
+  @Test
   void testLocalLeaseReadSticksToFollowerBeforeLeader()
       throws Exception {
     setupProxyProvider(3);
@@ -583,6 +597,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     private volatile boolean isFollowerReadSupported = true;
     private volatile boolean isThrowReadIndexException = false;
     private volatile boolean isThrowReadException = false;
+    private volatile OMRequest lastRequest;
 
     private OMProtocolAnswer clientAnswer = new OMProtocolAnswer();
 
@@ -598,6 +613,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
           Thread.sleep(SLOW_RESPONSE_SLEEP_TIME);
         }
         OMRequest omRequest = invocationOnMock.getArgument(1);
+        lastRequest = omRequest;
         switch (omRequest.getCmdType()) {
         case CreateKey:
           if (!isLeader) {

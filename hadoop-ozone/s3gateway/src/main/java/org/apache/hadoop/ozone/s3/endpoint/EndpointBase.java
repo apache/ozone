@@ -57,6 +57,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.hasUnsignedPayload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -260,7 +261,11 @@ public abstract class EndpointBase {
     ClientProtocol clientProtocol =
         getClient().getObjectStore().getClientProxy();
     clientProtocol.setThreadLocalS3Auth(s3Auth);
-    setReadConsistencyFromHeader(clientProtocol);
+    try {
+      setReadConsistencyFromHeader(clientProtocol);
+    } catch (OS3Exception ex) {
+      throw wrapOS3Exception(ex);
+    }
 
     bufferSize = (int) getOzoneConfiguration().getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,

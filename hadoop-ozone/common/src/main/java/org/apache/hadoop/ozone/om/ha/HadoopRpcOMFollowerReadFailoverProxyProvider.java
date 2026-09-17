@@ -279,13 +279,20 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
           args[1] = omRequest;
         }
       }
+      ReadConsistency readConsistency = getReadConsistency(omRequest);
+      if (leaderProxy.getOMProxyMap().size() == 1
+          && readConsistency == ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER) {
+        omRequest = omRequest.toBuilder()
+            .setReadConsistencyHint(leaderReadConsistency)
+            .build();
+        args[1] = omRequest;
+      }
       // Requests with explicit hints (for example S3 read consistency headers)
       // can narrow routing below, such as forcing leader-only reads.
       boolean isExplicitFollowerRead = omRequest.hasReadConsistencyHint()
           && allowFollowerRead(omRequest);
       boolean isFollowerReadEligible = omServiceSupportsFollowerRead && isReadRequest
           && (defaultFollowerReadEnabled || isExplicitFollowerRead);
-      ReadConsistency readConsistency = getReadConsistency(omRequest);
 
       if (isFollowerReadEligible) {
         int failedCount = 0;
