@@ -19,10 +19,14 @@ package org.apache.hadoop.hdds.server.http;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.net.URI;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermissions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.eclipse.jetty.server.ServerConnector;
@@ -74,5 +78,21 @@ public class TestHttpServer2 {
     Path systemTmpDir = Paths.get(System.getProperty("java.io.tmpdir"))
         .toAbsolutePath().normalize();
     assertThat(baseDirPath.startsWith(systemTmpDir)).isTrue();
+  }
+
+  /**
+   * The base dir must be owner-only (rwx------) so that only the user running
+   * the service can access it, since java.io.tmpdir is shared.
+   */
+  @Test
+  public void testSetHttpBaseDirIsOwnerOnly() throws Exception {
+    assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.unset(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
+
+    HttpServer2.setHttpBaseDir(conf);
+
+    Path baseDirPath = Paths.get(conf.get(OzoneConfigKeys.OZONE_HTTP_BASEDIR));
+    assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(baseDirPath))).isEqualTo("rwx------");
   }
 }
