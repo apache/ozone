@@ -146,12 +146,8 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
         throw ex;
       }
 
-      boolean directoryBucketLayout =
-          context.getBucket().getBucketLayout().isFileSystemOptimized();
-
       GetObjectAttributesResponse response =
-          buildResponse(keyPath, key, requestedAttributes, completedPartSizes,
-              directoryBucketLayout);
+          buildResponse(keyPath, key, requestedAttributes, completedPartSizes, context);
 
       Response.ResponseBuilder rb = Response.ok(response, MediaType.APPLICATION_XML_TYPE);
       ObjectEndpoint.addLastModifiedDate(rb, key);
@@ -191,7 +187,7 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
 
   private GetObjectAttributesResponse buildResponse(String keyPath, OzoneKey key,
       Set<String> requested, NavigableMap<Integer, Long> completedPartSizes,
-      boolean directoryBucketLayout)
+      ObjectRequestContext context)
       throws IOException, OS3Exception {
     GetObjectAttributesResponse resp = new GetObjectAttributesResponse();
 
@@ -218,6 +214,8 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
       if (eTag != null) {
         String partsCountStr = extractPartsCount(eTag);
         if (partsCountStr != null && completedPartSizes != null) {
+          boolean directoryBucketLayout =
+              context.getBucket().getBucketLayout().isFileSystemOptimized();
           resp.setObjectParts(buildObjectParts(keyPath, Integer.parseInt(partsCountStr),
               completedPartSizes, key, directoryBucketLayout));
         }
