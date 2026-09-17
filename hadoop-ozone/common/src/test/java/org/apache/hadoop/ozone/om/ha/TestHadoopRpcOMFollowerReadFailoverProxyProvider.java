@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
@@ -165,6 +166,20 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   }
 
   @Test
+  void testExplicitFollowerReadWhenDisabledByDefault() throws Exception {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, false);
+    setupProxyProvider(3, config);
+    omNodeAnswers[0].isLeader = true;
+
+    doRead();
+    assertHandledBy(0);
+
+    doRead(ReadConsistency.LOCAL_LEASE);
+    assertHandledBy(1);
+  }
+
+  @Test
   void testLinearizableAllowFollowerReadSticksToCurrentProxy()
       throws Exception {
     setupProxyProvider(3);
@@ -196,11 +211,11 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   @Test
   void testLeaderOnlyReadBypassesFollowerReadProxy() throws Exception {
     setupProxyProvider(3);
-    omNodeAnswers[2].isLeader = true;
+    omNodeAnswers[0].isLeader = true;
 
     doRead(ReadConsistency.LINEARIZABLE_LEADER_ONLY);
 
-    assertHandledBy(2);
+    assertHandledBy(0);
     assertTrue(proxyProvider.isUseFollowerRead());
     assertEquals(proxyProvider.getCurrentProxy().getNodeId(), omNodeIds[0]);
   }
@@ -398,7 +413,9 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   }
 
   private void setupProxyProvider(int omNodeCount) throws Exception {
-    setupProxyProvider(omNodeCount, new OzoneConfiguration());
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    setupProxyProvider(omNodeCount, config);
   }
 
   private void setupProxyProvider(int omNodeCount, OzoneConfiguration config) throws Exception {
@@ -477,7 +494,11 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         };
 
     // Wrap the leader-based failover proxy provider with follower read proxy provider
-    proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(underlyingProxyProvider);
+    boolean followerReadEnabled = config.getBoolean(
+        OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(
+        underlyingProxyProvider, ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER,
+        ReadConsistency.DEFAULT, followerReadEnabled);
     assertTrue(proxyProvider.isUseFollowerRead());
     // Wrap the follower read proxy provider in retry proxy to allow automatic failover
     retryProxy = (OzoneManagerProtocolPB) RetryProxy.create(

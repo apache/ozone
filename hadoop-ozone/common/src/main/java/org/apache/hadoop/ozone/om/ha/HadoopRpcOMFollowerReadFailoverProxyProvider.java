@@ -76,11 +76,11 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   /** The combined proxy which redirects to other proxies as necessary. */
   private final ProxyInfo<OzoneManagerProtocolPB> combinedProxy;
 
-  /**
-   * Whether reading from follower is enabled. If this is false, all read
-   * requests will still go to OM leader.
-   */
+  /** Whether follower reads are supported by the OM service. */
   private volatile boolean useFollowerRead;
+
+  /** Whether eligible reads without an explicit consistency hint use followers. */
+  private final boolean followerReadEnabled;
 
   /**
    * The current index of the underlying leader-based proxy provider's omNodesInOrder currently being used.
@@ -106,7 +106,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderProxy,
       ReadConsistency followerReadConsistencyType,
       ReadConsistency leaderReadConsistencyType,
-      boolean useFollowerRead) {
+      boolean followerReadEnabled) {
     Preconditions.assertTrue(followerReadConsistencyType.allowFollowerRead(),
         "Invalid follower read consistency " + followerReadConsistencyType);
     Preconditions.assertTrue(!leaderReadConsistencyType.allowFollowerRead(),
@@ -121,7 +121,8 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
         FollowerReadInvocationHandler.class.getClassLoader(),
         new Class<?>[] {OzoneManagerProtocolPB.class}, new FollowerReadInvocationHandler());
     combinedProxy = new ProxyInfo<>(wrappedProxy, combinedInfo);
-    this.useFollowerRead = useFollowerRead;
+    this.useFollowerRead = true;
+    this.followerReadEnabled = followerReadEnabled;
     this.followerReadConsistency = followerReadConsistencyType.getHint();
     this.leaderReadConsistency = leaderReadConsistencyType.getHint();
   }
@@ -274,10 +275,12 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
       // Apply default consistency hint once, before any routing decision.
       // Requests with explicit hints (for example S3 read consistency headers)
       // can narrow routing below, such as forcing leader-only reads.
-      boolean isFollowerReadRequest = useFollowerRead
-          && OmUtils.shouldSendToFollower(omRequest);
+      boolean isReadRequest = OmUtils.shouldSendToFollower(omRequest);
+      boolean isExplicitFollowerRead = omRequest.hasReadConsistencyHint()
+          && allowFollowerRead(omRequest);
       if (!omRequest.hasReadConsistencyHint()) {
-        final ReadConsistencyHint defaultReadConsistency = isFollowerReadRequest
+        final ReadConsistencyHint defaultReadConsistency = useFollowerRead
+            && followerReadEnabled && isReadRequest
             ? followerReadConsistency : leaderReadConsistency;
         if (defaultReadConsistency != null) {
           omRequest = omRequest.toBuilder()
@@ -286,13 +289,13 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
           args[1] = omRequest;
         }
       }
-      boolean isFollowerReadEligible = isFollowerReadRequest
-          && allowFollowerRead(omRequest);
+      boolean isFollowerReadEligible = useFollowerRead && isReadRequest
+          && (followerReadEnabled || isExplicitFollowerRead);
       ReadConsistency readConsistency = getReadConsistency(omRequest);
 
       if (isFollowerReadEligible) {
         int failedCount = 0;
-        for (int i = 0; useFollowerRead && i < leaderProxy.getOMProxyMap().size(); i++) {
+        for (int i = 0; i < leaderProxy.getOMProxyMap().size(); i++) {
           OMProxyInfo<OzoneManagerProtocolPB> current =
               getCurrentProxy(readConsistency);
           if (current == null) {
