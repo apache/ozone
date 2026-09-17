@@ -188,31 +188,26 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
    * Compares a host with a configured domain by address rather than by
    * spelling, so that a client writing the gateway's address in a form other
    * than the configured one still reaches it: ::1 and 0:0:0:0:0:0:0:1 are the
-   * same address, and hexadecimal digits may be in either case. Follows
-   * {@code SCMFailoverProxyProviderBase#sameIpLiteral} in comparing an IPv6
-   * scope as text: {@link java.net.InetAddress#equals} drops it, so fe80::1%eth0
-   * and fe80::1%eth1 would otherwise be the same interface, and resolving a
-   * scope the gateway host does not have would throw.
+   * same address, and hexadecimal digits may be in either case. A zone names an
+   * interface of the node holding the address and must not be sent on the wire
+   * (RFC 9844), so one the operator wrote in the domain is dropped before
+   * comparing, while a Host header carrying one names no gateway. Neither is
+   * ever resolved: Guava accepts a scoped literal as a valid address but throws
+   * on parsing one whose interface this node does not have.
    */
   private static boolean isSameAddress(String host, String domain) {
-    if (host.equals(domain)) {
-      return true;
+    if (host.indexOf('%') >= 0) {
+      return false;
     }
-    String hostIp = stripScope(host);
-    String domainIp = stripScope(domain);
-    return scopeOf(host).equals(scopeOf(domain))
-        && InetAddresses.isInetAddress(hostIp) && InetAddresses.isInetAddress(domainIp)
-        && InetAddresses.forString(hostIp).equals(InetAddresses.forString(domainIp));
+    String domainAddress = stripZone(domain);
+    return host.equals(domainAddress)
+        || (InetAddresses.isInetAddress(host) && InetAddresses.isInetAddress(domainAddress)
+            && InetAddresses.forString(host).equals(InetAddresses.forString(domainAddress)));
   }
 
-  private static String stripScope(String host) {
+  private static String stripZone(String host) {
     int mark = host.indexOf('%');
     return mark < 0 ? host : host.substring(0, mark);
-  }
-
-  private static String scopeOf(String host) {
-    int mark = host.indexOf('%');
-    return mark < 0 ? "" : host.substring(mark + 1);
   }
 
   /**
