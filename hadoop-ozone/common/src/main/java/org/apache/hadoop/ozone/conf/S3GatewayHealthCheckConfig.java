@@ -41,7 +41,11 @@ public class S3GatewayHealthCheckConfig {
           "unauthenticated health endpoints that a load balancer can poll: " +
           "a liveness endpoint at /health/live (process is up) and a " +
           "readiness endpoint at /health/ready (the gateway can reach OM). " +
-          "Disable to remove the endpoints entirely.")
+          "Disable to remove the endpoints entirely; the bundled Kubernetes " +
+          "manifests and HAProxy configs probe these paths unconditionally, " +
+          "so disabling here also requires removing those probes from the " +
+          "deployment, or liveness checks will restart the pods and HAProxy " +
+          "will mark the backends down.")
   private boolean enabled = true;
 
   @Config(key = "ozone.s3g.health-check.probe.interval",

@@ -64,6 +64,15 @@ public class S3GatewayReadinessProbe implements Closeable {
   private volatile boolean ready = false;
   private volatile OzoneClient client;
 
+  /**
+   * The probe task submitted on the previous tick, accessed only from the
+   * single scheduler thread. Used to keep at most one probe in flight: if the
+   * task is still running (e.g. an OM call that did not unblock on
+   * interruption), the next tick skips submitting another rather than queueing
+   * work on the single probe thread.
+   */
+  private Future<Void> inFlight;
+
   S3GatewayReadinessProbe(OzoneConfiguration conf,
       S3GatewayHealthCheckConfig healthConfig) {
     this.conf = conf;
@@ -94,9 +103,20 @@ public class S3GatewayReadinessProbe implements Closeable {
    * Runs one probe on the scheduler thread, bounded by the configured timeout.
    * The OM call runs on a separate single-threaded executor so a hung call
    * cannot block the scheduler and gets an enforced deadline: on timeout the
-   * gateway is reported not ready rather than staying stuck at ready.
+   * gateway is reported not ready rather than staying stuck at ready. At most
+   * one probe is kept in flight, so a call that ignores interruption cannot pile
+   * up queued work on the probe thread during a prolonged OM outage.
    */
   private void probe() {
+    if (inFlight != null && !inFlight.isDone()) {
+      // The previous probe's OM call has not returned yet (e.g. it did not
+      // unblock on interruption). Report not ready and retry cancelling rather
+      // than submitting another task onto the single probe thread.
+      ready = false;
+      inFlight.cancel(true);
+      LOG.debug("Previous readiness probe still in flight; reporting not ready");
+      return;
+    }
     Future<Void> future = probeExecutor.submit(() -> {
       OzoneClient c = client;
       if (c == null) {
@@ -107,6 +127,7 @@ public class S3GatewayReadinessProbe implements Closeable {
           .getServiceInfo();
       return null;
     });
+    inFlight = future;
     try {
       future.get(timeoutMillis, TimeUnit.MILLISECONDS);
       ready = true;
