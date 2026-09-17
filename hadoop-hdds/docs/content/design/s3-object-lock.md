@@ -172,7 +172,7 @@ Two new fields: retentionDate & legalHold.
 
 Ozone Object Lock enforces a dual-gate protection mechanism combining **Ranger policy-based authorization** and **underlying OM WORM state validation**:
 
-* **Standard Data Operations (Put / Delete)**: Even if a principal has valid Ranger `WRITE` or `DELETE` access, any attempt to mutate, overwrite, or delete an object under an active Legal Hold or an unexpired Retention period is immediately rejected with `403 Access Denied` (`WORMProtectionException`).
+* **Standard Data Operations (Put / Delete)**: Even if a principal has valid Ranger `CREATE`, `WRITE` or `DELETE` access, any attempt to mutate, overwrite, or delete an object under an active Legal Hold or an unexpired Retention period is immediately rejected with `403 Access Denied` (`WORMProtectionException`).
 * **Fine-Grained S3 Action Matching**: Object Lock management integrates with the action-matching authorization framework introduced via STS. S3 Object Lock actions map 1:1 to AWS S3 action names. See [AWS STS Design for Ozone S3](ozone-sts.md) for details.
 
 ---
@@ -202,15 +202,15 @@ To enable action-level authorization and onboard Object Lock actions into the Oz
 
 Following the declarative contract in `ozone.json`, each S3 action requires a baseline primitive Ranger permission at the designated resource hierarchy:
 
-| S3 Action | Resource Level | Required Ranger Access Type | Description |
-| :--- | :--- | :--- | :--- |
-| **`GetBucketObjectLockConfiguration`** | Bucket | `READ` | Retrieve default Object Lock settings on a bucket. |
-| **`PutBucketObjectLockConfiguration`** | Bucket | `WRITE` | Configure default retention mode and period on a bucket. |
-| **`GetObjectRetention`** | Key | `READ` | Read the retention mode and Retain-Until date of an object version. |
-| **`PutObjectRetention`** | Key | `WRITE` | Set or extend object retention mode and duration. |
-| **`GetObjectLegalHold`** | Key | `READ` | Query the current Legal Hold status (`ON` or `OFF`). |
-| **`PutObjectLegalHold`** | Key | `WRITE` | Toggle the Legal Hold state (`ON` or `OFF`). |
-| **`BypassGovernanceRetention`** | Key | `WRITE` / `DELETE` | Privileged entitlement to bypass retention in Governance Mode. |
+| S3 Action                              | Resource Level | Required Ranger Access Type | Description                                                         |
+|:---------------------------------------|:---------------|:----------------------------|:--------------------------------------------------------------------|
+| **`GetBucketObjectLockConfiguration`** | Bucket         | `READ`                      | Retrieve default Object Lock settings on a bucket.                  |
+| **`PutBucketObjectLockConfiguration`** | Bucket         | `WRITE`                     | Configure default retention mode and period on a bucket.            |
+| **`GetObjectRetention`**               | Key            | `READ`                      | Read the retention mode and Retain-Until date of an object version. |
+| **`PutObjectRetention`**               | Key            | `WRITE`                     | Set or extend object retention mode and duration.                   |
+| **`GetObjectLegalHold`**               | Key            | `READ`                      | Query the current Legal Hold status (`ON` or `OFF`).                |
+| **`PutObjectLegalHold`**               | Key            | `WRITE`                     | Toggle the Legal Hold state (`ON` or `OFF`).                        |
+| **`BypassGovernanceRetention`**        | Key            | `WRITE` and `DELETE`        | Privileged entitlement to bypass retention in Governance Mode.      |
 
 ---
 
@@ -328,7 +328,9 @@ Preliminary assessments indicate that the additional metadata lookups impose an 
 
 ## Security
 
-Centralized access control via Ranger ensures all Object Lock operations (such as Retention Policy configuration and Legal Hold management) are enforced under strict access permissions. Dedicated Access Types (BYPASS_GOVERNANCE, PUT_LEGAL_HOLD, etc.) enforce the Principle of Least Privilege, preventing unauthorized tampering or removal of locks and enhancing data immutability.
+Centralized access control via Ranger ensures all Object Lock operations (such as Retention Policy configuration and Legal Hold management) are enforced under strict access permissions.
+
+By leveraging the **STS action-matching framework**, Ozone maps standard S3 API actions (e.g., `BypassGovernanceRetention`, `PutObjectLegalHold`) directly to standard Ranger primitive access types (e.g., `WRITE` and `READ`). This fine-grained, action-level authorization enforces the Principle of Least Privilege **without requiring custom dedicated access types**. It effectively prevents unauthorized tampering or removal of locks, ensuring robust compliance and data immutability.
 
 ### Trusted Boundary and Compliance Scope
 
