@@ -588,7 +588,14 @@ public final class HttpServer2 implements FilterContainer {
     private ServerConnector createHttpsChannelConnector(
         Server server, HttpConfiguration httpConfig) {
       httpConfig.setSecureScheme(HTTPS_SCHEME);
-      httpConfig.addCustomizer(new SecureRequestCustomizer());
+      // Jetty 12's SecureRequestCustomizer defaults to sniHostCheck=true, which
+      // rejects every HTTPS request whose Host (or SNI) is not carried by the
+      // served certificate with a 400 "Invalid SNI" -- including requests to an
+      // IP literal (which send no SNI) or to localhost/VIP/alias names absent
+      // from the keystore certificate. Jetty 9.4 only ran that check when the
+      // client's SNI matched a certificate, so such requests were served with
+      // the default certificate. Disable the check to preserve that behaviour.
+      httpConfig.addCustomizer(new SecureRequestCustomizer(false));
       ServerConnector conn = createHttpChannelConnector(server, httpConfig);
 
       SslContextFactory.Server sslContextFactory =

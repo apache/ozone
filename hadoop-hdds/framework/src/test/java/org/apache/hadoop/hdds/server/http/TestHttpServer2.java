@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import jakarta.servlet.http.HttpServlet;
@@ -39,7 +40,10 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.http.FilterContainer;
+import org.apache.hadoop.http.FilterInitializer;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
@@ -465,6 +469,28 @@ public class TestHttpServer2 {
     }
   }
 
+  /**
+   * An operator-configured {@code ozone.http.filter.initializers} entry that
+   * registers a javax.servlet.Filter outside the set Ozone can bridge into Jetty
+   * EE10 must abort server construction with an
+   * {@link HttpServerConfigurationException} rather than being silently dropped.
+   * This proves the exception {@code ServletElementsFactory} throws propagates
+   * all the way out of {@code HttpServer2.Builder.build()} through the filter
+   * initializer path, which is what lets OM, SCM and DN fail fast on such a
+   * misconfiguration instead of coming up with a degraded web server.
+   */
+  @Test
+  public void testNonBridgeableFilterInitializerFailsBuild() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HttpServer2.FILTER_INITIALIZER_PROPERTY,
+        NonBridgeableFilterInitializer.class.getName());
+    HttpServer2.Builder builder = new HttpServer2.Builder()
+        .setConf(conf)
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"));
+    assertThrows(HttpServerConfigurationException.class, builder::build);
+  }
+
   private static int statusOf(String url) throws IOException {
     HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
     conn.setConnectTimeout(5000);
@@ -517,6 +543,39 @@ public class TestHttpServer2 {
       resp.setContentType("text/plain");
       String user = req.getRemoteUser();
       resp.getWriter().write(user == null ? "" : user);
+    }
+  }
+
+  /**
+   * FilterInitializer that registers a non-bridgeable javax filter, standing in
+   * for an operator-configured ozone.http.filter.initializers entry.
+   */
+  public static class NonBridgeableFilterInitializer extends FilterInitializer {
+    @Override
+    public void initFilter(FilterContainer container, Configuration conf) {
+      container.addFilter("nonbridgeable",
+          NonBridgeableJavaxFilter.class.getName(), new HashMap<>());
+    }
+  }
+
+  /**
+   * A plain javax.servlet.Filter outside the set ServletElementsFactory can
+   * bridge into Jetty EE10, so registering it must be rejected.
+   */
+  public static class NonBridgeableJavaxFilter implements javax.servlet.Filter {
+    @Override
+    public void init(javax.servlet.FilterConfig filterConfig) {
+    }
+
+    @Override
+    public void doFilter(javax.servlet.ServletRequest request,
+        javax.servlet.ServletResponse response, javax.servlet.FilterChain chain)
+        throws IOException, javax.servlet.ServletException {
+      chain.doFilter(request, response);
+    }
+
+    @Override
+    public void destroy() {
     }
   }
 

@@ -2227,9 +2227,9 @@
       Filters registered by these initializers run inside a Jetty EE10
       (jakarta.servlet) server. A filter that still implements the legacy
       javax.servlet.Filter API is run through a bridge and is supported when it
-      only acts on the request and response it is given - the hadoop-auth
-      authentication filters (which establish an authenticated principal),
-      StaticUserWebFilter, CrossOriginFilter (CORS response headers) and
+      only acts on the request and response it is given - AuthenticationFilter
+      (the hadoop-auth family, which establishes an authenticated principal),
+      StaticUserFilter, CrossOriginFilter (CORS response headers) and
       RestCsrfPreventionFilter. A filter that wraps the request or response and
       forwards the wrapper downstream (for example XFrameOptionsFilter) is not
       supported, because the bridge does not carry that wrapper. A javax.servlet

@@ -2352,9 +2352,6 @@
                 <ignoredNonTestScopedDependency>org.apache.commons:commons-compress:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.ozone:hdds-client:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.ozone:ozone-interface-client:jar</ignoredNonTestScopedDependency>
-                <!-- jetty-http is compile-scoped by httpfsgateway for the HttpServer2 runtime
-                     but referenced only by its test bytecode; see hadoop-ozone/httpfsgateway/pom.xml. -->
-                <ignoredNonTestScopedDependency>org.eclipse.jetty:jetty-http:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-common:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.rocksdb:rocksdbjni:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.springframework:spring-core:jar</ignoredNonTestScopedDependency>

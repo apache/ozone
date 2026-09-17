@@ -266,13 +266,17 @@ class TestOzoneAtRestEncryption {
     // Unlike testWarmupEDEKCacheOnStartup, this restarts the OM to drive the real
     // startup path rather than calling initializeEdekCache directly. The jceks
     // provider cannot be spied across a restart, so warm-up is asserted from the
-    // EDEKCacheLoader's "Successfully warmed up" log line.
+    // EDEKCacheLoader's log line. Every encrypted bucket in this class uses the
+    // single key TEST_KEY, which warmUpEdekCache dedupes into a one-element set,
+    // so the count must be exactly 1. Asserting the count (rather than the bare
+    // "Successfully warmed up" prefix) fails the test if the restart path
+    // discovers no keys, since the no-op jceks provider logs success regardless.
     GenericTestUtils.LogCapturer omLogs =
         GenericTestUtils.LogCapturer.captureLogs(OzoneManager.class);
     try {
       cluster.restartOzoneManager();
       GenericTestUtils.waitFor(
-          (BooleanSupplier) () -> omLogs.getOutput().contains("Successfully warmed up"),
+          (BooleanSupplier) () -> omLogs.getOutput().contains("Successfully warmed up 1 EDEKs."),
           500, 60000);
     } finally {
       omLogs.stopCapturing();

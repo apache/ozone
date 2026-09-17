@@ -25,9 +25,12 @@ package org.apache.hadoop.hdds.server.http;
  * error is deterministic and will never succeed on retry, so the services let
  * it abort start-up instead of silently disabling the HTTP server.
  *
- * <p>Extends {@link IllegalArgumentException} so existing callers that expect an
- * {@code IllegalArgumentException} for an invalid filter configuration keep
- * working.
+ * <p>Extends {@link IllegalArgumentException} (an unchecked exception) so it
+ * propagates out of the {@code IOException}-declared {@link BaseHttpServer}
+ * constructor without adding a checked-exception signature, and is a distinct
+ * type that OM, SCM and the datanode can catch ahead of their generic HTTP
+ * start-up {@code catch} block, which treats other start-up failures as
+ * non-fatal.
  */
 public class HttpServerConfigurationException extends IllegalArgumentException {
 

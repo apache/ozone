@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.util.HttpExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,14 +40,16 @@ public class ExceptionProvider implements ExceptionMapper<Throwable> {
 
   protected Response createResponse(Response.Status status,
                                     Throwable throwable) {
-    // Mirror hadoop-auth's HttpExceptionUtils JSON error contract so WebHDFS
+    // Mirror hadoop-common's HttpExceptionUtils JSON error contract so WebHDFS
     // clients can reconstruct the remote exception. hadoop's helper returns a
-    // javax.ws.rs Response, so build the jakarta.ws.rs equivalent directly.
+    // javax.ws.rs Response, so build the jakarta.ws.rs equivalent directly while
+    // reusing its public JSON key constants (the client-side parser reads the
+    // same ones), keeping the contract tied at compile time.
     Map<String, Object> error = new LinkedHashMap<>();
-    error.put("message", getOneLineMessage(throwable));
-    error.put("exception", throwable.getClass().getSimpleName());
-    error.put("javaClassName", throwable.getClass().getName());
-    Map<String, Object> json = Collections.singletonMap("RemoteException", error);
+    error.put(HttpExceptionUtils.ERROR_MESSAGE_JSON, getOneLineMessage(throwable));
+    error.put(HttpExceptionUtils.ERROR_EXCEPTION_JSON, throwable.getClass().getSimpleName());
+    error.put(HttpExceptionUtils.ERROR_CLASSNAME_JSON, throwable.getClass().getName());
+    Map<String, Object> json = Collections.singletonMap(HttpExceptionUtils.ERROR_JSON, error);
     return Response.status(status).type(MediaType.APPLICATION_JSON)
         .entity(json).build();
   }

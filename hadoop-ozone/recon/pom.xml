@@ -278,16 +278,13 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <!-- Recon's DTOs are annotated with jakarta.xml.bind.*, so Jackson needs the
+           jakarta xmlbind module to honour them during JSON (de)serialization; the
+           older jackson-module-jaxb-annotations only understands javax.xml.bind.
+           Matches s3gateway. -->
       <groupId>com.fasterxml.jackson.module</groupId>
-      <artifactId>jackson-module-jaxb-annotations</artifactId>
+      <artifactId>jackson-module-jakarta-xmlbind-annotations</artifactId>
       <scope>runtime</scope>
-      <exclusions>
-        <exclusion>
-          <!-- using jakarta.xml.bind instead -->
-          <groupId>javax.xml.bind</groupId>
-          <artifactId>jaxb-api</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.inject.extensions</groupId>

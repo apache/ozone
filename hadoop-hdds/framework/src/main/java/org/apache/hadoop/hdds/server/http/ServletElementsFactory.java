@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.hdds.server.http;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.server.http.servletbridge.JavaxFilterBridge;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
@@ -30,6 +33,21 @@ import org.eclipse.jetty.ee10.servlet.FilterMapping;
  * Factory class which helps to create different types of servlet elements.
  */
 public final class ServletElementsFactory {
+
+  /**
+   * The javax.servlet filter classes (and their subclasses) that Ozone bridges
+   * into the Jetty EE10 (jakarta) chain. This is the single source of truth for
+   * the operator-visible bridgeable set: both {@link #isBridgeableJavaxFilter}
+   * and the startup error message are derived from it, so they cannot drift.
+   * Keep the ozone.http.filter.initializers documentation in ozone-default.xml
+   * aligned with these simple names.
+   */
+  private static final List<Class<?>> BRIDGEABLE_JAVAX_FILTERS = Arrays.asList(
+      AuthenticationFilter.class,
+      StaticUserWebFilter.StaticUserFilter.class,
+      CrossOriginFilter.class,
+      RestCsrfPreventionFilter.class);
+
   private ServletElementsFactory() {
     throw new UnsupportedOperationException(
         "This is utility class and cannot be instantiated");
@@ -63,12 +81,11 @@ public final class ServletElementsFactory {
       if (!isBridgeableJavaxFilter(filterClass)) {
         throw new HttpServerConfigurationException("Filter " + classname
             + " implements javax.servlet.Filter, which Ozone only bridges into "
-            + "Jetty EE10 (jakarta) for the hadoop-auth AuthenticationFilter "
-            + "family, StaticUserWebFilter, CrossOriginFilter and "
-            + "RestCsrfPreventionFilter. The bridge does not propagate a request "
-            + "or response that a filter wraps and forwards downstream (for "
-            + "example XFrameOptionsFilter), so such a wrapper would be silently "
-            + "dropped. Provide a jakarta.servlet.Filter instead.");
+            + "Jetty EE10 (jakarta) for these filters and their subclasses: "
+            + bridgeableFilterNames() + ". The bridge does not propagate a "
+            + "request or response that a filter wraps and forwards downstream "
+            + "(for example XFrameOptionsFilter), so such a wrapper would be "
+            + "silently dropped. Provide a jakarta.servlet.Filter instead.");
       }
       holder.setFilter(new JavaxFilterBridge(newJavaxFilter(filterClass)));
     } else {
@@ -93,11 +110,14 @@ public final class ServletElementsFactory {
    * bridge does not carry that wrapper into the jakarta chain.
    */
   private static boolean isBridgeableJavaxFilter(Class<?> filterClass) {
-    return AuthenticationFilter.class.isAssignableFrom(filterClass)
-        || StaticUserWebFilter.StaticUserFilter.class
-            .isAssignableFrom(filterClass)
-        || CrossOriginFilter.class.isAssignableFrom(filterClass)
-        || RestCsrfPreventionFilter.class.isAssignableFrom(filterClass);
+    return BRIDGEABLE_JAVAX_FILTERS.stream()
+        .anyMatch(bridgeable -> bridgeable.isAssignableFrom(filterClass));
+  }
+
+  private static String bridgeableFilterNames() {
+    return BRIDGEABLE_JAVAX_FILTERS.stream()
+        .map(Class::getSimpleName)
+        .collect(Collectors.joining(", "));
   }
 
   private static Class<?> loadFilterClass(String classname) {

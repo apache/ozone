@@ -102,10 +102,16 @@
       <artifactId>ozone-common</artifactId>
     </dependency>
     <dependency>
-      <!-- Needed on the gateway runtime classpath for HttpServer2 (HttpField),
-           and at test compile for TestHttpFSServerWebServer (UriCompliance).
-           Only the test bytecode references it, so dependency:analyze reports it
-           as "non-test scoped test only" (ignored in the root pom). -->
+      <!-- Compile scope is deliberate. HttpServer2 needs jetty-http (HttpField) on the
+           gateway's runtime classpath, and maven-dependency-plugin's build-classpath goal
+           writes only compile/runtime-scoped deps into the generated
+           ozone-httpfsgateway.classpath that bin/ozone loads. jetty-http also arrives
+           transitively at compile scope from hdds-server-framework, so declaring it here at
+           test scope would win by Maven's nearest-wins rule and drop it from that classpath
+           file at runtime, even though unit tests, which carry it on the test classpath, pass.
+           Only this module's test bytecode (TestHttpFSServerWebServer, UriCompliance) actually
+           references jetty-http, so dependency:analyze reports it as "non-test scoped test only";
+           that exemption is kept module-local in the maven-dependency-plugin config below. -->
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-http</artifactId>
       <scope>compile</scope>
@@ -291,6 +297,24 @@
               <target>
                 <xslt in="${basedir}/src/main/resources/httpfs-default.xml" out="${project.build.directory}/site/httpfs-default.html" style="${basedir}/src/site/configuration.xsl" />
               </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>analyze</id>
+            <configuration>
+              <!-- jetty-http is compile-scoped by this module (see the dependency above) so it
+                   stays on the generated runtime classpath, but only test bytecode references it.
+                   Keep this analyze-only exemption module-local instead of weakening the root pom
+                   analyzer for every module. -->
+              <ignoredNonTestScopedDependencies>
+                <ignoredNonTestScopedDependency>org.eclipse.jetty:jetty-http:jar</ignoredNonTestScopedDependency>
+              </ignoredNonTestScopedDependencies>
             </configuration>
           </execution>
         </executions>
