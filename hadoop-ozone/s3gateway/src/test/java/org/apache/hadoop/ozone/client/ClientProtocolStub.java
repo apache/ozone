@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -195,6 +196,11 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void setBucketStoragePolicy(String volumeName, String bucketName,
                                      StoragePolicy storagePolicy) throws IOException {
+
+  }
+
+  @Override
+  public void setBucketStoragePolicy(OmBucketArgs args) throws IOException {
 
   }
 
