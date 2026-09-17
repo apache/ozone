@@ -107,7 +107,7 @@ public class TestRunningDatanodeState {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2})
+  @ValueSource(ints = {0, 1, 2, 3})
   void testStartupCompletesAfterHeartbeatTimeout(int failureType) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneContainer container = mock(OzoneContainer.class);
@@ -121,8 +121,9 @@ public class TestRunningDatanodeState {
     when(scm.getVersion(null)).thenReturn(versionResponse().getProtobufMessage());
     CountDownLatch initializing = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
-    Exception failure = failureType == 1 ? new IOException("Corrupt Raft log")
-        : new IllegalStateException("Failed to initRaftLog", new IOException("Corrupt Raft log"));
+    Throwable failure = failureType == 1 ? new IOException("Corrupt Raft log")
+        : failureType == 2 ? new IllegalStateException("Failed to initRaftLog", new IOException("Corrupt Raft log"))
+        : new AssertionError("Failed to initRaftLog", new IOException("Corrupt Raft log"));
     doAnswer(invocation -> {
       initializing.countDown();
       assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();

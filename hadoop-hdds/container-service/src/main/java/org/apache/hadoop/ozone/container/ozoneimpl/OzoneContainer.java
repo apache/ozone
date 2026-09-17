@@ -51,7 +51,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -149,7 +148,7 @@ public class OzoneContainer {
   private DiskBalancerService diskBalancerService;
   private final Object initializationLock = new Object();
   // Guarded by initializationLock.
-  private final AtomicReference<InitializingStatus> initializingStatus;
+  private InitializingStatus initializingStatus;
   private Throwable initializationFailure;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
@@ -337,7 +336,7 @@ public class OzoneContainer {
 
     datanodeStorageMetrics = DatanodeStorageMetrics.create(volumeSet);
 
-    initializingStatus = new AtomicReference<>(InitializingStatus.UNINITIALIZED);
+    initializingStatus = InitializingStatus.UNINITIALIZED;
   }
 
   /**
@@ -552,22 +551,22 @@ public class OzoneContainer {
   public void start(String clusterId) throws IOException {
     synchronized (initializationLock) {
       // SCM endpoints share one initialization attempt, including its failure.
-      if (initializingStatus.get() == InitializingStatus.INITIALIZED) {
+      if (initializingStatus == InitializingStatus.INITIALIZED) {
         LOG.info("Ignore. OzoneContainer already started.");
         return;
       }
-      if (initializingStatus.get() == InitializingStatus.FAILED) {
+      if (initializingStatus == InitializingStatus.FAILED) {
         throw new IOException("OzoneContainer initialization previously failed", initializationFailure);
       }
 
-      initializingStatus.set(InitializingStatus.INITIALIZING);
+      initializingStatus = InitializingStatus.INITIALIZING;
       try {
         initializeContainerServices(clusterId);
-        initializingStatus.set(InitializingStatus.INITIALIZED);
+        initializingStatus = InitializingStatus.INITIALIZED;
       } catch (IOException | RuntimeException | Error ex) {
         // Partially started services cannot safely be initialized again.
         initializationFailure = ex;
-        initializingStatus.set(InitializingStatus.FAILED);
+        initializingStatus = InitializingStatus.FAILED;
         throw ex;
       }
     }

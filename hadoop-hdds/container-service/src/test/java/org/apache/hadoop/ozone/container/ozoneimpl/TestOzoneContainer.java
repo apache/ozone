@@ -135,7 +135,7 @@ public class TestOzoneContainer {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2})
+  @ValueSource(ints = {0, 1, 2, 3})
   void testConcurrentStartup(int failureType) throws Exception {
     conf = SCMTestUtils.getConf(folder.toFile());
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
@@ -145,8 +145,9 @@ public class TestOzoneContainer {
     CountDownLatch initializing = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
     CountDownLatch secondCaller = new CountDownLatch(1);
-    Exception failure = failureType == 1 ? new IOException("Cannot read container metadata")
-        : new IllegalStateException("Failed to initRaftLog", new IOException("Corrupt Raft log"));
+    Throwable failure = failureType == 1 ? new IOException("Cannot read container metadata")
+        : failureType == 2 ? new IllegalStateException("Failed to initRaftLog", new IOException("Corrupt Raft log"))
+        : new AssertionError("Failed to initRaftLog", new IOException("Corrupt Raft log"));
     ExecutorService executor = Executors.newFixedThreadPool(2,
         new ThreadFactoryBuilder().setDaemon(true).build());
     try {
