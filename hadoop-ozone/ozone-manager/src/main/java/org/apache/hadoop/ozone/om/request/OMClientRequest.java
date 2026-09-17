@@ -148,7 +148,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     return omRequest;
   }
 
-  private static OzoneManagerProtocolProtos.S3Authentication resolveS3Authentication(
+  public static OzoneManagerProtocolProtos.S3Authentication resolveS3Authentication(
       OzoneManagerProtocolProtos.S3Authentication s3Auth, STSTokenIdentifier stsTokenIdentifier) {
     final OzoneManagerProtocolProtos.S3Authentication.Builder s3AuthBuilder = s3Auth.toBuilder();
 
@@ -217,6 +217,22 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
+    return getUserInfo(omRequest, true);
+  }
+
+  /**
+   * Get authenticated user information for a read request submitted to Ratis.
+   * Client-supplied user information is not trusted on this path.
+   * @param omRequest OM request
+   * @return User Info.
+   */
+  public static OzoneManagerProtocolProtos.UserInfo getAuthenticatedUserInfo(
+      OMRequest omRequest) throws IOException {
+    return getUserInfo(omRequest, false);
+  }
+
+  private static OzoneManagerProtocolProtos.UserInfo getUserInfo(
+      OMRequest omRequest, boolean allowClientUserInfo) throws IOException {
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
     InetAddress remoteAddress = ProtobufRpcEngine.Server.getRemoteIp();
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
@@ -258,7 +274,8 @@ public abstract class OMClientRequest implements RequestAuditor {
     // client-supplied user name when no identity was established above:
     // it is unauthenticated data and must never override the identity
     // derived from S3 authentication or from the RPC user.
-    if (user == null && !userInfo.hasUserName() && omRequest.hasUserInfo()) {
+    if (allowClientUserInfo && user == null && !userInfo.hasUserName() &&
+        omRequest.hasUserInfo()) {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 

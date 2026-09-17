@@ -21,6 +21,7 @@ import static java.util.UUID.randomUUID;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_USERS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
@@ -39,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.protobuf.ServiceException;
 import java.net.InetSocketAddress;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -78,6 +80,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -278,6 +281,46 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
       assertEquals(initialProxyOmNodeId, otherClientFollowerReadProxyProvider.getCurrentProxy().getNodeId());
     } finally {
       IOUtils.closeQuietly(anotherClient);
+    }
+  }
+
+  @Test
+  void testCallerContextPreservedForLinearizableRead() throws Exception {
+    OzoneBucket bucket = setupBucket();
+    String key = createKey(bucket);
+    String deniedUserName = uniqueObjectName("denied-user");
+    UserGroupInformation deniedUser = UserGroupInformation.createRemoteUser(deniedUserName);
+    OzoneManager followerOM = getCluster().getOzoneManagersList().stream()
+        .filter(om -> !om.isLeaderReady())
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("No follower OM available"));
+
+    for (OzoneManager om : getCluster().getOzoneManagersList()) {
+      om.getReconfigurationHandler().reconfigureProperty(OZONE_READ_BLACKLIST_USERS, deniedUserName);
+    }
+
+    try {
+      long previousLinearizableRead = followerOM.getMetrics().getNumLinearizableRead();
+      OMException exception = deniedUser.doAs((PrivilegedExceptionAction<OMException>) () -> {
+        OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
+        clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+        clientConf.set(OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY, "LINEARIZABLE_ALLOW_FOLLOWER");
+        clientConf.set(OZONE_OM_TRANSPORT_CLASS, Hadoop3OmTransportFactory.class.getName());
+        try (OzoneClient deniedClient = OzoneClientFactory.getRpcClient(getOmServiceId(), clientConf)) {
+          ObjectStore deniedObjectStore = deniedClient.getObjectStore();
+          changeFollowerReadInitialProxy(deniedObjectStore, Hadoop3OmTransportFactory.class,
+              getCluster().getOMLeader().getOMNodeId(), followerOM.getOMNodeId());
+          return assertThrows(OMException.class, () -> deniedObjectStore.getClientProxy().headObject(
+              bucket.getVolumeName(), bucket.getName(), key));
+        }
+      });
+
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED, exception.getResult());
+      assertThat(followerOM.getMetrics().getNumLinearizableRead()).isGreaterThan(previousLinearizableRead);
+    } finally {
+      for (OzoneManager om : getCluster().getOzoneManagersList()) {
+        om.getReconfigurationHandler().reconfigureProperty(OZONE_READ_BLACKLIST_USERS, "");
+      }
     }
   }
 

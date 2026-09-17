@@ -73,7 +73,17 @@ public class OMExecutionFlow {
         return OzoneManagerRatisUtils.createErrorResponse(request, ex);
       }
     } else {
-      requestToSubmit = request;
+      try {
+        OMRequest.Builder requestBuilder = request.toBuilder()
+            .setUserInfo(OMClientRequest.getAuthenticatedUserInfo(request));
+        if (request.hasS3Authentication()) {
+          requestBuilder.setS3Authentication(OMClientRequest.resolveS3Authentication(
+              request.getS3Authentication(), OzoneManager.getStsTokenIdentifier()));
+        }
+        requestToSubmit = requestBuilder.build();
+      } catch (IOException ex) {
+        return OzoneManagerRatisUtils.createErrorResponse(request, ex);
+      }
     }
 
     // 2. submit request to ratis
