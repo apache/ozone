@@ -84,10 +84,10 @@ public final class S3Consts {
   public static final String STORAGE_CONFIG_HEADER = "storage-config";
   public static final String READ_CONSISTENCY_HEADER =
       "x-ozone-read-consistency";
-  public static final String FOLLOWER_STALE_LOG_LIMIT_HEADER =
-      "x-ozone-follower-stale-log-limit";
-  public static final String FOLLOWER_STALE_TIME_MS_HEADER =
-      "x-ozone-follower-stale-time-ms";
+  public static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
+      "x-ozone-local-lease-log-limit";
+  public static final String LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER =
+      "x-ozone-local-lease-max-leader-contact-age-ms";
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";
