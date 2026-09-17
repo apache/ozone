@@ -97,12 +97,6 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   private final ReadConsistencyHint leaderReadConsistency;
 
   public HadoopRpcOMFollowerReadFailoverProxyProvider(
-      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderProxy
-  ) {
-    this(leaderProxy, ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER, ReadConsistency.DEFAULT, true);
-  }
-
-  public HadoopRpcOMFollowerReadFailoverProxyProvider(
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderProxy,
       ReadConsistency followerReadConsistencyType,
       ReadConsistency leaderReadConsistencyType,
