@@ -1280,7 +1280,6 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  @SuppressWarnings("methodlength")
   public void testShCreateBucketWithStoragePolicy() throws Exception {
     ObjectStore objectStore = client.getObjectStore();
     execute(ozoneShell, new String[]{"volume", "create", "spvol1"});
@@ -1322,7 +1321,6 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  @SuppressWarnings("methodlength")
   public void testShUpdateBucketStoragePolicy() throws Exception {
     ObjectStore objectStore = client.getObjectStore();
     execute(ozoneShell, new String[]{"volume", "create", "spvol2"});

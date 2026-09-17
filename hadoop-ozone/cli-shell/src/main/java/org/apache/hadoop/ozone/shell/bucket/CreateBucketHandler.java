@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
 
 /**
@@ -70,15 +71,17 @@ public class CreateBucketHandler extends BucketHandler {
   private SetSpaceQuotaOptions quotaOptions;
 
   @Option(names = {"--storage-policy", "-s"},
-      description = "Bucket StoragePolicy. Allowed values: HOT, WARM, COLD, null. Default: WARM.",
-      defaultValue = "WARM")
+      description = "Bucket StoragePolicy. Allowed values: HOT, WARM, COLD, null.",
+      defaultValue = "WARM",
+      showDefaultValue = Visibility.ALWAYS)
   private String storagePolicyStr;
 
   @Option(names = {"--allow-fallback-storage-policy", "-a"},
       description = "When true, allocation may fall back to the StoragePolicy's " +
-          "fallback tier if the creation tier is unavailable. Default: true.",
-      defaultValue = "true")
-  private String allowFallBackStoragePolicyStr;
+          "fallback tier if the creation tier is unavailable.",
+      defaultValue = "true", arity = "1",
+      showDefaultValue = Visibility.ALWAYS)
+  private boolean allowFallBackStoragePolicy;
 
   private static final String NULL_STORAGE_POLICY = "null";
 
@@ -94,8 +97,6 @@ public class CreateBucketHandler extends BucketHandler {
     }
 
     StoragePolicy storagePolicy = parseStoragePolicy(storagePolicyStr);
-    Boolean allowFallBackStoragePolicy =
-        Boolean.valueOf(allowFallBackStoragePolicyStr);
 
     BucketArgs.Builder bb =
         new BucketArgs.Builder()

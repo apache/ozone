@@ -547,7 +547,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
 
   private OMClientResponse runSetStoragePolicy(String volumeName,
       String bucketName, StoragePolicy storagePolicy,
-      Boolean unSetStoragePolicy, Boolean allowFallbackStoragePolicy,
+      Boolean unsetStoragePolicy, Boolean allowFallbackStoragePolicy,
       long txnId) throws Exception {
     OmBucketArgs.Builder argsBuilder = OmBucketArgs.newBuilder()
         .setVolumeName(volumeName)
@@ -555,8 +555,8 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     if (storagePolicy != null) {
       argsBuilder.setStoragePolicy(storagePolicy);
     }
-    if (unSetStoragePolicy != null) {
-      argsBuilder.setUnSetStoragePolicy(unSetStoragePolicy);
+    if (unsetStoragePolicy != null) {
+      argsBuilder.setUnsetStoragePolicy(unsetStoragePolicy);
     }
     if (allowFallbackStoragePolicy != null) {
       argsBuilder.setAllowFallbackStoragePolicy(allowFallbackStoragePolicy);

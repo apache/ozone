@@ -48,8 +48,9 @@ public class UpdateBucketHandler extends BucketHandler {
   @Option(names = {"--allow-fallback-storage-policy", "-a"},
       description = "When true, allocation may fall back to the StoragePolicy's "
           + "fallback tier if the creation tier is unavailable. Leave unset to "
-          + "keep the current value.")
-  private String allowFallBackStoragePolicyStr;
+          + "keep the current value.",
+      arity = "1")
+  private Boolean allowFallBackStoragePolicy;
 
   private static final String NULL_STORAGE_POLICY = "null";
 
@@ -80,13 +81,12 @@ public class UpdateBucketHandler extends BucketHandler {
       shouldSetStoragePolicyProperty = true;
       StoragePolicy storagePolicy = getStoragePolicy();
       if (storagePolicy == null) {
-        bucketArgsBuilder.setUnSetStoragePolicy(true);
+        bucketArgsBuilder.setUnsetStoragePolicy(true);
       } else {
         bucketArgsBuilder.setStoragePolicy(storagePolicy);
       }
     }
 
-    Boolean allowFallBackStoragePolicy = getAllowFallBackStoragePolicy();
     if (allowFallBackStoragePolicy != null) {
       shouldSetStoragePolicyProperty = true;
       bucketArgsBuilder.setAllowFallbackStoragePolicy(allowFallBackStoragePolicy);
@@ -124,10 +124,5 @@ public class UpdateBucketHandler extends BucketHandler {
           + storagePolicyStr
           + ". Allowed String values are: HOT, WARM, COLD, or null.");
     }
-  }
-
-  private Boolean getAllowFallBackStoragePolicy() {
-    return allowFallBackStoragePolicyStr == null ? null
-        : Boolean.valueOf(allowFallBackStoragePolicyStr);
   }
 }

@@ -298,7 +298,7 @@ public interface ClientProtocol {
    * Sets the storage-policy related properties of a bucket carried in the
    * given {@link OmBucketArgs} (storage policy, allowFallback, or unset).
    * Unlike the three-arg overload, the policy may be absent or explicitly
-   * cleared via {@link OmBucketArgs.Builder#setUnSetStoragePolicy}.
+   * cleared via {@link OmBucketArgs.Builder#setUnsetStoragePolicy}.
    * @param args Bucket arguments carrying the properties to update.
    * @throws IOException
    */

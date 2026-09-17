@@ -166,8 +166,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
       //Check StoragePolicy to update
       StoragePolicy storagePolicy = omBucketArgs.getStoragePolicy();
-      Boolean unSetStoragePolicy = omBucketArgs.getUnSetStoragePolicy();
-      if (storagePolicy != null && Boolean.TRUE.equals(unSetStoragePolicy)) {
+      Boolean unsetStoragePolicy = omBucketArgs.getUnsetStoragePolicy();
+      if (storagePolicy != null && Boolean.TRUE.equals(unsetStoragePolicy)) {
         throw new OMException("Set storagePolicy and unset storagePolicy cannot "
             + "be given at the same time",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
@@ -177,7 +177,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         LOG.debug("Updating bucket storage policy for bucket: {} in volume: {}",
             bucketName, volumeName);
       }
-      if (Boolean.TRUE.equals(unSetStoragePolicy)) {
+      if (Boolean.TRUE.equals(unsetStoragePolicy)) {
         bucketInfoBuilder.setStoragePolicy(null);
         LOG.debug("Unsetting bucket storage policy for bucket: {} in volume: {}",
             bucketName, volumeName);
