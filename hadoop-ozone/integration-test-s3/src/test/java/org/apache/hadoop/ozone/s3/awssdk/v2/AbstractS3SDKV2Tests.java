@@ -227,8 +227,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       "x-ozone-read-consistency";
   private static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
       "x-ozone-local-lease-log-limit";
-  private static final String LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER =
-      "x-ozone-local-lease-max-leader-contact-age-ms";
 
   private MiniOzoneCluster cluster;
   private S3Client s3Client;
@@ -326,7 +324,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
               c.putHeader(READ_CONSISTENCY_HEADER, readConsistency);
               if ("follower-stale".equals(readConsistency)) {
                 c.putHeader(LOCAL_LEASE_LOG_LIMIT_HEADER, "10");
-                c.putHeader(LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER, "100");
               }
             }));
 

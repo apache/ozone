@@ -42,7 +42,6 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.LOCAL_LEASE_LOG_LIMIT_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.READ_CONSISTENCY_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -292,16 +291,14 @@ public abstract class EndpointBase {
     ReadConsistency readConsistency = parseReadConsistencyHeader();
     Long localLeaseLogLimit = parseLocalLeaseContextHeader(
         LOCAL_LEASE_LOG_LIMIT_HEADER);
-    Long localLeaseMaxLeaderContactAgeMs = parseLocalLeaseContextHeader(
-        LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER);
     if (readConsistency == null) {
-      validateNoLocalLeaseContext(localLeaseLogLimit, localLeaseMaxLeaderContactAgeMs);
+      validateNoLocalLeaseContext(localLeaseLogLimit);
       clientProtocol.clearThreadLocalReadConsistency();
     } else if (readConsistency == ReadConsistency.LOCAL_LEASE) {
       clientProtocol.setThreadLocalReadConsistency(readConsistency,
-          localLeaseLogLimit, localLeaseMaxLeaderContactAgeMs);
+          localLeaseLogLimit, null);
     } else {
-      validateNoLocalLeaseContext(localLeaseLogLimit, localLeaseMaxLeaderContactAgeMs);
+      validateNoLocalLeaseContext(localLeaseLogLimit);
       clientProtocol.setThreadLocalReadConsistency(readConsistency);
     }
   }
@@ -341,8 +338,8 @@ public abstract class EndpointBase {
     }
   }
 
-  private void validateNoLocalLeaseContext(Long localLeaseLogLimit, Long localLeaseMaxLeaderContactAgeMs) {
-    if (localLeaseLogLimit != null || localLeaseMaxLeaderContactAgeMs != null) {
+  private void validateNoLocalLeaseContext(Long localLeaseLogLimit) {
+    if (localLeaseLogLimit != null) {
       OS3Exception ex = newError(INVALID_ARGUMENT, READ_CONSISTENCY_HEADER);
       ex.setErrorMessage("Local lease context requires read consistency: " +
           "follower-stale");

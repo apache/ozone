@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.LOCAL_LEASE_LOG_LIMIT_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.READ_CONSISTENCY_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -234,8 +233,6 @@ public class TestEndpointBase {
         .thenReturn("follower-stale");
     when(headers.getHeaderString(LOCAL_LEASE_LOG_LIMIT_HEADER))
         .thenReturn("10");
-    when(headers.getHeaderString(LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER))
-        .thenReturn("100");
 
     RootEndpoint endpoint = newRootEndpoint(headers);
 
@@ -244,7 +241,7 @@ public class TestEndpointBase {
     assertEquals(ReadConsistency.LOCAL_LEASE,
         clientProtocol.getThreadLocalReadConsistency());
     assertEquals(10L, clientProtocol.getThreadLocalLocalLeaseLogLimit());
-    assertEquals(100L, clientProtocol.getThreadLocalLocalLeaseTimeMs());
+    assertThat(clientProtocol.getThreadLocalLocalLeaseTimeMs()).isNull();
   }
 
   @Test
@@ -254,15 +251,13 @@ public class TestEndpointBase {
         .thenReturn("follower-stale");
     when(headers.getHeaderString(LOCAL_LEASE_LOG_LIMIT_HEADER))
         .thenReturn("-1");
-    when(headers.getHeaderString(LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER))
-        .thenReturn("-1");
 
     RootEndpoint endpoint = newRootEndpoint(headers);
 
     ClientProtocolStub clientProtocol = (ClientProtocolStub) endpoint
         .getClient().getObjectStore().getClientProxy();
     assertEquals(-1L, clientProtocol.getThreadLocalLocalLeaseLogLimit());
-    assertEquals(-1L, clientProtocol.getThreadLocalLocalLeaseTimeMs());
+    assertThat(clientProtocol.getThreadLocalLocalLeaseTimeMs()).isNull();
   }
 
   @Test

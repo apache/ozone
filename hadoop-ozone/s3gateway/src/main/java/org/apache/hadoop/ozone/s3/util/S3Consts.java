@@ -86,8 +86,6 @@ public final class S3Consts {
       "x-ozone-read-consistency";
   public static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
       "x-ozone-local-lease-log-limit";
-  public static final String LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER =
-      "x-ozone-local-lease-max-leader-contact-age-ms";
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";

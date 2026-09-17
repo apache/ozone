@@ -187,8 +187,6 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       "x-ozone-read-consistency";
   private static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
       "x-ozone-local-lease-log-limit";
-  private static final String LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER =
-      "x-ozone-local-lease-max-leader-contact-age-ms";
 
   /**
    * There are still some unsupported S3 operations.
@@ -598,7 +596,6 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
         readConsistency);
     if ("follower-stale".equals(readConsistency)) {
       request.putCustomRequestHeader(LOCAL_LEASE_LOG_LIMIT_HEADER, "10");
-      request.putCustomRequestHeader(LOCAL_LEASE_MAX_LEADER_CONTACT_AGE_MS_HEADER, "100");
     }
 
     try (S3Object object = s3Client.getObject(request);
