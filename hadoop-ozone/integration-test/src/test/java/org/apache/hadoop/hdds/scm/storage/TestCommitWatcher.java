@@ -157,13 +157,22 @@ public class TestCommitWatcher {
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
         assertEquals(1, xceiverClient.getRefcount());
         XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
+        // Commit one request synchronously before the async write burst so the
+        // Ratis client is fully established and the container already exists.
+        // Issuing the burst directly on a freshly-acquired client was seen to
+        // fail intermittently with AlreadyClosedException (HDDS-16398).
+        ratisClient.sendCommandAsync(
+            ContainerTestHelper.getCreateContainerRequest(containerId, pipeline))
+            .getResponse().get();
         CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
-        BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
         List<XceiverClientReply> replies = new ArrayList<>();
         long length = 0;
         List<CompletableFuture<ContainerCommandResponseProto>>
             futures = new ArrayList<>();
         for (int i = 0; i < capacity; i++) {
+          // Use a distinct block per iteration; a real client never rewrites the
+          // same blockID and offset with different data.
+          BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
           ContainerCommandRequestProto writeChunkRequest =
               ContainerTestHelper
                   .getWriteChunkRequest(pipeline, blockID, CHUNK_SIZE);
@@ -223,13 +232,22 @@ public class TestCommitWatcher {
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
         assertEquals(1, xceiverClient.getRefcount());
         XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
+        // Commit one request synchronously before the async write burst so the
+        // Ratis client is fully established and the container already exists.
+        // Issuing the burst directly on a freshly-acquired client was seen to
+        // fail intermittently with AlreadyClosedException (HDDS-16398).
+        ratisClient.sendCommandAsync(
+            ContainerTestHelper.getCreateContainerRequest(containerId, pipeline))
+            .getResponse().get();
         CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
-        BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
         List<XceiverClientReply> replies = new ArrayList<>();
         long length = 0;
         List<CompletableFuture<ContainerCommandResponseProto>>
             futures = new ArrayList<>();
         for (int i = 0; i < capacity; i++) {
+          // Use a distinct block per iteration; a real client never rewrites the
+          // same blockID and offset with different data.
+          BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
           ContainerCommandRequestProto writeChunkRequest =
               ContainerTestHelper
                   .getWriteChunkRequest(pipeline, blockID, CHUNK_SIZE);
