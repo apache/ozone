@@ -620,7 +620,7 @@ public class TestOzoneManagerStateMachine {
   }
 
   @Test
-  public void testQueryInstallsAndRestoresCallerContext() throws Exception {
+  public void testQueryInstallsAndClearsCallerContext() throws Exception {
     UserInfo userInfo = UserInfo.newBuilder()
         .setUserName("ratis-user")
         .setHostName("client.example.com")
@@ -642,18 +642,14 @@ public class TestOzoneManagerStateMachine {
       return expectedResponse;
     });
 
-    Server.Call previousCall = createCall("previous-user", "previous.example.com", new byte[] {10, 0, 0, 1});
-    Future<Server.Call> restoredCall = executor.submit(() -> {
-      Server.getCurCall().set(previousCall);
-      try {
-        sm.query(Message.valueOf(OMRatisHelper.convertRequestToByteString(request))).get();
-        return Server.getCurCall().get();
-      } finally {
-        Server.getCurCall().remove();
-      }
+    Server.Call staleCall = createCall("stale-user", "stale.example.com", new byte[] {10, 0, 0, 1});
+    Future<Server.Call> callAfterQuery = executor.submit(() -> {
+      Server.getCurCall().set(staleCall);
+      sm.query(Message.valueOf(OMRatisHelper.convertRequestToByteString(request))).get();
+      return Server.getCurCall().get();
     });
 
-    assertSame(previousCall, restoredCall.get());
+    assertNull(callAfterQuery.get());
     assertEquals("ratis-user", observedUser.get().getUserName());
     assertEquals(SIMPLE, observedUser.get().getAuthenticationMethod());
     assertNull(observedUser.get().getRealUser());
@@ -700,7 +696,7 @@ public class TestOzoneManagerStateMachine {
   }
 
   @Test
-  public void testQueryInstallsAndRestoresS3Context() throws Exception {
+  public void testQueryInstallsAndClearsS3Context() throws Exception {
     when(om.isSecurityEnabled()).thenReturn(true);
     S3Authentication requestS3Auth = S3Authentication.newBuilder()
         .setAccessId("temp-access-id")
@@ -728,22 +724,17 @@ public class TestOzoneManagerStateMachine {
       return expectedResponse;
     });
 
-    S3Authentication previousS3Auth = S3Authentication.newBuilder().setAccessId("previous-access-id").build();
-    STSTokenIdentifier previousStsToken = mock(STSTokenIdentifier.class);
-    Future<Boolean> restoredContext = executor.submit(() -> {
-      OzoneManager.setS3Auth(previousS3Auth);
-      OzoneManager.setStsTokenIdentifier(previousStsToken);
-      try {
-        sm.query(Message.valueOf(OMRatisHelper.convertRequestToByteString(request))).get();
-        return OzoneManager.getS3Auth() == previousS3Auth
-            && OzoneManager.getStsTokenIdentifier() == previousStsToken;
-      } finally {
-        OzoneManager.setS3Auth(null);
-        OzoneManager.setStsTokenIdentifier(null);
-      }
+    S3Authentication staleS3Auth = S3Authentication.newBuilder().setAccessId("stale-access-id").build();
+    STSTokenIdentifier staleStsToken = mock(STSTokenIdentifier.class);
+    Future<Boolean> clearedContext = executor.submit(() -> {
+      OzoneManager.setS3Auth(staleS3Auth);
+      OzoneManager.setStsTokenIdentifier(staleStsToken);
+      sm.query(Message.valueOf(OMRatisHelper.convertRequestToByteString(request))).get();
+      return OzoneManager.getS3Auth() == null
+          && OzoneManager.getStsTokenIdentifier() == null;
     });
 
-    assertTrue(restoredContext.get());
+    assertTrue(clearedContext.get());
     assertEquals(requestS3Auth, observedS3Auth.get());
     assertEquals("session-policy", observedStsToken.get().getSessionPolicy());
     assertEquals("role-arn", observedStsToken.get().getRoleArn());
@@ -752,7 +743,7 @@ public class TestOzoneManagerStateMachine {
   }
 
   @Test
-  public void testQueryRestoresContextAfterFailure() throws Exception {
+  public void testQueryClearsContextAfterFailure() throws Exception {
     when(om.isSecurityEnabled()).thenReturn(true);
     S3Authentication requestS3Auth = S3Authentication.newBuilder()
         .setAccessId("request-access-id")
@@ -764,27 +755,21 @@ public class TestOzoneManagerStateMachine {
     when(handler.handleReadRequest(any(OMRequest.class)))
         .thenThrow(new IllegalStateException("read failed"));
 
-    Server.Call previousCall = createCall("previous-user", "previous.example.com", new byte[] {10, 0, 0, 1});
-    S3Authentication previousS3Auth = S3Authentication.newBuilder().setAccessId("previous-access-id").build();
-    STSTokenIdentifier previousStsToken = mock(STSTokenIdentifier.class);
-    Future<Boolean> restoredContext = executor.submit(() -> {
-      Server.getCurCall().set(previousCall);
-      OzoneManager.setS3Auth(previousS3Auth);
-      OzoneManager.setStsTokenIdentifier(previousStsToken);
-      try {
-        assertThrows(IllegalStateException.class,
-            () -> sm.query(Message.valueOf(OMRatisHelper.convertRequestToByteString(request))));
-        return Server.getCurCall().get() == previousCall
-            && OzoneManager.getS3Auth() == previousS3Auth
-            && OzoneManager.getStsTokenIdentifier() == previousStsToken;
-      } finally {
-        Server.getCurCall().remove();
-        OzoneManager.setS3Auth(null);
-        OzoneManager.setStsTokenIdentifier(null);
-      }
+    Server.Call staleCall = createCall("stale-user", "stale.example.com", new byte[] {10, 0, 0, 1});
+    S3Authentication staleS3Auth = S3Authentication.newBuilder().setAccessId("stale-access-id").build();
+    STSTokenIdentifier staleStsToken = mock(STSTokenIdentifier.class);
+    Future<Boolean> clearedContext = executor.submit(() -> {
+      Server.getCurCall().set(staleCall);
+      OzoneManager.setS3Auth(staleS3Auth);
+      OzoneManager.setStsTokenIdentifier(staleStsToken);
+      assertThrows(IllegalStateException.class,
+          () -> sm.query(Message.valueOf(OMRatisHelper.convertRequestToByteString(request))));
+      return Server.getCurCall().get() == null
+          && OzoneManager.getS3Auth() == null
+          && OzoneManager.getStsTokenIdentifier() == null;
     });
 
-    assertTrue(restoredContext.get());
+    assertTrue(clearedContext.get());
   }
 
   // --- notifyTermIndexUpdated tests ---

@@ -817,15 +817,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   private static final class RatisQueryContext implements AutoCloseable {
     private final Server.Call currentCall;
-    private final Server.Call previousCall;
-    private final OzoneManagerProtocolProtos.S3Authentication previousS3Auth;
-    private final STSTokenIdentifier previousStsToken;
 
     private RatisQueryContext(OMRequest request, boolean securityEnabled)
         throws IOException {
-      previousCall = Server.getCurCall().get();
-      previousS3Auth = OzoneManager.getS3Auth();
-      previousStsToken = OzoneManager.getStsTokenIdentifier();
       currentCall = createCall(request);
 
       try {
@@ -917,13 +911,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     @Override
     public void close() {
-      if (previousCall == null) {
-        Server.getCurCall().remove();
-      } else {
-        Server.getCurCall().set(previousCall);
-      }
-      OzoneManager.setS3Auth(previousS3Auth);
-      OzoneManager.setStsTokenIdentifier(previousStsToken);
+      Server.getCurCall().remove();
+      OzoneManager.setS3Auth(null);
+      OzoneManager.setStsTokenIdentifier(null);
     }
   }
 
