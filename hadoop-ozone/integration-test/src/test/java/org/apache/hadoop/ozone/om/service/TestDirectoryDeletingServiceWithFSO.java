@@ -112,7 +112,10 @@ public class TestDirectoryDeletingServiceWithFSO {
   private boolean pendingSdsResume = false;
   private DirectoryDeletingService pendingResumeDds = null;
   private boolean needsTableCleanup = false;
+  private String snapshotCleanupVolume = null;
+  private String snapshotCleanupBucket = null;
   private String snapshotToDeleteInCleanup = null;
+  private String snapshotToDeleteInCleanup2 = null;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -163,12 +166,24 @@ public class TestDirectoryDeletingServiceWithFSO {
         pendingSdsResume = false;
       }
       if (snapshotToDeleteInCleanup != null) {
+        String cleanupVolume = snapshotCleanupVolume != null ? snapshotCleanupVolume : volumeName;
+        String cleanupBucket = snapshotCleanupBucket != null ? snapshotCleanupBucket : bucketName;
         try {
-          client.getObjectStore().deleteSnapshot(volumeName, bucketName, snapshotToDeleteInCleanup);
-        } catch (Exception ignored) {
+          client.getObjectStore().deleteSnapshot(cleanupVolume, cleanupBucket, snapshotToDeleteInCleanup);
+        } catch (IOException ignored) {
           // snapshot may have already been deleted by the test body
         }
         snapshotToDeleteInCleanup = null;
+        if (snapshotToDeleteInCleanup2 != null) {
+          try {
+            client.getObjectStore().deleteSnapshot(cleanupVolume, cleanupBucket, snapshotToDeleteInCleanup2);
+          } catch (IOException ignored) {
+            // snapshot may have already been deleted by the test body
+          }
+          snapshotToDeleteInCleanup2 = null;
+        }
+        snapshotCleanupVolume = null;
+        snapshotCleanupBucket = null;
       }
       if (snapshotCountAfterTest >= 0) {
         Table<String, SnapshotInfo> snapshotInfoTable =
@@ -181,7 +196,7 @@ public class TestDirectoryDeletingServiceWithFSO {
         pendingResumeDds.resume();
         pendingResumeDds = null;
       }
-      if (needsTableCleanup) {
+      if (needsTableCleanup && snapshotCountAfterTest < 0) {
         cleanupTables();
         needsTableCleanup = false;
       }
@@ -637,6 +652,10 @@ public class TestDirectoryDeletingServiceWithFSO {
     final int initialRenameCount = (int) omMetadataManager.countRowsInTable(renameTable);
     String snap1 = "snap1";
     String snap2 = "snap2";
+    snapshotCleanupVolume = testVolumeName;
+    snapshotCleanupBucket = testBucketName;
+    snapshotToDeleteInCleanup = snap1;
+    snapshotToDeleteInCleanup2 = snap2;
     createFileKey(bucket, "dir1/key1");
     store.createSnapshot(testVolumeName, testBucketName, "snap1");
     bucket.renameKey("dir1", "dir2");
