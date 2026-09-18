@@ -41,7 +41,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
@@ -186,7 +188,6 @@ public class BlockOutputStream extends OutputStream {
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
-
     ContainerProtos.DatanodeBlockID.Builder blkIDBuilder =
         ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(blockID.getContainerID())
@@ -195,6 +196,8 @@ public class BlockOutputStream extends OutputStream {
     if (replicationIndex > 0) {
       blkIDBuilder.setReplicaIndex(replicationIndex);
     }
+    // TODO: Replica to the method parameter
+    blkIDBuilder.setStorageTypeID(StorageTypeUtils.getID(StorageType.DISK));
     this.containerBlockData = BlockData.newBuilder().setBlockID(
         blkIDBuilder.build()).addMetadata(keyValue);
     this.pipeline = pipeline;

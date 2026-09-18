@@ -103,5 +103,13 @@ public final class StorageTypeUtils {
       throw new IllegalArgumentException("Illegal Storage Type specified");
     }
   }
+
+  /**
+   * Returns integer representation of FileSystem StorageType.
+   * @return storageType int ID value
+   */
+  public static int getID(StorageType storageType) throws IllegalArgumentException {
+    return getStorageTypeProto(storageType).getNumber();
+  }
 }
 

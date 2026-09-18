@@ -692,6 +692,8 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Objects.requireNonNull(blockData, "blockData == null");
+      Objects.requireNonNull(blockData.getBlockID());
+      BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockData.getBlockID());
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
@@ -1114,6 +1116,7 @@ public class KeyValueHandler extends Handler {
 
       WriteChunkRequestProto writeChunk = request.getWriteChunk();
       BlockID blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
+      BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockID);
       ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
 
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
@@ -1272,6 +1275,7 @@ public class KeyValueHandler extends Handler {
       BlockData blockData = BlockData.getFromProtoBuf(
           putSmallFileReq.getBlock().getBlockData());
       Objects.requireNonNull(blockData, "blockData == null");
+      BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockData.getBlockID());
 
       ContainerProtos.ChunkInfo chunkInfoProto = putSmallFileReq.getChunkInfo();
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
