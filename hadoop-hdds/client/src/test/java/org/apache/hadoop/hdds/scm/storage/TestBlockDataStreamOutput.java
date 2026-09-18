@@ -159,7 +159,7 @@ class TestBlockDataStreamOutput {
     }
   }
 
-  //@Test - skipped as it fails now.
+  @Test
   void hsyncPropagatesIOException() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     // Fail the first putBlock
@@ -171,10 +171,10 @@ class TestBlockDataStreamOutput {
 
     // hsync should propagate the IOException from the failed putBlock
     assertThrows(IOException.class, stream::hsync, "hsync() must propagate IOException from failed putBlock");
-    stream.close();
+    assertThrows(IOException.class, stream::close);
   }
 
-  //@Test - skipped as it fails now
+  @Test
   void hsyncPropagatesWatchFailure() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     // Fail the first watchForCommit
@@ -187,7 +187,7 @@ class TestBlockDataStreamOutput {
 
     // hsync should propagate the watch failure
     assertThrows(IOException.class, stream::hsync, "hsync() must propagate IOException from failed watchForCommit");
-    stream.close();
+    assertThrows(IOException.class, stream::close);
   }
 
   @Test

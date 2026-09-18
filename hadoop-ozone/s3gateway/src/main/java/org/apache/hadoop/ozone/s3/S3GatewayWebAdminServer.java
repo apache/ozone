@@ -43,8 +43,10 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.hdds.server.http.ServletElementsFactory;
+import org.apache.hadoop.ozone.conf.S3GatewayHealthCheckConfig;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
@@ -62,10 +64,46 @@ class S3GatewayWebAdminServer extends BaseHttpServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3GatewayWebAdminServer.class);
 
+  static final String READINESS_PROBE_ATTRIBUTE =
+      "ozone.s3g.readiness.probe";
+
+  private final S3GatewayReadinessProbe readinessProbe;
+
   S3GatewayWebAdminServer(MutableConfigurationSource conf, String name) throws IOException {
     super(conf, name);
     addServlet("icon", "/favicon.ico", IconServlet.class);
+    S3GatewayHealthCheckConfig healthConfig =
+        conf.getObject(S3GatewayHealthCheckConfig.class);
+    if (healthConfig.isEnabled()) {
+      // Register via addInternalServlet so no authentication filter is mapped
+      // to the paths: the endpoints must be reachable by a load balancer
+      // without Kerberos/SPNEGO, including in secure mode.
+      addInternalServlet("liveness", "/health/live", LivenessServlet.class);
+      readinessProbe =
+          new S3GatewayReadinessProbe(OzoneConfiguration.of(conf), healthConfig);
+      getWebAppContext().getServletContext()
+          .setAttribute(READINESS_PROBE_ATTRIBUTE, readinessProbe);
+      addInternalServlet("readiness", "/health/ready", ReadinessServlet.class);
+    } else {
+      readinessProbe = null;
+    }
     addSecretAuthentication(conf);
+  }
+
+  @Override
+  public void start() throws IOException {
+    super.start();
+    if (readinessProbe != null) {
+      readinessProbe.start();
+    }
+  }
+
+  @Override
+  public void stop() throws Exception {
+    if (readinessProbe != null) {
+      readinessProbe.close();
+    }
+    super.stop();
   }
 
   private void addSecretAuthentication(MutableConfigurationSource conf)
@@ -181,6 +219,49 @@ class S3GatewayWebAdminServer extends BaseHttpServer {
         throws IOException {
       response.setContentType("image/png");
       response.sendRedirect("/images/ozone.ico");
+    }
+  }
+
+  /**
+   * Liveness probe: returns 200 as long as the gateway process is up and its
+   * web admin server can serve requests. It does not check OM reachability;
+   * that is the responsibility of the readiness endpoint.
+   */
+  public static class LivenessServlet extends HttpServlet {
+    private static final long serialVersionUID = -1L;
+
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+      response.setStatus(HttpServletResponse.SC_OK);
+      response.setContentType("text/plain; charset=utf-8");
+      response.getWriter().println("OK");
+    }
+  }
+
+  /**
+   * Readiness probe: returns 200 only when a background probe has confirmed the
+   * gateway can reach OM, and 503 otherwise (during startup or while OM is
+   * unreachable). The check reads a cached flag maintained off the request
+   * path, so the endpoint always responds immediately and a load balancer
+   * polling it cannot be blocked by a slow OM.
+   */
+  public static class ReadinessServlet extends HttpServlet {
+    private static final long serialVersionUID = -1L;
+
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+      S3GatewayReadinessProbe probe = (S3GatewayReadinessProbe)
+          getServletContext().getAttribute(READINESS_PROBE_ATTRIBUTE);
+      response.setContentType("text/plain; charset=utf-8");
+      if (probe != null && probe.isReady()) {
+        response.setStatus(HttpServletResponse.SC_OK);
+        response.getWriter().println("READY");
+      } else {
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+        response.getWriter().println("NOT READY");
+      }
     }
   }
 }
