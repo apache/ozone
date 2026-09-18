@@ -101,18 +101,37 @@ public final class S3STSUtils {
    * @return validated duration
    * @throws OMException if duration is invalid
    */
-  public static int validateDuration(Integer durationSeconds) throws OMException {
-    if (durationSeconds == null) {
-      return DEFAULT_DURATION_SECONDS;
-    }
-
+  public static int validateDuration(int durationSeconds) throws OMException {
     if (durationSeconds < MIN_DURATION_SECONDS || durationSeconds > MAX_DURATION_SECONDS) {
-      throw new OMException(
-          "Invalid Value: DurationSeconds must be between " + MIN_DURATION_SECONDS + " and " + MAX_DURATION_SECONDS +
-          " seconds", INVALID_REQUEST);
+      throw new OMException(durationValidationErrorMessage(), INVALID_REQUEST);
     }
 
     return durationSeconds;
+  }
+
+  /**
+   * Validates the duration in seconds from a raw request value.
+   * @param durationSeconds duration in seconds as a string
+   * @return validated duration
+   * @throws OMException if duration is invalid
+   */
+  public static int validateDuration(String durationSeconds) throws OMException {
+    if (Strings.nullToEmpty(durationSeconds).trim().isEmpty()) {
+      return DEFAULT_DURATION_SECONDS;
+    }
+
+    final int value;
+    try {
+      value = Integer.parseInt(durationSeconds);
+    } catch (NumberFormatException e) {
+      throw new OMException(durationValidationErrorMessage(), INVALID_REQUEST);
+    }
+    return validateDuration(value);
+  }
+
+  private static String durationValidationErrorMessage() {
+    return "Invalid Value: DurationSeconds must be a number between " + MIN_DURATION_SECONDS + " and " +
+        MAX_DURATION_SECONDS + " seconds";
   }
 
   /**
