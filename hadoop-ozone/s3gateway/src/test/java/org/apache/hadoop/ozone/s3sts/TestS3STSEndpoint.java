@@ -531,6 +531,38 @@ public class TestS3STSEndpoint {
   }
 
   @Test
+  public void testStsBlankDurationForGetMethod() throws Exception {
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get(
+            "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "     ", "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", DURATION_VALIDATION_ERROR_MESSAGE);
+  }
+
+  @Test
+  public void testStsBlankDurationForPostMethod() throws Exception {
+    setAssumeRoleFormParameters(
+        "Action", "AssumeRole", "RoleArn", ROLE_ARN, "RoleSessionName", ROLE_SESSION_NAME, "DurationSeconds", "     ",
+        "Version", "2011-06-15");
+
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", DURATION_VALIDATION_ERROR_MESSAGE);
+  }
+
+  @Test
   public void testStsNullDurationUsesDefault3600() throws Exception {
     final Response response = endpoint.get(
         "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, null, "2011-06-15", null);

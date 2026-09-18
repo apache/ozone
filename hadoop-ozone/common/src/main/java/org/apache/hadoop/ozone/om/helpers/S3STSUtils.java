@@ -116,7 +116,7 @@ public final class S3STSUtils {
    * @throws OMException if duration is invalid
    */
   public static int validateDuration(String durationSeconds) throws OMException {
-    if (Strings.nullToEmpty(durationSeconds).trim().isEmpty()) {
+    if (durationSeconds == null) {
       return DEFAULT_DURATION_SECONDS;
     }
 

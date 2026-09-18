@@ -38,9 +38,12 @@ public class TestS3STSUtils {
   }
 
   @Test
-  public void testValidateDurationStringBlankUsesDefault() throws OMException {
-    assertEquals(S3STSUtils.DEFAULT_DURATION_SECONDS, S3STSUtils.validateDuration(""));
-    assertEquals(S3STSUtils.DEFAULT_DURATION_SECONDS, S3STSUtils.validateDuration("   "));
+  public void testValidateDurationStringBlankIsInvalid() {
+    final OMException empty = assertThrows(OMException.class, () -> S3STSUtils.validateDuration(""));
+    assertThat(empty.getMessage()).isEqualTo(DURATION_VALIDATION_ERROR_MESSAGE);
+
+    final OMException whitespace = assertThrows(OMException.class, () -> S3STSUtils.validateDuration("   "));
+    assertThat(whitespace.getMessage()).isEqualTo(DURATION_VALIDATION_ERROR_MESSAGE);
   }
 
   @Test
