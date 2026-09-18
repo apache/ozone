@@ -82,7 +82,7 @@ public class OzoneClientProducer {
 }
 ```
 
-As we can see here, the producer is *request* scoped (see the annotation on the class), which means that the `OzoneClient` bean will be created for each request. If the client couldn't be created a specific exception will be thrown by the CDI framework (!) as one bean couldn't be injected with CDI. This error is different from the regular business exceptions therefore the normal exception handler (`OS3ExceptionMapper` implements `javax.ws.rs.ext.ExceptionMapper`) -- which can transform exceptions to HTTP error code -- doesn't apply. It can cause strange 500 error instead of some authentication error.
+As we can see here, the producer is *request* scoped (see the annotation on the class), which means that the `OzoneClient` bean will be created for each request. If the client couldn't be created a specific exception will be thrown by the CDI framework (!) as one bean couldn't be injected with CDI. This error is different from the regular business exceptions therefore the normal exception handler (`OS3ExceptionMapper` implements `jakarta.ws.rs.ext.ExceptionMapper`) -- which can transform exceptions to HTTP error code -- doesn't apply. It can cause strange 500 error instead of some authentication error.
 
 ## Caching
 

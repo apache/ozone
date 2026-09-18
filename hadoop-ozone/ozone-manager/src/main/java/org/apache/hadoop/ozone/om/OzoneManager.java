@@ -831,9 +831,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     @Override
     public void run() {
-      LOG.info("Warming up {} EDEKs... (initialDelay={}, "
-              + "retryInterval={}, maxRetries={})", keyNames.length, initialDelay, retryInterval,
-          maxRetries);
+      LOG.info("Warming up {} EDEKs: {} (initialDelay={}, "
+              + "retryInterval={}, maxRetries={})", keyNames.length, Arrays.asList(keyNames),
+          initialDelay, retryInterval, maxRetries);
       try {
         Thread.sleep(initialDelay);
       } catch (InterruptedException ie) {

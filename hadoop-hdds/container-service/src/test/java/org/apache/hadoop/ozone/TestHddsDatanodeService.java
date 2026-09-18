@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -43,6 +44,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.server.http.HttpServer2;
+import org.apache.hadoop.hdds.server.http.HttpServerConfigurationException;
+import org.apache.hadoop.hdds.server.http.TestHttpServer2;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
@@ -206,6 +210,25 @@ public class TestHddsDatanodeService {
       service.stop();
       service.join();
       service.close();
+      DefaultMetricsSystem.shutdown();
+    }
+  }
+
+  /**
+   * Verifies that {@link HddsDatanodeService#start} re-throws
+   * {@link HttpServerConfigurationException} instead of swallowing it through
+   * the generic {@code catch (Exception ex)} handler. A non-bridgeable
+   * javax filter (one that {@code ServletElementsFactory} cannot adapt to
+   * Jetty EE10) is injected via {@code ozone.http.filter.initializers}; the
+   * datanode HTTP server builder detects it and throws during construction.
+   */
+  @Test
+  public void startThrowsOnNonBridgeableFilter() {
+    conf.set(HttpServer2.FILTER_INITIALIZER_PROPERTY,
+        TestHttpServer2.NonBridgeableFilterInitializer.class.getName());
+    try {
+      assertThrows(HttpServerConfigurationException.class, () -> service.start(conf));
+    } finally {
       DefaultMetricsSystem.shutdown();
     }
   }

@@ -50,6 +50,25 @@ ozone.http.filter.initializers | org.apache.hadoop.security.AuthenticationFilter
 
 之后，各个组件需要正确配置才能完全启用 SPNEGO 或 SIMPLE 身份验证。
 
+### Filter initializer 兼容性
+
+Ozone 的 HTTP 服务运行在 Jetty 12（EE10，`jakarta.servlet`）上。通过 `ozone.http.filter.initializers` 注册的过滤器必须使用 `jakarta.servlet.Filter`，或者属于以下已桥接的 `javax.servlet` 过滤器系列之一：
+
+* `AuthenticationFilter`（hadoop-auth：Kerberos/SPNEGO 和简单身份验证）
+* `StaticUserFilter`（未启用安全的控制台使用的静态用户过滤器）
+* `CrossOriginFilter`（CORS 响应头）
+* `RestCsrfPreventionFilter`（CSRF 防护）
+
+其他任何 `javax.servlet.Filter` 实现——包括 Hadoop 的 `XFrameOptionsFilter` 及站点自定义的包装过滤器——均不可桥接。注册此类过滤器将导致守护进程（OM、SCM、Datanode、S3G、Recon）**启动中止**。
+
+**升级注意事项：** 在迁移到 Jetty 12 之前，HTTP 服务启动失败仅会被记录日志，守护进程会在没有 Web UI 的情况下继续运行。迁移后，守护进程将拒绝启动，以确保配置错误的过滤器不会被静默跳过。如果您的集群将 `ozone.http.filter.initializers` 设置为自定义过滤器，请在升级前将其迁移至 `jakarta.servlet.Filter`。
+
+### Jetty 12 URI 合规性
+
+Jetty 12 连接器接受一些 Jetty 9 曾拒绝的、语义模糊但技术上合法的 URI 结构：空路径段（如 `bucket//key`）、模糊的百分号编码、编码的路径分隔符以及可疑路径字符。这些对于包含特殊但有效字符的 S3 和 WebHDFS 路径是必要的。
+
+但是，RFC 3986 明确禁止以未编码形式出现在 URI 中的非法字符——例如 `[`、`]`、`{`、`}` 和 `|`——仍会被拒绝并返回 `400 Bad Request`。符合规范的 S3 和 WebHDFS 客户端已对这些字符进行百分号编码。如果您的客户端以未编码形式发送这些字符，则必须在升级前更新客户端以对其进行百分号编码。
+
 ### 为 OM HTTP 启用 SPNEGO 身份验证
 参数 | 值
 -----------------------------------|-----------------------------------------

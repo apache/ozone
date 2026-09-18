@@ -278,6 +278,7 @@ class TestOzoneAtRestEncryption {
       GenericTestUtils.waitFor(
           (BooleanSupplier) () -> omLogs.getOutput().contains("Successfully warmed up 1 EDEKs."),
           500, 60000);
+      assertThat(omLogs.getOutput()).as("warm-up log must name the key").contains(TEST_KEY);
     } finally {
       omLogs.stopCapturing();
       ozClient.close();

@@ -54,6 +54,40 @@ ozone.http.filter.initializers | org.apache.hadoop.security.AuthenticationFilter
 After that, individual component needs to configure properly to completely enable
 SPNEGO or SIMPLE authentication.
 
+### Filter initializer compatibility
+
+Ozone's HTTP servers run on Jetty 12 (EE10, `jakarta.servlet`). Filters registered
+through `ozone.http.filter.initializers` must use `jakarta.servlet.Filter`, or must
+belong to one of these bridged `javax.servlet` families:
+
+* `AuthenticationFilter` (hadoop-auth: Kerberos/SPNEGO and simple authentication)
+* `StaticUserFilter` (static user for unsecured consoles)
+* `CrossOriginFilter` (CORS response headers)
+* `RestCsrfPreventionFilter` (CSRF prevention)
+
+Any other `javax.servlet.Filter` — including Hadoop's `XFrameOptionsFilter` and
+site-specific wrapper filters — is not bridgeable. Registering one causes the
+daemon (OM, SCM, Datanode, S3G, Recon) to **abort start-up**.
+
+**Upgrade note:** before the Jetty 12 migration, a failed HTTP server start was logged
+and the daemon continued without a web UI. After it, the daemon refuses to start so
+that a misconfigured filter is never silently skipped. If your cluster sets
+`ozone.http.filter.initializers` to a custom filter, migrate it to
+`jakarta.servlet.Filter` before upgrading.
+
+### Jetty 12 URI compliance
+
+The Jetty 12 connector accepts ambiguous but technically legal URI constructs that
+Jetty 9 rejected: empty path segments (e.g., `bucket//key`), ambiguous
+percent-encodings, encoded path separators, and suspicious path characters. These
+are needed for S3 and WebHDFS paths that contain unusual but valid characters.
+
+However, genuinely illegal URI characters that RFC 3986 forbids in unencoded form
+— such as `[`, `]`, `{`, `}`, and `|` — are still rejected with `400 Bad Request`.
+Conforming S3 and WebHDFS clients already percent-encode these characters.
+If your client sends them unencoded, it must be updated to percent-encode them
+before upgrading.
+
 ### Enable SPNEGO authentication for OM HTTP
 Property| Value
 -----------------------------------|-----------------------------------------

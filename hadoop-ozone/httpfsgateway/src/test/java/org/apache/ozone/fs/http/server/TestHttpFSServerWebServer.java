@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import org.apache.hadoop.util.HttpExceptionUtils;
 import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -150,9 +151,26 @@ public class TestHttpFSServerWebServer {
       // Empty segment ("//") and percent encoding ("%25") reach the WebHDFS
       // servlet, which resolves them ("/a//b" -> "/a/b", "/a%25b" -> "/a%b") and
       // reports the file does not exist (404). A strict connector would reject
-      // both with 400 before the servlet.
-      assertEquals(HttpURLConnection.HTTP_NOT_FOUND,
-          statusOf(base + "/a//b?op=GETFILESTATUS&user.name=alice"));
+      // both with 400 before the servlet. Read the 404 body from one request to
+      // verify the WebHDFS RemoteException JSON contract that clients depend on.
+      HttpURLConnection notFound =
+          openConnection(base + "/a//b?op=GETFILESTATUS&user.name=alice");
+      assertEquals(HttpURLConnection.HTTP_NOT_FOUND, notFound.getResponseCode());
+      assertTrue(notFound.getContentType().startsWith("application/json"),
+          "404 Content-Type must be application/json; was: " + notFound.getContentType());
+      String errorBody = readErrorBody(notFound);
+      assertTrue(errorBody.contains(HttpExceptionUtils.ERROR_JSON),
+          "error body must contain RemoteException key: " + errorBody);
+      assertTrue(errorBody.contains(
+          "\"" + HttpExceptionUtils.ERROR_EXCEPTION_JSON + "\":\"FileNotFoundException\""),
+          "error body must name the exception class: " + errorBody);
+      assertTrue(errorBody.contains(
+          "\"" + HttpExceptionUtils.ERROR_CLASSNAME_JSON + "\":\"java.io.FileNotFoundException\""),
+          "error body must carry javaClassName: " + errorBody);
+      assertTrue(errorBody.contains(
+          "\"" + HttpExceptionUtils.ERROR_MESSAGE_JSON + "\":\""),
+          "error body must carry a non-empty message: " + errorBody);
+      notFound.disconnect();
       assertEquals(HttpURLConnection.HTTP_NOT_FOUND,
           statusOf(base + "/a%25b?op=GETFILESTATUS&user.name=alice"));
 
@@ -230,6 +248,18 @@ public class TestHttpFSServerWebServer {
       while (read > -1) {
         out.write(buffer, 0, read);
         read = in.read(buffer);
+      }
+      return new String(out.toByteArray(), StandardCharsets.UTF_8);
+    }
+  }
+
+  private static String readErrorBody(HttpURLConnection conn) throws IOException {
+    try (InputStream in = conn.getErrorStream()) {
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      byte[] buf = new byte[1024];
+      int n;
+      while ((n = in.read(buf)) != -1) {
+        out.write(buf, 0, n);
       }
       return new String(out.toByteArray(), StandardCharsets.UTF_8);
     }
