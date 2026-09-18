@@ -53,9 +53,24 @@ import org.slf4j.LoggerFactory;
  * been rewritten to be read only and to output in a JSON format so it is not
  * really that close to the original.
  *
- * Forked from hadoop-common 3.4.3 org.apache.hadoop.jmx.JMXJsonServlet; the only
- * change is the switch from javax.servlet to jakarta.servlet imports. Re-sync
- * when bumping hadoop.version.
+ * Forked from hadoop-common 3.4.3 org.apache.hadoop.jmx.JMXJsonServlet. When
+ * re-syncing on a hadoop.version bump, re-apply these Ozone-side deltas rather
+ * than copying the upstream file wholesale:
+ *   - the package is org.apache.hadoop.hdds.server.http (upstream: org.apache.hadoop.jmx);
+ *   - javax.servlet imports are switched to jakarta.servlet;
+ *   - the HttpServer2 reference (isInstrumentationAccessAllowed) resolves to this
+ *     package's org.apache.hadoop.hdds.server.http.HttpServer2, so upstream's
+ *     "import org.apache.hadoop.http.HttpServer2" is dropped -- do NOT re-add it,
+ *     or the admin access check silently switches to hadoop's HttpServer2;
+ *   - the mBeanServer and jsonFactory fields are narrowed from protected to private;
+ *   - Ozone checkstyle formatting is applied (e.g. MBeanAttributeInfo[] array
+ *     syntax, indexOf(char) literals, Javadoc punctuation).
+ *
+ * Caveat inherited from upstream: the class Javadoc below promises 400/404 for a
+ * malformed query or a missing attribute, but the servlet flushes the JSON body
+ * before it calls setStatus, so the response is already committed at 200 and the
+ * error surfaces only as "result":"ERROR" in the body (see TestJMXJsonServlet).
+ * Left as-is to avoid diverging from upstream behaviour.
  */
 /**
  * Provides Read only web access to JMX.
