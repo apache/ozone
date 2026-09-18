@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -443,6 +444,13 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   ListOpenFilesResult listOpenFiles(String path, int maxKeys, String contToken)
+      throws IOException;
+
+  /**
+   * Calculate bucket-level deleted bytes split by reclaimability.
+   * @param bucketPath bucket path in volume/bucket format.
+   */
+  BucketDeletedBytes getBucketDeletedBytes(String bucketPath)
       throws IOException;
 
   /**

@@ -170,6 +170,7 @@ enum Type {
   RevokeSTSToken = 154;
   DeleteRevokedSTSTokens = 155;
   GetCallerIdentity = 156;
+  GetBucketDeletedBytes = 157;
 }
 
 enum SafeMode {
@@ -335,6 +336,7 @@ message OMRequest {
   optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 156;
   optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 157;
   optional GetCallerIdentityRequest         getCallerIdentityRequest       = 158;
+  optional GetBucketDeletedBytesRequest     getBucketDeletedBytesRequest   = 159;
 }
 
 message OMResponse {
@@ -484,6 +486,7 @@ message OMResponse {
   optional RevokeSTSTokenResponse            revokeSTSTokenResponse         = 154;
   optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 155;
   optional GetCallerIdentityResponse         getCallerIdentityResponse      = 156;
+  optional GetBucketDeletedBytesResponse     getBucketDeletedBytesResponse  = 157;
 }
 
 enum Status {
@@ -1762,6 +1765,19 @@ message ListOpenFilesResponse {
   // result
   repeated uint64 clientID = 4;
   repeated KeyInfo keyInfo = 5;
+}
+
+message GetBucketDeletedBytesRequest {
+  required string bucketPath = 1;
+}
+
+message GetBucketDeletedBytesResponse {
+  required uint64 snapshotTrappedBytes = 1;
+  required uint64 purgeableBytes = 2;
+  optional uint64 snapshotTrappedKeys = 3;
+  optional uint64 purgeableKeys = 4;
+  optional uint64 snapshotTrappedDirs = 5;
+  optional uint64 purgeableDirs = 6;
 }
 
 message ServicePort {

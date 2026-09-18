@@ -262,6 +262,7 @@ public final class OmUtils {
     case GetSnapshotInfo:
     case GetObjectTagging:
     case GetBucketTagging:
+    case GetBucketDeletedBytes:
       return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
@@ -395,6 +396,7 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetLifecycleConfiguration:
     case GetLifecycleServiceStatus:
+    case GetBucketDeletedBytes:
       return true;
     case GetBucketTagging:
       return true;
