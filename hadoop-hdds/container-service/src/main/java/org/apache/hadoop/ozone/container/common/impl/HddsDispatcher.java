@@ -196,10 +196,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   public ContainerCommandResponseProto dispatch(
       ContainerCommandRequestProto msg, DispatcherContext dispatcherContext) {
     try {
-      HddsUtils.getBlockID(msg);
-    } catch (IllegalArgumentException e) {
-      return ContainerUtils.logAndReturnError(LOG,
-          new StorageContainerException(e.getMessage(), e, Result.INVALID_ARGUMENT), msg);
+      validateBlockID(msg);
+    } catch (StorageContainerException e) {
+      return ContainerUtils.logAndReturnError(LOG, e, msg);
     }
     try {
       return dispatcher.processRequest(msg,
@@ -563,6 +562,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     );
   }
 
+  private static void validateBlockID(ContainerCommandRequestProto msg)
+      throws StorageContainerException {
+    try {
+      HddsUtils.getBlockID(msg);
+    } catch (IllegalArgumentException e) {
+      throw new StorageContainerException(e.getMessage(), e, Result.INVALID_ARGUMENT);
+    }
+  }
+
   /**
    * This will be called as a part of creating the log entry during
    * startTransaction in Ratis on the leader node. In such cases, if the
@@ -575,11 +583,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void validateContainerCommand(
       ContainerCommandRequestProto msg) throws StorageContainerException {
-    try {
-      HddsUtils.getBlockID(msg);
-    } catch (IllegalArgumentException e) {
-      throw new StorageContainerException(e.getMessage(), e, Result.INVALID_ARGUMENT);
-    }
+    validateBlockID(msg);
     try {
       validateToken(msg);
     } catch (IOException ioe) {

@@ -553,6 +553,10 @@ public class TestHddsDispatcher {
     ContainerCommandResponseProto response =
         dispatcher.createContainer(requestWithInvalidStorageType);
     assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, response.getResult());
+
+    StorageContainerException exception = assertThrows(StorageContainerException.class,
+        () -> dispatcher.validateContainerCommand(requestWithInvalidStorageType));
+    assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, exception.getResult());
   }
 
   @Test
