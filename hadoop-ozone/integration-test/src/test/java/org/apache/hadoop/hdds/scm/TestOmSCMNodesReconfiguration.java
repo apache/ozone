@@ -187,6 +187,78 @@ public class TestOmSCMNodesReconfiguration {
     assertResolvedHost(scmClient.getBlockProxyProvider(), nodeId, "127.0.0.2");
   }
 
+  /**
+   * Adding an SCM to the node list without first setting its address must fail
+   * the reconfiguration (so it is reported FAILED and can be retried) and must
+   * leave the live configuration and the SCM proxies unchanged -- the node list
+   * must never keep an SCM without a resolvable address.
+   */
+  @Test
+  void testReconfigureScmNodesFailsWhenAddressMissing() {
+    OzoneManager om = cluster.getOzoneManager();
+    ReconfigurationHandler handler = om.getReconfigurationHandler();
+    ScmClient scmClient = om.getScmClient();
+    OzoneConfiguration conf = om.getConfiguration();
+    String scmNodesKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+
+    List<String> before =
+        new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
+    String originalValue = conf.get(scmNodesKey);
+
+    List<String> withMissing = new ArrayList<>(before);
+    withMissing.add("scm-no-address");
+
+    assertThrows(ReconfigurationException.class, () ->
+        handler.reconfigureProperty(scmNodesKey, String.join(",", withMissing)));
+
+    // The node list is rolled back and both providers keep their membership.
+    assertEquals(originalValue, conf.get(scmNodesKey));
+    assertEquals(new HashSet<>(before),
+        new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds()));
+    assertEquals(new HashSet<>(before),
+        new HashSet<>(scmClient.getBlockProxyProvider().getSCMNodeIds()));
+  }
+
+  /**
+   * Adding an SCM in a single {@code reconfig start} is applied by the
+   * reconfiguration-complete callback: by the time it runs, both the new node
+   * list and the new node's address key are stored, regardless of the order the
+   * batch applied them (the "nodes before address" ordering the per-property
+   * path cannot satisfy on its own). Drive the callback directly, since the sync
+   * {@code reconfigureProperty} used by the other tests never fires it.
+   */
+  @Test
+  void testReconfigureAddScmNodeViaCompleteCallback() throws Exception {
+    OzoneManager om = cluster.getOzoneManager();
+    ScmClient scmClient = om.getScmClient();
+    OzoneConfiguration conf = om.getConfiguration();
+    String scmNodesKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+
+    List<String> before =
+        new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
+    String newNodeId = "scm-added";
+    String newAddrKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, newNodeId);
+
+    List<String> after = new ArrayList<>(before);
+    after.add(newNodeId);
+    conf.set(scmNodesKey, String.join(",", after));
+    conf.set(newAddrKey, "127.0.0.1");
+
+    Map<String, Boolean> changed = new HashMap<>();
+    changed.put(scmNodesKey, true);
+    changed.put(newAddrKey, true);
+    om.reloadScmProxiesOnReconfig(changed, conf);
+
+    Set<String> expected = new HashSet<>(after);
+    assertEquals(expected,
+        new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds()));
+    assertEquals(expected,
+        new HashSet<>(scmClient.getBlockProxyProvider().getSCMNodeIds()));
+  }
+
   private static void assertResolvedHost(
       org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase<?> provider,
       String nodeId, String expectedHost) {
