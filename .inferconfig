@@ -1,0 +1,15 @@
+{
+  "force-delete-results-dir": true,
+  "capture-block-list": [
+    {
+      "source_contains": "generated-sources"
+    },
+    {
+      "source_contains": "target/"
+    }
+  ],
+  "report-block-list-files-containing": [
+    "@generated",
+    "generated-sources"
+  ]
+}
