@@ -47,7 +47,7 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.lock.OMLockDetailsUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -699,14 +699,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
-      OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
-      OMResponse omResponse = omClientResponse.getOMResponse();
-      if (omLockDetails != null) {
-        return omResponse.toBuilder()
-            .setOmLockDetails(omLockDetails.toProtobufBuilder()).build();
-      } else {
-        return omResponse;
-      }
+      return OMLockDetailsUtil.addToResponse(
+          omClientResponse.getOMResponse(), omClientResponse.getOmLockDetails());
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e, termIndex);

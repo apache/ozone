@@ -22,12 +22,11 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
-import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.RpcConstants;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.lock.OMLockDetailsUtil;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -115,23 +114,8 @@ public final class OMRatisRequestContext implements AutoCloseable {
    * Adds query lock timings from the synthetic Hadoop RPC call to the response.
    */
   public OMResponse addLockDetails(OMResponse response) {
-    if (currentCall == null) {
-      return response;
-    }
-
-    long waitNanos = currentCall.getProcessingDetails().get(Timing.LOCKWAIT, TimeUnit.NANOSECONDS);
-    long readNanos = currentCall.getProcessingDetails().get(Timing.LOCKSHARED, TimeUnit.NANOSECONDS);
-    long writeNanos = currentCall.getProcessingDetails().get(Timing.LOCKEXCLUSIVE, TimeUnit.NANOSECONDS);
-    if (waitNanos == 0 && readNanos == 0 && writeNanos == 0) {
-      return response;
-    }
-
-    OzoneManagerProtocolProtos.OMLockDetailsProto.Builder lockDetails = response.hasOmLockDetails()
-        ? response.getOmLockDetails().toBuilder() : OzoneManagerProtocolProtos.OMLockDetailsProto.newBuilder();
-    lockDetails.setWaitLockNanos(lockDetails.getWaitLockNanos() + waitNanos);
-    lockDetails.setReadLockNanos(lockDetails.getReadLockNanos() + readNanos);
-    lockDetails.setWriteLockNanos(lockDetails.getWriteLockNanos() + writeNanos);
-    return response.toBuilder().setOmLockDetails(lockDetails).build();
+    return currentCall == null ? response
+        : OMLockDetailsUtil.addToResponse(response, currentCall.getProcessingDetails());
   }
 
   private static Server.Call createCall(OMRequest request) {
