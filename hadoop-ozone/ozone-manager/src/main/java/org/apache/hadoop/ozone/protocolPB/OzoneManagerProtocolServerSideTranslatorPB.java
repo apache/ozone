@@ -330,7 +330,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     }
   }
 
-  private OMResponse submitReadRequestToOmLinearizableAllowFollower(OMRequest request) throws ServiceException {
+  private OMResponse  submitReadRequestToOmLinearizableAllowFollower(OMRequest request) throws ServiceException {
     RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
     switch (raftServerStatus) {
     case LEADER_AND_NOT_READY:

@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * request is executed by Ratis.
  *
  * <p>Request-scoped thread-local state that is needed during Ratis queries
- * must be serialized by {@link #capture(OMRequest, OzoneManager)}. Write
+ * must be serialized by {@link #captureIntoRequest(OMRequest, OzoneManager)}. Write
  * requests capture their context during
  * {@link OMClientRequest#preExecute(OzoneManager)}. Context used during either
  * Ratis execution path must be installed by this class and cleared by
@@ -81,7 +81,7 @@ public final class OMRatisRequestContext implements AutoCloseable {
    * Captures authenticated request context on the RPC thread before submitting
    * a read request to Ratis.
    */
-  public static OMRequest capture(OMRequest request, OzoneManager ozoneManager) throws IOException {
+  public static OMRequest captureIntoRequest(OMRequest request, OzoneManager ozoneManager) throws IOException {
     Objects.requireNonNull(ozoneManager, "ozoneManager");
     OMRequest.Builder requestBuilder = request.toBuilder()
         .setUserInfo(OMClientRequest.getAuthenticatedUserInfo(request));

@@ -75,7 +75,7 @@ public class OMExecutionFlow {
       }
     } else {
       try {
-        requestToSubmit = OMRatisRequestContext.capture(request, ozoneManager);
+        requestToSubmit = OMRatisRequestContext.captureIntoRequest(request, ozoneManager);
       } catch (IOException ex) {
         return OzoneManagerRatisUtils.createErrorResponse(request, ex);
       }
