@@ -285,7 +285,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
   }
 
   @Test
-  void testCallerContextPreservedForLinearizableRead() throws Exception {
+  void testRemoteUserPreservedForLinearizableRead() throws Exception {
     OzoneBucket bucket = setupBucket();
     String key = createKey(bucket);
     String deniedUserName = uniqueObjectName("denied-user");
