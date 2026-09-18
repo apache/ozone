@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 
 /**
- * Captures and installs S3 authentication state associated with the current
+ * Captures and applies S3 authentication state associated with the current
  * thread.
  */
 public final class S3AuthenticationContext {
@@ -66,13 +66,13 @@ public final class S3AuthenticationContext {
     return new S3AuthenticationContext(s3Auth, stsToken);
   }
 
-  public void install() {
+  public void applyToCurrentThread() {
     OzoneManager.setS3Auth(s3Authentication);
     OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
   }
 
   public static void clear() {
-    EMPTY.install();
+    EMPTY.applyToCurrentThread();
   }
 
   private static S3Authentication resolve(

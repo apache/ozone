@@ -36,13 +36,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Captures request context before Ratis submission and installs it while an OM
+ * Captures request context before Ratis submission and applies it while an OM
  * request is executed by Ratis.
  *
  * <p>Request-scoped thread-local state that is needed during Ratis queries
  * must be serialized by {@link #captureIntoRequest(OMRequest, OzoneManager)}.
  * Write requests capture their context during {@link OMClientRequest#preExecute(OzoneManager)}.
- * Context used during either Ratis execution path must be installed by this class.
+ * Context used during either Ratis execution path must be applied by this class.
  *
  * <p>Ratis may execute a read either on the submitting RPC thread or on a separate thread. In both cases, the context
  * already present on the execution thread is saved, replaced with the context reconstructed from the request, and
@@ -57,6 +57,7 @@ public final class OMRatisRequestContext implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(OMRatisRequestContext.class);
 
   private final Server.Call currentCall;
+  // Read scopes save these values only to restore the execution thread in close().
   private final Server.Call previousCall;
   private final S3AuthenticationContext previousS3Context;
   private final Operation operation;
@@ -80,7 +81,8 @@ public final class OMRatisRequestContext implements AutoCloseable {
       if (currentCall != null) {
         Server.getCurCall().set(currentCall);
       }
-      S3AuthenticationContext.fromRequest(request, ozoneManager.isSecurityEnabled()).install();
+      // This request-derived S3/STS context is active during both read and write execution.
+      S3AuthenticationContext.fromRequest(request, ozoneManager.isSecurityEnabled()).applyToCurrentThread();
     } catch (IOException | RuntimeException ex) {
       close();
       throw ex;
@@ -100,7 +102,7 @@ public final class OMRatisRequestContext implements AutoCloseable {
   }
 
   /**
-   * Installs context for a Ratis read, including a synthetic Hadoop RPC call
+   * Applies context for a Ratis read, including a synthetic Hadoop RPC call
    * used by existing read implementations and lock accounting. This supports
    * execution on either the submitting thread or a separate Ratis thread by
    * restoring the execution thread's previous context when this scope closes.
@@ -111,7 +113,7 @@ public final class OMRatisRequestContext implements AutoCloseable {
   }
 
   /**
-   * Installs context for a Ratis write without a Hadoop RPC call, preserving
+   * Applies context for a Ratis write without a Hadoop RPC call, preserving
    * write lock accounting through ResourceLockTracker. Writes are expected to
    * execute on the separate StateMachineUpdater thread, whose context is
    * cleared when this scope closes.
@@ -185,7 +187,7 @@ public final class OMRatisRequestContext implements AutoCloseable {
       } else {
         Server.getCurCall().set(previousCall);
       }
-      previousS3Context.install();
+      previousS3Context.applyToCurrentThread();
     } else {
       clear();
     }
