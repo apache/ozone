@@ -56,15 +56,15 @@ import org.slf4j.LoggerFactory;
 public final class OMRatisRequestContext implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(OMRatisRequestContext.class);
 
-  private enum Operation {
-    READ,
-    WRITE
-  }
-
   private final Server.Call currentCall;
   private final Server.Call previousCall;
   private final S3AuthenticationContext previousS3Context;
   private final Operation operation;
+
+  private enum Operation {
+    READ,
+    WRITE
+  }
 
   private OMRatisRequestContext(OMRequest request, OzoneManager ozoneManager, Operation operation)
       throws IOException {
