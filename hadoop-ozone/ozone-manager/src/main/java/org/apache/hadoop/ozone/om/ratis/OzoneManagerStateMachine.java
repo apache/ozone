@@ -752,7 +752,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    */
   private Message queryCommand(OMRequest request) throws IOException {
-    try (OMRatisRequestContext context = OMRatisRequestContext.openForQuery(request, ozoneManager)) {
+    try (OMRatisRequestContext context = OMRatisRequestContext.openForRead(request, ozoneManager)) {
       OMResponse response = handler.handleReadRequest(request);
       return OMRatisHelper.convertResponseToMessage(context.addLockDetails(response));
     }

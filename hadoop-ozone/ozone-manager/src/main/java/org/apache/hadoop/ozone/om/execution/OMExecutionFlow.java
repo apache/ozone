@@ -75,6 +75,9 @@ public class OMExecutionFlow {
       }
     } else {
       try {
+        // We capture the ThreadLocal context in OzoneManager so that it will be available
+        // in a separate read thread in OzoneManagerStateMachine#query.
+        // Write requests already implemented this logic in the preExecute.
         requestToSubmit = OMRatisRequestContext.captureIntoRequest(request, ozoneManager);
       } catch (IOException ex) {
         return OzoneManagerRatisUtils.createErrorResponse(request, ex);

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.ratis;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.time.Instant;
 import java.util.Objects;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.RpcConstants;
@@ -31,8 +30,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.STSSecurityUtil;
-import org.apache.hadoop.ozone.security.STSTokenIdentifier;
+import org.apache.hadoop.ozone.security.S3AuthenticationContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,35 +40,40 @@ import org.slf4j.LoggerFactory;
  * request is executed by Ratis.
  *
  * <p>Request-scoped thread-local state that is needed during Ratis queries
- * must be serialized by {@link #captureIntoRequest(OMRequest, OzoneManager)}. Write
- * requests capture their context during
- * {@link OMClientRequest#preExecute(OzoneManager)}. Context used during either
- * Ratis execution path must be installed by this class and cleared by
- * {@link #close()}.
+ * must be serialized by {@link #captureIntoRequest(OMRequest, OzoneManager)}.
+ * Write requests capture their context during {@link OMClientRequest#preExecute(OzoneManager)}.
+ * Context used during either Ratis execution path must be installed by this class.
+ * {@link #close()} restores context for reads, which Ratis may execute on the calling thread,
+ * and clears context for writes executed by the StateMachineUpdater thread.
  */
 public final class OMRatisRequestContext implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(OMRatisRequestContext.class);
 
-  private final Server.Call currentCall;
+  private enum Operation {
+    READ,
+    WRITE
+  }
 
-  private OMRatisRequestContext(OMRequest request, OzoneManager ozoneManager, boolean installRpcCall)
+  private final Server.Call currentCall;
+  private final Server.Call previousCall;
+  private final S3AuthenticationContext previousS3Context;
+  private final Operation operation;
+
+  private OMRatisRequestContext(OMRequest request, OzoneManager ozoneManager, Operation operation)
       throws IOException {
     Objects.requireNonNull(ozoneManager, "ozoneManager");
-    currentCall = installRpcCall ? createCall(request) : null;
+    this.operation = Objects.requireNonNull(operation, "operation");
+    boolean isRead = operation == Operation.READ;
+    previousCall = isRead ? Server.getCurCall().get() : null;
+    previousS3Context = isRead ? S3AuthenticationContext.capture() : null;
+    currentCall = isRead ? createCall(request) : null;
 
     clear();
     try {
       if (currentCall != null) {
         Server.getCurCall().set(currentCall);
       }
-      if (ozoneManager.isSecurityEnabled() && request.hasS3Authentication()) {
-        STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
-        OzoneManagerProtocolProtos.S3Authentication s3Auth = request.getS3Authentication();
-        OzoneManager.setS3Auth(s3Auth);
-        if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
-          OzoneManager.setStsTokenIdentifier(rehydrateStsTokenIdentifier(s3Auth));
-        }
-      }
+      S3AuthenticationContext.fromRequest(request, ozoneManager.isSecurityEnabled()).install();
     } catch (IOException | RuntimeException ex) {
       close();
       throw ex;
@@ -85,20 +88,18 @@ public final class OMRatisRequestContext implements AutoCloseable {
     Objects.requireNonNull(ozoneManager, "ozoneManager");
     OMRequest.Builder requestBuilder = request.toBuilder()
         .setUserInfo(OMClientRequest.getAuthenticatedUserInfo(request));
-    if (request.hasS3Authentication()) {
-      requestBuilder.setS3Authentication(OMClientRequest.resolveS3Authentication(
-          request.getS3Authentication(), OzoneManager.getStsTokenIdentifier()));
-    }
+    S3AuthenticationContext.captureInto(requestBuilder);
     return requestBuilder.build();
   }
 
   /**
-   * Installs context for a Ratis query, including a synthetic Hadoop RPC call
-   * used by existing read implementations and lock accounting.
+   * Installs context for a Ratis read, including a synthetic Hadoop RPC call
+   * used by existing read implementations and lock accounting. Any context
+   * already present on the calling thread is restored when this scope closes.
    */
-  public static OMRatisRequestContext openForQuery(OMRequest request, OzoneManager ozoneManager)
+  public static OMRatisRequestContext openForRead(OMRequest request, OzoneManager ozoneManager)
       throws IOException {
-    return new OMRatisRequestContext(request, ozoneManager, true);
+    return new OMRatisRequestContext(request, ozoneManager, Operation.READ);
   }
 
   /**
@@ -107,7 +108,7 @@ public final class OMRatisRequestContext implements AutoCloseable {
    */
   public static OMRatisRequestContext openForWrite(OMRequest request, OzoneManager ozoneManager)
       throws IOException {
-    return new OMRatisRequestContext(request, ozoneManager, false);
+    return new OMRatisRequestContext(request, ozoneManager, Operation.WRITE);
   }
 
   /**
@@ -161,30 +162,22 @@ public final class OMRatisRequestContext implements AutoCloseable {
     }
   }
 
-  private static STSTokenIdentifier rehydrateStsTokenIdentifier(
-      OzoneManagerProtocolProtos.S3Authentication s3Auth) {
-    // Context reaching Ratis has already passed expiry and revocation checks.
-    return new STSTokenIdentifier(STSTokenIdentifier.Params.newBuilder()
-        .setTempAccessKeyId(s3Auth.hasResolvedStsTempAccessKeyId() ? s3Auth.getResolvedStsTempAccessKeyId() : "")
-        .setOriginalAccessKeyId(
-            s3Auth.hasResolvedStsOriginalAccessKeyId() ? s3Auth.getResolvedStsOriginalAccessKeyId() : "")
-        .setRoleArn(s3Auth.hasResolvedStsRoleArn() ? s3Auth.getResolvedStsRoleArn() : "")
-        .setCreationTime(Instant.MAX)
-        .setExpiry(Instant.MAX)
-        .setSecretAccessKey(null)
-        .setSessionPolicy(s3Auth.hasResolvedStsSessionPolicy() ? s3Auth.getResolvedStsSessionPolicy() : "")
-        .setManagedSecretKey(null)
-        .build());
-  }
-
   private static void clear() {
     Server.getCurCall().remove();
-    OzoneManager.setS3Auth(null);
-    OzoneManager.setStsTokenIdentifier(null);
+    S3AuthenticationContext.clear();
   }
 
   @Override
   public void close() {
-    clear();
+    if (operation == Operation.READ) {
+      if (previousCall == null) {
+        Server.getCurCall().remove();
+      } else {
+        Server.getCurCall().set(previousCall);
+      }
+      previousS3Context.install();
+    } else {
+      clear();
+    }
   }
 }
