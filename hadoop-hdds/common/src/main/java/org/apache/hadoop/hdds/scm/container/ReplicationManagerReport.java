@@ -54,7 +54,6 @@ public class ReplicationManagerReport {
 
   private final Map<String, LongAdder> stats;
   private final Map<String, List<ContainerID>> containerSample = new ConcurrentHashMap<>();
-  private ContainerHealthState containerHealthState = ContainerHealthState.HEALTHY;
 
   public static ReplicationManagerReport fromProtobuf(
       HddsProtos.ReplicationManagerReportProto proto) {
@@ -87,7 +86,6 @@ public class ReplicationManagerReport {
 
   public void incrementAndSample(ContainerHealthState stat, ContainerInfo containerInfo) {
     incrementAndSample(stat.name(), containerInfo.containerID());
-    containerHealthState = stat;
   }
 
   public void increment(HddsProtos.LifeCycleState stat) {
@@ -104,14 +102,6 @@ public class ReplicationManagerReport {
    */
   public long getReportTimeStamp() {
     return reportTimeStamp;
-  }
-
-  public ContainerHealthState getContainerHealthState() {
-    return containerHealthState;
-  }
-
-  public void resetContainerHealthState() {
-    this.containerHealthState = ContainerHealthState.HEALTHY;
   }
 
   /**
