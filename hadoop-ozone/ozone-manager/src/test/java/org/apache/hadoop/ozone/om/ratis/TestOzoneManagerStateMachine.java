@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.SIMPLE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,6 +53,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -74,6 +76,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -658,6 +661,42 @@ public class TestOzoneManagerStateMachine {
     assertNull(observedUser.get().getCredentials().getSecretKey(new Text("credential-key")));
     assertEquals("10.20.30.40", observedAddress.get().getHostAddress());
     assertEquals("client.example.com", observedAddress.get().getHostName());
+  }
+
+  @Test
+  public void testQueryReturnsResourceLockDetails() throws Exception {
+    OMRequest request = sampleReadRequest().toBuilder()
+        .setUserInfo(UserInfo.newBuilder().setUserName("ratis-user"))
+        .build();
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.ServiceList)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    when(handler.handleReadRequest(any(OMRequest.class))).thenAnswer(invocation -> {
+      lock.acquireReadLock(VOLUME_LOCK, "volume");
+      try {
+        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
+        return expectedResponse;
+      } finally {
+        lock.releaseReadLock(VOLUME_LOCK, "volume");
+      }
+    });
+
+    OMResponse response;
+    try {
+      Message message = sm.query(Message.valueOf(
+          OMRatisHelper.convertRequestToByteString(request))).get();
+      response = OMRatisHelper.convertByteStringToOMResponse(message.getContent());
+    } finally {
+      lock.cleanup();
+    }
+
+    assertTrue(response.hasOmLockDetails());
+    assertTrue(response.getOmLockDetails().getWaitLockNanos() > 0);
+    assertTrue(response.getOmLockDetails().getReadLockNanos() > 0);
+    assertEquals(0, response.getOmLockDetails().getWriteLockNanos());
   }
 
   @Test

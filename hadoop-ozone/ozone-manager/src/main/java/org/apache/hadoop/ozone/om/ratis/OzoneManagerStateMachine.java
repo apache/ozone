@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.RpcConstants;
 import org.apache.hadoop.ipc_.Server;
@@ -807,14 +808,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    */
   private Message queryCommand(OMRequest request) throws IOException {
-    try (RatisQueryContext ignored = new RatisQueryContext(request,
+    try (RatisQueryContext context = new RatisQueryContext(request,
         ozoneManager.isSecurityEnabled())) {
       OMResponse response = handler.handleReadRequest(request);
-      return OMRatisHelper.convertResponseToMessage(response);
+      return OMRatisHelper.convertResponseToMessage(context.addLockDetails(response));
     }
   }
 
   private static final class RatisQueryContext implements AutoCloseable {
+    private final Server.Call currentCall;
     private final Server.Call previousCall;
     private final OzoneManagerProtocolProtos.S3Authentication previousS3Auth;
     private final STSTokenIdentifier previousStsToken;
@@ -824,13 +826,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       previousCall = Server.getCurCall().get();
       previousS3Auth = OzoneManager.getS3Auth();
       previousStsToken = OzoneManager.getStsTokenIdentifier();
+      currentCall = createCall(request);
 
       try {
-        Server.Call call = createCall(request);
-        if (call == null) {
+        if (currentCall == null) {
           Server.getCurCall().remove();
         } else {
-          Server.getCurCall().set(call);
+          Server.getCurCall().set(currentCall);
         }
         OzoneManager.setS3Auth(null);
         OzoneManager.setStsTokenIdentifier(null);
@@ -847,6 +849,26 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         close();
         throw ex;
       }
+    }
+
+    private OMResponse addLockDetails(OMResponse response) {
+      if (currentCall == null) {
+        return response;
+      }
+
+      long waitNanos = currentCall.getProcessingDetails().get(Timing.LOCKWAIT, TimeUnit.NANOSECONDS);
+      long readNanos = currentCall.getProcessingDetails().get(Timing.LOCKSHARED, TimeUnit.NANOSECONDS);
+      long writeNanos = currentCall.getProcessingDetails().get(Timing.LOCKEXCLUSIVE, TimeUnit.NANOSECONDS);
+      if (waitNanos == 0 && readNanos == 0 && writeNanos == 0) {
+        return response;
+      }
+
+      OzoneManagerProtocolProtos.OMLockDetailsProto.Builder lockDetails = response.hasOmLockDetails()
+          ? response.getOmLockDetails().toBuilder() : OzoneManagerProtocolProtos.OMLockDetailsProto.newBuilder();
+      lockDetails.setWaitLockNanos(lockDetails.getWaitLockNanos() + waitNanos);
+      lockDetails.setReadLockNanos(lockDetails.getReadLockNanos() + readNanos);
+      lockDetails.setWriteLockNanos(lockDetails.getWriteLockNanos() + writeNanos);
+      return response.toBuilder().setOmLockDetails(lockDetails).build();
     }
 
     private static Server.Call createCall(OMRequest request) {
