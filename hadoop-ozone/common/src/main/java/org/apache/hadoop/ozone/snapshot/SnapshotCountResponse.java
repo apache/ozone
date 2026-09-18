@@ -15,28 +15,39 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.shell.snapshot;
+package org.apache.hadoop.ozone.snapshot;
 
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import picocli.CommandLine.Command;
+import java.util.List;
 
 /**
- * Subcommands for the snapshot related operations.
+ * POJO for snapshot count API.
  */
-@Command(name = "snapshot",
-    description = "Snapshot specific operations",
-    subcommands = {
-        CreateSnapshotHandler.class,
-        DeleteSnapshotHandler.class,
-        CountSnapshotHandler.class,
-        ListSnapshotHandler.class,
-        SnapshotDiffHandler.class,
-        ListSnapshotDiffHandler.class,
-        InfoSnapshotHandler.class,
-        RenameSnapshotHandler.class
-    },
-    mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class)
-public class SnapshotCommands {
+public final class SnapshotCountResponse {
+  private final long active;
+  private final long deleted;
+  private final long total;
+  private final List<SnapshotBucketCount> buckets;
 
+  public SnapshotCountResponse(long active, long deleted, long total, List<SnapshotBucketCount> buckets) {
+    this.active = active;
+    this.deleted = deleted;
+    this.total = total;
+    this.buckets = buckets;
+  }
+
+  public long getActive() {
+    return active;
+  }
+
+  public long getDeleted() {
+    return deleted;
+  }
+
+  public long getTotal() {
+    return total;
+  }
+
+  public List<SnapshotBucketCount> getBuckets() {
+    return buckets;
+  }
 }
