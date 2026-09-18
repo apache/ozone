@@ -43,8 +43,15 @@ import org.slf4j.LoggerFactory;
  * must be serialized by {@link #captureIntoRequest(OMRequest, OzoneManager)}.
  * Write requests capture their context during {@link OMClientRequest#preExecute(OzoneManager)}.
  * Context used during either Ratis execution path must be installed by this class.
- * {@link #close()} restores context for reads, which Ratis may execute on the calling thread,
- * and clears context for writes executed by the StateMachineUpdater thread.
+ *
+ * <p>Ratis may execute a read either on the submitting RPC thread or on a separate thread. In both cases, the context
+ * already present on the execution thread is saved, replaced with the context reconstructed from the request, and
+ * restored by {@link #close()}. This prevents an inline read from clearing the original RPC context while also leaving
+ * a separate execution thread in its previous state.
+ *
+ * <p>Writes are applied on the separate StateMachineUpdater thread. They do not install a synthetic Hadoop RPC call,
+ * and {@link #close()} clears their context instead of restoring it. If Ratis starts applying writes on the submitting
+ * thread, the write path must also preserve and restore the existing context.
  */
 public final class OMRatisRequestContext implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(OMRatisRequestContext.class);
@@ -94,8 +101,9 @@ public final class OMRatisRequestContext implements AutoCloseable {
 
   /**
    * Installs context for a Ratis read, including a synthetic Hadoop RPC call
-   * used by existing read implementations and lock accounting. Any context
-   * already present on the calling thread is restored when this scope closes.
+   * used by existing read implementations and lock accounting. This supports
+   * execution on either the submitting thread or a separate Ratis thread by
+   * restoring the execution thread's previous context when this scope closes.
    */
   public static OMRatisRequestContext openForRead(OMRequest request, OzoneManager ozoneManager)
       throws IOException {
@@ -104,7 +112,9 @@ public final class OMRatisRequestContext implements AutoCloseable {
 
   /**
    * Installs context for a Ratis write without a Hadoop RPC call, preserving
-   * write lock accounting through ResourceLockTracker.
+   * write lock accounting through ResourceLockTracker. Writes are expected to
+   * execute on the separate StateMachineUpdater thread, whose context is
+   * cleared when this scope closes.
    */
   public static OMRatisRequestContext openForWrite(OMRequest request, OzoneManager ozoneManager)
       throws IOException {
