@@ -50,6 +50,8 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskControllerMetrics;
@@ -473,8 +475,23 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             // Track task delta processing success
             taskMetrics.incrTaskDeltaProcessingSuccess(taskName);
 
-            taskStatusUpdater.setLastTaskRunStatus(0);
-            taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
+            // Make the derived-table RocksDB writes for this batch durable before the task-status
+            // cursor is committed to Derby. The cursor row is fsync-durable while the RocksDB writes
+            // are not synced by default, so without this barrier a power loss can leave the durable
+            // cursor ahead of the (lost) derived data. Startup reconciliation then sees the derived
+            // and delta cursors at the same sequence number and never reprocesses, permanently
+            // dropping the applied update. If the sync fails, leave the cursor unadvanced so the
+            // batch is reprocessed instead of recording an un-durable success.
+            if (syncReconDbLog()) {
+              taskStatusUpdater.setLastTaskRunStatus(0);
+              taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
+            } else {
+              failedTasks.add(new ReconOmTask.TaskResult.Builder()
+                  .setTaskName(taskName)
+                  .setSubTaskSeekPositions(result.getSubTaskSeekPositions())
+                  .build());
+              taskStatusUpdater.setLastTaskRunStatus(-1);
+            }
           }
           taskStatusUpdater.recordRunCompletion();
         }).exceptionally(ex -> {
@@ -501,6 +518,27 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       LOG.error("Completing all tasks failed with exception ", ce);
     } catch (CancellationException ce) {
       LOG.error("Some tasks were cancelled with exception", ce);
+    }
+  }
+
+  /**
+   * Flushes and syncs the Recon derived-data RocksDB write-ahead log to stable storage so the
+   * derived writes for the processed batch are durable before the task-status cursor advances.
+   * Returns {@code false} if the sync fails, in which case the caller must not advance the cursor,
+   * so that the cursor is never persisted ahead of the derived data.
+   */
+  private boolean syncReconDbLog() {
+    DBStore dbStore = reconDBProvider.getDbStore();
+    if (dbStore == null) {
+      return true;
+    }
+    try {
+      dbStore.flushLog(true);
+      return true;
+    } catch (RocksDatabaseException e) {
+      LOG.error("Failed to sync Recon DB WAL before advancing task status cursor; "
+          + "leaving cursor unadvanced so the batch is reprocessed.", e);
+      return false;
     }
   }
   

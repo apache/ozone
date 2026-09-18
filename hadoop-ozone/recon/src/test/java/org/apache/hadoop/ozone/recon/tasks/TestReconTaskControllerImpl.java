@@ -32,6 +32,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -77,6 +78,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
   private MockClock testClock;
+  private DBStore reconDbStore;
 
   public TestReconTaskControllerImpl() {
     super();
@@ -92,8 +94,9 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
           String taskName = i.getArgument(0);
           return new ReconTaskStatusUpdater(reconTaskStatusDao, taskName);
         });
+    reconDbStore = mock(DBStore.class);
     ReconDBProvider reconDbProvider = mock(ReconDBProvider.class);
-    when(reconDbProvider.getDbStore()).thenReturn(mock(DBStore.class));
+    when(reconDbProvider.getDbStore()).thenReturn(reconDbStore);
     when(reconDbProvider.getStagedReconDBProvider()).thenReturn(reconDbProvider);
     ReconContainerMetadataManager reconContainerMgr = mock(ReconContainerMetadataManager.class);
     ReconNamespaceSummaryManager nsSummaryManager = mock(ReconNamespaceSummaryManager.class);
@@ -930,6 +933,46 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
     ReconTaskControllerImpl controller = (ReconTaskControllerImpl) reconTaskController;
     assertThrows(IOException.class, () -> controller.createOMCheckpoint(omMetadataManager));
+  }
+
+  /**
+   * A successful delta batch must sync the derived-data RocksDB WAL to stable storage before the
+   * fsync-durable task-status cursor is advanced. Without that barrier a power loss can lose the
+   * un-synced derived write while the durable cursor survives, leaving the cursor ahead of the
+   * data; startup reconciliation then sees equal cursors and never reprocesses, permanently
+   * dropping the applied update.
+   */
+  @Test
+  public void testDerivedDbSyncedBeforeCursorAdvanceOnSuccess() throws Exception {
+    ReconOmTask reconOmTaskMock = getMockTask("SyncBarrierTask");
+    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyMap()))
+        .thenReturn(new ReconOmTask.TaskResult.Builder()
+            .setTaskName("SyncBarrierTask").setTaskSuccess(true).build());
+    reconTaskController.registerTask(reconOmTaskMock);
+
+    OMUpdateEventBatch batch = mock(OMUpdateEventBatch.class);
+    when(batch.getLastSequenceNumber()).thenReturn(100L);
+    when(batch.isEmpty()).thenReturn(false);
+    when(batch.getEvents()).thenReturn(new ArrayList<>());
+    when(batch.getEventType()).thenReturn(ReconEvent.EventType.OM_UPDATE_BATCH);
+    when(batch.getEventCount()).thenReturn(1);
+
+    reconTaskController.consumeOMEvents(batch, mock(OMMetadataManager.class));
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ReconTaskStatus status = reconTaskStatusDao.findById("SyncBarrierTask");
+        return status != null && status.getLastTaskRunStatus() == 0
+            && status.getLastUpdatedSeqNumber() == 100L;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 100, 5000);
+
+    // The derived-data RocksDB WAL must be synced (sync == true) before the durable cursor advances.
+    verify(reconDbStore, times(1)).flushLog(true);
+    // A non-syncing flush would leave the write in page cache and reintroduce the durability gap.
+    verify(reconDbStore, never()).flushLog(false);
   }
 
   private ReconOmTask getMockTask(String taskName) {
