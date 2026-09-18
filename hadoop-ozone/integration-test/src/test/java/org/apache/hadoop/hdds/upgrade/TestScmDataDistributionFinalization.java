@@ -334,7 +334,10 @@ public class TestScmDataDistributionFinalization {
         break;
       }
     }
+    // Leader transfer is async. Wait for the new election to finish.
     cluster.getStorageContainerLocationClient().transferLeadership(newLeaderScmId);
+    GenericTestUtils.waitFor(
+        () -> cluster.getActiveSCM() != null, 100, 10_000);
     StorageContainerManager newActiveSCM = cluster.getActiveSCM();
     deletedBlockLog = (DeletedBlockLogImpl) newActiveSCM.getScmBlockManager().getDeletedBlockLog();
     SCMDeletedBlockTransactionStatusManager newStatusManager =
@@ -365,7 +368,7 @@ public class TestScmDataDistributionFinalization {
         fail("Error while checking container state", e);
         return false;
       }
-    }, 100, 5000);
+    }, 100, 30_000);
 
     // wait for block deletion transactions to be confirmed by DN
     GenericTestUtils.waitFor(
