@@ -42,6 +42,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,6 +55,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -148,6 +150,18 @@ public class TestOzoneManagerStateMachine {
     Server.getCurCall().remove();
     OzoneManager.setS3Auth(null);
     OzoneManager.setStsTokenIdentifier(null);
+  }
+
+  @Test
+  public void testOzoneManagerThreadLocalsAreReviewedForRatisPropagation() {
+    List<String> threadLocalFields = Arrays.stream(OzoneManager.class.getDeclaredFields())
+        .filter(field -> ThreadLocal.class.isAssignableFrom(field.getType()))
+        .map(field -> field.getName())
+        .sorted()
+        .collect(Collectors.toList());
+
+    assertEquals(Arrays.asList("S3_AUTH", "STS_TOKEN"), threadLocalFields,
+        "Update OMRatisRequestContext when adding request-scoped ThreadLocal fields to OzoneManager");
   }
 
   // --- startTransaction tests ---
@@ -475,6 +489,37 @@ public class TestOzoneManagerStateMachine {
     assertNotNull(result);
     assertTrue(result.getSuccess());
     assertNull(OzoneManager.getStsTokenIdentifier(), "Expected STS ThreadLocal to be cleared after runCommand");
+  }
+
+  @Test
+  public void testRunCommandClearsStaleRequestContext() throws Exception {
+    OMRequest request = sampleWriteRequest();
+    TermIndex ti = TermIndex.valueOf(1, 5);
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+    OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+    when(clientResponse.getOmLockDetails()).thenReturn(null);
+    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer))).thenAnswer(invocation -> {
+      assertNull(Server.getCurCall().get());
+      assertNull(OzoneManager.getS3Auth());
+      assertNull(OzoneManager.getStsTokenIdentifier());
+      return clientResponse;
+    });
+
+    Server.getCurCall().set(createCall("stale-user", "stale.example.com", new byte[] {10, 0, 0, 1}));
+    OzoneManager.setS3Auth(S3Authentication.newBuilder().setAccessId("stale-access-id").build());
+    OzoneManager.setStsTokenIdentifier(mock(STSTokenIdentifier.class));
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertTrue(result.getSuccess());
+    assertNull(Server.getCurCall().get());
+    assertNull(OzoneManager.getS3Auth());
+    assertNull(OzoneManager.getStsTokenIdentifier());
   }
 
   @Test

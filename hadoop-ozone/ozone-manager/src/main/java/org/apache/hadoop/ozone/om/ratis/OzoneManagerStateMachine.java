@@ -24,9 +24,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -40,10 +37,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
-import org.apache.hadoop.ipc_.RPC;
-import org.apache.hadoop.ipc_.RpcConstants;
-import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
@@ -63,8 +56,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
-import org.apache.hadoop.ozone.security.STSSecurityUtil;
-import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -704,24 +695,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @VisibleForTesting
   OMResponse runCommand(OMRequest request, TermIndex termIndex) {
-    boolean isS3AuthThreadLocalSet = false;
-    boolean isStsThreadLocalSet = false;
-    try {
-      if (ozoneManager.isSecurityEnabled() && request.hasS3Authentication()) {
-        // STS token verification runs on the leader RPC path so we don't need to recheck here on the apply
-        // after the log is committed
-        STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
-
-        final OzoneManagerProtocolProtos.S3Authentication s3Auth = request.getS3Authentication();
-        // ThreadLocal carries S3 action for OmMetadataReader.
-        OzoneManager.setS3Auth(s3Auth);
-        isS3AuthThreadLocalSet = true;
-
-        if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
-          OzoneManager.setStsTokenIdentifier(rehydrateStsTokenIdentifier(s3Auth));
-          isStsThreadLocalSet = true;
-        }
-      }
+    try (OMRatisRequestContext ignored = OMRatisRequestContext.openForWrite(request, ozoneManager)) {
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
@@ -740,32 +714,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
-    } finally {
-      if (isS3AuthThreadLocalSet) {
-        OzoneManager.setS3Auth(null);
-      }
-      if (isStsThreadLocalSet) {
-        OzoneManager.setStsTokenIdentifier(null);
-      }
     }
     return null;
-  }
-
-  private static STSTokenIdentifier rehydrateStsTokenIdentifier(
-      OzoneManagerProtocolProtos.S3Authentication s3Auth) {
-    // Use Instant.MAX so future expiry and revocation checks do not reject
-    // context that was already validated before Ratis submission.
-    return new STSTokenIdentifier(STSTokenIdentifier.Params.newBuilder()
-        .setTempAccessKeyId(s3Auth.hasResolvedStsTempAccessKeyId() ? s3Auth.getResolvedStsTempAccessKeyId() : "")
-        .setOriginalAccessKeyId(
-            s3Auth.hasResolvedStsOriginalAccessKeyId() ? s3Auth.getResolvedStsOriginalAccessKeyId() : "")
-        .setRoleArn(s3Auth.hasResolvedStsRoleArn() ? s3Auth.getResolvedStsRoleArn() : "")
-        .setCreationTime(Instant.MAX)
-        .setExpiry(Instant.MAX)
-        .setSecretAccessKey(null)
-        .setSessionPolicy(s3Auth.hasResolvedStsSessionPolicy() ? s3Auth.getResolvedStsSessionPolicy() : "")
-        .setManagedSecretKey(null)
-        .build());
   }
 
   @VisibleForTesting
@@ -808,112 +758,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    */
   private Message queryCommand(OMRequest request) throws IOException {
-    try (RatisQueryContext context = new RatisQueryContext(request,
-        ozoneManager.isSecurityEnabled())) {
+    try (OMRatisRequestContext context = OMRatisRequestContext.openForQuery(request, ozoneManager)) {
       OMResponse response = handler.handleReadRequest(request);
       return OMRatisHelper.convertResponseToMessage(context.addLockDetails(response));
-    }
-  }
-
-  private static final class RatisQueryContext implements AutoCloseable {
-    private final Server.Call currentCall;
-
-    private RatisQueryContext(OMRequest request, boolean securityEnabled)
-        throws IOException {
-      currentCall = createCall(request);
-
-      try {
-        if (currentCall == null) {
-          Server.getCurCall().remove();
-        } else {
-          Server.getCurCall().set(currentCall);
-        }
-        OzoneManager.setS3Auth(null);
-        OzoneManager.setStsTokenIdentifier(null);
-
-        if (securityEnabled && request.hasS3Authentication()) {
-          STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
-          OzoneManagerProtocolProtos.S3Authentication s3Auth = request.getS3Authentication();
-          OzoneManager.setS3Auth(s3Auth);
-          if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
-            OzoneManager.setStsTokenIdentifier(rehydrateStsTokenIdentifier(s3Auth));
-          }
-        }
-      } catch (IOException | RuntimeException ex) {
-        close();
-        throw ex;
-      }
-    }
-
-    private OMResponse addLockDetails(OMResponse response) {
-      if (currentCall == null) {
-        return response;
-      }
-
-      long waitNanos = currentCall.getProcessingDetails().get(Timing.LOCKWAIT, TimeUnit.NANOSECONDS);
-      long readNanos = currentCall.getProcessingDetails().get(Timing.LOCKSHARED, TimeUnit.NANOSECONDS);
-      long writeNanos = currentCall.getProcessingDetails().get(Timing.LOCKEXCLUSIVE, TimeUnit.NANOSECONDS);
-      if (waitNanos == 0 && readNanos == 0 && writeNanos == 0) {
-        return response;
-      }
-
-      OzoneManagerProtocolProtos.OMLockDetailsProto.Builder lockDetails = response.hasOmLockDetails()
-          ? response.getOmLockDetails().toBuilder() : OzoneManagerProtocolProtos.OMLockDetailsProto.newBuilder();
-      lockDetails.setWaitLockNanos(lockDetails.getWaitLockNanos() + waitNanos);
-      lockDetails.setReadLockNanos(lockDetails.getReadLockNanos() + readNanos);
-      lockDetails.setWriteLockNanos(lockDetails.getWriteLockNanos() + writeNanos);
-      return response.toBuilder().setOmLockDetails(lockDetails).build();
-    }
-
-    private static Server.Call createCall(OMRequest request) {
-      if (!request.hasUserInfo()) {
-        return null;
-      }
-
-      OzoneManagerProtocolProtos.UserInfo userInfo = request.getUserInfo();
-      UserGroupInformation remoteUser = userInfo.hasUserName() && !userInfo.getUserName().isEmpty()
-          ? UserGroupInformation.createRemoteUser(userInfo.getUserName()) : null;
-      InetAddress remoteAddress = createRemoteAddress(userInfo);
-      if (remoteUser == null && remoteAddress == null) {
-        return null;
-      }
-
-      return new Server.Call(RpcConstants.INVALID_CALL_ID, RpcConstants.INVALID_RETRY_COUNT,
-          null, null, RPC.RpcKind.RPC_PROTOCOL_BUFFER, RpcConstants.DUMMY_CLIENT_ID) {
-        @Override
-        public UserGroupInformation getRemoteUser() {
-          return remoteUser;
-        }
-
-        @Override
-        public InetAddress getHostInetAddress() {
-          return remoteAddress;
-        }
-      };
-    }
-
-    private static InetAddress createRemoteAddress(
-        OzoneManagerProtocolProtos.UserInfo userInfo) {
-      if (!userInfo.hasRemoteAddress() || userInfo.getRemoteAddress().isEmpty()) {
-        return null;
-      }
-
-      try {
-        InetAddress address = InetAddress.getByName(userInfo.getRemoteAddress());
-        return userInfo.hasHostName() && !userInfo.getHostName().isEmpty()
-            ? InetAddress.getByAddress(userInfo.getHostName(), address.getAddress()) : address;
-      } catch (UnknownHostException ex) {
-        LOG.debug("Unable to restore remote address from Ratis query context: {}",
-            userInfo.getRemoteAddress(), ex);
-        return null;
-      }
-    }
-
-    @Override
-    public void close() {
-      Server.getCurCall().remove();
-      OzoneManager.setS3Auth(null);
-      OzoneManager.setStsTokenIdentifier(null);
     }
   }
 

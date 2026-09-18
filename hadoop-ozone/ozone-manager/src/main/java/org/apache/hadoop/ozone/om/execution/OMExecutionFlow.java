@@ -24,6 +24,7 @@ import java.io.IOException;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.ratis.OMRatisRequestContext;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -74,13 +75,7 @@ public class OMExecutionFlow {
       }
     } else {
       try {
-        OMRequest.Builder requestBuilder = request.toBuilder()
-            .setUserInfo(OMClientRequest.getAuthenticatedUserInfo(request));
-        if (request.hasS3Authentication()) {
-          requestBuilder.setS3Authentication(OMClientRequest.resolveS3Authentication(
-              request.getS3Authentication(), OzoneManager.getStsTokenIdentifier()));
-        }
-        requestToSubmit = requestBuilder.build();
+        requestToSubmit = OMRatisRequestContext.capture(request, ozoneManager);
       } catch (IOException ex) {
         return OzoneManagerRatisUtils.createErrorResponse(request, ex);
       }
