@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
@@ -38,6 +39,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -320,13 +322,13 @@ public class TestReplicationManagerUtil {
     NodeManager nodeManagerMock = mock(NodeManager.class);
     when(replicationManager.getNodeManager()).thenReturn(nodeManagerMock);
     doReturn(fullDn).when(nodeManagerMock).getNode(fullDn.getID());
-    doReturn(new SCMNodeMetric(50 * oneGb, 20 * oneGb, 30 * oneGb, 5 * oneGb,
+    doReturn(createSCMNodeMetric(50 * oneGb, 20 * oneGb, 30 * oneGb, 5 * oneGb,
         20 * oneGb, 0)).when(nodeManagerMock).getNodeStat(fullDn);
     doReturn(spaceAvailableDn).when(nodeManagerMock).getNode(spaceAvailableDn.getID());
-    doReturn(new SCMNodeMetric(50 * oneGb, 10 * oneGb, 40 * oneGb, 5 * oneGb,
+    doReturn(createSCMNodeMetric(50 * oneGb, 10 * oneGb, 40 * oneGb, 5 * oneGb,
         20 * oneGb, 0)).when(nodeManagerMock).getNodeStat(spaceAvailableDn);
     doReturn(expiredOpDn).when(nodeManagerMock).getNode(expiredOpDn.getID());
-    doReturn(new SCMNodeMetric(50 * oneGb, 20 * oneGb, 30 * oneGb, 5 * oneGb,
+    doReturn(createSCMNodeMetric(50 * oneGb, 20 * oneGb, 30 * oneGb, 5 * oneGb,
         20 * oneGb, 0)).when(nodeManagerMock).getNodeStat(expiredOpDn);
 
     when(replicationManager.getNodeStatus(any())).thenAnswer(
@@ -358,6 +360,17 @@ public class TestReplicationManagerUtil {
     assertThat(excludedAndUsedNodes.getExcludedNodes()).contains(remove.getDatanodeDetails());
     assertThat(excludedAndUsedNodes.getExcludedNodes()).contains(pendingDelete);
     assertThat(excludedAndUsedNodes.getExcludedNodes()).contains(fullDn);
+  }
+
+  private static SCMNodeMetric createSCMNodeMetric(long capacity, long used, long remaining,
+      long committed, long freeSpaceToSpare, long reserved) {
+    return new SCMNodeMetric(
+        singletonMap(StorageType.DEFAULT, capacity),
+        singletonMap(StorageType.DEFAULT, used),
+        singletonMap(StorageType.DEFAULT, remaining),
+        singletonMap(StorageType.DEFAULT, committed),
+        singletonMap(StorageType.DEFAULT, freeSpaceToSpare),
+        singletonMap(StorageType.DEFAULT, reserved));
   }
 
 }

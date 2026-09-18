@@ -83,6 +83,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -1624,6 +1625,57 @@ public class TestSCMNodeManager {
             nodeManager.getNodeStateManager().getNode(dn).getHealthyVolumeCount());
       }
       dnList.clear();
+    }
+  }
+
+  /**
+   * Test that node stats are bucketed per StorageType, while the aggregate
+   * totals still reflect the sum across all storage types.
+   */
+  @Test
+  public void testScmStatsPerStorageType()
+      throws IOException, AuthenticationException {
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000, MILLISECONDS);
+    final int nodeCount = 3;
+    final long diskCapacity = 2000;
+    final long diskUsed = 100;
+    final long ssdCapacity = 500;
+    final long ssdUsed = 50;
+    DatanodeDetails sampleDn = null;
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      EventQueue eventQueue = (EventQueue) scm.getEventQueue();
+      for (int x = 0; x < nodeCount; x++) {
+        DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+        sampleDn = dn;
+        DatanodeID dnId = dn.getID();
+        String base = testDir.getAbsolutePath() + "/" + dnId;
+        StorageReportProto diskReport = HddsTestUtils.createStorageReport(
+            dnId, base + "/disk", diskCapacity, diskUsed, diskCapacity - diskUsed,
+            StorageTypeProto.DISK);
+        StorageReportProto ssdReport = HddsTestUtils.createStorageReport(
+            dnId, base + "/ssd", ssdCapacity, ssdUsed, ssdCapacity - ssdUsed,
+            StorageTypeProto.SSD);
+        nodeManager.register(dn, HddsTestUtils.createNodeReport(
+            Arrays.asList(diskReport, ssdReport), emptyList()), null);
+        nodeManager.processHeartbeat(dn);
+      }
+      eventQueue.processAll(8000L);
+
+      SCMNodeStat stats = nodeManager.getStats();
+      // Per-StorageType aggregation across all nodes.
+      assertThat((long) stats.getCapacity(StorageType.DISK).get()).isEqualTo(diskCapacity * nodeCount);
+      assertThat((long) stats.getCapacity(StorageType.SSD).get()).isEqualTo(ssdCapacity * nodeCount);
+      assertThat((long) stats.getScmUsed(StorageType.DISK).get()).isEqualTo(diskUsed * nodeCount);
+      assertThat((long) stats.getScmUsed(StorageType.SSD).get()).isEqualTo(ssdUsed * nodeCount);
+      // Aggregate totals are the sum across all storage types.
+      assertThat((long) stats.getCapacity().get()).isEqualTo((diskCapacity + ssdCapacity) * nodeCount);
+      assertThat((long) stats.getScmUsed().get()).isEqualTo((diskUsed + ssdUsed) * nodeCount);
+
+      // A single node's stat is bucketed per StorageType too.
+      SCMNodeStat nodeStat = nodeManager.getNodeStat(sampleDn).get();
+      assertThat((long) nodeStat.getCapacity(StorageType.DISK).get()).isEqualTo(diskCapacity);
+      assertThat((long) nodeStat.getCapacity(StorageType.SSD).get()).isEqualTo(ssdCapacity);
     }
   }
 

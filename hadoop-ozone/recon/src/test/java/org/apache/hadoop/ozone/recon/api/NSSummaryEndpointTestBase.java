@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -29,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -175,8 +177,13 @@ public abstract class NSSummaryEndpointTestBase {
 
   private static SCMNodeStat getMockSCMRootStat(long rootQuota,
       long rootDataSize) {
-    return new SCMNodeStat(rootQuota, rootDataSize,
-        rootQuota - rootDataSize, 0L, 0L, 0);
+    return new SCMNodeStat(
+        singletonMap(StorageType.DEFAULT, rootQuota),
+        singletonMap(StorageType.DEFAULT, rootDataSize),
+        singletonMap(StorageType.DEFAULT, rootQuota - rootDataSize),
+        singletonMap(StorageType.DEFAULT, 0L),
+        singletonMap(StorageType.DEFAULT, 0L),
+        singletonMap(StorageType.DEFAULT, 0L));
   }
 
   static DUResponse getDiskUsage(NSSummaryEndpoint endpoint, String path,
