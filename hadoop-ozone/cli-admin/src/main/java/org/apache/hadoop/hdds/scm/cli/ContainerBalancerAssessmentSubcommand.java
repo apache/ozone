@@ -143,16 +143,16 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
 
   private static String getSourceNodesPrettyString(ContainerBalancerClusterSnapshot snapshot, int nodeLimit) {
     StringBuilder builder = new StringBuilder();
-    builder.append("Source Nodes (over-utilized):").append(System.lineSeparator());
-    builder.append(String.format("%-50s %s%n", "Datanodes above threshold", snapshot.getSourceCount()));
+    builder.append("Source Nodes (over-utilized):").append(System.lineSeparator())
+        .append(String.format("%-50s %s%n", "Datanodes above threshold", snapshot.getSourceCount()));
     appendNodeList(builder, snapshot.getTopSourceNodes(), snapshot.getClusterAvgUtilization(), true, nodeLimit);
     return builder.toString();
   }
 
   private static String getTargetNodesPrettyString(ContainerBalancerClusterSnapshot snapshot, int nodeLimit) {
     StringBuilder builder = new StringBuilder();
-    builder.append("Target Nodes (under-utilized):").append(System.lineSeparator());
-    builder.append(String.format("%-50s %s%n", "Datanodes below threshold", snapshot.getTargetCount()));
+    builder.append("Target Nodes (under-utilized):").append(System.lineSeparator())
+        .append(String.format("%-50s %s%n", "Datanodes below threshold", snapshot.getTargetCount()));
     appendNodeList(builder, snapshot.getBottomTargetNodes(), snapshot.getClusterAvgUtilization(), false, nodeLimit);
     return builder.toString();
   }
@@ -173,8 +173,8 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
     if (nodes.isEmpty()) {
       return;
     }
-    builder.append(System.lineSeparator());
-    builder.append(aboveMean ? "Top " + nodeLimit + ":" : "Bottom " + nodeLimit + ":")
+    builder.append(System.lineSeparator())
+        .append(aboveMean ? "Top " + nodeLimit + ":" : "Bottom " + nodeLimit + ":")
         .append(System.lineSeparator());
     for (ContainerBalancerClusterSnapshot.NodeUtilization node : nodes) {
       double deltaFromMean = (node.getUtilization() - clusterAvgUtilization) * 100;
@@ -229,7 +229,7 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
   }
 
   private static Set<String> parseNodeList(String commaSeparated) {
-    if (commaSeparated == null || commaSeparated.trim().isEmpty()) {
+    if (commaSeparated == null || commaSeparated.isEmpty()) {
       return Collections.emptySet();
     }
     return Arrays.stream(commaSeparated.split(","))
