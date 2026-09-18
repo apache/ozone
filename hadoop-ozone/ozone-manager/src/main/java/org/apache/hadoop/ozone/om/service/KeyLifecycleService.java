@@ -1555,8 +1555,10 @@ public class KeyLifecycleService extends BackgroundService {
       try {
         checkAndCreateTrashDirIfNeeded(bucket, trashCurrent);
       } catch (IOException e) {
-        keysList.clear();
-        return;
+        String message =
+            "Failed to prepare trash root " + trashCurrent + " for bucket " + volumeName + "/" + bucketName;
+        LOG.error(message, e);
+        throw new IllegalStateException(message, e);
       }
 
       for (int i = 0; i < keysList.size(); i++) {
@@ -1607,8 +1609,10 @@ public class KeyLifecycleService extends BackgroundService {
               });
           if (omResponse != null) {
             if (!omResponse.getSuccess()) {
+              OzoneManagerProtocolProtos.Status status = omResponse.getStatus();
               // log the failure and continue the iterating
-              LOG.error("RenameKey request failed with source key: {}, dest key: {}", keyName, targetKeyName);
+              LOG.error("RenameKey request failed with source key: {}, dest key: {}, status: {}",
+                  keyName, targetKeyName, status);
               continue;
             }
           }
@@ -1624,6 +1628,9 @@ public class KeyLifecycleService extends BackgroundService {
             metrics.incrSizeKeyRenamed(keysList.getReplicatedSize(i));
           }
         } catch (IOException | InterruptedException e) {
+          if (e instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+          }
           LOG.error("Failed to send RenameKeysRequest", e);
         }
       }

@@ -142,6 +142,15 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       applyPreparedEntries(preparedSubDirs, preparedSubFiles, preparedDirPurges, omMetadataManager,
           context.getIndex(), result);
 
+      // All bucket locks are still held here, and every purge path has been processed, so the accumulated
+      // copies can be published as a whole. Publishing only here, after all fallible apply work has
+      // succeeded, keeps a failed purge from changing the live bucket usage (HDDS-16161).
+      for (Map.Entry<Pair<String, String>, OmBucketInfo> entry : result.volBucketInfoMap.entrySet()) {
+        omMetadataManager.getBucketTable().addCacheEntry(
+            omMetadataManager.getBucketKey(entry.getKey().getLeft(), entry.getKey().getRight()),
+            entry.getValue(), context.getIndex());
+      }
+
       // The per-entry global OM metric mutations were unconditional, so the count is the total number of prepared
       // sub-directories and sub-files.
       long numKeysProcessed = (long) preparedSubDirs.size() + preparedSubFiles.size();
@@ -315,8 +324,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   private void applyPreparedEntries(List<PreparedEntry> preparedSubDirs, List<PreparedEntry> preparedSubFiles,
       List<PreparedDirPurge> preparedDirPurges, OmMetadataManagerImpl omMetadataManager, long trxnLogIndex,
       PurgeApplyResult result) throws IOException {
-    // Memoizes getBucketInfo lookups within this apply so that a purge transaction touching many keys of the same
-    // bucket resolves the bucket cache entry once instead of per key.
+    // Holds one mutable bucket-info copy per bucket for this apply so that a purge transaction touching many keys of
+    // the same bucket resolves it once and accumulates every quota delta on the same copy.
     Map<Pair<String, String>, OmBucketInfo> bucketInfoCache = new HashMap<>();
     // Quota deltas are accumulated per bucket across all three entry loops and applied once at the end.
     Map<Pair<String, String>, QuotaDelta> quotaDeltas = new HashMap<>();
@@ -539,10 +548,10 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   }
 
   /**
-   * Returns the cached bucket info for the given volume/bucket, memoizing the lookup within a single apply so that a
-   * purge transaction touching many keys of the same bucket does the {@link #getBucketInfo} cache lookup once. The
-   * returned instance is the same cached reference {@link #getBucketInfo} returns, so in-place quota mutations behave
-   * identically. {@code null} results (deleted bucket) are memoized too.
+   * Returns a single mutable bucket-info copy for the given volume/bucket, memoized within one apply so that all three
+   * purge paths touching the same bucket share one copy (or earlier quota deltas would be lost) and resolve the bucket
+   * cache lookup once. The copy comes from {@link #getBucketInfoForUpdate}, so quota mutations stay off the live cache
+   * until they are published on the success path. {@code null} results (deleted bucket) are memoized too.
    */
   private static OmBucketInfo getBucketInfoCached(OmMetadataManagerImpl omMetadataManager,
       Map<Pair<String, String>, OmBucketInfo> cache, String volumeName, String bucketName) {
@@ -550,7 +559,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     if (cache.containsKey(cacheKey)) {
       return cache.get(cacheKey);
     }
-    OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+    OmBucketInfo omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
     cache.put(cacheKey, omBucketInfo);
     return omBucketInfo;
   }

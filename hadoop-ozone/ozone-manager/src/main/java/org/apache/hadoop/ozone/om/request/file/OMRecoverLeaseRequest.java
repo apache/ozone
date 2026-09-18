@@ -96,7 +96,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   @Override
   @DisallowedUntilLayoutVersion(HBASE_SUPPORT)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest request = super.preExecute(ozoneManager);
+    final OMRequest request = super.preExecute(ozoneManager);
     RecoverLeaseRequest recoverLeaseRequest = request.getRecoverLeaseRequest();
 
     String keyPath = recoverLeaseRequest.getKeyName();
@@ -242,9 +242,9 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     openKeyInfo.setKeyName(keyName);
 
     OmKeyLocationInfoGroup keyLatestVersionLocations = keyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.getLocationList();
+    List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.createLocationList();
     OmKeyLocationInfoGroup openKeyLatestVersionLocations = openKeyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.getLocationList();
+    List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.createLocationList();
 
     if (!keyLocationInfoList.isEmpty()) {
       updateBlockInfo(ozoneManager, keyLocationInfoList.get(keyLocationInfoList.size() - 1));
