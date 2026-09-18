@@ -308,7 +308,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     final CompletableFuture<XceiverClientReply> replyFuture = new CompletableFuture<>();
     getClient().async().watch(index, watchType).thenAccept(reply -> {
       final long updated = updateCommitInfosMap(reply, watchType);
-      Preconditions.checkState(updated >= index, "Returned index " + updated + " < expected " + index);
+      Preconditions.checkState(updated >= index, "Returned index %s < expected %s", updated, index);
       replyFuture.complete(newWatchReply(index, watchType, updated));
     }).exceptionally(e -> {
       LOG.warn("{} way commit failed on pipeline {}", watchType, pipeline, e);
