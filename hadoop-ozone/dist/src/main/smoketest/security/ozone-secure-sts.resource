@@ -220,13 +220,14 @@ Assume Role Should Fail
 
 Assume Role Should Fail Using Curl
     # This keyword is needed to test boundary cases that the aws client prevents you from issuing, such as too short duration for token
-    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied  ${expected_http_code}=400  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900  ${extra_curl_params}=${EMPTY}
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied  ${expected_http_code}=400  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900  ${extra_curl_params}=${EMPTY}  ${expected_message}=${EMPTY}
     ${cmd} =                      Set Variable                  curl --silent --show-error --include --request POST --aws-sigv4 "aws:amz:us-east-1:sts" --user '${perm_access_key_id}:${perm_secret_key}' --header "Content-Type: application/x-www-form-urlencoded" --data-urlencode "Action=AssumeRole" --data-urlencode "Version=2011-06-15" --data-urlencode "RoleArn=${role_arn}" --data-urlencode "RoleSessionName=${role_session_name}" ${STS_ENDPOINT_URL}
     ${cmd} =                      Set Variable If               '${duration_seconds}' != '${EMPTY}'    ${cmd} --data-urlencode "DurationSeconds=${duration_seconds}"    ${cmd}
     ${cmd} =                      Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --data-urlencode "Policy=${policy_json}"    ${cmd}
     ${cmd} =                      Set Variable If               '${extra_curl_params}' != '${EMPTY}'    ${cmd} ${extra_curl_params}    ${cmd}
     ${output} =                   Execute And Ignore Error      ${cmd}
     Should Contain                ${output}                     ${expected_error}
+    Run Keyword If                '${expected_message}' != '${EMPTY}'        Should Contain    ${output}    ${expected_message}
     @{http_codes} =               Get Regexp Matches            ${output}    (?m)^HTTP/[0-9.]+ ([0-9]{3})    1
     ${code_count} =               Get Length                    ${http_codes}
     Should Be True                ${code_count} > 0             Expected to find an HTTP status code in curl output, but none was found.
