@@ -20,8 +20,11 @@ package org.apache.hadoop.ozone.s3.awssdk.v2;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
+import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.getOmKeyModificationTime;
+import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.getOmPartModificationTime;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
+import static org.apache.http.HttpStatus.SC_OK;
 import static org.apache.http.HttpStatus.SC_REQUESTED_RANGE_NOT_SATISFIABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -175,6 +178,7 @@ import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.Tag;
 import software.amazon.awssdk.services.s3.model.Tagging;
 import software.amazon.awssdk.services.s3.model.UploadPartCopyRequest;
+import software.amazon.awssdk.services.s3.model.UploadPartCopyResponse;
 import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -1328,6 +1332,73 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testCopyObjectLastModifiedMatchesOmDb() throws Exception {
+    final String sourceBucketName = getBucketName();
+    final String destBucketName = getBucketName();
+    final String sourceKey = getKeyName();
+    final String destKey = getKeyName();
+    final String content = "copy-last-modified-test-content";
+    s3Client.createBucket(b -> b.bucket(sourceBucketName));
+    s3Client.createBucket(b -> b.bucket(destBucketName));
+
+    s3Client.putObject(b -> b.bucket(sourceBucketName).key(sourceKey), RequestBody.fromString(content));
+
+    final long sourceModificationTime = getOmKeyModificationTime(cluster, sourceBucketName, sourceKey);
+
+    Thread.sleep(100);
+
+    final CopyObjectResponse copyObjectResponse = s3Client.copyObject(
+        CopyObjectRequest.builder()
+            .sourceBucket(sourceBucketName)
+            .sourceKey(sourceKey)
+            .destinationBucket(destBucketName)
+            .destinationKey(destKey)
+            .build());
+
+    assertNotNull(copyObjectResponse.copyObjectResult().lastModified());
+    final long responseModificationTime = copyObjectResponse.copyObjectResult().lastModified().toEpochMilli();
+    final long destModificationTime = getOmKeyModificationTime(cluster, destBucketName, destKey);
+
+    assertEquals(destModificationTime, responseModificationTime);
+    assertNotEquals(sourceModificationTime, responseModificationTime);
+  }
+
+  @Test
+  public void testUploadPartCopyLastModifiedMatchesOmDb() throws Exception {
+    final String bucketName = getBucketName();
+    final String sourceKey = getKeyName();
+    final String destKey = getKeyName();
+    final String content = "copy-last-modified-test-content";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b.bucket(bucketName).key(sourceKey), RequestBody.fromString(content));
+
+    final long sourceModificationTime = getOmKeyModificationTime(cluster, bucketName, sourceKey);
+
+    Thread.sleep(100);
+
+    final CreateMultipartUploadResponse initResponse = s3Client.createMultipartUpload(
+        b -> b.bucket(bucketName).key(destKey));
+    final String uploadId = initResponse.uploadId();
+
+    final UploadPartCopyResponse copyPartResponse = s3Client.uploadPartCopy(
+        b -> b
+            .sourceBucket(bucketName)
+            .sourceKey(sourceKey)
+            .destinationBucket(bucketName)
+            .destinationKey(destKey)
+            .uploadId(uploadId)
+            .partNumber(1));
+
+    assertNotNull(copyPartResponse.copyPartResult().lastModified());
+    final long responseModificationTime = copyPartResponse.copyPartResult().lastModified().toEpochMilli();
+    final long destPartModificationTime = getOmPartModificationTime(cluster, bucketName, destKey, uploadId, 1);
+
+    assertEquals(destPartModificationTime, responseModificationTime);
+    assertNotEquals(sourceModificationTime, responseModificationTime);
+  }
+
+  @Test
   public void testCopyObjectToSelfWithMetadataReplace() {
     final String bucketName = getBucketName();
     final String key = getKeyName();
@@ -1627,6 +1698,24 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       assertThat(malformed.statusCode()).isEqualTo(SC_BAD_REQUEST);
       assertEquals("InvalidArgument", malformed.awsErrorDetails().errorCode());
     }
+  }
+
+  @Test
+  public void testGetObjectInvertedRange() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "0123456789";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    // An inverted range is ignored and the whole object is returned, matching AWS GetObject.
+    ResponseBytes<GetObjectResponse> response = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(keyName).range("bytes=8-3"));
+
+    assertEquals(SC_OK, response.response().sdkHttpResponse().statusCode());
+    assertEquals(content, response.asUtf8String());
+    assertEquals(Long.valueOf(content.length()), response.response().contentLength());
+    assertNull(response.response().contentRange());
   }
 
   @Test
@@ -2696,6 +2785,26 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .lifecycleConfiguration(validConfig)));
     assertEquals(HttpURLConnection.HTTP_NOT_FOUND, exception2.statusCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), exception2.awsErrorDetails().errorCode());
+
+    LifecycleRule pastDateRule = LifecycleRule.builder()
+        .id("past-date")
+        .prefix("logs/")
+        .status(ExpirationStatus.ENABLED)
+        .expiration(LifecycleExpiration.builder().date(Instant.parse("2020-01-01T00:00:00Z")).build())
+        .build();
+    BucketLifecycleConfiguration pastDateConfig = BucketLifecycleConfiguration.builder()
+        .rules(pastDateRule)
+        .build();
+
+    S3Exception exception3 = assertThrows(S3Exception.class,
+        () -> s3Client.putBucketLifecycleConfiguration(b -> b
+            .bucket(bucketName)
+            .lifecycleConfiguration(pastDateConfig)));
+    assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, exception3.statusCode());
+    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), exception3.awsErrorDetails().errorCode());
+    assertTrue(exception3.awsErrorDetails().errorMessage().contains("must be in the future"),
+        "The client should receive OM's detailed message explaining the date is in the past, got: "
+            + exception3.awsErrorDetails().errorMessage());
   }
 
   @Test

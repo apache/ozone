@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
+import org.apache.hadoop.ozone.s3sts.S3STSConfigKeys;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -59,6 +60,7 @@ public class TestOzoneConfigurationFields extends ConfigurationFieldsTests {
             ReconConfigKeys.class, ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
             S3SecretConfigKeys.class,
+            S3STSConfigKeys.class
         };
     errorIfMissingConfigProps = true;
     errorIfMissingXmlProps = true;
