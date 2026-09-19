@@ -61,6 +61,7 @@ public class OMPerformanceMetrics implements MetricsSource {
   private final ConcurrentMutableRate getKeyInfoAclCheckLatencyNs;
   private final ConcurrentMutableRate getKeyInfoSortDatanodesLatencyNs;
   private final ConcurrentMutableRate allocateBlockSortDatanodesLatencyNs;
+  private final ConcurrentMutableRate allocateBlockResolveClientLatencyNs;
   private final ConcurrentMutableRate getKeyInfoResolveBucketLatencyNs;
   private final ConcurrentMutableRate s3VolumeContextLatencyNs;
   private final ConcurrentMutableRate forceContainerCacheRefresh;
@@ -138,7 +139,9 @@ public class OMPerformanceMetrics implements MetricsSource {
     getKeyInfoSortDatanodesLatencyNs = stat("GetKeyInfoSortDatanodesLatencyNs",
         "Sort datanodes latency in getKeyInfo");
     allocateBlockSortDatanodesLatencyNs = stat("AllocateBlockSortDatanodesLatencyNs",
-        "Client lookup and datanode sort latency in allocateBlock (streaming write), recorded as separate samples");
+        "Sort datanodes latency in allocateBlock (streaming write)");
+    allocateBlockResolveClientLatencyNs = stat("AllocateBlockResolveClientLatencyNs",
+        "Client lookup latency in allocateBlock (streaming write)");
     getKeyInfoResolveBucketLatencyNs = stat("GetKeyInfoResolveBucketLatencyNs",
         "resolveBucketLink latency in getKeyInfo");
     s3VolumeContextLatencyNs = stat("S3VolumeContextLatencyNs",
@@ -235,6 +238,7 @@ public class OMPerformanceMetrics implements MetricsSource {
     getKeyInfoAclCheckLatencyNs.snapshot(builder, all);
     getKeyInfoSortDatanodesLatencyNs.snapshot(builder, all);
     allocateBlockSortDatanodesLatencyNs.snapshot(builder, all);
+    allocateBlockResolveClientLatencyNs.snapshot(builder, all);
     getKeyInfoResolveBucketLatencyNs.snapshot(builder, all);
     s3VolumeContextLatencyNs.snapshot(builder, all);
     forceContainerCacheRefresh.snapshot(builder, all);
@@ -332,6 +336,10 @@ public class OMPerformanceMetrics implements MetricsSource {
 
   ConcurrentMutableRate getAllocateBlockSortDatanodesLatencyNs() {
     return allocateBlockSortDatanodesLatencyNs;
+  }
+
+  ConcurrentMutableRate getAllocateBlockResolveClientLatencyNs() {
+    return allocateBlockResolveClientLatencyNs;
   }
 
   public void setForceContainerCacheRefresh(boolean value) {
