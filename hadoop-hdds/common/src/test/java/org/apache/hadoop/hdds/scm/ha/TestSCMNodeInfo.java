@@ -196,4 +196,33 @@ public class TestSCMNodeInfo {
     assertEquals("[2001:db8::1]:" + OZONE_SCM_CLIENT_PORT_DEFAULT,
         scmNodeInfos.get(0).getScmClientAddress());
   }
+
+  @Test
+  public void testSCMHANodeInfoRejectsBracketedWildcardSCMAddress() {
+    for (String nodeId : nodes) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+          scmServiceId, nodeId), "localhost");
+    }
+    String addressKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        scmServiceId, "scm1");
+    conf.set(addressKey, "[::]");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> SCMNodeInfo.buildNodeInfo(conf));
+
+    assertThat(e.getMessage()).contains(addressKey).contains("[::]");
+  }
+
+  @Test
+  public void testNonHARejectsWildcardDatanodeAddress() {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
+    config.set(OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0:9861");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> SCMNodeInfo.buildNodeInfo(config));
+
+    assertThat(e.getMessage()).contains(OZONE_SCM_DATANODE_ADDRESS_KEY)
+        .contains("0.0.0.0");
+  }
 }

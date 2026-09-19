@@ -272,7 +272,7 @@ public class TestHddsServerUtils {
   }
 
   @Test
-  public void getSCMAddressForDatanodesRejectsWildcardSCMName() {
+  public void testGetSCMAddressForDatanodesRejectsWildcardSCMName() {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, "0.0.0.0");
 
@@ -283,7 +283,7 @@ public class TestHddsServerUtils {
   }
 
   @Test
-  public void getSCMAddressForDatanodesRejectsWildcardHASCMAddress() {
+  public void testGetSCMAddressForDatanodesRejectsWildcardHASCMAddress() {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final String addressKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
         "scmservice", "scm1");
@@ -297,7 +297,7 @@ public class TestHddsServerUtils {
   }
 
   @Test
-  public void getReconAddressForDatanodesRejectsWildcardAddress() {
+  public void testGetReconAddressForDatanodesRejectsWildcardAddress() {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_RECON_ADDRESS_KEY, "0.0.0.0:9891");
 
@@ -308,7 +308,7 @@ public class TestHddsServerUtils {
   }
 
   @Test
-  public void getReconAddressForDatanodesAcceptsHostname() {
+  public void testGetReconAddressForDatanodesAcceptsHostname() {
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_RECON_ADDRESS_KEY, "recon.example.com:9891");
 

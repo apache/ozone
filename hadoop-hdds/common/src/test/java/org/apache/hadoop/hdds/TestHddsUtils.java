@@ -340,7 +340,8 @@ public class TestHddsUtils {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"0.0.0.0", "::", "169.254.1.1", "fe80::1", "fe80::1%eth0", "2001:db8::1/64"})
+  @ValueSource(strings = {"0.0.0.0", "::", "169.254.1.1", "fe80::1", "fe80::1%eth0", "2001:db8::1/64",
+      "[::]", "[fe80::1]", "[fe80::1%eth0]"})
   void validateAdvertisedHostRejectsUnadvertisableHost(String host) {
     ConfigurationException e = assertThrows(ConfigurationException.class,
         () -> validateAdvertisedHost(OZONE_SCM_CLIENT_ADDRESS_KEY, host));
@@ -396,5 +397,23 @@ public class TestHddsUtils {
         () -> HddsUtils.getScmAddressForClients(conf));
 
     assertThat(e.getMessage()).contains(OZONE_SCM_NAMES);
+  }
+
+  /**
+   * A host that can never be advertised has to be named as such, rather than
+   * be asked for brackets that leave it rejected anyway.
+   */
+  @Test
+  void validateAdvertisedAddressReportsTheHostBeforeTheBrackets() {
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, "::"));
+
+    assertThat(e.getMessage()).contains("wildcard").doesNotContain("bracket");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"scm1.example.com", "192.0.2.1", "[2001:db8::1]:9860", "127.0.0.1:9860"})
+  void validateAdvertisedAddressAcceptsReachableAddress(String value) {
+    assertDoesNotThrow(() -> validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, value));
   }
 }

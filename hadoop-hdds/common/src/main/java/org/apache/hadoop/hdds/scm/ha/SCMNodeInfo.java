@@ -127,6 +127,11 @@ public class SCMNodeInfo {
     } else {
       scmServiceId = SCM_DUMMY_SERVICE_ID;
 
+      HddsUtils.validateAdvertisedAddressConfig(conf,
+          OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+          OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY, OZONE_SCM_DATANODE_ADDRESS_KEY,
+          OZONE_SCM_NAMES);
+
       // Following current approach of fall back to
       // OZONE_SCM_CLIENT_ADDRESS_KEY to figure out hostname.
 

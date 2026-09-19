@@ -260,7 +260,7 @@ public final class HddsUtils {
    * advertises.
    *
    * @param key the property the host was configured under
-   * @param host a hostname or an unbracketed IP literal
+   * @param host a hostname or an IP literal, bracketed or not
    * @throws ConfigurationException if the host cannot be advertised
    */
   public static void validateAdvertisedHost(String key, String host) {
@@ -268,21 +268,29 @@ public final class HddsUtils {
       return;
     }
 
-    // Judged on the text, because the scope makes the literal unresolvable
-    // here: InetAddresses.forString("fe80::1%eth0") throws unless this host
-    // happens to own an interface by that name.
-    if (host.indexOf('%') >= 0 || host.indexOf('/') >= 0) {
+    // A host-only property can still be written with brackets, and the brackets
+    // are stripped on the way to the address, so unwrap them here or the
+    // literal inside escapes every check below.
+    final String literal = host.startsWith("[") && host.endsWith("]")
+        ? host.substring(1, host.length() - 1)
+        : host;
+
+    // Judged on the text, like HddsServerUtil.isScopedOrMaskingIPv6Address,
+    // because the scope makes the literal unresolvable here:
+    // InetAddresses.forString("fe80::1%eth0") throws unless this host happens
+    // to own an interface by that name.
+    if (literal.indexOf('%') >= 0 || literal.indexOf('/') >= 0) {
       throw new ConfigurationException(String.format(
           "%s = %s carries a zone identifier or prefix length, which cannot be advertised: it names an interface "
               + "on this host, so a peer cannot resolve it and it cannot be encoded in an X.509 certificate.",
           key, host));
     }
 
-    if (!InetAddresses.isInetAddress(host)) {
+    if (!InetAddresses.isInetAddress(literal)) {
       return;
     }
 
-    final InetAddress address = InetAddresses.forString(host);
+    final InetAddress address = InetAddresses.forString(literal);
     if (address.isAnyLocalAddress()) {
       throw new ConfigurationException(String.format(
           "%s = %s is a wildcard address, which cannot be advertised. Configure the address this node is reachable "
@@ -306,8 +314,28 @@ public final class HddsUtils {
    * @see #validateAdvertisedHost(String, String)
    */
   public static void validateAdvertisedAddress(String key, String value) {
-    validateHostPortAuthority(key, value);
+    // The host first: a wildcard is rejected outright, so it must not be told
+    // to add brackets that leave it rejected anyway.
     getHostName(value).ifPresent(host -> validateAdvertisedHost(key, host));
+    validateHostPortAuthority(key, value);
+  }
+
+  /**
+   * Rejects an advertised address configured under any of the given properties.
+   * A property holding a comma-separated list is checked entry by entry, and a
+   * property that is not set is skipped.
+   *
+   * @param conf the configuration to read
+   * @param keys the properties to check
+   * @throws ConfigurationException if any configured address cannot be advertised
+   * @see #validateAdvertisedAddress(String, String)
+   */
+  public static void validateAdvertisedAddressConfig(ConfigurationSource conf, String... keys) {
+    for (final String key : keys) {
+      for (final String value : conf.getTrimmedStringCollection(key)) {
+        validateAdvertisedAddress(key, value);
+      }
+    }
   }
 
   /**
@@ -329,13 +357,13 @@ public final class HddsUtils {
     }
 
     final String host = HostAndPort.fromString(value).getHost();
-    final int lastGroup = host.lastIndexOf(':');
-    if (lastGroup < 0) {
+    final int lastColon = host.lastIndexOf(':');
+    if (lastColon < 0) {
       return;
     }
 
-    final String shorterHost = host.substring(0, lastGroup);
-    final String trailingGroup = host.substring(lastGroup + 1);
+    final String shorterHost = host.substring(0, lastColon);
+    final String trailingGroup = host.substring(lastColon + 1);
     if (isPortNumber(trailingGroup) && InetAddresses.isInetAddress(shorterHost)) {
       throw new ConfigurationException(String.format(
           "%s = %s is an unbracketed IPv6 literal. Write %s for host %s with port %s, or %s to use the whole "
