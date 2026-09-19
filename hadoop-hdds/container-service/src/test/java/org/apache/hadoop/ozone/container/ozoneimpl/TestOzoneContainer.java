@@ -51,6 +51,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -69,6 +70,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -82,6 +84,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -193,6 +196,40 @@ public class TestOzoneContainer {
     } finally {
       release.countDown();
       executor.shutdownNow();
+      container.stop();
+    }
+  }
+
+  @Test
+  void testInitTimeoutFailsStartupWhenInitializationStalls() throws Exception {
+    conf = SCMTestUtils.getConf(folder.toFile());
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT, true);
+    // Enable the init watchdog with a short timeout so a stall fails fast.
+    conf.setTimeDuration(DatanodeConfiguration.CONTAINER_INIT_TIMEOUT_KEY, 1, TimeUnit.SECONDS);
+    ContainerTestUtils.initializeDatanodeLayout(conf, datanodeDetails);
+    OzoneContainer container = spy(ContainerTestUtils.getOzoneContainer(datanodeDetails, conf));
+
+    CountDownLatch stalling = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    try {
+      // Simulate an initialization step that stalls past the configured timeout.
+      doAnswer(invocation -> {
+        stalling.countDown();
+        release.await(30, TimeUnit.SECONDS);
+        return invocation.callRealMethod();
+      }).when(container).buildContainerSet();
+
+      // The watchdog turns the stall into an IOException caused by a TimeoutException.
+      IOException firstFailure = assertThrows(IOException.class, () -> container.start(clusterId));
+      assertThat(firstFailure).hasCauseInstanceOf(TimeoutException.class);
+      assertThat(stalling.await(5, TimeUnit.SECONDS)).isTrue();
+
+      // Startup is now FAILED: later callers fail fast with the same recorded cause.
+      assertThat(assertThrows(IOException.class, () -> container.start(clusterId)))
+          .hasCause(firstFailure);
+    } finally {
+      release.countDown();
       container.stop();
     }
   }
