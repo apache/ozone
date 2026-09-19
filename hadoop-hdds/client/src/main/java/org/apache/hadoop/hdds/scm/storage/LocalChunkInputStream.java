@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -62,7 +63,9 @@ public class LocalChunkInputStream extends ChunkInputStream
   LocalChunkInputStream(ChunkInfo chunkInfo, BlockID blockId, XceiverClientFactory xceiverClientFactory,
       Supplier<Pipeline> pipelineSupplier, boolean verifyChecksum, Supplier<Token<?>> tokenSupplier,
       XceiverClientShortCircuit xceiverClientShortCircuit, FileInputStream blockInputStream) {
-    super(chunkInfo, blockId, xceiverClientFactory, pipelineSupplier, verifyChecksum, tokenSupplier);
+    // Pass null for xceiverClientFactory such readPositioned() is taken, both routing reads
+    // and checksum verification are done locally.
+    super(chunkInfo, blockId, null, pipelineSupplier, verifyChecksum, tokenSupplier);
     this.chunkInfo = chunkInfo;
     this.dataIn = blockInputStream.getChannel();
     this.validator = this::validateChunk;
@@ -80,12 +83,41 @@ public class LocalChunkInputStream extends ChunkInputStream
   protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo)
       throws IOException {
     int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
-    final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(readChunkInfo.getLen(),
-        bytesPerChecksum);
-    dataIn.position(readChunkInfo.getOffset()).read(buffers);
+    final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(readChunkInfo.getLen(), bytesPerChecksum);
+    readAtOffset(buffers, readChunkInfo.getOffset());
     Arrays.stream(buffers).forEach(ByteBuffer::flip);
     validator.accept(Arrays.asList(buffers), readChunkInfo);
     return buffers;
+  }
+
+  /**
+   * Read into {@code buffers} starting at {@code fileOffset} using positional
+   * {@link FileChannel} reads so concurrent callers on different chunks (which
+   * share the same underlying channel) do not stomp each other's cursor.
+   */
+  private void readAtOffset(ByteBuffer[] buffers, long fileOffset) throws IOException {
+    long pos = fileOffset;
+    for (ByteBuffer buffer : buffers) {
+      final int remaining = buffer.remaining();
+      final long read = readAtOffset(buffer, pos);
+      if (buffer.hasRemaining()) {
+        throw new EOFException("Read only " + read + "bytes but expected to read " + remaining
+            + " bytes at offset " + pos + " for chunk " + chunkInfo.getChunkName());
+      }
+      pos += read;
+    }
+  }
+
+  private long readAtOffset(ByteBuffer buffer, long fileOffset) throws IOException {
+    long pos = fileOffset;
+    while (buffer.hasRemaining()) {
+      final int n = dataIn.read(buffer, pos);
+      if (n < 0) {
+        break;
+      }
+      pos += n;
+    }
+    return pos - fileOffset;
   }
 
   private void validateChunk(List<ByteBuffer> bufferList, ChunkInfo readChunkInfo)
@@ -104,13 +136,5 @@ public class LocalChunkInputStream extends ChunkInputStream
       int startIndex = (int) (relativeOffset / bytesPerChecksum);
       Checksum.verifyChecksum(bufferList, startIndex, checksumData);
     }
-  }
-
-  /**
-   * Acquire short-circuit local read client.
-   */
-  @Override
-  protected synchronized void acquireClient() throws IOException {
-   // do nothing, read data doesn't need short-circuit client
   }
 }
