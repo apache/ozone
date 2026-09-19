@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.net.InetAddresses;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -129,6 +130,9 @@ public class BasicOzoneFileSystem extends FileSystem {
       "o3fs://bucket.volume.om-host.example.com:5678/key  OR " +
       "o3fs://bucket.volume.omServiceId/key";
 
+  private static final String IPV6_EXCEPTION_TEXT =
+      "Raw IPv6 literals are not supported in O3FS authorities; use an OM service ID or DNS name instead";
+
   private static final int PATH_DEPTH_TO_BUCKET = 0;
 
   @Override
@@ -161,6 +165,10 @@ public class BasicOzoneFileSystem extends FileSystem {
     String bucketStr = matcher.group(1);
     String volumeStr = matcher.group(2);
     String remaining = matcher.groupCount() == 3 ? matcher.group(3) : null;
+
+    if (!isEmpty(remaining) && remaining.contains(":") && InetAddresses.isInetAddress(remaining)) {
+      throw new IllegalArgumentException(IPV6_EXCEPTION_TEXT);
+    }
 
     String omHost = null;
     int omPort = -1;
