@@ -407,22 +407,57 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
   }
 
+  @Override
+  public ContainerCommandResponseProto sendCommand(
+      ContainerCommandRequestProto request, List<Validator> validators,
+      DatanodeDetails datanode) throws IOException {
+    return TracingUtil.executeInNewSpan(getSpanName(request), SpanKind.CLIENT,
+        () -> {
+          final ContainerCommandRequestProto requestWithTraceID = withTraceIDAndVersion(request);
+          try {
+            return sendCommandToDatanode(requestWithTraceID, validators, datanode);
+          } catch (ExecutionException e) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Failed to execute command {} on datanode {}",
+                  processForDebug(requestWithTraceID), datanode, e);
+            }
+            throw toIOException(e);
+          } catch (InterruptedException e) {
+            LOG.error("Command execution was interrupted ", e);
+            Thread.currentThread().interrupt();
+            throw (IOException) new InterruptedIOException(
+                "Command " + processForDebug(requestWithTraceID) + " was interrupted.")
+                .initCause(e);
+          }
+        });
+  }
+
+  @Override
+  public List<DatanodeDetails> getDatanodesInOrder(DatanodeBlockID blockID,
+      ContainerProtos.Type cmdType) throws IOException {
+    return sortDatanodes(blockID, cmdType);
+  }
+
   private XceiverClientReply sendCommandWithTraceIDAndRetry(
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
+    return TracingUtil.executeInNewSpan(getSpanName(request), SpanKind.CLIENT,
+        () -> sendCommandWithRetry(withTraceIDAndVersion(request), validators));
+  }
 
-    String spanName = "XceiverClientGrpc." + request.getCmdType().name();
+  private static String getSpanName(ContainerCommandRequestProto request) {
+    return "XceiverClientGrpc." + request.getCmdType().name();
+  }
 
-    return TracingUtil.executeInNewSpan(spanName, SpanKind.CLIENT,
-        () -> {
-          ContainerCommandRequestProto.Builder builder =
-              ContainerCommandRequestProto.newBuilder(request)
-                  .setTraceID(TracingUtil.exportCurrentSpan());
-          if (!request.hasVersion()) {
-            builder.setVersion(ClientVersion.CURRENT.toProtoValue());
-          }
-          return sendCommandWithRetry(builder.build(), validators);
-        });
+  private static ContainerCommandRequestProto withTraceIDAndVersion(
+      ContainerCommandRequestProto request) {
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder(request)
+            .setTraceID(TracingUtil.exportCurrentSpan());
+    if (!request.hasVersion()) {
+      builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+    }
+    return builder.build();
   }
 
   private List<DatanodeDetails> sortDatanodes(ContainerCommandRequestProto request) throws IOException {
@@ -485,6 +520,45 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return blockID;
   }
 
+  /**
+   * Sends the command to the given datanode only and validates the response.
+   */
+  private ContainerCommandResponseProto sendCommandToDatanode(
+      ContainerCommandRequestProto request, List<Validator> validators,
+      DatanodeDetails dn)
+      throws IOException, ExecutionException, InterruptedException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Executing command {} on datanode {}",
+          processForDebug(request), dn);
+    }
+    final ContainerCommandResponseProto responseProto =
+        sendCommandAsync(request, dn).getResponse().get();
+    if (validators != null && !validators.isEmpty()) {
+      for (Validator validator : validators) {
+        validator.accept(request, responseProto);
+      }
+    }
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      DatanodeBlockID getBlockID = request.getGetBlock().getBlockID();
+      getBlockDNcache.put(getBlockID, dn);
+    }
+    return responseProto;
+  }
+
+  /**
+   * @return the IOException for a failed command
+   * @throws SCMSecurityException if the datanode rejected the block token
+   */
+  private static IOException toIOException(ExecutionException e)
+      throws SCMSecurityException {
+    if (Status.fromThrowable(e.getCause()).getCode()
+        == Status.UNAUTHENTICATED.getCode()) {
+      throw new SCMSecurityException("Failed to authenticate with "
+          + "GRPC XceiverServer with Ozone block token.");
+    }
+    return new IOException(e);
+  }
+
   private XceiverClientReply sendCommandWithRetry(
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
@@ -498,28 +572,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     for (DatanodeDetails dn : datanodeList) {
       try {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Executing command {} on datanode {}",
-              processForDebug(request), dn);
-        }
         // In case the command gets retried on a 2nd datanode,
         // sendCommandAsyncCall will create a new channel and async stub
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
-        responseProto = sendCommandAsync(request, dn).getResponse().get();
-        if (validators != null && !validators.isEmpty()) {
-          for (Validator validator : validators) {
-            validator.accept(request, responseProto);
-          }
-        }
-        if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
-          DatanodeBlockID getBlockID = request.getGetBlock().getBlockID();
-          getBlockDNcache.put(getBlockID, dn);
-        }
+        responseProto = sendCommandToDatanode(request, validators, dn);
         break;
       } catch (IOException e) {
         ioException = e;
-        responseProto = null;
         if (LOG.isDebugEnabled()) {
           LOG.debug("Failed to execute command {} on datanode {}",
               processForDebug(request), dn, e);
@@ -529,13 +589,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           LOG.debug("Failed to execute command {} on datanode {}",
               processForDebug(request), dn, e);
         }
-        if (Status.fromThrowable(e.getCause()).getCode()
-            == Status.UNAUTHENTICATED.getCode()) {
-          throw new SCMSecurityException("Failed to authenticate with "
-              + "GRPC XceiverServer with Ozone block token.");
-        }
-
-        ioException = new IOException(e);
+        ioException = toIOException(e);
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted ", e);
         Thread.currentThread().interrupt();
