@@ -529,6 +529,14 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   Table<String, String> getMetaTable();
 
   /**
+   * Gets the S3RevokedStsTokenTable.
+   *
+   * @return Table.
+   */
+  Table<String, Long> getS3RevokedStsTokenTable();
+
+
+  /**
    * Returns number of rows in a table.  This should not be used for very
    * large tables.
    * @param table
