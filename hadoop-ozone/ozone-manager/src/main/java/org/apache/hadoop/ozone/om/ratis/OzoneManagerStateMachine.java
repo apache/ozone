@@ -24,7 +24,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -48,7 +47,7 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.lock.OMLockDetailsUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -57,8 +56,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
-import org.apache.hadoop.ozone.security.STSSecurityUtil;
-import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -698,52 +695,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @VisibleForTesting
   OMResponse runCommand(OMRequest request, TermIndex termIndex) {
-    boolean isS3AuthThreadLocalSet = false;
-    boolean isStsThreadLocalSet = false;
-    try {
-      if (ozoneManager.isSecurityEnabled() && request.hasS3Authentication()) {
-        // STS token verification runs on the leader RPC path so we don't need to recheck here on the apply
-        // after the log is committed
-        STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
-
-        final OzoneManagerProtocolProtos.S3Authentication s3Auth = request.getS3Authentication();
-        // ThreadLocal carries S3 action for OmMetadataReader.
-        OzoneManager.setS3Auth(s3Auth);
-        isS3AuthThreadLocalSet = true;
-
-        if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
-          // ThreadLocal carries session policy for OmMetadataReader
-          // Use Instant.MAX for creationTime so a future revocation check on this ThreadLocal
-          // identifier never treats the token as issued before a stored cutoff.
-          final STSTokenIdentifier rehydratedTokenIdentifier = new STSTokenIdentifier(
-              STSTokenIdentifier.Params.newBuilder()
-                  .setTempAccessKeyId(
-                      s3Auth.hasResolvedStsTempAccessKeyId() ? s3Auth.getResolvedStsTempAccessKeyId() : "")
-                  .setOriginalAccessKeyId(
-                      s3Auth.hasResolvedStsOriginalAccessKeyId() ? s3Auth.getResolvedStsOriginalAccessKeyId() : "")
-                  .setRoleArn(s3Auth.hasResolvedStsRoleArn() ? s3Auth.getResolvedStsRoleArn() : "")
-                  .setCreationTime(Instant.MAX)
-                  .setExpiry(Instant.MAX) // ensure it deterministically is not expired
-                  .setSecretAccessKey(null) // no secretAccessKey needed
-                  .setSessionPolicy(
-                      s3Auth.hasResolvedStsSessionPolicy() ? s3Auth.getResolvedStsSessionPolicy() : "")
-                  .setManagedSecretKey(null) // no ManagedSecretKey needed
-                  .build());
-          OzoneManager.setStsTokenIdentifier(rehydratedTokenIdentifier);
-          isStsThreadLocalSet = true;
-        }
-      }
+    try (OMRatisRequestContext ignored = OMRatisRequestContext.openForWrite(request, ozoneManager)) {
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
-      OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
-      OMResponse omResponse = omClientResponse.getOMResponse();
-      if (omLockDetails != null) {
-        return omResponse.toBuilder()
-            .setOmLockDetails(omLockDetails.toProtobufBuilder()).build();
-      } else {
-        return omResponse;
-      }
+      return OMLockDetailsUtil.addToResponse(
+          omClientResponse.getOMResponse(), omClientResponse.getOmLockDetails());
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e, termIndex);
@@ -751,13 +708,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
-    } finally {
-      if (isS3AuthThreadLocalSet) {
-        OzoneManager.setS3Auth(null);
-      }
-      if (isStsThreadLocalSet) {
-        OzoneManager.setStsTokenIdentifier(null);
-      }
     }
     return null;
   }
@@ -801,9 +751,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @param request OMRequest
    * @return response from OM
    */
-  private Message queryCommand(OMRequest request) {
-    OMResponse response = handler.handleReadRequest(request);
-    return OMRatisHelper.convertResponseToMessage(response);
+  private Message queryCommand(OMRequest request) throws IOException {
+    try (OMRatisRequestContext context = OMRatisRequestContext.openForRead(request, ozoneManager)) {
+      OMResponse response = handler.handleReadRequest(request);
+      return OMRatisHelper.convertResponseToMessage(context.addLockDetails(response));
+    }
   }
 
   private static <T> CompletableFuture<T> completeExceptionally(Exception e) {

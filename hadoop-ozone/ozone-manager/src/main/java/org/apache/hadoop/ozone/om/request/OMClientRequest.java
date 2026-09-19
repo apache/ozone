@@ -27,7 +27,6 @@ import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -56,6 +55,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.S3AuthenticationContext;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -141,38 +141,11 @@ public abstract class OMClientRequest implements RequestAuditor {
             OMException.ResultCodes.INVALID_REQUEST);
       }
 
-      requestBuilder.setS3Authentication(resolveS3Authentication(s3Auth, stsTokenIdentifier));
+      S3AuthenticationContext.captureInto(requestBuilder);
     }
 
     omRequest = requestBuilder.build();
     return omRequest;
-  }
-
-  private static OzoneManagerProtocolProtos.S3Authentication resolveS3Authentication(
-      OzoneManagerProtocolProtos.S3Authentication s3Auth, STSTokenIdentifier stsTokenIdentifier) {
-    final OzoneManagerProtocolProtos.S3Authentication.Builder s3AuthBuilder = s3Auth.toBuilder();
-
-    if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty() && stsTokenIdentifier != null) {
-      s3AuthBuilder.setResolvedStsSessionPolicy(
-          StringUtils.defaultString(stsTokenIdentifier.getSessionPolicy()));
-      s3AuthBuilder.setResolvedStsRoleArn(
-          StringUtils.defaultString(stsTokenIdentifier.getRoleArn()));
-      s3AuthBuilder.setResolvedStsOriginalAccessKeyId(
-          StringUtils.defaultString(stsTokenIdentifier.getOriginalAccessKeyId()));
-      s3AuthBuilder.setResolvedStsTempAccessKeyId(
-          StringUtils.defaultString(stsTokenIdentifier.getTempAccessKeyId()));
-      final UUID secretKeyId = stsTokenIdentifier.getSecretKeyId();
-      s3AuthBuilder.setResolvedStsSecretKeyId(
-          secretKeyId != null ? secretKeyId.toString() : "");
-    } else {
-      s3AuthBuilder.clearResolvedStsSessionPolicy();
-      s3AuthBuilder.clearResolvedStsRoleArn();
-      s3AuthBuilder.clearResolvedStsOriginalAccessKeyId();
-      s3AuthBuilder.clearResolvedStsTempAccessKeyId();
-      s3AuthBuilder.clearResolvedStsSecretKeyId();
-    }
-
-    return s3AuthBuilder.build();
   }
 
   /**
@@ -217,6 +190,22 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
+    return getUserInfo(omRequest, true);
+  }
+
+  /**
+   * Get authenticated user information for a read request submitted to Ratis.
+   * Client-supplied user information is not trusted on this path.
+   * @param omRequest OM request
+   * @return User Info.
+   */
+  public static OzoneManagerProtocolProtos.UserInfo getAuthenticatedUserInfo(
+      OMRequest omRequest) throws IOException {
+    return getUserInfo(omRequest, false);
+  }
+
+  private static OzoneManagerProtocolProtos.UserInfo getUserInfo(
+      OMRequest omRequest, boolean allowClientUserInfo) throws IOException {
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
     InetAddress remoteAddress = ProtobufRpcEngine.Server.getRemoteIp();
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
@@ -258,7 +247,8 @@ public abstract class OMClientRequest implements RequestAuditor {
     // client-supplied user name when no identity was established above:
     // it is unauthenticated data and must never override the identity
     // derived from S3 authentication or from the RPC user.
-    if (user == null && !userInfo.hasUserName() && omRequest.hasUserInfo()) {
+    if (allowClientUserInfo && user == null && !userInfo.hasUserName() &&
+        omRequest.hasUserInfo()) {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 
