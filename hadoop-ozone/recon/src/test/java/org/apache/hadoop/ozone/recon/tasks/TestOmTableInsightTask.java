@@ -177,7 +177,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     }
     MockitoAnnotations.openMocks(this);
     // Truncate table before running each test
-    dslContext.truncate(GLOBAL_STATS);
+    dslContext.truncate(GLOBAL_STATS).execute();
   }
 
   /**
