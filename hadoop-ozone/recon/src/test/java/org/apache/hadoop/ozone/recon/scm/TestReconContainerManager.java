@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -292,7 +293,7 @@ public class TestReconContainerManager
 
   @Test
   public void testUpdateAndRemoveContainerReplica()
-      throws IOException, TimeoutException {
+      throws IOException, InterruptedException, TimeoutException {
     // Sanity checking updateContainerReplica and ContainerReplicaHistory
 
     // Init Container 1
@@ -340,6 +341,10 @@ public class TestReconContainerManager
     containerReplica1 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
         .setDatanodeDetails(datanodeDetails1).setSequenceId(1051L).build();
+    // A refreshed last seen time is only distinguishable from the first seen
+    // time once the wall clock has left the millisecond it was stamped in.
+    GenericTestUtils.waitFor(
+        () -> System.currentTimeMillis() > repHist1.getFirstSeenTime(), 1, 1000);
     containerManager.updateContainerReplica(containerID1, containerReplica1);
     // Should still have 1 entry in the replica history map
     assertEquals(1, repHistMap.size());
