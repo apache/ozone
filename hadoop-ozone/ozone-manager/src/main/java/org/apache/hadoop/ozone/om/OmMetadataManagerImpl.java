@@ -68,6 +68,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -189,6 +190,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, SnapshotInfo> snapshotInfoTable;
   private Table<String, String> snapshotRenamedTable;
   private Table<String, CompactionLogEntry> compactionLogTable;
+
+  private Table<String, Long> s3RevokedStsTokenTable;
 
   private OzoneManager ozoneManager;
 
@@ -537,6 +540,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
+
+    // originalAccessKeyId -> revocationTimeMillis
+    // FULL_CACHE keeps revocations in memory as there are not expected to be many
+    s3RevokedStsTokenTable = initializer.get(
+        OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE_DEF, cacheType);
 
     lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF, cacheType);
     lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF, cacheType);
@@ -1484,7 +1492,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           final String clientIdString
               = dbOpenKeyName.substring(lastPrefix + 1);
 
-          final boolean isHsync = java.util.Optional.of(openKeyInfo)
+          final boolean isHsync = Optional.of(openKeyInfo)
               .map(WithMetadata::getMetadata)
               .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
               .filter(id -> id.equals(clientIdString))
@@ -1509,10 +1517,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .setBucketName(info.getBucketName())
                 .setKeyName(openKeyInfo.getKeyName())
                 .setDataSize(info.getDataSize());
-            java.util.Optional.ofNullable(info.getLatestVersionLocations())
-                .map(OmKeyLocationInfoGroup::createLocationList)
+            Optional.ofNullable(info.getLatestVersionLocations())
+                .map(OmKeyLocationInfoGroup::getLocationLists)
                 .map(Collection::stream)
                 .orElseGet(Stream::empty)
+                .flatMap(List::stream)
                 .map(loc -> loc.getProtobuf(ClientVersion.CURRENT_VERSION))
                 .forEach(keyArgs::addKeyLocations);
 
@@ -1749,6 +1758,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, CompactionLogEntry> getCompactionLogTable() {
     return compactionLogTable;
+  }
+
+  @Override
+  public Table<String, Long> getS3RevokedStsTokenTable() {
+    return s3RevokedStsTokenTable;
   }
 
   @Override
