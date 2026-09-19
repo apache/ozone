@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.junit.jupiter.api.Test;
 
@@ -53,5 +54,15 @@ public class TestTransactionInfoCodec
     IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
         () -> getCodec().fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8)));
     assertThat(ex).hasMessageContaining("Unexpected split length");
+  }
+
+  @Override
+  @Test
+  public void testInvalidProtocolBufferFromCodecBuffer() {
+    try (CodecBuffer buffer = CodecBuffer.wrap("random".getBytes(StandardCharsets.UTF_8))) {
+      IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+          () -> getCodec().fromCodecBuffer(buffer));
+      assertThat(ex).hasMessageContaining("Unexpected split length");
+    }
   }
 }

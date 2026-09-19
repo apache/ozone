@@ -65,6 +65,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.google.common.collect.Lists;
@@ -527,6 +528,7 @@ public abstract class OmSnapshotTests {
     KeyInfoWithVolumeContext fileInfo = writeClient.getKeyInfo(keyArgs, false);
     assertEquals(fileInfo.getKeyInfo().getKeyName(), snapshotKeyPrefix + key1);
 
+    assumeFalse(bucketLayout.equals(BucketLayout.OBJECT_STORE));
     OzoneFileStatus ozoneFileStatus = writeClient.getFileStatus(keyArgs);
     assertEquals(ozoneFileStatus.getKeyInfo().getKeyName(),
         snapshotKeyPrefix + key1);

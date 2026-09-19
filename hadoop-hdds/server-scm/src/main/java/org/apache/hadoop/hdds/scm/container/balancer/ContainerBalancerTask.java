@@ -563,9 +563,11 @@ public class ContainerBalancerTask implements Runnable {
 
     double threshold = config.getThresholdAsRatio();
     // over utilized nodes have utilization(that is, used / capacity) greater than upper limit
-    this.upperLimit = clusterAvgUtilisation + threshold;
+    this.upperLimit = ContainerBalancerClusterAnalyzer.computeUpperLimit(
+        clusterAvgUtilisation, threshold);
     // under utilized nodes have utilization(that is, used / capacity) less than lower limit
-    this.lowerLimit = clusterAvgUtilisation - threshold;
+    this.lowerLimit = ContainerBalancerClusterAnalyzer.computeLowerLimit(
+        clusterAvgUtilisation, threshold);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Lower limit for utilization is {} and Upper limit for utilization is {}", lowerLimit, upperLimit);
@@ -587,28 +589,18 @@ public class ContainerBalancerTask implements Runnable {
             datanodeUsageInfo.getScmNodeStat().getRemaining().get(),
             utilization);
       }
-      if (Double.compare(utilization, upperLimit) > 0) {
+      if (ContainerBalancerClusterAnalyzer.isOverUtilized(utilization, upperLimit)) {
         overUtilizedNodes.add(datanodeUsageInfo);
         metrics.incrementNumDatanodesUnbalanced(1);
-
-        // amount of bytes greater than upper limit in this node
-        long overUtilizedBytes = ratioToBytes(
-            datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-            utilization) - ratioToBytes(
-            datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-            upperLimit);
-        totalOverUtilizedBytes += overUtilizedBytes;
-      } else if (Double.compare(utilization, lowerLimit) < 0) {
+        totalOverUtilizedBytes +=
+            ContainerBalancerClusterAnalyzer.overUtilizedBytes(datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
+                utilization, upperLimit);
+      } else if (ContainerBalancerClusterAnalyzer.isUnderUtilized(utilization, lowerLimit)) {
         underUtilizedNodes.add(datanodeUsageInfo);
         metrics.incrementNumDatanodesUnbalanced(1);
-
-        // amount of bytes lesser than lower limit in this node
-        long underUtilizedBytes = ratioToBytes(
-            datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-            lowerLimit) - ratioToBytes(
-            datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
-            utilization);
-        totalUnderUtilizedBytes += underUtilizedBytes;
+        totalUnderUtilizedBytes +=
+            ContainerBalancerClusterAnalyzer.underUtilizedBytes(datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
+                utilization, lowerLimit);
       }
     }
     metrics.incrementDataSizeUnbalancedGB(
@@ -1129,17 +1121,6 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   /**
-   * Calculates the number of used bytes given capacity and utilization ratio.
-   *
-   * @param nodeCapacity     capacity of the node.
-   * @param utilizationRatio used space by capacity ratio of the node.
-   * @return number of bytes
-   */
-  private long ratioToBytes(Long nodeCapacity, double utilizationRatio) {
-    return (long) (nodeCapacity * utilizationRatio);
-  }
-
-  /**
    * Calculates the average utilization for the specified nodes.
    * Utilization is (capacity - remaining) divided by capacity.
    *
@@ -1160,8 +1141,8 @@ public class ContainerBalancerTask implements Runnable {
     }
     long clusterCapacity = aggregatedStats.getCapacity().get();
     long clusterRemaining = aggregatedStats.getRemaining().get();
-
-    return (clusterCapacity - clusterRemaining) / (double) clusterCapacity;
+    return ContainerBalancerClusterAnalyzer.calculateAvgUtilization(
+        clusterCapacity, clusterRemaining);
   }
 
   /**
