@@ -1289,6 +1289,50 @@ public class TestHSync {
   }
 
   @Test
+  public void testUsedNamespaceWithRepeatedHsync() throws Exception {
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final Path file = new Path(dir, "file-hsync-used-namespace");
+
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    String bucketKey = metadataManager.getBucketKey(bucket.getVolumeName(), bucket.getName());
+    final long usedNamespace = metadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      try {
+        try (FSDataOutputStream out = fs.create(file, true)) {
+          // Each block triggers an hsync commit; only the first adds the key.
+          byte[] blockData = RandomStringUtils.secure().nextAlphabetic(BLOCK_SIZE)
+              .getBytes(UTF_8);
+          for (int i = 0; i < 4; i++) {
+            out.write(blockData);
+            out.hsync();
+          }
+        }
+        assertEquals(usedNamespace + 1,
+            metadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
+
+        assertTrue(fs.delete(file, false));
+        GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
+            metadataManager.getBucketTable().get(bucketKey).getUsedNamespace() == usedNamespace,
+            100, 30000);
+      } finally {
+        try {
+          fs.delete(file, false);
+          waitForEmptyDeletedTable();
+        } finally {
+          cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
+        }
+      }
+    }
+  }
+
+  @Test
   public void testNormalKeyOverwriteHSyncKey() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",

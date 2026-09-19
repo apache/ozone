@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
+import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 import java.time.format.DateTimeFormatter;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
@@ -39,5 +41,5 @@ public interface SignatureProcessor {
   /**
    * API to return string to sign.
    */
-  SignatureInfo parseSignature() throws OS3Exception;
+  SignatureInfo parseSignature() throws OS3Exception, IOException, NoSuchAlgorithmException;
 }

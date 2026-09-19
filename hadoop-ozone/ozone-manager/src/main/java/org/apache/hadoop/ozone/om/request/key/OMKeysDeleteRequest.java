@@ -96,11 +96,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    DeleteKeysRequest deleteKeysRequest = super.preExecute(ozoneManager).getDeleteKeysRequest();
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+    DeleteKeysRequest deleteKeysRequest = omRequest.getDeleteKeysRequest();
     Objects.requireNonNull(deleteKeysRequest, "deleteKeysRequest == null");
 
     if (deleteKeysRequest.getSourceType() == RequestSource.LIFECYCLE && deleteKeysRequest.hasScanState()) {
-      if (ozoneManager.getAclsEnabled()) {
+      if (ozoneManager.isAdminAuthorizationEnabled()) {
         UserGroupInformation ugi = createUGIForApi();
         if (!ozoneManager.isAdmin(ugi)) {
           throw new OMException("Access denied for user " + ugi + ". "
@@ -110,7 +111,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
     }
 
-    return getOmRequest();
+    return omRequest;
   }
 
   @Override @SuppressWarnings("methodlength")
@@ -236,7 +237,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
 
       OmBucketInfo omBucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
+          getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
       // Mark all keys which can be deleted, in cache as deleted.
@@ -259,6 +260,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
+
+      // A partial delete still persists the accepted keys and the bucket row, so publish here
+      // rather than only when every key was deleted.
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
       omClientResponse =
           getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
               unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap, state);

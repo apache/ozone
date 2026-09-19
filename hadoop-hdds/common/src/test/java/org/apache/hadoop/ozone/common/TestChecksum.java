@@ -20,10 +20,15 @@ package org.apache.hadoop.ozone.common;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -99,5 +104,33 @@ public class TestChecksum {
 
     // The two checksums should not match as they have different types
     assertNotEquals(checksum1, checksum2, "Checksums should not match for different checksum types");
+  }
+
+  @Test
+  public void testChecksumFromNonzeroPosition() throws Exception {
+    final ChunkBuffer data = mock(ChunkBuffer.class);
+    when(data.position()).thenReturn(Integer.MAX_VALUE - 1);
+    when(data.limit()).thenReturn(Integer.MAX_VALUE);
+    when(data.remaining()).thenReturn(1);
+    when(data.asByteBufferList()).thenReturn(
+        Collections.singletonList(ByteBuffer.wrap(new byte[] {1})));
+
+    final Checksum checksum = getChecksum(null, false);
+    assertEquals(1, checksum.computeChecksum(data).getChecksums().size());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testRejectsIncrementalBufferInWriteMode(boolean useChecksumCache) {
+    try (ChunkBuffer data = ChunkBuffer.allocate(32, 8)) {
+      data.put(new byte[10]);
+
+      final Checksum checksum = getChecksum(null, useChecksumCache);
+      final IllegalStateException exception = assertThrows(
+          IllegalStateException.class,
+          () -> checksum.computeChecksum(data, useChecksumCache));
+      assertEquals("ChunkBuffer remaining byte count is 22, but its underlying buffers expose 6 bytes",
+          exception.getMessage());
+    }
   }
 }
