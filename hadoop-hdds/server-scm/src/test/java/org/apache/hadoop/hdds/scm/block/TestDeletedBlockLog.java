@@ -125,6 +125,10 @@ public class TestDeletedBlockLog {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     replicationManager = mock(ReplicationManager.class);
+    // This test runs a real SCM, whose startup builds a NodeDecommissionManager that reads
+    // rm.getConfig(), so the injected mock RM must return a real config, not null.
+    when(replicationManager.getConfig()).thenReturn(
+        conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class));
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setReplicationManager(replicationManager);
