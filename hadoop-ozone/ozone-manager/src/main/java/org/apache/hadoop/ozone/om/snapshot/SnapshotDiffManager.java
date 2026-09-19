@@ -715,9 +715,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final int pageSize
   ) throws IOException {
     if (!isBlank(index)) {
-      DIFF_TYPE_STRING_MAP.values().stream().filter(index::startsWith).findFirst()
-          .orElseThrow(() -> new IOException("Token " + index + " has invalid prefix. Valid prefixes: "
-              + DIFF_TYPE_STRING_MAP.values().stream().map(String::valueOf).collect(Collectors.joining(","))));
+      if (DIFF_TYPE_STRING_MAP.values().stream().noneMatch(index::startsWith)) {
+        throw new IOException("Token " + index + " has invalid prefix. Valid prefixes: "
+            + DIFF_TYPE_STRING_MAP.values().stream().map(String::valueOf).collect(Collectors.joining(",")));
+      }
     }
 
     int idx;
