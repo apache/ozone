@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializ
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -50,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -984,6 +986,52 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     verify(reconDbStore, times(1)).flushLog(true);
     // A non-syncing flush would leave the write in page cache and reintroduce the durability gap.
     verify(reconDbStore, never()).flushLog(false);
+  }
+
+  /**
+   * If syncing the derived-data RocksDB WAL fails, the cursor must remain unadvanced,
+   * the task status must be marked failed (-1), and the retry path must be exercised.
+   */
+  @Test
+  public void testDerivedDbSyncFailureLeavesCursorUnadvancedAndRetries() throws Exception {
+    doThrow(new RocksDatabaseException("Simulated sync failure")).when(reconDbStore).flushLog(true);
+
+    ReconOmTask task = getMockTask("SyncFailureTask");
+    when(task.process(any(OMUpdateEventBatch.class), anyMap()))
+        .thenReturn(new ReconOmTask.TaskResult.Builder()
+            .setTaskName("SyncFailureTask").setTaskSuccess(true).build());
+    reconTaskController.registerTask(task);
+
+    OMUpdateEventBatch batch = mock(OMUpdateEventBatch.class);
+    when(batch.getLastSequenceNumber()).thenReturn(100L);
+    when(batch.isEmpty()).thenReturn(false);
+    when(batch.getEvents()).thenReturn(new ArrayList<>());
+    when(batch.getEventType()).thenReturn(ReconEvent.EventType.OM_UPDATE_BATCH);
+    when(batch.getEventCount()).thenReturn(1);
+
+    reconTaskController.consumeOMEvents(batch, mock(OMMetadataManager.class));
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ReconTaskStatus status = reconTaskStatusDao.findById("SyncFailureTask");
+        return status != null && status.getLastTaskRunStatus() == -1
+            && status.getLastUpdatedSeqNumber() == 0L
+            && reconTaskController.hasTasksFailed();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 100, 5000);
+
+    // Initial batch execution + retry execution both attempt to sync and fail.
+    verify(reconDbStore, times(2)).flushLog(true);
+    // Task was retried because sync failure enqueued it into failedTasks.
+    verify(task, times(2)).process(any(OMUpdateEventBatch.class), anyMap());
+
+    ReconTaskStatus status = reconTaskStatusDao.findById("SyncFailureTask");
+    assertNotNull(status);
+    assertEquals(-1, status.getLastTaskRunStatus());
+    assertEquals(0L, status.getLastUpdatedSeqNumber());
+    assertTrue(reconTaskController.hasTasksFailed());
   }
 
   private ReconOmTask getMockTask(String taskName) {
