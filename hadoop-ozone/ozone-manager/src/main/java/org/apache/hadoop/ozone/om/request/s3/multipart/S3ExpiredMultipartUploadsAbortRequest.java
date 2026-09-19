@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -59,8 +61,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Handles requests to move both MPU open keys from the open key/file table and
- * MPU part keys to delete table. Modifies the open key/file table cache only,
- * and no underlying databases.
+ * MPU part keys to delete table. Modifies the open key/file, multipart info and
+ * bucket table caches, and no underlying databases.
  * The delete table cache does not need to be modified since it is not used
  * for client response validation.
  */
@@ -106,18 +108,44 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
     Result result = null;
     Map<OmBucketInfo, List<OmMultipartAbortInfo>>
         abortedMultipartUploads = new HashMap<>();
+    // One accumulated copy per bucket, so a bucket listed more than once keeps a single entry.
+    Map<Pair<String, String>, OmBucketInfo> bucketInfoMap = new HashMap<>();
+
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    List<String[]> bucketLockKeys = submittedExpiredMPUsPerBucket.stream()
+        .map(mpuByBucket -> Pair.of(mpuByBucket.getVolumeName(), mpuByBucket.getBucketName()))
+        .distinct()
+        .map(volBucketPair -> new String[]{volBucketPair.getLeft(), volBucketPair.getRight()})
+        .collect(Collectors.toList());
+    boolean acquiredLocks = false;
 
     try {
+      // Hold every bucket lock for the whole request, so the accumulated copies can be published
+      // once all buckets have been processed. A later bucket failing turns the whole request into
+      // an error response, which persists nothing.
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLocks(BUCKET_LOCK, bucketLockKeys));
+      acquiredLocks = getOmLockDetails().isLockAcquired();
+
       for (ExpiredMultipartUploadsBucket mpuByBucket:
           submittedExpiredMPUsPerBucket) {
-        // For each bucket where the MPU will be aborted from,
-        // get its bucket lock and update the cache accordingly.
         updateTableCache(ozoneManager, trxnLogIndex, mpuByBucket,
-            abortedMultipartUploads);
+            abortedMultipartUploads, bucketInfoMap);
       }
 
+      for (Map.Entry<Pair<String, String>, OmBucketInfo> entry : bucketInfoMap.entrySet()) {
+        omMetadataManager.getBucketTable().addCacheEntry(
+            omMetadataManager.getBucketKey(entry.getKey().getLeft(), entry.getKey().getRight()),
+            entry.getValue(), trxnLogIndex);
+      }
+
+      // Hand the response its own copies, so the instances now in the cache are not shared with
+      // the DB batch.
+      Map<OmBucketInfo, List<OmMultipartAbortInfo>> abortedMPUsToPersist =
+          abortedMultipartUploads.entrySet().stream()
+              .collect(Collectors.toMap(entry -> entry.getKey().copyObject(), Map.Entry::getValue));
+
       omClientResponse = new S3ExpiredMultipartUploadsAbortResponse(
-          omResponse.build(), abortedMultipartUploads
+          omResponse.build(), abortedMPUsToPersist
       );
 
       result = Result.SUCCESS;
@@ -128,6 +156,9 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           new S3ExpiredMultipartUploadsAbortResponse(createErrorOMResponse(
               omResponse, exception));
     } finally {
+      if (acquiredLocks) {
+        mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketLockKeys));
+      }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());
       }
@@ -194,171 +225,161 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
   @SuppressWarnings("methodlength")
   private void updateTableCache(OzoneManager ozoneManager,
         long trxnLogIndex, ExpiredMultipartUploadsBucket mpusPerBucket,
-        Map<OmBucketInfo, List<OmMultipartAbortInfo>> abortedMultipartUploads)
+        Map<OmBucketInfo, List<OmMultipartAbortInfo>> abortedMultipartUploads,
+        Map<Pair<String, String>, OmBucketInfo> bucketInfoMap)
       throws IOException {
 
-    boolean acquiredLock = false;
     String volumeName = mpusPerBucket.getVolumeName();
     String bucketName = mpusPerBucket.getBucketName();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OmBucketInfo omBucketInfo = null;
-    BucketLayout bucketLayout = null;
-    try {
-      mergeOmLockDetails(omMetadataManager.getLock()
-          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
-      acquiredLock = getOmLockDetails().isLockAcquired();
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+    OmBucketInfo omBucketInfo = bucketInfoMap.computeIfAbsent(
+        Pair.of(volumeName, bucketName),
+        volBucketPair -> getBucketInfoForUpdate(omMetadataManager,
+            volBucketPair.getLeft(), volBucketPair.getRight()));
 
-      if (omBucketInfo == null) {
-        LOG.warn("Volume: {}, Bucket: {} does not exist, skipping deletion.",
-            volumeName, bucketName);
-        return;
-      }
-
-      // Do not use getBucketLayout since the expired MPUs request might
-      // contains MPUs from all kind of buckets
-      bucketLayout = omBucketInfo.getBucketLayout();
-
-      for (ExpiredMultipartUploadInfo expiredMPU:
-          mpusPerBucket.getMultipartUploadsList()) {
-        String expiredMPUKeyName = expiredMPU.getName();
-
-        // If the MPU key is no longer present in the table, MPU
-        // might have been completed / aborted, and should not be
-        // aborted.
-        OmMultipartKeyInfo omMultipartKeyInfo =
-            omMetadataManager.getMultipartInfoTable().get(expiredMPUKeyName);
-
-        if (omMultipartKeyInfo != null) {
-          if (trxnLogIndex < omMultipartKeyInfo.getUpdateID()) {
-            LOG.warn("Transaction log index {} is smaller than " +
-                    "the current updateID {} of MPU key {}, skipping deletion.",
-                trxnLogIndex, omMultipartKeyInfo.getUpdateID(),
-                expiredMPUKeyName);
-            continue;
-          }
-
-          // Set the UpdateID to current transactionLogIndex
-          omMultipartKeyInfo = omMultipartKeyInfo.toBuilder()
-              .setUpdateID(trxnLogIndex)
-              .build();
-
-          // Parse the multipart upload components (e.g. volume, bucket, key)
-          // from the multipartInfoTable db key
-
-          OmMultipartUpload multipartUpload;
-          try {
-            multipartUpload =
-                OmMultipartUpload.from(expiredMPUKeyName);
-          } catch (IllegalArgumentException e) {
-            LOG.warn("Aborting expired MPU failed: MPU key: " +
-                expiredMPUKeyName + " has invalid structure, " +
-                "skipping this MPU.");
-            continue;
-          }
-
-          String multipartOpenKey;
-          try {
-            multipartOpenKey =
-                OMMultipartUploadUtils
-                    .getMultipartOpenKey(multipartUpload.getVolumeName(),
-                        multipartUpload.getBucketName(),
-                        multipartUpload.getKeyName(),
-                        multipartUpload.getUploadId(), omMetadataManager,
-                        bucketLayout);
-          } catch (OMException ome) {
-            LOG.warn("Aborting expired MPU Failed: volume: " +
-                multipartUpload.getVolumeName() + ", bucket: " +
-                multipartUpload.getBucketName() + ", key: " +
-                multipartUpload.getKeyName() + ". Cannot parse the open key" +
-                "for this MPU, skipping this MPU.");
-            continue;
-          }
-
-          // When abort uploaded key, we need to subtract the PartKey length
-          // from the volume usedBytes.
-          long quotaReleased = 0;
-          long numParts;
-          List<OmKeyInfo> partsKeyInfoToDelete = new ArrayList<>();
-          List<OmMultipartPartKey> partsTableKeysToDelete = new ArrayList<>();
-          if (omMultipartKeyInfo.getSchemaVersion()
-              == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
-            for (PartKeyInfo iterPartKeyInfo : omMultipartKeyInfo.
-                getPartKeyInfoMap()) {
-              quotaReleased += QuotaUtil.getReplicatedSize(
-                  iterPartKeyInfo.getPartKeyInfo().getDataSize(),
-                  omMultipartKeyInfo.getReplicationConfig());
-            }
-            numParts = omMultipartKeyInfo.getPartKeyInfoMap().size();
-          } else {
-            SortedMap<Integer, OmMultipartPartInfo> tableParts =
-                OMMultipartUploadUtils.scanParts(omMetadataManager,
-                    multipartUpload.getUploadId());
-            quotaReleased += OMMultipartUploadUtils.getReplicatedSize(
-                tableParts, omMultipartKeyInfo.getReplicationConfig());
-            partsKeyInfoToDelete.addAll(OMMultipartUploadUtils.toOmKeyInfoList(
-                tableParts, multipartUpload.getVolumeName(),
-                multipartUpload.getBucketName(), multipartUpload.getKeyName(),
-                omMultipartKeyInfo.getReplicationConfig()));
-            partsTableKeysToDelete.addAll(OMMultipartUploadUtils.getPartKeys(
-                multipartUpload.getUploadId(), tableParts));
-            OMMultipartUploadUtils.addPartCleanupCacheEntries(omMetadataManager,
-                partsTableKeysToDelete, trxnLogIndex);
-            numParts = tableParts.size();
-          }
-          omBucketInfo.incrUsedBytes(-quotaReleased);
-
-          OmMultipartAbortInfo omMultipartAbortInfo =
-              new OmMultipartAbortInfo.Builder()
-                  .setMultipartKey(expiredMPUKeyName)
-                  .setMultipartOpenKey(multipartOpenKey)
-                  .setMultipartKeyInfo(omMultipartKeyInfo)
-                  .setBucketLayout(omBucketInfo.getBucketLayout())
-                  .setPartsKeyInfoToDelete(partsKeyInfoToDelete)
-                  .setPartsTableKeysToDelete(partsTableKeysToDelete)
-                  .build();
-
-          abortedMultipartUploads.computeIfAbsent(omBucketInfo,
-              k -> new ArrayList<>()).add(omMultipartAbortInfo);
-
-          // Update cache of openKeyTable and multipartInfo table.
-          // No need to add the cache entries to delete table, as the entries
-          // in delete table are not used by any read/write operations.
-
-          // Unlike normal MPU abort request where the MPU open keys needs
-          // to exist. For OpenKeyCleanupService run prior to
-          // HDDS-9017, these MPU open keys might already be deleted,
-          // causing "orphan" MPU keys (MPU entry exist in
-          // multipartInfoTable, but not in openKeyTable).
-          // We can skip this existence check and just delete the
-          // multipartInfoTable. The existence check can be re-added
-          // once there are no "orphan" keys
-          if (omMetadataManager.getOpenKeyTable(bucketLayout)
-              .isExist(multipartOpenKey)) {
-            omMetadataManager.getOpenKeyTable(bucketLayout)
-                .addCacheEntry(new CacheKey<>(multipartOpenKey),
-                    CacheValue.get(trxnLogIndex));
-          }
-          omMetadataManager.getMultipartInfoTable()
-              .addCacheEntry(new CacheKey<>(expiredMPUKeyName),
-                  CacheValue.get(trxnLogIndex));
-
-          ozoneManager.getMetrics().incNumExpiredMPUAborted();
-          ozoneManager.getMetrics().incNumExpiredMPUPartsAborted(numParts);
-          LOG.debug("Expired MPU {} aborted containing {} parts.",
-              expiredMPUKeyName, numParts);
-        } else {
-          LOG.debug("MPU key {} was not aborted, as it was not " +
-              "found in the multipart info table", expiredMPUKeyName);
-        }
-      }
-    } finally {
-      if (acquiredLock) {
-        mergeOmLockDetails(omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
-      }
+    if (omBucketInfo == null) {
+      LOG.warn("Volume: {}, Bucket: {} does not exist, skipping deletion.",
+          volumeName, bucketName);
+      return;
     }
 
+    // Do not use getBucketLayout since the expired MPUs request might
+    // contains MPUs from all kind of buckets
+    BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
+
+    for (ExpiredMultipartUploadInfo expiredMPU:
+        mpusPerBucket.getMultipartUploadsList()) {
+      String expiredMPUKeyName = expiredMPU.getName();
+
+      // If the MPU key is no longer present in the table, MPU
+      // might have been completed / aborted, and should not be
+      // aborted.
+      OmMultipartKeyInfo omMultipartKeyInfo =
+          omMetadataManager.getMultipartInfoTable().get(expiredMPUKeyName);
+
+      if (omMultipartKeyInfo != null) {
+        if (trxnLogIndex < omMultipartKeyInfo.getUpdateID()) {
+          LOG.warn("Transaction log index {} is smaller than " +
+                  "the current updateID {} of MPU key {}, skipping deletion.",
+              trxnLogIndex, omMultipartKeyInfo.getUpdateID(),
+              expiredMPUKeyName);
+          continue;
+        }
+
+        // Set the UpdateID to current transactionLogIndex
+        omMultipartKeyInfo = omMultipartKeyInfo.toBuilder()
+            .setUpdateID(trxnLogIndex)
+            .build();
+
+        // Parse the multipart upload components (e.g. volume, bucket, key)
+        // from the multipartInfoTable db key
+
+        OmMultipartUpload multipartUpload;
+        try {
+          multipartUpload =
+              OmMultipartUpload.from(expiredMPUKeyName);
+        } catch (IllegalArgumentException e) {
+          LOG.warn("Aborting expired MPU failed: MPU key: " +
+              expiredMPUKeyName + " has invalid structure, " +
+              "skipping this MPU.");
+          continue;
+        }
+
+        String multipartOpenKey;
+        try {
+          multipartOpenKey =
+              OMMultipartUploadUtils
+                  .getMultipartOpenKey(multipartUpload.getVolumeName(),
+                      multipartUpload.getBucketName(),
+                      multipartUpload.getKeyName(),
+                      multipartUpload.getUploadId(), omMetadataManager,
+                      bucketLayout);
+        } catch (OMException ome) {
+          LOG.warn("Aborting expired MPU Failed: volume: " +
+              multipartUpload.getVolumeName() + ", bucket: " +
+              multipartUpload.getBucketName() + ", key: " +
+              multipartUpload.getKeyName() + ". Cannot parse the open key" +
+              "for this MPU, skipping this MPU.");
+          continue;
+        }
+
+        // When abort uploaded key, we need to subtract the PartKey length
+        // from the volume usedBytes.
+        long quotaReleased = 0;
+        long numParts;
+        List<OmKeyInfo> partsKeyInfoToDelete = new ArrayList<>();
+        List<OmMultipartPartKey> partsTableKeysToDelete = new ArrayList<>();
+        if (omMultipartKeyInfo.getSchemaVersion()
+            == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
+          for (PartKeyInfo iterPartKeyInfo : omMultipartKeyInfo.
+              getPartKeyInfoMap()) {
+            quotaReleased += QuotaUtil.getReplicatedSize(
+                iterPartKeyInfo.getPartKeyInfo().getDataSize(),
+                omMultipartKeyInfo.getReplicationConfig());
+          }
+          numParts = omMultipartKeyInfo.getPartKeyInfoMap().size();
+        } else {
+          SortedMap<Integer, OmMultipartPartInfo> tableParts =
+              OMMultipartUploadUtils.scanParts(omMetadataManager,
+                  multipartUpload.getUploadId());
+          quotaReleased += OMMultipartUploadUtils.getReplicatedSize(
+              tableParts, omMultipartKeyInfo.getReplicationConfig());
+          partsKeyInfoToDelete.addAll(OMMultipartUploadUtils.toOmKeyInfoList(
+              tableParts, multipartUpload.getVolumeName(),
+              multipartUpload.getBucketName(), multipartUpload.getKeyName(),
+              omMultipartKeyInfo.getReplicationConfig()));
+          partsTableKeysToDelete.addAll(OMMultipartUploadUtils.getPartKeys(
+              multipartUpload.getUploadId(), tableParts));
+          OMMultipartUploadUtils.addPartCleanupCacheEntries(omMetadataManager,
+              partsTableKeysToDelete, trxnLogIndex);
+          numParts = tableParts.size();
+        }
+        omBucketInfo.incrUsedBytes(-quotaReleased);
+
+        OmMultipartAbortInfo omMultipartAbortInfo =
+            new OmMultipartAbortInfo.Builder()
+                .setMultipartKey(expiredMPUKeyName)
+                .setMultipartOpenKey(multipartOpenKey)
+                .setMultipartKeyInfo(omMultipartKeyInfo)
+                .setBucketLayout(omBucketInfo.getBucketLayout())
+                .setPartsKeyInfoToDelete(partsKeyInfoToDelete)
+                .setPartsTableKeysToDelete(partsTableKeysToDelete)
+                .build();
+
+        abortedMultipartUploads.computeIfAbsent(omBucketInfo,
+            k -> new ArrayList<>()).add(omMultipartAbortInfo);
+
+        // Update cache of openKeyTable and multipartInfo table.
+        // No need to add the cache entries to delete table, as the entries
+        // in delete table are not used by any read/write operations.
+
+        // Unlike normal MPU abort request where the MPU open keys needs
+        // to exist. For OpenKeyCleanupService run prior to
+        // HDDS-9017, these MPU open keys might already be deleted,
+        // causing "orphan" MPU keys (MPU entry exist in
+        // multipartInfoTable, but not in openKeyTable).
+        // We can skip this existence check and just delete the
+        // multipartInfoTable. The existence check can be re-added
+        // once there are no "orphan" keys
+        if (omMetadataManager.getOpenKeyTable(bucketLayout)
+            .isExist(multipartOpenKey)) {
+          omMetadataManager.getOpenKeyTable(bucketLayout)
+              .addCacheEntry(new CacheKey<>(multipartOpenKey),
+                  CacheValue.get(trxnLogIndex));
+        }
+        omMetadataManager.getMultipartInfoTable()
+            .addCacheEntry(new CacheKey<>(expiredMPUKeyName),
+                CacheValue.get(trxnLogIndex));
+
+        ozoneManager.getMetrics().incNumExpiredMPUAborted();
+        ozoneManager.getMetrics().incNumExpiredMPUPartsAborted(numParts);
+        LOG.debug("Expired MPU {} aborted containing {} parts.",
+            expiredMPUKeyName, numParts);
+      } else {
+        LOG.debug("MPU key {} was not aborted, as it was not " +
+            "found in the multipart info table", expiredMPUKeyName);
+      }
+    }
   }
 }

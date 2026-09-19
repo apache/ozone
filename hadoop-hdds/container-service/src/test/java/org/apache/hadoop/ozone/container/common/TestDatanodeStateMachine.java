@@ -18,44 +18,65 @@
 package org.apache.hadoop.ozone.container.common;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
+import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
+import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,6 +167,76 @@ public class TestDatanodeStateMachine {
 
       stateMachine.stopDaemon();
       assertTrue(stateMachine.isDaemonStopped());
+    }
+  }
+
+  @Test
+  @Timeout(60)
+  void testDelayedRatisStartupFailureStopsDatanode() throws Exception {
+    conf.setFromObject(conf.getObject(ReplicationConfig.class).setPort(0));
+    DatanodeDetails datanodeDetails = getNewDatanodeDetails();
+    ContainerTestUtils.initializeDatanodeLayout(conf, datanodeDetails);
+    CountDownLatch initializing = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch shutdown = new CountDownLatch(1);
+    HddsDatanodeStopService stopService = mock(HddsDatanodeStopService.class);
+    doAnswer(invocation -> {
+      shutdown.countDown();
+      return null;
+    }).when(stopService).stopService();
+    DatanodeStateMachine stateMachine = new DatanodeStateMachine(null, datanodeDetails, conf, null, null,
+        stopService, new ReconfigurationHandler("DN", conf, op -> { }));
+    try (LogCapturer startupLogs = LogCapturer.captureLogs(VersionEndpointTask.class);
+         LogCapturer stateLogs = LogCapturer.captureLogs(RunningDatanodeState.class)) {
+      OzoneContainer container = stateMachine.getContainer();
+      XceiverServerSpi writeChannel = spy(container.getWriteChannel());
+      Field writeChannelField = OzoneContainer.class.getDeclaredField("writeChannel");
+      writeChannelField.setAccessible(true);
+      writeChannelField.set(container, writeChannel);
+      IllegalStateException failure = new IllegalStateException("Failed to initRaftLog",
+          new IOException("Corrupt Raft log"));
+      doAnswer(invocation -> {
+        initializing.countDown();
+        assertThat(release.await(30, TimeUnit.SECONDS)).isTrue();
+        throw failure;
+      }).when(writeChannel).start();
+
+      stateMachine.startDaemon();
+      assertThat(initializing.await(10, TimeUnit.SECONDS)).isTrue();
+      // Replication is already serving when Ratis startup fails.
+      try (Socket socket = new Socket("127.0.0.1", container.getReplicationServer().getPort())) {
+        assertThat(socket.isConnected()).isTrue();
+      }
+      String clusterId = mockServers.get(0).getClusterId();
+      CompletableFuture<Thread> waitingThread = new CompletableFuture<>();
+      Future<?> waitingCaller = executorService.submit(() -> {
+        waitingThread.complete(Thread.currentThread());
+        container.start(clusterId);
+        return null;
+      });
+      Thread caller = waitingThread.get(10, TimeUnit.SECONDS);
+      GenericTestUtils.waitFor(() -> caller.getState() == Thread.State.BLOCKED, 10, 10000);
+      // Let the real heartbeat wait expire before completing the initialization attempt.
+      GenericTestUtils.waitFor(() -> stateLogs.getOutput().contains("Detected timeout"), 10, 10000);
+      assertThat(stateMachine.getContext().getState()).isEqualTo(DatanodeStates.RUNNING);
+      assertThat(shutdown.getCount()).isEqualTo(1);
+      release.countDown();
+
+      assertThat(assertThrows(ExecutionException.class, () -> waitingCaller.get(10, TimeUnit.SECONDS)).getCause())
+          .isInstanceOf(IOException.class).hasCause(failure);
+      assertThat(shutdown.await(10, TimeUnit.SECONDS)).isTrue();
+      stateMachine.getStateMachineThread().join(10000);
+      assertThat(stateMachine.getStateMachineThread().isAlive()).isFalse();
+      assertThat(stateMachine.getContext().getState()).isEqualTo(DatanodeStates.SHUTDOWN);
+      assertThat(stateMachine.getContext().getShutdownOnError()).isTrue();
+      assertThat(startupLogs.getOutput()).contains("Failed to start required container services",
+          "java.lang.IllegalStateException: Failed to initRaftLog", "Caused by: java.io.IOException: Corrupt Raft log");
+      assertThat(assertThrows(IOException.class, () -> container.start(clusterId))).hasCause(failure);
+      verify(writeChannel, times(1)).start();
+      verify(stopService, times(1)).stopService();
+    } finally {
+      release.countDown();
+      stateMachine.stopDaemon();
     }
   }
 
