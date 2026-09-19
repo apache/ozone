@@ -437,6 +437,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks,
       OMUpdateEventBatch events, List<ReconOmTask.TaskResult> failedTasks) {
     List<ReconOmTask.TaskResult> successfulTasks = Collections.synchronizedList(new ArrayList<>());
+    List<ReconOmTask.TaskResult> executionFailedTasks = Collections.synchronizedList(new ArrayList<>());
     List<CompletableFuture<Void>> futures = tasks.stream()
         .map(task -> CompletableFuture.supplyAsync(() -> {
           // Track task delta processing duration
@@ -465,7 +466,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             // Track task delta processing failure
             taskMetrics.incrTaskDeltaProcessingFailures(taskName);
 
-            failedTasks.add(new ReconOmTask.TaskResult.Builder()
+            executionFailedTasks.add(new ReconOmTask.TaskResult.Builder()
                 .setTaskName(taskName)
                 .setSubTaskSeekPositions(result.getSubTaskSeekPositions())
                 .build());
@@ -501,6 +502,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     } catch (CancellationException ce) {
       LOG.error("Some tasks were cancelled with exception", ce);
     }
+
+    failedTasks.addAll(executionFailedTasks);
 
     if (!successfulTasks.isEmpty()) {
       // Make the derived-table RocksDB writes for this batch durable before the task-status
@@ -610,7 +613,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     }
 
     Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
-    List<ReconOmTask.TaskResult> failedTasks = new ArrayList<>();
+    List<ReconOmTask.TaskResult> failedTasks = Collections.synchronizedList(new ArrayList<>());
 
     for (Map.Entry<String, ReconOmTask> taskEntry : reconOmTasks.entrySet()) {
       ReconOmTask task = taskEntry.getValue();
@@ -622,7 +625,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     processTasks(tasks, events, failedTasks);
 
     // Handle failed tasks with retry logic
-    List<ReconOmTask.TaskResult> retryFailedTasks = new ArrayList<>();
+    List<ReconOmTask.TaskResult> retryFailedTasks = Collections.synchronizedList(new ArrayList<>());
     if (!failedTasks.isEmpty()) {
       LOG.warn("Some tasks failed while processing buffered events, retrying...");
       tasks.clear();
