@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -48,6 +49,7 @@ import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -947,6 +949,18 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
    */
   @Test
   public void testDerivedDbSyncedBeforeCursorAdvanceOnSuccess() throws Exception {
+    AtomicBoolean flushedBeforeCursorCommit = new AtomicBoolean(false);
+    doAnswer(invocation -> {
+      ReconTaskStatus status1 = reconTaskStatusDao.findById("SyncBarrierTask1");
+      ReconTaskStatus status2 = reconTaskStatusDao.findById("SyncBarrierTask2");
+      // At the exact moment flushLog(true) is invoked, neither cursor must have been committed to 100L yet.
+      if ((status1 == null || status1.getLastUpdatedSeqNumber() < 100L)
+          && (status2 == null || status2.getLastUpdatedSeqNumber() < 100L)) {
+        flushedBeforeCursorCommit.set(true);
+      }
+      return null;
+    }).when(reconDbStore).flushLog(true);
+
     ReconOmTask task1 = getMockTask("SyncBarrierTask1");
     when(task1.process(any(OMUpdateEventBatch.class), anyMap()))
         .thenReturn(new ReconOmTask.TaskResult.Builder()
@@ -986,6 +1000,9 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     verify(reconDbStore, times(1)).flushLog(true);
     // A non-syncing flush would leave the write in page cache and reintroduce the durability gap.
     verify(reconDbStore, never()).flushLog(false);
+    // Crucially assert that flushLog(true) was invoked strictly before cursors were committed to 100L.
+    assertTrue(flushedBeforeCursorCommit.get(),
+        "flushLog(true) must be invoked before task cursors are committed to 100L in Derby");
   }
 
   /**
