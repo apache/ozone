@@ -1,0 +1,276 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.hdds.scm;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.hadoop.conf.ReconfigurationException;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.scm.proxy.SCMProxyInfo;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ScmClient;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+/**
+ * Test the OM's SCM nodes reconfiguration wiring: the SCM node list and the
+ * per-node SCM addresses must be reconfigurable on a running OM so that the OM
+ * can reload its SCM failover proxies without a restart. The proxy-level
+ * add/remove behavior is covered by
+ * {@link org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase}'s unit
+ * tests; this verifies the OM-side registration and callback end to end.
+ */
+@Timeout(300)
+public class TestOmSCMNodesReconfiguration {
+
+  private MiniOzoneHAClusterImpl cluster = null;
+  private String scmServiceId;
+
+  @BeforeEach
+  public void init() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    scmServiceId = "scm-service-test1";
+    cluster = MiniOzoneCluster.newHABuilder(conf)
+        .setOMServiceId("om-service-test1")
+        .setSCMServiceId(scmServiceId)
+        .setNumOfStorageContainerManagers(3)
+        .setNumOfOzoneManagers(1)
+        .build();
+    cluster.waitForClusterToBeReady();
+  }
+
+  @AfterEach
+  public void shutdown() {
+    if (cluster != null) {
+      cluster.shutdown();
+    }
+  }
+
+  /**
+   * The SCM node list and each SCM's address (registered as a prefix) must be
+   * reconfigurable on the OM.
+   */
+  @Test
+  void testScmNodesAndAddressReconfigurableOnOm() throws Exception {
+    ReconfigurationHandler handler =
+        cluster.getOzoneManager().getReconfigurationHandler();
+    String scmNodesKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+
+    assertTrue(handler.isPropertyReconfigurable(scmNodesKey));
+    assertTrue(handler.listReconfigureProperties().contains(scmNodesKey));
+
+    // The per-node SCM address keys are registered as a prefix, so any node's
+    // address key is reconfigurable even though it was not registered by name.
+    for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
+      String scmAddrKey = ConfUtils.addKeySuffixes(
+          OZONE_SCM_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
+      assertTrue(handler.isPropertyReconfigurable(scmAddrKey));
+    }
+  }
+
+  /**
+   * Setting an empty SCM node list must be rejected, leaving the OM's SCM
+   * proxies untouched.
+   */
+  @Test
+  void testReconfigureScmNodesToBlankThrows() {
+    ReconfigurationHandler handler =
+        cluster.getOzoneManager().getReconfigurationHandler();
+    String scmNodesKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+
+    assertThrows(ReconfigurationException.class,
+        () -> handler.reconfigureProperty(scmNodesKey, ""));
+  }
+
+  /**
+   * Reconfiguring the SCM node list on a running OM must reload the SCM failover
+   * proxies to the new membership. Dropping one SCM from the list has to shrink
+   * the proxy node set for both the block and container providers; the reload
+   * reads the list from the (freshly written) configuration, so reconfiguring to
+   * a genuinely different value is what exercises the wiring.
+   */
+  @Test
+  void testReconfigureScmNodesReloadsProxies() throws Exception {
+    OzoneManager om = cluster.getOzoneManager();
+    ReconfigurationHandler handler = om.getReconfigurationHandler();
+    ScmClient scmClient = om.getScmClient();
+    String scmNodesKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+
+    List<String> before =
+        new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
+    assertEquals(3, before.size());
+
+    // Drop one SCM from the OM's view. Its address stays in the configuration,
+    // so the reload of the remaining nodes succeeds.
+    String dropped = before.get(before.size() - 1);
+    List<String> remaining = new ArrayList<>(before.subList(0, before.size() - 1));
+    Set<String> expected = new HashSet<>(remaining);
+
+    handler.reconfigureProperty(scmNodesKey, String.join(",", remaining));
+
+    Set<String> afterContainer =
+        new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
+    Set<String> afterBlock =
+        new HashSet<>(scmClient.getBlockProxyProvider().getSCMNodeIds());
+    assertEquals(expected, afterContainer);
+    assertEquals(expected, afterBlock);
+    assertFalse(afterContainer.contains(dropped));
+  }
+
+  /**
+   * Changing only a per-node SCM address (no node-list change) must reload the
+   * OM's SCM failover proxies against the new endpoint. The address keys are
+   * registered as a prefix with no per-key reload function, so an address-only
+   * change is applied by the reconfiguration-complete callback, not the
+   * per-property path. Drive that callback directly: the async {@code reconfig
+   * start} path reads ozone-site.xml from disk, which a mini-cluster does not
+   * rewrite, so it cannot be exercised end to end here.
+   */
+  @Test
+  void testReconfigureScmAddressReloadsProxies() throws Exception {
+    OzoneManager om = cluster.getOzoneManager();
+    ScmClient scmClient = om.getScmClient();
+    String nodeId =
+        cluster.getStorageContainerManagers().get(0).getSCMNodeId();
+    String scmAddrKey = ConfUtils.addKeySuffixes(
+        OZONE_SCM_ADDRESS_KEY, scmServiceId, nodeId);
+
+    // Point one SCM at a different resolvable address on the OM's live
+    // configuration -- the same instance the proxy providers read.
+    OzoneConfiguration conf = om.getConfiguration();
+    conf.set(scmAddrKey, "127.0.0.2");
+
+    Map<String, Boolean> changed = new HashMap<>();
+    changed.put(scmAddrKey, true);
+    om.reloadScmProxiesOnReconfig(changed, conf);
+
+    // Both providers must have rebuilt that node's proxy info to the new host.
+    assertResolvedHost(scmClient.getContainerProxyProvider(), nodeId,
+        "127.0.0.2");
+    assertResolvedHost(scmClient.getBlockProxyProvider(), nodeId, "127.0.0.2");
+  }
+
+  /**
+   * Adding an SCM to the node list without first setting its address must fail
+   * the reconfiguration (so it is reported FAILED and can be retried) and must
+   * leave the live configuration and the SCM proxies unchanged -- the node list
+   * must never keep an SCM without a resolvable address.
+   */
+  @Test
+  void testReconfigureScmNodesFailsWhenAddressMissing() {
+    OzoneManager om = cluster.getOzoneManager();
+    ReconfigurationHandler handler = om.getReconfigurationHandler();
+    ScmClient scmClient = om.getScmClient();
+    OzoneConfiguration conf = om.getConfiguration();
+    String scmNodesKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+
+    List<String> before =
+        new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
+    String originalValue = conf.get(scmNodesKey);
+
+    List<String> withMissing = new ArrayList<>(before);
+    withMissing.add("scm-no-address");
+
+    assertThrows(ReconfigurationException.class, () ->
+        handler.reconfigureProperty(scmNodesKey, String.join(",", withMissing)));
+
+    // The node list is rolled back and both providers keep their membership.
+    assertEquals(originalValue, conf.get(scmNodesKey));
+    assertEquals(new HashSet<>(before),
+        new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds()));
+    assertEquals(new HashSet<>(before),
+        new HashSet<>(scmClient.getBlockProxyProvider().getSCMNodeIds()));
+  }
+
+  /**
+   * Adding an SCM in a single {@code reconfig start} is applied by the
+   * reconfiguration-complete callback: by the time it runs, both the new node
+   * list and the new node's address key are stored, regardless of the order the
+   * batch applied them (the "nodes before address" ordering the per-property
+   * path cannot satisfy on its own). Drive the callback directly, since the sync
+   * {@code reconfigureProperty} used by the other tests never fires it.
+   */
+  @Test
+  void testReconfigureAddScmNodeViaCompleteCallback() throws Exception {
+    OzoneManager om = cluster.getOzoneManager();
+    ScmClient scmClient = om.getScmClient();
+    OzoneConfiguration conf = om.getConfiguration();
+    String scmNodesKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+
+    List<String> before =
+        new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
+    String newNodeId = "scm-added";
+    String newAddrKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, newNodeId);
+
+    List<String> after = new ArrayList<>(before);
+    after.add(newNodeId);
+    conf.set(scmNodesKey, String.join(",", after));
+    conf.set(newAddrKey, "127.0.0.1");
+
+    Map<String, Boolean> changed = new HashMap<>();
+    changed.put(scmNodesKey, true);
+    changed.put(newAddrKey, true);
+    om.reloadScmProxiesOnReconfig(changed, conf);
+
+    Set<String> expected = new HashSet<>(after);
+    assertEquals(expected,
+        new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds()));
+    assertEquals(expected,
+        new HashSet<>(scmClient.getBlockProxyProvider().getSCMNodeIds()));
+  }
+
+  private static void assertResolvedHost(
+      org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase<?> provider,
+      String nodeId, String expectedHost) {
+    SCMProxyInfo info = null;
+    for (SCMProxyInfo candidate : provider.getSCMProxyInfoList()) {
+      if (candidate.getNodeId().equals(nodeId)) {
+        info = candidate;
+        break;
+      }
+    }
+    assertNotNull(info);
+    assertEquals(expectedHost,
+        info.getAddress().getAddress().getHostAddress());
+  }
+}

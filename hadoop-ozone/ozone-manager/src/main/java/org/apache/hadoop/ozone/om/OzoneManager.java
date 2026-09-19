@@ -24,6 +24,8 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -203,6 +205,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
@@ -252,6 +256,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -585,6 +590,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READ_BLACKLIST_USERS, this::reconfOzoneReadBlacklistUsers)
             .register(OZONE_READ_BLACKLIST_GROUPS, this::reconfOzoneReadBlacklistGroups);
 
+    // Allow the SCM node list and the per-node SCM addresses to be reconfigured
+    // so that a newly added SCM can be reached without restarting the OM. The
+    // address keys are registered as a prefix since the new node's key does not
+    // exist at startup and cannot be registered by name in advance.
+    String scmServiceId = HddsUtils.getScmServiceId(conf);
+    if (scmServiceId != null) {
+      reconfigurationHandler
+          .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId))
+          .register(OZONE_SCM_NODES_KEY + "." + scmServiceId, this::reconfScmNodes)
+          .registerCompleteCallback(this::reloadScmProxiesOnReconfig);
+    }
+
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
     reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
@@ -663,12 +680,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Honor property 'hadoop.security.token.service.use_ip'
     omRpcAddressTxt = new Text(SecurityUtil.buildTokenService(omNodeRpcAddr));
 
-    final StorageContainerLocationProtocol scmContainerClient = getScmContainerClient(configuration);
+    // Keep references to the SCM proxy providers so the OM can dynamically
+    // reload the SCM node list / addresses on reconfiguration (see
+    // reconfScmNodes) without a restart.
+    final SCMContainerLocationFailoverProxyProvider scmContainerProxyProvider =
+        new SCMContainerLocationFailoverProxyProvider(configuration, null);
+    final StorageContainerLocationProtocol scmContainerClient =
+        HAUtils.getScmContainerClient(configuration, scmContainerProxyProvider);
     // verifies that the SCM info in the OM Version file is correct.
-    final ScmBlockLocationProtocol scmBlockClient = getScmBlockClient(configuration);
+    final SCMBlockLocationFailoverProxyProvider scmBlockProxyProvider =
+        new SCMBlockLocationFailoverProxyProvider(configuration);
+    final ScmBlockLocationProtocol scmBlockClient =
+        HAUtils.getScmBlockClient(configuration, scmBlockProxyProvider);
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
-        configuration);
+        scmBlockProxyProvider, scmContainerProxyProvider, configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 
@@ -1512,26 +1538,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           + "failed.");
     }
     LOG.info("Ozone Manager login successful.");
-  }
-
-  /**
-   * Create a scm block client, used by putKey() and getKey().
-   *
-   * @return {@link ScmBlockLocationProtocol}
-   */
-  private static ScmBlockLocationProtocol getScmBlockClient(
-      OzoneConfiguration conf) {
-    return HAUtils.getScmBlockClient(conf);
-  }
-
-  /**
-   * Returns a scm container client.
-   *
-   * @return {@link StorageContainerLocationProtocol}
-   */
-  private static StorageContainerLocationProtocol getScmContainerClient(
-      OzoneConfiguration conf) {
-    return HAUtils.getScmContainerClient(conf);
   }
 
   /**
@@ -6088,6 +6094,94 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (auditSuccess) {
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_SNAPSHOT_DIFF_JOBS,
             auditMap));
+      }
+    }
+  }
+
+  /**
+   * Validate and publish a reconfigured SCM node list
+   * ({@code ozone.scm.nodes.<serviceId>}) and reload the block and container SCM
+   * failover proxies so the OM can reach a newly added SCM without a restart.
+   *
+   * The reload reads the node list and the per-node address keys
+   * ({@code ozone.scm.address.<serviceId>.<nodeId>}) from the same live
+   * configuration. If the new list references an SCM whose address is not set
+   * yet, the reload fails: the previous node list is restored and the exception
+   * is rethrown so the reconfiguration is reported FAILED and can be retried.
+   * This keeps the live configuration from holding an SCM node without a
+   * resolvable address (which would break {@code getServiceList()}). To add an
+   * SCM in a single {@code reconfig start}, set its address key together with
+   * the node list; the reconfiguration-complete callback
+   * ({@link #reloadScmProxiesOnReconfig}) applies the final membership once both
+   * are stored.
+   *
+   * Scope: only the block and container proxies are reloaded. The secure-mode
+   * SCM security and secret-key proxy providers are not reloaded and continue to
+   * use the node list captured at startup.
+   */
+  private String reconfScmNodes(String value) {
+    if (StringUtils.isBlank(value)) {
+      throw new IllegalArgumentException("Reconfiguration failed since setting an empty SCM nodes "
+          + "configuration is not allowed");
+    }
+    // ReconfigurableBase stores the new value into the configuration only after
+    // this callback returns, but reloadScmNodes() rebuilds the SCM proxies from
+    // that same live configuration. Publish the new node list first so the
+    // reload sees the intended membership.
+    String scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY,
+        HddsUtils.getScmServiceId(configuration));
+    String previous = configuration.get(scmNodesKey);
+    configuration.set(scmNodesKey, value);
+    try {
+      scmClient.reloadScmNodes();
+      LOG.info("Reloaded SCM proxy configuration for {} : {}", scmNodesKey, value);
+    } catch (ConfigurationException e) {
+      // A referenced SCM address is not set, so the new membership cannot be
+      // resolved. Restore the previous node list so the live configuration never
+      // keeps a node without an address, and rethrow so the reconfiguration is
+      // reported FAILED and can be retried once the address key is set.
+      if (previous == null) {
+        configuration.unset(scmNodesKey);
+      } else {
+        configuration.set(scmNodesKey, previous);
+      }
+      throw e;
+    }
+    return value;
+  }
+
+  /**
+   * Reconfiguration-complete callback that reloads the block and container SCM
+   * failover proxies once a batch that touched the SCM node list or any per-node
+   * SCM address has been fully applied. Because it runs after every property in
+   * the batch is stored, an address-only change takes effect (the per-property
+   * path only fires for the node list), and a node added with its address key
+   * listed before or after the node list is picked up in a single reconfiguration.
+   */
+  @VisibleForTesting
+  public void reloadScmProxiesOnReconfig(Map<String, Boolean> changedProperties,
+      Configuration newConf) {
+    String scmServiceId = HddsUtils.getScmServiceId(configuration);
+    if (scmServiceId == null || scmClient == null) {
+      return;
+    }
+    String scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+    String scmAddressPrefix =
+        ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId) + ".";
+    boolean scmProxyKeyChanged = changedProperties.keySet().stream()
+        .anyMatch(key -> key.equals(scmNodesKey) || key.startsWith(scmAddressPrefix));
+    if (scmProxyKeyChanged) {
+      try {
+        scmClient.reloadScmNodes();
+        LOG.info("Reloaded SCM failover proxies after reconfiguration of {} / {}*",
+            scmNodesKey, scmAddressPrefix);
+      } catch (ConfigurationException e) {
+        // A complete callback must not break the chain: the remaining callbacks
+        // (tracing, logging) still need to run. A bad node list is already
+        // reported FAILED by reconfScmNodes; here we only log so an address-only
+        // change that cannot be resolved leaves the previous proxies in place.
+        LOG.warn("Failed to reload SCM failover proxies after reconfiguration of {} / {}*; "
+            + "keeping the previous SCM proxy configuration", scmNodesKey, scmAddressPrefix, e);
       }
     }
   }
