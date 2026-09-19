@@ -152,16 +152,13 @@ Two new fields: objectLockEnabled & defaultRetention.
 
 **Key Table**
 
-* **retentionDate**: Represents the expiration timestamp of the retention lock. While clients or API calls specify retention duration in terms of days or years, Ozone calculates the definitive expiration date upon applying the rule and persists it as a timestamp into key table.
-* **legalHold**: Indicates whether an explicit legal hold is active on the key.
-
 Two new fields: retentionDate & legalHold.
 
 ```protobuf
   message KeyInfo {
   // ... existing fields
-  optional RetentionConfig retentionConfig = 24;
-  optional bool legalHold = 25 [default = false];
+  optional RetentionConfig retentionConfig = 23;
+  optional bool legalHold = 24 [default = false];
   }
 ```
 
@@ -386,7 +383,7 @@ The implementation of S3 Object Lock in Apache Ozone is divided into five struct
      - `EventHold` message (`enabled`, `rule`).
      - `RetentionConfig` message (`rule`, `eventHold`).
    - Extend `BucketInfo` (OBS buckets only):
-     - `optional bool objectLockEnabled = 24 [default = false];`
+     - `required bool objectLockEnabled = 24 [default = false];`
      - `optional RetentionConfig defaultRetention = 25;`
    - Extend `KeyInfo` & `KeyInfoProtoLight`:
      - `optional RetentionConfig retentionConfig = 23;`
