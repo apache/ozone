@@ -40,6 +40,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.net.SocketFactory;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -131,9 +132,15 @@ public final class HAUtils {
    */
   public static ScmBlockLocationProtocol getScmBlockClient(
       OzoneConfiguration conf) {
+    return getScmBlockClient(conf, null);
+  }
+
+  public static ScmBlockLocationProtocol getScmBlockClient(
+      OzoneConfiguration conf, SocketFactory socketFactory) {
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
         new ScmBlockLocationProtocolClientSideTranslatorPB(
-            new SCMBlockLocationFailoverProxyProvider(conf), conf);
+            new SCMBlockLocationFailoverProxyProvider(conf, socketFactory),
+            conf);
     return TracingUtil
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
@@ -141,21 +148,21 @@ public final class HAUtils {
 
   public static StorageContainerLocationProtocol getScmContainerClient(
       ConfigurationSource conf) {
-    SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(conf, null);
-    StorageContainerLocationProtocol scmContainerClient =
-        TracingUtil.createProxy(
-            new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider), StorageContainerLocationProtocol.class, conf);
-    return scmContainerClient;
+    return getScmContainerClient(conf, null, null);
   }
 
   @VisibleForTesting
   public static StorageContainerLocationProtocol getScmContainerClient(
       ConfigurationSource conf, UserGroupInformation userGroupInformation) {
+    return getScmContainerClient(conf, userGroupInformation, null);
+  }
+
+  public static StorageContainerLocationProtocol getScmContainerClient(
+      ConfigurationSource conf, UserGroupInformation userGroupInformation,
+      SocketFactory socketFactory) {
     SCMContainerLocationFailoverProxyProvider proxyProvider =
         new SCMContainerLocationFailoverProxyProvider(conf,
-            userGroupInformation);
+            userGroupInformation, socketFactory);
     StorageContainerLocationProtocol scmContainerClient =
         TracingUtil.createProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(

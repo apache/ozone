@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.proxy;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.InetAddresses;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.stream.Collectors;
+import javax.net.SocketFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
@@ -48,6 +50,7 @@ import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.StandardSocketFactory;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -88,6 +91,8 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   private final long retryInterval;
 
   private final UserGroupInformation ugi;
+  @Nullable
+  private final SocketFactory socketFactory;
 
   private String updatedLeaderNodeID = null;
 
@@ -99,15 +104,37 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
    */
   private final boolean resolveOnFailureEnabled;
 
-  /**
-   * Construct SCMFailoverProxyProviderBase.
-   * If userGroupInformation is not null, use the passed ugi, else obtain
-   * from {@link UserGroupInformation#getCurrentUser()}
-   */
   public SCMFailoverProxyProviderBase(Class<T> protocol, ConfigurationSource conf,
       UserGroupInformation userGroupInformation) {
+    this(protocol, conf, userGroupInformation, null);
+  }
+
+  /**
+   * Construct SCMFailoverProxyProviderBase.
+   * <p>
+   * If userGroupInformation is not null, use the passed ugi, else obtain
+   * from {@link UserGroupInformation#getCurrentUser()}
+   * <p>
+   * Additionally, we can optionally specify {@link SocketFactory} which can be used for use
+   * case when two clients require different timeout configuration. This is because Hadoop
+   * {@link org.apache.hadoop.ipc.ClientCache} uses {@link SocketFactory} as the cache key.
+   * The default {@link StandardSocketFactory#hashCode()} hashes to the class name, which
+   * means that all clients with the same socket factory share the same {@link org.apache.hadoop.ipc.Client}.
+   * However, sometimes we want to have separate client with different timeout. In that case,
+   * we need to have a separate {@link SocketFactory}.
+   * @param protocol SCM RPC protocol
+   * @param conf Configuration
+   * @param userGroupInformation custom ugi for this client. If not specified the implementation defaults to
+   *                             {@link UserGroupInformation#getCurrentUser()}
+   * @param socketFactory custom socket factory for the client. If not specified, the implement defaults to
+   *                             {@link NetUtils#getDefaultSocketFactory(Configuration)}
+   */
+  public SCMFailoverProxyProviderBase(Class<T> protocol, ConfigurationSource conf,
+      UserGroupInformation userGroupInformation,
+      @Nullable SocketFactory socketFactory) {
     this.protocolClass = protocol;
     this.conf = conf;
+    this.socketFactory = socketFactory;
 
     if (userGroupInformation == null) {
       try {
@@ -496,10 +523,12 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     // retries on the same SCM in case of connection exception. This retry
     // policy essentially results in TRY_ONCE_THEN_FAIL.
     RetryPolicy connectionRetryPolicy = RetryPolicies.failoverOnNetworkException(0);
+    SocketFactory sockFactory = socketFactory == null ?
+        NetUtils.getDefaultSocketFactory(hadoopConf) : socketFactory;
     return RPC.getProtocolProxy(
         protocolClass,
         scmVersion, scmAddress, ugi,
-        hadoopConf, NetUtils.getDefaultSocketFactory(hadoopConf),
+        hadoopConf, sockFactory,
         (int)scmClientConfig.getRpcTimeOut(), connectionRetryPolicy).getProxy();
   }
 
