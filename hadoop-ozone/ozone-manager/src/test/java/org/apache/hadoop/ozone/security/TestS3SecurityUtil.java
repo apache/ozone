@@ -1,0 +1,350 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.security;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REVOKED_TOKEN;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
+import javax.crypto.spec.SecretKeySpec;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
+import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.AWSV4AuthValidator;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.ozone.test.MockClock;
+import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+
+/**
+ * Tests for STS revocation handling in {@link S3SecurityUtil}.
+ */
+public class TestS3SecurityUtil {
+  private static final ManagedSecretKey MANAGED_SECRET_KEY = createManagedSecretKey();
+  private static final MockClock CLOCK = MockClock.newInstance();
+  private static final String TEMP_ACCESS_KEY_ID = "temp-access-key-id";
+
+  @Test
+  public void testValidateS3CredentialFailsWhenTokenCreatedBeforeRevocationCutoff() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRevocationCutoffOffsetMs(1)
+            .setExpectedResult(REVOKED_TOKEN)
+            .setExpectedMessage("STS token has been revoked"));
+  }
+
+  @Test
+  public void testValidateS3CredentialWhenMetadataUnavailable() throws Exception {
+    // If the metadata manager is not available, throws INTERNAL_ERROR
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setMetadataManager(null)
+            .setExpectedResult(INTERNAL_ERROR)
+            .setExpectedMessage("Could not determine STS revocation: metadataManager is null"));
+  }
+
+  @Test
+  public void testValidateS3CredentialSuccessWhenNotRevoked() throws Exception {
+    // Normal case: token is NOT revoked and request is accepted
+    validateS3CredentialHelper(new TestConfig());
+  }
+
+  @Test
+  public void testValidateS3CredentialWhenMetadataManagerAvailableButRevokedTableNull() throws Exception {
+    // If the revoked STS token table is not available, throws INTERNAL_ERROR
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRevokedSTSTokenTable(null)
+            .setExpectedResult(INTERNAL_ERROR)
+            .setExpectedMessage("Could not determine STS revocation: revokedStsTokenTable is null"));
+  }
+
+  @Test
+  public void testValidateS3CredentialWhenTableThrowsException() throws Exception {
+    // If the revoked STS token table lookup throws, throws INTERNAL_ERROR (wrapped)
+    final Table<String, Long> revokedSTSTokenTable = spy(new InMemoryTestTable<>());
+    doThrow(new RuntimeException("lookup failed")).when(revokedSTSTokenTable).getIfExist(anyString());
+
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRevokedSTSTokenTable(revokedSTSTokenTable)
+            .setExpectedResult(INTERNAL_ERROR)
+            .setExpectedMessage("Could not determine STS revocation because of Exception: lookup failed"));
+  }
+
+  @Test
+  public void testValidateS3CredentialFailsWhenOriginalAccessKeyIdPrincipalRevoked() throws Exception {
+    // If the originalAccessKeyId principal is revoked, throws REVOKED_TOKEN
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setOriginalAccessKeyIdRevoked(true)
+            .setExpectedResult(REVOKED_TOKEN)
+            .setExpectedMessage("STS token no longer valid: OriginalAccessKeyId principal revoked"));
+  }
+
+  @Test
+  public void testValidateS3CredentialFailsWhenOriginalAccessKeyIdCheckThrows() throws Exception {
+    // If checking originalAccessKeyId principal revocation fails, throws INTERNAL_ERROR
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setShouldOriginalAccessKeyIdCheckThrowError(true)
+            .setExpectedResult(INTERNAL_ERROR)
+            .setExpectedMessage("Could not determine if original principal is revoked"));
+  }
+
+  @Test
+  public void testValidateS3CredentialFailsWhenRequestAccessIdDoesNotMatchTokenOwner() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRequestAccessId("some-other-access-id")
+            .setExpectedResult(INVALID_TOKEN)
+            .setExpectedMessage("STS token validation failed - accessKeyId is invalid for session token"));
+  }
+
+  @Test
+  public void testValidateS3CredentialFailsWhenRequestAccessIdMissing() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setIncludeAccessId(false)
+            .setExpectedResult(INVALID_TOKEN)
+            .setExpectedMessage("STS token validation failed - accessKeyId is invalid for session token"));
+  }
+
+  @Test
+  public void testValidateS3CredentialFailsWhenRequestAccessIdEmpty() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRequestAccessId("")
+            .setExpectedResult(INVALID_TOKEN)
+            .setExpectedMessage("STS token validation failed - accessKeyId is invalid for session token"));
+  }
+
+  @Test
+  public void testValidateS3CredentialSuccessWhenTokenCreatedAfterRevocationCutoff() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRevocationCutoffOffsetMs(-1)
+            .setExpectedResult(null));
+  }
+
+  @Test
+  public void testValidateS3CredentialSuccessWhenTokenCreatedAtRevocationCutoff() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRevocationCutoffOffsetMs(0)
+            .setExpectedResult(null));
+  }
+
+  private void validateS3CredentialHelper(TestConfig config) throws Exception {
+    try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
+      when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+      when(ozoneManager.getSecretKeyClient()).thenReturn(mock(SecretKeyClient.class));
+
+      final OMMetadataManager metadataManager = config.metadataManager;
+      when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
+      if (metadataManager != null) {
+        when(metadataManager.getS3RevokedStsTokenTable()).thenReturn(config.revokedSTSTokenTable);
+      }
+
+      // Mock S3SecretManager to handle originalAccessKeyId checks
+      final S3SecretManager s3SecretManager = mock(S3SecretManager.class);
+      when(ozoneManager.getS3SecretManager()).thenReturn(s3SecretManager);
+      if (config.shouldOriginalAccessKeyIdCheckThrowError) {
+        when(s3SecretManager.hasS3Secret(anyString())).thenThrow(
+            new IOException("An error occurred while checking if s3Secret exists"));
+      } else if (config.isOriginalAccessKeyIdRevoked) {
+        // Returning false means secret does NOT exist -> principal is revoked
+        when(s3SecretManager.hasS3Secret(anyString())).thenReturn(false);
+      } else {
+        // Returning true means secret exists -> principal is valid
+        when(s3SecretManager.hasS3Secret(anyString())).thenReturn(true);
+      }
+
+      final String sessionToken = "session-token";
+      final STSTokenIdentifier stsTokenIdentifier = createSTSTokenIdentifier();
+      final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
+      if (config.revocationCutoffOffsetMs != null && config.revokedSTSTokenTable != null) {
+        final long revocationTimeMillis = stsTokenIdentifier.getCreationTime().toEpochMilli() +
+            config.revocationCutoffOffsetMs;
+        config.revokedSTSTokenTable.put(originalAccessKeyId, revocationTimeMillis);
+      }
+
+      try (MockedStatic<STSSecurityUtil> stsSecurityUtilMock = mockStatic(STSSecurityUtil.class, CALLS_REAL_METHODS);
+           MockedStatic<AWSV4AuthValidator> awsV4AuthValidatorMock = mockStatic(
+               AWSV4AuthValidator.class, CALLS_REAL_METHODS)) {
+
+        stsSecurityUtilMock.when(
+            () -> STSSecurityUtil.constructValidateAndDecryptSTSToken(
+                eq(sessionToken), any(SecretKeyClient.class), any(Clock.class)))
+            .thenReturn(stsTokenIdentifier);
+
+        // Mock AWS V4 signature validation
+        awsV4AuthValidatorMock.when(() -> AWSV4AuthValidator.validateRequest(anyString(), anyString(), anyString()))
+            .thenReturn(true);
+
+        final OMRequest omRequest = createRequestWithSessionToken(
+            config.requestAccessId, config.includeAccessId);
+
+        if (config.expectedResult != null) {
+          final OMException omException = assertThrows(
+              OMException.class, () -> S3SecurityUtil.validateS3Credential(omRequest, ozoneManager));
+          assertEquals(config.expectedResult, omException.getResult());
+          if (config.expectedMessage != null) {
+            assertTrue(
+                omException.getMessage().contains(config.expectedMessage),
+                "Expected exception message to contain: '" + config.expectedMessage + "' but was: '" +
+                    omException.getMessage() + "'");
+          }
+        } else {
+          assertDoesNotThrow(() -> S3SecurityUtil.validateS3Credential(omRequest, ozoneManager));
+        }
+      }
+    }
+  }
+
+  private STSTokenIdentifier createSTSTokenIdentifier() {
+    return new STSTokenIdentifier(STSTokenIdentifier.Params.newBuilder()
+        .setTempAccessKeyId(TEMP_ACCESS_KEY_ID)
+        .setOriginalAccessKeyId("original-access-key-id")
+        .setRoleArn("arn:aws:iam::123456789012:role/test-role")
+        .setCreationTime(CLOCK.instant())
+        .setExpiry(CLOCK.instant().plusSeconds(3600))
+        .setSecretAccessKey("secret-access-key")
+        .setSessionPolicy("session-policy")
+        .setManagedSecretKey(MANAGED_SECRET_KEY)
+        .build());
+  }
+
+  private static ManagedSecretKey createManagedSecretKey() {
+    final byte[] keyBytes = new byte[32];
+    for (int i = 0; i < keyBytes.length; i++) {
+      keyBytes[i] = (byte) i;
+    }
+    return new ManagedSecretKey(
+        UUID.randomUUID(),
+        Instant.EPOCH,
+        Instant.EPOCH.plus(Duration.ofDays(1)),
+        new SecretKeySpec(keyBytes, "HmacSHA256"));
+  }
+
+  private static OMRequest createRequestWithSessionToken(String accessId, boolean includeAccessId) {
+    final S3Authentication.Builder s3AuthenticationBuilder = S3Authentication.newBuilder()
+        .setStringToSign("string-to-sign")
+        .setSignature("signature")
+        .setSessionToken("session-token");
+    if (includeAccessId) {
+      s3AuthenticationBuilder.setAccessId(accessId);
+    }
+    final S3Authentication s3Authentication = s3AuthenticationBuilder.build();
+
+    return OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.CreateVolume)
+        .setS3Authentication(s3Authentication)
+        .build();
+  }
+
+  /**
+   * Helper class to create various scenarios for testing.
+   */
+  private static final class TestConfig {
+    private OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    private Table<String, Long> revokedSTSTokenTable = new InMemoryTestTable<>();
+    private Long revocationCutoffOffsetMs = null;
+    private boolean isOriginalAccessKeyIdRevoked = false;
+    private boolean shouldOriginalAccessKeyIdCheckThrowError = false;
+    private String requestAccessId = TEMP_ACCESS_KEY_ID;
+    private boolean includeAccessId = true;
+    private OMException.ResultCodes expectedResult = null;
+    private String expectedMessage = null;
+
+    @SuppressWarnings("SameParameterValue")
+    TestConfig setMetadataManager(OMMetadataManager metadataManager) {
+      this.metadataManager = metadataManager;
+      return this;
+    }
+
+    TestConfig setRevokedSTSTokenTable(Table<String, Long> table) {
+      this.revokedSTSTokenTable = table;
+      return this;
+    }
+
+    TestConfig setRevocationCutoffOffsetMs(long offsetMs) {
+      this.revocationCutoffOffsetMs = offsetMs;
+      return this;
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    TestConfig setOriginalAccessKeyIdRevoked(boolean isRevoked) {
+      this.isOriginalAccessKeyIdRevoked = isRevoked;
+      return this;
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    TestConfig setShouldOriginalAccessKeyIdCheckThrowError(boolean isError) {
+      this.shouldOriginalAccessKeyIdCheckThrowError = isError;
+      return this;
+    }
+
+    TestConfig setRequestAccessId(String requestAccessId) {
+      this.requestAccessId = requestAccessId;
+      return this;
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    TestConfig setIncludeAccessId(boolean includeAccessId) {
+      this.includeAccessId = includeAccessId;
+      return this;
+    }
+
+    TestConfig setExpectedResult(OMException.ResultCodes result) {
+      this.expectedResult = result;
+      return this;
+    }
+
+    TestConfig setExpectedMessage(String message) {
+      this.expectedMessage = message;
+      return this;
+    }
+  }
+}

@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,6 +67,28 @@ public final class BufferUtils {
     dataBuffers[numBuffers - 1] = ByteBuffer.allocate(
         Math.toIntExact(totalLen - allocatedLen));
     return dataBuffers;
+  }
+
+  /**
+   * Return a non-copying {@link ByteBuffer#duplicate()} of {@code src} that
+   * covers exactly {@code [position, position + length)}. Read-only-ness
+   * and direct/heap kind are inherited from {@code src}.
+   */
+  public static ByteBuffer slice(ByteBuffer src, int position, int length) {
+    Objects.requireNonNull(src, "src must not be null");
+    Preconditions.checkArgument(position >= 0,
+        "position (%s) must not be negative", position);
+    Preconditions.checkArgument(length >= 0,
+        "length (%s) must not be negative", length);
+    Preconditions.checkArgument(position <= src.limit(),
+        "position (%s) exceeds source limit (%s)", position, src.limit());
+    Preconditions.checkArgument(length <= src.limit() - position,
+        "position (%s) + length (%s) exceeds source limit (%s)",
+        position, length, src.limit());
+    final ByteBuffer slice = src.duplicate();
+    slice.position(position);
+    slice.limit(position + length);
+    return slice;
   }
 
   /**

@@ -35,6 +35,14 @@ class TestConfigurationSource {
   }
 
   @Test
+  void getClassUsesConfiguredValueNotKey() {
+    MutableConfigurationSource c = new InMemoryConfigurationForTesting();
+    c.set("some.config.key", String.class.getName());
+
+    assertEquals(String.class, c.getClass("some.config.key", null));
+  }
+
+  @Test
   void getPropsMatchPrefix() {
     MutableConfigurationSource c = new InMemoryConfigurationForTesting();
     c.set("somePrefix.key", "value");
