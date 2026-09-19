@@ -56,6 +56,11 @@ import picocli.CommandLine.Command;
  *        start balancer with maximum size of 10GB to move in one iteration
  * To stop:
  *      ozone admin containerbalancer stop
+ * To assess:
+ *      ozone admin containerbalancer assessment
+ *      [ -t/--threshold {@literal <threshold>}]
+ *      [ --include-datanodes {@literal <hostnames>}]
+ *      [ --exclude-datanodes {@literal <hostnames>}]
  * </pre>
  *
  * <p>DESCRIPTION
@@ -82,7 +87,8 @@ import picocli.CommandLine.Command;
     subcommands = {
         ContainerBalancerStartSubcommand.class,
         ContainerBalancerStopSubcommand.class,
-        ContainerBalancerStatusSubcommand.class
+        ContainerBalancerStatusSubcommand.class,
+        ContainerBalancerAssessmentSubcommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
 public class ContainerBalancerCommands implements AdminSubcommand {
