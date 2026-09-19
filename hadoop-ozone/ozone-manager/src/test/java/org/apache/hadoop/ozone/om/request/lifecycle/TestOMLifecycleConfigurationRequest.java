@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AbortIncompleteMultipartUpload;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketLayoutProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
@@ -66,14 +67,16 @@ public class TestOMLifecycleConfigurationRequest {
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected AuditLogger auditLogger;
+  protected OzoneConfiguration ozoneConfiguration;
 
   @BeforeEach
   public void setup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration = new OzoneConfiguration();
     omMetrics = OMMetrics.create(ozoneConfiguration);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS, tempDir.getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
@@ -146,6 +149,46 @@ public class TestOMLifecycleConfigurationRequest {
 
     return OMRequest.newBuilder().setSetLifecycleConfigurationRequest(
             setLifecycleConfigurationRequest)
+        .setCmdType(Type.SetLifecycleConfiguration)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  /**
+   * Builds a SetLifecycleConfiguration request with a single AbortIncompleteMultipartUpload rule.
+   */
+  public OMRequest setLifecycleConfigurationRequestWithAbortMpu(
+      String volumeName, String bucketName, int daysAfterInitiation) {
+    return setLifecycleConfigurationRequestWithAbortMpu(volumeName, bucketName, daysAfterInitiation, true);
+  }
+
+  /**
+   * Builds a SetLifecycleConfiguration request with a single AbortIncompleteMultipartUpload rule,
+   * with configurable enabled state.
+   */
+  public OMRequest setLifecycleConfigurationRequestWithAbortMpu(
+      String volumeName, String bucketName, int daysAfterInitiation, boolean enabled) {
+    LifecycleConfiguration lcc = LifecycleConfiguration.newBuilder()
+        .setBucketLayout(BucketLayoutProto.OBJECT_STORE)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolume(volumeName)
+        .setBucket(bucketName)
+        .addRules(LifecycleRule.newBuilder()
+            .setId(RandomStringUtils.randomAlphabetic(32))
+            .setEnabled(enabled)
+            .addAction(LifecycleAction.newBuilder()
+                .setAbortIncompleteMultipartUpload(
+                    AbortIncompleteMultipartUpload.newBuilder()
+                        .setDaysAfterInitiation(daysAfterInitiation)
+                        .build()))
+            .setFilter(LifecycleFilter.newBuilder().setPrefix("prefix/")))
+        .build();
+
+    return OMRequest.newBuilder()
+        .setSetLifecycleConfigurationRequest(
+            SetLifecycleConfigurationRequest.newBuilder()
+                .setLifecycleConfiguration(lcc)
+                .build())
         .setCmdType(Type.SetLifecycleConfiguration)
         .setClientId(UUID.randomUUID().toString())
         .build();
