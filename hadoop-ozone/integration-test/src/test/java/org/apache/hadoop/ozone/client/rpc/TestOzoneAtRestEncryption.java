@@ -491,7 +491,7 @@ class TestOzoneAtRestEncryption {
         HddsProtos.ReplicationFactor.valueOf(factor.getValue());
     OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
     for (OmKeyLocationInfo info:
-        keyInfo.getLatestVersionLocations().getLocationList()) {
+        keyInfo.getLatestVersionLocations().createLocationList()) {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
       if (!ReplicationConfig.getLegacyFactor(container.getReplicationConfig())

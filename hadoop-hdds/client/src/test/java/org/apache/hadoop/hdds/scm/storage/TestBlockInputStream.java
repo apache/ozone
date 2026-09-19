@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.BUFFER_SIZE;
+import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -312,6 +315,71 @@ public class TestBlockInputStream {
         id -> newBlockLocationInfo);
   }
 
+  @ParameterizedTest
+  @MethodSource("exceptionsTriggersRefresh")
+  void refreshesPipelineOnPositionedReadFailure(IOException ex) throws Exception {
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
+    when(blockLocationInfo.getPipeline()).thenReturn(pipeline);
+    Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
+    BlockLocationInfo newBlockLocationInfo = mock(BlockLocationInfo.class);
+
+    testRefreshesPipelineOnPositionedReadFailure(ex, blockLocationInfo,
+        id -> newBlockLocationInfo);
+
+    when(newBlockLocationInfo.getPipeline()).thenReturn(newPipeline);
+    testRefreshesPipelineOnPositionedReadFailure(ex, blockLocationInfo,
+        id -> blockLocationInfo);
+
+    when(newBlockLocationInfo.getPipeline()).thenReturn(null);
+    testRefreshesPipelineOnPositionedReadFailure(ex, blockLocationInfo,
+        id -> newBlockLocationInfo);
+  }
+
+  private void testRefreshesPipelineOnPositionedReadFailure(IOException ex,
+      BlockLocationInfo blockLocationInfo,
+      Function<BlockID, BlockLocationInfo> refreshPipelineFunction)
+      throws Exception {
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    final int len = 200;
+    final ChunkInputStream stream = throwingChunkInputStreamForPositionedRead(ex, len, true);
+
+    when(this.refreshFunction.apply(any()))
+        .thenAnswer(inv -> refreshPipelineFunction.apply(blockID));
+
+    try (BlockInputStream subject = createSubject(blockID,
+        blockLocationInfo.getPipeline(), stream)) {
+      subject.initialize();
+      ByteBuffer buf = ByteBuffer.allocate(len);
+      int bytesRead = subject.readPositioned(0, buf);
+      assertEquals(len, bytesRead);
+      verify(this.refreshFunction).apply(blockID);
+    } finally {
+      reset(this.refreshFunction);
+    }
+  }
+
+  private static ChunkInputStream throwingChunkInputStreamForPositionedRead(
+      IOException ex, int len, boolean succeedOnRetry) throws IOException {
+    final ChunkInputStream stream = mock(ChunkInputStream.class);
+    OngoingStubbing<Integer> stubbing =
+        when(stream.readPositioned(anyLong(), any(ByteBuffer.class)))
+            .thenThrow(ex);
+    if (succeedOnRetry) {
+      stubbing.thenAnswer(invocation -> {
+        ByteBuffer buffer = invocation.getArgument(1);
+        int n = Math.min(len, buffer.remaining());
+        for (int i = 0; i < n; i++) {
+          buffer.put((byte) 0);
+        }
+        return n;
+      });
+    }
+    when(stream.getRemaining()).thenReturn((long) len);
+    when(stream.getLength()).thenReturn((long) len);
+    return stream;
+  }
+
   private void testRefreshesPipelineOnReadFailure(IOException ex,
       BlockLocationInfo blockLocationInfo,
       Function<BlockID, BlockLocationInfo> refreshPipelineFunction)
@@ -468,5 +536,46 @@ public class TestBlockInputStream {
         Arguments.of(new IOException(new ExecutionException(
             new StatusException(Status.UNAVAILABLE))))
     );
+  }
+
+  @Test
+  public void testConcurrentPositionedRead() throws Exception {
+    try (BlockInputStream largeBlockStream = createLargeBlockStream()) {
+      largeBlockStream.initialize();
+      PositionedReadTestHelper.runConcurrentPositionedReads(blockData,
+          (offset, buf) -> {
+            int read = largeBlockStream.readPositioned(offset, buf);
+            if (read != BUFFER_SIZE) {
+              throw new AssertionError("expected " + BUFFER_SIZE + " bytes at " + offset
+                  + " but read " + read);
+            }
+          });
+    }
+  }
+
+  private BlockInputStream createLargeBlockStream() throws Exception {
+    refreshFunction = mock(Function.class);
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 2));
+    checksum = new Checksum(ChecksumType.NONE, 1024);
+    chunks = new ArrayList<>(1);
+    chunkDataMap = new HashMap<>();
+    blockData = generateRandomData(SOURCE_SIZE);
+    blockSize = SOURCE_SIZE;
+    String chunkName = "large-chunk";
+    ChunkInfo chunkInfo = ChunkInfo.newBuilder()
+        .setChunkName(chunkName)
+        .setOffset(0)
+        .setLen(SOURCE_SIZE)
+        .setChecksumData(checksum.computeChecksum(
+            blockData, 0, SOURCE_SIZE).getProtoBufMessage())
+        .build();
+    chunkDataMap.put(chunkName, blockData);
+    chunks.add(chunkInfo);
+
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    return new DummyBlockInputStream(blockID, blockSize, pipeline, null,
+        null, refreshFunction, chunks, chunkDataMap, clientConfig);
   }
 }

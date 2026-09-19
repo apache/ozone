@@ -28,4 +28,4 @@ permissions:
 
 jobs:
   label:
-    uses: ./.github/workflows/label-pr.yml
+    uses: $/.github/workflows/label-pr.yml
