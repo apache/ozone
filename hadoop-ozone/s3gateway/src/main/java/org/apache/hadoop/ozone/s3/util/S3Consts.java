@@ -172,6 +172,7 @@ public final class S3Consts {
     public static final String PART_NUMBER = "partNumber";
     public static final String PART_NUMBER_MARKER = "part-number-marker";
     public static final String PREFIX = "prefix";
+    public static final String PUBLIC_ACCESS_BLOCK = "publicAccessBlock";
     public static final String START_AFTER = "start-after";
     public static final String TAGGING = "tagging";
     // GetObjectTorrent is not implemented
