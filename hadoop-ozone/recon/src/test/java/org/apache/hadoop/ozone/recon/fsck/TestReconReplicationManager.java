@@ -241,6 +241,7 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
       ContainerReplica replica = mock(ContainerReplica.class);
       int replicaIndex = isEC ? i : 0;
       when(replica.getReplicaIndex()).thenReturn(replicaIndex);
+      when(replica.getSequenceId()).thenReturn(1L);
       when(replica.getDataChecksum()).thenReturn(1000L + replicaIndex);
       replicas.add(replica);
     }
@@ -253,6 +254,7 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
 
     ContainerReplica duplicate = mock(ContainerReplica.class);
     when(duplicate.getReplicaIndex()).thenReturn(duplicateIndex);
+    when(duplicate.getSequenceId()).thenReturn(1L);
     when(duplicate.getDataChecksum()).thenReturn(1000L + duplicateIndex);
     replicas.add(duplicate);
     reconRM.processAll();
@@ -469,6 +471,8 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     when(containerInfo.getNumberOfKeys()).thenReturn(numberOfKeys);
     when(containerInfo.getUsedBytes()).thenReturn(usedBytes);
     when(containerInfo.getReplicationConfig()).thenReturn(replicationConfig);
+    when(containerInfo.getReplicationType()).thenReturn(
+        HddsProtos.ReplicationType.RATIS);
     when(containerInfo.getState()).thenReturn(HddsProtos.LifeCycleState.CLOSED);
     when(containerInfo.getHealthState()).thenAnswer(invocation -> healthStateRef.get());
     doAnswer(invocation -> {
@@ -477,6 +481,8 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     }).when(containerInfo).setHealthState(
         org.mockito.ArgumentMatchers.any(ContainerHealthState.class));
     when(replicationConfig.getRequiredNodes()).thenReturn(requiredNodes);
+    when(replicationConfig.getReplicationType()).thenReturn(
+        HddsProtos.ReplicationType.RATIS);
     return containerInfo;
   }
 
@@ -552,6 +558,7 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     for (Long checksum : checksums) {
       ContainerReplica replica = mock(ContainerReplica.class);
       when(replica.getDataChecksum()).thenReturn(checksum);
+      when(replica.getSequenceId()).thenReturn(1L);
       replicas.add(replica);
     }
     return replicas;
