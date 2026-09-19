@@ -52,3 +52,5 @@ services:
     <<: *monitoring-config
   recon:
     <<: *monitoring-config
+  httpfs:
+    <<: *monitoring-config
