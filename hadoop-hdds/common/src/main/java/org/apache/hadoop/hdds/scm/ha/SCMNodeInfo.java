@@ -96,6 +96,7 @@ public class SCMNodeInfo {
         if (scmAddress == null) {
           throw new ConfigurationException(addressKey + "is not defined");
         }
+        HddsUtils.validateAdvertisedHost(addressKey, scmAddress);
 
         // Get port from Address Key if defined, else fall back to port key.
         int scmClientPort = getPort(conf, scmServiceId, scmNodeId,

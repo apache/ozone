@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -203,7 +204,8 @@ public class OMHANodeDetails {
         LOG.info("Found matching OM address with OMServiceId: {}, " +
                 "OMNodeId: {}, RPC Address: {} ,Ratis port: {} and isListener: {}",
             localOMServiceId, localOMNodeId,
-            NetUtils.getHostPortString(localRpcAddress), localRatisPort, localIsListener);
+            HddsUtils.getHostPortString(localRpcAddress.getHostName(), localRpcAddress.getPort()),
+            localRatisPort, localIsListener);
 
         ConfUtils.setNodeSpecificConfigs(genericConfigKeys, conf,
             localOMServiceId, localOMNodeId, LOG);

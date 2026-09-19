@@ -30,6 +30,8 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getScmServiceId;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddress;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedHost;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -897,6 +899,7 @@ public final class HddsServerUtil {
 
       final Collection<HostAndPort> addresses = new HashSet<>(names.size());
       for (String address : names) {
+        validateAdvertisedAddress(OZONE_SCM_NAMES, address);
         Optional<String> hostname = getHostName(address);
         if (!hostname.isPresent()) {
           throw new IllegalArgumentException("Invalid hostname for SCM: "
@@ -937,6 +940,7 @@ public final class HddsServerUtil {
         LOG.warn("The SCM address configuration {} is not defined, return nothing", addressKey);
         return null;
       }
+      validateAdvertisedHost(addressKey, scmAddress);
 
       int scmDatanodePort = SCMNodeInfo.getPort(conf, scmServiceId, scmNodeId,
           OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
@@ -959,6 +963,7 @@ public final class HddsServerUtil {
     if (StringUtils.isEmpty(name)) {
       return null;
     }
+    validateAdvertisedAddress(OZONE_RECON_ADDRESS_KEY, name);
     Optional<String> hostname = getHostName(name);
     if (!hostname.isPresent()) {
       throw new IllegalArgumentException("Invalid hostname for Recon: "

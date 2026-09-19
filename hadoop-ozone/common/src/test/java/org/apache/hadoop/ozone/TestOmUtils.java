@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,7 +43,9 @@ import java.nio.file.Path;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -402,5 +405,39 @@ public class TestOmUtils {
         // Unresolved or unreachable in the test environment is acceptable.
       }
     }
+  }
+
+  @Test
+  void getOmRpcAddressRejectsWildcardPeerAddress() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+        "omservice", "om1");
+    conf.set(rpcAddrKey, "0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> OmUtils.getOmRpcAddress(conf, rpcAddrKey));
+
+    assertThat(e.getMessage()).contains(rpcAddrKey).contains("0.0.0.0");
+  }
+
+  @Test
+  void getOmRpcAddressAcceptsPeerHostname() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+        "omservice", "om1");
+    conf.set(rpcAddrKey, "om1.example.com");
+
+    assertEquals("om1.example.com:" + OZONE_OM_PORT_DEFAULT,
+        OmUtils.getOmRpcAddress(conf, rpcAddrKey));
+  }
+
+  /**
+   * The unsuffixed property ships as a wildcard and doubles as the non-HA bind
+   * address, so it is not an advertised-only property and stays accepted.
+   */
+  @Test
+  void getOmRpcAddressKeepsWildcardDefault() {
+    assertEquals("0.0.0.0:" + OZONE_OM_PORT_DEFAULT,
+        OmUtils.getOmRpcAddress(new OzoneConfiguration()));
   }
 }

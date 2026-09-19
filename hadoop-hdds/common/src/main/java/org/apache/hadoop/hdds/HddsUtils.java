@@ -34,6 +34,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY
 
 import com.google.common.base.Preconditions;
 import com.google.common.net.HostAndPort;
+import com.google.common.net.InetAddresses;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ServiceException;
 import jakarta.annotation.Nonnull;
@@ -42,6 +43,7 @@ import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
@@ -138,6 +140,8 @@ public final class HddsUtils {
       String address = conf.getTrimmed(OZONE_SCM_CLIENT_ADDRESS_KEY);
       int port = -1;
 
+      validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, address);
+
       if (address == null) {
         // fall back to ozone.scm.names for non-ha
         Collection<String> scmAddresses =
@@ -155,6 +159,7 @@ public final class HddsUtils {
         }
 
         address = scmAddresses.iterator().next();
+        validateAdvertisedAddress(OZONE_SCM_NAMES, address);
 
         port = conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
             OZONE_SCM_CLIENT_PORT_DEFAULT);
@@ -241,6 +246,116 @@ public final class HddsUtils {
    */
   public static String getHostPortString(String host, int port) {
     return HostAndPort.fromParts(host, port).toString();
+  }
+
+  /**
+   * Rejects a host configured as an advertised endpoint that cannot identify
+   * this node to a peer. A wildcard ({@code 0.0.0.0}, {@code ::}) names every
+   * local interface instead of one reachable endpoint, a link-local literal is
+   * only meaningful on a single link, and the zone identifier of a scoped
+   * literal ({@code fe80::1%eth0}) names an interface on the host that wrote
+   * it, so it cannot be resolved by a peer nor encoded in the SAN extension of
+   * an X.509 certificate (see RFC-5280). A DNS name is accepted without being
+   * resolved, and so is loopback, which a single-host deployment legitimately
+   * advertises.
+   *
+   * @param key the property the host was configured under
+   * @param host a hostname or an unbracketed IP literal
+   * @throws ConfigurationException if the host cannot be advertised
+   */
+  public static void validateAdvertisedHost(String key, String host) {
+    if (host == null || host.isEmpty()) {
+      return;
+    }
+
+    // Judged on the text, because the scope makes the literal unresolvable
+    // here: InetAddresses.forString("fe80::1%eth0") throws unless this host
+    // happens to own an interface by that name.
+    if (host.indexOf('%') >= 0 || host.indexOf('/') >= 0) {
+      throw new ConfigurationException(String.format(
+          "%s = %s carries a zone identifier or prefix length, which cannot be advertised: it names an interface "
+              + "on this host, so a peer cannot resolve it and it cannot be encoded in an X.509 certificate.",
+          key, host));
+    }
+
+    if (!InetAddresses.isInetAddress(host)) {
+      return;
+    }
+
+    final InetAddress address = InetAddresses.forString(host);
+    if (address.isAnyLocalAddress()) {
+      throw new ConfigurationException(String.format(
+          "%s = %s is a wildcard address, which cannot be advertised. Configure the address this node is reachable "
+              + "at, and listen on every interface through the matching bind host property.",
+          key, host));
+    }
+    if (address.isLinkLocalAddress()) {
+      throw new ConfigurationException(String.format(
+          "%s = %s is a link-local address, which is only reachable on one link and cannot be advertised.",
+          key, host));
+    }
+  }
+
+  /**
+   * Rejects a configured advertised address, both for the textual form of its
+   * authority and for the host it names.
+   *
+   * @param key the property the address was configured under
+   * @param value host or host:port
+   * @throws ConfigurationException if the address cannot be advertised
+   * @see #validateAdvertisedHost(String, String)
+   */
+  public static void validateAdvertisedAddress(String key, String value) {
+    validateHostPortAuthority(key, value);
+    getHostName(value).ifPresent(host -> validateAdvertisedHost(key, host));
+  }
+
+  /**
+   * Rejects an unbracketed IPv6 literal configured under a property that a port
+   * may follow. Both readings of {@code 2001:db8::1:9862} are valid IPv6
+   * literals - the host {@code 2001:db8::1} on port 9862, or the whole literal
+   * on the property's default port - and nothing in the text tells them apart,
+   * so one of them is used silently. Brackets remove the ambiguity, and are
+   * needed for the single-colon form too, since a bare literal there is read as
+   * a host and a port.
+   *
+   * @param key the property the value was configured under
+   * @param value host or host:port
+   * @throws ConfigurationException if the host is an unbracketed IPv6 literal
+   */
+  private static void validateHostPortAuthority(String key, String value) {
+    if (value == null || value.isEmpty() || value.startsWith("[")) {
+      return;
+    }
+
+    final String host = HostAndPort.fromString(value).getHost();
+    final int lastGroup = host.lastIndexOf(':');
+    if (lastGroup < 0) {
+      return;
+    }
+
+    final String shorterHost = host.substring(0, lastGroup);
+    final String trailingGroup = host.substring(lastGroup + 1);
+    if (isPortNumber(trailingGroup) && InetAddresses.isInetAddress(shorterHost)) {
+      throw new ConfigurationException(String.format(
+          "%s = %s is an unbracketed IPv6 literal. Write %s for host %s with port %s, or %s to use the whole "
+              + "literal as the host.",
+          key, value, getHostPortString(shorterHost, Integer.parseInt(trailingGroup)), shorterHost, trailingGroup,
+          HostAndPort.fromHost(host)));
+    }
+    throw new ConfigurationException(String.format(
+        "%s = %s is an unbracketed IPv6 literal. Write %s; a port may follow this property, so the host has to be "
+            + "bracketed.",
+        key, value, HostAndPort.fromHost(host)));
+  }
+
+  private static boolean isPortNumber(String value) {
+    try {
+      final int port = Integer.parseInt(value);
+      return port > 0 && port <= 65535;
+    } catch (NumberFormatException e) {
+      return false;
+    }
   }
 
   /**
@@ -337,11 +452,14 @@ public final class HddsUtils {
    * @return first port number component found from the given keys, or absent.
    * @throws IllegalArgumentException if any values are not in the 'host'
    *             or host:port format.
+   * @throws ConfigurationException if any value holds an unbracketed IPv6
+   *             literal, which cannot be told apart from a host and a port.
    */
   public static OptionalInt getPortNumberFromConfigKeys(
       ConfigurationSource conf, String... keys) {
     for (final String key : keys) {
       final String value = conf.getTrimmed(key);
+      validateHostPortAuthority(key, value);
       final OptionalInt hostPort = getHostPort(value);
       if (hostPort.isPresent()) {
         return hostPort;
@@ -360,10 +478,13 @@ public final class HddsUtils {
    * @return the hostname (NB: may not be a FQDN)
    * @throws UnknownHostException if the hdds.datanode.dns.interface
    *    option is used and the hostname can not be determined
+   * @throws ConfigurationException if the configured hostname cannot be
+   *    advertised to SCM
    */
   public static String getHostName(ConfigurationSource conf)
       throws UnknownHostException {
     String name = conf.get(HDDS_DATANODE_HOST_NAME_KEY);
+    validateAdvertisedHost(HDDS_DATANODE_HOST_NAME_KEY, name);
     if (name == null) {
       String dnsInterface = conf.get(
           CommonConfigurationKeysPublic.HADOOP_SECURITY_DNS_INTERFACE_KEY);

@@ -30,6 +30,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_K
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -161,5 +162,38 @@ public class TestSCMNodeInfo {
         scmNodeInfos.get(0).getScmClientAddress());
     assertEquals("localhost:" + OZONE_SCM_DATANODE_PORT_DEFAULT,
         scmNodeInfos.get(0).getScmDatanodeAddress());
+  }
+
+  @Test
+  public void testSCMHANodeInfoRejectsWildcardSCMAddress() {
+    for (String nodeId : nodes) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+          scmServiceId, nodeId), "localhost");
+    }
+    String addressKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        scmServiceId, "scm1");
+    conf.set(addressKey, "0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> SCMNodeInfo.buildNodeInfo(conf));
+
+    assertThat(e.getMessage()).contains(addressKey).contains("0.0.0.0");
+  }
+
+  /**
+   * The SCM address property names a host and takes its ports from separate
+   * properties, so a bare IPv6 literal is unambiguous there.
+   */
+  @Test
+  public void testSCMHANodeInfoAcceptsBareIPv6SCMAddress() {
+    for (String nodeId : nodes) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+          scmServiceId, nodeId), "2001:db8::1");
+    }
+
+    List<SCMNodeInfo> scmNodeInfos = SCMNodeInfo.buildNodeInfo(conf);
+
+    assertEquals("[2001:db8::1]:" + OZONE_SCM_CLIENT_PORT_DEFAULT,
+        scmNodeInfos.get(0).getScmClientAddress());
   }
 }
