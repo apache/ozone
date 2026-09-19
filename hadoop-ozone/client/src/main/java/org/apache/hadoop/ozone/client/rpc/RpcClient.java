@@ -183,6 +183,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -1147,6 +1148,12 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
         "bucket can't be null or empty.");
     return ozoneManagerClient.listSnapshot(volumeName, bucketName, snapshotPrefix, prevSnapshot, maxListResult);
+  }
+
+  @Override
+  public SnapshotCountResponse snapshotCount(String bucketFilter)
+      throws IOException {
+    return ozoneManagerClient.snapshotCount(bucketFilter);
   }
 
   /**
@@ -2843,6 +2850,11 @@ public class RpcClient implements ClientProtocol {
       LOG.error("Can't create KeyProvider for Ozone RpcClient.", e);
       return null;
     }
+  }
+
+  @Override
+  public OzoneManagerVersion getOmVersion() {
+    return omVersion;
   }
 
   @Override

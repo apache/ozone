@@ -145,6 +145,7 @@ public class TestOMClientRequestWithUserInfo {
   }
 
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testUserInfoInCaseOfGrpcTransport() throws Exception {
     OMRequest s3SignedOMRequest = createRequestWithS3Credentials("AccessId",
         "Signature", "StringToSign");
