@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -457,6 +458,59 @@ public class TestContainerBalancer {
         "hdds.container.balancer.size.leaving.source.max should be less than or "
             + "equal to hdds.container.balancer.size.moved.max.per.iteration");
     assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+  }
+
+  /**
+   * Verifies that a start request rejected during validation does not update startedAt of last run.
+   * Prevents startedAt from advancing past stoppedAt, which previously caused a negative duration and CLI status crash.
+   */
+  @Test
+  public void testRejectedStartDoesNotModifyStartedAt() throws Exception {
+    // The test first starts and immediately stops the balancer normally.This creates a realistic "previous state"
+    // in system memory and later trigger a bad request and verify that startedAt remains identical to startedAtBefore,
+    // rather than being wrongly overwritten with "now", which would make startedAt come after stoppedAt which resulted
+    // negative balancing duration.
+    startBalancer(balancerConfiguration);
+    assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
+    stopBalancer();
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    ContainerBalancerStatusInfo before = containerBalancer.getBalancerStatusInfo();
+    assertNotNull(before);
+    OffsetDateTime startedAtBefore = before.getStartedAt();
+    OffsetDateTime stoppedAt = before.getStoppedAt();
+    assertNotNull(startedAtBefore);
+    assertNotNull(stoppedAt);
+
+    // Pause so that system time advances before the second start attempt so a timestamp overwrite becomes measurable.
+    Thread.sleep(20);
+
+    // A start that is rejected during validation. Here we used an invalid config this is just one of many rejection
+    // paths (safe mode, non-leader SCM, already running, etc.).
+    OzoneConfiguration invalidConf = new OzoneConfiguration();
+    invalidConf.setTimeDuration(
+        "hdds.container.balancer.move.replication.timeout", 60, TimeUnit.MINUTES);
+    invalidConf.setTimeDuration(
+        "hdds.container.balancer.move.timeout", 59, TimeUnit.MINUTES);
+    ContainerBalancerConfiguration invalidConfig =
+        invalidConf.getObject(ContainerBalancerConfiguration.class);
+
+    assertThrows(InvalidContainerBalancerConfigurationException.class,
+        () -> containerBalancer.startBalancer(invalidConfig));
+    // The rejected start must leave the balancer STOPPED.
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    ContainerBalancerStatusInfo after = containerBalancer.getBalancerStatusInfo();
+    assertNotNull(after);
+
+    // startedAt must still equal the previous run's start time, a rejected start must not reset it.
+    assertEquals(startedAtBefore, after.getStartedAt(),
+        "Rejected start reset startedAt to 'now' (set before validation), replacing the previous run's start time");
+
+    // startedAt must never be after stoppedAt. Violating this is
+    // what produced the negative duration and the status --verbose crash.
+    assertFalse(after.getStartedAt().isAfter(stoppedAt),
+        "startedAt ended up after stoppedAt -> negative balancing duration that crashes 'status --verbose'");
   }
 
   private static List<DatanodeInfo> createEligibleDatanodes(int count) {
