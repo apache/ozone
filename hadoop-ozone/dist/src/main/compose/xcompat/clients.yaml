@@ -77,6 +77,10 @@ services:
     image: ${OZONE_IMAGE}:2.2.0${OZONE_IMAGE_FLAVOR}
     <<: *old-config
 
+  old_client_2_2_1:
+    image: ${OZONE_IMAGE}:2.2.1${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
   new_client:
     <<: *new-config
     environment:

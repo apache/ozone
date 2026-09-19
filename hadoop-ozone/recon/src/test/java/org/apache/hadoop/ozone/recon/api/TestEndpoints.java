@@ -580,7 +580,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         9L, 8L, 7L, 21L);
 
     // Truncate global stats table before running each test
-    dslContext.truncate(GLOBAL_STATS);
+    dslContext.truncate(GLOBAL_STATS).execute();
   }
 
   private void testDatanodeResponse(DatanodeMetadata datanodeMetadata)
