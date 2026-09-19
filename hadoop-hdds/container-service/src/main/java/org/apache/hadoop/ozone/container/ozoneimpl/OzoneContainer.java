@@ -44,16 +44,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -88,6 +85,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerDomainSocket;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
@@ -577,16 +575,19 @@ public class OzoneContainer {
   }
 
   /**
-   * Runs {@link #initializeContainerServices(String)}, optionally bounded by a
-   * watchdog timeout ({@code hdds.datanode.container.init.timeout}).
+   * Runs {@link #initializeContainerServices(String)} on the calling thread,
+   * optionally guarded by a startup watchdog
+   * ({@code hdds.datanode.container.init.timeout}).
    * <p>
-   * When the timeout is a positive duration, initialization runs on a separate
-   * thread so a stall - for example Ratis group recovery blocked on a failing
-   * volume inside {@code writeChannel.start()} - is turned into an
-   * {@link IOException} instead of an indefinite hang. The caller ({@code
-   * start}) then records the failure ({@code FAILED}) and the datanode shuts
-   * down cleanly. A non-positive timeout disables the watchdog and runs
-   * initialization inline, preserving the previous behavior.
+   * When the timeout is a positive duration, a watchdog is scheduled before
+   * initialization begins. If initialization has not finished by then - for
+   * example because Ratis group recovery inside {@code writeChannel.start()}
+   * has stalled on a failing volume - the watchdog terminates the datanode via
+   * {@link DatanodeStateMachine#triggerFatalShutdown(String)} instead of
+   * letting startup hang indefinitely. Because initialization runs on a single
+   * thread, no separate worker can keep starting services after the timeout.
+   * A non-positive timeout disables the watchdog, preserving the previous
+   * behavior.
    */
   private void initializeContainerServicesWithTimeout(String clusterId) throws IOException {
     Duration initTimeout =
@@ -596,39 +597,41 @@ public class OzoneContainer {
       return;
     }
 
-    ExecutorService initExecutor = Executors.newSingleThreadExecutor(
+    // Guards against the watchdog firing just as initialization finishes.
+    AtomicBoolean initInProgress = new AtomicBoolean(true);
+    ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor(
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("OzoneContainerInit").build());
-    Future<?> initFuture = initExecutor.submit(() -> {
-      initializeContainerServices(clusterId);
-      return null;
-    });
+            .setNameFormat("OzoneContainerInitWatchdog").build());
+    watchdog.schedule(() -> {
+      if (initInProgress.compareAndSet(true, false)) {
+        terminateOnInitializationTimeout(initTimeout);
+      }
+    }, initTimeout.toMillis(), TimeUnit.MILLISECONDS);
     try {
-      initFuture.get(initTimeout.toMillis(), TimeUnit.MILLISECONDS);
-    } catch (TimeoutException e) {
-      // Best-effort interrupt; a thread blocked on disk I/O may not respond,
-      // but the datanode will shut down once the caller marks startup FAILED.
-      initFuture.cancel(true);
-      throw new IOException("OzoneContainer initialization did not complete within " + initTimeout
-          + ". Failing datanode startup; a stalled Ratis group recovery or volume I/O is the likely cause.", e);
-    } catch (ExecutionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
-      }
-      if (cause instanceof RuntimeException) {
-        throw (RuntimeException) cause;
-      }
-      if (cause instanceof Error) {
-        throw (Error) cause;
-      }
-      throw new IOException("OzoneContainer initialization failed", cause);
-    } catch (InterruptedException e) {
-      initFuture.cancel(true);
-      Thread.currentThread().interrupt();
-      throw new IOException("Interrupted while initializing OzoneContainer", e);
+      initializeContainerServices(clusterId);
     } finally {
-      initExecutor.shutdownNow();
+      initInProgress.set(false);
+      watchdog.shutdownNow();
+    }
+  }
+
+  /**
+   * Terminates the datanode when container initialization has stalled past the
+   * watchdog timeout. A hung step (for example a Ratis {@code join()} or a
+   * blocking disk read) cannot be interrupted reliably, so the only safe
+   * recovery is to fail the process and let it be restarted; the JVM exit also
+   * stops the stalled initialization thread.
+   */
+  private void terminateOnInitializationTimeout(Duration initTimeout) {
+    String message = "OzoneContainer initialization did not complete within " + initTimeout
+        + ". Terminating datanode; a stalled Ratis group recovery or volume I/O is the likely cause.";
+    LOG.error(message);
+    StateContext current = context;
+    DatanodeStateMachine dsm = current == null ? null : current.getParent();
+    if (dsm != null) {
+      dsm.triggerFatalShutdown(message);
+    } else {
+      LOG.error("No datanode state machine available; cannot automatically terminate the stalled datanode.");
     }
   }
 
