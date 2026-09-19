@@ -436,6 +436,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private void processTasks(
       Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks,
       OMUpdateEventBatch events, List<ReconOmTask.TaskResult> failedTasks) {
+    List<ReconOmTask.TaskResult> successfulTasks = Collections.synchronizedList(new ArrayList<>());
     List<CompletableFuture<Void>> futures = tasks.stream()
         .map(task -> CompletableFuture.supplyAsync(() -> {
           // Track task delta processing duration
@@ -458,8 +459,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           }
         }, executorService).thenAccept(result -> {
           String taskName = result.getTaskName();
-          ReconTaskStatusUpdater taskStatusUpdater =
-              taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
           if (!result.isTaskSuccess()) {
             LOG.error("Task {} failed", taskName);
 
@@ -470,30 +469,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
                 .setTaskName(taskName)
                 .setSubTaskSeekPositions(result.getSubTaskSeekPositions())
                 .build());
+            ReconTaskStatusUpdater taskStatusUpdater =
+                taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
             taskStatusUpdater.setLastTaskRunStatus(-1);
+            taskStatusUpdater.recordRunCompletion();
           } else {
-            // Track task delta processing success
-            taskMetrics.incrTaskDeltaProcessingSuccess(taskName);
-
-            // Make the derived-table RocksDB writes for this batch durable before the task-status
-            // cursor is committed to Derby. The cursor row is fsync-durable while the RocksDB writes
-            // are not synced by default, so without this barrier a power loss can leave the durable
-            // cursor ahead of the (lost) derived data. Startup reconciliation then sees the derived
-            // and delta cursors at the same sequence number and never reprocesses, permanently
-            // dropping the applied update. If the sync fails, leave the cursor unadvanced so the
-            // batch is reprocessed instead of recording an un-durable success.
-            if (syncReconDbLog()) {
-              taskStatusUpdater.setLastTaskRunStatus(0);
-              taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
-            } else {
-              failedTasks.add(new ReconOmTask.TaskResult.Builder()
-                  .setTaskName(taskName)
-                  .setSubTaskSeekPositions(result.getSubTaskSeekPositions())
-                  .build());
-              taskStatusUpdater.setLastTaskRunStatus(-1);
-            }
+            successfulTasks.add(result);
           }
-          taskStatusUpdater.recordRunCompletion();
         }).exceptionally(ex -> {
           LOG.error("Task failed with exception: ", ex);
           if (ex.getCause() instanceof TaskExecutionException) {
@@ -518,6 +500,42 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       LOG.error("Completing all tasks failed with exception ", ce);
     } catch (CancellationException ce) {
       LOG.error("Some tasks were cancelled with exception", ce);
+    }
+
+    if (!successfulTasks.isEmpty()) {
+      // Make the derived-table RocksDB writes for this batch durable before the task-status
+      // cursors are committed to Derby. The cursor rows are fsync-durable while the RocksDB writes
+      // are not synced by default, so without this barrier a power loss can leave the durable
+      // cursors ahead of the (lost) derived data. Startup reconciliation then sees the derived
+      // and delta cursors at the same sequence number and never reprocesses, permanently
+      // dropping the applied update. Coalescing the barrier to once per batch syncs all successful
+      // task writes together before any cursor advances. If the sync fails, leave the cursors
+      // unadvanced so the batch is reprocessed instead of recording an un-durable success.
+      if (syncReconDbLog()) {
+        for (ReconOmTask.TaskResult result : successfulTasks) {
+          String taskName = result.getTaskName();
+          // Track task delta processing success
+          taskMetrics.incrTaskDeltaProcessingSuccess(taskName);
+
+          ReconTaskStatusUpdater taskStatusUpdater =
+              taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
+          taskStatusUpdater.setLastTaskRunStatus(0);
+          taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
+          taskStatusUpdater.recordRunCompletion();
+        }
+      } else {
+        for (ReconOmTask.TaskResult result : successfulTasks) {
+          String taskName = result.getTaskName();
+          failedTasks.add(new ReconOmTask.TaskResult.Builder()
+              .setTaskName(taskName)
+              .setSubTaskSeekPositions(result.getSubTaskSeekPositions())
+              .build());
+          ReconTaskStatusUpdater taskStatusUpdater =
+              taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
+          taskStatusUpdater.setLastTaskRunStatus(-1);
+          taskStatusUpdater.recordRunCompletion();
+        }
+      }
     }
   }
 

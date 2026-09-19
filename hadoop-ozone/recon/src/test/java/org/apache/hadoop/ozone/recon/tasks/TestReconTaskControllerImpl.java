@@ -940,15 +940,22 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
    * fsync-durable task-status cursor is advanced. Without that barrier a power loss can lose the
    * un-synced derived write while the durable cursor survives, leaving the cursor ahead of the
    * data; startup reconciliation then sees equal cursors and never reprocesses, permanently
-   * dropping the applied update.
+   * dropping the applied update. The barrier coalesces all successful task writes into a single
+   * sync per batch.
    */
   @Test
   public void testDerivedDbSyncedBeforeCursorAdvanceOnSuccess() throws Exception {
-    ReconOmTask reconOmTaskMock = getMockTask("SyncBarrierTask");
-    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyMap()))
+    ReconOmTask task1 = getMockTask("SyncBarrierTask1");
+    when(task1.process(any(OMUpdateEventBatch.class), anyMap()))
         .thenReturn(new ReconOmTask.TaskResult.Builder()
-            .setTaskName("SyncBarrierTask").setTaskSuccess(true).build());
-    reconTaskController.registerTask(reconOmTaskMock);
+            .setTaskName("SyncBarrierTask1").setTaskSuccess(true).build());
+    reconTaskController.registerTask(task1);
+
+    ReconOmTask task2 = getMockTask("SyncBarrierTask2");
+    when(task2.process(any(OMUpdateEventBatch.class), anyMap()))
+        .thenReturn(new ReconOmTask.TaskResult.Builder()
+            .setTaskName("SyncBarrierTask2").setTaskSuccess(true).build());
+    reconTaskController.registerTask(task2);
 
     OMUpdateEventBatch batch = mock(OMUpdateEventBatch.class);
     when(batch.getLastSequenceNumber()).thenReturn(100L);
@@ -961,15 +968,19 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
     GenericTestUtils.waitFor(() -> {
       try {
-        ReconTaskStatus status = reconTaskStatusDao.findById("SyncBarrierTask");
-        return status != null && status.getLastTaskRunStatus() == 0
-            && status.getLastUpdatedSeqNumber() == 100L;
+        ReconTaskStatus status1 = reconTaskStatusDao.findById("SyncBarrierTask1");
+        ReconTaskStatus status2 = reconTaskStatusDao.findById("SyncBarrierTask2");
+        return status1 != null && status1.getLastTaskRunStatus() == 0
+            && status1.getLastUpdatedSeqNumber() == 100L
+            && status2 != null && status2.getLastTaskRunStatus() == 0
+            && status2.getLastUpdatedSeqNumber() == 100L;
       } catch (Exception e) {
         return false;
       }
     }, 100, 5000);
 
-    // The derived-data RocksDB WAL must be synced (sync == true) before the durable cursor advances.
+    // The derived-data RocksDB WAL must be synced (sync == true) exactly once per batch before the
+    // durable cursors advance, coalescing multiple task writes.
     verify(reconDbStore, times(1)).flushLog(true);
     // A non-syncing flush would leave the write in page cache and reintroduce the durability gap.
     verify(reconDbStore, never()).flushLog(false);
