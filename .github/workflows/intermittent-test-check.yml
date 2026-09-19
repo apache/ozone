@@ -93,7 +93,7 @@ jobs:
           split_matrix="[${x%,}]"
           echo "matrix=$split_matrix" >> $GITHUB_OUTPUT
   ratis:
-    uses: ./.github/workflows/build-ratis.yml
+    uses: $/.github/workflows/build-ratis.yml
     if: ${{ github.event.inputs.ratis-ref != '' }}
     with:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
