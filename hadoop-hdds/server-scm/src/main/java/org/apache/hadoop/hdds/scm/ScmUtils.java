@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT;
@@ -85,14 +86,13 @@ public final class ScmUtils {
       logWarn(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
           OZONE_SCM_BLOCK_CLIENT_PORT_KEY);
     }
-    return NetUtils.createSocketAddr(
-        host.orElse(
-            OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(conf.getInt(
-                ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
-                    localScmServiceId, nodeId),
-                conf.getInt(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
-                    OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT))));
+    return NetUtils.createSocketAddr(getHostPortString(
+        host.orElse(OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT),
+        port.orElse(conf.getInt(
+            ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+                localScmServiceId, nodeId),
+            conf.getInt(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+                OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT)))));
   }
 
   public static String getScmBlockProtocolServerAddressKey(
@@ -118,12 +118,12 @@ public final class ScmUtils {
       logWarn(OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_CLIENT_PORT_KEY);
     }
 
-    return NetUtils.createSocketAddr(host + ":" +
+    return NetUtils.createSocketAddr(getHostPortString(host,
         port.orElse(
             conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
                 localScmServiceId, nodeId),
             conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
-                OZONE_SCM_CLIENT_PORT_DEFAULT))));
+                OZONE_SCM_CLIENT_PORT_DEFAULT)))));
   }
 
   public static String getClientProtocolServerAddressKey(
@@ -145,12 +145,13 @@ public final class ScmUtils {
       logWarn(OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY);
     }
 
-    return NetUtils.createSocketAddr(
-        host.orElse(OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(conf.getInt(ConfUtils.addKeySuffixes(
-                OZONE_SCM_DATANODE_PORT_KEY, localScmServiceId, nodeId),
-                conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
-                    OZONE_SCM_DATANODE_PORT_DEFAULT))));
+    return NetUtils.createSocketAddr(getHostPortString(
+        host.orElse(OZONE_SCM_DATANODE_BIND_HOST_DEFAULT),
+        port.orElse(conf.getInt(
+            ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
+                localScmServiceId, nodeId),
+            conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+                OZONE_SCM_DATANODE_PORT_DEFAULT)))));
   }
 
   public static String getScmDataNodeBindAddressKey(
