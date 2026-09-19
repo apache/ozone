@@ -247,7 +247,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(keyArgs, dbKeyInfo);
 
       OmBucketInfo bucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
+          getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       // If FILE_EXISTS we just override like how we used to do for Key Create.
       if (LOG.isDebugEnabled()) {
@@ -333,6 +333,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, bucketInfo.getBucketLayout(),
             null, missingParentInfos, trxnLogIndex);
+
+        // Parent directory creation holds the bucket write lock; key path locking leaves
+        // numMissingParents at 0.
+        omMetadataManager.getBucketTable().addCacheEntry(
+            omMetadataManager.getBucketKey(volumeName, bucketName), bucketInfo, trxnLogIndex);
       }
 
       // Add to cache entry can be done outside of lock for this openKey.
