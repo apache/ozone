@@ -41,9 +41,13 @@ spec:
         - s3g
         livenessProbe:
           httpGet:
-            path: /
+            path: /health/live
             port: 19878
           initialDelaySeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 19878
         envFrom:
         - configMapRef:
             name: config
