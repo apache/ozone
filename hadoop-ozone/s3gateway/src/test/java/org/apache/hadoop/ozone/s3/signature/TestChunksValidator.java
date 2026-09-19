@@ -28,6 +28,8 @@ import java.util.Locale;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Verifies {@link ChunksValidator} against the canonical AWS SigV4 streaming
@@ -53,6 +55,16 @@ class TestChunksValidator {
       "0055627c9e194cb4542bae2aa5492e3c1575bbb81b612b7d234b86a503ef5497";
   private static final String FINAL_CHUNK_SIGNATURE =
       "b6c6ea8a5354eaf15b3cb7646744f4275b71ea724fed81ceb9323e279d449df9";
+  private static final String TRAILER_SEED_SIGNATURE =
+      "106e2a8a18243abcf37539882f36619c00e2dfc72633413f02d3b74544bfeb8e";
+  private static final String TRAILER_CHUNK1_SIGNATURE =
+      "b474d8862b1487a5145d686f57f013e54db672cee1c953b3010fb58501ef5aa2";
+  private static final String TRAILER_CHUNK2_SIGNATURE =
+      "1c1344b170168f8e65b41376b44b20fe354e373826ccbbe2c1d40a8cae51e5c7";
+  private static final String TRAILER_FINAL_CHUNK_SIGNATURE =
+      "2ca2aba2005185cf7159c6277faf83795951dd77a3a99e6e65d5c9f85863f992";
+  private static final String TRAILER_SIGNATURE =
+      "d81f82fc3505edab99d459891051a732e8730629a2e4a59689829ca17fe2e435";
 
   /** A chunk that fails verification must surface as SignatureDoesNotMatch (HTTP 403), not any other error. */
   private static void assertSignatureMismatch(Executable call) {
@@ -65,6 +77,12 @@ class TestChunksValidator {
     return new ChunksValidator(
         SignatureTestUtils.signingKey(SECRET_KEY, "20130524", "us-east-1", "s3"),
         DATE_TIME, SCOPE, SEED_SIGNATURE, KEY_PATH);
+  }
+
+  private ChunksValidator newTrailerValidator() {
+    return new ChunksValidator(
+        SignatureTestUtils.signingKey(SECRET_KEY, "20130524", "us-east-1", "s3"),
+        DATE_TIME, SCOPE, TRAILER_SEED_SIGNATURE, KEY_PATH);
   }
 
   @Test
@@ -89,6 +107,30 @@ class TestChunksValidator {
 
     assertThatCode(() -> newValidator().validateChunk(CHUNK1_SIGNATURE.toUpperCase(Locale.ROOT),
         SignatureTestUtils.sha256Hex(chunk, 0, chunk.length))).doesNotThrowAnyException();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void validatesTrailerSignature(boolean tampered) {
+    ChunksValidator validator = newTrailerValidator();
+    byte[] chunk1 = repeat('a', 65536);
+    byte[] chunk2 = repeat('a', 1024);
+    String trailer = "x-amz-checksum-crc32c:sOO8/Q==";
+
+    assertDoesNotThrow(() -> validator.validateChunk(TRAILER_CHUNK1_SIGNATURE,
+        SignatureTestUtils.sha256Hex(chunk1, 0, chunk1.length)));
+    assertDoesNotThrow(() -> validator.validateChunk(TRAILER_CHUNK2_SIGNATURE,
+        SignatureTestUtils.sha256Hex(chunk2, 0, chunk2.length)));
+    assertDoesNotThrow(() -> validator.validateChunk(TRAILER_FINAL_CHUNK_SIGNATURE,
+        SignatureTestUtils.sha256Hex(new byte[0], 0, 0)));
+    String hash = SignatureTestUtils.sha256Hex((trailer + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        0, trailer.length() + 1);
+    if (tampered) {
+      assertSignatureMismatch(() -> validator.validateTrailer(
+          TRAILER_SIGNATURE.substring(0, TRAILER_SIGNATURE.length() - 1) + "0", hash));
+    } else {
+      assertDoesNotThrow(() -> validator.validateTrailer(TRAILER_SIGNATURE, hash));
+    }
   }
 
   @Test
