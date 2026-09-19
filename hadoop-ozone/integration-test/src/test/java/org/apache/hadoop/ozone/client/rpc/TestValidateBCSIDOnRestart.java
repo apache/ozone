@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -53,7 +52,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -84,9 +83,7 @@ public class TestValidateBCSIDOnRestart {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
 
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setStreamBufferFlushDelay(false);
-    conf.setFromObject(clientConfig);
+    conf.setBoolean("ozone.client.stream.buffer.flush.delay", false);
 
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
@@ -159,10 +156,10 @@ public class TestValidateBCSIDOnRestart {
           groupOutputStream.getLocationInfoList();
       assertEquals(1, locationInfoList.size());
       omKeyLocationInfo = locationInfoList.get(0);
-      dn = TestHelper.getDatanodeService(omKeyLocationInfo,
+      dn = OzoneTestHelper.getDatanodeService(omKeyLocationInfo,
           cluster);
       ContainerData containerData =
-          TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
+          OzoneTestHelper.getDatanodeService(omKeyLocationInfo, cluster)
               .getDatanodeStateMachine()
               .getContainer().getContainerSet()
               .getContainer(omKeyLocationInfo.getContainerID())
@@ -182,7 +179,7 @@ public class TestValidateBCSIDOnRestart {
             .getContainer();
     ozoneContainer.getContainerSet().removeContainer(containerID);
     ContainerStateMachine stateMachine =
-        (ContainerStateMachine) TestHelper.getStateMachine(cluster.
+        (ContainerStateMachine) OzoneTestHelper.getStateMachine(cluster.
                 getHddsDatanodes().get(index),
             omKeyLocationInfo.getPipeline());
     SimpleStateMachineStorage storage =
@@ -212,7 +209,7 @@ public class TestValidateBCSIDOnRestart {
       assertEquals(1, locationInfoList.size());
       omKeyLocationInfo = locationInfoList.get(0);
       containerID = omKeyLocationInfo.getContainerID();
-      dn = TestHelper.getDatanodeService(omKeyLocationInfo,
+      dn = OzoneTestHelper.getDatanodeService(omKeyLocationInfo,
           cluster);
       ContainerData containerData = dn.getDatanodeStateMachine()
           .getContainer().getContainerSet()

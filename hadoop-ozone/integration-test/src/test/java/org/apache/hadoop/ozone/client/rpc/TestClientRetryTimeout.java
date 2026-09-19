@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -473,7 +473,7 @@ public class TestClientRetryTimeout {
   }
 
   private OzoneOutputStream createKey(String keyName) throws Exception {
-    return TestHelper.createKey(keyName, ReplicationType.RATIS, 0,
+    return OzoneTestHelper.createKey(keyName, ReplicationType.RATIS, 0,
         objectStore, volumeName, bucketName);
   }
 

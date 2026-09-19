@@ -214,6 +214,11 @@ public class TestOzoneFileSystemDataStreamEnablement {
             Pipeline.PipelineState.OPEN);
   }
 
+  private static boolean noNodesHaveDatastreamPort(Pipeline pipeline) {
+    return pipeline.getNodes().stream()
+        .noneMatch(n -> n.hasPort(RATIS_DATASTREAM));
+  }
+
   private static boolean allNodesHaveDatastreamPort(Pipeline pipeline) {
     return pipeline.getNodes().stream()
         .allMatch(n -> n.hasPort(RATIS_DATASTREAM));
@@ -336,7 +341,7 @@ public class TestOzoneFileSystemDataStreamEnablement {
       }
       final List<Pipeline> before = openRatisThreePipelines();
       assertFalse(before.isEmpty());
-      before.forEach(p -> assertFalse(allNodesHaveDatastreamPort(p),
+      before.forEach(p -> assertTrue(noNodesHaveDatastreamPort(p),
           "pipeline should be portless before enabling datastream"));
 
       rollingRestartEnablingDataStream();
@@ -350,8 +355,8 @@ public class TestOzoneFileSystemDataStreamEnablement {
       final PipelineManagerImpl pipelineManager =
           (PipelineManagerImpl) cluster.getStorageContainerManager().getPipelineManager();
       final List<Pipeline> reloaded = openRatisThreePipelines();
-      assertFalse(reloaded.isEmpty());
-      reloaded.forEach(p -> assertFalse(allNodesHaveDatastreamPort(p),
+      reloaded.retainAll(before);
+      reloaded.forEach(p -> assertTrue(noNodesHaveDatastreamPort(p),
           "reloaded pipeline should still be portless"));
 
       // Close the pipeline(s) exposing the new datastream port; a fresh

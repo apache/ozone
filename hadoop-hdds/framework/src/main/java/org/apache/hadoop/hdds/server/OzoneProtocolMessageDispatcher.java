@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.server;
 
 import com.google.protobuf.ServiceException;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -71,7 +72,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE extends Enum
       CheckedFunction<REQUEST, RESPONSE, ServiceException> methodCall,
       TYPE type,
       String traceId) throws ServiceException {
-    Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
+    Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId, SpanKind.SERVER);
     try (Scope currentScope = span.makeCurrent()) {
       if (logger.isTraceEnabled()) {
         logger.trace(

@@ -294,7 +294,16 @@ public class OzoneManagerServiceProviderImpl
                   deltaTaskStatusUpdater.getLastUpdatedSeqNumber()) < 0; // Condition 3
         })
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));  // Collect into desired Map
-    if (!reconOmTaskMap.isEmpty()) {
+    if (!reconOmTaskMap.isEmpty() && omMetadataManager.getStore() == null) {
+      // Fresh start (or the local OM snapshot DB is missing) while stale task
+      // status rows still exist in the Recon SQL DB. There is no local OM DB to
+      // checkpoint/reprocess yet, so attempting reinitialization here would fail
+      // (checkpoint creation dereferences a null DB store). Skip it; the full
+      // snapshot sync scheduled below will download the OM DB and initialize tasks.
+      LOG.info("Skipping startup task reinitialization because the local OM DB store " +
+          "is not initialized yet (no OM snapshot present). The scheduled full snapshot " +
+          "sync will download the OM DB and initialize tasks.");
+    } else if (!reconOmTaskMap.isEmpty()) {
       LOG.info("Task name and last updated sequence number of tasks, that are not matching with " +
           "the last updated sequence number of OmDeltaRequest task:\n");
       LOG.info("{} -> {}", deltaTaskStatusUpdater.getTaskName(), deltaTaskStatusUpdater.getLastUpdatedSeqNumber());

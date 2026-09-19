@@ -51,7 +51,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -92,6 +91,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.DatanodeStorageMetrics;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -146,7 +146,10 @@ public class OzoneContainer {
       recoveringContainerScrubbingService;
   private final GrpcTlsConfig tlsClientConfig;
   private DiskBalancerService diskBalancerService;
-  private final AtomicReference<InitializingStatus> initializingStatus;
+  private final Object initializationLock = new Object();
+  // Guarded by initializationLock.
+  private InitializingStatus initializingStatus;
+  private Throwable initializationFailure;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
   private StateContext context;
@@ -156,9 +159,10 @@ public class OzoneContainer {
 
   private final ContainerMetrics metrics;
   private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
+  private final DatanodeStorageMetrics datanodeStorageMetrics;
 
   enum InitializingStatus {
-    UNINITIALIZED, INITIALIZING, INITIALIZED
+    UNINITIALIZED, INITIALIZING, INITIALIZED, FAILED
   }
 
   /**
@@ -330,7 +334,9 @@ public class OzoneContainer {
       tlsClientConfig = null;
     }
 
-    initializingStatus = new AtomicReference<>(InitializingStatus.UNINITIALIZED);
+    datanodeStorageMetrics = DatanodeStorageMetrics.create(volumeSet);
+
+    initializingStatus = InitializingStatus.UNINITIALIZED;
   }
 
   /**
@@ -543,24 +549,30 @@ public class OzoneContainer {
    * @throws IOException
    */
   public void start(String clusterId) throws IOException {
-    // If SCM HA is enabled, OzoneContainer#start() will be called multi-times
-    // from VersionEndpointTask. The first call should do the initializing job,
-    // the successive calls should wait until OzoneContainer is initialized.
-    if (!initializingStatus.compareAndSet(
-        InitializingStatus.UNINITIALIZED, InitializingStatus.INITIALIZING)) {
-
-      // wait OzoneContainer to finish its initializing.
-      while (initializingStatus.get() != InitializingStatus.INITIALIZED) {
-        try {
-          Thread.sleep(1);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
+    synchronized (initializationLock) {
+      // SCM endpoints share one initialization attempt, including its failure.
+      if (initializingStatus == InitializingStatus.INITIALIZED) {
+        LOG.info("Ignore. OzoneContainer already started.");
+        return;
       }
-      LOG.info("Ignore. OzoneContainer already started.");
-      return;
-    }
+      if (initializingStatus == InitializingStatus.FAILED) {
+        throw new IOException("OzoneContainer initialization previously failed", initializationFailure);
+      }
 
+      initializingStatus = InitializingStatus.INITIALIZING;
+      try {
+        initializeContainerServices(clusterId);
+        initializingStatus = InitializingStatus.INITIALIZED;
+      } catch (IOException | RuntimeException | Error ex) {
+        // Partially started services cannot safely be initialized again.
+        initializationFailure = ex;
+        initializingStatus = InitializingStatus.FAILED;
+        throw ex;
+      }
+    }
+  }
+
+  private void initializeContainerServices(String clusterId) throws IOException {
     DatanodeLayoutStorage layoutStorage
         = new DatanodeLayoutStorage(config);
     layoutStorage.setClusterId(clusterId);
@@ -603,9 +615,6 @@ public class OzoneContainer {
     recoveringContainerScrubbingService.start();
 
     initHddsVolumeContainer();
-
-    // mark OzoneContainer as INITIALIZED.
-    initializingStatus.set(InitializingStatus.INITIALIZED);
   }
 
   /**
@@ -633,6 +642,7 @@ public class OzoneContainer {
     this.handlers.values().forEach(Handler::stop);
     hddsDispatcher.shutdown();
     volumeChecker.shutdownAndWait(0, TimeUnit.SECONDS);
+    datanodeStorageMetrics.unregister();
     volumeSet.shutdown();
     metaVolumeSet.shutdown();
     if (dbVolumeSet != null) {

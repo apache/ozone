@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.DOUBLE_SLASH_OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -237,10 +238,12 @@ public final class OmUtils {
     case FinalizeUpgradeProgress:
     case PrepareStatus:
     case GetS3VolumeContext:
+    case GetCallerIdentity:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
+    case SnapshotCount:
     case RefetchSecretKey:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
@@ -284,6 +287,7 @@ public final class OmUtils {
     case CompleteMultiPartUpload:
     case AbortMultiPartUpload:
     case GetS3Secret:
+    case AssumeRole:
     case GetDelegationToken:
     case RenewDelegationToken:
     case CancelDelegationToken:
@@ -304,6 +308,7 @@ public final class OmUtils {
     case DeleteOpenKeys:
     case SetS3Secret:
     case RevokeS3Secret:
+    case RevokeSTSToken:
     case PurgeDirectories:
     case PurgePaths:
     case CreateTenant:
@@ -326,6 +331,7 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case DeleteRevokedSTSTokens:
     case PutBucketTagging:
     case DeleteBucketTagging:
     case SetLifecycleConfiguration:
@@ -379,10 +385,12 @@ public final class OmUtils {
     case FinalizeUpgradeProgress:
     case PrepareStatus:
     case GetS3VolumeContext:
+    case GetCallerIdentity:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
+    case SnapshotCount:
     case RefetchSecretKey:
     case GetKeyInfo:
     case GetSnapshotInfo:
@@ -452,6 +460,9 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case AssumeRole:
+    case RevokeSTSToken:
+    case DeleteRevokedSTSTokens:
     case PutBucketTagging:
     case DeleteBucketTagging:
     case ServiceList: // OM leader should have the most up-to-date OM service list info
@@ -493,7 +504,7 @@ public final class OmUtils {
           "This could possibly indicate a faulty JRE");
     }
   }
-
+  
   /**
    * Get a collection of all active omNodeIds (excluding decommissioned nodes)
    * for the given omServiceId.
@@ -1143,7 +1154,10 @@ public final class OmUtils {
    */
   public static void resolveOmHost(String omHost, int omPort)
       throws IOException {
-    InetSocketAddress omHostAddress = NetUtils.createSocketAddr(omHost, omPort);
+    // Combine via getHostPortString so an IPv6 literal is bracketed; passing a
+    // bare ::1 to createSocketAddr fails with "not a valid host:port authority".
+    InetSocketAddress omHostAddress =
+        NetUtils.createSocketAddr(getHostPortString(omHost, omPort));
     if (omHostAddress.isUnresolved()) {
       throw new IOException(
           "Cannot resolve OM host " + omHost + " in the URI",

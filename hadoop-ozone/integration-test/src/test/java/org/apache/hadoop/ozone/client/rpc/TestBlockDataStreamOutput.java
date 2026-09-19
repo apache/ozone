@@ -61,7 +61,7 @@ import org.apache.hadoop.ozone.client.io.BlockDataStreamOutputEntry;
 import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -247,7 +247,7 @@ public class TestBlockDataStreamOutput {
     ByteBufferStreamOutput stream =
         keyDataStreamOutput.getStreamEntries().get(0).getByteBufStreamOutput();
     assertInstanceOf(BlockDataStreamOutput.class, stream);
-    TestHelper.waitForContainerClose(key, cluster);
+    OzoneTestHelper.waitForContainerClose(key, cluster);
     key.write(b);
     key.close();
     String dataString = new String(data, UTF_8);
@@ -256,12 +256,12 @@ public class TestBlockDataStreamOutput {
 
   static OzoneDataStreamOutput createKey(OzoneClient client, String keyName,
                                          long size) throws Exception {
-    return TestHelper.createStreamKey(keyName, ReplicationType.RATIS, size,
+    return OzoneTestHelper.createStreamKey(keyName, ReplicationType.RATIS, size,
         client.getObjectStore(), VOLUME_NAME, BUCKET_NAME);
   }
 
   static void validateData(OzoneClient client, String keyName, byte[] data) throws Exception {
-    TestHelper.validateData(
+    OzoneTestHelper.validateData(
         keyName, data, client.getObjectStore(), VOLUME_NAME, BUCKET_NAME);
   }
 

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.NoSuchElementException;
 import javax.servlet.Filter;
@@ -56,6 +57,9 @@ public class EmptyContentTypeFilter implements Filter {
           if (name.equalsIgnoreCase("Content-Type")) {
             return null;
           }
+          if (name.equalsIgnoreCase(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE)) {
+            return "";
+          }
           return super.getHeader(name);
         }
 
@@ -63,6 +67,9 @@ public class EmptyContentTypeFilter implements Filter {
         public Enumeration<String> getHeaders(String name) {
           if ("Content-Type".equalsIgnoreCase(name)) {
             return null;
+          }
+          if (HeaderPreprocessor.ORIGINAL_CONTENT_TYPE.equalsIgnoreCase(name)) {
+            return Collections.enumeration(Collections.singletonList(""));
           }
           return super.getHeaders(name);
         }
@@ -84,8 +91,8 @@ public class EmptyContentTypeFilter implements Filter {
   }
 
   /**
-   * Enumeration Wrapper which removes Content-Type from the original
-   * enumeration.
+   * Enumeration Wrapper which replaces Content-Type with the internal header
+   * used to preserve its original value.
    */
   public static class EnumerationWrapper implements Enumeration<String> {
 
@@ -93,24 +100,27 @@ public class EmptyContentTypeFilter implements Filter {
 
     private String nextElement;
 
+    private boolean contentTypeReplaced;
+
     public EnumerationWrapper(Enumeration<String> original) {
       this.original = original;
       step();
     }
 
     private void step() {
-      if (original.hasMoreElements()) {
+      while (original.hasMoreElements()) {
         nextElement = original.nextElement();
-      } else {
-        nextElement = null;
-      }
-      if ("Content-Type".equalsIgnoreCase(nextElement)) {
-        if (original.hasMoreElements()) {
-          nextElement = original.nextElement();
+        if ("Content-Type".equalsIgnoreCase(nextElement)) {
+          if (!contentTypeReplaced) {
+            nextElement = HeaderPreprocessor.ORIGINAL_CONTENT_TYPE;
+            contentTypeReplaced = true;
+            return;
+          }
         } else {
-          nextElement = null;
+          return;
         }
       }
+      nextElement = null;
     }
 
     @Override

@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -88,6 +89,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -412,6 +414,62 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
 
     OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
         () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
+  }
+
+  @Test
+  public void testFailedCompleteAfterParentDeletionDoesNotLeakNamespaceQuota()
+      throws Exception {
+    OMMetadataManager metadataManager =
+        cluster().getOzoneManager().getMetadataManager();
+    String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED, metadataManager
+        .getBucketTable().get(bucketKey).getBucketLayout());
+
+    String parentDir = "parentToDelete";
+    String childKeyName = parentDir + "/" + keyName;
+
+    // Initiate the MPU under a parent directory. This creates the parent
+    // directory and charges the bucket namespace quota by 1.
+    String uploadID = initiateMultipartUploadWithAsserts(bucket, childKeyName,
+        RATIS, ONE);
+    Pair<String, String> partNameAndETag = uploadPart(bucket, childKeyName,
+        uploadID, 1, "data".getBytes(UTF_8));
+
+    // Delete the parent directory, reverting the namespace charge back to 0.
+    ozClient.getProxy().deleteKey(volumeName, bucketName, parentDir + "/",
+        false);
+    GenericTestUtils.waitFor(() -> getDurableUsedNamespace(bucketKey) == 0L,
+        100, 30_000);
+
+    // Complete the MPU with an invalid part ETag. The complete first recreates
+    // the now-missing parent directory in the cache (charging the namespace by
+    // 1), then fails validation with INVALID_PART.
+    TreeMap<Integer, String> partsMap = new TreeMap<>();
+    partsMap.put(1, partNameAndETag.getValue() + "-invalid");
+    OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
+        () -> completeMultipartUpload(bucket, childKeyName, uploadID,
+            partsMap));
+
+    // The failed complete must not leak namespace quota. The cached bucket
+    // usedNamespace must match the durable value (0). Before the fix, the
+    // in-place incrUsedNamespace done while recreating the parent was never
+    // reverted on the failure path, leaving the cached bucket at 1 with no
+    // backing object.
+    long durableUsedNamespace = getDurableUsedNamespace(bucketKey);
+    long liveUsedNamespace =
+        metadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+    assertEquals(0L, durableUsedNamespace);
+    assertEquals(0L, liveUsedNamespace,
+        "Failed CompleteMultipartUpload leaked bucket namespace quota");
+  }
+
+  private long getDurableUsedNamespace(String bucketKey) {
+    try {
+      return cluster().getOzoneManager().getMetadataManager().getBucketTable()
+          .getSkipCache(bucketKey).getUsedNamespace();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   @Test

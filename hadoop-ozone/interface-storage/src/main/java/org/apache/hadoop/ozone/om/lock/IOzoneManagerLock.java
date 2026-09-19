@@ -26,34 +26,52 @@ import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
  */
 public interface IOzoneManagerLock {
 
-  OMLockDetails acquireReadLock(Resource resource,
-                                String... resources);
+  // ---------- acquireReadLock ----------
+  OMLockDetails acquireReadLock(Resource resource, String key);
+
+  OMLockDetails acquireReadLock(Resource resource, String key1, String key2);
+
+  OMLockDetails acquireReadLock(Resource resource, String... keys);
 
   OMLockDetails acquireReadLocks(Resource resource, Iterable<String[]> keys);
 
-  OMLockDetails acquireWriteLock(Resource resource,
-                                 String... resources);
+  // ---------- acquireWriteLock ----------
+  OMLockDetails acquireWriteLock(Resource resource, String key);
+
+  OMLockDetails acquireWriteLock(Resource resource, String key1, String key2);
+
+  OMLockDetails acquireWriteLock(Resource resource, String... keys);
 
   OMLockDetails acquireWriteLocks(Resource resource, Iterable<String[]> keys);
 
   OMLockDetails acquireResourceWriteLock(Resource resource);
 
+  // ---------- MultiUserLock ----------
   boolean acquireMultiUserLock(String firstUser, String secondUser);
 
   void releaseMultiUserLock(String firstUser, String secondUser);
 
-  OMLockDetails releaseWriteLock(Resource resource,
-                        String... resources);
+  // ---------- releaseWriteLock ----------
+  OMLockDetails releaseWriteLock(Resource resource, String key);
+
+  OMLockDetails releaseWriteLock(Resource resource, String key1, String key2);
+
+  OMLockDetails releaseWriteLock(Resource resource, String... keys);
 
   OMLockDetails releaseWriteLocks(Resource resource, Iterable<String[]> keys);
 
   OMLockDetails releaseResourceWriteLock(Resource resource);
 
-  OMLockDetails releaseReadLock(Resource resource,
-                                String... resources);
+  // ---------- releaseReadLock ----------
+  OMLockDetails releaseReadLock(Resource resource, String key);
+
+  OMLockDetails releaseReadLock(Resource resource, String key1, String key2);
+
+  OMLockDetails releaseReadLock(Resource resource, String... keys);
 
   OMLockDetails releaseReadLocks(Resource resource, Iterable<String[]> keys);
 
+  // ---------- other methods ----------
   @VisibleForTesting
   int getReadHoldCount(Resource resource,
       String... resources);

@@ -26,9 +26,11 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.BiFunction;
@@ -175,7 +177,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+      // The namespace charge for recreating missing FSO parent directories is applied before the
+      // parts are validated, so a complete that fails with INVALID_PART must not leak it.
+      OmBucketInfo omBucketInfo = getBucketInfoForUpdate(omMetadataManager,
           volumeName, bucketName);
 
       List<OmDirectoryInfo> missingParentInfos;
@@ -296,7 +300,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         }
 
         // First Check for Invalid Part Order.
-        List< Integer > partNumbers = new ArrayList<>();
+        Set<Integer> partNumbers = new HashSet<>();
         int partsListSize = getPartsListSize(requestedVolume,
                 requestedBucket, keyName, ozoneKey, partNumbers, partsList);
 
@@ -334,6 +338,15 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(
               keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
+          // Remove any block from oldKeyVersionsToDelete that shares the same
+          // container ID and local ID with omKeyInfo blocks'.
+          // Otherwise, it causes data loss once those shared blocks are added
+          // to deletedTable and processed by KeyDeletingService for deletion.
+          // Unlike OMKeyCommitRequest, the returned filtered-block sizes are
+          // not applied to quota: part bytes were already counted at
+          // commit-part, and this transaction does not charge the new key,
+          // so there is no double-charge to correct.
+          filterOutBlocksStillInUse(omKeyInfo, oldKeyVersionsToDelete);
           allKeyInfoToRemove.addAll(oldKeyVersionsToDelete.getOmKeyInfoList());
           usedBytesDiff -= keyToDelete.getReplicatedSize();
         } else {
@@ -613,7 +626,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   private int getPartsListSize(String requestedVolume,
       String requestedBucket, String keyName, String ozoneKey,
-      List<Integer> partNumbers,
+      Set<Integer> partNumbers,
       List<OzoneManagerProtocolProtos.Part> partsList) throws OMException {
     int prevPartNumber = partsList.get(0).getPartNumber();
     int partsListSize = partsList.size();
@@ -684,10 +697,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .getKeyLocationVersions().get(0);
 
       // Set partNumber in each block.
-      currentKeyInfoGroup.getLocationList().forEach(
-          omKeyLocationInfo -> omKeyLocationInfo.setPartNumber(partNumber));
-
-      partLocationInfos.addAll(currentKeyInfoGroup.getLocationList());
+      currentKeyInfoGroup.getLocationLists().forEach(locationList -> {
+        locationList.forEach(
+            omKeyLocationInfo -> omKeyLocationInfo.setPartNumber(partNumber));
+        partLocationInfos.addAll(locationList);
+      });
       dataSize += currentPartKeyInfo.getDataSize();
     }
     return dataSize;
