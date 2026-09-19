@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
@@ -60,8 +61,10 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.NO
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.DIFF_REPORT_GEN;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_DIR;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_FILE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_OBS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.PATH_RESOLUTION_FSO;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -80,6 +83,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -96,6 +100,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.commons.io.file.PathUtils;
@@ -141,6 +146,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.util.ClosableIterator;
+import org.apache.hadoop.util.Time;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
@@ -1112,27 +1118,27 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       // repetition while constantly checking if the job is cancelled.
       Callable<Void>[] methodCalls = new Callable[]{
           () -> {
-            recordActivity(jobKey, OBJECT_ID_MAP_GEN_OBS);
             getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsKeyTable, tsKeyTable,
                 fsInfo, tsInfo, performNonNativeDiff, tablePrefixes,
                 objectIdToKeyNameMapForFromSnapshot,
                 objectIdToKeyNameMapForToSnapshot, objectIdToIsDirMap,
-                oldParentIds, newParentIds, deltaFileComputer, jobKey);
+                oldParentIds, newParentIds, deltaFileComputer, jobKey, jobId);
             return null;
           },
           () -> {
             if (bucketLayout.isFileSystemOptimized()) {
-              recordActivity(jobKey, OBJECT_ID_MAP_GEN_FSO);
               getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsDirTable, tsDirTable,
                   fsInfo, tsInfo, performNonNativeDiff, tablePrefixes,
                   objectIdToKeyNameMapForFromSnapshot,
                   objectIdToKeyNameMapForToSnapshot, objectIdToIsDirMap,
-                  oldParentIds, newParentIds, deltaFileComputer, jobKey);
+                  oldParentIds, newParentIds, deltaFileComputer, jobKey, jobId);
             }
             return null;
           },
           () -> {
             if (bucketLayout.isFileSystemOptimized()) {
+              recordActivity(jobKey, PATH_RESOLUTION_FSO);
+              long pathResolutionStart = Time.monotonicNow();
               long bucketId = toSnapshot.getMetadataManager()
                   .getBucketId(volumeName, bucketName);
               String tablePrefix = tablePrefixes.getTablePrefix(fromSnapshot.getMetadataManager()
@@ -1145,11 +1151,19 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
                   tablePrefix, bucketId,
                   toSnapshot.getMetadataManager().getDirectoryTable())
                   .getAbsolutePathForObjectIDs(newParentIds, true));
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Completed FSO path resolution for snapshot diff, resolved {} out of {} parent IDs, " +
+                        "elapsed: {}ms, jobId: {}",
+                    oldParentIdPathMap.get().size() + newParentIdPathMap.get().size(),
+                    oldParentIds.get().size() + newParentIds.get().size(),
+                    Time.monotonicNow() - pathResolutionStart, jobId);
+              }
             }
             return null;
           },
           () -> {
             recordActivity(jobKey, DIFF_REPORT_GEN);
+            long reportGenStart = Time.monotonicNow();
             Pair<Long, String> reportEntries = generateDiffReport(jobId,
                 fsKeyTable,
                 tsKeyTable,
@@ -1166,6 +1180,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
             if (reportEntries.getKey() >= 0 &&
                 areDiffJobAndSnapshotsActive(volumeName, bucketName,
                     fromSnapshotName, toSnapshotName)) {
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Generated snapshot diff report, entry count: {}, elapsed: {}ms, jobId: {}",
+                    reportEntries.getKey(), Time.monotonicNow() - reportGenStart, jobId);
+              }
               updateJobStatusToDone(jobKey, reportEntries.getKey(), reportEntries.getValue());
             }
             return null;
@@ -1221,17 +1239,24 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
       final PersistentMap<byte[], Boolean> objectIdToIsDirMap,
       final Optional<Set<Long>> oldParentIds, final Optional<Set<Long>> newParentIds,
-      final DeltaFileComputer deltaFileComputer, final String jobKey) throws IOException, RocksDBException {
+      final DeltaFileComputer deltaFileComputer, final String jobKey,
+      final String jobId) throws IOException, RocksDBException {
 
+    long deltaFilesStart = Time.monotonicNow();
     Set<String> tablesToLookUp = Collections.singleton(fsTable.getName());
     Collection<Pair<Path, SstFileInfo>> deltaFiles = deltaFileComputer.getDeltaFiles(fsInfo, tsInfo,
         tablesToLookUp);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Computed Delta SST File Set, Total count = {} ", deltaFiles.size());
+      LOG.debug("Computed Delta SST File Set for table '{}', file count: {}, elapsed: {}ms, jobId: {}",
+          fsTable.getName(), deltaFiles.size(), Time.monotonicNow() - deltaFilesStart, jobId);
     }
+    recordActivity(jobKey,
+        fsTable.getName().equals(FILE_TABLE) ? OBJECT_ID_MAP_GEN_FSO_FILE
+            : fsTable.getName().equals(DIRECTORY_TABLE) ? OBJECT_ID_MAP_GEN_FSO_DIR
+            : OBJECT_ID_MAP_GEN_OBS);
     addToObjectIdMap(fsTable, tsTable, deltaFiles.stream().map(Pair::getLeft).collect(Collectors.toList()),
         !skipNativeDiff, oldObjIdToKeyMap, newObjIdToKeyMap, objectIdToIsDirMap, oldParentIds,
-        newParentIds, tablePrefixes, jobKey);
+        newParentIds, tablePrefixes, jobKey, jobId);
   }
 
   @VisibleForTesting
@@ -1244,10 +1269,19 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       PersistentMap<byte[], Boolean> objectIdToIsDirMap,
       Optional<Set<Long>> oldParentIds,
       Optional<Set<Long>> newParentIds,
-      TablePrefixInfo tablePrefixes, String jobKey) throws IOException, RocksDBException {
+      TablePrefixInfo tablePrefixes, String jobKey,
+      String jobId) throws IOException, RocksDBException {
     if (deltaFiles.isEmpty()) {
+      updateProgress(jobKey, 1.0);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Skipped object ID map generation for table '{}' because there are no delta files, jobId: {}",
+            fsTable.getName(), jobId);
+      }
       return;
     }
+    updateProgress(jobKey, 0.0);
+    long objectIdMapStart = Time.monotonicNow();
+    AtomicLong keysProcessed = new AtomicLong(0);
     String tablePrefix = tablePrefixes.getTablePrefix(fsTable.getName());
     boolean isDirectoryTable = fsTable.getName().equals(DIRECTORY_TABLE);
     SstFileSetReader sstFileReader = new SstFileSetReader(deltaFiles);
@@ -1256,8 +1290,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     String sstFileReaderLowerBound = tablePrefix;
     String sstFileReaderUpperBound = null;
     double stepIncreasePct = 0.1;
-    double[] checkpoint = new double[1];
-    checkpoint[0] = stepIncreasePct;
+    double checkpoint = stepIncreasePct;
     if (Strings.isNotEmpty(tablePrefix)) {
       sstFileReaderUpperBound = getLexicographicallyHigherString(tablePrefix);
     }
@@ -1266,15 +1299,14 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
         : sstFileReader.getKeyStream(sstFileReaderLowerBound, sstFileReaderUpperBound);
          TableMergeIterator<String, WithParentObjectId> tableMergeIterator = new TableMergeIterator<>(keysToCheck,
              tablePrefix, (Table<String, WithParentObjectId>) fsTable, (Table<String, WithParentObjectId>) tsTable)) {
-      AtomicLong keysProcessed = new AtomicLong(0);
       while (tableMergeIterator.hasNext()) {
         Table.KeyValue<String, List<WithParentObjectId>> kvs = tableMergeIterator.next();
         String key = kvs.getKey();
         if (totalEstimatedKeysToProcess > 0) {
           double progressPct = (double) keysProcessed.get() / totalEstimatedKeysToProcess;
-          if (progressPct >= checkpoint[0]) {
+          if (progressPct >= checkpoint) {
             updateProgress(jobKey, progressPct);
-            checkpoint[0] += stepIncreasePct;
+            checkpoint += stepIncreasePct;
           }
         }
 
@@ -1311,6 +1343,11 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           throw new RuntimeException(e);
         }
       }
+    }
+    updateProgress(jobKey, 1.0);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Generated object ID map for table '{}', keys scanned: {}, elapsed: {}ms, jobId: {}",
+          fsTable.getName(), keysProcessed.get(), Time.monotonicNow() - objectIdMapStart, jobId);
     }
   }
 
@@ -1352,6 +1389,106 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     }
     return OzoneConsts.ROOT_PATH.resolve(key).toString()
         .substring(1);
+  }
+
+  /**
+   * Returns whether any ancestor of the given parent is a deleted directory.
+   * The walk stops at renamed directories because their descendant deletes are
+   * not subsumed by a deleted ancestor above them. Returns true when the parent
+   * chain cannot be resolved in the live from-snapshot directory graph, so the
+   * delete entry can be skipped from the final report.
+   *
+   * @param objectIdToParentId from-snapshot directory parent graph keyed by stable
+   *     objectId; must not be the to-snapshot graph
+   * @param renamedDirectoryIds objectIds of directories renamed in the diff (from
+   *     snapshot objectIds, not destination paths)
+   */
+  @VisibleForTesting
+  boolean hasDeletedAncestor(long parentObjectId, Set<Long> deletedDirectoryIds,
+      Set<Long> renamedDirectoryIds, Map<Long, Long> objectIdToParentId,
+      long bucketObjectId, Map<Long, Boolean> ancestorMemo) {
+    Objects.requireNonNull(objectIdToParentId, "objectIdToParentId must not be null");
+    Objects.requireNonNull(renamedDirectoryIds, "renamedDirectoryIds must not be null");
+
+    if (parentObjectId == bucketObjectId) {
+      return false;
+    }
+    Boolean cached = ancestorMemo.get(parentObjectId);
+    if (cached != null) {
+      return cached;
+    }
+
+    List<Long> path = new ArrayList<>();
+    long current = parentObjectId;
+    boolean result;
+    while (true) {
+      if (current == bucketObjectId) {
+        result = false;
+        break;
+      }
+      cached = ancestorMemo.get(current);
+      if (cached != null) {
+        result = cached;
+        break;
+      }
+      if (renamedDirectoryIds.contains(current)) {
+        result = false;
+        ancestorMemo.put(current, false);
+        break;
+      }
+      if (deletedDirectoryIds.contains(current)) {
+        result = true;
+        ancestorMemo.put(current, true);
+        break;
+      }
+      Long nextParent = objectIdToParentId.get(current);
+      if (nextParent == null) {
+        result = true;
+        ancestorMemo.put(current, true);
+        break;
+      }
+      path.add(current);
+      current = nextParent;
+    }
+    for (Long node : path) {
+      ancestorMemo.put(node, result);
+    }
+    return result;
+  }
+
+  /**
+   * Filters mixed directory and file delete entries, retaining only those without
+   * a deleted directory ancestor. FSO buckets only.
+   *
+   * @param objectIdToParentId from-snapshot directory parent graph keyed by stable
+   *     objectId, built from a full fromSnapshot directoryTable scan
+   * @param renamedDirectoryIds objectIds of directories renamed in the diff (from
+   *     snapshot objectIds); pass an empty set when there are no renames
+   */
+  @VisibleForTesting
+  <T extends WithParentObjectId> List<T> filterTopLevelDeletedEntries(
+      Collection<T> deletedEntries,
+      Predicate<T> isDirectory,
+      Map<Long, Long> objectIdToParentId,
+      Set<Long> renamedDirectoryIds,
+      long bucketObjectId) {
+    Objects.requireNonNull(objectIdToParentId, "objectIdToParentId must not be null");
+    Objects.requireNonNull(renamedDirectoryIds, "renamedDirectoryIds must not be null");
+    Set<Long> deletedDirectoryIds = new HashSet<>();
+    for (T deletedEntry : deletedEntries) {
+      if (isDirectory.test(deletedEntry)) {
+        deletedDirectoryIds.add(deletedEntry.getObjectID());
+      }
+    }
+    Map<Long, Boolean> ancestorMemo = new HashMap<>();
+    List<T> filteredDeletes = new ArrayList<>();
+    for (T deletedEntry : deletedEntries) {
+      if (!hasDeletedAncestor(deletedEntry.getParentObjectID(), deletedDirectoryIds,
+          renamedDirectoryIds, objectIdToParentId, bucketObjectId, ancestorMemo)) {
+        filteredDeletes.add(deletedEntry);
+      }
+    }
+    return filteredDeletes;
   }
 
   @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
@@ -1581,7 +1718,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     snapshotDiffJob.setKeysProcessedPct(pct * 100);
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Completed processing {}% of keys for snapshot diff job {}", pct, jobKey);
+      LOG.debug("Completed processing {}% of keys for snapshot diff job {}",
+          snapshotDiffJob.getKeysProcessedPct(), jobKey);
     }
   }
 

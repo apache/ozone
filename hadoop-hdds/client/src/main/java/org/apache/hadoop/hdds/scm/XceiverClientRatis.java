@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Comparator;
@@ -253,7 +254,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       }
     }
     return TracingUtil.executeInNewSpan(
-        "XceiverClientRatis." + request.getCmdType().name(),
+        "XceiverClientRatis." + request.getCmdType().name(), SpanKind.CLIENT,
         () -> {
           final ContainerCommandRequestMessage message
               = ContainerCommandRequestMessage.toMessage(
@@ -307,7 +308,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     final CompletableFuture<XceiverClientReply> replyFuture = new CompletableFuture<>();
     getClient().async().watch(index, watchType).thenAccept(reply -> {
       final long updated = updateCommitInfosMap(reply, watchType);
-      Preconditions.checkState(updated >= index, "Returned index " + updated + " < expected " + index);
+      Preconditions.checkState(updated >= index, "Returned index %s < expected %s", updated, index);
       replyFuture.complete(newWatchReply(index, watchType, updated));
     }).exceptionally(e -> {
       LOG.warn("{} way commit failed on pipeline {}", watchType, pipeline, e);

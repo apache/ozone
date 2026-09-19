@@ -32,7 +32,7 @@ public class ServerNotLeaderException extends IOException {
   private static final Pattern CURRENT_PEER_ID_PATTERN =
       Pattern.compile(".* Server:(.*?) is not the leader[.]+.*", Pattern.DOTALL);
   private static final Pattern SUGGESTED_LEADER_PATTERN =
-      Pattern.compile(".*Suggested leader is Server:([^:]*)(:[0-9]+).*",
+      Pattern.compile(".*Suggested leader is Server:(\\[[^\\]]+\\]|[^:]*)(:[0-9]+).*",
           Pattern.DOTALL);
 
   public ServerNotLeaderException(RaftPeerId currentPeerId, String hostname,
@@ -99,7 +99,8 @@ public class ServerNotLeaderException extends IOException {
         null;
     ServerNotLeaderException serverNotLeaderException;
     if (suggestedLeader != null) {
-      String suggestedLeaderHostPort = suggestedLeader + ":" + port;
+      String suggestedLeaderHostPort =
+          HddsUtils.getHostPortString(suggestedLeader, Integer.parseInt(port));
       serverNotLeaderException =
           new ServerNotLeaderException(currentPeer, suggestedLeaderHostPort, hostname, roleType);
     } else {

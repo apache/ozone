@@ -59,9 +59,7 @@ public class TestXceiverClientManagerSC {
   @BeforeAll
   public static void init() throws Exception {
     config = new OzoneConfiguration();
-    OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
-    clientConfig.setShortCircuit(true);
-    config.setFromObject(clientConfig);
+    config.setBoolean(OzoneClientConfig.OZONE_READ_SHORT_CIRCUIT, true);
     config.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocket.disableBindPathValidation();
     cluster = MiniOzoneCluster.newBuilder(config)

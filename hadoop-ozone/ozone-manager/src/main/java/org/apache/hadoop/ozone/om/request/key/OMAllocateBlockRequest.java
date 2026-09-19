@@ -216,7 +216,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       long preAllocatedKeySize = newLocationList.size()
           * ozoneManager.getScmBlockSize();
       long hadAllocatedKeySize =
-          openKeyInfo.getLatestVersionLocations().getLocationList().size()
+          openKeyInfo.getLatestVersionLocations().getLocationListCount()
               * ozoneManager.getScmBlockSize();
       ReplicationConfig repConfig = openKeyInfo.getReplicationConfig();
       long totalAllocatedSpace = QuotaUtil.getReplicatedSize(

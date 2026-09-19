@@ -635,6 +635,41 @@ public class TestSnapshotDefragService {
   }
 
   @Test
+  public void testCreateCheckpointCleansUpAfterOpenFailure() throws Exception {
+    SnapshotInfo snapshotInfo = createMockSnapshotInfo(UUID.randomUUID(), "vol1", "bucket1", "snap1");
+    Path checkpointPath = tempDir.resolve("tmp_defrag").resolve("checkpoint-" + UUID.randomUUID());
+    Files.createDirectories(checkpointPath);
+    DBCheckpoint checkpoint = new RocksDBCheckpoint(checkpointPath);
+    DBStore snapshotStore = mock(DBStore.class);
+    when(snapshotStore.getCheckpoint(anyString(), eq(true))).thenReturn(checkpoint);
+    createMockSnapshot(snapshotInfo, snapshotStore);
+
+    SnapshotDefragService spyDefragService = Mockito.spy(defragService);
+    Mockito.doThrow(new IOException("Failed to open checkpoint"))
+        .when(spyDefragService).createDefragCheckpointMetadataManager(eq(checkpoint), eq(false));
+
+    org.junit.jupiter.api.Assertions.assertThrows(IOException.class,
+        () -> spyDefragService.createCheckpoint(snapshotInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
+    assertFalse(Files.exists(checkpointPath));
+  }
+
+  @Test
+  public void testCreateCheckpointCleansUpWhenStoreReturnsNull() throws Exception {
+    SnapshotInfo snapshotInfo = createMockSnapshotInfo(UUID.randomUUID(), "vol1", "bucket1", "snap1");
+    String dbName = "snapshot-" + UUID.randomUUID();
+    Path partialCheckpoint = tempDir.resolve("tmp_defrag").resolve(dbName + "_checkpoint_1");
+    Files.createDirectories(partialCheckpoint);
+    DBStore snapshotStore = mock(DBStore.class);
+    when(snapshotStore.getCheckpoint(anyString(), eq(true))).thenReturn(null);
+    when(snapshotStore.getDbLocation()).thenReturn(tempDir.resolve(dbName).toFile());
+    createMockSnapshot(snapshotInfo, snapshotStore);
+
+    org.junit.jupiter.api.Assertions.assertThrows(IOException.class,
+        () -> defragService.createCheckpoint(snapshotInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
+    assertFalse(Files.exists(partialCheckpoint));
+  }
+
+  @Test
   public void testDefragCheckpointMetadataManagerSkipsRocksDBMetrics() throws Exception {
     Path checkpointPath = tempDir.resolve("defrag-metrics-" + UUID.randomUUID());
     createTableContents(checkpointPath, "_metrics_");
@@ -1036,9 +1071,10 @@ public class TestSnapshotDefragService {
     try (MockedStatic<SnapshotUtils> mockedStatic = Mockito.mockStatic(SnapshotUtils.class)) {
       mockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(eq(ozoneManager), eq(chainManager),
           eq(snapshotInfo.getSnapshotId()))).thenReturn(snapshotInfo);
-      doReturn(Pair.of(false, 0)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
+      doReturn(Pair.of(false, 2)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
       assertFalse(spyDefragService.checkAndDefragSnapshot(chainManager, snapshotInfo.getSnapshotId()));
       verify(snapshotMetrics).incNumSnapshotDefragSnapshotSkipped();
+      verify(omSnapshotManager).deleteSnapshotCheckpointDirectories(snapshotInfo.getSnapshotId(), 1);
     }
   }
 

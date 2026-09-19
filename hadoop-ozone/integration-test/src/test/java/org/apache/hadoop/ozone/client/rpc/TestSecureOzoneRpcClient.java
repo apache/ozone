@@ -342,7 +342,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
   private void assertTokenIsNull(OmKeyInfo value) {
     value.getKeyLocationVersions()
         .forEach(
-            keyLocationInfoGroup -> keyLocationInfoGroup.getLocationList()
+            keyLocationInfoGroup -> keyLocationInfoGroup.createLocationList()
                 .forEach(
                     keyLocationInfo -> assertNull(keyLocationInfo
                         .getToken())));
