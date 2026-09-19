@@ -506,14 +506,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     failedTasks.addAll(executionFailedTasks);
 
     if (!successfulTasks.isEmpty()) {
-      // Make the derived-table RocksDB writes for this batch durable before the task-status
-      // cursors are committed to Derby. The cursor rows are fsync-durable while the RocksDB writes
-      // are not synced by default, so without this barrier a power loss can leave the durable
-      // cursors ahead of the (lost) derived data. Startup reconciliation then sees the derived
-      // and delta cursors at the same sequence number and never reprocesses, permanently
-      // dropping the applied update. Coalescing the barrier to once per batch syncs all successful
-      // task writes together before any cursor advances. If the sync fails, leave the cursors
-      // unadvanced so the batch is reprocessed instead of recording an un-durable success.
+      // Sync derived-data RocksDB WAL before committing task-status cursors to avoid durability gaps.
       if (syncReconDbLog()) {
         for (ReconOmTask.TaskResult result : successfulTasks) {
           String taskName = result.getTaskName();
@@ -529,15 +522,17 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       } else {
         for (ReconOmTask.TaskResult result : successfulTasks) {
           String taskName = result.getTaskName();
-          failedTasks.add(new ReconOmTask.TaskResult.Builder()
-              .setTaskName(taskName)
-              .setSubTaskSeekPositions(result.getSubTaskSeekPositions())
-              .build());
+          // Track task delta processing failure
+          taskMetrics.incrTaskDeltaProcessingFailures(taskName);
+
           ReconTaskStatusUpdater taskStatusUpdater =
               taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
           taskStatusUpdater.setLastTaskRunStatus(-1);
           taskStatusUpdater.recordRunCompletion();
         }
+        // Signal task reinitialization directly instead of retrying process(),
+        // because task writes were already applied and retrying would re-apply non-idempotent events.
+        tasksFailed.compareAndSet(false, true);
       }
     }
   }
@@ -545,20 +540,26 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   /**
    * Flushes and syncs the Recon derived-data RocksDB write-ahead log to stable storage so the
    * derived writes for the processed batch are durable before the task-status cursor advances.
-   * Returns {@code false} if the sync fails, in which case the caller must not advance the cursor,
-   * so that the cursor is never persisted ahead of the derived data.
+   *
+   * The cursor rows committed to Derby are fsync-durable while RocksDB writes are not synced by default.
+   * Without this barrier, a power loss can leave the durable cursors ahead of the (lost) derived data.
+   * On restart, reconciliation sees matching sequence numbers and never reprocesses the events,
+   * permanently dropping the applied updates.
+   *
+   * @return {@code true} if sync succeeded; {@code false} if dbStore is null or sync failed,
+   *         in which case callers must not advance cursors and must signal reinitialization.
    */
   private boolean syncReconDbLog() {
     DBStore dbStore = reconDBProvider.getDbStore();
     if (dbStore == null) {
-      return true;
+      LOG.error("Recon DB store is null; cannot sync WAL before advancing task status cursor.");
+      return false;
     }
     try {
       dbStore.flushLog(true);
       return true;
     } catch (RocksDatabaseException e) {
-      LOG.error("Failed to sync Recon DB WAL before advancing task status cursor; "
-          + "leaving cursor unadvanced so the batch is reprocessed.", e);
+      LOG.error("Failed to sync Recon DB WAL before advancing task status cursor.", e);
       return false;
     }
   }
