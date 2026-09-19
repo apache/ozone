@@ -152,6 +152,51 @@ public final class ContainerBalancerConfiguration {
           "OVER_REPLICATED CLOSED/QUASI_CLOSED and HEALTHY QUASI_CLOSED containers.")
   private boolean includeNonStandardContainers = false;
 
+  @Config(key = "hdds.container.balancer.profile.slow.datanodes.involved.max.percentage", type = ConfigType.INT,
+      defaultValue = "10", tags = {ConfigTag.BALANCER},
+      description = "SLOW profile: max percent of eligible datanodes used in one iteration.")
+  private int profileSlowDatanodesMaxPercentage = 10;
+
+  @Config(key = "hdds.container.balancer.profile.slow.size.entering.target.max", type = ConfigType.SIZE,
+      defaultValue = "10GB", tags = {ConfigTag.BALANCER},
+      description = "SLOW profile: max bytes a target datanode may receive in one iteration.")
+  private long profileSlowMaxSizeEnteringTarget = 10 * OzoneConsts.GB;
+
+  @Config(key = "hdds.container.balancer.profile.slow.size.leaving.source.max", type = ConfigType.SIZE,
+      defaultValue = "10GB", tags = {ConfigTag.BALANCER},
+      description = "SLOW profile: max bytes a source datanode may send in one iteration.")
+  private long profileSlowMaxSizeLeavingSource = 10 * OzoneConsts.GB;
+
+  @Config(key = "hdds.container.balancer.profile.medium.datanodes.involved.max.percentage", type = ConfigType.INT,
+      defaultValue = "20", tags = {ConfigTag.BALANCER},
+      description = "MEDIUM profile: max percent of eligible datanodes used in one iteration.")
+  private int profileMediumDatanodesMaxPercentage = 20;
+
+  @Config(key = "hdds.container.balancer.profile.medium.size.entering.target.max", type = ConfigType.SIZE,
+      defaultValue = "26GB", tags = {ConfigTag.BALANCER},
+      description = "MEDIUM profile: max bytes a target datanode may receive in one iteration.")
+  private long profileMediumMaxSizeEnteringTarget = 26 * OzoneConsts.GB;
+
+  @Config(key = "hdds.container.balancer.profile.medium.size.leaving.source.max", type = ConfigType.SIZE,
+      defaultValue = "26GB", tags = {ConfigTag.BALANCER},
+      description = "MEDIUM profile: max bytes a source datanode may send in one iteration.")
+  private long profileMediumMaxSizeLeavingSource = 26 * OzoneConsts.GB;
+
+  @Config(key = "hdds.container.balancer.profile.fast.datanodes.involved.max.percentage", type = ConfigType.INT,
+      defaultValue = "40", tags = {ConfigTag.BALANCER},
+      description = "FAST profile: max percent of eligible datanodes used in one iteration.")
+  private int profileFastDatanodesMaxPercentage = 40;
+
+  @Config(key = "hdds.container.balancer.profile.fast.size.entering.target.max", type = ConfigType.SIZE,
+      defaultValue = "100GB", tags = {ConfigTag.BALANCER},
+      description = "FAST profile: max bytes a target datanode may receive in one iteration.")
+  private long profileFastMaxSizeEnteringTarget = 100 * OzoneConsts.GB;
+
+  @Config(key = "hdds.container.balancer.profile.fast.size.leaving.source.max", type = ConfigType.SIZE,
+      defaultValue = "100GB", tags = {ConfigTag.BALANCER},
+      description = "FAST profile: max bytes a source datanode may send in one iteration.")
+  private long profileFastMaxSizeLeavingSource = 100 * OzoneConsts.GB;
+
   /**
    * Gets the threshold value for Container Balancer.
    *
@@ -261,7 +306,21 @@ public final class ContainerBalancerConfiguration {
    * @return maximum datanodes that may be involved in one iteration
    */
   public int computeMaxDatanodesToInvolvePerIteration(int eligibleDatanodeCount) {
-    return (int) (getMaxDatanodesRatioToInvolvePerIteration() * eligibleDatanodeCount);
+    return computeMaxDatanodesToInvolvePerIteration(
+        getMaxDatanodesRatioToInvolvePerIteration(), eligibleDatanodeCount);
+  }
+
+  /**
+   * Computes the maximum number of datanodes that may be involved in an
+   * iteration for the given percentage and eligible datanode count.
+   *
+   * @param maxDatanodesPercentage percentage of eligible datanodes to involve
+   * @param eligibleDatanodeCount number of healthy, in-service datanodes
+   * @return maximum datanodes that may be involved in one iteration
+   */
+  public static int computeMaxDatanodesToInvolvePerIteration(
+      double maxDatanodesPercentage, int eligibleDatanodeCount) {
+    return (int) (maxDatanodesPercentage * eligibleDatanodeCount);
   }
 
   /**
@@ -465,6 +524,48 @@ public final class ContainerBalancerConfiguration {
    */
   public void setIncludeNonStandardContainers(boolean enable) {
     includeNonStandardContainers = enable;
+  }
+
+  /** Returns the preset max datanode involvement percent for the given profile. */
+  public int getProfileDatanodesMaxPercentage(ContainerBalancerProfile profile) {
+    switch (profile) {
+    case SLOW:
+      return profileSlowDatanodesMaxPercentage;
+    case MEDIUM:
+      return profileMediumDatanodesMaxPercentage;
+    case FAST:
+      return profileFastDatanodesMaxPercentage;
+    default:
+      throw new IllegalArgumentException("Unknown profile: " + profile);
+    }
+  }
+
+  /** Returns the preset max bytes entering a target datanode per iteration for the given profile. */
+  public long getProfileMaxSizeEnteringTarget(ContainerBalancerProfile profile) {
+    switch (profile) {
+    case SLOW:
+      return profileSlowMaxSizeEnteringTarget;
+    case MEDIUM:
+      return profileMediumMaxSizeEnteringTarget;
+    case FAST:
+      return profileFastMaxSizeEnteringTarget;
+    default:
+      throw new IllegalArgumentException("Unknown profile: " + profile);
+    }
+  }
+
+  /** Returns the preset max bytes leaving a source datanode per iteration for the given profile. */
+  public long getProfileMaxSizeLeavingSource(ContainerBalancerProfile profile) {
+    switch (profile) {
+    case SLOW:
+      return profileSlowMaxSizeLeavingSource;
+    case MEDIUM:
+      return profileMediumMaxSizeLeavingSource;
+    case FAST:
+      return profileFastMaxSizeLeavingSource;
+    default:
+      throw new IllegalArgumentException("Unknown profile: " + profile);
+    }
   }
 
   @Override

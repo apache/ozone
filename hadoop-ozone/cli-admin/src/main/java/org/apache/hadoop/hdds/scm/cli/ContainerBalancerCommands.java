@@ -54,11 +54,36 @@ import picocli.CommandLine.Command;
  *        involved in balancing
  *      ozone admin containerbalancer start -s 10
  *        start balancer with maximum size of 10GB to move in one iteration
+ * To estimate (dry-run):
+ *      ozone admin containerbalancer dry-run
+ *      [ --profile {@literal <slow|medium|fast>} ]
+ *      [ -t/--threshold {@literal <threshold>} ]
+ *      [ -d/--max-datanodes-percentage-to-involve-per-iteration {@literal <percent>} ]
+ *      [ -s/--max-size-to-move-per-iteration-in-gb {@literal <gb>} ]
+ *      [ -e/--max-size-entering-target-in-gb {@literal <gb>} ]
+ *      [ -l/--max-size-leaving-source-in-gb {@literal <gb>} ]
+ *      [ --balancing-iteration-interval-minutes {@literal <minutes>} ]
+ *      [ --move-timeout-minutes {@literal <minutes>} ]
+ *      [ --move-replication-timeout-minutes {@literal <minutes>} ]
+ *      [ --include-datanodes {@literal <host1,host2,...>} ]
+ *      [ --exclude-datanodes {@literal <host1,host2,...>} ]
+ *      Examples:
+ *      ozone admin containerbalancer dry-run
+ *        estimate bytes to move, number of iterations, per-iteration throughput, and duration for
+ *        SLOW, MEDIUM, and FAST profiles (does not start the balancer)
+ *      ozone admin containerbalancer dry-run --profile medium
+ *        estimate for the MEDIUM profile only
+ *      ozone admin containerbalancer dry-run --profile fast -t 5
+ *        estimate FAST profile with a 5% threshold
  * To stop:
  *      ozone admin containerbalancer stop
  * </pre>
  *
  * <p>DESCRIPTION
+ * <p>Dry-run fetches datanode usage from SCM and estimates from
+ * local configurations and cluster analysis made. It does not start the balancer. Start does not yet
+ * support {@code --profile}, compare dry-run profiles to the config you plan
+ * to pass on start, or wait until profile support is added to start. dry-run produces upper-bound estimates.
  * <p>The threshold parameter is a fraction in the range of (1%, 100%) with a
  * default value of 10%. The threshold sets a target for whether the cluster
  * is balanced. A cluster is balanced if for each datanode, the utilization
@@ -82,7 +107,8 @@ import picocli.CommandLine.Command;
     subcommands = {
         ContainerBalancerStartSubcommand.class,
         ContainerBalancerStopSubcommand.class,
-        ContainerBalancerStatusSubcommand.class
+        ContainerBalancerStatusSubcommand.class,
+        ContainerBalancerDryRunSubcommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
 public class ContainerBalancerCommands implements AdminSubcommand {
