@@ -88,27 +88,28 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "Number of containers currently in the over replicated queue");
 
   // Setup metric names and descriptions for Container Lifecycle states
-  private static final Map<LifeCycleState, MetricsInfo> LIFECYCLE_STATE_METRICS
-      = Collections.unmodifiableMap(
-          new LinkedHashMap<LifeCycleState, MetricsInfo>() {{
-            for (LifeCycleState s : LifeCycleState.values()) {
-              String name = CaseFormat.UPPER_UNDERSCORE
-                  .to(CaseFormat.UPPER_CAMEL, s.toString());
-              String metric = name + "Containers";
-              String description = "Current count of Containers in " + name +
-                  " state";
-              put(s, Interns.info(metric, description));
-            }
-          }});
+  private static final Map<LifeCycleState, MetricsInfo> LIFECYCLE_STATE_METRICS;
 
   // Setup metric names and descriptions for
   private static final Map<ContainerHealthState, MetricsInfo>
-      CONTAINER_HEALTH_STATE_METRICS = Collections.unmodifiableMap(
-          new LinkedHashMap<ContainerHealthState, MetricsInfo>() {{
-            for (ContainerHealthState s :  ContainerHealthState.values()) {
-              put(s, Interns.info(s.getMetricName(), s.getDescription()));
-            }
-          }});
+      CONTAINER_HEALTH_STATE_METRICS;
+
+  static {
+    Map<LifeCycleState, MetricsInfo> lifecycleStateMetrics = new LinkedHashMap<>();
+    for (LifeCycleState state : LifeCycleState.values()) {
+      String name = CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, state.toString());
+      String metric = name + "Containers";
+      String description = "Current count of Containers in " + name + " state";
+      lifecycleStateMetrics.put(state, Interns.info(metric, description));
+    }
+    LIFECYCLE_STATE_METRICS = Collections.unmodifiableMap(lifecycleStateMetrics);
+
+    Map<ContainerHealthState, MetricsInfo> containerHealthStateMetrics = new LinkedHashMap<>();
+    for (ContainerHealthState state : ContainerHealthState.values()) {
+      containerHealthStateMetrics.put(state, Interns.info(state.getMetricName(), state.getDescription()));
+    }
+    CONTAINER_HEALTH_STATE_METRICS = Collections.unmodifiableMap(containerHealthStateMetrics);
+  }
 
   @Metric("Number of replication commands sent.")
   private MutableCounterLong replicationCmdsSentTotal;
