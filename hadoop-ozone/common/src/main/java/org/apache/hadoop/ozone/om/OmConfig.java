@@ -192,7 +192,8 @@ public class OmConfig extends ReconfigurableConfig {
           "datanode first) locally using its cached cluster topology, instead " +
           "of asking SCM to sort on every allocateBlock. Defaults to false so " +
           "SCM performs the sort. Enable this to offload the sort from SCM " +
-          "when multiple OM services share a single SCM service."
+          "when multiple OM services share a single SCM service. SCM still sorts if OM has no cached topology " +
+          "or cannot resolve the client. If OM's topology lacks a pipeline datanode, the pipeline order is preserved."
   )
   private boolean sortDatanodesForWriteEnabled;
 
