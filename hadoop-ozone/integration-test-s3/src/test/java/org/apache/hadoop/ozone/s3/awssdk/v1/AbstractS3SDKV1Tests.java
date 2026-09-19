@@ -2257,6 +2257,27 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals(ErrorType.Client, ase2.getErrorType());
     assertEquals(HttpURLConnection.HTTP_NOT_FOUND, ase2.getStatusCode());
     assertEquals("NoSuchBucket", ase2.getErrorCode());
+
+    BucketLifecycleConfiguration pastDateConfig = new BucketLifecycleConfiguration();
+    List<BucketLifecycleConfiguration.Rule> pastDateRules = new ArrayList<>();
+    BucketLifecycleConfiguration.Rule pastDateRule = new BucketLifecycleConfiguration.Rule()
+        .withId("past-date")
+        .withPrefix("logs/")
+        .withStatus(BucketLifecycleConfiguration.ENABLED)
+        .withExpirationDate(Date.from(Instant.parse("2020-01-01T00:00:00Z")));
+    pastDateRules.add(pastDateRule);
+    pastDateConfig.setRules(pastDateRules);
+    SetBucketLifecycleConfigurationRequest pastDateRequest =
+        new SetBucketLifecycleConfigurationRequest(bucketName, pastDateConfig);
+
+    AmazonServiceException ase3 = assertThrows(AmazonServiceException.class,
+        () -> s3Client.setBucketLifecycleConfiguration(pastDateRequest));
+    assertEquals(ErrorType.Client, ase3.getErrorType());
+    assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, ase3.getStatusCode());
+    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), ase3.getErrorCode());
+    assertTrue(ase3.getErrorMessage().contains("must be in the future"),
+        "The client should receive OM's detailed message explaining the date is in the past, got: "
+            + ase3.getErrorMessage());
   }
 
   @Test

@@ -142,7 +142,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
       // translation maps to InvalidRequest. AWS S3 uses InvalidArgument for a rejected lifecycle
       // configuration, so only this validation step is remapped.
       if (ex.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, bucketName, ex);
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, bucketName, ex).withMessage(ex.getMessage());
       }
       throw S3ErrorTable.newError(bucketName, ex);
     }
@@ -152,6 +152,9 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     } catch (OMException ex) {
       // OM raises INVALID_REQUEST for server-side conditions as well, such as a bucket layout
       // mismatch, so its result codes keep the shared translation instead of being remapped.
+      if (ex.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
+        throw S3ErrorTable.newError(bucketName, ex).withMessage(ex.getMessage());
+      }
       throw S3ErrorTable.newError(bucketName, ex);
     }
     return Response.ok().build();
