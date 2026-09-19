@@ -48,7 +48,8 @@ public class OzoneClientProducer {
 
   @PreDestroy
   public void destroy() throws IOException {
-    LOG.debug("{}: Clearing thread-local auth", this);
+    LOG.debug("{}: Clearing thread-local S3 request context", this);
     client.getObjectStore().getClientProxy().clearThreadLocalS3Auth();
+    client.getObjectStore().getClientProxy().clearThreadLocalReadConsistency();
   }
 }

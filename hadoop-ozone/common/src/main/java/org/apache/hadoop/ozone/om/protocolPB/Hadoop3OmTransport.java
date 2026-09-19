@@ -64,7 +64,7 @@ public class Hadoop3OmTransport implements OmTransport {
     this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider<>(
             conf, ugi, omServiceId, OzoneManagerProtocolPB.class);
 
-    boolean followerReadEnabled = conf.getBoolean(
+    boolean defaultFollowerReadEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT);
 
@@ -90,7 +90,7 @@ public class Hadoop3OmTransport implements OmTransport {
         new HadoopRpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider,
             defaultFollowerReadConsistency,
             defaultLeaderReadConsistency,
-            followerReadEnabled);
+            defaultFollowerReadEnabled);
     this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
   }
 
