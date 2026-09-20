@@ -507,29 +507,24 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
     if (!successfulTasks.isEmpty()) {
       // Sync derived-data RocksDB WAL before committing task-status cursors to avoid durability gaps.
-      if (syncReconDbLog()) {
-        for (ReconOmTask.TaskResult result : successfulTasks) {
-          String taskName = result.getTaskName();
-          // Track task delta processing success
-          taskMetrics.incrTaskDeltaProcessingSuccess(taskName);
+      boolean synced = syncReconDbLog();
+      for (ReconOmTask.TaskResult result : successfulTasks) {
+        String taskName = result.getTaskName();
+        ReconTaskStatusUpdater taskStatusUpdater =
+            taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
 
-          ReconTaskStatusUpdater taskStatusUpdater =
-              taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
+        if (synced) {
+          taskMetrics.incrTaskDeltaProcessingSuccess(taskName);
           taskStatusUpdater.setLastTaskRunStatus(0);
           taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
-          taskStatusUpdater.recordRunCompletion();
-        }
-      } else {
-        for (ReconOmTask.TaskResult result : successfulTasks) {
-          String taskName = result.getTaskName();
-          // Track task delta processing failure
+        } else {
           taskMetrics.incrTaskDeltaProcessingFailures(taskName);
-
-          ReconTaskStatusUpdater taskStatusUpdater =
-              taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
           taskStatusUpdater.setLastTaskRunStatus(-1);
-          taskStatusUpdater.recordRunCompletion();
         }
+        taskStatusUpdater.recordRunCompletion();
+      }
+
+      if (!synced) {
         // Signal task reinitialization directly instead of retrying process(),
         // because task writes were already applied and retrying would re-apply non-idempotent events.
         tasksFailed.compareAndSet(false, true);
