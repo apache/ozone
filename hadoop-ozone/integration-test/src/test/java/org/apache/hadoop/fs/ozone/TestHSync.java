@@ -588,6 +588,7 @@ public class TestHSync {
       try (FSDataOutputStream os = fs.create(key1, true)) {
         os.write(1);
         os.hsync();
+        // Wait for double buffer flush to avoid flakiness because RDB iterator bypasses table cache
         cluster.getOzoneManager().awaitDoubleBufferFlush();
         // There should be 1 key in openFileTable
         assertThat(getOpenKeyInfo(BUCKET_LAYOUT))
