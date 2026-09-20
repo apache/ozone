@@ -143,8 +143,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     Preconditions.checkArgument(srcPath.getTrashRoot().
         toString().equals(dstPath.getTrashRoot().toString()));
     RenameIterator iterator = new RenameIterator(src, dst);
-    iterator.iterate();
-    return true;
+    return iterator.iterate();
   }
 
   private boolean renameFSO(OFSPath srcPath, OFSPath dstPath) {
@@ -173,8 +172,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       return deleteFSO(srcPath);
     }
     DeleteIterator iterator = new DeleteIterator(path, true);
-    iterator.iterate();
-    return true;
+    return iterator.iterate();
   }
 
   private boolean deleteFSO(OFSPath srcPath) {
@@ -516,11 +514,15 @@ public class TrashOzoneFileSystem extends FileSystem {
 
         OzoneManagerProtocolProtos.OMRequest omRequest =
             getRenameKeyRequest(src, dst);
+        if (omRequest == null) {
+          return false;
+        }
         try {
           ozoneManager.getMetrics().incNumTrashFilesRenames();
           submitRequest(omRequest);
         } catch (Throwable e) {
           LOG.error("Couldn't send rename request.", e);
+          return false;
         }
 
       }
@@ -579,11 +581,15 @@ public class TrashOzoneFileSystem extends FileSystem {
             ozoneConfiguration);
         OzoneManagerProtocolProtos.OMRequest omRequest =
             getDeleteKeysRequest(path);
+        if (omRequest == null) {
+          return false;
+        }
         try {
           ozoneManager.getMetrics().incNumTrashFilesDeletes();
           submitRequest(omRequest);
         } catch (Throwable e) {
-          LOG.error("Couldn't send rename request.", e);
+          LOG.error("Couldn't send delete request.", e);
+          return false;
         }
       }
       return true;

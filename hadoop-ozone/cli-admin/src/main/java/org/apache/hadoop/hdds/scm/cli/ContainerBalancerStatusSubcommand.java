@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -34,6 +35,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeFailureCountProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import picocli.CommandLine;
@@ -232,6 +235,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     if (leavingDataNodeList.isEmpty()) {
       leavingDataNodeList = " -" + System.lineSeparator();
     }
+    String failures = formatFailures(containerMovesFailed, iterationStatusInfo.getContainerMoveFailuresList());
     return String.format(
             "%-50s %s%n" +
                     "%-50s %s%n" +
@@ -243,6 +247,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
+                    "%s" +
                     "%-50s %n%s" +
                     "%-50s %n%s",
             "Key", "Value",
@@ -256,8 +261,46 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             "Already moved containers", containerMovesCompleted,
             "Failed to move containers", containerMovesFailed,
             "Failed to move containers by timeout", containerMovesTimeout,
+            failures,
             "Entered data to nodes", enteringDataNodeList,
             "Exited data from nodes", leavingDataNodeList);
+  }
+
+  private String formatFailures(long containerMovesFailed, List<ContainerMoveFailureDetailProto> failures) {
+    if (containerMovesFailed > 0 && failures.isEmpty()) {
+      return String.format("%-50s %s%n", "Failed container moves", "(no breakdown available)");
+    }
+    if (failures.isEmpty()) {
+      return "";
+    }
+    List<ContainerMoveFailureDetailProto> sorted = failures.stream()
+        .sorted(Comparator.comparingLong(ContainerMoveFailureDetailProto::getCount).reversed()
+            .thenComparing(ContainerMoveFailureDetailProto::getReason))
+        .collect(Collectors.toList());
+    StringBuilder builder = new StringBuilder();
+    builder.append(String.format("%-50s %n", "Failed container moves"));
+    for (ContainerMoveFailureDetailProto failure : sorted) {
+      builder.append(String.format("  %-48s %d%n", failure.getReason(), failure.getCount()));
+      if (!failure.getSourceFailureCountsList().isEmpty()) {
+        builder.append(String.format("    %-46s %n", "Source datanodes"));
+        for (NodeFailureCountProto src : failure.getSourceFailureCountsList()) {
+          builder.append(String.format("      %-44s %d%n", formatDatanodeLabel(src), src.getCount()));
+        }
+      }
+      if (!failure.getTargetFailureCountsList().isEmpty()) {
+        builder.append(String.format("    %-46s %n", "Target datanodes"));
+        for (NodeFailureCountProto tgt : failure.getTargetFailureCountsList()) {
+          builder.append(String.format("      %-44s %d%n", formatDatanodeLabel(tgt), tgt.getCount()));
+        }
+      }
+    }
+    return builder.toString();
+  }
+
+  private static String formatDatanodeLabel(NodeFailureCountProto node) {
+    return node.hasHostname()
+        ? node.getHostname() + " (" + node.getDatanodeUuid() + ")"
+        : node.getDatanodeUuid();
   }
 
 }
