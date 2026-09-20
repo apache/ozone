@@ -306,11 +306,14 @@ public class TestOzoneManagerRatisServer {
     assertEquals(600_000, retryCacheExpiryMillis(bareValueConf, ratisDir));
     assertThat(logCapturer.getOutput()).contains(deprecationWarning(600_000));
 
-    // The deprecated key is applied last, so it wins when both are set.
+    // An explicitly set current key wins over the deprecated one, which is then reported as ignored.
+    logCapturer.clearOutput();
     OzoneConfiguration bothKeysConf = new OzoneConfiguration();
     bothKeysConf.set(CURRENT_RETRY_CACHE_KEY, "42s");
     bothKeysConf.set(DEPRECATED_RETRY_CACHE_KEY, "17s");
-    assertEquals(17_000, retryCacheExpiryMillis(bothKeysConf, ratisDir));
+    assertEquals(42_000, retryCacheExpiryMillis(bothKeysConf, ratisDir));
+    assertThat(logCapturer.getOutput()).contains(DEPRECATED_RETRY_CACHE_KEY + " is deprecated and ignored, because "
+        + CURRENT_RETRY_CACHE_KEY + " is set.");
   }
 
   private static String deprecationWarning(long expectedMillis) {

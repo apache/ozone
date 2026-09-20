@@ -49,6 +49,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.RatisConfUtils;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -855,10 +856,14 @@ public final class OzoneManagerRatisServer {
     if (conf.get(RETRY_CACHE_TIMEOUT_DEPRECATED_KEY) == null) {
       return;
     }
+    final String currentKey = OZONE_OM_HA_PREFIX + "." + RaftServerConfigKeys.RetryCache.EXPIRY_TIME_KEY;
+    if (OzoneConfiguration.of(conf).isExplicitlySet(currentKey)) {
+      LOG.warn("{} is deprecated and ignored, because {} is set.", RETRY_CACHE_TIMEOUT_DEPRECATED_KEY, currentKey);
+      return;
+    }
     // A value without a unit suffix is read as milliseconds, as the deprecated key always has been.
     final TimeDuration timeout = TimeDuration.valueOf(
         conf.getTimeDuration(RETRY_CACHE_TIMEOUT_DEPRECATED_KEY, 0, TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
-    final String currentKey = OZONE_OM_HA_PREFIX + "." + RaftServerConfigKeys.RetryCache.EXPIRY_TIME_KEY;
     // Spell out the resolved value, so it can be copied to the current key without changing meaning.
     LOG.warn("{} is deprecated. Instead, use {} = {}.", RETRY_CACHE_TIMEOUT_DEPRECATED_KEY, currentKey, timeout);
     RaftServerConfigKeys.RetryCache.setExpiryTime(properties, timeout);
