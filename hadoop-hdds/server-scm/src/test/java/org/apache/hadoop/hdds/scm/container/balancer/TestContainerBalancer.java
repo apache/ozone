@@ -466,10 +466,10 @@ public class TestContainerBalancer {
    */
   @Test
   public void testRejectedStartDoesNotModifyStartedAt() throws Exception {
-    // The test first starts and immediately stops the balancer normally.This creates a realistic "previous state"
+    // The test first starts and immediately stops the balancer normally. This creates a realistic "previous state"
     // in system memory and later trigger a bad request and verify that startedAt remains identical to startedAtBefore,
     // rather than being wrongly overwritten with "now", which would make startedAt come after stoppedAt which resulted
-    // negative balancing duration.
+    // in a negative balancing duration.
     startBalancer(balancerConfiguration);
     assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
     stopBalancer();
@@ -485,18 +485,14 @@ public class TestContainerBalancer {
     // Pause so that system time advances before the second start attempt so a timestamp overwrite becomes measurable.
     Thread.sleep(20);
 
-    // A start that is rejected during validation. Here we used an invalid config this is just one of many rejection
+    // A start that is rejected during validation. Here we used an invalid config, this is just one of many rejection
     // paths (safe mode, non-leader SCM, already running, etc.).
-    OzoneConfiguration invalidConf = new OzoneConfiguration();
-    invalidConf.setTimeDuration(
-        "hdds.container.balancer.move.replication.timeout", 60, TimeUnit.MINUTES);
-    invalidConf.setTimeDuration(
-        "hdds.container.balancer.move.timeout", 59, TimeUnit.MINUTES);
-    ContainerBalancerConfiguration invalidConfig =
-        invalidConf.getObject(ContainerBalancerConfiguration.class);
 
+    balancerConfiguration.setMoveReplicationTimeout(TimeUnit.MINUTES.toMillis(60));
+    balancerConfiguration.setMoveTimeout(TimeUnit.MINUTES.toMillis(59));
     assertThrows(InvalidContainerBalancerConfigurationException.class,
-        () -> containerBalancer.startBalancer(invalidConfig));
+        () -> containerBalancer.startBalancer(balancerConfiguration));
+
     // The rejected start must leave the balancer STOPPED.
     assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
 
