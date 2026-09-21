@@ -86,6 +86,7 @@ public class TestOMMetadataReader {
   }
 
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testGetClientAddress() throws Exception {
     try (MockedStatic<Server> ipcServerStaticMock = mockStatic(Server.class)) {
       // given
