@@ -47,6 +47,10 @@ public final class S3STSUtils {
 
   public static final String OZONE_STATIC_ACCOUNT_ID = "123456789012";
 
+  public static final String DURATION_VALIDATION_ERROR_MESSAGE =
+      "Invalid Value: DurationSeconds must be a number between " + MIN_DURATION_SECONDS + " and " +
+          MAX_DURATION_SECONDS + " seconds";
+
   private S3STSUtils() {
   }
 
@@ -103,7 +107,7 @@ public final class S3STSUtils {
    */
   public static int validateDuration(int durationSeconds) throws OMException {
     if (durationSeconds < MIN_DURATION_SECONDS || durationSeconds > MAX_DURATION_SECONDS) {
-      throw new OMException(durationValidationErrorMessage(), INVALID_REQUEST);
+      throw new OMException(DURATION_VALIDATION_ERROR_MESSAGE, INVALID_REQUEST);
     }
 
     return durationSeconds;
@@ -124,14 +128,9 @@ public final class S3STSUtils {
     try {
       value = Integer.parseInt(durationSeconds);
     } catch (NumberFormatException e) {
-      throw new OMException(durationValidationErrorMessage(), INVALID_REQUEST);
+      throw new OMException(DURATION_VALIDATION_ERROR_MESSAGE, INVALID_REQUEST);
     }
     return validateDuration(value);
-  }
-
-  private static String durationValidationErrorMessage() {
-    return "Invalid Value: DurationSeconds must be a number between " + MIN_DURATION_SECONDS + " and " +
-        MAX_DURATION_SECONDS + " seconds";
   }
 
   /**
