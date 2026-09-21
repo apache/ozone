@@ -400,18 +400,6 @@ public class DatanodeStateMachine implements Closeable {
     }
   }
 
-  /**
-   * Terminates the datanode when startup cannot make progress and the state
-   * machine loop cannot drive the shutdown itself (for example when container
-   * initialization has stalled on a thread that ignores interruption). Invoked
-   * from the {@link org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer}
-   * startup watchdog.
-   */
-  public void triggerFatalShutdown(String reason) {
-    LOG.error("DatanodeStateMachine shutdown triggered: {}", reason);
-    hddsDatanodeStopService.stopService();
-  }
-
   public void handleFatalVolumeFailures() {
     LOG.error("DatanodeStateMachine Shutdown due to too many bad volumes, "
         + "check " + DatanodeConfiguration.FAILED_DATA_VOLUMES_TOLERATED_KEY

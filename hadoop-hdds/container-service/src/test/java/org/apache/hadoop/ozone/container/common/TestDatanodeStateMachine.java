@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -244,6 +245,8 @@ public class TestDatanodeStateMachine {
   @Test
   @Timeout(60)
   void testStalledInitializationTimeoutTerminatesDatanode() throws Exception {
+    ExitUtil.disableSystemExit();
+    ExitUtil.resetFirstExitException();
     conf.setFromObject(conf.getObject(ReplicationConfig.class).setPort(0));
     // Enable the startup watchdog with a short timeout.
     conf.setTimeDuration(DatanodeConfiguration.CONTAINER_INIT_TIMEOUT_KEY, 2, TimeUnit.SECONDS);
@@ -251,14 +254,8 @@ public class TestDatanodeStateMachine {
     ContainerTestUtils.initializeDatanodeLayout(conf, datanodeDetails);
     CountDownLatch initializing = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
-    CountDownLatch shutdown = new CountDownLatch(1);
-    HddsDatanodeStopService stopService = mock(HddsDatanodeStopService.class);
-    doAnswer(invocation -> {
-      shutdown.countDown();
-      return null;
-    }).when(stopService).stopService();
     DatanodeStateMachine stateMachine = new DatanodeStateMachine(null, datanodeDetails, conf, null, null,
-        stopService, new ReconfigurationHandler("DN", conf, op -> { }));
+        mock(HddsDatanodeStopService.class), new ReconfigurationHandler("DN", conf, op -> { }));
     try {
       OzoneContainer container = stateMachine.getContainer();
       XceiverServerSpi writeChannel = spy(container.getWriteChannel());
@@ -276,13 +273,16 @@ public class TestDatanodeStateMachine {
       stateMachine.startDaemon();
       assertThat(initializing.await(10, TimeUnit.SECONDS)).isTrue();
 
-      // The watchdog must terminate the datanode even though writeChannel.start()
-      // never returns and never throws.
-      assertThat(shutdown.await(20, TimeUnit.SECONDS)).isTrue();
-      verify(stopService, times(1)).stopService();
+      // The watchdog must enter JVM shutdown even though writeChannel.start()
+      // never returns and never throws. Going straight to ExitUtil (System.exit)
+      // avoids the synchronous stop() path, which could itself block on the disk.
+      GenericTestUtils.waitFor(ExitUtil::terminateCalled, 100, 20000);
+      assertThat(ExitUtil.getFirstExitException().getExitCode()).isEqualTo(1);
+      assertThat(ExitUtil.getFirstExitException().getMessage()).contains("did not complete within");
     } finally {
       release.countDown();
       stateMachine.stopDaemon();
+      ExitUtil.resetFirstExitException();
     }
   }
 
