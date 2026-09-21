@@ -538,8 +538,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       String snapTableKey, UUID expectedPreviousSnapshotId, Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap) {
 
     // Group purge paths by their owning bucket so that every submitted purge transaction contains paths from a single
-    // bucket only. This keeps the apply side acquiring exactly one bucket write lock per transaction; combined with
-    // apply-side chunking within that lock, a large background directory purge cannot starve readers on other buckets.
+    // bucket only. This keeps the apply side acquiring exactly one bucket write lock per transaction, so a large
+    // background directory purge cannot block readers on other buckets.
     Map<VolumeBucketId, List<PurgePathRequest>> requestsByBucket = new LinkedHashMap<>();
     for (PurgePathRequest req : requests) {
       requestsByBucket.computeIfAbsent(new VolumeBucketId(req.getVolumeId(), req.getBucketId()),
@@ -558,7 +558,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         if (batchBytes + reqSize > ratisByteLimit && !purgePathRequestBatch.isEmpty()) {
           OzoneManagerProtocolProtos.OMResponse resp =
               submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
-          if (!resp.getSuccess()) {
+          if (resp == null || !resp.getSuccess()) {
             return Collections.emptyList();
           }
           responses.add(resp);
@@ -575,7 +575,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       if (!purgePathRequestBatch.isEmpty()) {
         OzoneManagerProtocolProtos.OMResponse resp =
             submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
-        if (!resp.getSuccess()) {
+        if (resp == null || !resp.getSuccess()) {
           return Collections.emptyList();
         }
         responses.add(resp);

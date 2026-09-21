@@ -59,7 +59,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,9 +97,14 @@ import org.slf4j.LoggerFactory;
  * <pre>
  *   mvn -pl :ozone-integration-test test -DskipShade -DskipRecon \
  *     -Dtest=TestOmMixedWorkloadUnderDeletionBench -Dgroups=benchmark -Dexcluded-test-groups= \
- *     -Dsurefire.failIfNoSpecifiedTests=false
+ *     -Dsurefire.failIfNoSpecifiedTests=false -Djunit.jupiter.execution.timeout.default=20m
  * </pre>
- * Tunables: {@code bench.backlogDirs} (default 80), {@code bench.backlogFilesPerDir} (default 1000),
+ * <p>The timeout override belongs in the run command rather than a per-test annotation: the repository-wide
+ * {@code junit.jupiter.execution.timeout.default} is 5 minutes, which is shorter than staging the backlog plus the
+ * benchmark's own 900s phase-1 drain deadline, so without it a run is killed mid-drain before that deadline reports
+ * anything.
+ *
+ * <p>Tunables: {@code bench.backlogDirs} (default 80), {@code bench.backlogFilesPerDir} (default 1000),
  * {@code bench.backlogNonEmptyEvery} (default 3 — every 3rd backlog file is written with a block, the rest are
  * empty so a large backlog stays cheap to stage), {@code bench.workloadDirs} (default 20) and
  * {@code bench.workloadFilesPerDir} (default 100) sizing the stable dataset the read ops resolve against,
@@ -156,17 +160,30 @@ public class TestOmMixedWorkloadUnderDeletionBench {
    * mini-cluster unconditionally enables {@link CodecBuffer} leak detection (a per-allocation finalizer), and the test
    * log config runs the {@code CodecBuffer}/managed-RocksDB loggers at DEBUG/TRACE, which capture a full stack trace on
    * every buffer allocation. Neither happens in a production OM running at INFO.
+   *
+   * <p>Both settings are JVM-global, so the returned action must be run once the benchmark is done to keep them from
+   * leaking into any later test sharing the same Maven fork.
    */
-  private static void stripTestOnlyOverhead() {
+  private static Runnable stripTestOnlyOverhead() {
+    org.apache.log4j.Logger codecBufferLogger =
+        org.apache.log4j.Logger.getLogger("org.apache.hadoop.hdds.utils.db.CodecBuffer");
+    org.apache.log4j.Logger managedRocksLogger =
+        org.apache.log4j.Logger.getLogger("org.apache.hadoop.hdds.utils.db.managed");
+    org.apache.log4j.Level codecBufferLevel = codecBufferLogger.getLevel();
+    org.apache.log4j.Level managedRocksLevel = managedRocksLogger.getLevel();
+
     CodecBuffer.disableLeakDetection();
-    org.apache.log4j.Logger.getLogger("org.apache.hadoop.hdds.utils.db.CodecBuffer")
-        .setLevel(org.apache.log4j.Level.INFO);
-    org.apache.log4j.Logger.getLogger("org.apache.hadoop.hdds.utils.db.managed")
-        .setLevel(org.apache.log4j.Level.INFO);
+    codecBufferLogger.setLevel(org.apache.log4j.Level.INFO);
+    managedRocksLogger.setLevel(org.apache.log4j.Level.INFO);
+
+    return () -> {
+      CodecBuffer.enableLeakDetection();
+      codecBufferLogger.setLevel(codecBufferLevel);
+      managedRocksLogger.setLevel(managedRocksLevel);
+    };
   }
 
   @Test
-  @Timeout(value = 20, unit = TimeUnit.MINUTES)
   public void benchmarkMixedWorkloadUnderDeletionLoad() throws Exception {
     final String profileEvent = System.getProperty("bench.profile.event", "");
 
@@ -216,7 +233,7 @@ public class TestOmMixedWorkloadUnderDeletionBench {
         .build();
     // Strip after build: MiniOzoneClusterImpl's static initializer enables CodecBuffer leak detection when the class
     // is first loaded here, so disabling it earlier would be undone before any measurement.
-    stripTestOnlyOverhead();
+    Runnable restoreTestOnlyOverhead = stripTestOnlyOverhead();
     try {
       cluster.waitForClusterToBeReady();
       DirectoryDeletingService dds = cluster.getOzoneManager().getKeyManager().getDirDeletingService();
@@ -240,9 +257,11 @@ public class TestOmMixedWorkloadUnderDeletionBench {
           WorkloadDataset dataset = new WorkloadDataset(workloadDirs, workloadFilesPerDir, nonEmptyEvery, fileContent);
 
           // Control: interactive latency on the hot buckets with no deletion running.
-          Percentiles[] control = toPercentiles(
-              startMixedWorkload(env.fs, env.volume, env.buckets, dataset, clientThreads, opsPerThread, "control")
-                  .await(), "control");
+          Percentiles[] control;
+          try (RunningWorkload controlWl = startMixedWorkload(env.fs, env.volume, env.buckets, dataset, clientThreads,
+              opsPerThread, "control")) {
+            control = toPercentiles(controlWl.await(), "control");
+          }
 
           // Profile only the under-load window when -Dbench.profile.event=<cpu|lock|wall|alloc> is set. async-profiler
           // is loaded reflectively from -Dbench.profiler.jar / -Dbench.profiler.lib and a JFR recording is written to
@@ -265,35 +284,36 @@ public class TestOmMixedWorkloadUnderDeletionBench {
           long movedFilesBefore = dds.getMovedFilesCount();
           long start = System.nanoTime();
           long drainDeadline = start + TimeUnit.SECONDS.toNanos(900);
-          RunningWorkload underLoadWl = startMixedWorkload(env.fs, env.volume, env.buckets, dataset, clientThreads, 0,
-              "under-load");
-          for (int b = 0; b < numBuckets; b++) {
-            env.fs[b].delete(new Path("/" + BACKLOG_ROOT), true);
-          }
-          LOG.info("delete(recursive) issued on {} buckets; backlog draining in background", numBuckets);
-
-          long phase1DrainNanos;
-          try {
-            phase1DrainNanos = awaitPhase1Drain(dds, mm, deletedDirTable, movedFilesBefore, backlogFiles,
-                underLoadWl, start, drainDeadline);
-          } finally {
-            underLoadWl.stop();
-            if (profiler != null) {
-              profiler.stop();
+          try (RunningWorkload underLoadWl = startMixedWorkload(env.fs, env.volume, env.buckets, dataset,
+              clientThreads, 0, "under-load")) {
+            for (int b = 0; b < numBuckets; b++) {
+              env.fs[b].delete(new Path("/" + BACKLOG_ROOT), true);
             }
-          }
-          double phase1DrainMs = phase1DrainNanos / 1_000_000.0;
-          List<List<Long>> underLoadSamples = underLoadWl.await();
-          Percentiles[] underLoad = toPercentiles(underLoadSamples, "under-load");
-          long underLoadOps = totalOps(underLoadSamples);
-          String header = String.format(Locale.ROOT,
-              "BENCH mixed numBuckets=%d backlogFiles=%d threads=%d opsPerThread=%d ratisByteLimit=%s underLoadOps=%d "
-                  + "phase1DrainMs=%.1f",
-              numBuckets, backlogFiles, clientThreads, opsPerThread, ratisAppenderByteLimit, underLoadOps,
-              phase1DrainMs);
-          printBenchLine(control, underLoad, header);
-          if (profileOut != null) {
-            System.out.printf(Locale.ROOT, "BENCH profile event=%s out=%s%n", profileEvent, profileOut);
+            LOG.info("delete(recursive) issued on {} buckets; backlog draining in background", numBuckets);
+
+            long phase1DrainNanos;
+            try {
+              phase1DrainNanos = awaitPhase1Drain(dds, mm, deletedDirTable, movedFilesBefore, backlogFiles,
+                  underLoadWl, start, drainDeadline);
+            } finally {
+              underLoadWl.stop();
+              if (profiler != null) {
+                profiler.stop();
+              }
+            }
+            double phase1DrainMs = phase1DrainNanos / 1_000_000.0;
+            List<List<Long>> underLoadSamples = underLoadWl.await();
+            Percentiles[] underLoad = toPercentiles(underLoadSamples, "under-load");
+            long underLoadOps = totalOps(underLoadSamples);
+            String header = String.format(Locale.ROOT,
+                "BENCH mixed numBuckets=%d backlogFiles=%d threads=%d opsPerThread=%d ratisByteLimit=%s "
+                    + "underLoadOps=%d phase1DrainMs=%.1f",
+                numBuckets, backlogFiles, clientThreads, opsPerThread, ratisAppenderByteLimit, underLoadOps,
+                phase1DrainMs);
+            printBenchLine(control, underLoad, header);
+            if (profileOut != null) {
+              System.out.printf(Locale.ROOT, "BENCH profile event=%s out=%s%n", profileEvent, profileOut);
+            }
           }
         } finally {
           for (FileSystem f : env.fs) {
@@ -302,7 +322,13 @@ public class TestOmMixedWorkloadUnderDeletionBench {
         }
       }
     } finally {
-      cluster.shutdown();
+      // Restore last, so the buffer-heavy cluster shutdown still runs without the leak detector's per-allocation
+      // finalizer, and restore unconditionally so a failing shutdown cannot leak the stripped state into later tests.
+      try {
+        cluster.shutdown();
+      } finally {
+        restoreTestOnlyOverhead.run();
+      }
     }
   }
 
@@ -506,8 +532,12 @@ public class TestOmMixedWorkloadUnderDeletionBench {
     return new RunningWorkload(pool, futures, running, failed, label);
   }
 
-  /** Handle to a running {@link #startMixedWorkload} run: stop the threads, then await and collect their samples. */
-  private static final class RunningWorkload {
+  /**
+   * Handle to a running {@link #startMixedWorkload} run: stop the threads, then await and collect their samples.
+   * Closing stops the threads and shuts the pool down, so a failure anywhere in the measured window cannot leave the
+   * non-daemon client threads running and keep the Maven fork alive.
+   */
+  private static final class RunningWorkload implements AutoCloseable {
     private final ExecutorService pool;
     private final List<Future<List<long[]>>> futures;
     private final AtomicBoolean running;
@@ -531,20 +561,22 @@ public class TestOmMixedWorkloadUnderDeletionBench {
       return failed.get();
     }
 
+    @Override
+    public void close() {
+      stop();
+      HadoopExecutors.shutdown(pool, LOG, 180, TimeUnit.SECONDS);
+    }
+
     /** Joins the client threads and returns per-operation nanosecond samples grouped by operation index. */
     List<List<Long>> await() throws Exception {
       List<List<Long>> byOp = new ArrayList<>(OPS.length);
       for (String ignored : OPS) {
         byOp.add(new ArrayList<>());
       }
-      try {
-        for (Future<List<long[]>> future : futures) {
-          for (long[] sample : future.get()) {
-            byOp.get((int) sample[0]).add(sample[1]);
-          }
+      for (Future<List<long[]>> future : futures) {
+        for (long[] sample : future.get()) {
+          byOp.get((int) sample[0]).add(sample[1]);
         }
-      } finally {
-        HadoopExecutors.shutdown(pool, LOG, 180, TimeUnit.SECONDS);
       }
       if (failed.get()) {
         throw new IllegalStateException("client thread failed during " + label);
