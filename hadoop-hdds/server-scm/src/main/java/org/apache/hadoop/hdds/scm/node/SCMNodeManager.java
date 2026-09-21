@@ -158,6 +158,20 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   private static final String DNUUID = "UUID";
   private static final String VERSION = "VERSION";
 
+  // DecimalFormat is not thread-safe; keep one per thread and reuse across node-stats/JMX loops.
+  private static final ThreadLocal<DecimalFormat> ONE_DECIMAL_FORMAT =
+      ThreadLocal.withInitial(() -> {
+        DecimalFormat format = new DecimalFormat("#0.0");
+        format.setRoundingMode(RoundingMode.HALF_UP);
+        return format;
+      });
+  private static final ThreadLocal<DecimalFormat> TWO_DECIMAL_FORMAT =
+      ThreadLocal.withInitial(() -> {
+        DecimalFormat format = new DecimalFormat("#0.00");
+        format.setRoundingMode(RoundingMode.HALF_UP);
+        return format;
+      });
+
   /**
    * Constructs SCM machine Manager.
    */
@@ -1329,9 +1343,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       unit.replace(0, 2, "TB");
     }
 
-    DecimalFormat decimalFormat = new DecimalFormat("#0.0");
-    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-    String newValue = decimalFormat.format(value);
+    String newValue = ONE_DECIMAL_FORMAT.get().format(value);
     return newValue + unit.toString();
   }
 
@@ -1375,7 +1387,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
 
   private static String formatStoragePercentage(double percentage) {
     double capped = percentage > 100.0 ? 100.0 : percentage;
-    DecimalFormat decimalFormat = new DecimalFormat("#0.00");
+    DecimalFormat decimalFormat = TWO_DECIMAL_FORMAT.get();
     decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
     return decimalFormat.format(capped);
   }
@@ -1451,9 +1463,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       dev += (usage - totalOzoneUsed) * (usage - totalOzoneUsed);
     }
     dev = (float) Math.sqrt(dev / usages.length);
-    DecimalFormat decimalFormat = new DecimalFormat("#0.00");
-    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-    nodeStatics.put(UsageStatics.STDEV.getLabel(), decimalFormat.format(dev));
+    nodeStatics.put(UsageStatics.STDEV.getLabel(), TWO_DECIMAL_FORMAT.get().format(dev));
   }
 
   private void nodeStateStatistics(Map<String, String> nodeStatics, List<DatanodeInfo> allNodes) {
