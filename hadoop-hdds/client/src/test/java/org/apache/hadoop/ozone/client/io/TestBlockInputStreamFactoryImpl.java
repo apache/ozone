@@ -17,14 +17,18 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import static org.apache.hadoop.hdds.DatanodeVersion.RATIS_DATASTREAM_READ_BLOCK_SUPPORT;
+import static org.apache.hadoop.hdds.DatanodeVersion.STREAM_BLOCK_SUPPORT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -34,11 +38,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.RatisDataStreamBlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -78,6 +84,80 @@ public class TestBlockInputStreamFactoryImpl {
     }
     assertEquals(stream.getBlockID(), blockInfo.getBlockID());
     assertEquals(stream.getLength(), blockInfo.getLength());
+  }
+
+  @Test
+  public void testRatisStreamReadBlockWhenAllDatanodesSupport()
+      throws IOException {
+    BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
+    ReplicationConfig repConfig =
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+    BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
+        1024 * 1024 * 10);
+    blockInfo.getPipeline().getNodes().forEach(dn -> dn.setCurrentVersion(
+        RATIS_DATASTREAM_READ_BLOCK_SUPPORT.toProtoValue()));
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setRatisStreamReadBlock(true);
+
+    BlockExtendedInputStream stream = factory.create(repConfig, blockInfo,
+        blockInfo.getPipeline(), blockInfo.getToken(),
+        Mockito.mock(XceiverClientFactory.class), null, clientConfig);
+
+    assertInstanceOf(RatisDataStreamBlockInputStream.class, stream);
+  }
+
+  @Test
+  public void testRatisStreamReadBlockUsesCompatibilityPathWithoutDataStreamPort()
+      throws IOException {
+    BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
+    ReplicationConfig repConfig =
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+    DatanodeDetails datanode = DatanodeDetails.newBuilder()
+        .setUuid(UUID.randomUUID())
+        .setCurrentVersion(
+            RATIS_DATASTREAM_READ_BLOCK_SUPPORT.toProtoValue())
+        .addPort(DatanodeDetails.newRatisPort(0))
+        .build();
+    BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig,
+        1024 * 1024 * 10, Collections.singletonMap(datanode, 1));
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setRatisStreamReadBlock(true);
+
+    BlockExtendedInputStream stream = factory.create(repConfig, blockInfo,
+        blockInfo.getPipeline(), blockInfo.getToken(), null, null,
+        clientConfig);
+
+    assertInstanceOf(BlockInputStream.class, stream);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testRatisStreamReadBlockUsesCompatibilityPathForOlderDatanode(
+      boolean streamReadBlockEnabled) throws IOException {
+    BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
+    ReplicationConfig repConfig =
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+    BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
+        1024 * 1024 * 10);
+    blockInfo.getPipeline().getNodes().get(0)
+        .setCurrentVersion(STREAM_BLOCK_SUPPORT.toProtoValue());
+    Pipeline pipeline = Mockito.spy(blockInfo.getPipeline());
+    blockInfo.setPipeline(pipeline);
+    Mockito.when(pipeline.getReplicaIndex(any(DatanodeDetails.class)))
+        .thenReturn(1);
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setRatisStreamReadBlock(true);
+    clientConfig.setStreamReadBlock(streamReadBlockEnabled);
+
+    BlockExtendedInputStream stream = factory.create(repConfig, blockInfo,
+        blockInfo.getPipeline(), blockInfo.getToken(), null, null,
+        clientConfig);
+
+    if (streamReadBlockEnabled) {
+      assertInstanceOf(StreamBlockInputStream.class, stream);
+    } else {
+      assertInstanceOf(BlockInputStream.class, stream);
+    }
   }
 
   @Test

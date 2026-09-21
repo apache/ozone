@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import static org.apache.hadoop.hdds.DatanodeVersion.RATIS_DATASTREAM_READ_BLOCK_SUPPORT;
 import static org.apache.hadoop.hdds.DatanodeVersion.STREAM_BLOCK_SUPPORT;
 
 import java.io.IOException;
@@ -24,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -35,6 +37,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.RatisDataStreamBlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.ByteBufferPool;
@@ -89,7 +92,18 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
       return new ECBlockInputStreamProxy((ECReplicationConfig)repConfig,
           blockInfo, xceiverFactory, refreshFunction,
           ecBlockStreamFactory, config);
-    } else if (config.isStreamReadBlock() && allDataNodesSupportStreamBlock(pipeline)) {
+    } else if (config.isRatisStreamReadBlock()
+        && repConfig.getReplicationType().equals(HddsProtos.ReplicationType.RATIS)
+        && pipeline.getType().equals(HddsProtos.ReplicationType.RATIS)
+        && allDataNodesSupport(pipeline,
+            RATIS_DATASTREAM_READ_BLOCK_SUPPORT)
+        && pipeline.getNodes().stream().allMatch(dn ->
+            dn.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM))) {
+      return new RatisDataStreamBlockInputStream(blockInfo.getBlockID(),
+          blockInfo.getLength(), pipeline, token, xceiverFactory,
+          config);
+    } else if (config.isStreamReadBlock()
+        && allDataNodesSupport(pipeline, STREAM_BLOCK_SUPPORT)) {
       return new StreamBlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(), pipeline, token, xceiverFactory,
           refreshFunction, config);
     } else {
@@ -99,11 +113,12 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
     }
   }
 
-  private boolean allDataNodesSupportStreamBlock(Pipeline pipeline) {
+  private boolean allDataNodesSupport(Pipeline pipeline,
+      DatanodeVersion requiredVersion) {
     // return true only if all DataNodes in the pipeline are on a version
-    // that supports for reading a block by streaming chunks..
+    // that supports the requested read path.
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (dn.getCurrentVersion() < STREAM_BLOCK_SUPPORT.toProtoValue()) {
+      if (dn.getCurrentVersion() < requiredVersion.toProtoValue()) {
         return false;
       }
     }

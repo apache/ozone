@@ -107,6 +107,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -124,9 +125,9 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1103,11 +1104,12 @@ public class TestKeyValueHandler {
 
       final AtomicInteger responseCount = new AtomicInteger(0);
 
-      StreamObserver<ContainerCommandResponseProto> streamObserver =
-          new StreamObserver<ContainerCommandResponseProto>() {
+      DataStreamObserver<ReadBlockResponse> streamObserver =
+          new DataStreamObserver<ReadBlockResponse>() {
             @Override
-            public void onNext(ContainerCommandResponseProto response) {
-              assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+            public void onNext(ReadBlockResponse response) {
+              assertEquals(ContainerProtos.Result.SUCCESS,
+                  response.getResponse().getResult());
               responseCount.incrementAndGet();
             }
 
@@ -1262,7 +1264,7 @@ public class TestKeyValueHandler {
    * Collects everything a single readBlock call produced: the streamed data responses, the errors and the response
    * proto returned by the handler.
    */
-  private static final class ReadBlockResult implements StreamObserver<ContainerCommandResponseProto> {
+  private static final class ReadBlockResult implements DataStreamObserver<ReadBlockResponse> {
     private final BlockID blockID;
     private final List<ContainerCommandResponseProto> dataResponses = new ArrayList<>();
     private final List<Throwable> errors = new ArrayList<>();
@@ -1273,8 +1275,8 @@ public class TestKeyValueHandler {
     }
 
     @Override
-    public void onNext(ContainerCommandResponseProto dataResponse) {
-      dataResponses.add(dataResponse);
+    public void onNext(ReadBlockResponse dataResponse) {
+      dataResponses.add(dataResponse.getResponse());
     }
 
     @Override
@@ -1488,12 +1490,12 @@ public class TestKeyValueHandler {
             .build();
 
     @SuppressWarnings("unchecked")
-    StreamObserver<ContainerCommandResponseProto> streamObserver = mock(StreamObserver.class);
-    List<ContainerCommandResponseProto> capturedResponses = new java.util.ArrayList<>();
+    DataStreamObserver<ReadBlockResponse> streamObserver = mock(DataStreamObserver.class);
+    List<ReadBlockResponse> capturedResponses = new java.util.ArrayList<>();
     doAnswer(invocation -> {
       capturedResponses.add(invocation.getArgument(0));
       return null;
-    }).when(streamObserver).onNext(any(ContainerCommandResponseProto.class));
+    }).when(streamObserver).onNext(any(ReadBlockResponse.class));
 
     try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
       ContainerCommandResponseProto response = handlerWithVolume.getHandler().readBlock(
@@ -1506,16 +1508,16 @@ public class TestKeyValueHandler {
     verify(streamObserver, atLeastOnce()).onNext(any());
 
     int returnedDataLen = 0;
-    for (ContainerCommandResponseProto resp : capturedResponses) {
-      returnedDataLen += resp.getReadBlock().getData().size();
+    for (ReadBlockResponse resp : capturedResponses) {
+      returnedDataLen += resp.getData().remaining();
     }
     ByteBuffer allData = ByteBuffer.allocate(returnedDataLen);
-    long firstResponseOffset = capturedResponses.get(0).getReadBlock().getOffset();
+    long firstResponseOffset = capturedResponses.get(0).getResponse().getReadBlock().getOffset();
 
-    for (ContainerCommandResponseProto resp : capturedResponses) {
-      assertEquals(ContainerProtos.Result.SUCCESS, resp.getResult());
-      assertTrue(resp.hasReadBlock());
-      allData.put(resp.getReadBlock().getData().asReadOnlyByteBuffer());
+    for (ReadBlockResponse resp : capturedResponses) {
+      assertEquals(ContainerProtos.Result.SUCCESS, resp.getResponse().getResult());
+      assertTrue(resp.getResponse().hasReadBlock());
+      allData.put(resp.getData().duplicate());
     }
 
     assertEquals(readBackOffset, firstResponseOffset);
