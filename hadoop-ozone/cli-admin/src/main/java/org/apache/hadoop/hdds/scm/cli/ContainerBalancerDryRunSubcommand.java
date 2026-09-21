@@ -52,10 +52,8 @@ public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
   @CommandLine.Mixin
   private ContainerBalancerConfigOptions configOptions;
 
-  @Option(names = {"--profile"},
-      description = "Throttling profile: slow, medium, or fast. When set, only this profile is estimated. "
-          + "When omitted, dry-run estimates all three profiles. Start does not support --profile yet.")
-  private Optional<String> profileName = Optional.empty();
+  @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
+  private ProfileSelection profileSelection;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
@@ -94,8 +92,12 @@ public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
     ContainerBalancerAdvisor.AdvisorRequest request = new ContainerBalancerAdvisor.AdvisorRequest().setNodes(nodes);
     configOptions.applyToDryRunRequest(request);
 
-    if (profileName.isPresent()) {
-      request.setProfile(parseProfile(profileName.get()));
+    if (profileSelection != null) {
+      if (profileSelection.allProfiles) {
+        request.setAllProfiles(true);
+      } else {
+        request.setProfile(parseProfile(profileSelection.profileName.get()));
+      }
     }
     return request;
   }
@@ -104,7 +106,7 @@ public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
     try {
       return ContainerBalancerProfile.valueOf(name.trim().toUpperCase(Locale.ENGLISH));
     } catch (IllegalArgumentException e) {
-      throw new IOException("Invalid profile: " + name + ". Expected slow, medium, or fast.");
+      throw new IOException("Invalid profile: " + name + ". Expected SLOW, MEDIUM, or FAST.");
     }
   }
 
@@ -149,5 +151,16 @@ public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
     }
     long minutes = durationMillis / 60000;
     return String.format(Locale.ENGLISH, "~%d min", minutes);
+  }
+
+  static class ProfileSelection {
+    @Option(names = {"--profile"},
+        description = "Throttling profile: SLOW, MEDIUM, or FAST profiles. When set, only this profile is estimated. "
+            + "When omitted, dry-run estimates the MEDIUM profile.")
+    private Optional<String> profileName;
+
+    @Option(names = {"--all"},
+        description = "Estimate SLOW, MEDIUM, and FAST profiles.")
+    private boolean allProfiles;
   }
 }

@@ -836,12 +836,37 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
-  void testContainerBalancerDryRunSubcommandDefaultShowsAllProfiles() throws IOException {
+  void testContainerBalancerDryRunSubcommandDefaultShowsMediumProfile() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
 
     parseSubcommand(dryRunCmd);
+    dryRunCmd.execute(scmClient);
+
+    String output = out.get();
+    assertThat(output).contains("Profile: MEDIUM");
+    assertThat(output).doesNotContain("Profile: SLOW");
+    assertThat(output).doesNotContain("Profile: FAST");
+    assertThat(output.split("Profile:")).hasSize(2);
+    assertThat(output)
+        .contains("Based on:")
+        .contains("Datanode involvement:     20%")
+        .contains("Bytes to move:")
+        .contains("Per iteration (estimate): ~" + byteDesc(26L * GB * 7))
+        .contains("planning estimate:")
+        .contains("upper bound")
+        .contains("assumes full move timeout + interval each cycle")
+        .doesNotContain("Estimation failed:");
+  }
+
+  @Test
+  void testContainerBalancerDryRunSubcommandAllShowsAllProfiles() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(dryRunCmd, "--all");
     dryRunCmd.execute(scmClient);
 
     String output = out.get();
@@ -929,17 +954,17 @@ class TestContainerBalancerSubCommand {
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
 
-    parseSubcommand(dryRunCmd, "--profile", "medium");
+    parseSubcommand(dryRunCmd, "--profile", "FAST");
     dryRunCmd.execute(scmClient);
 
     String output = out.get();
-    assertThat(output).contains("Profile: MEDIUM");
+    assertThat(output).contains("Profile: FAST");
     assertThat(output).doesNotContain("Profile: SLOW");
-    assertThat(output).doesNotContain("Profile: FAST");
+    assertThat(output).doesNotContain("Profile: MEDIUM");
     assertThat(output.split("Profile:")).hasSize(2);
     assertThat(output)
-        .contains("Datanode involvement:     20%")
-        .contains("Per iteration (estimate): ~" + byteDesc(26L * GB * 7))
+        .contains("Datanode involvement:     40%")
+        .contains("Per iteration (estimate): ~" + byteDesc(500L * GB))
         .contains("Estimated duration:       upper bound");
   }
 
@@ -964,7 +989,7 @@ class TestContainerBalancerSubCommand {
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
 
-    parseSubcommand(dryRunCmd, "-s", "70", "-t", "5");
+    parseSubcommand(dryRunCmd, "--all", "-s", "70", "-t", "5");
     dryRunCmd.execute(scmClient);
 
     String output = out.get();

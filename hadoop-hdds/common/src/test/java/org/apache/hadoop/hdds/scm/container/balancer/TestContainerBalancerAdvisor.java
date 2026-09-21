@@ -36,19 +36,6 @@ import org.junit.jupiter.api.Test;
 public final class TestContainerBalancerAdvisor {
 
   @Test
-  void testComputePerIterationBytesLimitedByEnteringTarget() {
-    int[] involved = {7, 7};
-    long expected = 26L * OzoneConsts.GB * 7;
-
-    assertEquals(expected, ContainerBalancerAdvisor.computePerIterationBytes(
-        expected * 10,
-        500L * OzoneConsts.GB,
-        26 * OzoneConsts.GB,
-        26 * OzoneConsts.GB,
-        involved));
-  }
-
-  @Test
   void testComputePerIterationBytesNeverExceedsBytesToMove() {
     int[] involved = {3, 3};
     long bytesToMove = 50L * OzoneConsts.GB;
@@ -62,11 +49,28 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testEstimateDryRunDefaultReturnsThreeProfiles() {
+  void testEstimateDryRunDefaultReturnsMediumProfile() {
     OzoneConfiguration conf = new OzoneConfiguration();
     List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimateDryRun(
         conf,
         new ContainerBalancerAdvisor.AdvisorRequest().setNodes(buildCluster(70, 14, 14)));
+
+    assertEquals(1, results.size());
+    ContainerBalancerEstimation estimation = results.get(0);
+    assertTrue(estimation.succeeded());
+    assertEquals(ContainerBalancerProfile.MEDIUM, estimation.getProfile());
+    assertTrue(estimation.getBytesToMove() > 0);
+    assertEquals(26L * OzoneConsts.GB * 7, estimation.getPerIterationBytes());
+  }
+
+  @Test
+  void testEstimateDryRunAllProfilesReturnsThreeProfiles() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimateDryRun(
+        conf,
+        new ContainerBalancerAdvisor.AdvisorRequest()
+            .setNodes(buildCluster(70, 14, 14))
+            .setAllProfiles(true));
 
     assertEquals(3, results.size());
     assertEquals(ContainerBalancerProfile.SLOW, results.get(0).getProfile());
@@ -89,7 +93,7 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testEstimateDryRunSingleProfileMedium() {
+  void testEstimateDryRunSingleProfileFast() {
     OzoneConfiguration conf = new OzoneConfiguration();
     ContainerBalancerConfiguration balancerConfig = conf.getObject(ContainerBalancerConfiguration.class);
     long expectedCycleTimeMillis = ContainerBalancerAdvisor.computeCycleTimeMillis(
@@ -100,15 +104,15 @@ public final class TestContainerBalancerAdvisor {
         conf,
         new ContainerBalancerAdvisor.AdvisorRequest()
             .setNodes(buildCluster(70, 14, 14))
-            .setProfile(ContainerBalancerProfile.MEDIUM));
+            .setProfile(ContainerBalancerProfile.FAST));
 
     assertEquals(1, results.size());
     ContainerBalancerEstimation estimation = results.get(0);
     assertTrue(estimation.succeeded());
-    assertEquals(ContainerBalancerProfile.MEDIUM, estimation.getProfile());
-
-    // maxInvolved=14 -> [7 sources, 7 targets]; MEDIUM cap=26GB/target -> 7*26GB
-    assertEquals(26L * OzoneConsts.GB * 7, estimation.getPerIterationBytes());
+    assertEquals(ContainerBalancerProfile.FAST, estimation.getProfile());
+    // 40% of 70 -> maxInvolved=28 -> [14 sources, 14 targets];
+    // 14*100GB exceeds the 500GB iteration cap, so the cap binds.
+    assertEquals(500L * OzoneConsts.GB, estimation.getPerIterationBytes());
     assertEquals(expectedCycleTimeMillis,
         estimation.getMoveTimeoutMillis() + estimation.getBalancingIntervalMillis());
     assertEquals(
@@ -117,7 +121,7 @@ public final class TestContainerBalancerAdvisor {
     assertEquals(
         estimation.getEstimatedIterations() * expectedCycleTimeMillis,
         estimation.getEstimatedDurationMillis());
-    assertEquals(20, estimation.getMaxDatanodesPercentage());
+    assertEquals(40, estimation.getMaxDatanodesPercentage());
   }
 
   @Test
@@ -192,6 +196,7 @@ public final class TestContainerBalancerAdvisor {
         conf,
         new ContainerBalancerAdvisor.AdvisorRequest()
             .setNodes(buildCluster(70, 14, 14))
+            .setAllProfiles(true)
             .setMaxSizeToMovePerIteration(70L * OzoneConsts.GB));
 
     assertEquals(3, results.size());

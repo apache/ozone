@@ -45,8 +45,9 @@ public final class ContainerBalancerAdvisor {
   /**
    * Estimates per-iteration size, iterations and duration for one or more balancer profiles.
    *
-   * If profile is unset, returns SLOW, MEDIUM, and FAST.
+   * If {@link AdvisorRequest#allProfiles} is true, returns SLOW, MEDIUM, and FAST.
    * If profile is set, returns a result for that profile only.
+   * Otherwise returns MEDIUM only.
    * Per-profile validation failures are returned with {@link ContainerBalancerEstimation#succeeded()} false
    * instead of aborting other profiles.
    */
@@ -356,13 +357,16 @@ public final class ContainerBalancerAdvisor {
   }
 
   private static List<ContainerBalancerProfile> selectProfiles(AdvisorRequest request) {
+    if (request.allProfiles) {
+      return Arrays.asList(
+          ContainerBalancerProfile.SLOW,
+          ContainerBalancerProfile.MEDIUM,
+          ContainerBalancerProfile.FAST);
+    }
     if (request.profile != null) {
       return Collections.singletonList(request.profile);
     }
-    return Arrays.asList(
-        ContainerBalancerProfile.SLOW,
-        ContainerBalancerProfile.MEDIUM,
-        ContainerBalancerProfile.FAST);
+    return Collections.singletonList(ContainerBalancerProfile.MEDIUM);
   }
 
   /**
@@ -375,6 +379,7 @@ public final class ContainerBalancerAdvisor {
     private Set<String> excludeNodes;
     private Double thresholdPercent;
     private ContainerBalancerProfile profile;
+    private boolean allProfiles;
     private Integer maxDatanodesPercentageToInvolvePerIteration;
     private Long maxSizeToMovePerIteration;
     private Long maxSizeEnteringTarget;
@@ -405,6 +410,11 @@ public final class ContainerBalancerAdvisor {
 
     public AdvisorRequest setProfile(ContainerBalancerProfile profileValue) {
       this.profile = profileValue;
+      return this;
+    }
+
+    public AdvisorRequest setAllProfiles(boolean allProfilesValue) {
+      this.allProfiles = allProfilesValue;
       return this;
     }
 

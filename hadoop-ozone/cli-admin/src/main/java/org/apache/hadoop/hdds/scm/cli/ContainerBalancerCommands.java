@@ -57,6 +57,7 @@ import picocli.CommandLine.Command;
  * To estimate (dry-run):
  *      ozone admin containerbalancer dry-run
  *      [ --profile {@literal <slow|medium|fast>} ]
+ *      [ --all ]
  *      [ -t/--threshold {@literal <threshold>} ]
  *      [ -d/--max-datanodes-percentage-to-involve-per-iteration {@literal <percent>} ]
  *      [ -s/--max-size-to-move-per-iteration-in-gb {@literal <gb>} ]
@@ -70,9 +71,11 @@ import picocli.CommandLine.Command;
  *      Examples:
  *      ozone admin containerbalancer dry-run
  *        estimate bytes to move, number of iterations, per-iteration throughput, and duration for
- *        SLOW, MEDIUM, and FAST profiles (does not start the balancer)
- *      ozone admin containerbalancer dry-run --profile medium
- *        estimate for the MEDIUM profile only
+ *        the MEDIUM profile (does not start the balancer)
+ *      ozone admin containerbalancer dry-run --all
+ *        estimate for SLOW, MEDIUM, and FAST profiles
+ *      ozone admin containerbalancer dry-run --profile slow
+ *        estimate for the SLOW profile only
  *      ozone admin containerbalancer dry-run --profile fast -t 5
  *        estimate FAST profile with a 5% threshold
  * To stop:
