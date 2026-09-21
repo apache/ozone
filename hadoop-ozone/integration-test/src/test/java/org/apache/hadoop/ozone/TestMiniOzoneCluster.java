@@ -64,10 +64,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
+  private OzoneConfiguration conf;
 
   @BeforeEach
-  static void setup(@TempDir File testDir) {
+  void setup(@TempDir File testDir) {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
