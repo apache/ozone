@@ -118,9 +118,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
   private OmKeyInfo(Builder b) {
     super(b);
-    this.retentionDate = b.retentionDate;
-    this.retentionConfig = b.retentionConfig;
-    this.legalHold = b.legalHold;
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
     this.keyName = b.keyName;
@@ -137,6 +134,9 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.retentionDate = b.retentionDate;
+    this.retentionConfig = b.retentionConfig;
+    this.legalHold = b.legalHold;
   }
 
   public Long getRetentionDate() {
@@ -513,9 +513,6 @@ public final class OmKeyInfo extends WithParentObjectId
    * Builder of OmKeyInfo.
    */
   public static class Builder extends WithParentObjectId.Builder<OmKeyInfo> {
-    private Long retentionDate;
-    private Retention retentionConfig;
-    private Boolean legalHold;
     private String volumeName;
     private String bucketName;
     private String keyName;
@@ -535,6 +532,9 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private Long retentionDate;
+    private Retention retentionConfig;
+    private Boolean legalHold;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -544,9 +544,6 @@ public final class OmKeyInfo extends WithParentObjectId
     public Builder(OmKeyInfo obj) {
       super(obj);
       this.acls = AclListBuilder.of(obj.acls);
-      this.retentionDate = obj.retentionDate;
-      this.retentionConfig = obj.retentionConfig;
-      this.legalHold = obj.legalHold;
       this.volumeName = obj.volumeName;
       this.bucketName = obj.bucketName;
       this.keyName = obj.keyName;
@@ -566,6 +563,9 @@ public final class OmKeyInfo extends WithParentObjectId
               new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
                   keyLocationVersion.createLocationList(),
                   keyLocationVersion.isMultipartKey())));
+      this.retentionDate = obj.retentionDate;
+      this.retentionConfig = obj.retentionConfig;
+      this.legalHold = obj.legalHold;
     }
 
     private Builder(OmDirectoryInfo dirInfo) {

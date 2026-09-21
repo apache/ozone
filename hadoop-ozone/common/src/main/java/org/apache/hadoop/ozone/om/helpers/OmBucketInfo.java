@@ -118,8 +118,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   private OmBucketInfo(Builder b) {
     super(b);
-    this.objectLockEnabled = b.objectLockEnabled;
-    this.defaultRetention = b.defaultRetention;
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
     this.acls = b.acls.build();
@@ -140,6 +138,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.owner = b.owner;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
     this.tags = b.tags.build();
+    this.objectLockEnabled = b.objectLockEnabled;
+    this.defaultRetention = b.defaultRetention;
   }
 
   public boolean isObjectLockEnabled() {
@@ -443,8 +443,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    * Builder for OmBucketInfo.
    */
   public static class Builder extends WithObjectID.Builder<OmBucketInfo> {
-    private boolean objectLockEnabled;
-    private Retention defaultRetention;
     private String volumeName;
     private String bucketName;
     private final AclListBuilder acls;
@@ -465,6 +463,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private final MapBuilder<String, String> tags;
     private long snapshotUsedBytes;
     private long snapshotUsedNamespace;
+    private boolean objectLockEnabled;
+    private Retention defaultRetention;
 
     public Builder() {
       acls = AclListBuilder.empty();
