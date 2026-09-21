@@ -1238,7 +1238,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         .build();
     OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
     for (OmKeyLocationInfo info:
-        keyInfo.getLatestVersionLocations().getLocationList()) {
+        keyInfo.getLatestVersionLocations().createLocationList()) {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
       assertEquals(replication, container.getReplicationConfig());

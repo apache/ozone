@@ -47,7 +47,7 @@ public class MockDatanodeStorage {
   private final Map<BlockID, BlockData> blocks = new HashedMap();
   private final Map<Long, List<DatanodeBlockID>>
       containerBlocks = new HashedMap();
-  private final Map<BlockID, String> fullBlockData = new HashMap<>();
+  private final Map<BlockID, ByteString> fullBlockData = new HashMap<>();
 
   private final Map<String, ByteString> data = new HashMap<>();
 
@@ -157,20 +157,19 @@ public class MockDatanodeStorage {
       throw exception;
     }
     String blockKey = createKey(blockID);
+    ByteString storedBytes = ByteString.copyFrom(bytes.asReadOnlyByteBuffer());
     ByteString block;
     if (data.containsKey(blockKey)) {
       block = data.get(blockKey);
       assert block.size() == chunkInfo.getOffset();
-      data.put(blockKey, block.concat(ByteString.copyFrom(bytes.asReadOnlyByteBuffer())));
+      data.put(blockKey, block.concat(storedBytes));
     } else {
       assert chunkInfo.getOffset() == 0;
-      data.put(blockKey, ByteString.copyFrom(bytes.asReadOnlyByteBuffer()));
+      data.put(blockKey, storedBytes);
     }
 
-    fullBlockData
-        .put(new BlockID(blockID.getContainerID(), blockID.getLocalID()),
-            fullBlockData.getOrDefault(toBlockID(blockID), "")
-                .concat(bytes.toStringUtf8()));
+    BlockID id = toBlockID(blockID);
+    fullBlockData.put(id, fullBlockData.getOrDefault(id, ByteString.EMPTY).concat(storedBytes));
   }
 
   public ByteString readChunkData(
@@ -195,7 +194,7 @@ public class MockDatanodeStorage {
     return this.data;
   }
 
-  public String getFullBlockData(BlockID blockID) {
+  public ByteString getFullBlockData(BlockID blockID) {
     return this.fullBlockData.get(blockID);
   }
 

@@ -303,5 +303,5 @@ public abstract class Handler {
   public abstract ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto msg, Container container,
       RandomAccessFileChannel blockFile,
-      DataStreamObserver<ReadBlockResponse> streamObserver);
+      DataStreamObserver<ReadBlockResponse> streamObserver, boolean testVariableChunks);
 }
