@@ -108,6 +108,7 @@ import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -778,15 +779,18 @@ public class TestSCMNodeManager {
   public void testScmDetectStaleAndDeadNode()
       throws IOException, InterruptedException, AuthenticationException,
       TimeoutException {
+    final int healthCheckInterval = 50;
     final int interval = 100;
     final int nodeCount = 10;
 
     OzoneConfiguration conf = getConf();
-    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, interval,
-        MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, healthCheckInterval, MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, interval, MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 300, MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 600, MILLISECONDS);
+
+    assertThat(HddsServerUtil.getStaleNodeInterval(conf)).isEqualTo(300);
+    assertThat(HddsServerUtil.getDeadNodeInterval(conf)).isEqualTo(600);
 
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
