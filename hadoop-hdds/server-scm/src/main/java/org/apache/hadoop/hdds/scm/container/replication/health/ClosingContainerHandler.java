@@ -70,7 +70,7 @@ public class ClosingContainerHandler extends AbstractCheck {
 
     // TODO - review this logic - may need an empty check here
     if (request.getContainerReplicas().isEmpty()) {
-      request.getReport().incrementAndSample(ContainerHealthState.MISSING, containerInfo);
+      request.setHealthState(ContainerHealthState.MISSING);
     }
 
     if (request.isReadOnly()) {
