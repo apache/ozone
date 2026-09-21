@@ -183,6 +183,11 @@ public class OzoneCryptoInputStream extends CryptoInputStream
     return super.read();
   }
 
+  @Override
+  public synchronized int available() throws IOException {
+    return super.available();
+  }
+
   /**
    * Positioned read. Decryption can only happen at Crypto buffer boundaries, so this stream cannot read
    * at an arbitrary position without moving its cursor. The read is serialized against the other reads:
