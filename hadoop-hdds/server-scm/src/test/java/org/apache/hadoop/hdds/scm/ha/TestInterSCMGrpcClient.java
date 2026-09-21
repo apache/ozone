@@ -76,6 +76,37 @@ class TestInterSCMGrpcClient {
   }
 
   /**
+   * The client channel keepalive settings are additive to the deadline: a
+   * stuck download must still be aborted at the configured deadline when
+   * custom keepalive values are set.
+   */
+  @Test
+  void testDownloadIsAbortedAtDeadlineWithCustomKeepAlive() throws Exception {
+    int port = PortAllocator.getFreePort();
+    Server server = ServerBuilder.forPort(port)
+        .addService(new NeverRespondingService())
+        .build();
+    server.start();
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL, "200ms");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIME, "1m");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIMEOUT, "10s");
+
+    try (InterSCMGrpcClient client =
+        new InterSCMGrpcClient("localhost", port, conf, null)) {
+      CompletableFuture<Path> res = client.download(temp.resolve("cpFile"));
+      ExecutionException e = assertThrows(ExecutionException.class,
+          () -> res.get(10, TimeUnit.SECONDS));
+      assertEquals(Status.Code.DEADLINE_EXCEEDED,
+          Status.fromThrowable(e.getCause()).getCode());
+    } finally {
+      server.shutdownNow();
+      server.awaitTermination(5, TimeUnit.SECONDS);
+    }
+  }
+
+  /**
    * Keeps the download stream pending, so that the client side deadline is
    * the only way the call can end.
    */

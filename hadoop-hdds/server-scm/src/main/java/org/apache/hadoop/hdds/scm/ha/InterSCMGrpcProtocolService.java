@@ -57,9 +57,35 @@ public class InterSCMGrpcProtocolService {
     this.port = conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
         ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
+    final long maxConnectionIdle = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_MAX_CONNECTION_IDLE,
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_MAX_CONNECTION_IDLE_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final long keepAliveTime = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIME,
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIME_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final long keepAliveTimeout = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIMEOUT,
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final long permitKeepAliveTime = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME,
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final boolean permitKeepAliveWithoutCalls = conf.getBoolean(
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_WITHOUT_CALLS,
+        ScmConfigKeys
+            .OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_WITHOUT_CALLS_DEFAULT);
+
     NettyServerBuilder nettyServerBuilder =
         ((NettyServerBuilder) ServerBuilder.forPort(port))
-            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+            .maxConnectionIdle(maxConnectionIdle, TimeUnit.MILLISECONDS)
+            .keepAliveTime(keepAliveTime, TimeUnit.MILLISECONDS)
+            .keepAliveTimeout(keepAliveTimeout, TimeUnit.MILLISECONDS)
+            .permitKeepAliveTime(permitKeepAliveTime, TimeUnit.MILLISECONDS)
+            .permitKeepAliveWithoutCalls(permitKeepAliveWithoutCalls);
 
     InterSCMGrpcService service = new InterSCMGrpcService(scm);
     ServerBuilder b = nettyServerBuilder.addService(service);

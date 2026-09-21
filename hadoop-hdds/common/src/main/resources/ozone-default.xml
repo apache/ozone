@@ -4369,6 +4369,60 @@
     <description>Deadline for SCM DB checkpoint interval.</description>
   </property>
   <property>
+    <name>ozone.scm.ha.grpc.client.keepalive.time</name>
+    <value>5m</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Interval after which an Inter-SCM gRPC client (a follower SCM
+      or Recon downloading a DB checkpoint) sends an HTTP/2 keepalive ping to
+      the leader SCM when the connection is otherwise quiet, to keep long
+      checkpoint downloads alive across proxies and load balancers.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.client.keepalive.timeout</name>
+    <value>30s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Time an Inter-SCM gRPC client waits for a keepalive ping ack
+      before considering the connection dead and closing it.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.server.max.connection.idle</name>
+    <value>15m</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Maximum time the Inter-SCM gRPC server keeps a connection with
+      no active RPC before closing it with a GOAWAY. Does not affect an
+      in-progress checkpoint download, which holds an active stream.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.server.keepalive.time</name>
+    <value>5m</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Interval after which the Inter-SCM gRPC server sends an HTTP/2
+      keepalive ping to a client when the connection is otherwise quiet.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.server.keepalive.timeout</name>
+    <value>30s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Time the Inter-SCM gRPC server waits for a keepalive ping ack
+      before considering the connection dead and closing it.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.server.permit.keepalive.time</name>
+    <value>5m</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Minimum interval the Inter-SCM gRPC server permits between
+      keepalive pings from a client. Clients pinging more frequently are
+      disconnected. Should be no larger than
+      ozone.scm.ha.grpc.client.keepalive.time so client pings are accepted.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.server.permit.keepalive.without.calls</name>
+    <value>true</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Whether the Inter-SCM gRPC server permits client keepalive
+      pings when there is no active RPC on the connection.</description>
+  </property>
+  <property>
     <name>ozone.scm.close.container.wait.duration</name>
     <value>150s</value>
     <tag>SCM, OZONE, RECON</tag>
