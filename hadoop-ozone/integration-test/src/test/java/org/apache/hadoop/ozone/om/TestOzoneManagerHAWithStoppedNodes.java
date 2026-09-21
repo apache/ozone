@@ -335,6 +335,10 @@ public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
       createKey(ozoneBucket);
     }
 
+    GenericTestUtils.waitFor(() -> followerOM1.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex() > leaderOMSnaphsotIndex,
+        100, 200000);
+
     final long followerOM1LastAppliedIndexNew =
         followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     assertThat(followerOM1LastAppliedIndexNew).isGreaterThan(leaderOMSnaphsotIndex);
