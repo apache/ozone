@@ -44,7 +44,6 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -329,11 +328,12 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     setupProxyProvider(2);
 
     OzoneManagerProtocolPB routingProxy = proxyProvider.getProxy().proxy;
-    assertFalse(Proxy.isProxyClass(routingProxy.getClass()));
-    assertNotNull(routingProxy.toString());
+    assertEquals(routingProxy.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(routingProxy)),
+        routingProxy.toString());
     assertEquals(routingProxy.hashCode(), routingProxy.hashCode());
     assertNotEquals((Object) routingProxy, new Object());
-    assertNotNull(retryProxy.toString());
+    assertEquals(retryProxy.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(retryProxy)),
+        retryProxy.toString());
     assertEquals(retryProxy.hashCode(), retryProxy.hashCode());
     assertNotEquals((Object) retryProxy, new Object());
     for (OMProxyInfo<OzoneManagerProtocolPB> omProxy : proxyProvider.getOMProxies()) {
