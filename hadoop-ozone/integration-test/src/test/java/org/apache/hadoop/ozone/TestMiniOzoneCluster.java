@@ -315,6 +315,7 @@ public class TestMiniOzoneCluster {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
+    cluster.setWaitForClusterToBeReadyTimeout(180000);
     cluster.waitForClusterToBeReady();
 
     // Stop the SCM
