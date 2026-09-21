@@ -24,16 +24,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -102,27 +109,55 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
     @Test
     void testReprocessLowThresholdConservesData() throws IOException {
       getReconNamespaceSummaryManager().clearNSSummaryTable();
+      ReconOMMetadataManager omMetadataManager = getReconOMMetadataManager();
+      Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(getBucketLayout());
+      List<String> addedKeys = new ArrayList<>();
+      int extraKeys = 40;
+      try {
+        for (int i = 0; i < extraKeys; i++) {
+          String keyName = "parallel-key-" + i;
+          String dbKey = omMetadataManager.getOzoneKey(VOL, BUCKET_ONE, keyName);
+          addedKeys.add(dbKey);
+          keyTable.put(dbKey, buildOmKeyInfo(VOL, BUCKET_ONE, keyName, keyName,
+              100L + i, BUCKET_ONE_OBJECT_ID, KEY_ONE_SIZE));
+        }
+        // SST bounds enable parallel iteration; ten-key batches give every worker multiple map replacements.
+        omMetadataManager.getStore().flushDB();
+        NSSummaryTaskWithOBS task = spy(new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
+            omMetadataManager, 1, 1, 4, 40));
+        Map<Thread, Integer> keysPerWorker = new ConcurrentHashMap<>();
+        doAnswer(invocation -> {
+          keysPerWorker.merge(Thread.currentThread(), 1, Integer::sum);
+          return invocation.callRealMethod();
+        }).when(task).handlePutKeyEventReprocess(any(OmKeyInfo.class), anyMap(), anyLong());
 
-      // maxWorkers=4 requests parallelism, but the small in-memory fixture is
-      // served from the memtable, so ParallelTableIteratorOperation takes its
-      // single-threaded fallback. A threshold of 1 still forces a flush and a
-      // fresh map after (almost) every key, exercising the repeated
-      // map-replacement, async-flush and end-of-loop drain path; the per-bucket
-      // totals must still add up exactly.
-      NSSummaryTaskWithOBS task = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
-          getReconOMMetadataManager(), 1, 4, 20, 2000);
+        assertThat(task.reprocessWithOBS(omMetadataManager)).isTrue();
+        assertThat(keysPerWorker).hasSize(4).doesNotContainKey(Thread.currentThread());
+        assertThat(keysPerWorker.values()).allSatisfy(count -> assertThat(count).isGreaterThanOrEqualTo(10));
 
-      assertThat(task.reprocessWithOBS(getReconOMMetadataManager())).isTrue();
-
-      NSSummary bucketOne = getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-      NSSummary bucketTwo = getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
-      assertNotNull(bucketOne);
-      assertNotNull(bucketTwo);
-      // No key lost or double-counted across the repeated map replacements.
-      assertEquals(3, bucketOne.getNumOfFiles());
-      assertEquals(2, bucketTwo.getNumOfFiles());
-      assertEquals(KEY_ONE_SIZE + KEY_TWO_OLD_SIZE + KEY_THREE_SIZE, bucketOne.getSizeOfFiles());
-      assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE, bucketTwo.getSizeOfFiles());
+        NSSummary bucketOne = getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
+        NSSummary bucketTwo = getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
+        assertThat(bucketOne).isNotNull();
+        assertThat(bucketTwo).isNotNull();
+        assertThat(bucketOne.getNumOfFiles()).isEqualTo(3 + extraKeys);
+        assertThat(bucketTwo.getNumOfFiles()).isEqualTo(2);
+        assertThat(bucketOne.getSizeOfFiles())
+            .isEqualTo(KEY_ONE_SIZE * (1 + extraKeys) + KEY_TWO_OLD_SIZE + KEY_THREE_SIZE);
+        assertThat(bucketTwo.getSizeOfFiles()).isEqualTo(KEY_FOUR_SIZE + KEY_FIVE_SIZE);
+        int[] expectedBucketOne = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
+        expectedBucketOne[0] = 1 + extraKeys;
+        expectedBucketOne[1] = 1;
+        expectedBucketOne[40] = 1;
+        assertThat(bucketOne.getFileSizeBucket()).containsExactly(expectedBucketOne);
+        int[] expectedBucketTwo = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
+        expectedBucketTwo[0] = 1;
+        expectedBucketTwo[2] = 1;
+        assertThat(bucketTwo.getFileSizeBucket()).containsExactly(expectedBucketTwo);
+      } finally {
+        for (String key : addedKeys) {
+          keyTable.delete(key);
+        }
+      }
     }
   }
 
