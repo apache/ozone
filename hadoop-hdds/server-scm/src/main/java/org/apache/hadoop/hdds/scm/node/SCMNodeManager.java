@@ -1387,9 +1387,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
 
   private static String formatStoragePercentage(double percentage) {
     double capped = percentage > 100.0 ? 100.0 : percentage;
-    DecimalFormat decimalFormat = TWO_DECIMAL_FORMAT.get();
-    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-    return decimalFormat.format(capped);
+    return TWO_DECIMAL_FORMAT.get().format(capped);
   }
 
   @Override
