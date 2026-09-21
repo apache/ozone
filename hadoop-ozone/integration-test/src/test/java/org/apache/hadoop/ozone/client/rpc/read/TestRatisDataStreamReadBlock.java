@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.BlockDataStreamOutputEntry;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.apache.ratis.util.SizeInBytes;
@@ -61,11 +61,12 @@ public class TestRatisDataStreamReadBlock {
 
   @Test
   void readLargeBlockWithRatisDataStream() throws Exception {
-    try (MiniOzoneCluster cluster = TestStreamRead.newCluster(16 << 10)) {
+    try (MiniOzoneCluster cluster = TestStreamRead.newCluster()) {
       cluster.waitForClusterToBeReady();
 
       final OzoneConfiguration conf = cluster.getConf();
       final OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+      clientConfig.setBytesPerChecksum(16 << 10);
       clientConfig.setStreamReadBlock(false);
       clientConfig.setRatisStreamReadBlock(true);
       conf.setFromObject(clientConfig);
@@ -89,12 +90,13 @@ public class TestRatisDataStreamReadBlock {
   @Test
   void readClosedContainerAfterRatisGroupRemovalWithRatisDataStream()
       throws Exception {
-    try (MiniOzoneCluster cluster = TestStreamRead.newCluster(16 << 10)) {
+    try (MiniOzoneCluster cluster = TestStreamRead.newCluster()) {
       cluster.waitForClusterToBeReady();
 
       final OzoneConfiguration conf = cluster.getConf();
       final OzoneClientConfig clientConfig =
           conf.getObject(OzoneClientConfig.class);
+      clientConfig.setBytesPerChecksum(16 << 10);
       clientConfig.setStreamReadBlock(false);
       clientConfig.setRatisStreamReadBlock(true);
       conf.setFromObject(clientConfig);
@@ -145,7 +147,7 @@ public class TestRatisDataStreamReadBlock {
       containerIds = getContainerIds(out);
     }
     final List<Pipeline> pipelines = getPipelines(cluster, containerIds);
-    TestHelper.waitForContainerClose(cluster, containerIds.toArray(new Long[0]));
+    OzoneTestHelper.waitForContainerClose(cluster, containerIds.toArray(new Long[0]));
     removeRatisGroups(cluster, pipelines);
     return expectedMd5;
   }
