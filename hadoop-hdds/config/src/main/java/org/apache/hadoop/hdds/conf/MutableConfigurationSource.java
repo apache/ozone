@@ -27,14 +27,6 @@ public interface MutableConfigurationSource
     extends ConfigurationSource, ConfigurationTarget {
 
   /**
-   * Returns whether a property has an explicitly configured value.
-   * By default, any non-null value is explicit; implementations may distinguish default resources.
-   */
-  default boolean isExplicitlySet(String key) {
-    return get(key) != null;
-  }
-
-  /**
    * Sets {@code value} for {@code key} only if the key is not already set.
    * Default implementation treats any non-null {@link #get(String)} result as set.
    * {@code OzoneConfiguration} (in hdds-common) overrides this to allow
