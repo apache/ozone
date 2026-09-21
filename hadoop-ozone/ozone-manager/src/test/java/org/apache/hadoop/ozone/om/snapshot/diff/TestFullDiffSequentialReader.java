@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -117,12 +116,12 @@ class TestFullDiffSequentialReader {
     try (SnapDiffJobStore store = newStore(false)) {
       new FullDiffSequentialReader(store, gate).scanFileTables(fromTable, toTable, null);
 
-      assertTrue(store.isNewListCandidate(1L));
-      assertTrue(store.isNewListCandidate(2L));
-      assertTrue(store.isNewListCandidate(3L));
-      assertFalse(store.hasNewListEntry(4L));
-      assertTrue(store.hasNewListEntry(5L));
-      assertFalse(store.isNewListCandidate(5L));
+      assertTrue(isNewListCandidate(store, 1L));
+      assertTrue(isNewListCandidate(store, 2L));
+      assertTrue(isNewListCandidate(store, 3L));
+      assertFalse(hasNewListEntry(store, 4L));
+      assertTrue(hasNewListEntry(store, 5L));
+      assertFalse(isNewListCandidate(store, 5L));
 
       assertNull(store.getOldList(1L));
       assertNotNull(store.getOldList(2L));
@@ -157,8 +156,8 @@ class TestFullDiffSequentialReader {
 
     try (SnapDiffJobStore store = newStore(false)) {
       new FullDiffSequentialReader(store).scanFileTables(fromTable, toTable, null);
-      assertTrue(store.isNewListCandidate(1L));
-      assertTrue(store.isNewListCandidate(2L));
+      assertTrue(isNewListCandidate(store, 1L));
+      assertTrue(isNewListCandidate(store, 2L));
       assertNotNull(store.getOldList(1L));
       assertEquals(0, store.getDiffCandidateCount());
     }
@@ -196,8 +195,8 @@ class TestFullDiffSequentialReader {
     try (SnapDiffJobStore store = newStore(false)) {
       new FullDiffSequentialReader(store, gate).scanFileTables(fromTable, toTable, null);
 
-      assertTrue(store.isNewListCandidate(10L));
-      assertTrue(store.isNewListCandidate(11L));
+      assertTrue(isNewListCandidate(store, 10L));
+      assertTrue(isNewListCandidate(store, 11L));
       assertNotNull(store.getOldList(10L));
       assertNotNull(store.getOldList(11L));
       assertEquals(0, store.getDiffCandidateCount());
@@ -218,12 +217,12 @@ class TestFullDiffSequentialReader {
 
     try (SnapDiffJobStore store = SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
         "job" + JOB_ID.incrementAndGet(), false, SnapDiffJobStore.Mode.FULL,
-        SnapDiffJobStore.DEFAULT_WRITE_BATCH_SIZE, 2L)) {
+        SnapDiffJobStore.DEFAULT_BATCH_SIZE, 2L)) {
       new FullDiffSequentialReader(store, 50L).scanFileTables(fromTable, toTable, null);
 
-      assertTrue(store.isNewListCandidate(1L));
-      assertTrue(store.isNewListCandidate(2L));
-      assertTrue(store.isNewListCandidate(3L));
+      assertTrue(isNewListCandidate(store, 1L));
+      assertTrue(isNewListCandidate(store, 2L));
+      assertTrue(isNewListCandidate(store, 3L));
       assertNotNull(store.getOldList(1L));
       assertNotNull(store.getOldList(2L));
       assertNotNull(store.getOldList(3L));
@@ -245,8 +244,8 @@ class TestFullDiffSequentialReader {
     try (SnapDiffJobStore store = newStore(false)) {
       new FullDiffSequentialReader(store).scanFileTables(fromTable, toTable, bucketPrefix);
 
-      assertTrue(store.isNewListCandidate(1L));
-      assertFalse(store.hasNewListEntry(2L));
+      assertTrue(isNewListCandidate(store, 1L));
+      assertFalse(hasNewListEntry(store, 2L));
       assertNotNull(store.getOldList(1L));
       assertNull(store.getOldList(2L));
     }
@@ -264,13 +263,25 @@ class TestFullDiffSequentialReader {
 
     try (SnapDiffJobStore store = newStore(true)) {
       new FullDiffSequentialReader(store, 50L).scanDirectoryTables(fromTable, toTable, null);
+      store.flushWrites();
 
-      assertEquals("a", name(store.getToEdgeName(BUCKET_OBJECT_ID, 100L)));
-      assertEquals("b", name(store.getToEdgeName(100L, 101L)));
-      assertEquals("a", name(store.getFromEdgeName(BUCKET_OBJECT_ID, 100L)));
-      assertEquals("b", name(store.getFromEdgeName(100L, 101L)));
+      SnapDiffPathResolver toResolver = store.newToPathResolver(BUCKET_OBJECT_ID);
+      SnapDiffPathResolver fromResolver = store.newFromPathResolver(BUCKET_OBJECT_ID);
+      assertEquals("a", toResolver.resolvePath(100L));
+      assertEquals("a/b", toResolver.resolvePath(101L));
+      assertEquals("a", fromResolver.resolvePath(100L));
+      assertEquals("a/b", fromResolver.resolvePath(101L));
       assertEquals(0, store.getDiffCandidateCount());
     }
+  }
+
+  private static boolean hasNewListEntry(SnapDiffJobStore store, long objectId) throws IOException {
+    return store.getNewList(objectId) != null;
+  }
+
+  private static boolean isNewListCandidate(SnapDiffJobStore store, long objectId) throws IOException {
+    byte[] value = store.getNewList(objectId);
+    return value != null && !store.isPresentMarker(value);
   }
 
   private static SnapDiffJobStore newStore(boolean fso) throws IOException {
@@ -312,9 +323,5 @@ class TestFullDiffSequentialReader {
         .setParentObjectID(parentId)
         .setUpdateID(updateId)
         .build();
-  }
-
-  private static String name(byte[] value) {
-    return value == null ? null : new String(value, StandardCharsets.UTF_8);
   }
 }

@@ -17,13 +17,14 @@
 
 package org.apache.hadoop.ozone.om.snapshot.diff;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
 
 /**
- * Metadata for a classified snapshot diff entry used to build the dependency
+ * Metadata for a path-resolved snapshot diff entry used to build the dependency
  * graph for dependency-ordered report emission.
  *
  * <p>Paths in the wrapped {@link DiffReportEntry} must use the snapshot
@@ -46,8 +47,14 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
  *   <li>The source parent drives from-snapshot ordering (an entry must be
  *       applied before its source parent is deleted).</li>
  * </ul>
+ *
+ * <p>Unresolved classified rows use parent-id payloads in per-type column
+ * families encoded by {@link SnapDiffJobStore}. This type is used only after path
+ * resolution for dependency ordering.
  */
 public final class SnapDiffDependencyEntry {
+
+  private static final int RESOLVED_HEADER_BYTES = 1 + 3 * Long.BYTES;
 
   private final long objectId;
   private final long sourceParentObjectId;
@@ -63,7 +70,6 @@ public final class SnapDiffDependencyEntry {
 
   /**
    * Creates an entry whose source and target parent are the same object.
-   * Suitable for CREATE, DELETE and MODIFY where the object does not move.
    */
   public SnapDiffDependencyEntry(long objectId, long parentObjectId,
       DiffReportEntry reportEntry) {
@@ -71,8 +77,7 @@ public final class SnapDiffDependencyEntry {
   }
 
   /**
-   * Creates an entry with distinct source and target parents. Use this for
-   * RENAME entries that move an object between parents.
+   * Creates an entry with source and target parents.
    */
   public SnapDiffDependencyEntry(long objectId, long sourceParentObjectId,
       long targetParentObjectId, DiffReportEntry reportEntry) {
@@ -122,7 +127,7 @@ public final class SnapDiffDependencyEntry {
   }
 
   public boolean isDelete() {
-    return getDiffType() == DiffType.DELETE;
+    return reportEntry.getType() == DiffType.DELETE;
   }
 
   /**
@@ -139,6 +144,59 @@ public final class SnapDiffDependencyEntry {
     sourcePath = null;
     targetPath = null;
     targetPathDecoded = false;
+  }
+
+  byte[] toResolvedBytes() {
+    String sourcePathStr = new String(reportEntry.getSourcePath(), StandardCharsets.UTF_8);
+    byte[] sourcePathBytes = sourcePathStr.getBytes(StandardCharsets.UTF_8);
+    byte[] targetPathBytes = reportEntry.getTargetPath();
+    int targetLenField = targetPathBytes == null ? -1 : targetPathBytes.length;
+    int targetPayload = targetPathBytes == null ? 0 : targetPathBytes.length;
+    ByteBuffer buffer = ByteBuffer.allocate(
+        RESOLVED_HEADER_BYTES + Integer.BYTES + sourcePathBytes.length + Integer.BYTES
+            + targetPayload);
+    buffer.put((byte) reportEntry.getType().ordinal());
+    buffer.putLong(objectId);
+    buffer.putLong(sourceParentObjectId);
+    buffer.putLong(targetParentObjectId);
+    buffer.putInt(sourcePathBytes.length);
+    buffer.put(sourcePathBytes);
+    buffer.putInt(targetLenField);
+    if (targetPathBytes != null) {
+      buffer.put(targetPathBytes);
+    }
+    return buffer.array();
+  }
+
+  static SnapDiffDependencyEntry fromResolvedBytes(byte[] bytes) {
+    Objects.requireNonNull(bytes, "bytes must not be null");
+    if (bytes.length < RESOLVED_HEADER_BYTES + Integer.BYTES + Integer.BYTES) {
+      throw new IllegalArgumentException("Resolved entry too short: " + bytes.length);
+    }
+    ByteBuffer buffer = ByteBuffer.wrap(bytes);
+    DiffType diffType = DiffType.values()[buffer.get() & 0xFF];
+    long objectId = buffer.getLong();
+    long sourceParentId = buffer.getLong();
+    long targetParentId = buffer.getLong();
+    int sourcePathLen = buffer.getInt();
+    if (sourcePathLen < 0 || sourcePathLen > buffer.remaining()) {
+      throw new IllegalArgumentException("Invalid source path length: " + sourcePathLen);
+    }
+    byte[] sourcePathBytes = new byte[sourcePathLen];
+    buffer.get(sourcePathBytes);
+    int targetPathLen = buffer.getInt();
+    byte[] targetPathBytes = null;
+    if (targetPathLen >= 0) {
+      if (targetPathLen > buffer.remaining()) {
+        throw new IllegalArgumentException("Invalid target path length: " + targetPathLen);
+      }
+      targetPathBytes = new byte[targetPathLen];
+      buffer.get(targetPathBytes);
+    }
+    DiffReportEntry reportEntry = targetPathBytes == null
+        ? new DiffReportEntry(diffType, sourcePathBytes, null)
+        : new DiffReportEntry(diffType, sourcePathBytes, targetPathBytes);
+    return new SnapDiffDependencyEntry(objectId, sourceParentId, targetParentId, reportEntry);
   }
 
   @Override
