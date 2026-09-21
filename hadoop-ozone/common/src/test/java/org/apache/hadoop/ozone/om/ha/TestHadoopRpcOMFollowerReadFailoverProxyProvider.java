@@ -331,11 +331,11 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     OzoneManagerProtocolPB routingProxy = proxyProvider.getProxy().proxy;
     assertFalse(Proxy.isProxyClass(routingProxy.getClass()));
     assertNotNull(routingProxy.toString());
-    routingProxy.hashCode();
-    assertTrue(routingProxy.equals(routingProxy));
-    retryProxy.toString();
-    retryProxy.hashCode();
-    assertTrue(retryProxy.equals(retryProxy));
+    assertEquals(routingProxy.hashCode(), routingProxy.hashCode());
+    assertNotEquals((Object) routingProxy, new Object());
+    assertNotNull(retryProxy.toString());
+    assertEquals(retryProxy.hashCode(), retryProxy.hashCode());
+    assertNotEquals((Object) retryProxy, new Object());
     for (OMProxyInfo<OzoneManagerProtocolPB> omProxy : proxyProvider.getOMProxies()) {
       assertNull(omProxy.getProxy());
     }
