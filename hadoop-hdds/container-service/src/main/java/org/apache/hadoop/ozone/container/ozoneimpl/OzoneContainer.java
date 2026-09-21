@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerDomainSocket;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
@@ -109,7 +110,6 @@ import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
-import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Timer;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -582,11 +582,12 @@ public class OzoneContainer {
    * When the timeout is a positive duration, a watchdog is scheduled before
    * initialization begins. If initialization has not finished by then - for
    * example because Ratis group recovery inside {@code writeChannel.start()}
-   * has stalled on a failing volume - the watchdog terminates the JVM via
-   * {@link ExitUtil#terminate(int, String)} instead of letting startup hang
-   * indefinitely. Because initialization runs on a single thread, no separate
-   * worker can keep starting services after the timeout. A non-positive timeout
-   * disables the watchdog, preserving the previous behavior.
+   * has stalled on a failing volume - the watchdog terminates the datanode via
+   * {@link DatanodeStateMachine#triggerFatalShutdown(String)} (which enters JVM
+   * shutdown) instead of letting startup hang indefinitely. Because
+   * initialization runs on a single thread, no separate worker can keep starting
+   * services after the timeout. A non-positive timeout disables the watchdog,
+   * preserving the previous behavior.
    */
   private void initializeContainerServicesWithTimeout(String clusterId) throws IOException {
     Duration initTimeout =
@@ -628,9 +629,16 @@ public class OzoneContainer {
     // Enter JVM shutdown directly rather than calling the datanode stop service.
     // Its synchronous stop() can itself block on the same failing disk (for
     // example a container scanner's Thread.join()), so it could hang before the
-    // process exits. System.exit runs the datanode cleanup registered with
-    // ShutdownHookManager, which bounds each hook with a timeout.
-    ExitUtil.terminate(1, message);
+    // process exits. triggerFatalShutdown() calls ExitUtils.terminate, and
+    // System.exit runs the datanode cleanup registered with ShutdownHookManager,
+    // which bounds each hook with a timeout.
+    StateContext current = context;
+    DatanodeStateMachine dsm = current == null ? null : current.getParent();
+    if (dsm != null) {
+      dsm.triggerFatalShutdown(message);
+    } else {
+      LOG.error("No datanode state machine available; cannot automatically terminate the stalled datanode.");
+    }
   }
 
   private void initializeContainerServices(String clusterId) throws IOException {

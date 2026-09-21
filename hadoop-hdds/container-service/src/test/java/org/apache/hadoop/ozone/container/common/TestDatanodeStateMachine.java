@@ -71,10 +71,10 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
-import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -245,8 +245,8 @@ public class TestDatanodeStateMachine {
   @Test
   @Timeout(60)
   void testStalledInitializationTimeoutTerminatesDatanode() throws Exception {
-    ExitUtil.disableSystemExit();
-    ExitUtil.resetFirstExitException();
+    ExitUtils.disableSystemExit();
+    ExitUtils.clear();
     conf.setFromObject(conf.getObject(ReplicationConfig.class).setPort(0));
     // Enable the startup watchdog with a short timeout.
     conf.setTimeDuration(DatanodeConfiguration.CONTAINER_INIT_TIMEOUT_KEY, 2, TimeUnit.SECONDS);
@@ -274,15 +274,15 @@ public class TestDatanodeStateMachine {
       assertThat(initializing.await(10, TimeUnit.SECONDS)).isTrue();
 
       // The watchdog must enter JVM shutdown even though writeChannel.start()
-      // never returns and never throws. Going straight to ExitUtil (System.exit)
+      // never returns and never throws. Going straight to ExitUtils (System.exit)
       // avoids the synchronous stop() path, which could itself block on the disk.
-      GenericTestUtils.waitFor(ExitUtil::terminateCalled, 100, 20000);
-      assertThat(ExitUtil.getFirstExitException().getExitCode()).isEqualTo(1);
-      assertThat(ExitUtil.getFirstExitException().getMessage()).contains("did not complete within");
+      GenericTestUtils.waitFor(ExitUtils::isTerminated, 100, 20000);
+      assertThat(ExitUtils.getFirstExitException().getStatus()).isEqualTo(1);
+      assertThat(ExitUtils.getFirstExitException().getMessage()).contains("did not complete within");
     } finally {
       release.countDown();
       stateMachine.stopDaemon();
-      ExitUtil.resetFirstExitException();
+      ExitUtils.clear();
     }
   }
 
