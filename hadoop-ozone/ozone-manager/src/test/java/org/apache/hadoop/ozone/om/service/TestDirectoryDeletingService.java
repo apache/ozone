@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DE
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -40,6 +41,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -58,6 +60,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
@@ -66,6 +71,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 
 /**
@@ -257,6 +264,66 @@ public class TestDirectoryDeletingService {
     assertThat(subject.getIntervalMillis())
         .as("interval after restart")
         .isEqualTo(newInterval.toMillis());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"1, true", "2, true", "3, true", "1, false", "2, false", "3, false"})
+  void testPurgeDirectoriesSubmitFailure(int failedBatch, boolean throwException) throws Exception {
+    List<PurgePathRequest> purgeList = new ArrayList<>();
+    String directoryName = StringUtils.repeat("d", 1200);
+    for (int i = 0; i < 3; i++) {
+      purgeList.add(PurgePathRequest.newBuilder().setVolumeId(1).setBucketId(2)
+          .setDeletedDir(directoryName + i).build());
+    }
+
+    OzoneConfiguration conf = createConfAndInitValues(1);
+    // Each path fits in one batch, but two paths exceed the byte limit.
+    conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 2304, StorageUnit.BYTES);
+    OmTestManagers managers = new OmTestManagers(conf);
+    try {
+      KeyManager keyManager = managers.getKeyManager();
+      DirectoryDeletingService service = keyManager.getDirDeletingService();
+      service.suspend();
+      DirectoryDeletingService subject = Mockito.spy(service);
+
+      OMResponse success = OMResponse.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
+          .setStatus(OzoneManagerProtocolProtos.Status.OK).setSuccess(true).build();
+      List<OMRequest> submitted = new ArrayList<>();
+      Mockito.doAnswer(invocation -> {
+        submitted.add(invocation.getArgument(0));
+        if (submitted.size() == failedBatch) {
+          if (throwException) {
+            throw new ServiceException("Transient purge submit failure");
+          }
+          return success.toBuilder().setStatus(OzoneManagerProtocolProtos.Status.INTERNAL_ERROR)
+              .setSuccess(false).build();
+        }
+        return success;
+      }).when(subject).submitRequest(Mockito.any(OMRequest.class));
+
+      subject.optimizeDirDeletesAndSubmitRequest(3L, 0L, 0L, Collections.emptyList(), purgeList, null,
+          Time.monotonicNow(), keyManager, kv -> true, kv -> true, Collections.emptyMap(), null, 1,
+          new AtomicInteger(0));
+
+      assertThat(submitted).hasSize(failedBatch);
+      assertThat(subject.getDeletedDirsCount()).isZero();
+      assertThat(subject.getMovedDirsCount()).isZero();
+      assertThat(subject.getMovedFilesCount()).isZero();
+
+      subject.optimizeDirDeletesAndSubmitRequest(3L, 0L, 0L, Collections.emptyList(), purgeList, null,
+          Time.monotonicNow(), keyManager, kv -> true, kv -> true, Collections.emptyMap(), null, 2,
+          new AtomicInteger(0));
+
+      assertThat(submitted).hasSize(failedBatch + purgeList.size());
+      for (int i = 0; i < purgeList.size(); i++) {
+        OMRequest request = submitted.get(failedBatch + i);
+        assertThat(request.getCmdType()).isEqualTo(OzoneManagerProtocolProtos.Type.PurgeDirectories);
+        assertThat(request.getPurgeDirectoriesRequest().getDeletedPathList()).containsExactly(purgeList.get(i));
+      }
+      assertThat(subject.getDeletedDirsCount()).isEqualTo(3);
+    } finally {
+      managers.stop();
+    }
   }
 
   @Test

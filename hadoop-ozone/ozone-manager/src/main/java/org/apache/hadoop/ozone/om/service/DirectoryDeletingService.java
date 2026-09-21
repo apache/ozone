@@ -362,7 +362,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       }
     }
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePathsWithBatching(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap);
+      if (submitPurgePathsWithBatching(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId,
+          bucketNameInfoMap).isEmpty()) {
+        return;
+      }
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
@@ -547,7 +550,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       if (batchBytes + reqSize > ratisByteLimit && !purgePathRequestBatch.isEmpty()) {
         OzoneManagerProtocolProtos.OMResponse resp =
             submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
-        if (!resp.getSuccess()) {
+        if (resp == null || !resp.getSuccess()) {
           return Collections.emptyList();
         }
         responses.add(resp);
@@ -564,7 +567,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     if (!purgePathRequestBatch.isEmpty()) {
       OzoneManagerProtocolProtos.OMResponse resp =
           submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
-      if (!resp.getSuccess()) {
+      if (resp == null || !resp.getSuccess()) {
         return Collections.emptyList();
       }
       responses.add(resp);
