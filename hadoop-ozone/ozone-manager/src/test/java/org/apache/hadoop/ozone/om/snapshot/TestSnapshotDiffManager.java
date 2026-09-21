@@ -1684,20 +1684,19 @@ public class TestSnapshotDiffManager {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("filterTopLevelDeletedEntryScenarios")
-  public void testFilterTopLevelDeletedEntries(
+  public void testHasDeletedAncestorsBatch(
       String scenarioDescription,
       List<WithParentObjectId> deletedEntries,
       Set<Long> renamedDirectoryIds,
       Map<Long, Long> objectIdToParentId,
-      Set<Long> expectedObjectIds) {
+      Set<Long> expectedObjectIds) throws IOException {
     long bucketObjectId = 0L;
     Map<Long, Long> parentMap = objectIdToParentId != null
         ? objectIdToParentId
         : buildDirATreeParentMap(bucketObjectId);
 
-    List<WithParentObjectId> filteredDeletes = snapshotDiffManager
-        .filterTopLevelDeletedEntries(deletedEntries, OmDirectoryInfo.class::isInstance,
-            parentMap, renamedDirectoryIds, bucketObjectId);
+    List<WithParentObjectId> filteredDeletes = filterTopLevelDeletedEntriesBatch(
+        deletedEntries, renamedDirectoryIds, parentMap, bucketObjectId);
 
     assertThat(filteredDeletes)
         .extracting(WithParentObjectId::getObjectID)
@@ -1764,17 +1763,19 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testFilterTopLevelDeletedEntriesRejectsNullArguments() {
+  public void testHasDeletedAncestorsBatchRejectsNullArguments() {
     long bucketObjectId = 0L;
     OmDirectoryInfo dirA = newDeletedDir(100L, bucketObjectId);
-    List<OmDirectoryInfo> deletedEntries = Collections.singletonList(dirA);
+    List<Long> parentObjectIds = Collections.singletonList(dirA.getParentObjectID());
 
     assertThrows(NullPointerException.class, () -> snapshotDiffManager
-        .filterTopLevelDeletedEntries(deletedEntries, OmDirectoryInfo.class::isInstance,
-            null, Collections.emptySet(), bucketObjectId));
+        .hasDeletedAncestors(parentObjectIds, null, id -> false,
+            ids -> ids.stream().map(id -> dirA.getParentObjectID()).collect(Collectors.toList()),
+            bucketObjectId, new HashMap<>()));
     assertThrows(NullPointerException.class, () -> snapshotDiffManager
-        .filterTopLevelDeletedEntries(deletedEntries, OmDirectoryInfo.class::isInstance,
-            Collections.emptyMap(), null, bucketObjectId));
+        .hasDeletedAncestors(parentObjectIds, id -> false, null,
+            ids -> ids.stream().map(id -> dirA.getParentObjectID()).collect(Collectors.toList()),
+            bucketObjectId, new HashMap<>()));
   }
 
   private static Map<Long, Long> buildDirATreeParentMap(long bucketObjectId) {
@@ -1786,6 +1787,29 @@ public class TestSnapshotDiffManager {
         .put(104L, 102L)
         .put(105L, 101L)
         .build();
+  }
+
+  private List<WithParentObjectId> filterTopLevelDeletedEntriesBatch(
+      List<WithParentObjectId> deletedEntries, Set<Long> renamedDirectoryIds,
+      Map<Long, Long> objectIdToParentId, long bucketObjectId) throws IOException {
+    List<Long> parentObjectIds = deletedEntries.stream()
+        .map(WithParentObjectId::getParentObjectID)
+        .collect(Collectors.toList());
+    Set<Long> deletedDirectoryIds = deletedEntries.stream()
+        .filter(OmDirectoryInfo.class::isInstance)
+        .map(WithParentObjectId::getObjectID)
+        .collect(Collectors.toSet());
+    boolean[] hasDeletedAncestor = snapshotDiffManager.hasDeletedAncestors(parentObjectIds,
+        deletedDirectoryIds::contains, renamedDirectoryIds::contains,
+        objectIds -> objectIds.stream().map(objectIdToParentId::get).collect(Collectors.toList()),
+        bucketObjectId, new HashMap<>());
+    List<WithParentObjectId> filteredDeletes = new ArrayList<>();
+    for (int i = 0; i < deletedEntries.size(); i++) {
+      if (!hasDeletedAncestor[i]) {
+        filteredDeletes.add(deletedEntries.get(i));
+      }
+    }
+    return filteredDeletes;
   }
 
   @ParameterizedTest

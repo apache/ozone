@@ -19,12 +19,13 @@ package org.apache.hadoop.ozone.om.snapshot.diff;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -82,7 +83,7 @@ public final class SnapDiffDependencyGraph {
   private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
   private static final String PATH_SEPARATOR = OM_KEY_PREFIX;
 
-  private final List<SnapDiffDependencyEntry> nodes = new ArrayList<>();
+  private final List<NodeData> nodes = new ArrayList<>();
 
   // Edges collected during construction, each encoded as (from << 32 | to).
   // Deduplicated and compacted into the CSR arrays below by buildCsr(), then
@@ -107,8 +108,14 @@ public final class SnapDiffDependencyGraph {
    *     matches a CREATE path
    */
   public SnapDiffDependencyGraph(List<SnapDiffDependencyEntry> entries) {
+    this(entries.iterator());
+  }
+
+  public SnapDiffDependencyGraph(Iterator<SnapDiffDependencyEntry> entries) {
     Objects.requireNonNull(entries, "entries");
-    nodes.addAll(entries);
+    while (entries.hasNext()) {
+      nodes.add(new NodeData(entries.next()));
+    }
     // Size the initial edge buffer to roughly the node count so realistic
     // graphs (edge density 3-8 per node) skip most of the doubling copies.
     // Clamp to INITIAL_EDGE_CAPACITY so tiny inputs still allocate cheaply.
@@ -124,6 +131,15 @@ public final class SnapDiffDependencyGraph {
    * @throws IllegalStateException if the graph contains a cycle
    */
   public List<SnapDiffDependencyEntry> getOrderedEntries() {
+    List<Integer> orderedNodeIds = getOrderedNodeIds();
+    List<SnapDiffDependencyEntry> orderedEntries = new ArrayList<>(orderedNodeIds.size());
+    for (int nodeId : orderedNodeIds) {
+      orderedEntries.add(nodes.get(nodeId).toDependencyEntry());
+    }
+    return orderedEntries;
+  }
+
+  List<Integer> getOrderedNodeIds() {
     int nodeCount = nodes.size();
     // Work on a local copy of the in-degrees so the method is idempotent and
     // does not mutate the graph's shared state.
@@ -149,11 +165,11 @@ public final class SnapDiffDependencyGraph {
       }
     }
 
-    List<SnapDiffDependencyEntry> orderedEntries = new ArrayList<>(nodeCount);
+    List<Integer> orderedNodeIds = new ArrayList<>(nodeCount);
     while (deleteHead < deleteTail || otherHead < otherTail) {
       int nodeId = deleteHead < deleteTail
           ? deleteReady[deleteHead++] : otherReady[otherHead++];
-      orderedEntries.add(nodes.get(nodeId));
+      orderedNodeIds.add(nodeId);
       for (int i = adjOffsets[nodeId]; i < adjOffsets[nodeId + 1]; i++) {
         int dependentNodeId = adjTargets[i];
         if (--remainingInDegree[dependentNodeId] == 0) {
@@ -166,8 +182,8 @@ public final class SnapDiffDependencyGraph {
       }
     }
 
-    if (orderedEntries.size() != nodeCount) {
-      List<String> unresolved = collectUnresolvedNodes(orderedEntries);
+    if (orderedNodeIds.size() != nodeCount) {
+      List<String> unresolved = collectUnresolvedNodes(orderedNodeIds);
       LOG.debug("Cycle detected in snapshot diff dependency graph. "
           + "Unresolved entries: {}", unresolved);
       int total = unresolved.size();
@@ -178,17 +194,16 @@ public final class SnapDiffDependencyGraph {
               + "entries (showing up to %d): %s",
           total, MAX_CYCLE_ENTRIES_IN_MESSAGE, sample));
     }
-    return orderedEntries;
+    return orderedNodeIds;
   }
 
-  private List<String> collectUnresolvedNodes(
-      List<SnapDiffDependencyEntry> orderedEntries) {
-    Set<SnapDiffDependencyEntry> resolved =
-        Collections.newSetFromMap(new IdentityHashMap<>());
-    resolved.addAll(orderedEntries);
+  private List<String> collectUnresolvedNodes(List<Integer> orderedNodeIds) {
+    Set<Integer> resolved = new HashSet<>(expectedHashMapCapacity(orderedNodeIds.size()));
+    resolved.addAll(orderedNodeIds);
     List<String> unresolved = new ArrayList<>();
-    for (SnapDiffDependencyEntry entry : nodes) {
-      if (!resolved.contains(entry)) {
+    for (int nodeId = 0; nodeId < nodes.size(); nodeId++) {
+      if (!resolved.contains(nodeId)) {
+        NodeData entry = nodes.get(nodeId);
         unresolved.add(entry.getDiffType() + " " + entry.getSourcePath());
       }
     }
@@ -206,6 +221,28 @@ public final class SnapDiffDependencyGraph {
       reportEntries.add(entry.getReportEntry());
     }
     return reportEntries;
+  }
+
+  /**
+   * Persists CSR adjacency and topological order into the job store. Keys use
+   * 4-byte big-endian node or edge indices so iterators read in emission order.
+   */
+  void persistToStore(SnapDiffJobStore store, List<Integer> orderedNodeIds)
+      throws IOException {
+    int nodeCount = nodes.size();
+    for (int i = 0; i < nodeCount; i++) {
+      store.putDepAdjOffset(i, adjOffsets[i]);
+      store.putDepInDegree(i, inDegree[i]);
+    }
+    for (int i = 0; i < adjTargets.length; i++) {
+      store.putDepAdjTarget(i, adjTargets[i]);
+    }
+    if (orderedNodeIds.size() != nodeCount) {
+      throw new IllegalStateException("Ordered node id count does not match dependency graph");
+    }
+    for (int position = 0; position < orderedNodeIds.size(); position++) {
+      store.putDepOrder(position, orderedNodeIds.get(position));
+    }
   }
 
   private void addEdge(int fromNodeId, int toNodeId) {
@@ -299,7 +336,7 @@ public final class SnapDiffDependencyGraph {
     int createCount = 0;
     int deleteCount = 0;
     int renameCount = 0;
-    for (SnapDiffDependencyEntry entry : nodes) {
+    for (NodeData entry : nodes) {
       DiffType diffType = entry.getDiffType();
       if (diffType == DiffType.DELETE) {
         deleteCount++;
@@ -319,7 +356,7 @@ public final class SnapDiffDependencyGraph {
         new HashMap<>(expectedHashMapCapacity(renameCount));
 
     for (int nodeId = 0; nodeId < nodes.size(); nodeId++) {
-      SnapDiffDependencyEntry entry = nodes.get(nodeId);
+      NodeData entry = nodes.get(nodeId);
       if (entry.isDelete()) {
         addToPathIndex(deleteNodesByPath, entry.getSourcePath(), nodeId);
       } else {
@@ -354,12 +391,6 @@ public final class SnapDiffDependencyGraph {
     groupOffsets = null;
     groupNodes = null;
 
-    // Path strings were cached on each entry so that repeated edge-building
-    // passes did not re-decode. The graph no longer reads them once edges
-    // are built; drop the caches to reclaim per-entry heap.
-    for (SnapDiffDependencyEntry entry : nodes) {
-      entry.clearPathCache();
-    }
   }
 
   /**
@@ -389,7 +420,7 @@ public final class SnapDiffDependencyGraph {
     long[] renameObjectIds = new long[renameCount];
     int uniqueCount = 0;
     for (int i = 0; i < nodeCount && uniqueCount < renameCount; i++) {
-      SnapDiffDependencyEntry entry = nodes.get(i);
+      NodeData entry = nodes.get(i);
       if (entry.getDiffType() == DiffType.RENAME) {
         renameObjectIds[uniqueCount] = entry.getObjectId();
         rankByObjectId.put(entry.getObjectId(), uniqueCount);
@@ -446,7 +477,7 @@ public final class SnapDiffDependencyGraph {
       if (renameNodeId < 0) {
         continue;
       }
-      SnapDiffDependencyEntry rename = nodes.get(renameNodeId);
+      NodeData rename = nodes.get(renameNodeId);
       for (int i = start; i < end; i++) {
         int nodeId = groupNodes[i];
         if (nodeId == renameNodeId) {
@@ -576,7 +607,7 @@ public final class SnapDiffDependencyGraph {
     }
 
     for (int nodeId = 0; nodeId < nodes.size(); nodeId++) {
-      SnapDiffDependencyEntry entry = nodes.get(nodeId);
+      NodeData entry = nodes.get(nodeId);
       DiffType diffType = entry.getDiffType();
       if (diffType != DiffType.RENAME && diffType != DiffType.MODIFY) {
         continue;
@@ -613,7 +644,7 @@ public final class SnapDiffDependencyGraph {
       Map<String, Integer> renameNodesByTargetPath,
       Set<String> reoccupiedPaths) {
     for (int nodeId = 0; nodeId < nodes.size(); nodeId++) {
-      SnapDiffDependencyEntry entry = nodes.get(nodeId);
+      NodeData entry = nodes.get(nodeId);
       if (entry.isDelete()) {
         continue;
       }
@@ -678,7 +709,7 @@ public final class SnapDiffDependencyGraph {
   private static boolean shouldSkipReoccupiedPathToSnapshotEdge(
       String ancestorPath,
       Set<String> reoccupiedPaths,
-      SnapDiffDependencyEntry descendant) {
+      NodeData descendant) {
     if (!reoccupiedPaths.contains(ancestorPath)) {
       return false;
     }
@@ -696,7 +727,7 @@ public final class SnapDiffDependencyGraph {
     return path.startsWith(prefix + PATH_SEPARATOR);
   }
 
-  private static String getToSnapshotPath(SnapDiffDependencyEntry entry) {
+  private static String getToSnapshotPath(NodeData entry) {
     if (entry.getDiffType() == DiffType.RENAME) {
       return entry.getTargetPath();
     }
@@ -733,6 +764,53 @@ public final class SnapDiffDependencyGraph {
             "Invalid snapshot diff report: RENAME target path '%s' cannot match "
                 + "a CREATE path in the same diff", path));
       }
+    }
+  }
+
+  private static final class NodeData {
+    private final long objectId;
+    private final long sourceParentObjectId;
+    private final long targetParentObjectId;
+    private final DiffType diffType;
+    private final String sourcePath;
+    private final String targetPath;
+
+    private NodeData(SnapDiffDependencyEntry entry) {
+      this.objectId = entry.getObjectId();
+      this.sourceParentObjectId = entry.getSourceParentObjectId();
+      this.targetParentObjectId = entry.getTargetParentObjectId();
+      this.diffType = entry.getDiffType();
+      this.sourcePath = entry.getSourcePath();
+      this.targetPath = entry.getTargetPath();
+    }
+
+    private long getObjectId() {
+      return objectId;
+    }
+
+    private DiffType getDiffType() {
+      return diffType;
+    }
+
+    private boolean isDelete() {
+      return diffType == DiffType.DELETE;
+    }
+
+    private String getSourcePath() {
+      return sourcePath;
+    }
+
+    private String getTargetPath() {
+      return targetPath;
+    }
+
+    private SnapDiffDependencyEntry toDependencyEntry() {
+      byte[] sourceBytes = sourcePath.getBytes(StandardCharsets.UTF_8);
+      byte[] targetBytes = targetPath == null ? null : targetPath.getBytes(StandardCharsets.UTF_8);
+      DiffReportEntry reportEntry = targetBytes == null
+          ? new DiffReportEntry(diffType, sourceBytes, null)
+          : new DiffReportEntry(diffType, sourceBytes, targetBytes);
+      return new SnapDiffDependencyEntry(objectId, sourceParentObjectId, targetParentObjectId, reportEntry);
     }
   }
 }
