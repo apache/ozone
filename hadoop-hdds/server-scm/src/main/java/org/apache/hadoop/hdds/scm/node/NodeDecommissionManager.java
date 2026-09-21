@@ -281,8 +281,6 @@ public class NodeDecommissionManager {
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    // Read the maintenance replica config from ReplicationManagerConfiguration,
-    // which is the single source of truth for these values.
     ReplicationManager.ReplicationManagerConfiguration rmConf = rm.getConfig();
     setMaintenanceConfigs(rmConf.getMaintenanceReplicaMinimum(),
         rmConf.getMaintenanceRemainingRedundancy());
