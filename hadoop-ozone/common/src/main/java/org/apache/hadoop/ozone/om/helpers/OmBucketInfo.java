@@ -113,8 +113,13 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   private final ImmutableMap<String, String> tags;
 
+  private final boolean objectLockEnabled;
+  private final Retention defaultRetention;
+
   private OmBucketInfo(Builder b) {
     super(b);
+    this.objectLockEnabled = b.objectLockEnabled;
+    this.defaultRetention = b.defaultRetention;
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
     this.acls = b.acls.build();
@@ -135,6 +140,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.owner = b.owner;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
     this.tags = b.tags.build();
+  }
+
+  public boolean isObjectLockEnabled() {
+    return objectLockEnabled;
+  }
+
+  public Retention getDefaultRetention() {
+    return defaultRetention;
   }
 
   public static Codec<OmBucketInfo> getCodec() {
@@ -393,6 +406,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setBucketLayout(bucketLayout)
         .setOwner(owner)
         .setDefaultReplicationConfig(defaultReplicationConfig)
+        .setObjectLockEnabled(objectLockEnabled)
+        .setDefaultRetention(defaultRetention)
         .setTags(tags);
   }
 
@@ -417,6 +432,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setSnapshotUsedNamespace(source.getSnapshotUsedNamespace())
         .setBucketLayout(source.getBucketLayout())
         .setDefaultReplicationConfig(source.getDefaultReplicationConfig())
+        .setObjectLockEnabled(source.isObjectLockEnabled())
+        .setDefaultRetention(source.getDefaultRetention())
         .setTags(source.getTags())
         .addAllMetadata(source.getMetadata())
         .build();
@@ -426,6 +443,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    * Builder for OmBucketInfo.
    */
   public static class Builder extends WithObjectID.Builder<OmBucketInfo> {
+    private boolean objectLockEnabled;
+    private Retention defaultRetention;
     private String volumeName;
     private String bucketName;
     private final AclListBuilder acls;
@@ -456,6 +475,16 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       super(obj);
       acls = AclListBuilder.of(obj.acls);
       tags = MapBuilder.of(obj.tags);
+    }
+
+    public Builder setObjectLockEnabled(boolean objectLockEnabled) {
+      this.objectLockEnabled = objectLockEnabled;
+      return this;
+    }
+
+    public Builder setDefaultRetention(Retention defaultRetention) {
+      this.defaultRetention = defaultRetention;
+      return this;
     }
 
     public Builder setVolumeName(String volume) {
@@ -657,6 +686,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (owner != null) {
       bib.setOwner(owner);
     }
+    bib.setObjectLockEnabled(objectLockEnabled);
+    if (defaultRetention != null) {
+      bib.setDefaultRetention(defaultRetention.toProto());
+    }
     return bib.build();
   }
 
@@ -728,6 +761,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
     if (bucketInfo.hasOwner()) {
       obib.setOwner(bucketInfo.getOwner());
+    }
+    obib.setObjectLockEnabled(bucketInfo.getObjectLockEnabled());
+    if (bucketInfo.hasDefaultRetention()) {
+      obib.setDefaultRetention(Retention.fromProto(bucketInfo.getDefaultRetention()));
     }
     return obib;
   }
@@ -802,7 +839,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         Objects.equals(bekInfo, that.bekInfo) &&
         Objects.equals(owner, that.owner) &&
         Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig) &&
-        Objects.equals(tags, that.tags);
+        Objects.equals(tags, that.tags) &&
+        objectLockEnabled == that.objectLockEnabled &&
+        Objects.equals(defaultRetention, that.defaultRetention);
   }
 
   @Override

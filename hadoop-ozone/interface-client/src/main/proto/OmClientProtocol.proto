@@ -833,6 +833,34 @@ message BucketInfo {
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
     repeated hadoop.hdds.KeyValue tags = 23;
+    optional bool objectLockEnabled = 24 [default = false];
+    optional RetentionConfig defaultRetention = 25;
+}
+
+message RetentionConfig {
+    optional Rule rule = 1;
+    optional EventHold eventHold = 2;
+}
+
+message EventHold {
+    required bool enabled = 1;
+    required Rule rule = 2;
+}
+
+message Rule {
+    required RetentionMode retentionMode = 1;
+    required TimeUnit timeUnit = 2;
+    required uint64 duration = 3;
+}
+
+enum TimeUnit {
+    DAYS = 1;
+    YEARS = 2;
+}
+
+enum RetentionMode {
+    GOVERNANCE = 1;
+    COMPLIANCE = 2;
 }
 
 enum BucketLayoutProto {
@@ -1241,6 +1269,9 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+    optional uint64 retentionDate = 23;
+    optional RetentionConfig retentionConfig = 24;
+    optional bool legalHold = 25 [default = false];
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -1260,6 +1291,9 @@ message KeyInfoProtoLight {
   optional uint64 parentID = 16;
   optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
   optional bool isFile = 19;
+  optional uint64 retentionDate = 23;
+  optional RetentionConfig retentionConfig = 24;
+  optional bool legalHold = 25 [default = false];
 }
 
 message BasicKeyInfo {

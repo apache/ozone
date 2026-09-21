@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.fs.FileChecksum;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
@@ -129,6 +131,33 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
         .setFileChecksum(checksum)
         .setExpectedDataGeneration(12345L)
         .build();
+  }
+
+  @Test
+  public void testObjectLockFields() throws IOException {
+    OzoneManagerProtocolProtos.Rule rule = OzoneManagerProtocolProtos.Rule.newBuilder()
+        .setRetentionMode(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE)
+        .setTimeUnit(OzoneManagerProtocolProtos.TimeUnit.YEARS).setDuration(1).build();
+    Retention retention = new Retention(rule,
+        OzoneManagerProtocolProtos.EventHold.newBuilder().setEnabled(true).setRule(rule).build());
+    OmKeyInfo key = getKeyInfo(1).toBuilder()
+        .setRetentionDate(1_800_000_000_000L).setRetentionConfig(retention).setLegalHold(true).build();
+    for (Codec<OmKeyInfo> codec : Arrays.asList(OmKeyInfo.getOpenKeyTableCodec(), OmKeyInfo.getKeyTableCodec())) {
+      byte[] rawData = codec.toPersistedFormat(key);
+      OmKeyInfo decoded = codec.fromPersistedFormat(rawData);
+      assertEquals(key.getRetentionDate(), decoded.getRetentionDate());
+      assertEquals(retention, decoded.getRetentionConfig());
+      assertEquals(Boolean.TRUE, decoded.getLegalHold());
+
+      OzoneManagerProtocolProtos.KeyInfoProtoLight light =
+          OzoneManagerProtocolProtos.KeyInfoProtoLight.parseFrom(rawData);
+      assertEquals(key.getRetentionDate().longValue(), light.getRetentionDate());
+      assertEquals(retention.toProto(), light.getRetentionConfig());
+      assertTrue(light.getLegalHold());
+    }
+    assertEquals(23, KeyInfo.RETENTIONDATE_FIELD_NUMBER);
+    assertEquals(24, KeyInfo.RETENTIONCONFIG_FIELD_NUMBER);
+    assertEquals(25, KeyInfo.LEGALHOLD_FIELD_NUMBER);
   }
 
   @Test

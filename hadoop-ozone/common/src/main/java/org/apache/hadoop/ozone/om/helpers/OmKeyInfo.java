@@ -112,8 +112,15 @@ public final class OmKeyInfo extends WithParentObjectId
   // been modified.
   private final Long expectedDataGeneration;
 
+  private final Long retentionDate;
+  private final Retention retentionConfig;
+  private final Boolean legalHold;
+
   private OmKeyInfo(Builder b) {
     super(b);
+    this.retentionDate = b.retentionDate;
+    this.retentionConfig = b.retentionConfig;
+    this.legalHold = b.legalHold;
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
     this.keyName = b.keyName;
@@ -130,6 +137,18 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+  }
+
+  public Long getRetentionDate() {
+    return retentionDate;
+  }
+
+  public Retention getRetentionConfig() {
+    return retentionConfig;
+  }
+
+  public Boolean getLegalHold() {
+    return legalHold;
   }
 
   /**
@@ -494,6 +513,9 @@ public final class OmKeyInfo extends WithParentObjectId
    * Builder of OmKeyInfo.
    */
   public static class Builder extends WithParentObjectId.Builder<OmKeyInfo> {
+    private Long retentionDate;
+    private Retention retentionConfig;
+    private Boolean legalHold;
     private String volumeName;
     private String bucketName;
     private String keyName;
@@ -522,6 +544,9 @@ public final class OmKeyInfo extends WithParentObjectId
     public Builder(OmKeyInfo obj) {
       super(obj);
       this.acls = AclListBuilder.of(obj.acls);
+      this.retentionDate = obj.retentionDate;
+      this.retentionConfig = obj.retentionConfig;
+      this.legalHold = obj.legalHold;
       this.volumeName = obj.volumeName;
       this.bucketName = obj.bucketName;
       this.keyName = obj.keyName;
@@ -555,6 +580,21 @@ public final class OmKeyInfo extends WithParentObjectId
           .getInstance(ReplicationFactor.ONE);
       this.omKeyLocationInfoGroups.add(
           new OmKeyLocationInfoGroup(0, new ArrayList<>()));
+    }
+
+    public Builder setRetentionDate(Long retentionDate) {
+      this.retentionDate = retentionDate;
+      return this;
+    }
+
+    public Builder setRetentionConfig(Retention retentionConfig) {
+      this.retentionConfig = retentionConfig;
+      return this;
+    }
+
+    public Builder setLegalHold(Boolean legalHold) {
+      this.legalHold = legalHold;
+      return this;
     }
 
     public Builder setVolumeName(String volume) {
@@ -857,6 +897,15 @@ public final class OmKeyInfo extends WithParentObjectId
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
+    if (retentionDate != null) {
+      kb.setRetentionDate(retentionDate);
+    }
+    if (retentionConfig != null) {
+      kb.setRetentionConfig(retentionConfig.toProto());
+    }
+    if (legalHold != null) {
+      kb.setLegalHold(legalHold);
+    }
     return kb.build();
   }
 
@@ -887,6 +936,15 @@ public final class OmKeyInfo extends WithParentObjectId
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
         .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
+    if (keyInfo.hasRetentionDate()) {
+      builder.setRetentionDate(keyInfo.getRetentionDate());
+    }
+    if (keyInfo.hasRetentionConfig()) {
+      builder.setRetentionConfig(Retention.fromProto(keyInfo.getRetentionConfig()));
+    }
+    if (keyInfo.hasLegalHold()) {
+      builder.setLegalHold(keyInfo.getLegalHold());
+    }
     if (keyInfo.hasObjectID()) {
       builder.setObjectID(keyInfo.getObjectID());
     }
@@ -948,6 +1006,9 @@ public final class OmKeyInfo extends WithParentObjectId
         Objects.equals(getMetadata(), omKeyInfo.getMetadata()) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         Objects.equals(getTags(), omKeyInfo.getTags()) &&
+        Objects.equals(retentionDate, omKeyInfo.retentionDate) &&
+        Objects.equals(retentionConfig, omKeyInfo.retentionConfig) &&
+        Objects.equals(legalHold, omKeyInfo.legalHold) &&
         getObjectID() == omKeyInfo.getObjectID();
 
     if (isEqual && checkUpdateID) {

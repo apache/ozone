@@ -41,6 +41,26 @@ import org.junit.jupiter.api.Test;
 public class TestOmBucketInfo {
 
   @Test
+  public void objectLockProtobufConversionAndCopy() {
+    Retention retention = new Retention(OzoneManagerProtocolProtos.Rule.newBuilder()
+        .setRetentionMode(OzoneManagerProtocolProtos.RetentionMode.COMPLIANCE)
+        .setTimeUnit(OzoneManagerProtocolProtos.TimeUnit.DAYS).setDuration(30).build(), null);
+    OmBucketInfo bucket = OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("bucket")
+        .setObjectLockEnabled(true).setDefaultRetention(retention).build();
+    OmBucketInfo decoded = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    for (OmBucketInfo value : new OmBucketInfo[]{decoded, bucket.copyObject(), bucket.toBuilder().build(),
+        OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("link").build()
+            .withOperationalPropertiesFrom(bucket)}) {
+      assertTrue(value.isObjectLockEnabled());
+      assertEquals(retention, value.getDefaultRetention());
+    }
+    OmBucketInfo legacy = OmBucketInfo.getFromProtobuf(bucket.getProtobuf().toBuilder()
+        .clearObjectLockEnabled().clearDefaultRetention().build());
+    assertFalse(legacy.isObjectLockEnabled());
+    assertNull(legacy.getDefaultRetention());
+  }
+
+  @Test
   public void protobufConversion() {
     OmBucketInfo bucket = OmBucketInfo.newBuilder()
         .setBucketName("bucket")
