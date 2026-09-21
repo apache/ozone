@@ -52,9 +52,7 @@ public class RunningDatanodeState implements DatanodeState {
   private final ConfigurationSource conf;
   private final StateContext context;
   private CompletionService<EndPointStates> ecs;
-  // Since we connectionManager endpoints can be changed by reconfiguration
-  // we should not rely on ConnectionManager#getValues being unchanged between
-  // execute and await
+  // Include tasks from earlier heartbeats whose completions have not been collected yet.
   private int executingEndpointCount = 0;
 
   public RunningDatanodeState(ConfigurationSource conf,
@@ -88,8 +86,10 @@ public class RunningDatanodeState implements DatanodeState {
    */
   @Override
   public void execute(ExecutorService executor) {
-    ecs = new ExecutorCompletionService<>(executor);
-    executingEndpointCount = 0;
+    // Reuse the completion queue across heartbeats so results arriving after await() times out are not lost.
+    if (ecs == null) {
+      ecs = new ExecutorCompletionService<>(executor);
+    }
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
       Callable<EndPointStates> endpointTask = buildEndPointTask(endpoint);
       if (endpointTask != null) {
@@ -210,26 +210,21 @@ public class RunningDatanodeState implements DatanodeState {
   public DatanodeStateMachine.DatanodeStates
       await(long duration, TimeUnit timeUnit)
       throws InterruptedException {
-    int returned = 0;
     long durationMS = timeUnit.toMillis(duration);
     long timeLeft = durationMS;
     long startTime = Time.monotonicNow();
     List<Future<EndPointStates>> results = new LinkedList<>();
 
-    while (returned < executingEndpointCount && timeLeft > 0) {
+    while (executingEndpointCount > 0 && timeLeft > 0) {
       Future<EndPointStates> result =
           ecs.poll(timeLeft, TimeUnit.MILLISECONDS);
       if (result != null) {
         results.add(result);
-        returned++;
+        executingEndpointCount--;
       }
       timeLeft = durationMS - (Time.monotonicNow() - startTime);
     }
     return computeNextContainerState(results);
   }
 
-  @Override
-  public void clear() {
-    ecs = null;
-  }
 }

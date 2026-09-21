@@ -22,11 +22,13 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -87,6 +89,52 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
     OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, omKeyInfoFSO.getObjectID(),
             omMetadataManager);
+  }
+
+  @Override
+  protected void addKeyToTable(String volumeName, String bucketName,
+      String keyName, long clientID, List<OmKeyLocationInfo> locationList)
+      throws Exception {
+    long parentID = getParentID(volumeName, bucketName, keyName);
+    long txnId = 2;
+    long objectId = parentID + 1;
+
+    OmKeyInfo omKeyInfoFSO =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+                RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
+            .setObjectID(objectId)
+            .setParentObjectID(parentID)
+            .setUpdateID(txnId)
+            .build();
+    omKeyInfoFSO.appendNewBlocks(locationList, false);
+
+    // add key to openFileTable
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    omKeyInfoFSO.setKeyName(fileName);
+    OMRequestTestUtils.addFileToKeyTable(true, false,
+            fileName, omKeyInfoFSO, clientID, omKeyInfoFSO.getObjectID(),
+            omMetadataManager);
+  }
+
+  @Override
+  protected void addCommittedKeyToTable(String volumeName, String bucketName,
+      String keyName, List<OmKeyLocationInfo> locationList) throws Exception {
+    long parentID = getParentID(volumeName, bucketName, keyName);
+
+    OmKeyInfo omKeyInfoFSO =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+                RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), false))
+            .setObjectID(parentID + 2)
+            .setParentObjectID(parentID)
+            .setUpdateID(0L)
+            .build();
+    omKeyInfoFSO.appendNewBlocks(locationList, false);
+
+    // add key to fileTable
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    omKeyInfoFSO.setKeyName(fileName);
+    OMRequestTestUtils.addFileToKeyTable(false, false,
+            fileName, omKeyInfoFSO, 0L, 100L, omMetadataManager);
   }
 
   private long getParentID(String volumeName, String bucketName,
