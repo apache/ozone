@@ -35,11 +35,17 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 /**
  * The input stream for Ozone file system.
- *
- * TODO: Make inputStream generic for both rest and rpc clients
- * Sequential reads are not thread safe. Positioned reads delegate to the
- * underlying {@link ExtendedInputStream} when it supports them; otherwise they
- * fall back to a synchronized seek-read-restore sequence.
+ * <p>
+ * Sequential reads are NOT thread safe.
+ * <p>
+ * Positioned reads are thread safe.
+ * When the underlying stream is an {@link ExtendedInputStream} and
+ * when it supports {@link ExtendedInputStream#readFully(long, ByteBuffer)},
+ * they delegate to it.
+ * Otherwise, they fall back to the default synchronized seek-read-restore implementation.
+ * <p>
+ * Applications must use either sequential reads or position reads at any given time,
+ * but not concurrent sequential/position reads
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -179,7 +185,14 @@ public class OzoneFSInputStream extends FSInputStream
       final int remainingBeforeRead = buf.remaining();
       try {
         if (((ExtendedInputStream) inputStream).readFully(position, buf)) {
-          return remainingBeforeRead - buf.remaining();
+          final int bytesRead = remainingBeforeRead - buf.remaining();
+          if (bytesRead == 0) {
+            return -1;
+          }
+          if (statistics != null) {
+            statistics.incrementBytesRead(bytesRead);
+          }
+          return bytesRead;
         }
       } catch (EOFException e) {
         return -1;
@@ -303,11 +316,6 @@ public class OzoneFSInputStream extends FSInputStream
         remaining -= n;
       }
     }
-  }
-
-  @Override
-  public void readFully(long position, byte[] buffer) throws IOException {
-    readFully(position, buffer, 0, buffer.length);
   }
 
   private int readAtPositionSeekRestoreByteArray(long position, byte[] buffer, int offset, int length)
