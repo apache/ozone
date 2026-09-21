@@ -15,4 +15,13 @@
    limitations under the License.
 -->
 <FindBugsFilter>
+  <!-- MergedKeyValue owns key/value arrays copied once at emit time; callers must not mutate. -->
+  <Match>
+    <Class name="org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator$MergedKeyValue"/>
+    <Or>
+      <Method name="getUserKey"/>
+      <Method name="getValue"/>
+    </Or>
+    <Bug pattern="EI_EXPOSE_REP"/>
+  </Match>
 </FindBugsFilter>

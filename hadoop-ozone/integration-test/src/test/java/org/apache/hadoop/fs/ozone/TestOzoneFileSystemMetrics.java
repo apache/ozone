@@ -28,8 +28,8 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -70,7 +70,7 @@ public abstract class TestOzoneFileSystemMetrics implements NonHATests.TestCase 
     omConfig.setFileSystemPathEnabled(true);
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.LEGACY);
+    bucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.LEGACY);
 
     // Set the fs.defaultFS and start the filesystem
     String uri = String.format("%s://%s.%s/",

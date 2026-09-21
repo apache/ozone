@@ -19,10 +19,18 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CACHE_CONTROL_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_DISPOSITION_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_ENCODING_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_LANGUAGE_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_TYPE_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.EXPIRES_CUSTOM;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.endpoint.TestObjectGet.EXPIRES1;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
@@ -42,6 +50,7 @@ import java.io.OutputStream;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -55,9 +64,13 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test head object.
@@ -106,6 +119,14 @@ public class TestObjectHead {
   @Test
   public void testHeadFailByBadName() throws Exception {
     assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, "badKeyName"));
+  }
+
+  @Test
+  public void testHeadWithNegativePartNumber() throws Exception {
+    keyEndpoint.queryParamsForTest()
+        .setInt(S3Consts.QueryParams.PART_NUMBER, -1);
+    assertErrorResponse(INVALID_ARGUMENT,
+        () -> keyEndpoint.head(bucketName, "key1"));
   }
 
   @Test
@@ -235,35 +256,69 @@ public class TestObjectHead {
     assertEquals("2", response.getHeaderString(TAG_COUNT_HEADER));
   }
 
-  @Test
-  public void testHeadSeparatesUserContentTypeMetadataFromObjectContentType()
+  @ParameterizedTest
+  @MethodSource("reservedMetadataCollisionCases")
+  public void testHeadSeparatesUserMetadataFromSystemHeader(
+      String headerName, String customKey, String systemValue, String userValue)
       throws Exception {
-    String keyName = "typed-with-user-meta";
-    String objectContentType = "image/jpeg";
-    String userContentType = "user/custom-type";
-
-    // PUT with both the object's Content-Type and a colliding user
-    // x-amz-meta-content-type.
-    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
-        .thenReturn(objectContentType);
+    String keyName = "reserved-" + customKey;
     MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
-    requestHeaders.putSingle(
-        CUSTOM_METADATA_HEADER_PREFIX + "content-type", userContentType);
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + headerName.toLowerCase(), userValue);
     when(headers.getRequestHeaders()).thenReturn(requestHeaders);
-    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "head-content"));
+    if (HttpHeaders.CONTENT_TYPE.equals(headerName)) {
+      when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+          .thenReturn(systemValue);
+    } else {
+      when(headers.getHeaderString(headerName)).thenReturn(systemValue);
+    }
 
-    // The user value is remapped, so the object's Content-Type is preserved.
-    assertEquals(objectContentType,
-        bucket.getKey(keyName).getMetadata().get(HttpHeaders.CONTENT_TYPE));
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "body"));
 
-    // HEAD returns the object Content-Type as the standard header and the user
-    // value as x-amz-meta-content-type.
+    assertEquals(systemValue, bucket.getKey(keyName).getMetadata().get(headerName));
+    assertEquals(userValue,
+        bucket.getKey(keyName).getMetadata().get(customKey));
+
     Response response = keyEndpoint.head(bucketName, keyName);
     assertEquals(HttpStatus.SC_OK, response.getStatus());
-    assertEquals(objectContentType,
-        response.getHeaderString(HttpHeaders.CONTENT_TYPE));
-    assertEquals(userContentType,
-        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "content-type"));
+    assertEquals(systemValue, response.getHeaderString(headerName));
+    assertEquals(userValue,
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + headerName.toLowerCase()));
+  }
+
+  @Test
+  public void testUserMetadataSuffixDoesNotCollideWithInternalKey() throws Exception {
+    String keyName = "reserved-cache-control-suffix";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "cache-control", "user-cache");
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "cache-control-custom", "suffix-value");
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+    when(headers.getHeaderString(HttpHeaders.CACHE_CONTROL)).thenReturn("no-cache");
+
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "body"));
+
+    assertEquals("no-cache",
+        bucket.getKey(keyName).getMetadata().get(HttpHeaders.CACHE_CONTROL));
+    assertEquals("user-cache",
+        bucket.getKey(keyName).getMetadata().get(CACHE_CONTROL_CUSTOM));
+    assertEquals("suffix-value",
+        bucket.getKey(keyName).getMetadata().get("cache-control-custom"));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+    assertEquals("no-cache", response.getHeaderString(HttpHeaders.CACHE_CONTROL));
+    assertEquals("user-cache",
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "cache-control"));
+    assertEquals("suffix-value",
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "cache-control-custom"));
+  }
+
+  private static Stream<Arguments> reservedMetadataCollisionCases() {
+    return Stream.of(
+        Arguments.of(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM, "image/jpeg", "user/custom-type"),
+        Arguments.of(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_CUSTOM, "no-cache", "user-cache"),
+        Arguments.of(HttpHeaders.EXPIRES, EXPIRES_CUSTOM, EXPIRES1, "user-expires"),
+        Arguments.of(HttpHeaders.CONTENT_ENCODING, CONTENT_ENCODING_CUSTOM, "gzip", "user-encoding"),
+        Arguments.of(HttpHeaders.CONTENT_LANGUAGE, CONTENT_LANGUAGE_CUSTOM, "en-CA", "user-lang"),
+        Arguments.of(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION_CUSTOM, "inline", "user-disp"));
   }
 
   private byte[] createKey(String keyPath) throws IOException {

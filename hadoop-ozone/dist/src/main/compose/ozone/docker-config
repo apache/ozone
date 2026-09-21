@@ -89,9 +89,19 @@ OZONE-SITE.XML_ozone.snapshot.defrag.service.interval=30s
 # store instead (see ozone-site.xml.template for full setup instructions).
 #
 # To enable the chatbot locally for testing:
-#   1. Uncomment the lines below.
-#   2. Replace YOUR_GEMINI_API_KEY_HERE with a real key.
+#   1. Uncomment ONE block below (direct provider or gateway).
+#   2. Replace the placeholder key with a real key.
 #   3. Never commit a real key to git — rotate it immediately if you do.
+#
+# --- Direct provider (Gemini example; OpenAI and Anthropic are also supported) ---
 # OZONE-SITE.XML_ozone.recon.chatbot.enabled=true
 # OZONE-SITE.XML_ozone.recon.chatbot.provider=gemini
 # OZONE-SITE.XML_ozone.recon.chatbot.gemini.api.key=YOUR_GEMINI_API_KEY_HERE
+#
+# --- OpenAI-compatible gateway (LiteLLM etc.) — one door for all models ---
+# OZONE-SITE.XML_ozone.recon.chatbot.enabled=true
+# OZONE-SITE.XML_ozone.recon.chatbot.provider=gateway
+# OZONE-SITE.XML_ozone.recon.chatbot.gateway.base.url=https://your-gateway/v1
+# OZONE-SITE.XML_ozone.recon.chatbot.gateway.api.key=YOUR_GATEWAY_KEY_HERE
+# OZONE-SITE.XML_ozone.recon.chatbot.gateway.models=gpt-4.1,claude-sonnet,gemini-2.5-flash
+# OZONE-SITE.XML_ozone.recon.chatbot.default.model=claude-sonnet

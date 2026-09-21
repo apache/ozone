@@ -35,9 +35,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -149,7 +149,7 @@ public class TestNSSummaryMemoryLeak {
     client = cluster.newClient();
 
     // Create FSO bucket for testing
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
     String volumeName = bucket.getVolumeName();
     String bucketName = bucket.getName();

@@ -25,6 +25,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.api.types.OMDBReprocessResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 
@@ -52,6 +53,17 @@ public class TriggerDBSyncEndpoint {
     boolean isSuccess =
         ozoneManagerServiceProvider.triggerSyncDataFromOMImmediately();
     return Response.ok(isSuccess).build();
+  }
+
+  @POST
+  @Path("om/reinit")
+  public Response triggerOMDBReinit() {
+    OMDBReprocessResponse response = ozoneManagerServiceProvider.triggerTaskRebuild();
+    if (response.getStatus() == OMDBReprocessResponse.Status.ACCEPTED) {
+      return Response.accepted(response).build();
+    } else {
+      return Response.status(Response.Status.CONFLICT).entity(response).build();
+    }
   }
 
   @POST

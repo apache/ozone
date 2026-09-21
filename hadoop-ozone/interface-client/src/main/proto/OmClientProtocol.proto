@@ -157,11 +157,20 @@ enum Type {
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
   SubmitSnapshotDiff = 143;
-
-  // TODO(HDDS-15497): S3 bucket tagging RPCs; handled by OM in a follow-up PR (S3G maps to PUT/GET/DELETE ?tagging).
   PutBucketTagging = 144;
   GetBucketTagging = 145;
   DeleteBucketTagging = 146;
+  SetLifecycleConfiguration = 147;
+  GetLifecycleConfiguration   = 148;
+  DeleteLifecycleConfiguration = 149;
+  GetLifecycleServiceStatus    = 150;
+  SetLifecycleServiceStatus    = 151;
+  SaveLifecycleScanState       = 152;
+  AssumeRole = 153;
+  RevokeSTSToken = 154;
+  DeleteRevokedSTSTokens = 155;
+  GetCallerIdentity = 156;
+  SnapshotCount = 157;
 }
 
 enum SafeMode {
@@ -312,15 +321,22 @@ message OMRequest {
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
-
-  optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest       = 144;
-
-  // TODO: PutBucketTagging — tags in bucketArgs.tags; OM persists to BucketInfo.tags.
+  optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest      = 144;
   optional PutBucketTaggingRequest          putBucketTaggingRequest         = 145;
-  // TODO: GetBucketTagging — volume/bucket in bucketArgs; response returns tag list.
   optional GetBucketTaggingRequest          getBucketTaggingRequest          = 146;
-  // TODO: DeleteBucketTagging — clears tags on target bucket (link resolves in OM).
   optional DeleteBucketTaggingRequest       deleteBucketTaggingRequest       = 147;
+  optional SetLifecycleConfigurationRequest setLifecycleConfigurationRequest = 148;
+  optional GetLifecycleConfigurationRequest   getLifecycleConfigurationRequest   = 149;
+  optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 150;
+  optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 151;
+  optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 152;
+  optional SaveLifecycleScanStateRequest saveLifecycleScanStateRequest = 153;
+  optional AssumeRoleRequest                assumeRoleRequest              = 154;
+  optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 155;
+  optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 156;
+  optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 157;
+  optional GetCallerIdentityRequest         getCallerIdentityRequest       = 158;
+  optional SnapshotCountRequest snapshotCountRequest = 159;
 }
 
 message OMResponse {
@@ -454,15 +470,23 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
-
   optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse    = 143;
 
-  // TODO: Empty ack after OM applies tag set to OmBucketInfo.
   optional PutBucketTaggingResponse          putBucketTaggingResponse      = 144;
-  // TODO: Tag list for S3G GetBucketTagging XML; empty if no tags.
   optional GetBucketTaggingResponse          getBucketTaggingResponse      = 145;
-  // TODO: Empty ack after OM clears BucketInfo.tags.
   optional DeleteBucketTaggingResponse       deleteBucketTaggingResponse    = 146;
+
+  optional SetLifecycleConfigurationResponse setLifecycleConfigurationResponse = 147;
+  optional GetLifecycleConfigurationResponse   getLifecycleConfigurationResponse   = 148;
+  optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 149;
+  optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 150;
+  optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 151;
+  optional SaveLifecycleScanStateResponse saveLifecycleScanStateResponse = 152;
+  optional AssumeRoleResponse                assumeRoleResponse             = 153;
+  optional RevokeSTSTokenResponse            revokeSTSTokenResponse         = 154;
+  optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 155;
+  optional GetCallerIdentityResponse         getCallerIdentityResponse      = 156;
+  optional SnapshotCountResponse snapshotCountResponse = 157;
 }
 
 enum Status {
@@ -598,6 +622,11 @@ enum Status {
     ETAG_NOT_AVAILABLE = 100;
 
     ATOMIC_WRITE_CONFLICT = 101;
+
+    LIFECYCLE_CONFIGURATION_NOT_FOUND = 102;
+    UPDATE_ID_NOT_MATCH = 103;
+    REVOKED_TOKEN = 104;
+    MALFORMED_POLICY_DOCUMENT = 105;
 }
 
 /**
@@ -806,7 +835,6 @@ message BucketInfo {
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
-    // TODO: S3 bucket tags persisted in OM DB; set by PutBucketTagging, read by GetBucketTagging.
     repeated hadoop.hdds.KeyValue tags = 23;
 }
 
@@ -881,7 +909,6 @@ message BucketArgs {
     optional string ownerName = 10;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
     optional BucketEncryptionInfoProto bekInfo = 12;
-    // TODO: Tag payload for PutBucketTagging only.
     repeated hadoop.hdds.KeyValue tags = 13;
 }
 
@@ -1337,6 +1364,9 @@ message ListStatusRequest {
     required string startKey = 3;
     required uint64 numEntries = 4;
     optional bool allowPartialPrefix = 5;
+    // When keyArgs.keyName is empty (root listing), this is the original S3/list
+    // prefix for STS auth. Enables LIST check on this prefix instead of "*".
+    optional string listPrefix = 6;
 }
 
 message ListStatusResponse {
@@ -1352,6 +1382,7 @@ message CreateKeyRequest {
     // Set in OM HA during preExecute step. This way all OM's use same ID in
     // OM HA.
     optional uint64 clientID = 2;
+    optional bool derivedKeyPiggyBacking = 3;
 }
 
 message CreateKeyResponse {
@@ -1360,6 +1391,7 @@ message CreateKeyResponse {
     // (similar to a cookie).
     optional uint64 ID = 3;
     optional uint64 openVersion = 4;
+    optional bytes derivedKey = 5;
 }
 
 message LookupKeyRequest {
@@ -1409,6 +1441,7 @@ message RenameKeysResponse{
 message RenameKeyRequest{
     required KeyArgs keyArgs = 1;
     required string toKeyName = 2;
+    optional uint64 updateID = 3;
 }
 
 message RenameKeyResponse{
@@ -1421,12 +1454,21 @@ message DeleteKeyRequest {
 
 message DeleteKeysRequest {
     optional DeleteKeyArgs deleteKeys = 1;
+    optional RequestSource sourceType = 2 [default = USER];
+    optional LifecycleScanState scanState = 3;
+}
+
+enum RequestSource {
+  USER = 1;
+  LIFECYCLE = 2;
+  TRASH = 3;
 }
 
 message DeleteKeyArgs {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated string keys = 3;
+    repeated uint64 updateIDs = 4; // each key's update ID when key is identified for deletion
 }
 
 message DeleteKeyError {
@@ -1541,6 +1583,7 @@ message OMTokenProto {
     enum Type {
       DELEGATION_TOKEN = 1;
       S3AUTHINFO = 2;
+      S3_STS_TOKEN = 3;
     };
     required Type   type           = 1;
     optional uint32 version        = 2;
@@ -1558,6 +1601,13 @@ message OMTokenProto {
     optional string strToSign      = 14;
     optional string omServiceId    = 15 [deprecated = true];
     optional string secretKeyId    = 16;
+    // STS-specific fields
+    optional string roleArn             = 17;
+    optional string originalAccessKeyId = 18;
+    optional string secretAccessKey     = 19;
+    optional string sessionPolicy       = 20;
+    optional string assumedRoleId       = 21;
+    optional string assumedRoleUserArn  = 22;
 }
 
 message SecretKeyProto {
@@ -1594,6 +1644,8 @@ message CommitKeyRequest {
 
 message CommitKeyResponse {
 
+    // Modification time of the committed key, set by OM during preExecute.
+    optional uint64 modificationTime = 1;
 }
 
 message AllocateBlockRequest {
@@ -1742,6 +1794,7 @@ message ServiceInfo {
 
 message MultipartInfoInitiateRequest {
     required KeyArgs keyArgs = 1;
+    optional uint32 schemaVersion = 2;
 
 }
 
@@ -1798,6 +1851,8 @@ message MultipartCommitUploadPartResponse {
     optional string partName = 1;
     // This one is returned as Etag for S3.
     optional string eTag = 2;
+    // Modification time of the committed part key, set by OM during preExecute.
+    optional uint64 modificationTime = 3;
 }
 
 message MultipartUploadCompleteRequest {
@@ -2063,6 +2118,10 @@ message ListSnapshotRequest {
   optional uint32 maxListResult = 5;
 }
 
+message SnapshotCountRequest {
+  optional string bucketFilter = 1;
+}
+
 message SnapshotDiffRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
@@ -2210,6 +2269,21 @@ message ListSnapshotResponse {
   optional string lastSnapshot = 2;
 }
 
+message SnapshotBucketCount {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional uint64 active = 3;
+  optional uint64 deleted = 4;
+  optional uint64 total = 5;
+}
+
+message SnapshotCountResponse {
+  optional uint64 active = 1;
+  optional uint64 deleted = 2;
+  optional uint64 total = 3;
+  repeated SnapshotBucketCount buckets = 4;
+}
+
 message SnapshotDiffResponse {
   enum JobStatusProto {
     QUEUED = 1;
@@ -2225,8 +2299,11 @@ message SnapshotDiffResponse {
       SST_FILE_DELTA_DAG_WALK = 1;
       SST_FILE_DELTA_FULL_DIFF = 2;
       OBJECT_ID_MAP_GEN_OBS = 3;
-      OBJECT_ID_MAP_GEN_FSO = 4;
+      OBJECT_ID_MAP_GEN_FSO = 4 [deprecated = true];
       DIFF_REPORT_GEN = 5;
+      PATH_RESOLUTION_FSO = 6;
+      OBJECT_ID_MAP_GEN_FSO_FILE = 7;
+      OBJECT_ID_MAP_GEN_FSO_DIR = 8;
   }
 
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
@@ -2234,6 +2311,7 @@ message SnapshotDiffResponse {
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
   optional SubStatus subStatus = 5;
+  optional double progressPercent = 6;
 }
 
 message SubmitSnapshotDiffResponse {
@@ -2343,6 +2421,20 @@ message S3Authentication {
     optional string stringToSign = 1;
     optional string signature = 2;
     optional string accessId = 3;
+    // If present, indicates this request uses STS temporary credentials
+    // and carries the base64-encoded session token for validation.
+    optional string sessionToken = 4;
+    // The following fields are resolved from the STS session token by OM.
+    // They are used to enforce STS session policies during Ratis apply.
+    // They must be written or cleared by the OM leader when the token is validated.
+    optional string resolvedStsSessionPolicy = 5;
+    optional string resolvedStsRoleArn = 6;
+    optional string resolvedStsOriginalAccessKeyId = 7;
+    optional string resolvedStsTempAccessKeyId = 8;
+    optional string resolvedStsSecretKeyId = 9;
+    // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
+    // in finer-grained STS permissions.
+    optional string s3Action = 10;
 }
 
 message RecoverLeaseRequest {
@@ -2436,6 +2528,69 @@ message DeleteObjectTaggingRequest {
 message DeleteObjectTaggingResponse {
 }
 
+message AssumeRoleRequest {
+  required string roleArn                 = 1;
+  required string roleSessionName         = 2;
+  optional int32 durationSeconds          = 3 [default = 3600];
+  optional string awsIamSessionPolicy     = 4;
+  required string requestId               = 5;
+}
+
+message AssumeRoleResponse {
+  required string accessKeyId             = 1;
+  required string secretAccessKey         = 2;
+  required string sessionToken            = 3;
+  required uint64 expirationEpochSeconds  = 4;
+  required string assumedRoleId           = 5;
+}
+
+/**
+  This request will be used internally by OM to replicate credentials generated by the leader
+  across the OMs in HA mode. This ensures all OMs have identical audit logs.
+*/
+message UpdateAssumeRoleRequest {
+  required string roleArn                 = 1;
+  required string roleSessionName         = 2;
+  required int32 durationSeconds          = 3;
+  optional string awsIamSessionPolicy     = 4;
+  required string requestId               = 5;
+  // Leader-generated credentials
+  required string tempAccessKeyId         = 6;
+  required string secretAccessKey         = 7;
+  required string roleId                  = 8;
+  optional string sessionToken            = 9;
+  optional uint64 expirationEpochSeconds  = 10;
+}
+
+message RevokeSTSTokenRequest {
+  required string originalAccessKeyId = 1;
+  // Leader-generated revocation cutoff, replicated across OMs in HA mode.
+  optional uint64 revocationTimeMillis = 2;
+}
+
+message RevokeSTSTokenResponse {
+}
+
+/**
+ This will contain a list of originalAccessKeyIds whose revocation entries should be removed from
+ the s3RevokedStsTokenTable.
+*/
+message DeleteRevokedSTSTokensRequest {
+  repeated string originalAccessKeyId = 1;
+}
+
+message DeleteRevokedSTSTokensResponse {
+}
+
+message GetCallerIdentityRequest {
+}
+
+message GetCallerIdentityResponse {
+  optional string account = 1;
+  optional string arn     = 2;
+  optional string userId  = 3;
+}
+
 enum ReadConsistencyProto {
   // Unspecified consistency, the read consistency behavior is decided
   // by the OM
@@ -2498,6 +2653,110 @@ message ReadConsistencyHint {
 }
 
 /**
+S3 lifecycles (filter, expiration, rule and configuration).
+ */
+message LifecycleFilterTag {
+  required string key = 1;
+  required string value = 2;
+}
+
+message LifecycleRuleAndOperator {
+  optional string prefix = 1;
+  repeated LifecycleFilterTag tags = 2;
+}
+
+// TODO: proto 2.5 does not support oneof fields, once we start using protoc 3.x, consider to refactor these message using "oneof"
+/*
+message LifecycleFilter {
+  oneof Filter {
+      string prefix = 1;
+      LifecycleFilterTag tag = 2;
+      LifecycleRuleAndOperator andOperator = 3;
+   }
+}
+
+message LifecycleExpiration {
+  oneof Condition {
+     uint32 days = 1;
+     string date = 2;
+  }
+}
+
+message LifecycleRule {
+  //...
+  oneof Condition {
+    optional string prefix = 4;
+    optional LifecycleFilter filter = 5;
+  }
+  //...
+}
+ */
+message LifecycleFilter {
+  optional string prefix = 1;
+  optional LifecycleFilterTag tag = 2;
+  optional LifecycleRuleAndOperator andOperator = 3;
+}
+
+message LifecycleExpiration {
+  optional uint32 days = 1;
+  optional string date = 2;
+}
+
+message AbortIncompleteMultipartUpload {
+  optional uint32 daysAfterInitiation = 1;
+}
+
+message LifecycleRule {
+  required string id = 1;
+  required bool enabled = 2;
+  repeated LifecycleAction action = 3;
+  optional string prefix = 4;
+  optional LifecycleFilter filter = 5;
+}
+
+message LifecycleAction {
+  optional LifecycleExpiration expiration = 1;
+  optional AbortIncompleteMultipartUpload abortIncompleteMultipartUpload = 2;
+}
+
+message LifecycleConfiguration {
+  required string volume = 1;
+  required string bucket = 2;
+  required BucketLayoutProto bucketLayout = 3;
+  required uint64 creationTime = 4;
+  repeated LifecycleRule rules = 5;
+  optional uint64 objectID = 6;
+  optional uint64 updateID = 7;
+  optional uint64 bucketObjectID = 8;
+}
+
+message SetLifecycleConfigurationRequest {
+  required LifecycleConfiguration lifecycleConfiguration = 1;
+}
+
+message SetLifecycleConfigurationResponse {
+
+}
+
+message GetLifecycleConfigurationRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+}
+
+message GetLifecycleConfigurationResponse {
+  required LifecycleConfiguration lifecycleConfiguration = 1;
+}
+
+message DeleteLifecycleConfigurationRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+}
+
+message DeleteLifecycleConfigurationResponse {
+
+}
+
+/**
  The OM service that takes care of Ozone namespace.
 */
 service OzoneManagerService {
@@ -2506,32 +2765,61 @@ service OzoneManagerService {
           returns(OMResponse);
 }
 
-// TODO: S3 PutBucketTagging — bucketArgs identifies bucket; tags in bucketArgs.tags replace existing set.
+message GetLifecycleServiceStatusRequest {
+}
+
+message GetLifecycleServiceStatusResponse {
+  required bool isEnabled = 1;
+  optional bool isSuspended = 2;
+  repeated string runningBuckets = 3;
+}
+
+message SetLifecycleServiceStatusRequest {
+  required bool suspend = 1;
+}
+
+message SetLifecycleServiceStatusResponse {
+}
+
+message LifecycleScanState {
+  optional string bucketKey = 1;  // volume/bucket
+  optional uint64 bucketObjID = 2;
+  optional uint64 lifecycleConfigurationUpdateID = 3;
+  optional uint64 scanStartTime = 4;
+  optional uint64 scanEndTime = 5;
+  optional string lastScannedKey = 6;
+  optional string lastScannedDir = 7;
+  optional string lastScannedDirKey = 8;
+  optional string lastScannedMpuKey = 9;
+}
+
+message SaveLifecycleScanStateRequest {
+  optional LifecycleScanState state = 1;
+}
+
+message SaveLifecycleScanStateResponse {
+}
+
 message PutBucketTaggingRequest {
   required BucketArgs bucketArgs = 1;
   optional uint64 modificationTime = 2;
 }
 
-// TODO: Success response; no body (tags stored on OmBucketInfo).
 message PutBucketTaggingResponse {
 }
 
-// TODO: S3 GetBucketTagging — bucketArgs.volumeName/bucketName; link resolved in OM reader.
 message GetBucketTaggingRequest {
   required BucketArgs bucketArgs = 1;
 }
 
-// TODO: Returns current bucket tags for S3G Tagging XML response.
 message GetBucketTaggingResponse {
   repeated hadoop.hdds.KeyValue tags = 1;
 }
 
-// TODO: S3 DeleteBucketTagging — clears all tags on bucket (link → source bucket in OM).
 message DeleteBucketTaggingRequest {
   required BucketArgs bucketArgs = 1;
   optional uint64 modificationTime = 2;
 }
 
-// TODO: Success response; bucket has no tags after commit.
 message DeleteBucketTaggingResponse {
 }

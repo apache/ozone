@@ -43,10 +43,10 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -90,7 +90,7 @@ public class TestOzoneManagerHASnapshot {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     store = client.getObjectStore();
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(client);
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(client);
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
   }
@@ -235,7 +235,7 @@ public class TestOzoneManagerHASnapshot {
 
     // Create 10 buckets and initialize snapshot name lists.
     for (int i = 0; i < 10; i++) {
-      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+      OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client);
       ozoneBuckets.add(bucket);
       volumeNames.add(bucket.getVolumeName());
       bucketNames.add(bucket.getName());

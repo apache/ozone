@@ -17,10 +17,16 @@
 
 package org.apache.hadoop.ozone.local;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
@@ -41,6 +47,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.server.http.BaseHttpServer.SERVER_DIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_BASEDIR;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
@@ -68,35 +80,44 @@ import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.TimeDurationUtil;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Starts the SCM and OM portion of the {@code ozone local} runtime.
+ * Starts the SCM, OM, and datanode portion of the {@code ozone local} runtime.
  *
- * <p>Datanodes, S3 Gateway, Recon, and end-to-end key writes are added by
- * later local runtime tickets.</p>
+ * <p>S3 Gateway and Recon are added by later local runtime tickets.</p>
  */
 public final class LocalOzoneCluster implements LocalOzoneRuntime {
 
@@ -111,6 +132,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   private static final String OZONE_METADATA_DIR_NAME = "ozone-metadata";
   private static final String DATA_DIR_NAME = "data";
   private static final String RATIS_DIR_NAME = "ratis";
+  private static final String DATANODE_DIR_PREFIX = "datanode-";
   private static final String SCM_CLIENT_PORT_KEY = "scm.client";
   private static final String SCM_BLOCK_PORT_KEY = "scm.block";
   private static final String SCM_DATANODE_PORT_KEY = "scm.datanode";
@@ -123,9 +145,19 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   private static final String OM_HTTP_PORT_KEY = "om.http";
   private static final String OM_HTTPS_PORT_KEY = "om.https";
   private static final String OM_RATIS_PORT_KEY = "om.ratis";
+  private static final String DATANODE_PORT_KEY_PREFIX = "dn.";
+  private static final String DATANODE_HTTP_PORT_KEY_SUFFIX = "http";
+  private static final String DATANODE_CLIENT_PORT_KEY_SUFFIX = "client";
+  private static final String DATANODE_CONTAINER_IPC_PORT_KEY_SUFFIX = "container.ipc";
+  private static final String DATANODE_RATIS_IPC_PORT_KEY_SUFFIX = "ratis.ipc";
+  private static final String DATANODE_RATIS_ADMIN_PORT_KEY_SUFFIX = "ratis.admin";
+  private static final String DATANODE_RATIS_SERVER_PORT_KEY_SUFFIX = "ratis.server";
+  private static final String DATANODE_RATIS_DATASTREAM_PORT_KEY_SUFFIX = "ratis.datastream";
+  private static final String DATANODE_REPLICATION_PORT_KEY_SUFFIX = "replication";
   private static final int LOCAL_RATIS_RPC_TIMEOUT_SECONDS = 1;
   private static final long SCM_CLIENT_MAX_RETRY_TIMEOUT_MILLIS = 30_000;
   private static final long READINESS_POLL_INTERVAL_MILLIS = 500;
+  private static final long READINESS_LOG_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(5);
 
   private static final int MAX_PORT = 65_535;
 
@@ -144,6 +176,28 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       OM_RATIS_PORT_KEY
   };
 
+  private static final String[] DATANODE_PORT_KEY_SUFFIXES = {
+      DATANODE_HTTP_PORT_KEY_SUFFIX,
+      DATANODE_CLIENT_PORT_KEY_SUFFIX,
+      DATANODE_CONTAINER_IPC_PORT_KEY_SUFFIX,
+      DATANODE_RATIS_IPC_PORT_KEY_SUFFIX,
+      DATANODE_RATIS_ADMIN_PORT_KEY_SUFFIX,
+      DATANODE_RATIS_SERVER_PORT_KEY_SUFFIX,
+      DATANODE_RATIS_DATASTREAM_PORT_KEY_SUFFIX,
+      DATANODE_REPLICATION_PORT_KEY_SUFFIX
+  };
+
+  // Every datanode runs in this JVM and reserves DATANODE_PORT_KEY_SUFFIXES.length
+  // local ports, so an unbounded count would exhaust local ports; cap it.
+  static final int MAX_DATANODES = 20;
+
+  private static final Set<String> SHIPPED_DEFAULT_RESOURCES = Collections.unmodifiableSet(
+      OzoneConfiguration.getConfigurationResourceFiles().stream()
+          .filter(resource -> resource.endsWith("-default.xml"))
+          .collect(Collectors.toSet()));
+
+  private static final String[] NO_ARGS = new String[0];
+
   private final LocalOzoneClusterConfig config;
   private final OzoneConfiguration seedConfiguration;
   private boolean closed;
@@ -151,6 +205,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   private PreparedConfiguration preparedConfiguration;
   private StorageContainerManager scm;
   private OzoneManager om;
+  private final List<HddsDatanodeService> datanodes = new ArrayList<>();
   private boolean previousMetricsMiniClusterMode;
   private boolean metricsMiniClusterModeEnabled;
 
@@ -179,7 +234,8 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       initializeStorage(prepared.getConfiguration());
       startScm(prepared.getConfiguration());
       startOm(prepared.getConfiguration());
-      waitForScmAndOmReadiness(config.getStartupTimeout());
+      startDatanodes(prepared.getDatanodeConfigurations());
+      waitForClusterReadiness(config.getStartupTimeout());
     } catch (Exception ex) {
       // Roll back without latching closed: the caller's close() still owns the
       // ephemeral data dir lifecycle.
@@ -193,8 +249,10 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       return preparedConfiguration;
     }
 
-    prepareStorageLayout();
-
+    // Every rejection of user input, validateStorageLayout() and the port checks included, runs before
+    // prepareStorageLayout(), which deletes the data dir in format mode ALWAYS.
+    requireSupportedDatanodeCount();
+    validateStorageLayout();
     OzoneConfiguration conf = new OzoneConfiguration(seedConfiguration);
     configureLocalDefaults(conf);
 
@@ -202,9 +260,14 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     PortAllocator portAllocator = new PortAllocator();
     int scmPort = configureScm(conf, persistedPorts, portAllocator);
     int omPort = configureOm(conf, persistedPorts, portAllocator);
+    List<OzoneConfiguration> datanodeConfigurations =
+        configureDatanodes(conf, persistedPorts, portAllocator);
 
+    prepareStorageLayout();
+    createServiceDirectories();
     persistedPorts.store();
-    preparedConfiguration = new PreparedConfiguration(conf, scmPort, omPort);
+    preparedConfiguration = new PreparedConfiguration(conf, scmPort, omPort,
+        datanodeConfigurations);
     return preparedConfiguration;
   }
 
@@ -222,6 +285,13 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   @Override
   public int getOmPort() {
     return om.getOmRpcServerAddr().getPort();
+  }
+
+  /**
+   * Returns the number of running datanodes.
+   */
+  public int getDatanodeCount() {
+    return datanodes.size();
   }
 
   @Override
@@ -258,11 +328,25 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
 
   private void stopServices() {
     try {
-      // Shutdown is best-effort so one failed service cannot leak the other.
-      IOUtils.closeQuietly(this::stopOm, this::stopScm);
+      // Logged rather than closeQuietly: stopServices() is also the start() rollback, where a silent
+      // failure hides leaked threads and ports.
+      IOUtils.close(LOG, this::stopDatanodes, this::stopOm, this::stopScm);
     } finally {
       restoreSameJvmMetricsMode();
     }
+  }
+
+  private void stopDatanodes() {
+    List<AutoCloseable> stoppers = new ArrayList<>();
+    for (int i = datanodes.size() - 1; i >= 0; i--) {
+      HddsDatanodeService service = datanodes.get(i);
+      stoppers.add(() -> {
+        service.stop();
+        service.join();
+      });
+    }
+    datanodes.clear();
+    IOUtils.close(LOG, stoppers);
   }
 
   private void stopOm() {
@@ -282,29 +366,154 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     }
   }
 
-  private void configureLocalDefaults(OzoneConfiguration conf) {
+  private void configureLocalDefaults(OzoneConfiguration conf) throws IOException {
     conf.set(OZONE_METADATA_DIRS, metadataDir().toString());
     // SCM and OM share one configuration and JVM, so the Jetty base dir is a
     // single service-neutral location; Jetty keeps per-context temp dirs.
     conf.setIfUnset(OZONE_HTTP_BASEDIR, metadataDir() + SERVER_DIR);
-    conf.set(OZONE_REPLICATION, ReplicationFactor.ONE.name());
-    conf.set(OZONE_REPLICATION_TYPE, ReplicationType.STAND_ALONE.name());
-    conf.set(OZONE_SERVER_DEFAULT_REPLICATION_KEY, ReplicationFactor.ONE.name());
-    conf.set(OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
+    setLocalOverrideReplication(conf, OZONE_REPLICATION, ReplicationFactor.ONE);
+    setLocalOverride(conf, OZONE_REPLICATION_TYPE, ReplicationType.STAND_ALONE.name());
+    setLocalOverrideReplication(conf, OZONE_SERVER_DEFAULT_REPLICATION_KEY, ReplicationFactor.ONE);
+    setLocalOverride(conf, OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
         ReplicationType.STAND_ALONE.name());
-    conf.setBoolean(HDDS_CONTAINER_RATIS_ENABLED_KEY, false);
-    conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-    conf.setInt(HDDS_SCM_SAFEMODE_MIN_DATANODE,
-        Math.max(1, config.getDatanodes()));
-    conf.setTimeDuration(OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
-        LOCAL_RATIS_RPC_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-    conf.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "3s");
+    setLocalOverride(conf, HDDS_CONTAINER_RATIS_ENABLED_KEY, false);
+    // A single-node local cluster can heartbeat aggressively; this speeds
+    // datanode registration and safe-mode exit.
+    setLocalOverrideDuration(conf, HDDS_HEARTBEAT_INTERVAL, "1s");
+    setLocalOverride(conf, HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    setLocalOverride(conf, HDDS_SCM_SAFEMODE_MIN_DATANODE, config.getDatanodes());
+    setLocalOverrideDuration(conf, OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
+        LOCAL_RATIS_RPC_TIMEOUT_SECONDS + "s");
+    setLocalOverrideDuration(conf, HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "3s");
     conf.setIfUnset(OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT,
         "1s");
 
     SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
     scmClientConfig.setMaxRetryTimeout(SCM_CLIENT_MAX_RETRY_TIMEOUT_MILLIS);
     conf.setFromObject(scmClientConfig);
+  }
+
+  /**
+   * Sets a value the local runtime requires and rejects a user-configured conflict. Set rather than
+   * {@code setIfUnset}: ozone-default.xml would otherwise win. The typed overloads compare through the
+   * accessor the services read the key with, so an equivalent spelling is not a conflict.
+   */
+  private void setLocalOverride(OzoneConfiguration conf, String key, String value)
+      throws IOException {
+    // Configuration#unset() keeps the key's source, so a null value is unconfigured, not a conflict.
+    // Trimmed because Hadoop keeps XML whitespace and the value is rewritten below anyway.
+    String configured = conf.get(key);
+    if (configured != null && !value.equals(configured.trim())) {
+      rejectUserConfigured(conf, key, value);
+    }
+    conf.set(key, value);
+  }
+
+  private void setLocalOverride(OzoneConfiguration conf, String key, boolean value)
+      throws IOException {
+    // The default is the negation so a value getBoolean() cannot parse counts as a conflict.
+    String configured = conf.get(key);
+    if (configured != null && conf.getBoolean(key, !value) != value) {
+      rejectUserConfigured(conf, key, String.valueOf(value));
+    }
+    conf.setBoolean(key, value);
+  }
+
+  private void setLocalOverride(OzoneConfiguration conf, String key, int value)
+      throws IOException {
+    String configured = conf.get(key);
+    if (configured != null && !matchesInt(conf, key, value)) {
+      rejectUserConfigured(conf, key, String.valueOf(value));
+    }
+    conf.setInt(key, value);
+  }
+
+  private void setLocalOverrideDuration(OzoneConfiguration conf, String key, String value)
+      throws IOException {
+    long requiredMillis = TimeDurationUtil.getTimeDurationHelper(key, value, TimeUnit.MILLISECONDS);
+    String configured = conf.get(key);
+    if (configured != null && !matchesDuration(conf, key, configured, requiredMillis)) {
+      rejectUserConfigured(conf, key, value);
+    }
+    conf.set(key, value);
+  }
+
+  private void setLocalOverrideReplication(OzoneConfiguration conf, String key,
+      ReplicationFactor value) throws IOException {
+    String configured = conf.get(key);
+    if (configured != null && parseReplicationFactor(configured) != value) {
+      rejectUserConfigured(conf, key, value.name());
+    }
+    conf.set(key, value.name());
+  }
+
+  private static void rejectUserConfigured(OzoneConfiguration conf, String key, String required)
+      throws IOException {
+    String source = userConfiguredSource(conf, key);
+    if (source == null) {
+      return;
+    }
+    throw new IOException("ozone local requires " + key + "=" + required
+        + ", but it is set to " + conf.get(key) + " (source: " + source
+        + "). Remove or change that setting.");
+  }
+
+  private static boolean matchesInt(OzoneConfiguration conf, String key, int value) {
+    try {
+      return conf.getInt(key, value) == value;
+    } catch (NumberFormatException unreadable) {
+      return false;
+    }
+  }
+
+  private static boolean matchesDuration(OzoneConfiguration conf, String key, String configured,
+      long requiredMillis) {
+    if (lacksTimeUnit(configured)) {
+      return false;
+    }
+    try {
+      return conf.getTimeDuration(key, requiredMillis, TimeUnit.MILLISECONDS) == requiredMillis;
+    } catch (NumberFormatException unreadable) {
+      return false;
+    }
+  }
+
+  /**
+   * {@link TimeDurationUtil#getDuration} reads a bare number in the caller's unit with only a warning,
+   * so "120" would mean 120 milliseconds. Every unit suffix it accepts ends in a letter.
+   */
+  static boolean lacksTimeUnit(String value) {
+    String trimmed = value.trim();
+    return !trimmed.isEmpty() && Character.isDigit(trimmed.charAt(trimmed.length() - 1));
+  }
+
+  /** Accepts both spellings {@link org.apache.hadoop.hdds.client.ReplicationConfig#parse} does, "1" and "ONE". */
+  private static ReplicationFactor parseReplicationFactor(String value) {
+    String trimmed = value.trim();
+    try {
+      return ReplicationFactor.valueOf(Integer.parseInt(trimmed));
+    } catch (IllegalArgumentException notNumeric) {
+      try {
+        return ReplicationFactor.valueOf(trimmed);
+      } catch (IllegalArgumentException notNamed) {
+        return null;
+      }
+    }
+  }
+
+  /**
+   * Source of the value the user chose for {@code key}, or null when its last source is a shipped
+   * {@code *-default.xml} classpath resource. The comparison is exact: Configuration records a classpath
+   * resource by its bare name, and {@link OzoneLocal#setConfigurationPath} absolutizes a {@code --conf}
+   * path so a file with the same name stays a user choice.
+   */
+  private static String userConfiguredSource(OzoneConfiguration conf, String key) {
+    String[] sources = conf.getPropertySources(key);
+    if (sources == null || sources.length == 0) {
+      return null;
+    }
+    String source = sources[sources.length - 1];
+    return SHIPPED_DEFAULT_RESOURCES.contains(source) ? null : source;
   }
 
   private int configureScm(OzoneConfiguration conf,
@@ -353,10 +562,9 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     return scmClientPort;
   }
 
-  private void configureScmStorage(OzoneConfiguration conf) throws IOException {
+  private void configureScmStorage(OzoneConfiguration conf) {
     Path scmDir = config.getDataDir().resolve(SCM_DIR_NAME);
     Path scmMetadataDir = scmDir.resolve(OZONE_METADATA_DIR_NAME);
-    Files.createDirectories(scmDir.resolve(DATA_DIR_NAME));
 
     conf.setIfUnset(OZONE_SCM_DB_DIRS,
         scmDir.resolve(DATA_DIR_NAME).toString());
@@ -389,10 +597,9 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     return omRpcPort;
   }
 
-  private void configureOmStorage(OzoneConfiguration conf) throws IOException {
+  private void configureOmStorage(OzoneConfiguration conf) {
     Path omDir = config.getDataDir().resolve(OM_DIR_NAME);
     Path omMetadataDir = omDir.resolve(OZONE_METADATA_DIR_NAME);
-    Files.createDirectories(omDir.resolve(DATA_DIR_NAME));
 
     conf.setIfUnset(OZONE_OM_DB_DIRS, omDir.resolve(DATA_DIR_NAME).toString());
     conf.setIfUnset(OZONE_OM_RATIS_STORAGE_DIR,
@@ -401,6 +608,71 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
         omMetadataDir.resolve(OZONE_RATIS_SNAPSHOT_DIR).toString());
     conf.setIfUnset(OZONE_OM_SNAPSHOT_DIFF_DB_DIR,
         omMetadataDir.toString());
+  }
+
+  private List<OzoneConfiguration> configureDatanodes(OzoneConfiguration conf,
+      PersistedPortState persistedPorts, PortAllocator portAllocator)
+      throws IOException {
+    List<OzoneConfiguration> datanodeConfigurations =
+        new ArrayList<>(config.getDatanodes());
+    for (int index = 0; index < config.getDatanodes(); index++) {
+      datanodeConfigurations.add(
+          configureDatanode(conf, index, persistedPorts, portAllocator));
+    }
+    return datanodeConfigurations;
+  }
+
+  private OzoneConfiguration configureDatanode(OzoneConfiguration conf,
+      int index, PersistedPortState persistedPorts,
+      PortAllocator portAllocator) throws IOException {
+    OzoneConfiguration dnConf = new OzoneConfiguration(conf);
+    configureDatanodeStorage(dnConf, index);
+
+    dnConf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, address(config.getHost(),
+        reserveDatanodePort(portAllocator, persistedPorts, index,
+            DATANODE_HTTP_PORT_KEY_SUFFIX)));
+    dnConf.set(HDDS_DATANODE_HTTP_BIND_HOST_KEY, config.getBindHost());
+    dnConf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, address(config.getHost(),
+        reserveDatanodePort(portAllocator, persistedPorts, index,
+            DATANODE_CLIENT_PORT_KEY_SUFFIX)));
+    dnConf.set(HDDS_DATANODE_CLIENT_BIND_HOST_KEY, config.getBindHost());
+    dnConf.setInt(HDDS_CONTAINER_IPC_PORT,
+        reserveDatanodePort(portAllocator, persistedPorts, index,
+            DATANODE_CONTAINER_IPC_PORT_KEY_SUFFIX));
+    dnConf.setInt(HDDS_CONTAINER_RATIS_IPC_PORT,
+        reserveDatanodePort(portAllocator, persistedPorts, index,
+            DATANODE_RATIS_IPC_PORT_KEY_SUFFIX));
+    dnConf.setInt(HDDS_CONTAINER_RATIS_ADMIN_PORT,
+        reserveDatanodePort(portAllocator, persistedPorts, index,
+            DATANODE_RATIS_ADMIN_PORT_KEY_SUFFIX));
+    dnConf.setInt(HDDS_CONTAINER_RATIS_SERVER_PORT,
+        reserveDatanodePort(portAllocator, persistedPorts, index,
+            DATANODE_RATIS_SERVER_PORT_KEY_SUFFIX));
+    dnConf.setInt(HDDS_CONTAINER_RATIS_DATASTREAM_PORT,
+        reserveDatanodePort(portAllocator, persistedPorts, index,
+            DATANODE_RATIS_DATASTREAM_PORT_KEY_SUFFIX));
+
+    ReplicationServer.ReplicationConfig replicationConfig =
+        dnConf.getObject(ReplicationServer.ReplicationConfig.class);
+    replicationConfig.setPort(reserveDatanodePort(portAllocator,
+        persistedPorts, index, DATANODE_REPLICATION_PORT_KEY_SUFFIX));
+    dnConf.setFromObject(replicationConfig);
+    return dnConf;
+  }
+
+  private void configureDatanodeStorage(OzoneConfiguration dnConf, int index) {
+    Path datanodeDir = config.getDataDir()
+        .resolve(DATANODE_DIR_PREFIX + index);
+    Path datanodeMetadataDir = datanodeDir.resolve(OZONE_METADATA_DIR_NAME);
+
+    dnConf.set(OZONE_METADATA_DIRS, datanodeMetadataDir.toString());
+    // Each datanode gets its own Jetty base dir so same-JVM HTTP servers do
+    // not share unpacked web resources.
+    dnConf.set(OZONE_HTTP_BASEDIR, datanodeMetadataDir + SERVER_DIR);
+    dnConf.set(HDDS_DATANODE_DIR_KEY,
+        datanodeDir.resolve(DATA_DIR_NAME).toString());
+    dnConf.set(HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+        datanodeDir.resolve(RATIS_DIR_NAME).toString());
   }
 
   private void initializeStorage(OzoneConfiguration conf) throws IOException {
@@ -483,20 +755,77 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     om.start();
   }
 
-  private void waitForScmAndOmReadiness(Duration timeout) throws Exception {
-    long deadlineNanos = System.nanoTime() + timeout.toNanos();
+  private void startDatanodes(List<OzoneConfiguration> datanodeConfigurations) {
+    for (OzoneConfiguration dnConf : datanodeConfigurations) {
+      // Track the datanode before start() so a failed start can still be
+      // rolled back by stopServices().
+      HddsDatanodeService datanode = new HddsDatanodeService(NO_ARGS);
+      datanodes.add(datanode);
+      datanode.start(dnConf);
+    }
+  }
+
+  private void waitForClusterReadiness(Duration timeout) throws Exception {
+    waitForReadiness(this::clusterReadinessBlocker, "Ozone cluster", timeout);
+  }
+
+  /** {@code blocker} returns why {@code subject} is not ready yet, or null once it is. */
+  static void waitForReadiness(Supplier<String> blocker, String subject, Duration timeout)
+      throws InterruptedException, TimeoutException {
+    long startNanos = System.nanoTime();
+    long nextLogNanos = startNanos + READINESS_LOG_INTERVAL_NANOS;
     while (true) {
-      // Readiness is intentionally scoped to SCM and OM leadership until
-      // datanode and full safe-mode readiness are added in later tickets.
-      if (scm.checkLeader() && om.isLeaderReady()) {
+      String reason = blocker.get();
+      if (reason == null) {
         return;
       }
-      if (System.nanoTime() >= deadlineNanos) {
-        throw new TimeoutException("Timed out waiting " + timeout
-            + " for local SCM and OM leadership.");
+      long now = System.nanoTime();
+      // Compared as a Duration because timeout.toNanos() overflows for very long timeouts.
+      if (Duration.ofNanos(now - startNanos).compareTo(timeout) >= 0) {
+        throw new TimeoutException("Timed out waiting " + timeout + " for the local " + subject
+            + " to become ready: " + reason + ".");
+      }
+      if (now >= nextLogNanos) {
+        LOG.info("Waiting for the local {} to become ready: {}.", subject, reason);
+        nextLogNanos = now + READINESS_LOG_INTERVAL_NANOS;
       }
       Thread.sleep(READINESS_POLL_INTERVAL_MILLIS);
     }
+  }
+
+  private String clusterReadinessBlocker() {
+    if (!scm.checkLeader()) {
+      return "SCM has no Ratis leader yet";
+    }
+    if (!om.isLeaderReady()) {
+      return "OM is not leader-ready yet";
+    }
+    int registered = scm.getScmNodeManager().getAllNodeCount();
+    if (registered < config.getDatanodes()) {
+      return "only " + registered + " of " + config.getDatanodes()
+          + " datanodes have registered with SCM";
+    }
+    // SCM refuses block allocation until it leaves safe mode (BlockManagerImpl#allocateBlock).
+    if (scm.isInSafeMode()) {
+      return "SCM is still in safe mode ("
+          + formatSafeModeRuleBlocker(scm.getRuleStatus()) + ")";
+    }
+    return null;
+  }
+
+  static String formatSafeModeRuleBlocker(List<SafeModeRuleStatusProto> rules) {
+    if (rules.isEmpty()) {
+      return "safe-mode rule status is not available yet";
+    }
+    String unmetRules = joinSafeModeRules(rules.stream().filter(rule -> !rule.getValidate()));
+    return unmetRules.isEmpty()
+        ? "all rules currently report satisfied: " + joinSafeModeRules(rules.stream())
+        : unmetRules;
+  }
+
+  private static String joinSafeModeRules(Stream<SafeModeRuleStatusProto> rules) {
+    return rules.map(rule -> rule.getRuleName() + ": " + rule.getStatusText())
+        .collect(Collectors.joining("; "));
   }
 
   private void enableSameJvmMetricsMode() {
@@ -514,20 +843,39 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     }
   }
 
-  private void prepareStorageLayout() throws IOException {
+  private void requireSupportedDatanodeCount() throws IOException {
+    int datanodeCount = config.getDatanodes();
+    if (datanodeCount < 1) {
+      throw new IOException("Datanode count " + datanodeCount + " is below the local minimum of 1.");
+    }
+    if (datanodeCount > MAX_DATANODES) {
+      throw new IOException("Datanode count " + datanodeCount
+          + " exceeds the local maximum of " + MAX_DATANODES
+          + "; each datanode reserves " + DATANODE_PORT_KEY_SUFFIXES.length
+          + " local ports.");
+    }
+  }
+
+  private void validateStorageLayout() throws IOException {
     Path dataDir = config.getDataDir();
     if (Files.exists(dataDir) && !Files.isDirectory(dataDir)) {
       throw new IOException("Local Ozone data dir " + dataDir
           + " is not a directory.");
     }
+    if (config.getFormatMode() == LocalOzoneClusterConfig.FormatMode.NEVER) {
+      requireExistingLayout();
+    }
+  }
 
+  private void prepareStorageLayout() throws IOException {
     switch (config.getFormatMode()) {
     case ALWAYS:
-      deleteDirectory(dataDir);
+      LOG.info("Removing local Ozone data dir {} (format mode ALWAYS).", config.getDataDir());
+      deleteDirectory(config.getDataDir());
       createBaseLayout();
       break;
     case NEVER:
-      requireExistingLayout();
+      // validateStorageLayout() already required the existing layout.
       break;
     case IF_NEEDED:
       createBaseLayout();
@@ -535,6 +883,17 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     default:
       throw new IOException("Unsupported format mode "
           + config.getFormatMode() + ".");
+    }
+  }
+
+  private void createServiceDirectories() throws IOException {
+    Path dataDir = config.getDataDir();
+    Files.createDirectories(dataDir.resolve(SCM_DIR_NAME).resolve(DATA_DIR_NAME));
+    Files.createDirectories(dataDir.resolve(OM_DIR_NAME).resolve(DATA_DIR_NAME));
+    for (int index = 0; index < config.getDatanodes(); index++) {
+      Path datanodeDir = dataDir.resolve(DATANODE_DIR_PREFIX + index);
+      Files.createDirectories(datanodeDir.resolve(OZONE_METADATA_DIR_NAME));
+      Files.createDirectories(datanodeDir.resolve(DATA_DIR_NAME));
     }
   }
 
@@ -564,12 +923,27 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   }
 
   private PersistedPortState loadPersistedPortState() throws IOException {
+    if (config.getFormatMode() == LocalOzoneClusterConfig.FormatMode.ALWAYS) {
+      // Format mode ALWAYS deletes the data dir in prepareStorageLayout(), so the persisted ports would be stale.
+      return PersistedPortState.empty(portStateFile());
+    }
     PersistedPortState persistedPorts =
         PersistedPortState.load(portStateFile());
     if (config.getFormatMode() == LocalOzoneClusterConfig.FormatMode.NEVER) {
-      persistedPorts.requireKeys(REQUIRED_PERSISTED_PORT_KEYS);
+      persistedPorts.requireKeys(requiredPersistedPortKeys());
     }
     return persistedPorts;
+  }
+
+  private String[] requiredPersistedPortKeys() {
+    List<String> keys =
+        new ArrayList<>(Arrays.asList(REQUIRED_PERSISTED_PORT_KEYS));
+    for (int index = 0; index < config.getDatanodes(); index++) {
+      for (String suffix : DATANODE_PORT_KEY_SUFFIXES) {
+        keys.add(datanodePortKey(index, suffix));
+      }
+    }
+    return keys.toArray(new String[0]);
   }
 
   private int reservePort(PortAllocator allocator,
@@ -580,6 +954,17 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     int port = allocator.reserve(preferredPort);
     persistedPorts.set(key, port);
     return port;
+  }
+
+  private int reserveDatanodePort(PortAllocator allocator,
+      PersistedPortState persistedPorts, int index, String suffix)
+      throws IOException {
+    return reservePort(allocator, persistedPorts,
+        datanodePortKey(index, suffix), 0);
+  }
+
+  private static String datanodePortKey(int index, String suffix) {
+    return DATANODE_PORT_KEY_PREFIX + index + "." + suffix;
   }
 
   private Path metadataDir() {
@@ -615,13 +1000,17 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     private final OzoneConfiguration configuration;
     private final int scmPort;
     private final int omPort;
+    private final List<OzoneConfiguration> datanodeConfigurations;
 
     PreparedConfiguration(OzoneConfiguration configuration, int scmPort,
-        int omPort) {
+        int omPort, List<OzoneConfiguration> datanodeConfigurations) {
       this.configuration = Objects.requireNonNull(configuration,
           "configuration");
       this.scmPort = scmPort;
       this.omPort = omPort;
+      this.datanodeConfigurations = Collections.unmodifiableList(
+          new ArrayList<>(Objects.requireNonNull(datanodeConfigurations,
+              "datanodeConfigurations")));
     }
 
     OzoneConfiguration getConfiguration() {
@@ -634,6 +1023,10 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
 
     int getOmPort() {
       return omPort;
+    }
+
+    List<OzoneConfiguration> getDatanodeConfigurations() {
+      return datanodeConfigurations;
     }
   }
 
@@ -686,6 +1079,10 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
 
     private PersistedPortState(Path path) {
       this.path = path;
+    }
+
+    static PersistedPortState empty(Path path) {
+      return new PersistedPortState(path);
     }
 
     static PersistedPortState load(Path path) throws IOException {

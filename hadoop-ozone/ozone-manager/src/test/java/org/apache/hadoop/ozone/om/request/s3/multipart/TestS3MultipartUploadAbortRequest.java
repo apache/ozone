@@ -19,12 +19,15 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -76,6 +79,10 @@ public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
     S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
         getS3MultipartUploadAbortReq(abortMPURequest);
 
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo cachedBeforeAbort = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey)).getCacheValue();
+
     omClientResponse =
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
@@ -93,6 +100,97 @@ public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
         .getOpenKeyTable(s3MultipartUploadAbortRequest.getBucketLayout())
         .get(multipartOpenKey));
 
+    // No part was committed, so the released quota is zero and only the instance identity shows
+    // that the abort published the copy it released on.
+    assertNotSame(cachedBeforeAbort, omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey)).getCacheValue());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheUsesSchemaVersionOneBeforeFinalization()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    // The base test fixture is pre-finalized by default.
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    createParentPath(volumeName, bucketName);
+
+    String multipartUploadID =
+        initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
+            keyName, 1);
+
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
+    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
+        .getMultipartInfoTable().get(multipartKey);
+    assertNotNull(multipartKeyInfo);
+    assertEquals(1, multipartKeyInfo.getSchemaVersion());
+
+    OMRequest abortMPURequest =
+        doPreExecuteAbortMPU(volumeName, bucketName, keyName,
+            multipartUploadID);
+
+    S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
+        getS3MultipartUploadAbortReq(abortMPURequest);
+
+    OMClientResponse omClientResponse =
+        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheAllowsSchemaVersionZeroAfterFinalization()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    createParentPath(volumeName, bucketName);
+
+    // Upload is initiated on a pre-finalized cluster, so it uses the legacy
+    // (schema 0) inline layout.
+    OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
+        bucketName, keyName);
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
+        getS3InitiateMultipartUploadReq(initiateMPURequest);
+    OMClientResponse initiateResponse =
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
+            1L);
+    String multipartUploadID = initiateResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
+    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
+        .getMultipartInfoTable().get(multipartKey);
+    assertNotNull(multipartKeyInfo);
+    assertEquals(0, multipartKeyInfo.getSchemaVersion());
+
+    // Cluster finalizes the split feature, the pre-existing legacy upload must
+    // still be abortable.
+    finalizeMpuPartsTableSplit();
+
+    OMRequest abortMPURequest =
+        doPreExecuteAbortMPU(volumeName, bucketName, keyName,
+            multipartUploadID);
+
+    S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
+        getS3MultipartUploadAbortReq(abortMPURequest);
+
+    OMClientResponse omClientResponse =
+        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
   }
 
   @Test

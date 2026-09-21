@@ -1327,6 +1327,23 @@ function ozone_add_to_classpath_userpath
   fi
 }
 
+function ozone_update_native_symlink
+{
+  if [ -z "$TARGET_FILE" ]; then
+    echo "Error: libhadoop doesn't support platform combination ($OS_TYPE / $ARCH_TYPE)." >&2
+    return 1
+  elif pushd "${OZONE_HOME}/lib/native" > /dev/null 2>&1; then
+    # Check if it already exists but points to the wrong target
+    if [ -L "$LINK_FILE" ] && [ "$(readlink "$LINK_FILE")" != "$TARGET_FILE" ]; then
+      # Forcefully recreate it so it points to the correct target file
+      ln -sf "$TARGET_FILE" "$LINK_FILE" > /dev/null 2>&1
+    fi
+    popd > /dev/null
+  else
+    return 1
+  fi
+}
+
 ## @description  Routine to configure any OS-specific settings.
 ## @audience     public
 ## @stability    stable
@@ -1335,6 +1352,7 @@ function ozone_add_to_classpath_userpath
 function ozone_os_tricks
 {
   OZONE_IS_CYGWIN=false
+  ARCH_TYPE=$(uname -m)
   case ${OZONE_OS_TYPE} in
     Darwin)
       if [[ -z "${JAVA_HOME}" ]]; then
@@ -1346,6 +1364,15 @@ function ozone_os_tricks
           export JAVA_HOME
         fi
       fi
+
+      if [ "$ARCH_TYPE" = "arm64" ]; then
+        TARGET_FILE="libhadoop_osx_aarch_64.dylib"
+      fi
+
+      LINK_FILE="libhadoop.dylib"
+      if ozone_update_native_symlink; then
+        export DYLD_LIBRARY_PATH="${OZONE_HOME}/lib/native":$DYLD_LIBRARY_PATH
+      fi
     ;;
     Linux)
 
@@ -1354,6 +1381,17 @@ function ozone_os_tricks
       # with the many threads that we use in Hadoop. Tune the variable
       # down to prevent vmem explosion.
       export MALLOC_ARENA_MAX=${MALLOC_ARENA_MAX:-4}
+
+      if [ "$ARCH_TYPE" = "aarch64" ]; then
+        TARGET_FILE="libhadoop_linux_aarch_64.so"
+      elif [ "$ARCH_TYPE" = "x86_64" ]; then
+        TARGET_FILE="libhadoop_linux_x86_64.so"
+      fi
+
+      LINK_FILE="libhadoop.so"
+      if ozone_update_native_symlink; then
+        export LD_LIBRARY_PATH="${OZONE_HOME}/lib/native":$LD_LIBRARY_PATH
+      fi
     ;;
     CYGWIN*)
       # Flag that we're running on Cygwin to trigger path translation later.

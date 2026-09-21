@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -207,6 +208,7 @@ public abstract class AbstractTestStorageDistributionEndpoint {
         .createMultipartKey(volumeName, bucketName, "mpukey1",
             100L, 1, multipartInfo.getUploadID());
     partStream.write(new byte[100]);
+    partStream.getMetadata().put(OzoneConsts.ETAG, "mpukey1-part1-etag");
     partStream.close();
   }
 

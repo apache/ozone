@@ -25,9 +25,9 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DO
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -43,9 +43,9 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -98,7 +98,7 @@ public class TestSnapshotDirectoryCleaningService {
     client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
@@ -235,15 +235,10 @@ public class TestSnapshotDirectoryCleaningService {
     long prevRunCount = directoryDeletingService.getRunCount().get();
     GenericTestUtils.waitFor(() -> directoryDeletingService.getRunCount().get()
         > prevRunCount + 1, 100, 10000);
-    Map<String, Long> expectedSize = new HashMap<String, Long>() {{
-      // /v/b/snapDir/appRoot0/parentDir0-2/childFile contribute
-      // exclusive size, /v/b/snapDir/appRoot0/parentDir0-2/childFile0-4
-      // are deep cleaned and hence don't contribute to size.
-        put("snap1", 3L);
-      // Only testKey5-9 contribute to the exclusive size
-        put("snap2", 5L);
-        put("snap3", 0L);
-      }};
+    // /v/b/snapDir/appRoot0/parentDir0-2/childFile contribute exclusive size,
+    // /v/b/snapDir/appRoot0/parentDir0-2/childFile0-4 are deep cleaned and hence don't contribute to size.
+    // Only testKey5-9 contribute to the exclusive size of snap2.
+    Map<String, Long> expectedSize = ImmutableMap.of("snap1", 3L, "snap2", 5L, "snap3", 0L);
 
     try (Table.KeyValueIterator<String, SnapshotInfo>
         iterator = snapshotInfoTable.iterator()) {
@@ -305,7 +300,7 @@ public class TestSnapshotDirectoryCleaningService {
     String volume = "vol-" + counter.incrementAndGet();
     String bucket = "buc-" + counter.incrementAndGet();
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket volBucket = TestDataUtil.createVolumeAndBucket(client, volume, bucket,
+    OzoneBucket volBucket = DataTestUtil.createVolumeAndBucket(client, volume, bucket,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volBucket.createDirectory("dir1/dir2/dir3/dir4");
     cluster.getOzoneManager().getKeyManager().getDirDeletingService().suspend();

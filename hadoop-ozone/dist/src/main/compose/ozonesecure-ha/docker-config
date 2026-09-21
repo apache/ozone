@@ -104,6 +104,9 @@ OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
 OZONE-SITE.XML_ozone.s3g.secret.http.enabled=true
 OZONE-SITE.XML_ozone.http.filter.initializers=org.apache.hadoop.security.AuthenticationFilterInitializer
 
+# Enable S3 Gateway STS (AWS STS compatible) endpoint on s3g (http://s3g:9880)
+OZONE-SITE.XML_ozone.s3g.sts.http.enabled=true
+
 OZONE-SITE.XML_ozone.om.http.auth.type=kerberos
 OZONE-SITE.XML_hdds.scm.http.auth.type=kerberos
 OZONE-SITE.XML_hdds.datanode.http.auth.type=kerberos
@@ -179,3 +182,9 @@ OZONE-SITE.XML_hdds.secret.key.expiry.duration=1h
 OZONE-SITE.XML_ozone.manager.delegation.token.max-lifetime=30m
 OZONE-SITE.XML_ozone.manager.delegation.token.renew-interval=5m
 OZONE-SITE.XML_ozone.manager.delegation.remover.scan.interval=1m
+
+# Enable Ozone lifecycle service
+OZONE-SITE.XML_ozone.lifecycle.service.enabled=true
+OZONE-SITE.XML_ozone.lifecycle.service.interval=30s
+OZONE-SITE.XML_ozone.lifecycle.service.timeout=10s
+

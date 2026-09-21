@@ -32,6 +32,8 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_PARTS_TABLE;
@@ -39,6 +41,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
@@ -53,12 +56,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import java.io.File;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -73,11 +78,13 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -87,8 +94,11 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -102,6 +112,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -138,7 +149,10 @@ public class TestOmMetadataManager {
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
       SNAPSHOT_RENAMED_TABLE,
-      COMPACTION_LOG_TABLE
+      COMPACTION_LOG_TABLE,
+      S3_REVOKED_STS_TOKEN_TABLE,
+      LIFECYCLE_CONFIGURATION_TABLE,
+      LIFECYCLE_SCAN_STATE_TABLE
   };
 
   private OMMetadataManager omMetadataManager;
@@ -1043,6 +1057,226 @@ public class TestOmMetadataManager {
     assertThat(expiredMPUs).containsAll(names);
   }
 
+  @Test
+  public void testGetExpiredMPUsSplitSchema() throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    final int numExpiredMPUs = 4;
+    final int numUnexpiredMPUs = 1;
+    final int numPartsPerMPU = 5;
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_MPU_EXPIRE_THRESHOLD,
+        OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+
+    final long expiredMPUCreationTime =
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+
+    Set<String> expiredMPUs = new HashSet<>();
+    for (int i = 0; i < numExpiredMPUs + numUnexpiredMPUs; i++) {
+      final long creationTime = i < numExpiredMPUs ?
+          expiredMPUCreationTime : Time.now();
+
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      final OmMultipartKeyInfo mpuKeyInfo = new OmMultipartKeyInfo.Builder(
+          OMRequestTestUtils.createOmMultipartKeyInfo(uploadId, creationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L))
+          .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+          .build();
+
+      String keyName = "expired-split" + i;
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+              bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(creationTime)
+          .build();
+
+      for (int j = 1; j <= numPartsPerMPU; j++) {
+        addSplitSchemaPart(uploadId, j);
+      }
+
+      final String mpuDbKey = OMRequestTestUtils.addMultipartInfoToTable(
+          false, keyInfo, mpuKeyInfo, 0L, omMetadataManager);
+
+      expiredMPUs.add(mpuDbKey);
+    }
+
+    List<ExpiredMultipartUploadsBucket> someExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(
+            expireThreshold,
+            (numExpiredMPUs * numPartsPerMPU) - (numPartsPerMPU));
+    List<String> names = getMultipartKeyNames(someExpiredMPUs);
+    assertEquals(numExpiredMPUs - 1, names.size());
+    assertThat(expiredMPUs).containsAll(names);
+
+    List<ExpiredMultipartUploadsBucket> allExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold,
+            (numExpiredMPUs * numPartsPerMPU));
+    names = getMultipartKeyNames(allExpiredMPUs);
+    assertEquals(numExpiredMPUs, names.size());
+    assertThat(expiredMPUs).containsAll(names);
+  }
+
+  @Test
+  public void testGetExpiredMPUsMixedSchema() throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    final int numPartsPerMPU = 3;
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_MPU_EXPIRE_THRESHOLD,
+        OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+    final long expiredCreationTime =
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+
+    Set<String> expiredLegacyKeys = new HashSet<>();
+    Set<String> expiredSplitKeys = new HashSet<>();
+
+    // Create 2 legacy-schema expired MPUs with embedded parts
+    for (int i = 0; i < 2; i++) {
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      OmMultipartKeyInfo mpuKeyInfo = OMRequestTestUtils
+          .createOmMultipartKeyInfo(uploadId, expiredCreationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L);
+      String keyName = "legacy" + i;
+      OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+              bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(expiredCreationTime)
+          .build();
+      for (int j = 1; j <= numPartsPerMPU; j++) {
+        PartKeyInfo partKeyInfo = OMRequestTestUtils
+            .createPartKeyInfo(volumeName, bucketName, keyName, uploadId, j);
+        OMRequestTestUtils.addPart(partKeyInfo, mpuKeyInfo);
+      }
+      String mpuDbKey = OMRequestTestUtils.addMultipartInfoToTable(
+          false, keyInfo, mpuKeyInfo, 0L, omMetadataManager);
+      expiredLegacyKeys.add(mpuDbKey);
+    }
+
+    // Create 2 split-schema expired MPUs with parts in multipartPartsTable
+    for (int i = 0; i < 2; i++) {
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      OmMultipartKeyInfo mpuKeyInfo = new OmMultipartKeyInfo.Builder(
+          OMRequestTestUtils.createOmMultipartKeyInfo(uploadId, expiredCreationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L))
+          .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+          .build();
+      String keyName = "split" + i;
+      OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+              bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(expiredCreationTime)
+          .build();
+      for (int j = 1; j <= numPartsPerMPU; j++) {
+        addSplitSchemaPart(uploadId, j);
+      }
+      String mpuDbKey = OMRequestTestUtils.addMultipartInfoToTable(
+          false, keyInfo, mpuKeyInfo, 0L, omMetadataManager);
+      expiredSplitKeys.add(mpuDbKey);
+    }
+
+    // Budget of 9 parts fits exactly 3 MPUs (3 parts each)
+    List<ExpiredMultipartUploadsBucket> someExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold,
+            numPartsPerMPU * 3);
+    List<String> names = getMultipartKeyNames(someExpiredMPUs);
+    assertEquals(3, names.size());
+
+    // Budget of 12 parts fits all 4 expired MPUs
+    List<ExpiredMultipartUploadsBucket> allExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold,
+            numPartsPerMPU * 4);
+    names = getMultipartKeyNames(allExpiredMPUs);
+    assertEquals(4, names.size());
+    assertThat(names).containsAll(expiredLegacyKeys);
+    assertThat(names).containsAll(expiredSplitKeys);
+  }
+
+  @Test
+  public void testGetExpiredMPUsZeroPartsSplitSchema() throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_MPU_EXPIRE_THRESHOLD,
+        OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+    final long expiredCreationTime =
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+
+    // Zero-parts split-schema MPU (freshly initiated, no parts uploaded)
+    String uploadIdZero = OMMultipartUploadUtils.getMultipartUploadId();
+    OmMultipartKeyInfo mpuZero = new OmMultipartKeyInfo.Builder(
+        OMRequestTestUtils.createOmMultipartKeyInfo(uploadIdZero, expiredCreationTime,
+            HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, 0L))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    OmKeyInfo keyInfoZero = OMRequestTestUtils.createOmKeyInfo(volumeName,
+            bucketName, "aaa-zero-parts", RatisReplicationConfig.getInstance(ONE))
+        .setCreationTime(expiredCreationTime)
+        .build();
+    String zeroKey = OMRequestTestUtils.addMultipartInfoToTable(
+        false, keyInfoZero, mpuZero, 0L, omMetadataManager);
+
+    // Split-schema MPU with 3 parts
+    String uploadIdThree = OMMultipartUploadUtils.getMultipartUploadId();
+    OmMultipartKeyInfo mpuThree = new OmMultipartKeyInfo.Builder(
+        OMRequestTestUtils.createOmMultipartKeyInfo(uploadIdThree, expiredCreationTime,
+            HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, 0L))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    OmKeyInfo keyInfoThree = OMRequestTestUtils.createOmKeyInfo(volumeName,
+            bucketName, "zzz-three-parts", RatisReplicationConfig.getInstance(ONE))
+        .setCreationTime(expiredCreationTime)
+        .build();
+    for (int j = 1; j <= 3; j++) {
+      addSplitSchemaPart(uploadIdThree, j);
+    }
+    String threeKey = OMRequestTestUtils.addMultipartInfoToTable(
+        false, keyInfoThree, mpuThree, 0L, omMetadataManager);
+
+    // maxParts=0 returns nothing (loop pre-check 0 < 0 is false)
+    List<ExpiredMultipartUploadsBucket> noneExpired =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold, 0);
+    assertTrue(getMultipartKeyNames(noneExpired).isEmpty());
+
+    // maxParts=3 should return both: zero-parts contributes 0, three-parts
+    // contributes 3, total = 3 which satisfies the loop exit condition
+    List<ExpiredMultipartUploadsBucket> allExpired =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold, 3);
+    List<String> names = getMultipartKeyNames(allExpired);
+    assertEquals(2, names.size());
+    assertThat(names).contains(zeroKey);
+    assertThat(names).contains(threeKey);
+  }
+
+  private void addSplitSchemaPart(String uploadId, int partNumber) throws IOException {
+    OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(1L, partNumber))
+        .setLength(100)
+        .build();
+    OmKeyLocationInfoGroup locationGroup = new OmKeyLocationInfoGroup(0,
+        Collections.singletonList(locationInfo));
+    String partName = "part-" + partNumber;
+    OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo("vol", "bucket", "key",
+            RatisReplicationConfig.getInstance(ONE))
+        .setDataSize(100L)
+        .setObjectID(partNumber)
+        .setUpdateID(partNumber)
+        .addOmKeyLocationInfoGroup(locationGroup)
+        .addMetadata(org.apache.hadoop.ozone.OzoneConsts.ETAG, "etag-" + partNumber)
+        .build();
+    OmMultipartPartInfo partInfo = OmMultipartPartInfo.from(partName, partNumber, keyInfo);
+    omMetadataManager.getMultipartPartsTable().put(
+        OmMultipartPartKey.of(uploadId, partNumber), partInfo);
+  }
+
   private List<String> getOpenKeyNames(
       Collection<OpenKeyBucket.Builder> openKeyBuckets) {
     return openKeyBuckets.stream()
@@ -1293,6 +1527,44 @@ public class TestOmMetadataManager {
         volumeName, bucketName, prefix, null, null, 10, true);
 
     assertEquals(25, noPagination.size());
+  }
+
+  @Test
+  public void testS3RevokedStsTokenTablePutAndGet() throws Exception {
+    // Ensure the table is initialized
+    assertNotNull(omMetadataManager.getS3RevokedStsTokenTable(), "s3RevokedStsTokenTable should be initialized");
+
+    final MockClock clock = MockClock.newInstance();
+    final String originalAccessKeyId1 = "orig-1";
+    final long insertionTime1 = clock.millis();
+    final String originalAccessKeyId2 = "orig-2";
+    final long insertionTime2 = insertionTime1 + 1234L;
+
+    // This table is configured as FULL_CACHE in OmMetadataManagerImpl.
+    // A put() writes to RocksDB but does not update the table cache, so get() and getIfExist() will return null unless
+    // the cache is updated with addCacheEntry().  getSkipCache() will read the DB instead of the cache.
+    final TypedTable<String, Long> revokedTable =
+        (TypedTable<String, Long>) omMetadataManager.getS3RevokedStsTokenTable();
+
+    revokedTable.put(originalAccessKeyId1, insertionTime1);
+    revokedTable.put(originalAccessKeyId2, insertionTime2);
+
+    // Verify the values are persisted in RocksDB.
+    assertEquals(insertionTime1, revokedTable.getSkipCache(originalAccessKeyId1));
+    assertEquals(insertionTime2, revokedTable.getSkipCache(originalAccessKeyId2));
+
+    // Update cache to make get/getIfExist reflect the write for FULL_CACHE tables.
+    revokedTable.addCacheEntry(originalAccessKeyId1, insertionTime1, 1L);
+    revokedTable.addCacheEntry(originalAccessKeyId2, insertionTime2, 1L);
+
+    // Verify get and getIfExist return the stored value
+    assertEquals(insertionTime1, revokedTable.get(originalAccessKeyId1));
+    assertEquals(insertionTime1, revokedTable.getIfExist(originalAccessKeyId1));
+    assertEquals(insertionTime2, revokedTable.get(originalAccessKeyId2));
+    assertEquals(insertionTime2, revokedTable.getIfExist(originalAccessKeyId2));
+
+    // Invalid originalAccessKeyId should return null for getIfExist.
+    assertNull(revokedTable.getIfExist("INVALID_ORIGINAL_ACCESS_KEY_ID"));
   }
 
   @Test

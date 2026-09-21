@@ -146,7 +146,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     LOG.debug("Length of the bounds - {}", bounds.size());
     // Fallback for small tables (no SST files yet - data only in memtable)
     if (bounds.size() < 2) {
-      try (TableIterator<K, ? extends Table.KeyValue<K, V>> iter = table.iterator()) {
+      try (TableIterator<K, Table.KeyValue<K, V>> iter = table.iterator()) {
         if (startKey != null) {
           iter.seek(startKey);
         }
@@ -188,7 +188,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
 
       // ===== STEP 3: SUBMIT ITERATOR TASK =====
       iterFutures.add(iteratorExecutor.submit(() -> {
-        try (TableIterator<K, ? extends Table.KeyValue<K, V>> iter  = table.iterator()) {
+        try (TableIterator<K, Table.KeyValue<K, V>> iter  = table.iterator()) {
           iter.seek(beg);
           while (iter.hasNext()) {
             List<Table.KeyValue<K, V>> keyValues = new ArrayList<>();

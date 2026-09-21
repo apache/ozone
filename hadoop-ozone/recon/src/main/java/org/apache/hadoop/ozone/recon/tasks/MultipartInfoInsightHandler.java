@@ -17,13 +17,23 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.slf4j.Logger;
@@ -32,11 +42,60 @@ import org.slf4j.LoggerFactory;
 /**
  * Manages records in the MultipartInfo Table, updating counts and sizes of
  * multipart upload keys in the backend.
+ *
+ * <p>Multipart uploads are stored in one of two schemas:
+ * <ul>
+ *   <li>Legacy (schemaVersion {@link OmMultipartKeyInfo#LEGACY_SCHEMA_VERSION}):
+ *   the part information is embedded inside the {@code multipartInfoTable} value
+ *   (see {@link OmMultipartKeyInfo#getPartKeyInfoMap()}).</li>
+ *   <li>Split parts-table (schemaVersion
+ *   {@link OmMultipartKeyInfo#SPLIT_PARTS_TABLE_SCHEMA_VERSION}): the
+ *   {@code multipartInfoTable} value carries no embedded parts; each part is a
+ *   separate row in the {@code multipartPartsTable}, keyed by
+ *   {@code uploadId/partNumber}.</li>
+ * </ul>
+ *
+ * <p>Split-schema part sizes are accounted incrementally, one
+ * {@code multipartPartsTable} event at a time (see {@link #handlePartPutEvent},
+ * {@link #handlePartDeleteEvent}, {@link #handlePartUpdateEvent}), each O(1).
+ * {@code OmMultipartPartInfo} does not carry a replication config, so the parent
+ * MPU's config is cached here, keyed by uploadId, from the {@code multipartInfoTable}
+ * PUT/UPDATE events handled below; OM always writes {@code multipartInfoTable}
+ * before the corresponding {@code multipartPartsTable} row in the same batch, so the
+ * cache entry is available by the time a part event for that upload is processed.
+ * The cache is bounded (LRU) rather than explicitly evicted per upload, since a
+ * part-delete event can follow an info-table delete for the same upload within the
+ * same batch and still needs the cached config.
  */
 public class MultipartInfoInsightHandler implements OmTableHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MultipartInfoInsightHandler.class);
+
+  private static final int MAX_CACHED_SPLIT_SCHEMA_UPLOADS = 10_000;
+
+  /**
+   * uploadId -> parent replication config, for split-schema MPUs, used to compute
+   * the replicated size of {@code multipartPartsTable} events in O(1). Bounded
+   * (LRU, access-order) so long-lived Recon processes do not grow this unbounded;
+   * a cache miss (e.g. under eviction pressure) simply skips that part's size
+   * update, which is reconciled by the next {@link #getTableSizeAndCount} reprocess.
+   */
+  private final Map<String, ReplicationConfig> splitSchemaUploadReplicationConfig =
+      new LinkedHashMap<String, ReplicationConfig>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, ReplicationConfig> eldest) {
+          return size() > MAX_CACHED_SPLIT_SCHEMA_UPLOADS;
+        }
+      };
+
+  /**
+   * Consumes the (unreplicated, replicated) size of a single multipart part.
+   */
+  @FunctionalInterface
+  private interface PartSizeConsumer {
+    void accept(long dataSize, long replicatedSize);
+  }
 
   /**
    * Invoked by the process method to add information on those keys that have
@@ -50,14 +109,8 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count + 1L);
-
-      for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-        unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
-            (k, size) -> size + omKeyInfo.getDataSize());
-        replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
-            (k, size) -> size + omKeyInfo.getReplicatedSize());
-      }
+      applyLegacyPartSizes(multipartKeyInfo, tableName, unReplicatedSizeMap, replicatedSizeMap, true);
+      cacheSplitSchemaReplicationConfig(multipartKeyInfo);
     } else {
       LOG.warn("Put event does not have the Multipart Key Info for {}.", event.getKey());
     }
@@ -75,28 +128,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count > 0 ? count - 1L : 0L);
-
-      for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-        unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
-            (k, size) -> {
-              long newSize = size > omKeyInfo.getDataSize() ? size - omKeyInfo.getDataSize() : 0L;
-              if (newSize < 0) {
-                LOG.warn("Negative unreplicated size for key: {}. Original: {}, Part: {}",
-                    k, size, omKeyInfo.getDataSize());
-              }
-              return newSize;
-            });
-        replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
-            (k, size) -> {
-              long newSize = size > omKeyInfo.getReplicatedSize() ? size - omKeyInfo.getReplicatedSize() : 0L;
-              if (newSize < 0) {
-                LOG.warn("Negative replicated size for key: {}. Original: {}, Part: {}",
-                    k, size, omKeyInfo.getReplicatedSize());
-              }
-              return newSize;
-            });
-      }
+      applyLegacyPartSizes(multipartKeyInfo, tableName, unReplicatedSizeMap, replicatedSizeMap, false);
     } else {
       LOG.warn("Delete event does not have the Multipart Key Info for {}.", event.getKey());
     }
@@ -116,31 +148,61 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
         return;
       }
 
-      // In Update event the count for the multipart info table will not change. So we
-      // don't need to update the count.
+      // In an Update event the count for the multipart info table does not
+      // change, so only the sizes are adjusted: subtract the old parts and add
+      // the new parts.
       OmMultipartKeyInfo oldMultipartKeyInfo = (OmMultipartKeyInfo) event.getOldValue();
       OmMultipartKeyInfo newMultipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
-
-      // Calculate old sizes
-      for (PartKeyInfo partKeyInfo : oldMultipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-        unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
-            (k, size) -> size - omKeyInfo.getDataSize());
-        replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
-            (k, size) -> size - omKeyInfo.getReplicatedSize());
-      }
-
-      // Calculate new sizes
-      for (PartKeyInfo partKeyInfo : newMultipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-        unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
-            (k, size) -> size + omKeyInfo.getDataSize());
-        replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
-            (k, size) -> size + omKeyInfo.getReplicatedSize());
-      }
+      applyLegacyPartSizes(oldMultipartKeyInfo, tableName, unReplicatedSizeMap, replicatedSizeMap, false);
+      applyLegacyPartSizes(newMultipartKeyInfo, tableName, unReplicatedSizeMap, replicatedSizeMap, true);
+      // A split-schema MPU's multipartInfoTable row is rewritten (PUT->UPDATE) on
+      // every part commit, so refresh/populate the cache here too.
+      cacheSplitSchemaReplicationConfig(newMultipartKeyInfo);
     } else {
       LOG.warn("Update event does not have the Multipart Key Info for {}.", event.getKey());
     }
+  }
+
+  /**
+   * Invoked for a PUT (part committed) event on the {@code multipartPartsTable}.
+   * Adds this part's size to the {@code multipartInfoTable} totals in O(1).
+   */
+  public void handlePartPutEvent(OMDBUpdateEvent<OmMultipartPartKey, OmMultipartPartInfo> event,
+      Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
+    if (event.getValue() != null) {
+      applyPartSize(event.getKey(), event.getValue(), unReplicatedSizeMap, replicatedSizeMap, true);
+    } else {
+      LOG.warn("Put event does not have the Multipart Part Info for {}.", event.getKey());
+    }
+  }
+
+  /**
+   * Invoked for a DELETE (part removed on abort/complete) event on the
+   * {@code multipartPartsTable}. Subtracts this part's size from the
+   * {@code multipartInfoTable} totals in O(1).
+   */
+  public void handlePartDeleteEvent(OMDBUpdateEvent<OmMultipartPartKey, OmMultipartPartInfo> event,
+      Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
+    if (event.getValue() != null) {
+      applyPartSize(event.getKey(), event.getValue(), unReplicatedSizeMap, replicatedSizeMap, false);
+    } else {
+      LOG.warn("Delete event does not have the Multipart Part Info for {}.", event.getKey());
+    }
+  }
+
+  /**
+   * Invoked for an UPDATE (part re-uploaded with the same part number) event on
+   * the {@code multipartPartsTable}. Subtracts the old size and adds the new
+   * size from/to the {@code multipartInfoTable} totals in O(1).
+   */
+  public void handlePartUpdateEvent(OMDBUpdateEvent<OmMultipartPartKey, OmMultipartPartInfo> event,
+      Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
+    if (event.getValue() == null || event.getOldValue() == null) {
+      LOG.warn("Update event does not have the old/new Multipart Part Info for {}.", event.getKey());
+      return;
+    }
+    applyPartSize(event.getKey(), event.getOldValue(), unReplicatedSizeMap, replicatedSizeMap, false);
+    applyPartSize(event.getKey(), event.getValue(), unReplicatedSizeMap, replicatedSizeMap, true);
   }
 
   /**
@@ -148,30 +210,175 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
    * counts for the multipart info table. Additionally, it computes the sizes
    * of both replicated and unreplicated parts that are currently in multipart
    * uploads in the backend.
+   *
+   * <p>This is schema-aware: legacy (schemaVersion 0) part sizes are read from
+   * the embedded {@link OmMultipartKeyInfo#getPartKeyInfoMap()}, while split
+   * (schemaVersion 1) part sizes are summed from the separate
+   * {@code multipartPartsTable}. The count returned is always the number of
+   * multipart uploads (rows in the {@code multipartInfoTable}), regardless of
+   * schema.
    */
   @Override
   public Triple<Long, Long, Long> getTableSizeAndCount(String tableName,
       OMMetadataManager omMetadataManager) throws IOException {
     long count = 0;
-    long unReplicatedSize = 0;
-    long replicatedSize = 0;
+    // left = unreplicated size, right = replicated size. A mutable pair is used
+    // so the running totals can be updated from the part-iteration lambda below.
+    final MutablePair<Long, Long> sizes = MutablePair.of(0L, 0L);
+
+    // uploadId -> parent replication config, for split-schema MPUs. Their parts
+    // live in multipartPartsTable but do not carry a replication config, so the
+    // parent's config (recorded here) is used to compute their replicated size
+    // in the second pass below.
+    Map<String, ReplicationConfig> splitSchemaUploads = new HashMap<>();
 
     Table<String, OmMultipartKeyInfo> table =
         (Table<String, OmMultipartKeyInfo>) omMetadataManager.getTable(tableName);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> iterator = table.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmMultipartKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmMultipartKeyInfo> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
           OmMultipartKeyInfo multipartKeyInfo = kv.getValue();
-          for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-            ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-            unReplicatedSize += omKeyInfo.getDataSize();
-            replicatedSize += omKeyInfo.getReplicatedSize();
+          if (isLegacySchema(multipartKeyInfo)) {
+            forEachLegacyPart(multipartKeyInfo, (dataSize, replicatedSize) -> {
+              sizes.setLeft(sizes.getLeft() + dataSize);
+              sizes.setRight(sizes.getRight() + replicatedSize);
+            });
+          } else {
+            // Split schema: parts are stored in multipartPartsTable. Remember
+            // the parent replication config keyed by uploadId (last component
+            // of the multipart key) for the second pass.
+            splitSchemaUploads.put(getUploadIdFromMultipartKey(kv.getKey()),
+                multipartKeyInfo.getReplicationConfig());
           }
           count++;
         }
       }
     }
-    return Triple.of(count, unReplicatedSize, replicatedSize);
+
+    // Second pass: sum the sizes of split-schema parts from multipartPartsTable.
+    if (!splitSchemaUploads.isEmpty()) {
+      Table<OmMultipartPartKey, OmMultipartPartInfo> partsTable =
+          omMetadataManager.getMultipartPartsTable();
+      try (TableIterator<OmMultipartPartKey, Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo>> partIterator =
+               partsTable.iterator()) {
+        while (partIterator.hasNext()) {
+          Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo> kv = partIterator.next();
+          if (kv != null && kv.getKey() != null && kv.getValue() != null) {
+            ReplicationConfig replicationConfig = splitSchemaUploads.get(kv.getKey().getUploadId());
+            if (replicationConfig == null) {
+              // Part whose parent MPU is not in multipartInfoTable (e.g. an
+              // orphan mid-cleanup). Skip to avoid mis-attributing its size.
+              continue;
+            }
+            long partDataSize = kv.getValue().getDataSize();
+            sizes.setLeft(sizes.getLeft() + partDataSize);
+            sizes.setRight(sizes.getRight()
+                + QuotaUtil.getReplicatedSize(partDataSize, replicationConfig));
+          }
+        }
+      }
+    }
+
+    return Triple.of(count, sizes.getLeft(), sizes.getRight());
+  }
+
+  /**
+   * Adds (or subtracts) the sizes of a legacy MPU's embedded parts to the size
+   * maps. Split-schema MPUs carry no embedded parts and are ignored here (their
+   * sizes are accounted per-part via {@link #handlePartPutEvent} and friends).
+   *
+   * @param add {@code true} to add the part sizes (PUT / new value in UPDATE),
+   *            {@code false} to subtract them (DELETE / old value in UPDATE).
+   */
+  private void applyLegacyPartSizes(OmMultipartKeyInfo multipartKeyInfo, String tableName,
+      Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap, boolean add) {
+    forEachLegacyPart(multipartKeyInfo, (dataSize, replicatedSize) -> {
+      updateSize(unReplicatedSizeMap, getUnReplicatedSizeKeyFromTable(tableName), dataSize, add, "unreplicated");
+      updateSize(replicatedSizeMap, getReplicatedSizeKeyFromTable(tableName), replicatedSize, add, "replicated");
+    });
+  }
+
+  /**
+   * Caches the replication config of a split-schema MPU, keyed by uploadId, for use
+   * by {@link #applyPartSize}. No-op for legacy-schema MPUs.
+   */
+  private void cacheSplitSchemaReplicationConfig(OmMultipartKeyInfo multipartKeyInfo) {
+    if (isLegacySchema(multipartKeyInfo)) {
+      return;
+    }
+    splitSchemaUploadReplicationConfig.put(multipartKeyInfo.getUploadID(), multipartKeyInfo.getReplicationConfig());
+  }
+
+  /**
+   * Adds (or subtracts) a single split-schema part's size to/from the
+   * {@code multipartInfoTable} size maps, using the parent MPU's replication
+   * config cached by {@link #cacheSplitSchemaReplicationConfig}. If the parent's
+   * config is not cached (e.g. evicted under memory pressure), the update is
+   * skipped with a warning; it is reconciled by the next reprocess.
+   */
+  private void applyPartSize(OmMultipartPartKey partKey, OmMultipartPartInfo partInfo,
+      Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap, boolean add) {
+    ReplicationConfig replicationConfig = splitSchemaUploadReplicationConfig.get(partKey.getUploadId());
+    if (replicationConfig == null) {
+      LOG.warn("No cached replication config for upload {}; skipping part size update.", partKey.getUploadId());
+      return;
+    }
+    long partDataSize = partInfo.getDataSize();
+    long partReplicatedSize = QuotaUtil.getReplicatedSize(partDataSize, replicationConfig);
+    updateSize(unReplicatedSizeMap, getUnReplicatedSizeKeyFromTable(MULTIPART_INFO_TABLE), partDataSize, add,
+        "unreplicated");
+    updateSize(replicatedSizeMap, getReplicatedSizeKeyFromTable(MULTIPART_INFO_TABLE), partReplicatedSize, add,
+        "replicated");
+  }
+
+  /**
+   * Invokes {@code consumer} with the (unreplicated, replicated) size of each
+   * embedded part of a legacy MPU. Does nothing for split-schema MPUs.
+   */
+  private static void forEachLegacyPart(OmMultipartKeyInfo multipartKeyInfo, PartSizeConsumer consumer) {
+    if (!isLegacySchema(multipartKeyInfo)) {
+      return;
+    }
+    for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
+      ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      consumer.accept(omKeyInfo.getDataSize(), omKeyInfo.getReplicatedSize());
+    }
+  }
+
+  /**
+   * Adds or subtracts {@code delta} from the value stored under {@code key} in
+   * {@code sizeMap} (only if the key is already present). Subtraction is clamped
+   * at zero, and an underflow is logged (as it indicates an accounting anomaly,
+   * e.g. a delete/update for a part whose size was never added).
+   *
+   * @param sizeType a human-readable label ("unreplicated"/"replicated") used
+   *                 only in the underflow warning message.
+   */
+  private static void updateSize(Map<String, Long> sizeMap, String key, long delta, boolean add, String sizeType) {
+    sizeMap.computeIfPresent(key, (k, size) -> {
+      if (add) {
+        return size + delta;
+      }
+      if (size < delta) {
+        LOG.warn("Negative {} size for key: {}. Current: {}, Part: {}. Clamping to 0.",
+            sizeType, k, size, delta);
+        return 0L;
+      }
+      return size - delta;
+    });
+  }
+
+  private static boolean isLegacySchema(OmMultipartKeyInfo multipartKeyInfo) {
+    return multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION;
+  }
+
+  /**
+   * The multipart key is {@code .../uploadId}; the split parts-table rows are
+   * keyed by that same uploadId. Extract it from the last path component.
+   */
+  private static String getUploadIdFromMultipartKey(String multipartKey) {
+    int idx = multipartKey.lastIndexOf(OzoneConsts.OM_KEY_PREFIX);
+    return idx >= 0 ? multipartKey.substring(idx + OzoneConsts.OM_KEY_PREFIX.length()) : multipartKey;
   }
 }

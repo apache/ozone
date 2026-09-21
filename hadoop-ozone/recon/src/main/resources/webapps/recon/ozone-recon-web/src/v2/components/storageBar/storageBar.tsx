@@ -60,6 +60,7 @@ const StorageBar: React.FC<StorageReportProps> = ({
     ? (filesystemUsed !== undefined ? filesystemUsed : (fsCap as number) - (fsAvail as number))
     : undefined;
   const fsReserved = hasFilesystemView ? (reserved as number) : undefined;
+  const hasFsReserved = fsReserved !== undefined && fsReserved !== null;
   const tooltip = (
     <>
       <table cellPadding={5}>
@@ -68,37 +69,55 @@ const StorageBar: React.FC<StorageReportProps> = ({
             <>
               <tr>
                 <td>Filesystem Capacity</td>
-                <td><strong>{size(fsCap as number)}</strong></td>
+                <td>
+                  <strong>{size(fsCap as number)}</strong>
+                </td>
               </tr>
               <tr>
                 <td>Filesystem Used</td>
-                <td><strong>{size(fsUsed as number)}</strong></td>
+                <td>
+                  <strong>{size(fsUsed as number)}</strong>
+                </td>
               </tr>
               <tr>
                 <td>Filesystem Available</td>
-                <td><strong>{size(fsAvail as number)}</strong></td>
+                <td>
+                  <strong>{size(fsAvail as number)}</strong>
+                </td>
               </tr>
-              <tr>
-                <td>Filesystem Reserved</td>
-                <td><strong>{size(fsReserved)}</strong></td>
-              </tr>
+              {hasFsReserved && (
+                <tr>
+                  <td>Filesystem Reserved</td>
+                  <td>
+                    <strong>{size(fsReserved as number)}</strong>
+                  </td>
+                </tr>
+              )}
             </>
           )}
           <tr>
             <td>Ozone Capacity</td>
-            <td><strong>{size(capacity)}</strong></td>
+            <td>
+              <strong>{size(capacity)}</strong>
+            </td>
           </tr>
           <tr>
             <td>Ozone Used</td>
-            <td><strong>{size(used)}</strong></td>
+            <td>
+              <strong>{size(used)}</strong>
+            </td>
           </tr>
           <tr>
             <td>Ozone Available</td>
-            <td><strong>{size(remaining)}</strong></td>
+            <td>
+              <strong>{size(remaining)}</strong>
+            </td>
           </tr>
           <tr>
             <td>Container Pre-allocated</td>
-            <td><strong>{size(committed)}</strong></td>
+            <td>
+              <strong>{size(committed)}</strong>
+            </td>
           </tr>
         </tbody>
       </table>

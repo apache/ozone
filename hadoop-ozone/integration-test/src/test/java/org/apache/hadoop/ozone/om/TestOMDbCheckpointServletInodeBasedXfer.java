@@ -105,9 +105,9 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
@@ -556,9 +556,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     om.getKeyManager().getSnapshotSstFilteringService().pause();
     om.getKeyManager().getSnapshotDeletingService().suspend();
     // Create test data and snapshots
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName);
     // Create key before first snapshot
-    TestDataUtil.createKey(bucket, "key1",
+    DataTestUtil.createKey(bucket, "key1",
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "data1".getBytes(StandardCharsets.UTF_8));
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot1");
@@ -821,10 +821,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     om.getKeyManager().getSnapshotSstFilteringService().pause();
 
     // Create test data and snapshots
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName);
 
     // Create key before first snapshot
-    TestDataUtil.createKey(bucket, "key1",
+    DataTestUtil.createKey(bucket, "key1",
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "data1".getBytes(StandardCharsets.UTF_8));
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot1");
@@ -1134,18 +1134,18 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   }
 
   private void writeData(String volumeName, String bucketName, boolean includeSnapshots) throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName);
     for (int i = 0; i < 10; i++) {
-      TestDataUtil.createKey(bucket, "key" + i,
+      DataTestUtil.createKey(bucket, "key" + i,
           ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
           "sample".getBytes(StandardCharsets.UTF_8));
       om.getMetadataManager().getStore().flushDB();
     }
     if (includeSnapshots) {
-      TestDataUtil.createKey(bucket, "keysnap1",
+      DataTestUtil.createKey(bucket, "keysnap1",
           ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
           "sample".getBytes(StandardCharsets.UTF_8));
-      TestDataUtil.createKey(bucket, "keysnap2",
+      DataTestUtil.createKey(bucket, "keysnap2",
           ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
           "sample".getBytes(StandardCharsets.UTF_8));
       client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot10");

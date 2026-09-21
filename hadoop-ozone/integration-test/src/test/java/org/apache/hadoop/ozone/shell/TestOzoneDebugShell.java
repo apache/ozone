@@ -45,8 +45,8 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
@@ -189,9 +189,9 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
       repConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
           ReplicationFactor.THREE);
     }
-    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
+    DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName,
         layout);
-    TestDataUtil.createKey(
+    DataTestUtil.createKey(
         client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
         keyName, repConfig, "test".getBytes(StandardCharsets.UTF_8));
   }

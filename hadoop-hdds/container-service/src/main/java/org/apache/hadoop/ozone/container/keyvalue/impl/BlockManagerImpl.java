@@ -171,6 +171,16 @@ public class BlockManagerImpl implements BlockManager {
     }
   }
 
+  @Override
+  public void updateContainerBcsId(Container container, long bcsId) throws IOException {
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      Objects.requireNonNull(db, "db == null");
+      db.getStore().getMetadataTable().put(containerData.getBcsIdKey(), bcsId);
+    }
+    container.updateBlockCommitSequenceId(bcsId);
+  }
+
   public long persistPutBlock(KeyValueContainer container,
       BlockData data, boolean endOfBlock)
       throws IOException {
@@ -209,6 +219,20 @@ public class BlockManagerImpl implements BlockManager {
       // container to determine whether the blockCount is already incremented
       // for this block in the DB or not.
       long localID = data.getLocalID();
+      // For the PutBlock that is endOfBlock and meanwhile bscId = 0, it means
+      // this PutBlock comes from data stream close without going through the
+      // Raft, thus there is no log index. In this case, we should not let
+      // 0 to overwrite previous possible PutBlocks from Ratis log that were
+      // generated during immediate flushes from the active data stream. Instead,
+      // we should load the latest bscid and reuse that id.
+      if (endOfBlock && bcsId == 0) {
+        BlockData existing = db.getStore().getBlockDataTable()
+            .get(containerData.getBlockKey(localID));
+        if (existing != null) {
+          bcsId = existing.getBlockCommitSequenceId();
+          data.setBlockCommitSequenceId(bcsId);
+        }
+      }
       boolean isBlockInCache = container.isBlockInPendingPutBlockCache(localID);
       boolean incrBlockCount = false;
 

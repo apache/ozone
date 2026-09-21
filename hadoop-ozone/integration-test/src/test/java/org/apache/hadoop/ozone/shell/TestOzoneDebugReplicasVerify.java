@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import static org.apache.hadoop.ozone.TestDataUtil.createKeys;
+import static org.apache.hadoop.ozone.DataTestUtil.createKeys;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.corruptFile;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.truncateFile;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
@@ -216,7 +216,8 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
       fail("No suitable key is available in the cluster");
     }
     OmKeyInfo keyInfo = keyInfoMap.get(key.get());
-    OmKeyLocationInfo location = Objects.requireNonNull(keyInfo.getLatestVersionLocations()).getLocationList().get(0);
+    OmKeyLocationInfo location = Objects.requireNonNull(
+        keyInfo.getLatestVersionLocations()).createLocationList().get(0);
     Container<?> container = getFirstContainer(location.getContainerID());
     long localID = location.getLocalID();
     LOG.info("Corrupting key: {}/{}/{} with localID {}", keyInfoMap.get(key.get()).getVolumeName(),
@@ -247,7 +248,8 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
       fail("No suitable key is available in the cluster");
     }
     OmKeyInfo keyInfo = keyInfoMap.get(key.get());
-    OmKeyLocationInfo location = Objects.requireNonNull(keyInfo.getLatestVersionLocations()).getLocationList().get(0);
+    OmKeyLocationInfo location = Objects.requireNonNull(
+        keyInfo.getLatestVersionLocations()).createLocationList().get(0);
     Container<?> container = getFirstContainer(location.getContainerID());
     long localID = location.getLocalID();
     LOG.info("Truncating key: {} with localID {}", key, localID);

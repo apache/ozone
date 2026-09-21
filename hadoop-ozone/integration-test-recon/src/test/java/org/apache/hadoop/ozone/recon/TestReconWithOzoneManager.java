@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -52,9 +53,11 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.http.HttpEntity;
@@ -74,6 +77,8 @@ import org.junit.jupiter.api.Test;
  * Test Ozone Recon.
  */
 public class TestReconWithOzoneManager {
+  private static final AtomicLong OBJECT_ID_SEQUENCE = new AtomicLong();
+
   private static MiniOzoneCluster cluster = null;
   private static OMMetadataManager metadataManager;
   private static CloseableHttpClient httpClient;
@@ -393,6 +398,93 @@ public class TestReconWithOzoneManager {
    * Helper function to add voli/bucketi/keyi to containeri to OM Metadata.
    * For test purpose each container will have only one key.
    */
+  @Test
+  public void testManualOMDBRebuild() throws Exception {
+    // 1. Stop Recon
+    recon.stop();
+
+    // 2. Write keys to OM
+    addKeys(20, 25);
+    long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
+        .getDb().getLatestSequenceNumber();
+    java.io.File omDbDir = metadataManager.getStore().getDbLocation();
+
+    // 3. Stop OM (flush to disk)
+    cluster.getOzoneManager().stop();
+
+    // 4. Copy OM DB into Recon's OM snapshot dir. The dir and the "om.snapshot.db_" prefix must
+    // match what ReconOmMetadataManagerImpl#start looks up via ReconUtils#getLastKnownDB, otherwise
+    // Recon will not load the copied DB on restart.
+    java.io.File reconOmSnapshotDir = new ReconUtils()
+        .getReconDbDir(cluster.getConf(), ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR);
+    java.io.File reconOmDbDir = new java.io.File(reconOmSnapshotDir,
+        ReconConstants.RECON_OM_SNAPSHOT_DB + "_" + System.currentTimeMillis());
+    org.apache.commons.io.FileUtils.deleteDirectory(reconOmDbDir);
+    org.apache.commons.io.FileUtils.copyDirectory(omDbDir, reconOmDbDir);
+
+    // 5. Restart Recon and confirm it loaded the OM DB copy we placed above. Shutting OM down
+    // writes its own trailing records, so the copy is at or ahead of the sequence number we
+    // captured while OM was up.
+    recon.start(cluster.getConf());
+    OzoneManagerServiceProviderImpl reconImpl = (OzoneManagerServiceProviderImpl)
+        recon.getReconServer().getOzoneManagerServiceProvider();
+    long reconLoadedSeqNumber = ((RDBStore) reconImpl.getOMMetadataManagerInstance().getStore())
+        .getDb().getLatestSequenceNumber();
+    assertThat(reconLoadedSeqNumber).isGreaterThanOrEqualTo(omLatestSeqNumber);
+
+    // 6. POST reinit
+    String triggerUrl = "http://" + cluster.getConf().get(OZONE_RECON_HTTP_ADDRESS_KEY) +
+        "/api/v1/triggerdbsync/om/reinit";
+    org.apache.http.client.methods.HttpPost httpPost = new org.apache.http.client.methods.HttpPost(triggerUrl);
+    HttpResponse response = httpClient.execute(httpPost);
+    assertEquals(202, response.getStatusLine().getStatusCode());
+
+    // 7. Wait for reprocess to succeed (REPROCESS_STAGING seq is set by reInitializeTasks)
+    GenericTestUtils.waitFor(() -> {
+      try {
+        String taskStatusResponse = makeHttpCall(taskStatusURL);
+        long reconLatestSeqNumber = getReconTaskAttributeFromJson(
+            taskStatusResponse,
+            "REPROCESS_STAGING",
+            "lastUpdatedSeqNumber");
+        return reconLatestSeqNumber == reconLoadedSeqNumber;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 30000);
+
+    // 8. Start OM
+    cluster.getOzoneManager().restart();
+    // restart() rebuilds the OM metadata manager, so re-fetch the live handle.
+    refreshOmMetadataManager();
+
+    // 9. Write more keys and verify delta resumes
+    addKeys(25, 30);
+    long newOmLatestSeqNumber = ((RDBStore) cluster.getOzoneManager().getMetadataManager().getStore())
+        .getDb().getLatestSequenceNumber();
+
+    OzoneManagerServiceProviderImpl newImpl = (OzoneManagerServiceProviderImpl)
+        recon.getReconServer().getOzoneManagerServiceProvider();
+    newImpl.syncDataFromOM();
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        String taskStatusResponse = makeHttpCall(taskStatusURL);
+        long reconLatestSeqNumber = getReconTaskAttributeFromJson(
+            taskStatusResponse,
+            OmSnapshotRequest.name(),
+            "lastUpdatedSeqNumber");
+        return reconLatestSeqNumber == newOmLatestSeqNumber;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 30000);
+  }
+
+  private static void refreshOmMetadataManager() {
+    metadataManager = cluster.getOzoneManager().getMetadataManager();
+  }
+
   private void addKeys(int start, int end) throws Exception {
     for (int i = start; i < end; i++) {
       Pipeline pipeline = HddsTestUtils.getRandomPipeline();
@@ -420,6 +512,30 @@ public class TestReconWithOzoneManager {
                                     List<OmKeyLocationInfoGroup>
                                         omKeyLocationInfoGroupList)
       throws IOException {
+
+    // Recon's full reprocess resolves the parent bucket of every key it reads, so the volume
+    // and bucket rows have to exist next to the key entry.
+    String volumeKey = metadataManager.getVolumeKey(volume);
+    if (metadataManager.getVolumeTable().get(volumeKey) == null) {
+      metadataManager.getVolumeTable().put(volumeKey,
+          OmVolumeArgs.newBuilder()
+              .setVolume(volume)
+              .setAdminName("TestUser")
+              .setOwnerName("TestUser")
+              .setObjectID(OBJECT_ID_SEQUENCE.incrementAndGet())
+              .build());
+    }
+
+    String bucketKey = metadataManager.getBucketKey(volume, bucket);
+    if (metadataManager.getBucketTable().get(bucketKey) == null) {
+      metadataManager.getBucketTable().put(bucketKey,
+          OmBucketInfo.newBuilder()
+              .setVolumeName(volume)
+              .setBucketName(bucket)
+              .setBucketLayout(getBucketLayout())
+              .setObjectID(OBJECT_ID_SEQUENCE.incrementAndGet())
+              .build());
+    }
 
     String omKey = metadataManager.getOzoneKey(volume,
         bucket, key);

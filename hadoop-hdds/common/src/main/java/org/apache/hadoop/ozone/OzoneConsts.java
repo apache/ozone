@@ -313,6 +313,8 @@ public final class OzoneConsts {
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
   public static final String S3_SETSECRET_USER = "S3SetSecretUser";
   public static final String S3_REVOKESECRET_USER = "S3RevokeSecretUser";
+  public static final String S3_REVOKESTSTOKEN_USER = "S3RevokeSTSTokenUser";
+  public static final String S3_STS_TEMP_ACCESS_KEY_ID = "tempAccessKeyId";
   public static final String RENAMED_KEYS_MAP = "renamedKeysMap";
   public static final String UNRENAMED_KEYS_MAP = "unRenamedKeysMap";
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
@@ -326,6 +328,7 @@ public final class OzoneConsts {
   public static final String TENANT = "tenant";
   public static final String USER_PREFIX = "userPrefix";
   public static final String REWRITE_GENERATION = "rewriteGeneration";
+  public static final String DELETED_KEY_SOURCE_TYPE = "deletedKeySourceType";
   /** Sentinel generation used to request atomic create-if-not-exists(put if absent) semantics. */
   public static final long EXPECTED_GEN_CREATE_IF_ABSENT = 0L;
   public static final String FROM_SNAPSHOT = "fromSnapshot";

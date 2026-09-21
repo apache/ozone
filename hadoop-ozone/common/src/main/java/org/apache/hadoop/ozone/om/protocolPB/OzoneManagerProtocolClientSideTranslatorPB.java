@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.tracing.InternalSpanKind;
 import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -57,7 +58,9 @@ import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -73,6 +76,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
@@ -124,6 +128,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteB
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantRequest;
@@ -144,6 +149,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
@@ -155,6 +163,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
@@ -220,6 +229,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
@@ -248,6 +258,8 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationToke
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotBucketCount;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -256,6 +268,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.Time;
 
 /**
  * The client side implementation of OzoneManagerProtocol.
@@ -295,6 +308,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @throws IOException if an I/O error occurs
    */
   @Override
+  @InternalSpanKind
   public void close() throws IOException {
     //transport is not reusable
     transport.close();
@@ -322,15 +336,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest.Builder  builder = OMRequest.newBuilder(omRequest);
     // Insert S3 Authentication information for each request.
     if (getThreadLocalS3Auth() != null) {
-      builder.setS3Authentication(
+      final S3Authentication.Builder s3AuthBuilder =
           S3Authentication.newBuilder()
               .setSignature(
                   threadLocalS3Auth.get().getSignature())
               .setStringToSign(
                   threadLocalS3Auth.get().getStringTosSign())
               .setAccessId(
-                  threadLocalS3Auth.get().getAccessID())
-              .build());
+                  threadLocalS3Auth.get().getAccessID());
+
+      // Include STS session token if present so OM can validate it
+      if (threadLocalS3Auth.get().getSessionToken() != null) {
+        s3AuthBuilder.setSessionToken(threadLocalS3Auth.get().getSessionToken());
+      }
+      if (threadLocalS3Auth.get().getS3Action() != null) {
+        s3AuthBuilder.setS3Action(threadLocalS3Auth.get().getS3Action());
+      }
+
+      builder.setS3Authentication(s3AuthBuilder.build());
     }
     if (s3AuthCheck && getThreadLocalS3Auth() == null) {
       throw new IllegalArgumentException("S3 Auth expected to " +
@@ -756,21 +779,26 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
 
     req.setKeyArgs(keyArgs.build());
+    req.setDerivedKeyPiggyBacking(args.isDerivedKeyPiggyBacking());
 
     OMRequest omRequest = createOMRequest(Type.CreateKey)
         .setCreateKeyRequest(req)
         .build();
 
     CreateKeyResponse keyResponse = handleSubmitRequestAndSCMSafeModeRetry(omRequest).getCreateKeyResponse();
-    return new OpenKeySession(keyResponse.getID(),
+    OpenKeySession openKeySession = new OpenKeySession(keyResponse.getID(),
         OmKeyInfo.getFromProtobuf(keyResponse.getKeyInfo()),
         keyResponse.getOpenVersion());
+    if (keyResponse.hasDerivedKey()) {
+      openKeySession.setDerivedKey(keyResponse.getDerivedKey().asReadOnlyByteBuffer());
+    }
+    return openKeySession;
   }
 
   private OMResponse handleError(OMResponse resp) throws OMException {
     if (resp.getStatus() != OK) {
       throw new OMException(resp.getMessage(),
-          ResultCodes.values()[resp.getStatus().ordinal()]);
+          ResultCodes.valueOf(resp.getStatus().name()));
     }
     return resp;
   }
@@ -817,9 +845,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void commitKey(OmKeyArgs args, long clientId)
+  public long commitKey(OmKeyArgs args, long clientId)
           throws IOException {
-    updateKey(args, clientId, false, false);
+    return updateKeyAndGetModificationTime(args, clientId, false, false);
   }
 
   @Override
@@ -842,6 +870,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   private void updateKey(OmKeyArgs args, long clientId, boolean hsync, boolean recovery)
+      throws IOException {
+    // Preserve legacy behavior (ignore response payload).
+    updateKeyAndGetModificationTime(args, clientId, hsync, recovery);
+  }
+
+  private long updateKeyAndGetModificationTime(OmKeyArgs args, long clientId, boolean hsync, boolean recovery)
       throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
     List<OmKeyLocationInfo> locationInfoList = args.getLocationInfoList();
@@ -868,7 +902,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCommitKeyRequest(req)
         .build();
 
-    handleError(submitRequest(omRequest));
+    final OMResponse resp = handleError(submitRequest(omRequest));
+    if (resp.hasCommitKeyResponse() && resp.getCommitKeyResponse().hasModificationTime()) {
+      return resp.getCommitKeyResponse().getModificationTime();
+    }
+    return Time.now();
   }
 
   @Override
@@ -1388,6 +1426,29 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return new ListSnapshotResponse(snapshotInfos, lastSnapshot);
   }
 
+  @Override
+  public SnapshotCountResponse snapshotCount(String bucketFilter)
+      throws IOException {
+    final OzoneManagerProtocolProtos.SnapshotCountRequest.Builder requestBuilder =
+        OzoneManagerProtocolProtos.SnapshotCountRequest.newBuilder();
+    if (bucketFilter != null) {
+      requestBuilder.setBucketFilter(bucketFilter);
+    }
+    final OMRequest omRequest = createOMRequest(Type.SnapshotCount)
+        .setSnapshotCountRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+
+    OzoneManagerProtocolProtos.SnapshotCountResponse response = omResponse.getSnapshotCountResponse();
+    List<SnapshotBucketCount> bucketCounts = response.getBucketsList().stream()
+        .map(count -> new SnapshotBucketCount(count.getVolumeName(), count.getBucketName(),
+            count.getActive(), count.getDeleted(), count.getTotal()))
+        .collect(Collectors.toList());
+
+    return new SnapshotCountResponse(response.getActive(), response.getDeleted(), response.getTotal(), bucketCounts);
+  }
+
   /**
    * {@inheritDoc}
    */
@@ -1461,12 +1522,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OzoneManagerProtocolProtos.SnapshotDiffResponse diffResponse =
         omResponse.getSnapshotDiffResponse();
 
-    return new SnapshotDiffResponse(SnapshotDiffReportOzone.fromProtobuf(
-        diffResponse.getSnapshotDiffReport()),
+    SnapshotDiffResponse result = new SnapshotDiffResponse(
+        SnapshotDiffReportOzone.fromProtobuf(diffResponse.getSnapshotDiffReport()),
         JobStatus.fromProtobuf(diffResponse.getJobStatus()),
         diffResponse.getWaitTimeInMs(),
         diffResponse.getReason(),
         reportOnly);
+    if (diffResponse.hasSubStatus()) {
+      result.setSubStatus(SnapshotDiffResponse.SubStatus.fromProtoBuf(diffResponse.getSubStatus()));
+      if (diffResponse.hasProgressPercent()) {
+        result.setProgressPercent(diffResponse.getProgressPercent());
+      }
+    }
+    return result;
   }
 
   /**
@@ -1788,10 +1856,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest))
         .getCommitMultiPartUploadResponse();
 
-    OmMultipartCommitUploadPartInfo info = new
-        OmMultipartCommitUploadPartInfo(response.getPartName(),
-          response.getETag());
-    return info;
+    final long modificationTime = response.hasModificationTime() ? response.getModificationTime() : Time.now();
+    return new OmMultipartCommitUploadPartInfo(response.getPartName(), response.getETag(), modificationTime);
   }
 
   @Override
@@ -2184,6 +2250,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  @SkipTracing
   public ThreadLocal<S3Auth> getS3CredentialsProvider() {
     return this.threadLocalS3Auth;
   }
@@ -2465,8 +2532,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
 
-    ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(keyArgs, recursive, startKey,
-        numEntries, allowPartialPrefixes);
+    final ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(
+        keyArgs, recursive, startKey, numEntries, allowPartialPrefixes);
 
     OMRequest omRequest = createOMRequest(Type.ListStatus)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2494,8 +2561,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setLatestVersionLocation(true)
         .build();
 
-    ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(keyArgs, recursive, startKey,
-        numEntries, allowPartialPrefixes);
+    final ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(
+        keyArgs, recursive, startKey, numEntries, allowPartialPrefixes);
+    final String listPrefix = args.getListPrefix();
+    if (listPrefix != null && !listPrefix.isEmpty()) {
+      listStatusRequestBuilder.setListPrefix(listPrefix);
+    }
 
     OMRequest omRequest = createOMRequest(Type.ListStatusLight)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2761,6 +2832,73 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException {
+    GetLifecycleConfigurationRequest.Builder req =
+        GetLifecycleConfigurationRequest.newBuilder();
+    req.setVolumeName(volumeName);
+    req.setBucketName(bucketName);
+
+    OMRequest omRequest = createOMRequest(Type.GetLifecycleConfiguration)
+        .setGetLifecycleConfigurationRequest(req)
+        .build();
+
+    GetLifecycleConfigurationResponse resp = handleError(submitRequest(
+        omRequest)).getGetLifecycleConfigurationResponse();
+
+    return OmLifecycleConfiguration.getFromProtobuf(
+        resp.getLifecycleConfiguration());
+  }
+
+  @Override
+  public GetLifecycleServiceStatusResponse getLifecycleServiceStatus() throws IOException {
+    OzoneManagerProtocolProtos.GetLifecycleServiceStatusRequest
+        getLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.GetLifecycleServiceStatusRequest
+            .newBuilder().build();
+
+    OMRequest omRequest = createOMRequest(Type.GetLifecycleServiceStatus)
+        .setGetLifecycleServiceStatusRequest(getLifecycleServiceStatusRequest)
+        .build();
+
+    return handleError(submitRequest(omRequest))
+        .getGetLifecycleServiceStatusResponse();
+  }
+
+  @Override
+  public void setLifecycleConfiguration(
+      OmLifecycleConfiguration omLifecycleConfiguration) throws IOException {
+    SetLifecycleConfigurationRequest.Builder req =
+        SetLifecycleConfigurationRequest.newBuilder();
+    LifecycleConfiguration lifecycleConfiguration =
+        omLifecycleConfiguration.getProtobuf();
+    req.setLifecycleConfiguration(lifecycleConfiguration);
+
+    OMRequest omRequest =
+        createOMRequest(Type.SetLifecycleConfiguration)
+            .setSetLifecycleConfigurationRequest(req)
+            .build();
+
+    OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+  }
+
+  @Override
+  public void deleteLifecycleConfiguration(String volumeName, String bucketName)
+      throws IOException {
+    DeleteLifecycleConfigurationRequest.Builder req =
+        DeleteLifecycleConfigurationRequest.newBuilder();
+    req.setVolumeName(volumeName);
+    req.setBucketName(bucketName);
+
+    OMRequest omRequest = createOMRequest(Type.DeleteLifecycleConfiguration)
+        .setDeleteLifecycleConfigurationRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
   public Map<String, String> getBucketTagging(OmBucketArgs args) throws IOException {
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
@@ -2803,6 +2941,34 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public void suspendLifecycleService() throws IOException {
+    OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+        setLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+            .newBuilder().setSuspend(true).build();
+
+    OMRequest omRequest = createOMRequest(Type.SetLifecycleServiceStatus)
+        .setSetLifecycleServiceStatusRequest(setLifecycleServiceStatusRequest)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public void resumeLifecycleService() throws IOException {
+    OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+        setLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+            .newBuilder().setSuspend(false).build();
+
+    OMRequest omRequest = createOMRequest(Type.SetLifecycleServiceStatus)
+        .setSetLifecycleServiceStatusRequest(setLifecycleServiceStatusRequest)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
   public void deleteBucketTagging(OmBucketArgs args) throws IOException {
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
@@ -2816,6 +2982,48 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.DeleteBucketTagging)
         .setDeleteBucketTaggingRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy, String requestId) throws IOException {
+    final OzoneManagerProtocolProtos.AssumeRoleRequest.Builder request =
+        OzoneManagerProtocolProtos.AssumeRoleRequest.newBuilder()
+            .setRoleArn(roleArn)
+            .setRoleSessionName(roleSessionName)
+            .setDurationSeconds(durationSeconds)
+            .setAwsIamSessionPolicy(awsIamSessionPolicy != null ? awsIamSessionPolicy : "")
+            .setRequestId(requestId);
+
+    final OMRequest omRequest = createOMRequest(Type.AssumeRole)
+        .setAssumeRoleRequest(request)
+        .build();
+
+    return AssumeRoleResponseInfo.fromProtobuf(
+        handleError(submitRequest(omRequest)).getAssumeRoleResponse());
+  }
+
+  @Override
+  public CallerIdentityInfo getCallerIdentity() throws IOException {
+    final OMRequest omRequest = createOMRequest(Type.GetCallerIdentity)
+        .setGetCallerIdentityRequest(OzoneManagerProtocolProtos.GetCallerIdentityRequest.newBuilder().build())
+        .build();
+
+    return CallerIdentityInfo.fromProtobuf(handleError(submitRequest(omRequest)).getGetCallerIdentityResponse());
+  }
+
+  @Override
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException {
+    final OzoneManagerProtocolProtos.RevokeSTSTokenRequest request =
+        OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
+            .setOriginalAccessKeyId(originalAccessKeyId)
+            .build();
+
+    final OMRequest omRequest = createOMRequest(Type.RevokeSTSToken)
+        .setRevokeSTSTokenRequest(request)
         .build();
 
     handleError(submitRequest(omRequest));

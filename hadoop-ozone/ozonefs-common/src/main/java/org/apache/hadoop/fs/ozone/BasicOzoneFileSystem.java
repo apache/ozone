@@ -785,8 +785,15 @@ public class BasicOzoneFileSystem extends FileSystem {
     try {
       if (!allUsers) {
         Path userTrash = new Path(trashRoot, userName);
-        if (exists(userTrash) && getFileStatus(userTrash).isDirectory()) {
-          ret.add(getFileStatus(userTrash));
+        // headOp: only the entry type is needed here. Fetch once instead of
+        // calling exists()/getFileStatus() repeatedly for the same path.
+        try {
+          FileStatus userTrashStatus = getFileStatus(userTrash, true);
+          if (userTrashStatus.isDirectory()) {
+            ret.add(userTrashStatus);
+          }
+        } catch (FileNotFoundException ignored) {
+          // No trash root for this user.
         }
       } else {
         if (exists(trashRoot)) {
@@ -834,6 +841,16 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
+    return getFileStatus(f, false);
+  }
+
+  /**
+   * @param headOp when true, requests a metadata-only (type) check so the OM
+   *               skips the pipeline refresh (SCM round-trip) and datanode
+   *               sorting. Used by {@link #isDirectory(Path)}/{@link #isFile(Path)},
+   *               which only need the entry type.
+   */
+  private FileStatus getFileStatus(Path f, boolean headOp) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
@@ -842,7 +859,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     FileStatus fileStatus = null;
     try {
       fileStatus = convertFileStatus(
-          adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
+          adapter.getFileStatus(key, uri, qualifiedPath, getUsername(), headOp));
     } catch (IOException ex) {
       if (ex instanceof OMException) {
         if (((OMException) ex).getResult()
@@ -1014,17 +1031,25 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
-  @SuppressWarnings("deprecation")
   public boolean isDirectory(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_DIRECTORY);
-    return super.isDirectory(f);
+    try {
+      // headOp: only the entry type is needed, so skip the pipeline refresh.
+      return getFileStatus(f, true).isDirectory();
+    } catch (FileNotFoundException e) {
+      return false;
+    }
   }
 
   @Override
-  @SuppressWarnings("deprecation")
   public boolean isFile(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_FILE);
-    return super.isFile(f);
+    try {
+      // headOp: only the entry type is needed, so skip the pipeline refresh.
+      return getFileStatus(f, true).isFile();
+    } catch (FileNotFoundException e) {
+      return false;
+    }
   }
 
   @Override

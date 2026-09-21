@@ -562,7 +562,7 @@ public class TestDeleteContainerHandler {
 
   private void clearTable(DBHandle dbHandle, Table<String, BlockData> table, Container container)
       throws IOException {
-    List<? extends Table.KeyValue<String, BlockData>>
+    List<Table.KeyValue<String, BlockData>>
         blocks = table.getRangeKVs(
             ((KeyValueContainerData) container.getContainerData()).
                 startKeyEmpty(),

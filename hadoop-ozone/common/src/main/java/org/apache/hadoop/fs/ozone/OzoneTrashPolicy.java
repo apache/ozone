@@ -46,7 +46,7 @@ public class OzoneTrashPolicy extends TrashPolicyDefault {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneTrashPolicy.class);
 
-  protected static final Path CURRENT = new Path("Current");
+  public static final Path CURRENT = new Path("Current");
 
   protected static final int MSECS_PER_MINUTE = 60 * 1000;
 

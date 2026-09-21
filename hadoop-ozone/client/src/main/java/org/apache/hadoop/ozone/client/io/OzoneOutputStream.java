@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,6 +38,7 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   private final OutputStream outputStream;
   private final Syncable syncable;
   private boolean enableHsync;
+  private ByteBuffer derivedKey;
 
   /**
    * Constructs an instance with a {@link Syncable} {@link OutputStream}.
@@ -138,6 +140,14 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
     return null;
   }
 
+  public long getModificationTime() {
+    final KeyOutputStream keyOutputStream = getKeyOutputStream();
+    if (keyOutputStream != null) {
+      return keyOutputStream.getModificationTime();
+    }
+    throw new IllegalStateException("OutputStream is not a KeyOutputStream: " + outputStream.getClass());
+  }
+
   public OutputStream getOutputStream() {
     return outputStream;
   }
@@ -148,7 +158,7 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   }
 
   public void setPreCommits(List<CheckedRunnable<IOException>> preCommits) {
-    KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
+    final KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
     if (keyCommitOutput != null) {
       keyCommitOutput.setPreCommits(preCommits);
       return;
@@ -180,5 +190,13 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
       return ((CipherOutputStreamOzone) out).getWrappedStream();
     }
     return out;
+  }
+
+  public ByteBuffer getDerivedKey() {
+    return derivedKey;
+  }
+
+  public void setDerivedKey(ByteBuffer derivedKey) {
+    this.derivedKey = derivedKey;
   }
 }

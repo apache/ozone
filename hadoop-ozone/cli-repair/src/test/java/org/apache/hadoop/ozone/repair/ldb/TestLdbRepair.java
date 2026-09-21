@@ -126,7 +126,7 @@ public class TestLdbRepair {
     String[] args = {
         "--db", dbPath.toString(),
         "--column-family", TEST_CF_NAME,
-        "--blc", "2"
+        "--blc", "kForce"
     };
     // Pass two "y" inputs - one for user confirmation and the other for warning to stop service
     int exitCode = withTextFromSystemIn("y", "y")

@@ -32,6 +32,7 @@ rm -f "${REPORT_DIR}/output.log"
 
 find * \( \
     -path '*/src/test/shell/*' -name '*.bats' \
+    -or -path dev-support/ci/errorprone.bats \
     -or -path dev-support/ci/selective_ci_checks.bats \
     -or -path dev-support/ci/pr_title_check.bats \
     -or -path dev-support/ci/find_test_class_project.bats \

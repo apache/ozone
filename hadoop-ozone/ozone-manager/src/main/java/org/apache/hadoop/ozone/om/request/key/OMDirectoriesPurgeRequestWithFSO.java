@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager.VolumeBucketId;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -146,7 +147,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           subDirNames.add(processed.deleteKey);
 
           omMetrics.decNumKeys();
-          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+          omMetrics.incNumKeyDeletesInternal();
+          OmBucketInfo omBucketInfo = accumulatedBucketInfo(volBucketInfoMap, omMetadataManager,
               processed.volumeName, processed.bucketName);
           // bucketInfo can be null in case of delete volume or bucket
           // or key does not belong to bucket as bucket is recreated
@@ -181,8 +183,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
 
           omMetrics.decNumKeys();
+          omMetrics.incNumKeyDeletesInternal();
           numSubFilesMoved++;
-          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+          OmBucketInfo omBucketInfo = accumulatedBucketInfo(volBucketInfoMap, omMetadataManager,
               processed.volumeName, processed.bucketName);
           // bucketInfo can be null in case of delete volume or bucket
           // or key does not belong to bucket as bucket is recreated
@@ -203,7 +206,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           deletedDirNames.add(path.getDeletedDir());
           BucketNameInfo bucketNameInfo = volumeBucketIdMap.get(new VolumeBucketId(path.getVolumeId(),
               path.getBucketId()));
-          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+          OmBucketInfo omBucketInfo = accumulatedBucketInfo(volBucketInfoMap, omMetadataManager,
               bucketNameInfo.getVolumeName(), bucketNameInfo.getBucketName());
           if (omBucketInfo != null && omBucketInfo.getObjectID() == path.getBucketId()) {
             omBucketInfo.purgeSnapshotUsedNamespace(1);
@@ -219,6 +222,14 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       deletingServiceMetrics.incrNumSubDirectoriesMoved(numSubDirMoved);
       deletingServiceMetrics.incrNumSubFilesMoved(numSubFilesMoved);
       deletingServiceMetrics.incrNumDirPurged(numDirsDeleted);
+
+      // All bucket locks are still held here, and every purge path has been processed, so the
+      // accumulated copies can be published as a whole.
+      for (Map.Entry<Pair<String, String>, OmBucketInfo> entry : volBucketInfoMap.entrySet()) {
+        omMetadataManager.getBucketTable().addCacheEntry(
+            omMetadataManager.getBucketKey(entry.getKey().getLeft(), entry.getKey().getRight()),
+            entry.getValue(), context.getIndex());
+      }
 
       TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
       if (fromSnapshotInfo != null) {
@@ -265,6 +276,18 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     return new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests,
         getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);
+  }
+
+  /**
+   * Return the copy this request accumulates deltas on, fetching it on first use. All three purge
+   * paths can touch the same bucket, so they must share one copy or earlier deltas are lost.
+   */
+  private OmBucketInfo accumulatedBucketInfo(Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap,
+      OMMetadataManager omMetadataManager, String volumeName, String bucketName) {
+    OmBucketInfo omBucketInfo = volBucketInfoMap.get(Pair.of(volumeName, bucketName));
+
+    return omBucketInfo != null ? omBucketInfo
+        : getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
   }
 
   /**

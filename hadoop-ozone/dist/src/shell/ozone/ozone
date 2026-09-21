@@ -66,6 +66,7 @@ function ozone_usage
   ozone_add_subcommand "s3" client "command line interface for s3 related operations"
   ozone_add_subcommand "tenant" client "command line interface for multi-tenant related operations"
   ozone_add_subcommand "insight" client "tool to get runtime operation information"
+  ozone_add_subcommand "local" client "run a single-node local ozone cluster"
   ozone_add_subcommand "version" client "print the version"
   ozone_add_subcommand "dtutil" client "operations related to delegation tokens"
   ozone_add_subcommand "interactive" client "interactive shell for ozone commands"
@@ -182,7 +183,7 @@ function ozonecmd_case
     ;;
     httpfs)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
-      OZONE_HTTPFS_OPTS="${OZONE_HTTPFS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties"
+      OZONE_HTTPFS_OPTS="${OZONE_HTTPFS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_LOG_DIR} -Dhttpfs.temp.dir=${OZONE_PID_DIR} -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties"
       OZONE_CLASSNAME='org.apache.ozone.fs.http.server.HttpFSServerWebServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-httpfsgateway"
     ;;
@@ -207,6 +208,10 @@ function ozonecmd_case
     insight)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.insight.Insight
       OZONE_RUN_ARTIFACT_NAME="ozone-insight"
+    ;;
+    local)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.local.OzoneLocal
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     version)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.util.OzoneVersionInfo
@@ -297,6 +302,7 @@ function ozone_suppress_shell_log
       OZONE_LOGLEVEL=OFF
       OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"
       OZONE_OPTS="${OZONE_OPTS} -Dslf4j.internal.verbosity=ERROR"
+      OZONE_OPTS="-Djava.util.logging.config.file='${OZONE_CONF_DIR}/shell-logging.properties' ${OZONE_OPTS}"
     fi
   fi
 }

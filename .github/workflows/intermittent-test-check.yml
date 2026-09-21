@@ -57,7 +57,7 @@ on:
         default: '25'
         required: true
 env:
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Daether.connector.http.retryHandler.count=10
   TEST_CLASS: ${{ github.event.inputs.test-class}}
   TEST_METHOD: ${{ github.event.inputs.test-name }}
   ITERATIONS: ${{ github.event.inputs.iterations }}
@@ -78,7 +78,7 @@ jobs:
     outputs:
       matrix: ${{steps.generate.outputs.matrix}}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.event.inputs.ref }}
@@ -93,7 +93,7 @@ jobs:
           split_matrix="[${x%,}]"
           echo "matrix=$split_matrix" >> $GITHUB_OUTPUT
   ratis:
-    uses: ./.github/workflows/build-ratis.yml
+    uses: $/.github/workflows/build-ratis.yml
     if: ${{ github.event.inputs.ratis-ref != '' }}
     with:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
@@ -107,7 +107,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout project
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.event.inputs.ref }}
@@ -128,7 +128,7 @@ jobs:
           path: |
             ~/.m2/repository/org/apache/ratis
       - name: Setup java
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: 'temurin'
           java-version: ${{ github.event.inputs.java-version }}
@@ -161,7 +161,7 @@ jobs:
         split: ${{fromJson(needs.prepare-job.outputs.matrix)}}  # Define  splits
       fail-fast: ${{ fromJson(github.event.inputs.fail-fast) }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.event.inputs.ref }}
@@ -189,7 +189,7 @@ jobs:
           path: |
             ~/.m2/repository/org/apache/ozone
       - name: Setup java
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: 'temurin'
           java-version: ${{ github.event.inputs.java-version }}
