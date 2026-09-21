@@ -34,6 +34,7 @@ import java.util.Set;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.apache.hadoop.hdds.scm.proxy.SCMProxyInfo;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -221,18 +222,19 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Adding an SCM in a single {@code reconfig start} is applied by the
-   * reconfiguration-complete callback: by the time it runs, both the new node
-   * list and the new node's address key are stored, regardless of the order the
-   * batch applied them (the "nodes before address" ordering the per-property
-   * path cannot satisfy on its own). Drive the callback directly, since the sync
-   * {@code reconfigureProperty} used by the other tests never fires it.
+   * Adding an SCM, applying the keys in "nodes before address" order (the order
+   * a real {@code reconfig start} batch may use). Applying the node list before
+   * the new SCM's address cannot resolve the node, so that property fails and is
+   * rolled back and the node is not added; once the address is set, reapplying
+   * the node list adds it. This mirrors the datanode, which skips an SCM whose
+   * address is not resolvable yet, so adding a node is retriable rather than
+   * silently leaving a node without an address in the configuration.
    */
   @Test
-  void testReconfigureAddScmNodeViaCompleteCallback() throws Exception {
+  void testReconfigureAddScmNodeNodesBeforeAddress() throws Exception {
     OzoneManager om = cluster.getOzoneManager();
+    ReconfigurationHandler handler = om.getReconfigurationHandler();
     ScmClient scmClient = om.getScmClient();
-    OzoneConfiguration conf = om.getConfiguration();
     String scmNodesKey =
         ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
 
@@ -241,17 +243,22 @@ public class TestOmSCMNodesReconfiguration {
     String newNodeId = "scm-added";
     String newAddrKey =
         ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, newNodeId);
-
     List<String> after = new ArrayList<>(before);
     after.add(newNodeId);
-    conf.set(scmNodesKey, String.join(",", after));
-    conf.set(newAddrKey, "127.0.0.1");
+    String requested = String.join(",", after);
 
-    Map<String, Boolean> changed = new HashMap<>();
-    changed.put(scmNodesKey, true);
-    changed.put(newAddrKey, true);
-    om.reloadScmProxiesOnReconfig(changed, conf);
+    // 1. Node list applied first, before the new SCM's address: the reload
+    //    cannot resolve the node, so the property fails and is rolled back.
+    assertThrows(ReconfigurationException.class,
+        () -> handler.reconfigureProperty(scmNodesKey, requested));
+    assertFalse(new HashSet<>(
+        scmClient.getContainerProxyProvider().getSCMNodeIds()).contains(newNodeId));
 
+    // 2. The new SCM's address is applied (prefix key, no reload of its own).
+    handler.reconfigureProperty(newAddrKey, "127.0.0.1");
+
+    // 3. Reapplying the node list now resolves the new SCM, so it is added.
+    handler.reconfigureProperty(scmNodesKey, requested);
     Set<String> expected = new HashSet<>(after);
     assertEquals(expected,
         new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds()));
@@ -260,7 +267,7 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   private static void assertResolvedHost(
-      org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase<?> provider,
+      SCMFailoverProxyProviderBase<?> provider,
       String nodeId, String expectedHost) {
     SCMProxyInfo info = null;
     for (SCMProxyInfo candidate : provider.getSCMProxyInfoList()) {
