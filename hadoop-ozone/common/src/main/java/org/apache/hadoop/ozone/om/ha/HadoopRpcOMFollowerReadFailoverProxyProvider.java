@@ -150,7 +150,16 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   }
 
   /**
-   * Create a client that applies the default consistency hint once, before entering the retry loop.
+   * Create a client that applies the default consistency hint once, before retries.
+   * <p>
+   * Proxy/provider structure:
+   * <pre>{@code
+   * ReadConsistencyProxy
+   * └── RetryProxy
+   *     └── HadoopRpcOMFollowerReadFailoverProxyProvider
+   *         ├── FollowerReadProxy
+   *         └── HadoopRpcOMFailoverProxyProvider (leaderProxy)
+   * }</pre>
    */
   public OzoneManagerProtocolPB newProxy(int maxFailovers) {
     OzoneManagerProtocolPB retryProxy = (OzoneManagerProtocolPB) RetryProxy.create(

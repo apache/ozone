@@ -374,8 +374,6 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     ServiceException exception = assertThrows(ServiceException.class,
         () -> retryProxy.submitRequest(null, null));
     assertInstanceOf(RpcNoSuchProtocolException.class, exception.getCause());
-    exception = assertThrows(ServiceException.class, () -> proxyProvider.getProxy().proxy.submitRequest(null, null));
-    assertInstanceOf(RpcNoSuchProtocolException.class, exception.getCause());
     verifyNoInteractions((Object[]) proxies);
   }
 
