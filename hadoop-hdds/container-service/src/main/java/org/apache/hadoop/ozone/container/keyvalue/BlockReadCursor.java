@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 /** Tracks chunk-relative checksum boundaries for a streaming block read. */
 class BlockReadCursor {
   private final List<ChunkInfo> chunks;
-  // Chunk starts, followed by the block end.
+  // [c1 offset, c2 offset, ..., cn offset, cn offset + cn len]
   private final long[] chunkOffsets;
   private final int responseDataSize;
   private final long start;
@@ -85,7 +85,11 @@ class BlockReadCursor {
 
   private int findChunk(long position) {
     int index = Arrays.binarySearch(chunkOffsets, chunkIndex, chunks.size(), position);
-    return index >= 0 ? index : -index - 2;
+    if (index >= 0) {
+      return index;
+    }
+    int insertionPoint = -index - 1;
+    return insertionPoint - 1;
   }
 
   long offset() {
