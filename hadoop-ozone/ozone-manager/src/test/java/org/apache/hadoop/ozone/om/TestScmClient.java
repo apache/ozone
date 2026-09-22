@@ -20,13 +20,12 @@ package org.apache.hadoop.ozone.om;
 import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Arrays.asList;
 import static org.apache.hadoop.hdds.client.ReplicationConfig.fromTypeAndFactor;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -88,7 +87,7 @@ public class TestScmClient {
   }
 
   @Test
-  void closesDistinctScmProtocolClients() throws IOException {
+  void preservesScmProtocolClientsOnClose() throws IOException {
     ScmBlockLocationProtocol foregroundClient =
         mock(ScmBlockLocationProtocol.class);
     ScmBlockLocationProtocol keyDeletionClient =
@@ -100,43 +99,9 @@ public class TestScmClient {
 
     client.close();
 
-    verify(foregroundClient).close();
-    verify(keyDeletionClient).close();
-    verify(containerClient).close();
-  }
-
-  @Test
-  void closesSharedBlockClientOnlyOnce() throws IOException {
-    ScmBlockLocationProtocol blockClient =
-        mock(ScmBlockLocationProtocol.class);
-    StorageContainerLocationProtocol containerClient =
-        mock(StorageContainerLocationProtocol.class);
-    ScmClient client = new ScmClient(blockClient, containerClient,
-        new OzoneConfiguration());
-
-    client.close();
-
-    verify(blockClient).close();
-    verify(containerClient).close();
-  }
-
-  @Test
-  void continuesClosingClientsAfterCloseFailure() throws IOException {
-    ScmBlockLocationProtocol foregroundClient =
-        mock(ScmBlockLocationProtocol.class);
-    ScmBlockLocationProtocol keyDeletionClient =
-        mock(ScmBlockLocationProtocol.class);
-    StorageContainerLocationProtocol containerClient =
-        mock(StorageContainerLocationProtocol.class);
-    ScmClient client = new ScmClient(foregroundClient, containerClient,
-        new OzoneConfiguration(), keyDeletionClient);
-    doThrow(new IOException("close failed")).when(foregroundClient).close();
-
-    assertDoesNotThrow(client::close);
-
-    verify(foregroundClient).close();
-    verify(keyDeletionClient).close();
-    verify(containerClient).close();
+    verify(foregroundClient, never()).close();
+    verify(keyDeletionClient, never()).close();
+    verify(containerClient, never()).close();
   }
 
   private static Stream<Arguments> getContainerLocationsTestCases() {

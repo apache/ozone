@@ -46,17 +46,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.util.CacheMetrics;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Wrapper class for Scm protocol clients.
  */
 public class ScmClient {
-  private static final Logger LOG = LoggerFactory.getLogger(ScmClient.class);
-
   private final ScmBlockLocationProtocol blockClient;
   private final ScmBlockLocationProtocol blockClientForKeyDeletion;
   private final StorageContainerLocationProtocol containerClient;
@@ -228,12 +223,9 @@ public class ScmClient {
   public void close() {
     containerCacheMetrics.unregister();
     datanodeDetailsCacheMetrics.unregister();
-    if (blockClientForKeyDeletion == blockClient) {
-      IOUtils.close(LOG, blockClient, containerClient);
-    } else {
-      IOUtils.close(LOG, blockClient, blockClientForKeyDeletion,
-          containerClient);
-    }
+    // OzoneManager.stop() is also used before restarting the same OM instance.
+    // The protocol clients are final fields reused by OzoneManager.restart(),
+    // so closing them here would leave the restarted OM with stopped clients.
   }
 
 }
