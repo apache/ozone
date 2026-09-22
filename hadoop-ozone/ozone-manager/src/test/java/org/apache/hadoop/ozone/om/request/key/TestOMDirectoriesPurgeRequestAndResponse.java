@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -616,6 +617,91 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends OMKeyRequestTests 
 
     // The keys should exist in the DeletedKeys table after dir delete
     validateDeletedKeys(omMetadataManager, deletedKeyNames);
+  }
+
+  /**
+   * Guards the apply-path light parse in {@link OMDirectoriesPurgeRequestWithFSO}: for a sub-file the request reads the
+   * replicated byte sum and the hsync client id directly from the protobuf instead of building a full
+   * {@link OmKeyInfo}. This asserts the two subtle spots stay equivalent to the full parse: a multi-version,
+   * replication-factor-three block sum decrements bucket quota to exactly zero, and the matching open key is marked
+   * deleted via its hsync metadata.
+   */
+  @Test
+  public void testLightParsePreservesReplicatedByteSumAndHsyncForSubFiles() throws Exception {
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    String bucket = "bucket" + RandomUtils.secure().randomInt();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket,
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = bucketInfo.getObjectID();
+
+    OmDirectoryInfo dir1 = OmDirectoryInfo.newBuilder()
+        .setName("dir1")
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setObjectID(1)
+        .setParentObjectID(bucketId)
+        .setUpdateID(0)
+        .build();
+    OMRequestTestUtils.addDirKeyToDirTable(false, dir1, volumeName, bucket, 1L, omMetadataManager);
+
+    // Sub-file with RATIS THREE replication, two block-location versions of different lengths, and hsync metadata.
+    String hsyncClientId = UUID.randomUUID().toString();
+    OmKeyInfo subFile = OMRequestTestUtils.createOmKeyInfo(volumeName, bucket, "file1",
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setObjectID(2L)
+        .setParentObjectID(dir1.getObjectID())
+        .setUpdateID(100L)
+        .addMetadata(OzoneConsts.HSYNC_CLIENT_ID, hsyncClientId)
+        .build();
+    List<OmKeyLocationInfoGroup> locationVersions = new ArrayList<>();
+    locationVersions.add(new OmKeyLocationInfoGroup(1, Collections.singletonList(
+        new OmKeyLocationInfo.Builder().setLength(100L).setBlockID(new BlockID(1, 1)).build()), false));
+    locationVersions.add(new OmKeyLocationInfoGroup(2, Collections.singletonList(
+        new OmKeyLocationInfo.Builder().setLength(250L).setBlockID(new BlockID(1, 2)).build()), false));
+    subFile.setKeyLocationVersions(locationVersions);
+
+    long expectedReplicatedBytes = OMKeyRequest.sumBlockLengths(subFile);
+    assertEquals((100L + 250L) * 3, expectedReplicatedBytes);
+
+    // Seed bucket quota to exactly the full-parse byte sum so a correct light-parse decrement lands on zero.
+    bucketInfo.incrUsedBytes(expectedReplicatedBytes);
+    bucketInfo.incrUsedNamespace(1L);
+    omMetadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey), CacheValue.get(1L, bucketInfo));
+    omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
+
+    // Seed the matching open key that the hsync purge leg should mark deleted.
+    String dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId, dir1.getObjectID(), "file1",
+        hsyncClientId);
+    OmKeyInfo openKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucket, "file1",
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setObjectID(2L)
+        .setParentObjectID(dir1.getObjectID())
+        .setUpdateID(100L)
+        .build();
+    omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(dbOpenKey, openKeyInfo);
+
+    subFile.setKeyName("dir1/file1");
+    OMRequest omRequest = createPurgeKeysRequest(null, null, Collections.emptyList(),
+        Collections.singletonList(subFile), bucketInfo);
+    OMDirectoriesPurgeRequestWithFSO purgeRequest =
+        new OMDirectoriesPurgeRequestWithFSO(preExecute(omRequest));
+    OMDirectoriesPurgeResponseWithFSO omClientResponse =
+        (OMDirectoriesPurgeResponseWithFSO) purgeRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    // Light-parse block-length sum matches the full OmKeyInfo parse: bucket usedBytes drops exactly to zero.
+    OmBucketInfo updatedBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(0L, updatedBucketInfo.getUsedBytes());
+    assertEquals(expectedReplicatedBytes, updatedBucketInfo.getSnapshotUsedBytes());
+
+    performBatchOperationCommit(omClientResponse);
+
+    // hsync leg: the corresponding open key is marked deleted after the batch commit.
+    OmKeyInfo purgedOpenKey = omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).get(dbOpenKey);
+    assertEquals("true", purgedOpenKey.getMetadata().get(OzoneConsts.DELETED_HSYNC_KEY));
   }
 
   private void performBatchOperationCommit(OMDirectoriesPurgeResponseWithFSO omClientResponse)
