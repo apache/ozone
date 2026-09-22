@@ -405,7 +405,7 @@ class TestKeyInputStream extends InputStreamTests {
 
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
     assertNotNull(locations);
-    List<OmKeyLocationInfo> locationInfoList = locations.getLocationList();
+    List<OmKeyLocationInfo> locationInfoList = locations.createLocationList();
     assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo loc = locationInfoList.get(0);
     long containerID = loc.getContainerID();

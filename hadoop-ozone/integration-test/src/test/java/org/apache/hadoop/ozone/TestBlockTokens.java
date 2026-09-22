@@ -219,7 +219,7 @@ public final class TestBlockTokens {
     OmKeyInfo keyInfo = getTestKeyInfo();
     // replace block token secret key id with wrong id.
     for (OmKeyLocationInfoGroup v : keyInfo.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo l : v.getLocationList()) {
+      for (OmKeyLocationInfo l : v.createLocationList()) {
         Token<OzoneBlockTokenIdentifier> token = l.getToken();
         OzoneBlockTokenIdentifier tokenId = token.decodeIdentifier();
         tokenId.setSecretKeyId(UUID.randomUUID());
@@ -243,7 +243,7 @@ public final class TestBlockTokens {
     OmKeyInfo keyInfo = getTestKeyInfo();
     // replace block token secret key id with wrong id.
     for (OmKeyLocationInfoGroup v : keyInfo.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo l : v.getLocationList()) {
+      for (OmKeyLocationInfo l : v.createLocationList()) {
         Token<OzoneBlockTokenIdentifier> token = l.getToken();
         byte[] randomPassword = RandomUtils.secure().randomBytes(100);
         Token<OzoneBlockTokenIdentifier> override = new Token<>(
@@ -263,7 +263,7 @@ public final class TestBlockTokens {
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
     OmKeyLocationInfo locationInfo =
-        keyInfo.getKeyLocationVersions().get(0).getLocationList().get(0);
+        keyInfo.getKeyLocationVersions().get(0).createLocationList().get(0);
     Token<OzoneBlockTokenIdentifier> token = locationInfo.getToken();
     return token.decodeIdentifier().getSecretKeyId();
   }
