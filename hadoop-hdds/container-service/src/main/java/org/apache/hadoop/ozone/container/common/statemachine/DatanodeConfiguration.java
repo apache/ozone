@@ -94,6 +94,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String CONTAINER_CLIENT_CACHE_SIZE = "hdds.datanode.container.client.cache.size";
   public static final String CONTAINER_CLIENT_CACHE_STALE_THRESHOLD =
       "hdds.datanode.container.client.cache.stale.threshold";
+  public static final String CONTAINER_INIT_TIMEOUT_KEY = "hdds.datanode.container.init.timeout";
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
@@ -470,6 +471,22 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           + " postfix (ns,ms,s,m,h,d)."
   )
   private Duration diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+
+  @Config(key = "hdds.datanode.container.init.timeout",
+      defaultValue = "0s",
+      type = ConfigType.TIME,
+      tags = { DATANODE },
+      description = "Maximum time allowed for datanode container services to"
+          + " initialize at startup. Initialization builds the container set"
+          + " and starts the Ratis write channel, which recovers all Raft"
+          + " groups from disk. If it does not complete within this time,"
+          + " startup is failed so the datanode shuts down cleanly instead of"
+          + " hanging indefinitely (for example when Ratis group recovery"
+          + " stalls on a failing volume). A value of 0 (the default) disables"
+          + " the watchdog and preserves the previous behavior of waiting"
+          + " indefinitely. Unit could be defined with postfix (ns,ms,s,m,h,d)."
+  )
+  private Duration containerInitTimeout = Duration.ZERO;
 
   @Config(key = "hdds.datanode.disk.check.sliding.window.timeout",
       defaultValue = "70m",
@@ -1091,6 +1108,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setDiskCheckTimeout(Duration duration) {
     diskCheckTimeout = duration;
+  }
+
+  public Duration getContainerInitTimeout() {
+    return containerInitTimeout;
+  }
+
+  public void setContainerInitTimeout(Duration duration) {
+    containerInitTimeout = duration;
   }
 
   public void setDiskCheckEnabled(boolean diskCheckEnabled) {

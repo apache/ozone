@@ -30,6 +30,9 @@ updates:
         versions:
           - ">=4.0.0.0" # too many new warnings
           - ">=4.9.0.0" # requires Java 11
+      - dependency-name: "com.google.errorprone:error_prone_core"
+        versions:
+          - ">=2.43.0" # requires Java 21
       - dependency-name: "com.googlecode.maven-download-plugin:download-maven-plugin"
         versions:
           - ">=1.10.0" # requires Java 11

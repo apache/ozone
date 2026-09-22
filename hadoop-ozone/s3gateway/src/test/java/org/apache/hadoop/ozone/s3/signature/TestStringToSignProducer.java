@@ -179,6 +179,7 @@ public class TestStringToSignProducer {
         new MultivaluedHashMap<>());
     SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
         authHeader, DATETIME).parseSignature();
+    signatureInfo.setPayloadHash("Content-SHA");
     signatureInfo.setUnfilteredURI("/mybucket/mykey");
 
     String canonicalRequest = "GET\n"
