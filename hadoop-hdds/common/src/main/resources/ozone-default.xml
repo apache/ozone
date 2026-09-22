@@ -616,7 +616,8 @@
     <description>
       TCP connect timeout for OM's SCM block and container location
       clients. The value accepts a duration suffix such as ms, s, or m and is
-      converted to milliseconds for Hadoop IPC.
+      converted to milliseconds for Hadoop IPC. The converted value must be
+      between 0 and 2147483647 milliseconds.
     </description>
   </property>
   <property>
@@ -633,9 +634,11 @@
     <value>3</value>
     <description>
       Maximum failover retries for OM's SCM block and container location
-      clients. The effective retry count is the larger of this value and the
-      quotient of ozone.om.scmclient.location.max.retry.timeout divided by
-      ozone.om.scmclient.location.failover.retry.interval.
+      clients. The effective retry count is the largest of this value, the
+      configured SCM node count, and the floored quotient of
+      ozone.om.scmclient.location.max.retry.timeout divided by
+      ozone.om.scmclient.location.failover.retry.interval. Failover failures
+      permit one initial attempt plus the effective retry count.
     </description>
   </property>
   <property>
@@ -653,7 +656,7 @@
     <value>2s</value>
     <description>
       Delay between failover retries for OM's SCM block and container location
-      clients.
+      clients. The value must resolve to at least 1 millisecond.
     </description>
   </property>
   <property>

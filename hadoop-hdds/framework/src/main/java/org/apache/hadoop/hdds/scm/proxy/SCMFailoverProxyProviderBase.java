@@ -268,6 +268,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   @Override
   public synchronized void performFailover(T newLeader) {
     if (updatedLeaderNodeID != null) {
+      currentProxyIndex = scmNodeIds.indexOf(updatedLeaderNodeID);
       currentProxySCMNodeId = updatedLeaderNodeID;
     } else {
       nextProxyIndex();

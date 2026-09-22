@@ -27,10 +27,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SCM_LOCATION_CLIE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SCM_LOCATION_CLIENT_RPC_TIMEOUT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.TimeUnit;
 import javax.net.SocketFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.ObjectWritable;
 import org.apache.hadoop.ipc.Client;
@@ -178,6 +181,54 @@ class TestOMScmLocationClientConfig {
         OMScmLocationClientConfig.createScmClientConfiguration(configuration);
     assertEquals(8, scmClientConfiguration.getInt(
         OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY, 0));
+  }
+
+  @Test
+  void rejectsNonPositiveFailoverRetryInterval() {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL,
+        "0ms");
+
+    ConfigurationException zeroInterval = assertThrows(
+        ConfigurationException.class,
+        () -> OMScmLocationClientConfig.createScmClientConfiguration(
+            configuration));
+    assertTrue(zeroInterval.getMessage().contains(
+        OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL));
+
+    configuration.set(OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL,
+        "500us");
+    ConfigurationException subMillisecondInterval = assertThrows(
+        ConfigurationException.class,
+        () -> OMScmLocationClientConfig.createScmClientConfiguration(
+            configuration));
+    assertTrue(subMillisecondInterval.getMessage().contains(
+        OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL));
+  }
+
+  @Test
+  void rejectsConnectTimeoutOutsideHadoopIpcIntegerRange() {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.setTimeDuration(
+        OZONE_OM_SCM_LOCATION_CLIENT_IPC_CONNECT_TIMEOUT,
+        -1, TimeUnit.MILLISECONDS);
+
+    ConfigurationException negativeTimeout = assertThrows(
+        ConfigurationException.class,
+        () -> OMScmLocationClientConfig.createScmClientConfiguration(
+            configuration));
+    assertTrue(negativeTimeout.getMessage().contains(
+        OZONE_OM_SCM_LOCATION_CLIENT_IPC_CONNECT_TIMEOUT));
+
+    configuration.setTimeDuration(
+        OZONE_OM_SCM_LOCATION_CLIENT_IPC_CONNECT_TIMEOUT,
+        (long) Integer.MAX_VALUE + 1, TimeUnit.MILLISECONDS);
+    ConfigurationException excessiveTimeout = assertThrows(
+        ConfigurationException.class,
+        () -> OMScmLocationClientConfig.createScmClientConfiguration(
+            configuration));
+    assertTrue(excessiveTimeout.getMessage().contains(
+        OZONE_OM_SCM_LOCATION_CLIENT_IPC_CONNECT_TIMEOUT));
   }
 
   @Test

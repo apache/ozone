@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import javax.net.SocketFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -45,13 +46,14 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
  * count, retry timeout divided by retry interval, and configured SCM node
  * count:
  * <pre>
- * R = max(3, 6s / 2s, SCM node count)
+ * R = max(3, floor(6s / 2s), SCM node count)
+ * C = configured connect-timeout retry count (default 0)
  * </pre>
  * For failures that always trigger failover, this allows {@code R + 1}
  * attempts. The configured timeout envelopes are:
  * <pre>
  * established connection: (R + 1) * 30s + R * 2s
- * including TCP connect:   (R + 1) * (5s + 30s) + R * 2s
+ * including TCP connect:   (R + 1) * ((C + 1) * 5s + 30s) + R * 2s
  * </pre>
  *
  * <p>Hadoop tracks retries and failovers separately. A sequence of {@code R}
@@ -60,7 +62,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
  * envelopes are:
  * <pre>
  * established connection: (2R + 1) * 30s + 2R * 2s
- * including TCP connect:   (2R + 1) * (5s + 30s) + 2R * 2s
+ * including TCP connect:   (2R + 1) * ((C + 1) * 5s + 30s) + 2R * 2s
  * </pre>
  * Actual calls can complete sooner. These calculations are not caller-side
  * deadlines and exclude time outside the configured connect and RPC waits.
@@ -106,6 +108,15 @@ public final class OMScmLocationClientConfig {
         OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL,
         OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL_DEFAULT,
         OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_RETRY_INTERVAL);
+    long retryIntervalMillis = configuration.getTimeDuration(
+        OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL,
+        OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    if (retryIntervalMillis <= 0) {
+      throw new ConfigurationException(
+          OZONE_OM_SCM_LOCATION_CLIENT_FAILOVER_RETRY_INTERVAL
+              + " must resolve to at least 1 ms");
+    }
     return scmClientConfiguration;
   }
 
@@ -129,6 +140,10 @@ public final class OMScmLocationClientConfig {
       String targetKey) {
     long value = source.getTimeDuration(sourceKey, defaultValue,
         TimeUnit.MILLISECONDS);
-    target.setInt(targetKey, Math.toIntExact(value));
+    if (value < 0 || value > Integer.MAX_VALUE) {
+      throw new ConfigurationException(sourceKey + " must resolve to between 0"
+          + " and " + Integer.MAX_VALUE + " ms, but was " + value + " ms");
+    }
+    target.setInt(targetKey, (int) value);
   }
 }
