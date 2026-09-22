@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SHORT_CIRCUIT_FD_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
@@ -170,8 +169,7 @@ public class FilePerBlockStrategy implements ChunkManager {
     try {
       fileLengthBeforeWrite = channel.size();
     } catch (IOException e) {
-      throw new StorageContainerException("Encountered an error while getting the file size for "
-          + chunkFile.getName(), e, CONTAINER_INTERNAL_ERROR);
+      throw new UncheckedIOException("Encountered an error while getting the file size for " + chunkFile.getName(), e);
     }
 
     boolean overwrite = validateChunkForOverwrite(fileLengthBeforeWrite, info);
