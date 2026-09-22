@@ -21,6 +21,8 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -28,10 +30,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
@@ -47,6 +51,8 @@ import org.apache.ratis.client.impl.ClientProtoUtils;
 import org.apache.ratis.proto.RaftProtos.DataStreamPacketHeaderProto.Type;
 import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.util.ReferenceCountedObject;
 import org.slf4j.Logger;
@@ -202,6 +208,7 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private ByteBuffer readBlock(int length, boolean preRead) throws IOException {
+    int leaderRedirects = 0;
     while (position < blockLength) {
       if (streamInput == null) {
         streamDataSeen = false;
@@ -217,7 +224,11 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
           return data;
         }
       } else if (reply.getType() == Type.STREAM_HEADER) {
-        handleTerminalReply(ref);
+        final RaftPeer leader = handleTerminalReply(ref);
+        if (leader != null) {
+          redirectToLeader(leader, ++leaderRedirects);
+          continue;
+        }
         if (!streamDataSeen && position < blockLength) {
           throw new EOFException("ReadBlock stream returned no data for "
               + blockID + " at position " + position);
@@ -240,10 +251,12 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
       throws IOException {
     final long readLength = computeReadLength(blockLength, position, length,
         preRead, largeReadWindowEligible, preReadSize, readWindowSize);
+    acquireClient();
+    // Name the datanode the client streams to (the closest node of the client's pipeline): a datanode serves a
+    // closed-container read only when the request names it, see ClosedContainerReadResolver.
     final ContainerCommandRequestProto request =
         ContainerProtocolCalls.buildReadBlockCommandProto(blockID, position,
-            readLength, responseDataSize, tokenRef.get(), pipelineRef.get());
-    acquireClient();
+            readLength, responseDataSize, tokenRef.get(), xceiverClient.getPipeline());
     final ContainerCommandRequestMessage message =
         ContainerCommandRequestMessage.toMessage(request,
             TracingUtil.exportCurrentSpan());
@@ -318,27 +331,57 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private void handleTerminalReply(ReferenceCountedObject<DataStreamReply> ref)
+  /**
+   * @return the suggested leader when a follower refused the read before sending data (reads of open containers
+   *     are served by the Raft leader), or null when the stream completed successfully
+   */
+  private RaftPeer handleTerminalReply(ReferenceCountedObject<DataStreamReply> ref)
       throws IOException {
     try {
       final RaftClientReply raftReply =
           ClientProtoUtils.getRaftClientReply(ref.get());
-      if (!raftReply.isSuccess()) {
-        throw new IOException("Failed Ratis read-only data stream request",
-            raftReply.getException());
+      if (raftReply.isSuccess()) {
+        return null;
       }
+      final NotLeaderException notLeader = raftReply.getNotLeaderException();
+      if (notLeader != null && notLeader.getSuggestedLeader() != null && !streamDataSeen) {
+        return notLeader.getSuggestedLeader();
+      }
+      throw new IOException("Failed Ratis read-only data stream request",
+          raftReply.getException());
     } finally {
       ref.release();
     }
   }
 
+  /** Moves the suggested leader to the front of the pipeline, so the next stream is opened on it. */
+  private void redirectToLeader(RaftPeer leader, int attempt) throws IOException {
+    final Pipeline pipeline = pipelineRef.get();
+    final DatanodeDetails target = pipeline.getNodes().stream()
+        .filter(dn -> RatisHelper.toRaftPeerId(dn).equals(leader.getId()))
+        .findFirst()
+        .orElse(null);
+    if (target == null || attempt > pipeline.getNodes().size()) {
+      throw new IOException("Failed Ratis read-only data stream request for " + blockID
+          + ": not leader, suggested leader " + leader + ", attempt " + attempt + ", " + pipeline);
+    }
+    final List<DatanodeDetails> nodes = new ArrayList<>(pipeline.getNodes());
+    nodes.remove(target);
+    nodes.add(0, target);
+    releaseClient(false);
+    pipelineRef.set(pipeline.copyWithNodesInOrder(nodes));
+    LOG.debug("Redirecting Ratis read-only data stream for {} to leader {}", blockID, target);
+  }
+
   private synchronized void acquireClient() throws IOException {
     checkOpen();
     if (xceiverClient == null) {
+      // Topology aware: one cached client per target datanode (the pipeline's closest node), so a stream can be
+      // redirected to the Raft leader.
       final XceiverClientSpi client =
-          xceiverClientFactory.acquireClientForReadData(pipelineRef.get());
+          xceiverClientFactory.acquireClient(pipelineRef.get(), true);
       if (!(client instanceof XceiverClientRatis)) {
-        xceiverClientFactory.releaseClientForReadData(client, false);
+        xceiverClientFactory.releaseClient(client, false, true);
         throw new IOException("Unexpected client class: "
             + client.getClass().getName() + ", " + pipelineRef.get());
       }
@@ -351,8 +394,7 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     largeReadWindowEligible = false;
     if (xceiverClient != null) {
       closeStream();
-      xceiverClientFactory.releaseClientForReadData(xceiverClient,
-          invalidateClient);
+      xceiverClientFactory.releaseClient(xceiverClient, invalidateClient, true);
       xceiverClient = null;
     }
   }
