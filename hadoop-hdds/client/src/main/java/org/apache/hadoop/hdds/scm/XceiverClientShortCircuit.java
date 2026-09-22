@@ -344,7 +344,14 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     ContainerCommandRequestProto request = entry.getRequest();
     try {
       final RequestKey key = new RequestKey(request.getClientId(), request.getCallId());
-      scheduler.schedule(key, entry, readTimeoutMs);
+      TimerTask task = new TimerTask() {
+        @Override
+        public void run() {
+          requestTimeout(key);
+        }
+      };
+      entry.setTimerTask(task);
+      scheduler.schedule(task, readTimeoutMs);
       sentRequests.put(key, entry);
       ContainerProtos.Type type = request.getCmdType();
       metrics.incrPendingContainerOpsMetrics(type);
@@ -399,6 +406,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   public class ReceiveResponseTask implements Runnable {
     @Override
     public void run() {
+      long timerTaskCancelledCount = 0;
       do {
         RequestEntry entry = null;
         try {
@@ -423,6 +431,16 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
             // 2. the response is too late, the request is removed from sentRequests after it is timeout.
             throw new IOException("Failed to find request for response, type " + type +
                 ", clientId " + responseProto.getClientId().toStringUtf8() + ", callId " + responseProto.getCallId());
+          }
+
+          // cancel timeout timer task
+          if (entry.cancelTimerTask()) {
+            timerTaskCancelledCount++;
+            // purge timer every 1000 cancels
+            if (timerTaskCancelledCount == 1000) {
+              scheduler.purge();
+              timerTaskCancelledCount = 0;
+            }
           }
 
           long processStartTime = System.nanoTime();
@@ -540,6 +558,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     private final ContainerCommandRequestProto request;
     private final CompletableFuture<ContainerCommandResponseProto> future;
     private final long createTimeNs;
+    private final AtomicReference<TimerTask> timerTask = new AtomicReference<>();
 
     RequestEntry(ContainerCommandRequestProto requestProto,
                  CompletableFuture<ContainerCommandResponseProto> future) {
@@ -548,19 +567,33 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
       this.createTimeNs = System.nanoTime();
     }
 
-    ContainerCommandRequestProto getRequest() {
+    public ContainerCommandRequestProto getRequest() {
       return request;
     }
 
-    CompletableFuture<ContainerCommandResponseProto> getFuture() {
+    public CompletableFuture<ContainerCommandResponseProto> getFuture() {
       return future;
     }
 
-    long getCreateTimeNs() {
+    public long getCreateTimeNs() {
       return createTimeNs;
     }
 
+    public void setTimerTask(TimerTask task) {
+      final boolean set = timerTask.compareAndSet(null, task);
+      Preconditions.assertTrue(set);
+    }
+
+    boolean cancelTimerTask() {
+      final TimerTask t = timerTask.getAndSet(null);
+      if (t == null) {
+        return false;
+      }
+      return t.cancel();
+    }
+
     public void fail(Throwable e) {
+      cancelTimerTask();
       future.completeExceptionally(e);
     }
   }
@@ -592,36 +625,26 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     }
   }
 
-  class TimeoutScheduler {
+  static final class TimeoutScheduler {
     private Timer timer;
-    private int cancelCount = 0;
 
     synchronized void init(String prefix) {
       Preconditions.assertNull(timer, "timer");
       timer = new Timer(prefix + "-Timer");
     }
 
-    synchronized void schedule(RequestKey key, RequestEntry entry, int timeoutMs) {
+    synchronized void schedule(TimerTask task, int timeoutMs) {
       if (timer == null) {
         return;
       }
-      final TimerTask task = new TimerTask() {
-        @Override
-        public void run() {
-          requestTimeout(key);
-        }
-      };
       timer.schedule(task, timeoutMs);
-      entry.getFuture().whenComplete((r, e) -> cancel(task));
     }
 
-    synchronized void cancel(TimerTask task) {
-      if (task.cancel()) {
-        if (timer != null && ++cancelCount == 1000) {
-          timer.purge();
-          cancelCount = 0;
-        }
+    synchronized void purge() {
+      if (timer == null) {
+        return;
       }
+      timer.purge();
     }
 
     synchronized void close() {
