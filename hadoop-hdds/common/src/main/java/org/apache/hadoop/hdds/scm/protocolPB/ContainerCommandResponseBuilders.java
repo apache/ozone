@@ -347,11 +347,15 @@ public final class ContainerCommandResponseBuilders {
         .build();
   }
 
-  public static ContainerCommandResponseProto getReadBlockResponse(
-      ContainerCommandRequestProto request, List<ChunkInfo> chunks, ByteBuffer data, long offset) {
+  /**
+   * If {@code byteBufferToByteString} wraps {@code data} instead of copying it, the caller must not modify the buffer
+   * until the response has been serialized, i.e. until {@code StreamObserver.onNext} has returned.
+   */
+  public static ContainerCommandResponseProto getReadBlockResponse(ContainerCommandRequestProto request,
+      List<ChunkInfo> chunks, ByteBuffer data, long offset, Function<ByteBuffer, ByteString> byteBufferToByteString) {
 
     ContainerProtos.ReadBlockResponseProto.Builder response = ContainerProtos.ReadBlockResponseProto.newBuilder()
-        .setData(ByteString.copyFrom(data))
+        .setData(byteBufferToByteString.apply(data))
         .setOffset(offset);
     if (request.getReadBlock().getIncludeChecksums()) {
       response.addAllChunkInfoList(chunks);
