@@ -158,21 +158,6 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     return new ReadConsistencyProxy(retryProxy);
   }
 
-  private OMRequest applyReadConsistency(OMRequest request) throws ServiceException {
-    if (request == null) {
-      // Keep invalid requests non-retriable, including calls made directly to the routing proxy.
-      throw new ServiceException(new RpcNoSuchProtocolException("OMRequest == null"));
-    }
-    if (!request.hasReadConsistencyHint()) {
-      ReadConsistencyHint hint = useFollowerRead && OmUtils.shouldSendToFollower(request)
-          ? followerReadConsistency : leaderReadConsistency;
-      if (hint != null) {
-        return request.toBuilder().setReadConsistencyHint(hint).build();
-      }
-    }
-    return request;
-  }
-
   private class ReadConsistencyProxy implements OzoneManagerProtocolPB, RpcProxy {
     private final OzoneManagerProtocolPB retryProxy;
 
@@ -183,6 +168,21 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     @Override
     public OMResponse submitRequest(RpcController controller, OMRequest request) throws ServiceException {
       return retryProxy.submitRequest(controller, applyReadConsistency(request));
+    }
+
+    private OMRequest applyReadConsistency(OMRequest request) throws ServiceException {
+      if (request == null) {
+        // Reject invalid requests before entering the retry loop.
+        throw new ServiceException(new RpcNoSuchProtocolException("OMRequest == null"));
+      }
+      if (!request.hasReadConsistencyHint()) {
+        ReadConsistencyHint hint = useFollowerRead && OmUtils.shouldSendToFollower(request)
+            ? followerReadConsistency : leaderReadConsistency;
+        if (hint != null) {
+          return request.toBuilder().setReadConsistencyHint(hint).build();
+        }
+      }
+      return request;
     }
 
     @Override
@@ -250,7 +250,6 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     @Override
     public OMResponse submitRequest(RpcController controller, OMRequest omRequest) throws ServiceException {
       lastProxy = null;
-      omRequest = applyReadConsistency(omRequest);
       boolean isFollowerReadEligible = useFollowerRead && OmUtils.shouldSendToFollower(omRequest);
 
       if (isFollowerReadEligible) {
