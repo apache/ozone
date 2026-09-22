@@ -146,14 +146,20 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
       DeletedBlocksTransactionSummary summary) throws IOException {
-    transactionBuffer.runWithBufferLock(() -> {
+    // Hold the buffer lock across the row-plus-summary write so that a concurrent flush()
+    // (checkpoint download or leader transfer) cannot land between the two, which would commit
+    // the transaction rows to RocksDB without the matching summary update.
+    transactionBuffer.lock();
+    try {
       for (DeletedBlocksTransaction tx : txs) {
         transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
       }
       if (summary != null) {
         transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
       }
-    });
+    } finally {
+      transactionBuffer.unlock();
+    }
   }
 
   @Override
@@ -165,7 +171,7 @@ public class DeletedBlockLogStateManagerImpl
     // present, re-exposing it to the deletion scanner and causing the summary to be double-decremented.
     transactionBuffer.lock();
     try {
-    if (deletingTxIDs != null) {
+      if (deletingTxIDs != null) {
         deletingTxIDs.addAll(txIDs);
       }
       for (Long txID : txIDs) {
