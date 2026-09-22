@@ -17,9 +17,17 @@
 
 package org.apache.hadoop.hdds;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.HddsUtils.processForLogging;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddress;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedHost;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -30,6 +38,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -37,6 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Testing HddsUtils.
@@ -248,5 +258,162 @@ public class TestHddsUtils {
     assertEquals(processedConf.get("hdds.test.secret.key"), REDACTED_TEXT);
     /* Verify that non-sensitive properties retain their value */
     assertEquals(processedConf.get("ozone.normal.config"), ORIGINAL_VALUE);
+  }
+
+  @ParameterizedTest
+  @MethodSource("ambiguousIPv6Authorities")
+  void getPortNumberFromConfigKeysRejectsAmbiguousIPv6Authority(String value, String host, String port) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, value);
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getPortNumberFromConfigKeys(conf, OZONE_SCM_CLIENT_ADDRESS_KEY));
+
+    // Both readings have to be spelled out, since the configured text does not
+    // say which one was meant.
+    assertThat(e.getMessage())
+        .contains(OZONE_SCM_CLIENT_ADDRESS_KEY)
+        .contains(value)
+        .contains("[" + host + "]:" + port)
+        .contains("[" + value + "]");
+  }
+
+  static List<Arguments> ambiguousIPv6Authorities() {
+    return Arrays.asList(
+        Arguments.of("2001:db8::1:9862", "2001:db8::1", "9862"),
+        Arguments.of("fd00::1:2", "fd00::1", "2")
+    );
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"::1", "2001:db8::1", "2001:db8::1:abcd", "fe80::1%eth0"})
+  void getPortNumberFromConfigKeysRejectsBareIPv6Literal(String value) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, value);
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getPortNumberFromConfigKeys(conf, OZONE_SCM_CLIENT_ADDRESS_KEY));
+
+    assertThat(e.getMessage())
+        .contains(OZONE_SCM_CLIENT_ADDRESS_KEY)
+        .contains("[" + value + "]");
+  }
+
+  @ParameterizedTest
+  @MethodSource("unambiguousAuthorities")
+  void getPortNumberFromConfigKeysAcceptsUnambiguousAuthority(String value, OptionalInt expectedPort) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, value);
+
+    assertEquals(expectedPort,
+        HddsUtils.getPortNumberFromConfigKeys(conf, OZONE_SCM_CLIENT_ADDRESS_KEY));
+  }
+
+  static List<Arguments> unambiguousAuthorities() {
+    return Arrays.asList(
+        Arguments.of("[2001:db8::1]:9862", OptionalInt.of(9862)),
+        Arguments.of("[2001:db8::1:9862]:9862", OptionalInt.of(9862)),
+        Arguments.of("[2001:db8::1]", OptionalInt.empty()),
+        Arguments.of("192.0.2.1:9862", OptionalInt.of(9862)),
+        Arguments.of("scm1.example.com:9862", OptionalInt.of(9862)),
+        Arguments.of("scm1.example.com", OptionalInt.empty())
+    );
+  }
+
+  /**
+   * A bind host names no port, so the bracket rule must leave it alone: an
+   * explicit IPv6 listener is configured as a bare {@code ::}.
+   */
+  @Test
+  void getHostNameFromConfigKeysAcceptsBareIPv6BindHost() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_BIND_HOST_KEY, "::");
+
+    assertEquals(Optional.of("::"),
+        HddsUtils.getHostNameFromConfigKeys(conf, OZONE_SCM_CLIENT_BIND_HOST_KEY));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"scm1.example.com", "192.0.2.1", "2001:db8::1", "localhost", "127.0.0.1", "::1"})
+  void validateAdvertisedHostAcceptsReachableHost(String host) {
+    assertDoesNotThrow(() -> validateAdvertisedHost(OZONE_SCM_CLIENT_ADDRESS_KEY, host));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0.0.0.0", "::", "169.254.1.1", "fe80::1", "fe80::1%eth0", "2001:db8::1/64",
+      "[::]", "[fe80::1]", "[fe80::1%eth0]"})
+  void validateAdvertisedHostRejectsUnadvertisableHost(String host) {
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> validateAdvertisedHost(OZONE_SCM_CLIENT_ADDRESS_KEY, host));
+
+    assertThat(e.getMessage())
+        .contains(OZONE_SCM_CLIENT_ADDRESS_KEY)
+        .contains(host);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0.0.0.0:9860", "[::]:9860", "[fe80::1%eth0]:9860"})
+  void validateAdvertisedAddressRejectsUnadvertisableHostWithPort(String value) {
+    assertThrows(ConfigurationException.class,
+        () -> validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, value));
+  }
+
+  @Test
+  void getHostNameRejectsUnadvertisableDatanodeHostname() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_HOST_NAME_KEY, "0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getHostName(conf));
+
+    assertThat(e.getMessage()).contains(HDDS_DATANODE_HOST_NAME_KEY);
+  }
+
+  @Test
+  void getHostNameAcceptsConfiguredDatanodeHostname() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_HOST_NAME_KEY, "dn1.example.com");
+
+    assertEquals("dn1.example.com", HddsUtils.getHostName(conf));
+  }
+
+  @Test
+  void getScmAddressForClientsRejectsUnadvertisableClientAddress() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:9860");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getScmAddressForClients(conf));
+
+    assertThat(e.getMessage()).contains(OZONE_SCM_CLIENT_ADDRESS_KEY);
+  }
+
+  @Test
+  void getScmAddressForClientsRejectsUnadvertisableScmName() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_NAMES, "0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getScmAddressForClients(conf));
+
+    assertThat(e.getMessage()).contains(OZONE_SCM_NAMES);
+  }
+
+  /**
+   * A host that can never be advertised has to be named as such, rather than
+   * be asked for brackets that leave it rejected anyway.
+   */
+  @Test
+  void validateAdvertisedAddressReportsTheHostBeforeTheBrackets() {
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, "::"));
+
+    assertThat(e.getMessage()).contains("wildcard").doesNotContain("bracket");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"scm1.example.com", "192.0.2.1", "[2001:db8::1]:9860", "127.0.0.1:9860"})
+  void validateAdvertisedAddressAcceptsReachableAddress(String value) {
+    assertDoesNotThrow(() -> validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, value));
   }
 }
