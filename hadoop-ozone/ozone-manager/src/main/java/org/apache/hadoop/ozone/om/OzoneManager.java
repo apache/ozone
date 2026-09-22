@@ -6135,11 +6135,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       scmClient.reloadScmNodes();
       LOG.info("Reloaded SCM proxy configuration for {} : {}", scmNodesKey, value);
-    } catch (ConfigurationException e) {
-      // A referenced SCM address is not set, so the new membership cannot be
-      // resolved. Restore the previous node list so the live configuration never
-      // keeps a node without an address, and rethrow so the reconfiguration is
-      // reported FAILED and can be retried once the address key is set.
+    } catch (RuntimeException e) {
+      // A referenced SCM address is missing or malformed (an unset address throws
+      // ConfigurationException, a bad host:port throws IllegalArgumentException from
+      // NetUtils.createSocketAddr), so the new membership cannot be resolved. Restore
+      // the previous node list so the live configuration never keeps a node without a
+      // resolvable address, and rethrow so the reconfiguration is reported FAILED and
+      // can be retried once the address key is fixed.
       if (previous == null) {
         configuration.unset(scmNodesKey);
       } else {
@@ -6175,11 +6177,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         scmClient.reloadScmNodes();
         LOG.info("Reloaded SCM failover proxies after reconfiguration of {} / {}*",
             scmNodesKey, scmAddressPrefix);
-      } catch (ConfigurationException e) {
+      } catch (RuntimeException e) {
         // A complete callback must not break the chain: the remaining callbacks
         // (tracing, logging) still need to run. A bad node list is already
-        // reported FAILED by reconfScmNodes; here we only log so an address-only
-        // change that cannot be resolved leaves the previous proxies in place.
+        // reported FAILED by reconfScmNodes; here we catch any reload failure
+        // (unset address -> ConfigurationException, malformed host:port ->
+        // IllegalArgumentException) and only log, so an address-only change that
+        // cannot be resolved leaves the previous proxies in place.
         LOG.warn("Failed to reload SCM failover proxies after reconfiguration of {} / {}*; "
             + "keeping the previous SCM proxy configuration", scmNodesKey, scmAddressPrefix, e);
       }

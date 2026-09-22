@@ -222,6 +222,48 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
+   * Adding an SCM whose address is malformed (an explicit host:port value, which
+   * cannot be reassembled into a valid socket address) must fail the same way as a
+   * missing address: resolving the membership throws IllegalArgumentException, so
+   * the reload failure is caught, the node list is rolled back, and the SCM proxies
+   * are left unchanged. This guards the widened catch that would otherwise let the
+   * live configuration keep a node with an unusable address.
+   */
+  @Test
+  void testReconfigureScmNodesFailsWhenAddressMalformed() {
+    OzoneManager om = cluster.getOzoneManager();
+    ReconfigurationHandler handler = om.getReconfigurationHandler();
+    ScmClient scmClient = om.getScmClient();
+    OzoneConfiguration conf = om.getConfiguration();
+    String scmNodesKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+    String newNodeId = "scm-bad-address";
+    String newAddrKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, newNodeId);
+
+    List<String> before =
+        new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
+    String originalValue = conf.get(scmNodesKey);
+
+    // An address that already carries a port cannot be rebuilt into a valid
+    // host:port authority, so resolving the new membership throws
+    // IllegalArgumentException rather than ConfigurationException.
+    conf.set(newAddrKey, "127.0.0.1:9999");
+    List<String> withBadAddress = new ArrayList<>(before);
+    withBadAddress.add(newNodeId);
+
+    assertThrows(ReconfigurationException.class, () -> handler
+        .reconfigureProperty(scmNodesKey, String.join(",", withBadAddress)));
+
+    // The node list is rolled back and both providers keep their membership.
+    assertEquals(originalValue, conf.get(scmNodesKey));
+    assertEquals(new HashSet<>(before),
+        new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds()));
+    assertEquals(new HashSet<>(before),
+        new HashSet<>(scmClient.getBlockProxyProvider().getSCMNodeIds()));
+  }
+
+  /**
    * Adding an SCM, applying the keys in "nodes before address" order (the order
    * a real {@code reconfig start} batch may use). Applying the node list before
    * the new SCM's address cannot resolve the node, so that property fails and is
