@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -26,6 +27,8 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 /** Tracks chunk-relative checksum boundaries for a streaming block read. */
 class BlockReadCursor {
   private final List<ChunkInfo> chunks;
+  // Chunk starts, followed by the block end.
+  private final long[] chunkOffsets;
   private final int responseDataSize;
   private final long start;
   private final long end;
@@ -34,30 +37,33 @@ class BlockReadCursor {
 
   BlockReadCursor(long requestedOffset, long length, int responseSize, List<ChunkInfo> chunks) throws IOException {
     this.chunks = chunks;
-    long blockEnd = 0;
+    chunkOffsets = new long[chunks.size() + 1];
     int bufferSize = responseSize;
-    for (ChunkInfo chunk : chunks) {
-      if (chunk.getOffset() != blockEnd || chunk.getLen() <= 0 || chunk.getLen() > Long.MAX_VALUE - blockEnd) {
+    for (int i = 0; i < chunks.size(); i++) {
+      ChunkInfo chunk = chunks.get(i);
+      long chunkOffset = chunkOffsets[i];
+      if (chunk.getOffset() != chunkOffset || chunk.getLen() <= 0 || chunk.getLen() > Long.MAX_VALUE - chunkOffset) {
         throw new IOException("Invalid chunk range: " + chunk);
       }
-      blockEnd += chunk.getLen();
+      chunkOffsets[i + 1] = chunkOffset + chunk.getLen();
       // One checksum interval (or the short chunk containing it) must always fit in the buffer.
       bufferSize = Math.max(bufferSize, (int) Math.min(chunk.getLen(), interval(chunk)));
     }
+    long blockEnd = chunkOffsets[chunks.size()];
     if (requestedOffset < 0 || requestedOffset >= blockEnd || length < 0 || responseSize <= 0) {
       throw new IOException("Invalid streaming read range or response size");
     }
     this.responseDataSize = ChunkUtils.limitReadSize(bufferSize);
     chunkIndex = findChunk(requestedOffset);
-    start = length == 0 ? requestedOffset : alignDown(requestedOffset, chunks.get(chunkIndex));
+    start = length == 0 ? requestedOffset : alignDown(requestedOffset, chunkIndex);
     offset = start;
     if (length == 0) {
       end = start;
     } else {
       long requestedEnd = requestedOffset + Math.min(length, blockEnd - requestedOffset);
-      ChunkInfo last = chunks.get(findChunk(requestedEnd - 1));
+      int last = findChunk(requestedEnd - 1);
       long floor = alignDown(requestedEnd - 1, last);
-      end = floor + Math.min(interval(last), last.getOffset() + last.getLen() - floor);
+      end = floor + Math.min(interval(chunks.get(last)), chunkOffsets[last + 1] - floor);
     }
   }
 
@@ -73,22 +79,13 @@ class BlockReadCursor {
     return size;
   }
 
-  private static long alignDown(long position, ChunkInfo chunk) throws IOException {
-    return position - (position - chunk.getOffset()) % interval(chunk);
+  private long alignDown(long position, int index) throws IOException {
+    return position - (position - chunkOffsets[index]) % interval(chunks.get(index));
   }
 
   private int findChunk(long position) {
-    int low = chunkIndex;
-    int high = chunks.size() - 1;
-    while (low < high) {
-      int mid = (low + high + 1) >>> 1;
-      if (chunks.get(mid).getOffset() <= position) {
-        low = mid;
-      } else {
-        high = mid - 1;
-      }
-    }
-    return low;
+    int index = Arrays.binarySearch(chunkOffsets, chunkIndex, chunks.size(), position);
+    return index >= 0 ? index : -index - 2;
   }
 
   long offset() {
@@ -106,7 +103,7 @@ class BlockReadCursor {
   int nextReadLength() throws IOException {
     long limit = offset + Math.min(responseDataSize, end - offset);
     if (limit < end) {
-      limit = alignDown(limit, chunks.get(findChunk(limit)));
+      limit = alignDown(limit, findChunk(limit));
     }
     return Math.toIntExact(limit - offset);
   }

@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -69,6 +70,34 @@ class TestBlockReadCursor {
     cursor.advance(5);
     assertFalse(cursor.hasRemaining());
     assertEquals(12, cursor.bytesRead());
+  }
+
+  @Test
+  void testReadsAtChunkAndChecksumBoundaries() throws Exception {
+    List<ChunkInfo> chunks = Arrays.asList(chunk(0, 3, 4), chunk(3, 9, 4), chunk(12, 7, 3));
+    for (int[] range : new int[][] {{0, 3, 0}, {3, 7, 1}, {7, 11, 1}, {11, 12, 1},
+        {12, 15, 2}, {15, 18, 2}, {18, 19, 2}}) {
+      for (int requestedOffset : new int[] {range[0], range[1] - 1}) {
+        BlockReadCursor cursor = new BlockReadCursor(requestedOffset, 1, 8, chunks);
+        int length = range[1] - range[0];
+        assertEquals(range[0], cursor.offset());
+        assertEquals(length, cursor.nextReadLength());
+        assertEquals(Collections.singletonList(chunks.get(range[2])), cursor.chunksForRead(length));
+        cursor.advance(length);
+        assertFalse(cursor.hasRemaining());
+      }
+    }
+  }
+
+  @Test
+  void testRejectsInvalidChunkBoundaries() {
+    for (List<ChunkInfo> chunks : Arrays.asList(
+        Arrays.asList(chunk(0, 3, 4), chunk(2, 9, 4)),
+        Arrays.asList(chunk(0, 3, 4), chunk(4, 9, 4)),
+        Collections.singletonList(chunk(0, 0, 4)),
+        Arrays.asList(chunk(0, Long.MAX_VALUE, 4), chunk(Long.MAX_VALUE, 1, 4)))) {
+      assertThrows(IOException.class, () -> new BlockReadCursor(0, 1, 8, chunks));
+    }
   }
 
   @Test
