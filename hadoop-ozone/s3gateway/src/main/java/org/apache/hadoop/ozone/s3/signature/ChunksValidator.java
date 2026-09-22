@@ -125,10 +125,16 @@ public class ChunksValidator {
   }
 
   private void validateSignature(String signature, String stringToSign) {
+    byte[] decodedSignature;
+    try {
+      decodedSignature = DatatypeConverter.parseHexBinary(signature);
+    } catch (IllegalArgumentException ex) {
+      throw newError(SIGNATURE_DOES_NOT_MATCH, resource);
+    }
     byte[] expected = hmacSha256(stringToSign);
     // Constant-time comparison to avoid leaking the signature via timing. Decoding the hex also
     // makes the comparison case-insensitive, as the signature may be sent in either case.
-    if (!MessageDigest.isEqual(expected, DatatypeConverter.parseHexBinary(signature))) {
+    if (!MessageDigest.isEqual(expected, decodedSignature)) {
       throw newError(SIGNATURE_DOES_NOT_MATCH, resource);
     }
   }

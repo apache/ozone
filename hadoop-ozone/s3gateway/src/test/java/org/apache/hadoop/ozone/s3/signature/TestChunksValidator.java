@@ -143,6 +143,20 @@ class TestChunksValidator {
         CHUNK2_SIGNATURE, SignatureTestUtils.sha256Hex(chunk1, 0, chunk1.length)));
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"a", "gg"})
+  void rejectsMalformedChunkSignature(String signature) {
+    assertSignatureMismatch(() -> newValidator().validateChunk(
+        signature, SignatureTestUtils.sha256Hex(new byte[0], 0, 0)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"a", "gg"})
+  void rejectsMalformedTrailerSignature(String signature) {
+    assertSignatureMismatch(() -> newTrailerValidator().validateTrailer(
+        signature, SignatureTestUtils.sha256Hex(new byte[0], 0, 0)));
+  }
+
   @Test
   void rejectsTamperedChunkPayload() {
     ChunksValidator validator = newValidator();
