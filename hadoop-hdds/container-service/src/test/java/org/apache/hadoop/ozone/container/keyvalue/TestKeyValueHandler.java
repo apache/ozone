@@ -71,7 +71,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
@@ -133,6 +132,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1125,7 +1126,7 @@ public class TestKeyValueHandler {
 
       blockFile = new RandomAccessFileChannel();
       ContainerCommandResponseProto response = kvHandler.readBlock(
-          readBlockRequest, container, blockFile, streamObserver, false);
+          readBlockRequest, container, blockFile, streamObserver);
 
       assertNull(response, "ReadBlock should return null on success");
       assertTrue(responseCount.get() > 0, "Should receive at least one response");
@@ -1220,7 +1221,7 @@ public class TestKeyValueHandler {
   }
 
   /** Asserts a successful read of {@code totalLength} contiguous bytes from {@code firstOffset}. */
-  private static void assertResponses(ReadBlockResult result, long firstOffset, long totalLength) {
+  private static void assertResponses(ReadBlockResult result, long firstOffset, long totalLength) throws Exception {
     assertNull(result.getResponse());
     assertThat(result.getErrors()).isEmpty();
     long offset = firstOffset;
@@ -1229,6 +1230,8 @@ public class TestKeyValueHandler {
       assertEquals(offset, response.getReadBlock().getOffset());
       final ByteString data = response.getReadBlock().getData();
       assertArrayEquals(writtenBytes(offset, data.size()), data.toByteArray());
+      Checksum.validateChecksums(data.asReadOnlyByteBuffer(), offset, 0,
+          response.getReadBlock().getChunkInfoListList());
       offset += data.size();
     }
     assertEquals(totalLength, offset - firstOffset, "total bytes delivered");
@@ -1299,7 +1302,7 @@ public class TestKeyValueHandler {
               .build())
           .build();
       ReadBlockResult result = new ReadBlockResult(blockID);
-      result.setResponse(kvHandler.readBlock(request, container, blockFile, result, false));
+      result.setResponse(kvHandler.readBlock(request, container, blockFile, result));
       return result;
     }
 
@@ -1425,7 +1428,7 @@ public class TestKeyValueHandler {
       }
 
       byte[] rawData = new byte[totalLen];
-      ThreadLocalRandom.current().nextBytes(rawData);
+      new java.util.Random(16258).nextBytes(rawData);
       writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2, 2, 2, 2);
     } finally {
@@ -1453,7 +1456,7 @@ public class TestKeyValueHandler {
       }
 
       byte[] rawData = new byte[totalLen];
-      ThreadLocalRandom.current().nextBytes(rawData);
+      new java.util.Random(16258).nextBytes(rawData);
       writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2048, 2048, 1044, 3072);
     } finally {
@@ -1462,8 +1465,12 @@ public class TestKeyValueHandler {
     }
   }
 
-  @Test
-  public void testReadBlockMultipleResponse() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testReadBlockMultipleResponse(boolean validateChecksums) throws Exception {
+    DatanodeConfiguration datanodeConfig = conf.getObject(DatanodeConfiguration.class);
+    datanodeConfig.setChunkDataValidationCheck(validateChecksums);
+    conf.setFromObject(datanodeConfig);
     int[] chunkLens = {(1 << 20) + 10, 20, 4096};
     Path testDir = Files.createTempDirectory("testReadBlock");
     try {
@@ -1481,7 +1488,7 @@ public class TestKeyValueHandler {
       }
 
       byte[] rawData = new byte[totalLen];
-      ThreadLocalRandom.current().nextBytes(rawData);
+      new java.util.Random(16258).nextBytes(rawData);
       writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 20, (1 << 20) + 20, 0, (1 << 20) + 30 + 1024);
     } finally {
@@ -1538,7 +1545,8 @@ public class TestKeyValueHandler {
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private void readBlockAndVerify(HandlerWithVolumeSet handlerWithVolume, KeyValueContainer container,
-      BlockID blockID, byte[] rawData, long readOffset, long length, long readBackOffset, long readBackLength) {
+      BlockID blockID, byte[] rawData, long readOffset, long length, long readBackOffset, long readBackLength)
+      throws Exception {
     ContainerCommandRequestProto readBlockRequest =
         ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.ReadBlock)
@@ -1561,7 +1569,7 @@ public class TestKeyValueHandler {
 
     try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
       ContainerCommandResponseProto response = handlerWithVolume.getHandler().readBlock(
-          readBlockRequest, container, blockFile, streamObserver, true);
+          readBlockRequest, container, blockFile, streamObserver);
 
       assertNull(response, "ReadBlock should return null on success");
     }
@@ -1573,12 +1581,22 @@ public class TestKeyValueHandler {
     for (ContainerCommandResponseProto resp : capturedResponses) {
       returnedDataLen += resp.getReadBlock().getData().size();
     }
+    List<ContainerProtos.ChunkInfo> storedChunks = handlerWithVolume.getHandler().getBlockManager()
+        .getBlock(container, blockID).getChunks();
     ByteBuffer allData = ByteBuffer.allocate(returnedDataLen);
     long firstResponseOffset = capturedResponses.get(0).getReadBlock().getOffset();
 
     for (ContainerCommandResponseProto resp : capturedResponses) {
       assertEquals(ContainerProtos.Result.SUCCESS, resp.getResult());
       assertTrue(resp.hasReadBlock());
+      long responseOffset = resp.getReadBlock().getOffset();
+      long responseEnd = responseOffset + resp.getReadBlock().getData().size();
+      List<ContainerProtos.ChunkInfo> overlapping = storedChunks.stream()
+          .filter(chunk -> chunk.getOffset() < responseEnd && chunk.getOffset() + chunk.getLen() > responseOffset)
+          .collect(java.util.stream.Collectors.toList());
+      assertEquals(overlapping, resp.getReadBlock().getChunkInfoListList());
+      Checksum.validateChecksums(resp.getReadBlock().getData().asReadOnlyByteBuffer(),
+          resp.getReadBlock().getOffset(), 0, resp.getReadBlock().getChunkInfoListList());
       allData.put(resp.getReadBlock().getData().asReadOnlyByteBuffer());
     }
 
@@ -1592,6 +1610,30 @@ public class TestKeyValueHandler {
     for (int i = 0; i < readBack.length; i++) {
       assertEquals(rawData[(int) firstResponseOffset + i], readBack[i],
           "Data mismatch at returned byte index " + i);
+    }
+  }
+
+  @Test
+  void testReadBlockZeroLengthAndOversizedRange() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      assertResponses(fixture.read(1, 0), 1, 0);
+      assertResponses(fixture.read(1, Long.MAX_VALUE), 0, BLOCK_SIZE);
+    }
+  }
+
+  @Test
+  void testReadBlockUnexpectedEof() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      File file = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(
+          fixture.container.getContainerData(), fixture.blockID, "unused");
+      try (java.io.RandomAccessFile truncated = new java.io.RandomAccessFile(file, "rw")) {
+        truncated.setLength(BLOCK_SIZE - 1);
+      }
+      ReadBlockResult result = fixture.read(0, BLOCK_SIZE);
+      assertEquals(ContainerProtos.Result.IO_EXCEPTION, result.getResponse().getResult());
+      assertThat(result.getDataResponses()).isEmpty();
     }
   }
 
