@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.s3.signature.SignatureTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -293,7 +295,7 @@ public class TestSignedChunksInputStream {
   void verifiesTrailerSignature() throws Exception {
     String body = trailerBody();
     try (SignedChunksInputStream is = new SignedChunksInputStream(
-        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, "x-amz-checksum-crc32c")) {
+        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, TrailerHeader.CRC32C)) {
       is.attachValidator(newTrailerValidator());
       assertThat(IOUtils.toString(is, UTF_8)).isEqualTo(repeat('a', 66560));
     }
@@ -304,7 +306,7 @@ public class TestSignedChunksInputStream {
     String body = trailerBody().replace(TRAILER_SIGNATURE,
         TRAILER_SIGNATURE.substring(0, TRAILER_SIGNATURE.length() - 1) + "0");
     SignedChunksInputStream is = new SignedChunksInputStream(
-        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, "x-amz-checksum-crc32c");
+        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, TrailerHeader.CRC32C);
     is.attachValidator(newTrailerValidator());
     assertSignatureMismatch(is);
   }
@@ -313,7 +315,7 @@ public class TestSignedChunksInputStream {
   void rejectsMissingTrailerSignature() {
     String body = trailerBody().replace("x-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n\r\n", "");
     SignedChunksInputStream is = new SignedChunksInputStream(
-        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, "x-amz-checksum-crc32c");
+        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, TrailerHeader.CRC32C);
     is.attachValidator(newTrailerValidator());
     assertInvalidBody(is, "Missing trailing signature");
   }
@@ -323,7 +325,7 @@ public class TestSignedChunksInputStream {
     String body = trailerBody();
     body = body.substring(0, body.length() - 4);
     SignedChunksInputStream is = new SignedChunksInputStream(
-        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, "x-amz-checksum-crc32c");
+        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, TrailerHeader.CRC32C);
     is.attachValidator(newTrailerValidator());
     assertInvalidBody(is, "Truncated trailing header");
   }
@@ -332,7 +334,7 @@ public class TestSignedChunksInputStream {
   void rejectsDataAfterTrailerSignature() {
     SignedChunksInputStream is = new SignedChunksInputStream(
         new ByteArrayInputStream((trailerBody() + "extra").getBytes(UTF_8)), KEY_PATH,
-        "x-amz-checksum-crc32c");
+        TrailerHeader.CRC32C);
     is.attachValidator(newTrailerValidator());
     assertInvalidBody(is, "Unexpected data after trailing signature");
   }
@@ -342,19 +344,34 @@ public class TestSignedChunksInputStream {
     String body = trailerBody();
     SignedChunksInputStream is = new SignedChunksInputStream(
         new ByteArrayInputStream(body.substring(0, body.length() - 2).getBytes(UTF_8)), KEY_PATH,
-        "x-amz-checksum-crc32c");
+        TrailerHeader.CRC32C);
     is.attachValidator(newTrailerValidator());
     assertInvalidBody(is, "Invalid trailer terminator");
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", " ", ",", "x-amz-meta-test", "x-amz-trailer-signature", "x-amz-checksum-crc32c,",
+  @ValueSource(strings = {",", "x-amz-meta-test", "x-amz-trailer-signature", "x-amz-checksum-crc32c,",
       "x-amz-checksum-crc32c,x-amz-checksum-crc32c", "x-amz-checksum-crc32,x-amz-checksum-sha256"})
   void rejectsInvalidTrailerHeader(String header) {
-    assertThatThrownBy(() -> new SignedChunksInputStream(
-        new ByteArrayInputStream(new byte[0]), KEY_PATH, header))
+    assertThatThrownBy(() -> TrailerHeader.fromHeader(header, KEY_PATH))
         .isInstanceOfSatisfying(OS3Exception.class,
             ex -> assertThat(ex.getCode()).isEqualTo(S3ErrorTable.INVALID_REQUEST.getCode()));
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {" ", "\t"})
+  void rejectsMissingTrailerHeader(String header) {
+    assertThatThrownBy(() -> TrailerHeader.fromHeader(header, KEY_PATH))
+        .isInstanceOfSatisfying(OS3Exception.class,
+            ex -> assertThat(ex.getCode()).isEqualTo(S3ErrorTable.INVALID_ARGUMENT.getCode()));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"x-amz-checksum-crc32,CRC32", "x-amz-checksum-crc32c,CRC32C", "x-amz-checksum-crc64nvme,CRC64NVME",
+      "x-amz-checksum-sha1,SHA1", "x-amz-checksum-sha256,SHA256", "' X-AMZ-CHECKSUM-CRC32C ',CRC32C"})
+  void parsesTrailerHeader(String header, TrailerHeader expected) {
+    assertThat(TrailerHeader.fromHeader(header, KEY_PATH)).isEqualTo(expected);
   }
 
   @Test

@@ -187,9 +187,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
           // If request has S3Authentication, validate S3 credentials.
           // If current OM is leader and then proceed with the request.
           S3SecurityUtil.validateS3Credential(request, ozoneManager);
-          if (ozoneManager.isSecurityEnabled() && request.getCmdType() == OzoneManagerProtocolProtos.Type.CreateKey
-              && request.getCreateKeyRequest().getDerivedKeyPiggyBacking()) {
-            derivedKey = ByteString.copyFrom(ozoneManager.getS3DerivedKey(request.getS3Authentication()));
+          derivedKey = getS3DerivedKey(request);
+          if (derivedKey != null) {
             // Only the RPC response needs this key. Older followers must not derive it during apply either.
             request = request.toBuilder().setCreateKeyRequest(request.getCreateKeyRequest().toBuilder()
                 .clearDerivedKeyPiggyBacking()).build();
@@ -224,6 +223,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       OzoneManager.setS3Auth(null);
       OzoneManager.setStsTokenIdentifier(null);
     }
+  }
+
+  private ByteString getS3DerivedKey(OMRequest request) throws IOException {
+    if (ozoneManager.isSecurityEnabled() && request.getCmdType() == OzoneManagerProtocolProtos.Type.CreateKey
+        && request.getCreateKeyRequest().getDerivedKeyPiggyBacking()) {
+      return ByteString.copyFrom(ozoneManager.getS3DerivedKey(request.getS3Authentication()));
+    }
+    return null;
   }
 
   @VisibleForTesting

@@ -110,6 +110,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EmptySource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
@@ -311,15 +312,29 @@ class TestObjectPut {
     assertKeyWasNotCommitted();
   }
 
-  @Test
-  void testPutObjectRejectsMissingTrailerHeader() {
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {" ", "\t"})
+  void testPutObjectRejectsMissingTrailerHeader(String trailerHeader) {
     ((OzoneBucketStub) bucket).setDerivedKey(signingKey());
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("0");
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn(trailerHeader);
 
     assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT,
         () -> putObject(signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32c", "sOO8/Q==")));
+    assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"x-amz-meta-test", "x-amz-checksum-crc32c,x-amz-checksum-sha256", "NONE"})
+  void testPutObjectRejectsUnsupportedTrailerHeader(String trailerHeader) {
+    configureSignedChunksWithTrailer(CONTENT.length());
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn(trailerHeader);
+
+    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> putObject(signedChunkedBodyWithTrailer(CONTENT, "x-amz-checksum-crc32c", "sOO8/Q==")));
     assertKeyWasNotCommitted();
   }
 

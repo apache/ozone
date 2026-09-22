@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
@@ -89,9 +91,41 @@ public class SignedChunksInputStream extends InputStream {
       Pattern.compile("([0-9A-Fa-f]+);chunk-signature=([0-9A-Fa-f]{64})");
   private static final Pattern TRAILER_SIGNATURE_PATTERN =
       Pattern.compile("x-amz-trailer-signature:([0-9A-Fa-f]{64})", Pattern.CASE_INSENSITIVE);
-  private static final Pattern CHECKSUM_TRAILER_PATTERN =
-      Pattern.compile("x-amz-checksum-(crc32|crc32c|crc64nvme|sha1|sha256)");
   private static final int MAX_LINE_LENGTH = 8 * 1024;
+
+  /** Supported checksum trailers, or no trailer for a regular signed stream. */
+  public enum TrailerHeader {
+    NONE(""),
+    CRC32("x-amz-checksum-crc32"),
+    CRC32C("x-amz-checksum-crc32c"),
+    CRC64NVME("x-amz-checksum-crc64nvme"),
+    SHA1("x-amz-checksum-sha1"),
+    SHA256("x-amz-checksum-sha256");
+
+    private final String headerName;
+
+    TrailerHeader(String headerName) {
+      this.headerName = headerName;
+    }
+
+    /** Parse the required single-checksum declaration of a signed trailer upload. */
+    public static TrailerHeader fromHeader(String header, String keyPath) {
+      if (StringUtils.isBlank(header)) {
+        OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, keyPath);
+        ex.setErrorMessage("The " + X_AMZ_TRAILER + " header is required for signed trailing headers");
+        throw ex;
+      }
+      String name = header.trim().toLowerCase(Locale.ROOT);
+      for (TrailerHeader trailer : values()) {
+        if (trailer != NONE && trailer.headerName.equals(name)) {
+          return trailer;
+        }
+      }
+      OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyPath);
+      ex.setErrorMessage("Invalid x-amz-trailer header");
+      throw ex;
+    }
+  }
 
   private final InputStream originalStream;
 
@@ -107,8 +141,8 @@ public class SignedChunksInputStream extends InputStream {
   /** Signature parsed from the current chunk header line. */
   private String chunkSignature;
 
-  /** Checksum header declared by x-amz-trailer, or null for a regular signed stream. */
-  private final String trailerHeader;
+  /** Checksum header declared by x-amz-trailer, or NONE for a regular signed stream. */
+  private final TrailerHeader trailerHeader;
 
   /**
    * Size of the chunk payload. If zero, the signature line should be parsed to
@@ -123,7 +157,7 @@ public class SignedChunksInputStream extends InputStream {
   private boolean isFinalChunkEncountered = false;
 
   public SignedChunksInputStream(InputStream inputStream, String keyPath) {
-    this(inputStream, keyPath, null);
+    this(inputStream, keyPath, TrailerHeader.NONE);
   }
 
   /**
@@ -131,15 +165,12 @@ public class SignedChunksInputStream extends InputStream {
    *
    * @param inputStream the encoded request body
    * @param keyPath resource used in S3 errors
-   * @param trailerHeader a single supported x-amz-checksum-* header name, or null when no trailer is expected
+   * @param trailerHeader the checksum trailer, or NONE when no trailer is expected
    */
-  public SignedChunksInputStream(InputStream inputStream, String keyPath, String trailerHeader) {
+  public SignedChunksInputStream(InputStream inputStream, String keyPath, TrailerHeader trailerHeader) {
     originalStream = inputStream;
     this.keyPath = keyPath;
-    this.trailerHeader = trailerHeader == null ? null : trailerHeader.trim().toLowerCase(Locale.ROOT);
-    if (this.trailerHeader != null && !CHECKSUM_TRAILER_PATTERN.matcher(this.trailerHeader).matches()) {
-      throw invalidBody("Invalid x-amz-trailer header");
-    }
+    this.trailerHeader = Objects.requireNonNull(trailerHeader, "trailerHeader == null");
   }
 
   /**
@@ -226,11 +257,11 @@ public class SignedChunksInputStream extends InputStream {
     }
     if (remainingData == 0) {
       // The final zero-byte chunk has no payload terminator when trailing headers follow it.
-      if (trailerHeader == null) {
+      if (trailerHeader == TrailerHeader.NONE) {
         readChunkTerminator();
       }
       validateChunk();
-      if (trailerHeader != null) {
+      if (trailerHeader != TrailerHeader.NONE) {
         validateTrailer();
       }
       isFinalChunkEncountered = true;
@@ -331,7 +362,7 @@ public class SignedChunksInputStream extends InputStream {
     }
     String name = trailerLine.substring(0, separator).trim().toLowerCase(Locale.ROOT);
     String value = trailerLine.substring(separator + 1).trim();
-    if (!trailerHeader.equals(name)) {
+    if (!trailerHeader.headerName.equals(name)) {
       throw invalidBody("Unexpected trailing header: " + name);
     }
 

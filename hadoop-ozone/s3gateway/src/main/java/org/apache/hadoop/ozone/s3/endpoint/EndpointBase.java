@@ -113,6 +113,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
 import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.commontypes.RequestParameters;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -824,14 +825,8 @@ public abstract class EndpointBase {
       if (hasUnsignedPayload(amzContentSha256Header)) {
         chunkInputStream = new UnsignedChunksInputStream(body);
       } else {
-        String trailerHeader = STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header)
-            ? getHeaders().getHeaderString(X_AMZ_TRAILER) : null;
-        if (STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header)
-            && StringUtils.isBlank(trailerHeader)) {
-          OS3Exception ex = newError(INVALID_ARGUMENT, keyPath);
-          ex.setErrorMessage("The " + X_AMZ_TRAILER + " header is required for signed trailing headers");
-          throw ex;
-        }
+        TrailerHeader trailerHeader = STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header)
+            ? TrailerHeader.fromHeader(getHeaders().getHeaderString(X_AMZ_TRAILER), keyPath) : TrailerHeader.NONE;
         chunkInputStream = new SignedChunksInputStream(body, keyPath, trailerHeader);
       }
       effectiveLength = Long.parseLong(amzDecodedLength);
