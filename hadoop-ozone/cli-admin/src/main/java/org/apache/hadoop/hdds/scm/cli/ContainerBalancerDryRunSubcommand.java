@@ -72,6 +72,10 @@ public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
       throw new IOException(e.getMessage(), e);
     }
 
+    if (profileSelection == null) {
+      out().println("No profile specified, using the default.");
+    }
+
     boolean anySucceeded = false;
     for (ContainerBalancerEstimation result : estimations) {
       out().printf("Profile: %s%n", result.getProfile().name());
@@ -114,6 +118,7 @@ public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
     long moveTimeoutMinutes = Math.round(estimation.getMoveTimeoutMillis() / 60000d);
     long balancingIntervalMinutes = Math.round(estimation.getBalancingIntervalMillis() / 60000d);
     out().println(" Based on:");
+    out().printf(Locale.ENGLISH, "   Threshold:                %.1f%%%n", estimation.getThresholdPercent());
     out().printf(Locale.ENGLISH, "   Datanode involvement:     %d%%%n",
         estimation.getMaxDatanodesPercentage());
     out().printf("   Max entering target:      %s / node%n", byteDesc(estimation.getMaxSizeEnteringTarget()));

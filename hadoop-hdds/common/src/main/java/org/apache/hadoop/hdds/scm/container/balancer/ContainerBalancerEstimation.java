@@ -30,6 +30,7 @@ public final class ContainerBalancerEstimation {
   private final long perIterationBytes;
   private final long estimatedIterations;
   private final long estimatedDurationMillis;
+  private final double thresholdPercent;
   private final int maxDatanodesPercentage;
   private final long maxSizeEnteringTarget;
   private final long maxSizeLeavingSource;
@@ -44,6 +45,7 @@ public final class ContainerBalancerEstimation {
     this.perIterationBytes = b.perIterationBytes;
     this.estimatedIterations = b.estimatedIterations;
     this.estimatedDurationMillis = b.estimatedDurationMillis;
+    this.thresholdPercent = b.thresholdPercent;
     this.maxDatanodesPercentage = b.maxDatanodesPercentage;
     this.maxSizeEnteringTarget = b.maxSizeEnteringTarget;
     this.maxSizeLeavingSource = b.maxSizeLeavingSource;
@@ -84,6 +86,10 @@ public final class ContainerBalancerEstimation {
     return estimatedDurationMillis;
   }
 
+  public double getThresholdPercent() {
+    return thresholdPercent;
+  }
+
   public int getMaxDatanodesPercentage() {
     return maxDatanodesPercentage;
   }
@@ -116,6 +122,7 @@ public final class ContainerBalancerEstimation {
     private long perIterationBytes;
     private long estimatedIterations;
     private long estimatedDurationMillis;
+    private double thresholdPercent;
     private int maxDatanodesPercentage;
     private long maxSizeEnteringTarget;
     private long maxSizeLeavingSource;
@@ -153,6 +160,11 @@ public final class ContainerBalancerEstimation {
 
     public Builder setEstimatedDurationMillis(long durationMillis) {
       this.estimatedDurationMillis = durationMillis;
+      return this;
+    }
+
+    public Builder setThresholdPercent(double threshold) {
+      this.thresholdPercent = threshold;
       return this;
     }
 

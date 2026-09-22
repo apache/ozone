@@ -43,7 +43,7 @@ public class ContainerBalancerConfigOptions {
   @Option(names = {"-d", "--max-datanodes-percentage-to-involve-per-iteration"},
       description = "Max percentage of healthy, in service datanodes " +
           "that can be involved in balancing in one iteration. The value " +
-          "should be in the range [0,100]. When omitted on dry-run, each profile uses its default preset. " +
+          "should be in the range (0,100]. When omitted on dry-run, each profile uses its default preset. " +
           "When omitted on start, the global config with a default of 20 (specify '20' for 20%%).")
   private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
 

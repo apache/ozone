@@ -845,12 +845,15 @@ class TestContainerBalancerSubCommand {
     dryRunCmd.execute(scmClient);
 
     String output = out.get();
-    assertThat(output).contains("Profile: MEDIUM");
+    assertThat(output)
+        .contains("No profile specified, using the default.")
+        .contains("Profile: MEDIUM");
     assertThat(output).doesNotContain("Profile: SLOW");
     assertThat(output).doesNotContain("Profile: FAST");
     assertThat(output.split("Profile:")).hasSize(2);
     assertThat(output)
         .contains("Based on:")
+        .contains("Threshold:                10.0%")
         .contains("Datanode involvement:     20%")
         .contains("Bytes to move:")
         .contains("Per iteration (estimate): ~" + byteDesc(26L * GB * 7))
@@ -876,6 +879,7 @@ class TestContainerBalancerSubCommand {
     String slow = blocks[1];
     assertThat(slow)
         .contains("Based on:")
+        .contains("Threshold:                10.0%")
         .contains("Datanode involvement:     10%")
         .contains("Bytes to move:")
         .contains("Per iteration (estimate): ~" + byteDesc(30L * GB))
@@ -887,6 +891,7 @@ class TestContainerBalancerSubCommand {
     String medium = blocks[2];
     assertThat(medium)
         .contains("Based on:")
+        .contains("Threshold:                10.0%")
         .contains("Datanode involvement:     20%")
         .contains("Bytes to move:")
         .contains("Per iteration (estimate): ~" + byteDesc(26L * GB * 7))
@@ -897,6 +902,7 @@ class TestContainerBalancerSubCommand {
     String fast = blocks[3];
     assertThat(fast)
         .contains("Based on:")
+        .contains("Threshold:                10.0%")
         .contains("Datanode involvement:     40%")
         .contains("Bytes to move:")
         .contains("Per iteration (estimate): ~" + byteDesc(500L * GB))
@@ -999,6 +1005,7 @@ class TestContainerBalancerSubCommand {
     String slow = blocks[1];
     assertThat(slow)
         .contains("Based on:")
+        .contains("Threshold:                5.0%")
         .contains("Max per iteration:        " + byteDesc(70L * GB))
         .contains("Bytes to move:")
         .contains("Per iteration (estimate): ~" + byteDesc(30L * GB))
@@ -1007,6 +1014,7 @@ class TestContainerBalancerSubCommand {
     String medium = blocks[2];
     assertThat(medium)
         .contains("Based on:")
+        .contains("Threshold:                5.0%")
         .contains("Max per iteration:        " + byteDesc(70L * GB))
         .contains("Bytes to move:")
         .contains("Per iteration (estimate): ~" + byteDesc(70L * GB))
@@ -1015,6 +1023,7 @@ class TestContainerBalancerSubCommand {
     String fast = blocks[3];
     assertThat(fast)
         .contains("Based on:")
+        .contains("Threshold:                5.0%")
         .contains("Max entering target:      " + byteDesc(100L * GB) + " / node")
         .contains("Max per iteration:        " + byteDesc(70L * GB))
         .contains("Estimation failed: max-size-entering-target must be less than or equal to "

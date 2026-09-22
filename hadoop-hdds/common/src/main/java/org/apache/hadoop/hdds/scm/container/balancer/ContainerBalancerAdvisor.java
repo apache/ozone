@@ -77,14 +77,14 @@ public final class ContainerBalancerAdvisor {
     List<ContainerBalancerProfile> profiles = selectProfiles(request);
     List<ContainerBalancerEstimation> estimations = new ArrayList<>(profiles.size());
     for (ContainerBalancerProfile profile : profiles) {
-      estimations.add(estimateForProfile(conf, request, profile, snapshot, balancerConfig));
+      estimations.add(estimateForProfile(conf, request, profile, snapshot, balancerConfig, thresholdPercent));
     }
     return Collections.unmodifiableList(estimations);
   }
 
-  private static ContainerBalancerEstimation estimateForProfile(OzoneConfiguration conf, AdvisorRequest request, 
-      ContainerBalancerProfile profile, ContainerBalancerClusterSnapshot snapshot, 
-      ContainerBalancerConfiguration balancerConfig) {
+  private static ContainerBalancerEstimation estimateForProfile(OzoneConfiguration conf, AdvisorRequest request,
+      ContainerBalancerProfile profile, ContainerBalancerClusterSnapshot snapshot,
+      ContainerBalancerConfiguration balancerConfig, double thresholdPercent) {
     
     boolean userProvidedMaxDatanodesPercentage =
         request.maxDatanodesPercentageToInvolvePerIteration != null;
@@ -112,6 +112,7 @@ public final class ContainerBalancerAdvisor {
 
     ContainerBalancerEstimation.Builder builder = ContainerBalancerEstimation.newBuilder()
         .setProfile(profile)
+        .setThresholdPercent(thresholdPercent)
         .setMaxSizeEnteringTarget(maxSizeEnteringTarget)
         .setMaxSizeLeavingSource(maxSizeLeavingSource)
         .setMaxSizeToMovePerIteration(maxSizeToMovePerIteration)
