@@ -269,7 +269,7 @@ public class TestDeletedBlockSummaryFlushRace {
 
   /**
    * Regression test for the reviewer-flagged gap: {@code addTransactions()} evaluates
-   * {@code getSummary()} before entering {@code runWithBufferLock()}, so a concurrent
+   * {@code getSummary()} before entering {@code addTransactionsToDB()}'s buffer lock, so a concurrent
    * {@code onBecomeLeader()} could reload the old DB summary between the counter update and
    * the snapshot, and that stale snapshot would then be the one persisted. Verifies the
    * summary handed to {@code addTransactionsToDB} (i.e. what actually gets persisted) always

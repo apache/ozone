@@ -17,14 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.ratis.statemachine.SnapshotInfo;
-import org.apache.ratis.util.function.CheckedRunnable;
 
 /**
  * DB transaction that buffers SCM DB transactions. Call the flush method
@@ -60,6 +58,4 @@ public interface SCMHADBTransactionBuffer
   void lock();
 
   void unlock();
-
-  void runWithBufferLock(CheckedRunnable<IOException> operation) throws IOException;
 }
