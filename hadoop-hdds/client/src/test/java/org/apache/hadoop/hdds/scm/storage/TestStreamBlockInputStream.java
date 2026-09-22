@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
@@ -861,23 +862,51 @@ public class TestStreamBlockInputStream {
   }
 
   private ReadBlockResponseProto buildReadBlockResponse(byte[] data) {
-    return buildResponseProto(data, 0).getReadBlock();
+    return ReadBlockResponseProto.newBuilder()
+        .setOffset(0)
+        .setData(ByteString.copyFrom(data))
+        .addChunkInfoList(ContainerProtos.ChunkInfo.newBuilder()
+            .setChunkName("chunk").setOffset(0).setLen(data.length)
+            .setChecksumData(ChecksumData.newBuilder()
+                .setType(ContainerProtos.ChecksumType.NONE)
+                .setBytesPerChecksum(data.length)
+                .build()))
+        .build();
   }
 
   private ContainerCommandResponseProto buildResponseProto(byte[] data, long offset) {
-    ContainerProtos.ChunkInfo chunk = ContainerProtos.ChunkInfo.newBuilder()
-        .setChunkName("chunk").setOffset(offset).setLen(data.length)
-        .setChecksumData(Checksum.getNoChecksumDataProto()).build();
-    return response(data, offset, Collections.singletonList(chunk));
+    return ContainerCommandResponseProto.newBuilder()
+        .setCmdType(Type.ReadBlock)
+        .setResult(ContainerProtos.Result.SUCCESS)
+        .setReadBlock(ReadBlockResponseProto.newBuilder()
+            .setOffset(offset)
+            .setData(ByteString.copyFrom(data))
+            .addChunkInfoList(ContainerProtos.ChunkInfo.newBuilder()
+                .setChunkName("chunk").setOffset(offset).setLen(data.length)
+                .setChecksumData(ChecksumData.newBuilder()
+                    .setType(ContainerProtos.ChecksumType.NONE)
+                    .setBytesPerChecksum(data.length)
+                    .build()))
+            .build())
+        .build();
   }
 
-  private ContainerCommandResponseProto buildCorruptResponseProto(byte[] data, long offset) throws Exception {
-    ContainerCommandResponseProto valid = response(data, offset,
-        Collections.singletonList(checksummedChunk(data, 0, data.length).toBuilder().setOffset(offset).build()));
-    byte[] corrupt = data.clone();
-    corrupt[0]++;
-    return valid.toBuilder().setReadBlock(valid.getReadBlock().toBuilder()
-        .setData(ByteString.copyFrom(corrupt))).build();
+  private ContainerCommandResponseProto buildCorruptResponseProto(byte[] data, long offset) {
+    return ContainerCommandResponseProto.newBuilder()
+        .setCmdType(Type.ReadBlock)
+        .setResult(ContainerProtos.Result.SUCCESS)
+        .setReadBlock(ReadBlockResponseProto.newBuilder()
+            .setOffset(offset)
+            .setData(ByteString.copyFrom(data))
+            .addChunkInfoList(ContainerProtos.ChunkInfo.newBuilder()
+                .setChunkName("chunk").setOffset(offset).setLen(data.length)
+                .setChecksumData(ChecksumData.newBuilder()
+                    .setType(ContainerProtos.ChecksumType.CRC32)
+                    .setBytesPerChecksum(data.length)
+                    .addChecksums(ByteString.copyFrom(new byte[4]))
+                    .build()))
+            .build())
+        .build();
   }
 
   private static ContainerProtos.ChunkInfo checksummedChunk(byte[] data, int offset, int length) throws Exception {
@@ -913,9 +942,12 @@ public class TestStreamBlockInputStream {
     assertStreamResponse(missing, data, 0, true, true);
     assertStreamResponse(missing, data, 0, false, false);
     assertStreamResponse(buildResponseProto(data, 0), data, 0, true, false);
-    ContainerCommandResponseProto corrupt = buildCorruptResponseProto(data, 0);
+    byte[] corruptData = data.clone();
+    corruptData[0]++;
+    ContainerCommandResponseProto corrupt = response(corruptData, 0,
+        Collections.singletonList(checksummedChunk(data, 0, data.length)));
     assertStreamResponse(corrupt, data, 0, true, true);
-    assertStreamResponse(corrupt, corrupt.getReadBlock().getData().toByteArray(), 0, false, false);
+    assertStreamResponse(corrupt, corruptData, 0, false, false);
   }
 
   private void assertStreamResponse(ContainerCommandResponseProto response, byte[] expected, int seek,
