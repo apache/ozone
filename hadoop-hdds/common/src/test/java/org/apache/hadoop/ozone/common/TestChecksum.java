@@ -173,6 +173,13 @@ public class TestChecksum {
       assertThrows(OzoneChecksumException.class,
           () -> Checksum.validateChecksums(ByteBuffer.wrap(data), 0, 0, chunks));
     }
+    assertThrows(OzoneChecksumException.class, () -> Checksum.validateChecksums(
+        ByteBuffer.wrap(data), -1, 0, Arrays.asList(first, second)));
+    assertThrows(OzoneChecksumException.class, () -> Checksum.validateChecksums(
+        ByteBuffer.wrap(data), 0, -1, Arrays.asList(first, second)));
+    ContainerProtos.ChunkInfo last = first.toBuilder().setOffset(Long.MAX_VALUE - first.getLen()).build();
+    assertThrows(OzoneChecksumException.class, () -> Checksum.validateChecksums(
+        ByteBuffer.wrap(data), last.getOffset(), 0, Collections.singletonList(last)));
     for (int[] range : new int[][] {{4, 4}, {3, 3}}) {
       assertThrows(OzoneChecksumException.class, () -> Checksum.validateChecksums(
           ByteBuffer.wrap(data, range[0], range[1]), range[0], 0, Collections.singletonList(second)));

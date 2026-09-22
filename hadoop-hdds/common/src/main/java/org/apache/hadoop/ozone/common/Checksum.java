@@ -442,14 +442,11 @@ public class Checksum {
     if (!data.hasRemaining()) {
       return;
     }
-    if (blockOffset < 0 || blockOffset > Long.MAX_VALUE - data.remaining() || startIndex < 0) {
-      throw new OzoneChecksumException("Invalid response range or chunk index");
-    }
     int dataOffset = data.position();
     int remaining = data.remaining();
     long offset = blockOffset;
     while (remaining > 0) {
-      if (startIndex >= chunks.size()) {
+      if (startIndex < 0 || startIndex >= chunks.size()) {
         throw new OzoneChecksumException("Missing chunk metadata at offset " + offset);
       }
       ChunkInfo chunk = chunks.get(startIndex++);

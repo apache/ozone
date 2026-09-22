@@ -1229,21 +1229,19 @@
             "fields": [
               {
                 "id": 1,
-                "name": "checksumData",
-                "type": "ChecksumData",
-                "required": true
+                "name": "offset",
+                "type": "uint64"
               },
               {
                 "id": 2,
-                "name": "offset",
-                "type": "uint64",
-                "required": true
+                "name": "data",
+                "type": "bytes"
               },
               {
                 "id": 3,
-                "name": "data",
-                "type": "bytes",
-                "required": true
+                "name": "chunkInfoList",
+                "type": "ChunkInfo",
+                "is_repeated": true
               }
             ]
           },
