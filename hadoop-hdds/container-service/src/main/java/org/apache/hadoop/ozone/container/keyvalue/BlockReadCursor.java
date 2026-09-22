@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 
 /** Tracks chunk-relative checksum boundaries for a streaming block read. */
 class BlockReadCursor {
@@ -46,7 +47,7 @@ class BlockReadCursor {
     if (requestedOffset < 0 || requestedOffset >= blockEnd || length < 0 || responseSize <= 0) {
       throw new IOException("Invalid streaming read range or response size");
     }
-    this.responseDataSize = bufferSize;
+    this.responseDataSize = ChunkUtils.limitReadSize(bufferSize);
     chunkIndex = findChunk(requestedOffset);
     start = length == 0 ? requestedOffset : alignDown(requestedOffset, chunks.get(chunkIndex));
     offset = start;

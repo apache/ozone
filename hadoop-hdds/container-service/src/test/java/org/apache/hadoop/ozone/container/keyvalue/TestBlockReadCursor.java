@@ -17,14 +17,18 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.junit.jupiter.api.Test;
 
 /** Tests the response ranges selected by {@link BlockReadCursor}. */
@@ -78,6 +82,24 @@ class TestBlockReadCursor {
     }
     assertFalse(cursor.hasRemaining());
     assertFalse(new BlockReadCursor(3, 0, 1, chunks).hasRemaining());
+  }
+
+  @Test
+  void testBufferSizeLimit() throws Exception {
+    for (int[] sizes : new int[][] {{OZONE_SCM_CHUNK_MAX_SIZE + 1, 4}, {1, Integer.MAX_VALUE}}) {
+      StorageContainerException error = assertThrows(StorageContainerException.class,
+          () -> new BlockReadCursor(0, 1, sizes[0],
+              Collections.singletonList(chunk(0, Integer.MAX_VALUE, sizes[1]))));
+      assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, error.getResult());
+    }
+    BlockReadCursor shortChunk = new BlockReadCursor(0, 3, 1,
+        Collections.singletonList(chunk(0, 3, Integer.MAX_VALUE)));
+    assertEquals(3, shortChunk.responseDataSize());
+    assertEquals(3, shortChunk.nextReadLength());
+    BlockReadCursor largestInterval = new BlockReadCursor(0, 1, 1,
+        Collections.singletonList(chunk(0, OZONE_SCM_CHUNK_MAX_SIZE, OZONE_SCM_CHUNK_MAX_SIZE)));
+    assertEquals(OZONE_SCM_CHUNK_MAX_SIZE, largestInterval.responseDataSize());
+    assertEquals(OZONE_SCM_CHUNK_MAX_SIZE, largestInterval.nextReadLength());
   }
 
   @Test

@@ -58,6 +58,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
@@ -2345,7 +2346,8 @@ public class KeyValueHandler extends Handler {
           "Requested offset " + readBlock.getOffset() + " is beyond the end of block " + blockID + " with size "
               + blockData.getSize()));
     }
-    if (readBlock.getOffset() < 0 || readBlock.getLength() < 0 || responseDataSize < 0) {
+    if (readBlock.getOffset() < 0 || readBlock.getLength() < 0
+        || responseDataSize < 0 || responseDataSize > OZONE_SCM_CHUNK_MAX_SIZE) {
       return rejectReadBlock(blockFile, streamObserver, Status.INVALID_ARGUMENT.withDescription(
           "Invalid ReadBlock range or response size: " + readBlock));
     }
