@@ -26,6 +26,8 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 
 /** Tracks chunk-relative checksum boundaries for a streaming block read. */
 class BlockReadCursor {
+  private static final int STREAMING_BYTES_PER_CHUNK = 1024 * 64;
+
   private final List<ChunkInfo> chunks;
   // [c1 offset, c2 offset, ..., cn offset, cn offset + cn len]
   private final long[] chunkOffsets;
@@ -70,7 +72,7 @@ class BlockReadCursor {
   private static int interval(ChunkInfo chunk) throws IOException {
     // Retain the existing read alignment for chunks without checksums.
     if (chunk.getChecksumData().getType() == ChecksumType.NONE) {
-      return 64 * 1024;
+      return STREAMING_BYTES_PER_CHUNK;
     }
     int size = chunk.getChecksumData().getBytesPerChecksum();
     if (size <= 0) {
