@@ -213,6 +213,24 @@ public class TestOzoneFSInputStream {
 
   @Test
   @Timeout(value = 30)
+  public void testByteArrayFallbackWorksForSeekableOnlyStream() throws Exception {
+    // Regression: the old routing through read(long, ByteBuffer) would cast to
+    // ByteBufferReadable in readAtPositionSeekRestore and throw ClassCastException
+    // for a stream that only implements Seekable (not ByteBufferReadable).
+    final byte[] source = RandomUtils.secure().randomBytes(SOURCE_SIZE);
+    final SeekableOnlyInputStream underlying = new SeekableOnlyInputStream(source);
+    try (OzoneFSInputStream subject = new OzoneFSInputStream(underlying,
+        new FileSystem.Statistics("test"))) {
+      PositionedReadTestHelper.runConcurrentPositionedReads(source, (offset, buf) -> {
+        byte[] arr = new byte[buf.remaining()];
+        subject.readFully(offset, arr);
+        buf.put(arr);
+      });
+    }
+  }
+
+  @Test
+  @Timeout(value = 30)
   public void testConcurrentPositionedRead() throws Exception {
     final byte[] source = RandomUtils.secure().randomBytes(SOURCE_SIZE);
     final InterleavingSeekableInputStream underlying =
@@ -234,24 +252,6 @@ public class TestOzoneFSInputStream {
         new FileSystem.Statistics("test"))) {
       PositionedReadTestHelper.runConcurrentPositionedReads(source,
           (offset, buf) -> subject.readFully(offset, buf));
-    }
-  }
-
-  @Test
-  @Timeout(value = 30)
-  public void testByteArrayFallbackWorksForSeekableOnlyStream() throws Exception {
-    // Regression: the old routing through read(long, ByteBuffer) would cast to
-    // ByteBufferReadable in readAtPositionSeekRestore and throw ClassCastException
-    // for a stream that only implements Seekable (not ByteBufferReadable).
-    final byte[] source = RandomUtils.secure().randomBytes(SOURCE_SIZE);
-    final SeekableOnlyInputStream underlying = new SeekableOnlyInputStream(source);
-    try (OzoneFSInputStream subject = new OzoneFSInputStream(underlying,
-        new FileSystem.Statistics("test"))) {
-      PositionedReadTestHelper.runConcurrentPositionedReads(source, (offset, buf) -> {
-        byte[] arr = new byte[buf.remaining()];
-        subject.readFully(offset, arr);
-        buf.put(arr);
-      });
     }
   }
 
@@ -334,8 +334,7 @@ public class TestOzoneFSInputStream {
   /**
    * Mimics an erasure-coded key stream: {@link ExtendedInputStream#readFully}
    * returns {@code false}, so {@link OzoneFSInputStream} falls back to
-   * seek-read-restore on the shared cursor. Implements both ByteBuffer and
-   * byte-array reads so both fallback paths can be exercised.
+   * seek-read-restore on the shared cursor.
    */
   private static final class EcInterleavingInputStream extends ExtendedInputStream {
 
@@ -343,11 +342,6 @@ public class TestOzoneFSInputStream {
 
     private EcInterleavingInputStream(byte[] data) {
       this.readState = new InterleavingReadState(data);
-    }
-
-    @Override
-    public boolean readFully(long position, ByteBuffer buffer) {
-      return false;
     }
 
     @Override
@@ -415,6 +409,11 @@ public class TestOzoneFSInputStream {
       System.arraycopy(data, pos, b, off, n);
       pos += n;
       return n;
+    }
+
+    @Override
+    public synchronized int available() {
+      return data.length - pos;
     }
 
     @Override
