@@ -22,9 +22,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -50,6 +52,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -299,6 +302,86 @@ public class TestOzoneConfiguration {
     assertEquals(val, configuration.get(key));
 
     assertNotEquals(val, new OzoneConfiguration().get(key));
+  }
+
+  @Test
+  public void setIfUnsetOverridesDefaultButKeepsExplicitValue() {
+    final String key = OZONE_SCM_HANDLER_COUNT_KEY;
+    OzoneConfiguration subject = new OzoneConfiguration();
+
+    // Default resources provide a value, so Hadoop's get(key) is non-null.
+    assertNotNull(subject.get(key));
+    String fromDefaults = subject.get(key);
+    MutableConfigurationSource wrapped = MutableConfigurationSource.ifUnsetWrapper(subject);
+    assertThat(wrapped.isExplicitlySet(key)).isFalse();
+
+    subject.setIfUnset(key, "20");
+    assertEquals("20", subject.get(key));
+    assertNotEquals(fromDefaults, subject.get(key));
+    assertThat(wrapped.isExplicitlySet(key)).isTrue();
+
+    subject.set(key, "42");
+    subject.setIfUnset(key, "20");
+    assertEquals("42", subject.get(key));
+  }
+
+  @Test
+  public void setIfUnsetPreservesSiteXmlValue(@TempDir File tempDir)
+      throws IOException {
+    final String key = OZONE_SCM_HANDLER_COUNT_KEY;
+    File ozoneSite = new File(tempDir, "ozone-site.xml");
+    try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
+        Files.newOutputStream(ozoneSite.toPath()), StandardCharsets.UTF_8))) {
+      startConfig(out);
+      appendProperty(out, key, "99");
+      endConfig(out);
+    }
+
+    OzoneConfiguration subject = new OzoneConfiguration();
+    subject.addResource(new Path(ozoneSite.getAbsolutePath()));
+    assertEquals("99", subject.get(key));
+
+    subject.setIfUnset(key, "20");
+    assertEquals("99", subject.get(key));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void setIfUnsetAfterUnset(boolean wrapped) {
+    final String key = OZONE_SCM_HANDLER_COUNT_KEY;
+    conf.set(key, "42");
+    conf.unset(key);
+    assertThat(conf.get(key)).isNull();
+
+    MutableConfigurationSource target = wrapped ? MutableConfigurationSource.ifUnsetWrapper(conf) : conf;
+    assertThat(target.isExplicitlySet(key)).isFalse();
+    target.setIfUnset(key, "20");
+
+    assertThat(conf.get(key)).isEqualTo("20");
+    assertThat(target.isExplicitlySet(key)).isTrue();
+  }
+
+  @Test
+  public void setIfUnsetPreservesCustomResourceValue(@TempDir File tempDir)
+      throws IOException {
+    final String key = OZONE_SCM_HANDLER_COUNT_KEY;
+    // Named *-default.xml on purpose: a user-provided resource is explicit even
+    // when its name matches the built-in default resource convention.
+    File custom = new File(tempDir, "custom-default.xml");
+    try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
+        Files.newOutputStream(custom.toPath()), StandardCharsets.UTF_8))) {
+      startConfig(out);
+      appendProperty(out, key, "77");
+      endConfig(out);
+    }
+
+    OzoneConfiguration subject = new OzoneConfiguration();
+    subject.addResource(new Path(custom.getAbsolutePath()));
+    assertEquals("77", subject.get(key));
+
+    // A value from any non-default resource is explicit and must be preserved.
+    subject.setIfUnset(key, "20");
+    assertEquals("77", subject.get(key));
   }
 
   @Test
