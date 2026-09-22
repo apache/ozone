@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static java.util.Collections.singletonMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -36,6 +37,7 @@ import java.util.Map;
 import java.util.UUID;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
@@ -237,8 +239,13 @@ public class TestStorageDistributionEndpoint {
           uuid.toString(), PENDING_DELETION_SIZE));
       dataNodes.add(new DatanodeInfo(datanode, NodeStatus.inServiceHealthy(), null, 5 * 60 * 1000));
       when(nodeManager.getNodeStat(datanode))
-          .thenReturn(new SCMNodeMetric(OZONE_CAPACITY, OZONE_USED, OZONE_REMAINING, COMMITTED,
-              MIN_FREE_SPACE, RESERVED));
+          .thenReturn(new SCMNodeMetric(
+              singletonMap(StorageType.DEFAULT, OZONE_CAPACITY),
+              singletonMap(StorageType.DEFAULT, OZONE_USED),
+              singletonMap(StorageType.DEFAULT, OZONE_REMAINING),
+              singletonMap(StorageType.DEFAULT, COMMITTED),
+              singletonMap(StorageType.DEFAULT, MIN_FREE_SPACE),
+              singletonMap(StorageType.DEFAULT, RESERVED)));
       when(nodeManager.getTotalFilesystemUsage(datanode))
           .thenReturn(new SpaceUsageSource.Fixed(FS_CAPACITY, FS_AVAILABLE, FS_USED));
 

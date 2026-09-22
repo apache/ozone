@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
+import jakarta.annotation.Nonnull;
+import org.apache.hadoop.fs.StorageType;
 
 /**
  * Interface that defines Node Stats.
@@ -60,14 +62,48 @@ interface NodeStat {
   LongMetric getReserved();
 
   /**
-   * Set the total/used/remaining space.
-   * @param capacity - total space.
-   * @param used - used space.
-   * @param remain - remaining space.
+   * Get capacity of the node for a specific StorageType.
+   * @return capacity of the node for a specific StorageType.
+   */
+  LongMetric getCapacity(StorageType storageType);
+
+  /**
+   * Get the used space of the node for a specific StorageType.
+   * @return the used space of the node for a specific StorageType.
+   */
+  LongMetric getScmUsed(StorageType storageType);
+
+  /**
+   * Get the remaining space of the node for a specific StorageType.
+   * @return the remaining space of the node for a specific StorageType.
+   */
+  LongMetric getRemaining(StorageType storageType);
+
+  /**
+   * Get the committed space of the node for a specific StorageType.
+   * @return the committed space of the node for a specific StorageType.
+   */
+  LongMetric getCommitted(StorageType storageType);
+
+  /**
+   * Get the min free space available to spare on the node for a specific StorageType.
+   * @return the min free space available to spare for a specific StorageType.
+   */
+  LongMetric getFreeSpaceToSpare(StorageType storageType);
+
+  /**
+   * Get the reserved space on the node for a specific StorageType.
+   * @return the reserved space on the node for a specific StorageType.
+   */
+  LongMetric getReserved(StorageType storageType);
+
+  /**
+   * Copy the total and per-StorageType values from another stat.
+   *
+   * @param stat - stat to be set.
    */
   @VisibleForTesting
-  void set(long capacity, long used, long remain, long committed,
-           long freeSpaceToSpare, long reserved);
+  void set(NodeStat stat);
 
   /**
    * Adding of the stat.
@@ -75,6 +111,22 @@ interface NodeStat {
    * @return updated node stat.
    */
   NodeStat add(NodeStat stat);
+
+  /**
+   * Add the specified capacity, used, remaining, committed, freeSpaceToSpare and reserved
+   * values for a specific StorageType.
+   *
+   * @param capacity   Capacity to add for the specified storage type.
+   * @param used       Used space to add for the specified storage type.
+   * @param remaining  Remaining space to add for the specified storage type.
+   * @param committed  Committed space to add for the specified storage type.
+   * @param freeSpaceToSpare  FreeSpaceToSpare space to add for the specified storage type.
+   * @param reserved   Reserved space to add for the specified storage type.
+   * @param storageType The storage type for the specified values.
+   * @return Updated node stat.
+   */
+  NodeStat add(long capacity, long used, long remaining, long committed,
+      long freeSpaceToSpare, long reserved, @Nonnull StorageType storageType);
 
   /**
    * Subtract of the stat.
