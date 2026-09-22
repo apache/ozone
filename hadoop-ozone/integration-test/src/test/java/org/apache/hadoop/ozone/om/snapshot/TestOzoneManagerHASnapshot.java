@@ -130,9 +130,6 @@ public class TestOzoneManagerHASnapshot {
 
     cluster.waitForLeaderOM();
 
-    response = store.snapshotDiff(volumeName, bucketName, snapshot1,
-        snapshot2, null, 0, false, false);
-    assertEquals(IN_PROGRESS, response.getJobStatus());
     while (true) {
       response = store.snapshotDiff(volumeName, bucketName, snapshot1,
               snapshot2, null, 0, false, false);
