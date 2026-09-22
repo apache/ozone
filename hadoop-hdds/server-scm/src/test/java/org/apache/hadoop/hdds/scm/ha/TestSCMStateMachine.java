@@ -68,18 +68,16 @@ public class TestSCMStateMachine {
   private final RaftPeerId followerId = RaftPeerId.valueOf("follower");
   private final RaftPeerId leaderId = RaftPeerId.valueOf("leader");
 
-  private StorageContainerManager scm;
   private SCMMetrics metrics;
-  private SCMHADBTransactionBuffer buffer;
   private SCMDatanodeProtocolServer datanodeProtocolServer;
   private SCMSafeModeManager safeModeManager;
   private SCMStateMachine stateMachine;
 
   @BeforeEach
   void setUp() {
-    scm = mock(StorageContainerManager.class);
+    StorageContainerManager scm = mock(StorageContainerManager.class);
     metrics = SCMMetrics.create();
-    buffer = mock(SCMHADBTransactionBuffer.class);
+    SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     datanodeProtocolServer = mock(SCMDatanodeProtocolServer.class);
     safeModeManager = mock(SCMSafeModeManager.class);
 
