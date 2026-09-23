@@ -127,12 +127,15 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
 
       OzoneKey key;
       NavigableMap<Integer, Long> completedPartSizes = null;
+      boolean directoryBucketLayout = false;
       try {
         if (requestedAttributes.contains(ATTR_OBJECT_PARTS)) {
           S3HeadObjectAttributes headAttributes =
               getClientProtocol().headS3ObjectAttributes(bucketName, keyPath);
           key = headAttributes.getKey();
           completedPartSizes = headAttributes.getCompletedMultipartPartSizes();
+          directoryBucketLayout =
+              headAttributes.getBucketLayout().isFileSystemOptimized();
         } else {
           key = getClientProtocol().headS3Object(bucketName, keyPath);
         }
@@ -147,7 +150,8 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
       }
 
       GetObjectAttributesResponse response =
-          buildResponse(keyPath, key, requestedAttributes, completedPartSizes, context);
+          buildResponse(keyPath, key, requestedAttributes, completedPartSizes,
+              directoryBucketLayout);
 
       Response.ResponseBuilder rb = Response.ok(response, MediaType.APPLICATION_XML_TYPE);
       ObjectEndpoint.addLastModifiedDate(rb, key);
@@ -187,7 +191,7 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
 
   private GetObjectAttributesResponse buildResponse(String keyPath, OzoneKey key,
       Set<String> requested, NavigableMap<Integer, Long> completedPartSizes,
-      ObjectRequestContext context)
+      boolean directoryBucketLayout)
       throws IOException, OS3Exception {
     GetObjectAttributesResponse resp = new GetObjectAttributesResponse();
 
@@ -214,8 +218,6 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
       if (eTag != null) {
         String partsCountStr = extractPartsCount(eTag);
         if (partsCountStr != null && completedPartSizes != null) {
-          boolean directoryBucketLayout =
-              context.getBucket().getBucketLayout().isFileSystemOptimized();
           resp.setObjectParts(buildObjectParts(keyPath, Integer.parseInt(partsCountStr),
               completedPartSizes, key, directoryBucketLayout));
         }

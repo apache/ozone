@@ -1947,7 +1947,22 @@ public class RpcClient implements ClientProtocol {
   @Override
   public S3HeadObjectAttributes headS3ObjectAttributes(String bucketName, String keyName)
       throws IOException {
-    OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, true);
+    verifyBucketName(bucketName);
+    Objects.requireNonNull(keyName, "keyName == null");
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setSortDatanodesInPipeline(topologyAwareReadEnabled)
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setForceUpdateContainerCacheFromSCM(false)
+        .setHeadOp(true)
+        .build();
+    KeyInfoWithVolumeContext keyInfoWithS3Context =
+        ozoneManagerClient.getKeyInfo(keyArgs, true);
+    keyInfoWithS3Context.getUserPrincipal().ifPresent(this::updateS3Principal);
+    OmKeyInfo keyInfo = keyInfoWithS3Context.getKeyInfo();
     OmKeyLocationInfoGroup locationGroup = keyInfo.getLatestVersionLocations();
     NavigableMap<Integer, Long> partSizes = Collections.emptyNavigableMap();
     if (locationGroup != null && locationGroup.isMultipartKey()) {
@@ -1959,7 +1974,9 @@ public class RpcClient implements ClientProtocol {
         }
       }
     }
-    return new S3HeadObjectAttributes(OzoneKey.fromKeyInfo(keyInfo), partSizes);
+    BucketLayout bucketLayout = keyInfoWithS3Context.getBucketLayout()
+        .orElse(BucketLayout.DEFAULT);
+    return new S3HeadObjectAttributes(OzoneKey.fromKeyInfo(keyInfo), partSizes, bucketLayout);
   }
 
   private OmKeyInfo getS3PartOmKeyInfo(String bucketName, String keyName,

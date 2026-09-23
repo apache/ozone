@@ -38,16 +38,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
@@ -336,6 +340,25 @@ public class TestObjectAttributesGet {
   public void testShouldIncludePartElements() {
     assertFalse(ObjectAttributesHandler.shouldIncludePartElements(null, false));
     assertTrue(ObjectAttributesHandler.shouldIncludePartElements(null, true));
+
+    OzoneKey obsKeyNoChecksum = testOzoneKey(false);
+    assertFalse(ObjectAttributesHandler.shouldIncludePartElements(obsKeyNoChecksum, false));
+
+    OzoneKey obsKeyWithChecksum = testOzoneKey(true);
+    assertTrue(ObjectAttributesHandler.shouldIncludePartElements(obsKeyWithChecksum, false));
+
+    assertTrue(ObjectAttributesHandler.shouldIncludePartElements(obsKeyNoChecksum, true));
+    assertTrue(ObjectAttributesHandler.shouldIncludePartElements(obsKeyWithChecksum, true));
+  }
+
+  private static OzoneKey testOzoneKey(boolean withAdditionalChecksum) {
+    OzoneKey key = new OzoneKey("vol", "b", "k", 0, 0, 0,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        true, "owner");
+    if (withAdditionalChecksum) {
+      key.setMetadata(Collections.singletonMap("x-amz-checksum-crc32", "abc"));
+    }
+    return key;
   }
 
   private void completeMultipartUploadWithPartsInBucket(String bucketName, String key,
