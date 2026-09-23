@@ -730,6 +730,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
           SNAPSHOT_FLUSH_TIMEOUT_MILLIS);
       snap.setDeepCleanedDeletedDir(true);
       om.getMetadataManager().getSnapshotInfoTable().put(snap.getTableKey(), snap);
+      om.getMetadataManager().getSnapshotInfoTable().addCacheEntry(
+          snap.getTableKey(), snap, om.getOmRatisServer().getLastAppliedTermIndex().getIndex());
       assertTrue(om.getMetadataManager().getSnapshotInfo(volume, bucket, "snap2")
           .isDeepCleanedDeletedDir());
     }
