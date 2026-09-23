@@ -17,24 +17,37 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.hadoop.ozone.OzoneConsts;
+
 /**
  * Throttling profile for container balancer.
  */
 
 public enum ContainerBalancerProfile {
-  SLOW,
-  MEDIUM,
-  FAST;
+  SLOW(10, 10L * OzoneConsts.GB, 10L * OzoneConsts.GB),
+  MEDIUM(20, 26L * OzoneConsts.GB, 26L * OzoneConsts.GB),
+  FAST(40, 100L * OzoneConsts.GB, 100L * OzoneConsts.GB);
 
-  public int getDatanodesMaxPercentage(ContainerBalancerConfiguration conf) {
-    return conf.getProfileDatanodesMaxPercentage(this);
+  private final int datanodesMaxPercentage;
+  private final long maxSizeEnteringTarget;
+  private final long maxSizeLeavingSource;
+
+  ContainerBalancerProfile(int datanodesMaxPercentage, long maxSizeEnteringTarget,
+      long maxSizeLeavingSource) {
+    this.datanodesMaxPercentage = datanodesMaxPercentage;
+    this.maxSizeEnteringTarget = maxSizeEnteringTarget;
+    this.maxSizeLeavingSource = maxSizeLeavingSource;
   }
 
-  public long getMaxSizeEnteringTarget(ContainerBalancerConfiguration conf) {
-    return conf.getProfileMaxSizeEnteringTarget(this);
+  public int getDatanodesMaxPercentage() {
+    return datanodesMaxPercentage;
   }
 
-  public long getMaxSizeLeavingSource(ContainerBalancerConfiguration conf) {
-    return conf.getProfileMaxSizeLeavingSource(this);
+  public long getMaxSizeEnteringTarget() {
+    return maxSizeEnteringTarget;
+  }
+
+  public long getMaxSizeLeavingSource() {
+    return maxSizeLeavingSource;
   }
 }

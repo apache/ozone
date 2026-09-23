@@ -72,7 +72,7 @@ public final class ContainerBalancerAdvisor {
 
     ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(nodes, thresholdRatio, 
         includeNodes, excludeNodes);
-    validateSnapshotForEstimation(snapshot, conf);
+    validateSnapshotForEstimation(snapshot);
 
     List<ContainerBalancerProfile> profiles = selectProfiles(request);
     List<ContainerBalancerEstimation> estimations = new ArrayList<>(profiles.size());
@@ -90,13 +90,13 @@ public final class ContainerBalancerAdvisor {
         request.maxDatanodesPercentageToInvolvePerIteration != null;
     int maxDatanodesPercentage = userProvidedMaxDatanodesPercentage
         ? request.maxDatanodesPercentageToInvolvePerIteration
-        : profile.getDatanodesMaxPercentage(balancerConfig);
+        : profile.getDatanodesMaxPercentage();
     long maxSizeEnteringTarget = request.maxSizeEnteringTarget != null
         ? request.maxSizeEnteringTarget
-        : profile.getMaxSizeEnteringTarget(balancerConfig);
+        : profile.getMaxSizeEnteringTarget();
     long maxSizeLeavingSource = request.maxSizeLeavingSource != null
         ? request.maxSizeLeavingSource
-        : profile.getMaxSizeLeavingSource(balancerConfig);
+        : profile.getMaxSizeLeavingSource();
     long maxSizeToMovePerIteration = request.maxSizeToMovePerIteration != null
         ? request.maxSizeToMovePerIteration
         : balancerConfig.getMaxSizeToMovePerIteration();
@@ -130,8 +130,7 @@ public final class ContainerBalancerAdvisor {
           maxDatanodesPercentage / 100d, eligibleDatanodeCount);
 
       if (!userProvidedMaxDatanodesPercentage && maxInvolved < 2) {
-        int maxProfileDatanodesPercentage =
-            balancerConfig.getProfileDatanodesMaxPercentage(ContainerBalancerProfile.FAST);
+        int maxProfileDatanodesPercentage = ContainerBalancerProfile.FAST.getDatanodesMaxPercentage();
         maxDatanodesPercentage = minimumPercentForAtLeastTwoNodes(
             eligibleDatanodeCount, maxDatanodesPercentage, maxProfileDatanodesPercentage);
         maxInvolved = ContainerBalancerConfiguration.computeMaxDatanodesToInvolvePerIteration(
@@ -246,12 +245,7 @@ public final class ContainerBalancerAdvisor {
     return result;
   }
 
-  private static void validateSnapshotForEstimation(ContainerBalancerClusterSnapshot snapshot,
-      OzoneConfiguration conf) {
-    long containerSizeBytes = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-        StorageUnit.BYTES);
+  private static void validateSnapshotForEstimation(ContainerBalancerClusterSnapshot snapshot) {
     if (snapshot.getSourceCount() < 1) {
       throw new IllegalArgumentException("No over-utilized datanodes (sources) found.");
     }
@@ -260,11 +254,6 @@ public final class ContainerBalancerAdvisor {
     }
     if (snapshot.getBytesToMove() <= 0) {
       throw new IllegalArgumentException("No bytes to move.");
-    }
-    if (snapshot.getBytesToMove() < containerSizeBytes) {
-      throw new IllegalArgumentException(
-              "Bytes to move (" + snapshot.getBytesToMove()
-                      + ") is less than container size (" + containerSizeBytes + ").");
     }
     if (snapshot.getTotalEligibleDatanodes() < 2) {
       throw new IllegalArgumentException(String.format(
@@ -280,18 +269,12 @@ public final class ContainerBalancerAdvisor {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
 
-    if (maxSizeEnteringTarget <= 0) {
-      throw new IllegalArgumentException("Max Size Entering Target must be greater than zero.");
-    }
-    if (maxSizeEnteringTarget <= containerSizeBytes) {
+    if (maxSizeEnteringTarget <= 0 || maxSizeEnteringTarget <= containerSizeBytes) {
       throw new IllegalArgumentException(
           "max-size-entering-target must be greater than ozone.scm.container.size ("
               + containerSizeBytes + " bytes).");
     }
-    if (maxSizeLeavingSource <= 0) {
-      throw new IllegalArgumentException("Max Size Leaving Source must be greater than zero.");
-    }
-    if (maxSizeLeavingSource <= containerSizeBytes) {
+    if (maxSizeLeavingSource <= 0 || maxSizeLeavingSource <= containerSizeBytes) {
       throw new IllegalArgumentException(
           "max-size-leaving-source must be greater than ozone.scm.container.size ("
               + containerSizeBytes + " bytes).");
@@ -313,11 +296,9 @@ public final class ContainerBalancerAdvisor {
 
   private static void validateMoveTimeouts(OzoneConfiguration conf, long moveReplicationTimeoutMillis,
       long moveTimeoutMillis) {
-    if (moveTimeoutMillis <= 0) {
-      throw new IllegalArgumentException("Move Timeout must be greater than zero.");
-    }
-    if (moveReplicationTimeoutMillis <= 0) {
-      throw new IllegalArgumentException("Move Replication Timeout must be greater than zero.");
+    if (moveTimeoutMillis <= 0 || moveReplicationTimeoutMillis <= 0) {
+      throw new IllegalArgumentException(
+          "Move timeout and move replication timeout must each be greater than zero.");
     }
     if (moveReplicationTimeoutMillis >= moveTimeoutMillis) {
       throw new IllegalArgumentException("hdds.container.balancer.move.replication.timeout should " +
