@@ -138,6 +138,14 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-client</artifactId>
+      <!-- runtime, not test: HttpFS needs it at run time (it came in transitively via
+           ozone-filesystem before), and a direct test-scoped declaration would demote it off
+           the dist classpath. runtime is still on the test classpath, so tests compile. -->
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-filesystem</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -175,11 +183,6 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-reload4j</artifactId>
       <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-client</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
