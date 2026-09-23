@@ -278,7 +278,12 @@ class TestOzoneAtRestEncryption {
       GenericTestUtils.waitFor(
           (BooleanSupplier) () -> omLogs.getOutput().contains("Successfully warmed up 1 EDEKs."),
           500, 60000);
-      assertThat(omLogs.getOutput()).as("warm-up log must name the key").contains(TEST_KEY);
+      // Match the loader's own line, not a bare key name: TEST_KEY also appears in unrelated OM
+      // log output during the restart, so a plain substring check would pass without the key ever
+      // having been warmed up.
+      assertThat(omLogs.getOutput())
+          .as("the loader must report warming up exactly this key")
+          .contains("Warming up 1 EDEKs: [" + TEST_KEY + "]");
     } finally {
       omLogs.stopCapturing();
       ozClient.close();

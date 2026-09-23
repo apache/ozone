@@ -28,9 +28,22 @@ package org.apache.hadoop.hdds.server.http;
  * <p>Extends {@link IllegalArgumentException} (an unchecked exception) so it
  * propagates out of the {@code IOException}-declared {@link BaseHttpServer}
  * constructor without adding a checked-exception signature, and is a distinct
- * type that OM, SCM and the datanode can catch ahead of their generic HTTP
- * start-up {@code catch} block, which treats other start-up failures as
- * non-fatal.
+ * type a service can catch ahead of its generic HTTP start-up {@code catch}
+ * block, which treats other start-up failures as non-fatal.
+ *
+ * <p>Each service honors this differently, so code that adds a generic {@code catch} around a
+ * web-server start has to re-establish the contract there or that daemon silently goes back to
+ * starting without a web server:
+ * <ul>
+ *   <li>{@code OzoneManager.startHttpServer()} -- rethrown ahead of the non-fatal catch; shared
+ *       by {@code start()} and {@code restart()}.</li>
+ *   <li>{@code StorageContainerManager.start()} -- rethrown ahead of the non-fatal catch.</li>
+ *   <li>{@code HddsDatanodeService.start()} -- rethrown ahead of the non-fatal catch.</li>
+ *   <li>{@code ReconServer.call()} -- found by searching the cause chain, because Guice wraps a
+ *       constructor failure in a {@code ProvisionException} that a plain {@code catch} misses.</li>
+ *   <li>{@code Gateway.call()} (S3 Gateway) -- constructs its servers outside any {@code try}, so
+ *       this propagates with no catch clause needed.</li>
+ * </ul>
  */
 public class HttpServerConfigurationException extends IllegalArgumentException {
 

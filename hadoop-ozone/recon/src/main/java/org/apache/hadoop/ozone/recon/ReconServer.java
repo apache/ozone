@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
+import org.apache.hadoop.hdds.server.http.HttpServerConfigurationException;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
@@ -210,6 +211,13 @@ public class ReconServer extends GenericCli implements Callable<Void> {
 
       LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
+      final HttpServerConfigurationException webServerMisconfigured =
+          findHttpServerConfigurationException(e);
+      if (webServerMisconfigured != null) {
+        // A filter/HTTP misconfiguration will never succeed on retry; fail fast instead of
+        // leaving Recon running without a web server.
+        throw webServerMisconfigured;
+      }
       LOG.error("Error during initializing Recon server.", e);
       updateAndLogReconHealthStatus();
     }
@@ -222,6 +230,23 @@ public class ReconServer extends GenericCli implements Callable<Void> {
         LOG.error("Error during stop Recon server", e);
       }
     }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
+    return null;
+  }
+
+  /**
+   * Finds a {@link HttpServerConfigurationException} in {@code failure}'s cause chain. Guice wraps
+   * a constructor failure in a {@code ProvisionException}, so the web-server misconfiguration is
+   * never the top-level exception here.
+   *
+   * @return the misconfiguration, or {@code null} if this failure is not one
+   */
+  private static HttpServerConfigurationException findHttpServerConfigurationException(
+      Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof HttpServerConfigurationException) {
+        return (HttpServerConfigurationException) cause;
+      }
+    }
     return null;
   }
 

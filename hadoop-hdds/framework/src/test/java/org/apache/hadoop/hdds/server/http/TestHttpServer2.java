@@ -257,6 +257,22 @@ public class TestHttpServer2 {
   }
 
   /**
+   * When hadoop.log.dir is itself a symlink to an existing directory -- a common packaging layout,
+   * e.g. /opt/ozone/logs -> /var/log/ozone -- "/logs" must still be served. Before JDK 20
+   * (JDK-8294193) Files.createDirectories throws FileAlreadyExistsException for a symlink to a
+   * directory, so creating unconditionally would drop the context on the JDK 17 runtime the server
+   * supports, while a JDK 21+ runtime would hide it.
+   */
+  @Test
+  public void testLogsContextServedWhenLogDirIsSymlink(@TempDir Path parent)
+      throws Exception {
+    Path realLogDir = Files.createDirectory(parent.resolve("real-logs"));
+    Path linkedLogDir = Files.createSymbolicLink(parent.resolve("logs"), realLogDir);
+    ServletContextHandler logs = buildLogsContext(linkedLogDir, new OzoneConfiguration());
+    assertNotNull(logs, "/logs must be served when hadoop.log.dir is a symlink to a directory");
+  }
+
+  /**
    * When hadoop.log.dir cannot be used as a directory (here: a regular file is
    * in the way), the server must not fail to start; it skips "/logs" gracefully,
    * as the sibling "/static" context does when its base resource is absent.
@@ -489,6 +505,67 @@ public class TestHttpServer2 {
         .setName("test")
         .addEndpoint(URI.create("http://localhost:0"));
     assertThrows(HttpServerConfigurationException.class, builder::build);
+  }
+
+  /**
+   * "/conf" is registered by {@link HttpServer2#addDefaultServlets()}, so no service-specific code
+   * puts it on the server any more and nothing but a wire request proves it is still reachable --
+   * a dropped or duplicated registration would otherwise fail no test. Driving it on a running
+   * server also pins the redaction of sensitive values end to end, on the XML branch in particular,
+   * which emitted them in clear text until {@code HddsConfServlet} was given a redactor.
+   *
+   * <p>The format comes from the {@code Accept} header rather than a query parameter, and an
+   * absent header means XML, so both branches are reachable from here.
+   */
+  @Test
+  public void servesConfOverTheWireWithSecretsRedacted() throws Exception {
+    final String knownKey = "ozone.test.wire.key";
+    final String knownValue = "wire-value";
+    final String secretKey = "test.ssl.keystore.password";
+    final String secretValue = "must-not-appear-on-the-wire";
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(knownKey, knownValue);
+    conf.set(secretKey, secretValue);
+
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(conf)
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .configureXFrame(true)
+        .build();
+    server.start();
+    try {
+      String confUrl =
+          "http://localhost:" + server.getConnectorAddress(0).getPort() + "/conf";
+
+      for (String accept : new String[] {null, "application/json"}) {
+        String what = accept == null ? "xml (no Accept header)" : accept;
+        HttpURLConnection conn = connectTo(confUrl, accept);
+        assertEquals(HttpURLConnection.HTTP_OK, conn.getResponseCode(),
+            "/conf must be reachable on a running server: " + what);
+        assertNotNull(conn.getHeaderField("X-FRAME-OPTIONS"),
+            "configureXFrame(true) must set the header on /conf responses");
+        String body = readBody(conn);
+        assertTrue(body.contains(knownKey) && body.contains(knownValue),
+            "/conf must report a configured key: " + what);
+        assertTrue(body.contains(secretKey),
+            "/conf must still list the sensitive key: " + what);
+        assertFalse(body.contains(secretValue),
+            "/conf must not expose the sensitive value: " + what);
+      }
+    } finally {
+      server.stop();
+    }
+  }
+
+  private static HttpURLConnection connectTo(String url, String accept) throws IOException {
+    HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+    conn.setConnectTimeout(5000);
+    conn.setReadTimeout(5000);
+    if (accept != null) {
+      conn.setRequestProperty("Accept", accept);
+    }
+    return conn;
   }
 
   private static int statusOf(String url) throws IOException {

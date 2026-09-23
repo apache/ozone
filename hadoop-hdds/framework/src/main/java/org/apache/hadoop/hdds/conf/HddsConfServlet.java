@@ -106,7 +106,11 @@ public class HddsConfServlet extends HttpServlet {
             OzoneConfiguration.dumpConfiguration(getConfFromContext(), name, out);
             break;
           case XML:
-            getConfFromContext().writeXml(name, out);
+            // Pass the configuration as the redactor: the two-argument writeXml overload passes a
+            // null Configuration, which skips ConfigRedactor and emits sensitive values
+            // (hadoop.security.sensitive-config-keys) in clear text.
+            OzoneConfiguration xmlConf = getConfFromContext();
+            xmlConf.writeXml(name, out, xmlConf);
             break;
           default:
             throw new BadFormatException("Bad format: " + format);

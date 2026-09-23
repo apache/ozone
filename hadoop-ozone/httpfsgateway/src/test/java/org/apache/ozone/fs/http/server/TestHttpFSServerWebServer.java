@@ -129,6 +129,61 @@ public class TestHttpFSServerWebServer {
   }
 
   /**
+   * Impersonation ("doas") is decided inside the bridged javax filter: HttpFS's auth filter
+   * extends {@code DelegationTokenAuthenticationFilter}, which validates the proxy user, then
+   * wraps its javax request with the impersonated identity and forwards the wrapper. That wrapper
+   * is exactly what {@code JavaxFilterBridge}'s AuthenticatedRequest overlay has to carry into the
+   * jakarta chain, and a denial has to stop the jakarta chain from running at all.
+   *
+   * <p>Only the outcomes are asserted, not the effective user string: this server is backed by
+   * {@code file:///}, whose home and trash roots come from the JVM's own user rather than the
+   * request's, so no WebHDFS response here reports the impersonated name. The allowed case still
+   * proves the bridge carried the authenticated user (alice) as far as the proxy-user check --
+   * had the bridge dropped it, that check would see no authenticated user and refuse.
+   */
+  @Test
+  public void bridgedAuthFilterCarriesImpersonation(@TempDir Path baseDir)
+      throws Exception {
+    Map<String, String> saved = new HashMap<>();
+    // Only alice may impersonate; carol is deliberately left unconfigured.
+    String proxyUser =
+        "  <property>\n"
+        + "    <name>httpfs.proxyuser.alice.hosts</name>\n"
+        + "    <value>*</value>\n"
+        + "  </property>\n"
+        + "  <property>\n"
+        + "    <name>httpfs.proxyuser.alice.groups</name>\n"
+        + "    <value>*</value>\n"
+        + "  </property>\n";
+    HttpFSServerWebServer webServer =
+        configureWebServer(baseDir, false, saved, proxyUser);
+    try {
+      webServer.start();
+      String base = webServer.getUrl().toString() + "/v1/";
+
+      // Baseline: alice alone is admitted through the bridged filter.
+      assertEquals(HttpURLConnection.HTTP_OK,
+          statusOf(base + "?op=GETFILESTATUS&user.name=alice"));
+
+      // Permitted impersonation: the filter accepts alice->bob and forwards its wrapped request,
+      // which the bridge overlays onto the jakarta request so the operation still runs.
+      HttpURLConnection impersonated =
+          openConnection(base + "?op=GETFILESTATUS&user.name=alice&doas=bob");
+      assertEquals(HttpURLConnection.HTTP_OK, impersonated.getResponseCode());
+      assertTrue(readBody(impersonated).contains("FileStatus"),
+          "an allowed doas request must still reach the WebHDFS servlet");
+
+      // Denied impersonation: carol is not a configured proxy user, so the bridged filter
+      // short-circuits with 403 and the bridge must never continue the jakarta chain.
+      assertEquals(HttpURLConnection.HTTP_FORBIDDEN,
+          statusOf(base + "?op=GETFILESTATUS&user.name=carol&doas=bob"));
+    } finally {
+      webServer.stop();
+      restore(saved);
+    }
+  }
+
+  /**
    * Request-level counterpart to {@link #allowsAmbiguousUris} (which only checks
    * the connector's configured compliance): drives real WebHDFS requests through
    * the running HttpFS server. An empty path segment ("//", the WebHDFS analogue
@@ -193,6 +248,12 @@ public class TestHttpFSServerWebServer {
    */
   private static HttpFSServerWebServer configureWebServer(Path baseDir,
       boolean anonymousAllowed, Map<String, String> saved) throws Exception {
+    return configureWebServer(baseDir, anonymousAllowed, saved, "");
+  }
+
+  private static HttpFSServerWebServer configureWebServer(Path baseDir,
+      boolean anonymousAllowed, Map<String, String> saved, String extraProperties)
+      throws Exception {
     Path confDir = Files.createDirectories(baseDir.resolve("conf"));
     Path secretFile = confDir.resolve("httpfs-signature.secret");
     Files.write(secretFile,
@@ -208,6 +269,7 @@ public class TestHttpFSServerWebServer {
         + "    <name>hadoop.http.authentication.signature.secret.file</name>\n"
         + "    <value>" + secretFile + "</value>\n"
         + "  </property>\n"
+        + extraProperties
         + "</configuration>\n").getBytes(StandardCharsets.UTF_8));
 
     setProperty(saved, "httpfs.home.dir", baseDir.toString());

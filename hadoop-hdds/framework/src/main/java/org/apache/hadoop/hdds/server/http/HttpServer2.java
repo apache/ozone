@@ -856,11 +856,16 @@ public final class HttpServer2 implements FilterContainer {
       // the "/static" skip-if-absent guard below.
       Path logPath = Paths.get(logDir);
       boolean logDirReady = true;
-      try {
-        Files.createDirectories(logPath);
-      } catch (IOException e) {
-        LOG.warn("Log directory {} is not available; /logs will not be served.", logDir, e);
-        logDirReady = false;
+      // Create only when absent. Files.isDirectory follows symlinks, so a log directory that is a
+      // symlink to a directory is left alone: before JDK 20 (JDK-8294193) createDirectories throws
+      // FileAlreadyExistsException for such a link, which would drop "/logs" on a JDK 17 runtime.
+      if (!Files.isDirectory(logPath)) {
+        try {
+          Files.createDirectories(logPath);
+        } catch (IOException e) {
+          LOG.warn("Log directory {} is not available; /logs will not be served.", logDir, e);
+          logDirReady = false;
+        }
       }
       if (logDirReady && Files.isDirectory(logPath)) {
         ServletContextHandler logContext = new ServletContextHandler("/logs");

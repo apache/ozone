@@ -44,6 +44,14 @@ curl -X PUT --negotiate -u : https://localhost:9879/secret
 
 这条命令会与 Ozone 进行通信，对用户进行 Kerberos 认证并生成 AWS 凭据，结果会直接打印在屏幕上，你可以将其配置在 _.aws._ 文件中，这样可以在操作 Ozone S3 桶时自动进行认证。
 
+如果该用户的 secret 已存在，该端点会返回 HTTP `400 Bad Request`，并在纯文本响应体中给出错误码 `S3_SECRET_ALREADY_EXISTS`。错误码位于响应体中，而不在 HTTP 状态行（reason phrase）中，因此客户端必须读取响应体，不能再解析状态行中的消息：
+
+```bash
+curl -X PUT --negotiate -u : -v https://localhost:9879/secret
+# < HTTP/1.1 400 Bad Request
+# S3_SECRET_ALREADY_EXISTS
+```
+
 <div class="alert alert-danger" role="alert">
 请注意：这些 S3 凭据和你的 Kerberos 密码一样，具有你所有桶的完全访问权限。 
 </div>

@@ -2048,17 +2048,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         stsTokenCleanupInterval, TimeUnit.MILLISECONDS, stsTokenCleanupTimeout, this);
     revokedSTSTokenCleanupService.start();
 
-    try {
-      httpServer = new OzoneManagerHttpServer(configuration, this);
-      httpServer.start();
-    } catch (HttpServerConfigurationException ex) {
-      // A filter/HTTP misconfiguration will never succeed on retry; fail fast
-      // instead of silently starting OM without a web server.
-      throw ex;
-    } catch (Exception ex) {
-      // Allow OM to start as Http Server failure is not fatal.
-      LOG.error("OM HttpServer failed to start.", ex);
-    }
+    startHttpServer();
 
     omRpcServer.start();
     isOmRpcServerRunning = true;
@@ -2079,6 +2069,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omState = State.RUNNING;
     auditMap.put("NewOmState", omState.name());
     SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.STARTUP, auditMap));
+  }
+
+  /**
+   * Starts the OM web server, shared by {@link #start()} and {@link #restart()}.
+   *
+   * @throws HttpServerConfigurationException if the HTTP server is misconfigured. Such a failure
+   *     will never succeed on retry, so it aborts start-up rather than silently leaving OM without
+   *     a web server. Every other start-up failure is logged and tolerated.
+   */
+  private void startHttpServer() {
+    try {
+      httpServer = new OzoneManagerHttpServer(configuration, this);
+      httpServer.start();
+    } catch (HttpServerConfigurationException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      // Allow OM to start as Http Server failure is not fatal.
+      LOG.error("OM HttpServer failed to start.", ex);
+    }
   }
 
   /**
@@ -2138,17 +2147,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isOmGrpcServerEnabled) {
       omS3gGrpcServer = getOmS3gGrpcServer(configuration);
     }
-    try {
-      httpServer = new OzoneManagerHttpServer(configuration, this);
-      httpServer.start();
-    } catch (HttpServerConfigurationException ex) {
-      // A filter/HTTP misconfiguration will never succeed on retry; fail fast
-      // instead of silently starting OM without a web server.
-      throw ex;
-    } catch (Exception ex) {
-      // Allow OM to start as Http Server failure is not fatal.
-      LOG.error("OM HttpServer failed to start.", ex);
-    }
+    startHttpServer();
     omRpcServer.start();
     isOmRpcServerRunning = true;
 

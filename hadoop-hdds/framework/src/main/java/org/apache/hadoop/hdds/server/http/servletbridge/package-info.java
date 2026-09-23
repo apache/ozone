@@ -20,5 +20,10 @@
  * hadoop's {@code javax.servlet}-based authentication filters run inside
  * Ozone's Jetty EE10 (jakarta) HTTP server. See
  * {@link org.apache.hadoop.hdds.server.http.servletbridge.JavaxFilterBridge}.
+ *
+ * <p>"Minimal" describes the bridging, not the set of supported callers:
+ * {@code DBCheckpointServlet} also wraps its request in
+ * {@link org.apache.hadoop.hdds.server.http.servletbridge.JakartaToJavaxRequest} to feed
+ * commons-fileupload 1.x, so that class carries constraints beyond the authentication filters.
  */
 package org.apache.hadoop.hdds.server.http.servletbridge;

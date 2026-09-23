@@ -71,6 +71,11 @@ class TestJavaxFilterBridge {
               public String getAuthType() {
                 return "KERBEROS";
               }
+
+              @Override
+              public boolean isUserInRole(String role) {
+                return "admin".equals(role);
+              }
             };
         chain.doFilter(wrapped, resp);
       }
@@ -85,6 +90,11 @@ class TestJavaxFilterBridge {
     assertEquals("alice", seen.getRemoteUser(), "principal must be visible downstream");
     assertEquals("KERBEROS", seen.getAuthType());
     assertEquals("alice", seen.getUserPrincipal().getName());
+    // Roles are part of the authentication result a downstream authorization check reads, so the
+    // delegate's answer -- not the unauthenticated original request's -- must be the one visible.
+    assertTrue(seen.isUserInRole("admin"), "granted role must be visible downstream");
+    assertFalse(seen.isUserInRole("guest"),
+        "roles must come from the delegate, not be granted wholesale");
   }
 
   @Test

@@ -49,11 +49,18 @@ import org.slf4j.LoggerFactory;
  * {@code javax.servlet}-based authentication filters can read the request
  * inside a Jetty EE10 (jakarta) servlet chain. See {@link JavaxFilterBridge}.
  *
- * <p>The methods used by the hadoop-auth filter chain (headers, cookies,
- * method, URL/URI, remote address, attributes, scheme, body) delegate to the
- * wrapped jakarta request. Async, upgrade, multipart, session and dispatcher
- * operations are not part of that chain and throw
- * {@link UnsupportedOperationException}.
+ * <p>The hadoop-auth filters are not the only consumer: {@code DBCheckpointServlet} wraps its
+ * jakarta request in this class to hand it to commons-fileupload 1.x (javax), which parses the
+ * multipart body itself out of {@code getContentType()} and {@code getInputStream()}. The OM/SCM
+ * checkpoint path -- follower bootstrap and Recon snapshot download -- therefore depends on the
+ * header and body methods here, and would break at runtime with no compile-time signal if this
+ * class were narrowed to only what the authentication filters happen to call.
+ *
+ * <p>The methods those callers use (headers, cookies, method, URL/URI, remote address, attributes,
+ * scheme, body) delegate to the wrapped jakarta request. Async, upgrade, session and dispatcher
+ * operations throw {@link UnsupportedOperationException}, as do the Servlet-API multipart
+ * accessors {@code getPart}/{@code getParts} -- which does not prevent multipart <em>parsing</em>,
+ * since commons-fileupload reads the raw input stream rather than calling those accessors.
  */
 public class JakartaToJavaxRequest implements HttpServletRequest {
 

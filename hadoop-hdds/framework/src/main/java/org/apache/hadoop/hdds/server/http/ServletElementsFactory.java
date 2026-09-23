@@ -39,8 +39,16 @@ public final class ServletElementsFactory {
    * into the Jetty EE10 (jakarta) chain. This is the single source of truth for
    * the operator-visible bridgeable set: both {@link #isBridgeableJavaxFilter}
    * and the startup error message are derived from it, so they cannot drift.
-   * Keep the ozone.http.filter.initializers documentation in ozone-default.xml
-   * aligned with these simple names.
+   *
+   * <p>These simple names are also spelled out by hand in four places that no test checks, so
+   * changing this list means updating every one of them:
+   * <ul>
+   *   <li>the {@code ozone.http.filter.initializers} description in {@code ozone-default.xml}</li>
+   *   <li>{@code docs/content/security/SecuringOzoneHTTP.md}, "Filter initializer
+   *       compatibility"</li>
+   *   <li>{@code docs/content/security/SecuringOzoneHTTP.zh.md}, the same section</li>
+   *   <li>the class javadoc of {@code JavaxFilterBridge}</li>
+   * </ul>
    */
   private static final List<Class<?>> BRIDGEABLE_JAVAX_FILTERS = Arrays.asList(
       AuthenticationFilter.class,

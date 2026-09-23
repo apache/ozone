@@ -203,6 +203,57 @@ public class TestHddsConfServlet {
     }
   }
 
+  /**
+   * "/conf" must not expose values of keys matching hadoop.security.sensitive-config-keys
+   * ("password$" among them) in any format. The XML branch used
+   * {@code Configuration.writeXml(name, out)}, whose two-argument overload passes a null
+   * Configuration and so skips ConfigRedactor entirely, emitting secrets in clear text.
+   *
+   * <p>Asserts the absence of the value rather than the presence of a redaction marker, so the
+   * test pins the security property and not Hadoop's wording, and asserts the key is still listed
+   * so a dump that simply omitted the property could not pass.
+   */
+  @Test
+  public void testSensitiveValuesAreRedactedInAllFormats() throws Exception {
+    final String secretKey = "test.ssl.keystore.password";
+    final String secretValue = "must-not-appear-in-conf-output";
+    OzoneConfiguration conf = getPropertiesConf();
+    conf.set(secretKey, secretValue);
+
+    for (String format : TEST_FORMATS.keySet()) {
+      String result = dumpAllProperties(conf, format);
+      assertThat(result)
+          .as("%s dump must still list the sensitive key", format)
+          .contains(secretKey);
+      assertThat(result)
+          .as("%s dump must not expose the sensitive value", format)
+          .doesNotContain(secretValue);
+    }
+  }
+
+  /** Drives the servlet for a full configuration dump and returns the response body. */
+  private String dumpAllProperties(OzoneConfiguration conf, String format) throws Exception {
+    HddsConfServlet service = new HddsConfServlet();
+    try (StringWriter sw = new StringWriter(); PrintWriter pw = new PrintWriter(sw)) {
+      ServletContext context = mock(ServletContext.class);
+      service.init(mock(ServletConfig.class));
+      when(context.getAttribute(HttpServer2.CONF_CONTEXT_ATTRIBUTE)).thenReturn(conf);
+      when(service.getServletContext()).thenReturn(context);
+
+      HttpServletRequest request = mock(HttpServletRequest.class);
+      when(request.getHeader(HttpHeaders.ACCEPT)).thenReturn(TEST_FORMATS.get(format));
+      when(request.getParameter("name")).thenReturn(null);
+
+      HttpServletResponse response = mock(HttpServletResponse.class);
+      when(response.getWriter()).thenReturn(pw);
+
+      service.doGet(request, response);
+      return sw.toString().trim();
+    } finally {
+      service.destroy();
+    }
+  }
+
   private void verifyGetProperty(OzoneConfiguration conf, String format,
       String propertyName) throws Exception {
     StringWriter sw = null;

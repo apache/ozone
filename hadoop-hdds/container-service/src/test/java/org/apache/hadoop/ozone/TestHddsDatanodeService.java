@@ -229,6 +229,12 @@ public class TestHddsDatanodeService {
     try {
       assertThrows(HttpServerConfigurationException.class, () -> service.start(conf));
     } finally {
+      // The DatanodeStateMachine -- volumes, RocksDB handles under the temp directory, executors --
+      // is constructed just before the web server that throws, so it has to be released here or it
+      // outlives the test in this fork while its temp directory is deleted underneath it. Unlike
+      // the tests above there is no join(): the state machine's daemon was never started.
+      service.stop();
+      service.close();
       DefaultMetricsSystem.shutdown();
     }
   }

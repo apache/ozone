@@ -77,16 +77,21 @@ that a misconfigured filter is never silently skipped. If your cluster sets
 
 ### Jetty 12 URI compliance
 
-The Jetty 12 connector accepts ambiguous but technically legal URI constructs that
-Jetty 9 rejected: empty path segments (e.g., `bucket//key`), ambiguous
-percent-encodings, encoded path separators, and suspicious path characters. These
-are needed for S3 and WebHDFS paths that contain unusual but valid characters.
+Jetty 12 answers `400 Bad Request` for ambiguous URI constructs that Jetty 9.4 accepted:
+empty path segments (e.g., `bucket//key`), ambiguous percent-encodings, encoded path
+separators, and suspicious path characters (a decoded backslash, `DEL`, or a C0 control
+byte).
 
-However, genuinely illegal URI characters that RFC 3986 forbids in unencoded form
-— such as `[`, `]`, `{`, `}`, and `|` — are still rejected with `400 Bad Request`.
-Conforming S3 and WebHDFS clients already percent-encode these characters.
-If your client sends them unencoded, it must be updated to percent-encode them
-before upgrading.
+Because S3 object keys and WebHDFS paths legitimately contain these sequences, the **S3
+Gateway REST endpoint** and **HttpFS** relax exactly those four checks, so they keep serving
+the URIs they served before the migration. Every other Ozone HTTP server — OM, SCM, Datanode,
+Recon, and the S3 Gateway's web-admin and STS endpoints — uses the Jetty 12 defaults and
+answers `400 Bad Request` for such URIs.
+
+Genuinely illegal URI characters that RFC 3986 forbids in unencoded form — such as `[`, `]`,
+`{`, `}`, and `|` — are rejected with `400 Bad Request` on every server, including the two
+that relax the ambiguity checks. Conforming S3 and WebHDFS clients already percent-encode
+these characters; a client that sends them unencoded must be updated before upgrading.
 
 ### Enable SPNEGO authentication for OM HTTP
 Property| Value
