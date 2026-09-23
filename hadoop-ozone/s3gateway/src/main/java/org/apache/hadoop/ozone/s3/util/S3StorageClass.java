@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_GLACIER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD_IA;
 
+import java.util.Locale;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.StoragePolicy;
 
@@ -65,7 +66,7 @@ public enum S3StorageClass {
       throw new IllegalArgumentException("Not supported s3StorageClass: null");
     }
     try {
-      return S3StorageClass.valueOf(s3StorageClass.toUpperCase());
+      return S3StorageClass.valueOf(s3StorageClass.toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
           "Not supported s3StorageClass: " + s3StorageClass);
