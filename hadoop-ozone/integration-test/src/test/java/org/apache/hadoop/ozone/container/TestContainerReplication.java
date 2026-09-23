@@ -25,9 +25,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.container.TestHelper.isContainerClosed;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.isContainerClosed;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.waitForContainerClose;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.waitForReplicaCount;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -62,9 +62,9 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -171,18 +171,18 @@ class TestContainerReplication {
   }
 
   private void createTestData(OzoneClient client) throws IOException {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
 
-    TestDataUtil.createKey(bucket, KEY,
+    DataTestUtil.createKey(bucket, KEY,
         RatisReplicationConfig.getInstance(THREE),
         "Hello".getBytes(UTF_8));
   }
 
   private byte[] createTestData(OzoneClient client, int size) throws IOException {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, VOLUME, BUCKET);
 
     byte[] b = RandomUtils.secure().randomBytes(size);
-    TestDataUtil.createKey(bucket, KEY,
+    DataTestUtil.createKey(bucket, KEY,
         new ECReplicationConfig("RS-3-2-1k"), b);
     return b;
   }
@@ -197,7 +197,7 @@ class TestContainerReplication {
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
     Assertions.assertNotNull(locations);
-    return locations.getLocationList().get(0);
+    return locations.createLocationList().get(0);
   }
 
   public void assertState(MiniOzoneCluster cluster, Map<Integer, DatanodeDetails> expectedReplicaMap)

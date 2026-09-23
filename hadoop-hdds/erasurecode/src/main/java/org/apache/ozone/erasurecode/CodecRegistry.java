@@ -51,7 +51,8 @@ public final class CodecRegistry {
     coderMap = new HashMap<>();
     coderNameMap = new HashMap<>();
     final ServiceLoader<RawErasureCoderFactory> coderFactories =
-        ServiceLoader.load(RawErasureCoderFactory.class);
+        ServiceLoader.load(RawErasureCoderFactory.class,
+            CodecRegistry.class.getClassLoader());
     updateCoders(coderFactories);
   }
 

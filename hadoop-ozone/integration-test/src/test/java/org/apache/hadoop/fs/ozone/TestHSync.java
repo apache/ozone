@@ -19,6 +19,8 @@ package org.apache.hadoop.fs.ozone;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
+import static org.apache.hadoop.ozone.DataTestUtil.cleanupDeletedTable;
+import static org.apache.hadoop.ozone.DataTestUtil.cleanupOpenKeyTable;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED;
@@ -26,8 +28,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
-import static org.apache.hadoop.ozone.TestDataUtil.cleanupDeletedTable;
-import static org.apache.hadoop.ozone.TestDataUtil.cleanupOpenKeyTable;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -93,11 +93,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -107,7 +107,7 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.keyvalue.impl.AbstractTestChunkManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -208,7 +208,7 @@ public class TestHSync {
     client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(client, layout);
+    bucket = DataTestUtil.createVolumeAndBucket(client, layout);
 
     openKeyCleanupService =
         (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
@@ -390,7 +390,7 @@ public class TestHSync {
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
-    HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo, cluster);
+    HddsDatanodeService dn = OzoneTestHelper.getDatanodeService(omKeyLocationInfo, cluster);
     chunkPath = dn.getDatanodeStateMachine()
         .getContainer().getContainerSet()
         .getContainer(omKeyLocationInfo.getContainerID()).
@@ -492,10 +492,17 @@ public class TestHSync {
         // Create key2 without hsync
         try (FSDataOutputStream os1 = fs.create(key2, true)) {
           os1.write(1);
+          // Wait for double buffer flush to avoid flakiness because RDB iterator bypasses table cache
+          cluster.getOzoneManager().awaitDoubleBufferFlush();
           // There should be 2 key in openFileTable
-          assertThat(2 == getOpenKeyInfo(BUCKET_LAYOUT).size());
-          // One key will be in fileTable as hsynced
-          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
+          assertThat(getOpenKeyInfo(BUCKET_LAYOUT))
+              .extracting(OmKeyInfo::getKeyName)
+              .contains(key1.getName(), key2.getName());
+          // key1 will be in fileTable as hsynced, but key2 will not.
+          assertThat(getKeyInfo(BUCKET_LAYOUT))
+              .extracting(OmKeyInfo::getKeyName)
+              .contains(key1.getName())
+              .doesNotContain(key2.getName());
 
           // Resume openKeyCleanupService
           openKeyCleanupService.resume();
@@ -503,8 +510,11 @@ public class TestHSync {
           // Key without hsync is deleted
           GenericTestUtils.waitFor(() ->
               getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
-          // Verify only one key is still present in fileTable
-          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
+          // Verify key1 remains in fileTable and key2 is absent.
+          assertThat(getKeyInfo(BUCKET_LAYOUT))
+              .extracting(OmKeyInfo::getKeyName)
+              .contains(key1.getName())
+              .doesNotContain(key2.getName());
 
           // Clean up
           assertTrue(fs.delete(key1, false));
@@ -578,8 +588,12 @@ public class TestHSync {
       try (FSDataOutputStream os = fs.create(key1, true)) {
         os.write(1);
         os.hsync();
+        // Wait for double buffer flush to avoid flakiness because RDB iterator bypasses table cache
+        cluster.getOzoneManager().awaitDoubleBufferFlush();
         // There should be 1 key in openFileTable
-        assertThat(1 == getOpenKeyInfo(BUCKET_LAYOUT).size());
+        assertThat(getOpenKeyInfo(BUCKET_LAYOUT))
+            .extracting(OmKeyInfo::getKeyName)
+            .contains("dir1/dir2/hsync-key");
         // Delete directory recursively
         fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
             bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);
@@ -1077,7 +1091,7 @@ public class TestHSync {
                 3, 2, ECReplicationConfig.EcCodec.RS, (int) OzoneConsts.MB)));
     BucketArgs omBucketArgs = builder.build();
     String ecBucket = UUID.randomUUID().toString();
-    TestDataUtil.createBucket(client, bucket.getVolumeName(), omBucketArgs,
+    DataTestUtil.createBucket(client, bucket.getVolumeName(), omBucketArgs,
         ecBucket);
     String ecUri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
@@ -1286,6 +1300,50 @@ public class TestHSync {
       }
     }
     bucket.deleteKey(keyName);
+  }
+
+  @Test
+  public void testUsedNamespaceWithRepeatedHsync() throws Exception {
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final Path file = new Path(dir, "file-hsync-used-namespace");
+
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    String bucketKey = metadataManager.getBucketKey(bucket.getVolumeName(), bucket.getName());
+    final long usedNamespace = metadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      try {
+        try (FSDataOutputStream out = fs.create(file, true)) {
+          // Each block triggers an hsync commit; only the first adds the key.
+          byte[] blockData = RandomStringUtils.secure().nextAlphabetic(BLOCK_SIZE)
+              .getBytes(UTF_8);
+          for (int i = 0; i < 4; i++) {
+            out.write(blockData);
+            out.hsync();
+          }
+        }
+        assertEquals(usedNamespace + 1,
+            metadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
+
+        assertTrue(fs.delete(file, false));
+        GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
+            metadataManager.getBucketTable().get(bucketKey).getUsedNamespace() == usedNamespace,
+            100, 30000);
+      } finally {
+        try {
+          fs.delete(file, false);
+          waitForEmptyDeletedTable();
+        } finally {
+          cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
+        }
+      }
+    }
   }
 
   @Test

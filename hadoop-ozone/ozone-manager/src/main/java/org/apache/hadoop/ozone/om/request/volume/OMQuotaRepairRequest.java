@@ -143,7 +143,14 @@ public class OMQuotaRepairRequest extends OMClientRequest {
 
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey), CacheValue.get(transactionLogIndex, bucketInfo));
-      bucketMap.put(Pair.of(bucketCountInfo.getVolName(), bucketCountInfo.getBucketName()), bucketInfo);
+
+      // Store an immutable snapshot in the response map so the double buffer
+      // serializes the repair result, not a value later mutated in place by a
+      // concurrent key commit that reads the same live cached OmBucketInfo.
+      // Every other mutating request copies its response bucket for the same
+      // reason (see OMKeyCommitRequest#validateAndUpdateCache).
+      bucketMap.put(Pair.of(bucketCountInfo.getVolName(), bucketCountInfo.getBucketName()),
+          bucketInfo.copyObject());
     } finally {
       if (acquiredBucketLock) {
         mergeOmLockDetails(omMetadataManager.getLock()

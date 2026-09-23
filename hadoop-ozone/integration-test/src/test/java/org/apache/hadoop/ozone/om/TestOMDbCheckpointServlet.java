@@ -105,9 +105,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
@@ -705,14 +705,14 @@ public class TestOMDbCheckpointServlet {
   private void prepSnapshotData() throws Exception {
     metaDir = OMStorage.getOmDbDir(conf);
 
-    OzoneBucket bucket = TestDataUtil
+    OzoneBucket bucket = DataTestUtil
         .createVolumeAndBucket(client);
 
     // Create dummy keys for snapshotting.
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
+    DataTestUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
             .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "content".getBytes(StandardCharsets.UTF_8));
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
+    DataTestUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
             .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "content".getBytes(StandardCharsets.UTF_8));
 

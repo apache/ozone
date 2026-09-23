@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.net;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.Objects;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.net.NetUtils;
 
 /**
@@ -30,14 +33,13 @@ public class HostAndPort {
   private final String hostAndPortString;
   private final int hash;
   /** The address can be updated from time to time. */
-  private final InetSocketAddress address;
+  private volatile InetSocketAddress address;
 
   public HostAndPort(String host, int port) {
     this.host = host;
     this.port = port;
-    this.hostAndPortString = host + ":" + port;
+    this.hostAndPortString = HddsUtils.getHostPortString(host, port);
     this.hash = host.hashCode() ^ Integer.hashCode(port);
-    // TODO: HDDS-15533 change the address resolution logic and make this.address threadsafe.
     this.address = NetUtils.createSocketAddr(hostAndPortString);
   }
 
@@ -55,6 +57,21 @@ public class HostAndPort {
 
   public InetSocketAddress getAddress() {
     return address;
+  }
+
+  /** Re-resolves host:port and returns the new address if its IP changed, else null. No mutation. */
+  public InetSocketAddress resolveLatest() {
+    final InetSocketAddress latest = NetUtils.createSocketAddr(hostAndPortString);
+    final InetAddress latestIp = latest.getAddress();
+    if (latestIp == null || latestIp.equals(address.getAddress())) {
+      return null;
+    }
+    return latest;
+  }
+
+  /** Commits an address re-resolved via {@link #resolveLatest()}. */
+  public void setAddress(InetSocketAddress newAddress) {
+    this.address = Objects.requireNonNull(newAddress, "newAddress == null");
   }
 
   @Override

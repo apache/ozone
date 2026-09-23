@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +94,26 @@ public interface Table<KEY, VALUE> {
   }
 
   /**
+   * Skip checking cache and get the values mapped to the given keys. The
+   * returned list has the same size and order as {@code keys}; a missing key
+   * is represented by a null value.
+   *
+   * @param keys metadata keys
+   * @return values in the same order as {@code keys}
+   */
+  default List<VALUE> multiGetSkipCache(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<VALUE> values = new ArrayList<>(keys.size());
+    for (KEY key : keys) {
+      values.add(getSkipCache(key));
+    }
+    return values;
+  }
+
+  /**
    * Returns the value mapped to the given key in byte array or returns null
    * if the key is not found.
    *
@@ -134,12 +156,34 @@ public interface Table<KEY, VALUE> {
   void deleteWithBatch(BatchOperation batch, KEY key) throws CodecException;
 
   /**
-   * Deletes a range of keys from the metadata store.
+   * Deletes a range of keys from this table.
    *
-   * @param beginKey start metadata key
-   * @param endKey end metadata key
+   * @param beginKey start key (inclusive)
+   * @param endKey end key (exclusive)
    */
   void deleteRange(KEY beginKey, KEY endKey) throws RocksDatabaseException, CodecException;
+
+  /**
+   * Deletes all entries from this table.
+   * Note: only entries in the underlying DB are deleted; the table cache
+   * (if any) is not affected. Callers must ensure the cache stays empty
+   * (or is separately invalidated) for the duration of this operation,
+   * e.g. by holding exclusive access to the table.
+   */
+  default void clear() throws RocksDatabaseException, CodecException {
+    final KEY beginKey;
+    final KEY endKey;
+    try (TableIterator<KEY, KEY> keyIterator = keyIterator()) {
+      if (!keyIterator.hasNext()) {
+        return;
+      }
+      beginKey = keyIterator.next();
+      keyIterator.seekToLast();
+      endKey = keyIterator.next();
+    }
+    deleteRange(beginKey, endKey);
+    delete(endKey);
+  }
 
   /** The same as iterator(null, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator() throws RocksDatabaseException, CodecException {

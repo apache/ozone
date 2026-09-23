@@ -367,14 +367,13 @@ Apache License 2.0
    io.prometheus:simpleclient
    io.prometheus:simpleclient_common
    io.prometheus:simpleclient_dropwizard
+   io.r2dbc:r2dbc-spi
    joda-time:joda-time
    jakarta.inject:jakarta.inject-api
    jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
    javax.inject:javax.inject
    log4j:apache-log4j-extras
-   net.java.dev.jna:jna
-   net.java.dev.jna:jna-platform
    org.apache.avro:avro
    org.apache.commons:commons-compress
    org.apache.commons:commons-configuration2
@@ -430,6 +429,7 @@ Apache License 2.0
    org.apache.parquet:parquet-variant
    org.apache.ranger:ranger-audit-core
    org.apache.ranger:ranger-authz-api
+   org.apache.ranger:ranger-common-utils
    org.apache.ranger:ranger-intg
    org.apache.ranger:ranger-plugin-classloader
    org.apache.ranger:ranger-plugin-common
@@ -484,12 +484,12 @@ MIT
    com.bettercloud:vault-java-driver
    com.github.jnr:jnr-x86asm
    com.knuddels:jtokkit
-   com.kstruct:gethostname4j
    org.bouncycastle:bcpkix-jdk18on
    org.bouncycastle:bcprov-jdk18on
    org.bouncycastle:bcutil-jdk18on
    org.codehaus.mojo:animal-sniffer-annotations
    org.slf4j:jcl-over-slf4j
+   org.slf4j:jul-to-slf4j
    org.slf4j:slf4j-api
    org.slf4j:slf4j-reload4j
 
@@ -498,6 +498,12 @@ Public Domain
 =====================
 
    aopalliance:aopalliance
+
+
+CC0
+=====================
+
+   org.reactivestreams:reactive-streams
 
 
 BSD 3-Clause

@@ -39,8 +39,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -388,7 +388,7 @@ public class TestOzoneManagerPrepare extends OzoneManagerHATests {
     String keyString = UUID.randomUUID().toString();
     byte[] data = ContainerTestHelper.getFixedLengthString(
         keyString, 100).getBytes(UTF_8);
-    TestDataUtil.createKey(store.getVolume(volumeName).
+    DataTestUtil.createKey(store.getVolume(volumeName).
         getBucket(bucketName), keyName, data);
   }
 

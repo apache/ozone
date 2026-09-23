@@ -49,7 +49,9 @@ public class EndpointStateMachine
   private final HostAndPort hostAndPort;
   private final Lock lock;
   private final ConfigurationSource conf;
-  private EndPointStates state = EndPointStates.FIRST;
+  // RunningDatanodeState reads this without the endpoint lock and must see late SHUTDOWN transitions,
+  // even after its wait for the endpoint task has timed out.
+  private volatile EndPointStates state = EndPointStates.FIRST;
   private VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
   private boolean isPassive;
@@ -152,10 +154,14 @@ public class EndpointStateMachine
    */
   @Override
   public void close() {
-    if (endPoint != null) {
-      endPoint.close();
+    try {
+      if (endPoint != null) {
+        endPoint.close();
+      }
+    } finally {
+      // Always release the executor thread, even if closing the RPC proxy throws.
+      executorService.shutdown();
     }
-    executorService.shutdown();
   }
 
   /**

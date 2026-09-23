@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.SpanKind;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.UncheckedIOException;
@@ -38,7 +39,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.LockSupport;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -71,6 +71,7 @@ import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientResponseObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
@@ -90,7 +91,7 @@ import org.slf4j.LoggerFactory;
  * how it works, and how it is integrated with the Ozone client.
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
-  private static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
+  public static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
   private static final int SHUTDOWN_WAIT_MAX_SECONDS = 5;
   private final Pipeline pipeline;
   private final ConfigurationSource config;
@@ -137,6 +138,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
     this.trustManager = trustManager;
     this.getBlockDNcache = new ConcurrentHashMap<>();
+    LOG.info("{} is created for pipeline {}", XceiverClientGrpc.class.getSimpleName(), pipeline);
   }
 
   /**
@@ -288,6 +290,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   @Override
+  public boolean isClosed() {
+    return isClosed.get();
+  }
+
+  @Override
   public Pipeline getPipeline() {
     return pipeline;
   }
@@ -406,7 +413,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     String spanName = "XceiverClientGrpc." + request.getCmdType().name();
 
-    return TracingUtil.executeInNewSpan(spanName,
+    return TracingUtil.executeInNewSpan(spanName, SpanKind.CLIENT,
         () -> {
           ContainerCommandRequestProto.Builder builder =
               ContainerCommandRequestProto.newBuilder(request)
@@ -566,16 +573,15 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           request.getReadBlock().getBlockID().getLocalID(),
           request.getReadBlock().getOffset(),
           request.getReadBlock().getLength());
-      final long deadlineNs = System.nanoTime() + streamReadTimeoutNanos;
-      while (!obs.isReady() && System.nanoTime() - deadlineNs < 0) {
-        LockSupport.parkNanos(10_000_000L);
-        if (Thread.currentThread().isInterrupted()) {
-          Thread.currentThread().interrupt();
-          throw new InterruptedIOException("Interrupted while waiting for stream to become ready: " + streamObserver);
+      try {
+        if (!streamObserver.awaitReady(streamReadTimeoutNanos)) {
+          throw new TimeoutIOException("Timed out waiting for stream to become ready: " + streamObserver);
         }
-      }
-      if (!obs.isReady()) {
-        throw new TimeoutIOException("Timed out waiting for stream to become ready: " + streamObserver);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw (IOException) new InterruptedIOException(
+            "Interrupted while waiting for stream to become ready: " + streamObserver)
+            .initCause(e);
       }
     }
 
@@ -612,11 +618,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
         }
         LOG.debug("initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
-        StreamObserver<ContainerCommandRequestProto> requestObserver = stub
-            .withDeadlineAfter(timeout, TimeUnit.SECONDS)
-            .send(streamObserver);
-        streamObserver.setStreamingReadResponse(new StreamingReadResponse(dn,
-            (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver));
+        stub.withDeadlineAfter(timeout, TimeUnit.SECONDS)
+            .send(new ReadyAwareResponseObserver(dn, streamObserver));
         return;
       } catch (IOException e) {
         LOG.error("Failed to start streaming read to DataNode {}", dn, e);
@@ -631,6 +634,48 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throw lastException;
     } else {
       throw new IOException("Failed to start streaming read to any available DataNodes");
+    }
+  }
+
+  /**
+   * Registers the request stream's {@code onReadyHandler} in {@code beforeStart}, the only point gRPC allows it,
+   * hands the {@link StreamingReadResponse} to the reader from there, and tells it when the call terminates so a
+   * sender blocked in {@link StreamingReadResponse#awaitReady(long)} fails right away.
+   */
+  @VisibleForTesting
+  static final class ReadyAwareResponseObserver
+      implements ClientResponseObserver<ContainerCommandRequestProto, ContainerCommandResponseProto> {
+    private final DatanodeDetails dn;
+    private final StreamingReaderSpi reader;
+    private StreamingReadResponse response;
+
+    ReadyAwareResponseObserver(DatanodeDetails dn, StreamingReaderSpi reader) {
+      this.dn = dn;
+      this.reader = reader;
+    }
+
+    @Override
+    public void beforeStart(ClientCallStreamObserver<ContainerCommandRequestProto> requestStream) {
+      response = new StreamingReadResponse(dn, requestStream);
+      requestStream.setOnReadyHandler(response::signalReady);
+      reader.setStreamingReadResponse(response);
+    }
+
+    @Override
+    public void onNext(ContainerCommandResponseProto value) {
+      reader.onNext(value);
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      response.signalTerminated(t);
+      reader.onError(t);
+    }
+
+    @Override
+    public void onCompleted() {
+      response.signalTerminated(null);
+      reader.onCompleted();
     }
   }
 
@@ -674,7 +719,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throws IOException, ExecutionException, InterruptedException {
 
     try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(
-        "XceiverClientGrpc." + request.getCmdType().name())) {
+        "XceiverClientGrpc." + request.getCmdType().name(), SpanKind.CLIENT)) {
 
       ContainerCommandRequestProto.Builder builder =
           ContainerCommandRequestProto.newBuilder(request)

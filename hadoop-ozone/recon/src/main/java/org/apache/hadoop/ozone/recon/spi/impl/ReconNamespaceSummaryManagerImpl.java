@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.NAMESPACE_SUMMARY;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 
 import java.io.IOException;
 import javax.inject.Inject;
@@ -27,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.metrics.NSSummaryMetrics;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 
@@ -39,23 +39,28 @@ public class ReconNamespaceSummaryManagerImpl
   private Table<Long, NSSummary> nsSummaryTable;
   private DBStore namespaceDbStore;
   private NSSummaryTask nsSummaryTask;
+  private final NSSummaryMetrics nsSummaryMetrics;
 
   @Inject
-  public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider, NSSummaryTask nsSummaryTask)
-          throws IOException {
-    this(reconDBProvider.getDbStore(), nsSummaryTask);
+  public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider,
+      NSSummaryTask nsSummaryTask, NSSummaryMetrics nsSummaryMetrics)
+      throws IOException {
+    this(reconDBProvider.getDbStore(), nsSummaryTask, nsSummaryMetrics);
   }
 
-  private ReconNamespaceSummaryManagerImpl(DBStore dbStore, NSSummaryTask nsSummaryTask)
+  private ReconNamespaceSummaryManagerImpl(DBStore dbStore,
+      NSSummaryTask nsSummaryTask, NSSummaryMetrics nsSummaryMetrics)
       throws IOException {
     namespaceDbStore = dbStore;
     this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
     this.nsSummaryTask = nsSummaryTask;
+    this.nsSummaryMetrics = nsSummaryMetrics;
   }
 
   @Override
   public ReconNamespaceSummaryManager getStagedNsSummaryManager(DBStore dbStore) throws IOException {
-    return new ReconNamespaceSummaryManagerImpl(dbStore, nsSummaryTask);
+    return new ReconNamespaceSummaryManagerImpl(
+        dbStore, nsSummaryTask, nsSummaryMetrics);
   }
 
   @Override
@@ -66,7 +71,7 @@ public class ReconNamespaceSummaryManagerImpl
 
   @Override
   public void clearNSSummaryTable() throws IOException {
-    truncateTable(nsSummaryTable);
+    nsSummaryTable.clear();
   }
 
   @Override
@@ -96,6 +101,11 @@ public class ReconNamespaceSummaryManagerImpl
   @Override
   public NSSummary getNSSummary(long objectId) throws IOException {
     return nsSummaryTable.get(objectId);
+  }
+
+  @Override
+  public void recordNSSummaryInvalidTreeDetection() {
+    nsSummaryMetrics.recordInvalidTreeDetection();
   }
 
   @Override

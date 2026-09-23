@@ -92,7 +92,6 @@ import java.util.regex.Pattern;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -1268,9 +1267,8 @@ final class TestSecureOzoneCluster {
 
   private static void addIpAndDnsDataToBuilder(
       CertificateSignRequest.Builder csrBuilder) throws IOException {
-    DomainValidator validator = DomainValidator.getInstance();
     // Add all valid ips.
     List<InetAddress> inetAddresses = getValidInetsForCurrentHost();
-    csrBuilder.addInetAddresses(inetAddresses, validator);
+    csrBuilder.addInetAddresses(inetAddresses);
   }
 }

@@ -42,6 +42,7 @@ import { otherUsedSpaceDesc, totalCapacityDesc } from '@/v2/pages/capacity/const
 
 import './overview.less';
 import { Link } from 'react-router-dom';
+import { DEFAULT_CLUSTER_STATE } from "@/v2/constants/overview.constants";
 
 // ------------- Helper Functions -------------- //
 const size = filesize.partial({ round: 1 });
@@ -172,7 +173,7 @@ const Overview: React.FC<{}> = () => {
     openContainers,
     omServiceId,
     scmServiceId
-  } = clusterState.data;
+  } = clusterState.data ?? DEFAULT_CLUSTER_STATE;
   const {
     totalReplicatedDataSize: openSummarytotalRepSize,
     totalUnreplicatedDataSize: openSummarytotalUnrepSize,

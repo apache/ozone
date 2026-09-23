@@ -183,16 +183,30 @@ public class ReplicationServer {
     static final String REPLICATION_OUTOFSERVICE_FACTOR_KEY =
         PREFIX + "." + OUTOFSERVICE_FACTOR_KEY;
 
+    public static final String PER_VOLUME_ENABLED_KEY =
+        PREFIX + ".per.volume.enabled";
+    public static final String PER_VOLUME_STREAMS_LIMIT_KEY =
+        PREFIX + ".per.volume.streams.limit";
+    public static final int PER_VOLUME_STREAMS_LIMIT_DEFAULT = 2;
+
     /**
-     * The maximum number of replication commands a single datanode can execute
-     * simultaneously.
+     * Base size of the global replication handler executor and inbound
+     * replication server executor.
      */
     @Config(key = "hdds.datanode.replication.streams.limit",
         type = ConfigType.INT,
         defaultValue = "10",
         tags = {DATANODE},
-        description = "The maximum number of replication commands a single " +
-            "datanode can execute simultaneously"
+        description = "Sets both the base size of the global replication "
+            + "handler executor and the inbound replication server executor. "
+            + "The global executor is subject to outofservice.limit.factor "
+            + "scaling. When "
+            + "hdds.datanode.replication.per.volume.enabled is false (default), "
+            + "all source-side replication tasks use the global executor. "
+            + "When per.volume.enabled is true, per-volume executors handle "
+            + "normal source-side push tasks, while this limit still applies "
+            + "to non-push and fallback source tasks and target-side inbound "
+            + "push requests."
     )
     private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
 
@@ -223,6 +237,34 @@ public class ReplicationServer {
             "executor pool size."
     )
     private double outOfServiceFactor = OUTOFSERVICE_FACTOR_DEFAULT;
+
+    @Config(key = PER_VOLUME_ENABLED_KEY,
+        type = ConfigType.BOOLEAN,
+        defaultValue = "false",
+        tags = {DATANODE},
+        description = "When true, push-based container replication uses a " +
+            "separate replication handler thread pool per data volume so " +
+            "that slow replication on one disk does not block replication " +
+            "on other disks. Pull replication and other replication tasks " +
+            "continue to use the global replication handler thread pool."
+    )
+    private boolean perVolumeEnabled = false;
+
+    @Config(key = PER_VOLUME_STREAMS_LIMIT_KEY,
+        type = ConfigType.INT,
+        defaultValue = "2",
+        reconfigurable = true,
+        tags = {DATANODE},
+        description = "When hdds.datanode.replication.per.volume.enabled is "
+            + "true, maximum concurrent push replication commands per data "
+            + "volume (each volume has its own handler thread pool; effective "
+            + "push parallelism on the datanode is roughly the number of "
+            + "volumes times this limit, with outofservice.limit.factor "
+            + "applied per pool on decommissioning or maintenance nodes). "
+            + "Push replication is usually disk-bound, so one or two "
+            + "concurrent transfers per volume often saturates the disk."
+    )
+    private int perVolumeStreamsLimit = PER_VOLUME_STREAMS_LIMIT_DEFAULT;
 
     public double getOutOfServiceFactor() {
       return outOfServiceFactor;
@@ -257,6 +299,22 @@ public class ReplicationServer {
       this.replicationQueueLimit = limit;
     }
 
+    public boolean isPerVolumeEnabled() {
+      return perVolumeEnabled;
+    }
+
+    public void setPerVolumeEnabled(boolean enabled) {
+      this.perVolumeEnabled = enabled;
+    }
+
+    public int getPerVolumeStreamsLimit() {
+      return perVolumeStreamsLimit;
+    }
+
+    public void setPerVolumeStreamsLimit(int limit) {
+      this.perVolumeStreamsLimit = limit;
+    }
+
     @PostConstruct
     public void validate() {
       if (replicationMaxStreams < 1) {
@@ -278,6 +336,13 @@ public class ReplicationServer {
             outOfServiceFactor,
             clamped);
         outOfServiceFactor = clamped;
+      }
+
+      if (perVolumeStreamsLimit < 1) {
+        LOG.warn(PER_VOLUME_STREAMS_LIMIT_KEY + " must be greater than zero " +
+                "and was set to {}. Defaulting to {}",
+            perVolumeStreamsLimit, PER_VOLUME_STREAMS_LIMIT_DEFAULT);
+        perVolumeStreamsLimit = PER_VOLUME_STREAMS_LIMIT_DEFAULT;
       }
     }
 

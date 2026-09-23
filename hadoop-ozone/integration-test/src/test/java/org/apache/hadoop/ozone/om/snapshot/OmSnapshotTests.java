@@ -65,6 +65,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.google.common.collect.Lists;
@@ -116,10 +117,10 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -147,6 +148,7 @@ import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
@@ -263,7 +265,7 @@ public abstract class OmSnapshotTests {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBucket);
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBucket);
     if (createLinkedBucket) {
       this.linkedBuckets.put(ozoneBucket.getName(), ozoneBucket.getSourceBucket());
     }
@@ -284,7 +286,7 @@ public abstract class OmSnapshotTests {
     if (createLinkedBucket) {
       String sourceBucketName = linkedBuckets.computeIfAbsent(bucketVal, (k) -> bucketVal + counter.incrementAndGet());
       volume.createBucket(sourceBucketName);
-      TestDataUtil.createLinkedBucket(client, volume.getName(), sourceBucketName, bucketVal);
+      DataTestUtil.createLinkedBucket(client, volume.getName(), sourceBucketName, bucketVal);
       this.linkedBuckets.put(bucketVal, sourceBucketName);
     } else {
       volume.createBucket(bucketVal);
@@ -526,9 +528,35 @@ public abstract class OmSnapshotTests {
     KeyInfoWithVolumeContext fileInfo = writeClient.getKeyInfo(keyArgs, false);
     assertEquals(fileInfo.getKeyInfo().getKeyName(), snapshotKeyPrefix + key1);
 
+    assumeFalse(bucketLayout.equals(BucketLayout.OBJECT_STORE));
     OzoneFileStatus ozoneFileStatus = writeClient.getFileStatus(keyArgs);
     assertEquals(ozoneFileStatus.getKeyInfo().getKeyName(),
         snapshotKeyPrefix + key1);
+  }
+
+  @Test
+  public void testSnapshotListStatusLightReturnsDenormalizedKeyName()
+      throws Exception {
+    String key = "light-list/" + "key-" + counter.incrementAndGet();
+    createFileKey(ozoneBucket, key);
+
+    String snapshotName = "snap-light-" + counter.incrementAndGet();
+    String snapshotKeyPrefix = createSnapshot(volumeName, bucketName,
+        snapshotName);
+    String snapshotKey = snapshotKeyPrefix + key;
+
+    OmKeyArgs keyArgs = genKeyArgs(snapshotKey);
+
+    List<OzoneFileStatus> fullStatuses =
+        writeClient.listStatus(keyArgs, false, "", 1, false);
+    List<OzoneFileStatusLight> lightStatuses =
+        writeClient.listStatusLight(keyArgs, false, "", 1, false);
+
+    assertEquals(1, fullStatuses.size());
+    assertEquals(1, lightStatuses.size());
+
+    assertEquals(snapshotKey, fullStatuses.get(0).getKeyInfo().getKeyName());
+    assertEquals(snapshotKey, lightStatuses.get(0).getKeyInfo().getKeyName());
   }
 
   @Test
