@@ -46,6 +46,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
+import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -188,6 +189,55 @@ public class TestUploadWithStream {
 
     final long newDataSize = bucket.getKey(S3KEY).getDataSize();
     assertEquals(dataSize, newDataSize);
+  }
+
+  @Test
+  public void testUploadWithCopyReusesSourceETag() throws Exception {
+    // A deliberately fake plain (non-multipart) ETag: if the copy re-hashed the
+    // content, the destination would get the real MD5 instead of this value
+    String sourceETag = "00000000000000000000000000000000";
+    createCopySourceKey(sourceETag);
+    setCopyHeaders();
+
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, null));
+
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    assertEquals(sourceETag, bucket.getKey(S3KEY).getMetadata().get(OzoneConsts.ETAG));
+  }
+
+  @Test
+  public void testUploadWithCopyRecomputesETagForMultipartSource() throws Exception {
+    // An aggregate "-N" ETag of an MPU-created source is not a content MD5, so
+    // the copy computes a fresh digest for the destination
+    createCopySourceKey("9b2cf535f27731c974343645a3985328-2");
+    setCopyHeaders();
+
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, null));
+
+    String expectedETag = DatatypeConverter.printHexBinary(
+        MessageDigest.getInstance("MD5").digest(S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8))).toLowerCase();
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    assertEquals(expectedETag, bucket.getKey(S3KEY).getMetadata().get(OzoneConsts.ETAG));
+  }
+
+  private void createCopySourceKey(String eTag) throws IOException {
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    byte[] keyContent = S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8);
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put(OzoneConsts.ETAG, eTag);
+    try (OutputStream stream = bucket
+        .createStreamKey(S3_COPY_EXISTING_KEY, keyContent.length,
+            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                ReplicationFactor.THREE), metadata)) {
+      stream.write(keyContent);
+    }
+  }
+
+  private void setCopyHeaders() {
+    HttpHeaders copyHeaders = mock(HttpHeaders.class);
+    when(copyHeaders.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
+    when(copyHeaders.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(S3BUCKET + "/" + S3_COPY_EXISTING_KEY);
+    rest.setHeaders(copyHeaders);
   }
 
   private OzoneBucket configureSignedChunks(int decodedLength) throws IOException {

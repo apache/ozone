@@ -3,7 +3,7 @@ title: AWS STS Design for Ozone S3
 summary: STS Support in Ozone
 date: 2025-10-30
 jira: HDDS-13323
-status: implementing
+status: implemented
 author: Madhan Neethiraj, Ren Koike, Fabian Morgan, Stephen O'Donnell, Istvan Fajth, Uma Maheswara Rao Gangumalla
 ---
 <!--
@@ -247,8 +247,9 @@ originalAccessKeyId in the session token and perform the following checks:
   - Ensure the sessionToken is not expired
   - Ensure the STS credentials are not revoked by looking up the revocation cutoff for the token's originalAccessKeyId
     and comparing it against the token's signed creationTime
+  - Ensure that the Kerberos identity associated with the originalAccessKeyId is not revoked
   - Validate the HMAC-SHA256 signature in the sessionToken
   - Decrypt the secretAccessKey from the sessionToken and validate the AWS signature
-  - Authorize the call with either RangerOzoneAuthorizer or OzoneNativeAuthorizer
+  - Authorize the call with RangerOzoneAuthorizer
 
 Assuming all these checks pass, the S3 API call will be invoked.

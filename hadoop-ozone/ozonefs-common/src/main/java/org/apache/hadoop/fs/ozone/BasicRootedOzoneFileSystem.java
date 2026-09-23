@@ -38,6 +38,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.net.HostAndPort;
+import com.google.common.net.InetAddresses;
 import io.opentelemetry.api.trace.Span;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -132,7 +133,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       "URL should be one of the following formats: " +
       "ofs://om-service-id/path/to/key  OR " +
       "ofs://om-host.example.com/path/to/key  OR " +
-      "ofs://om-host.example.com:5678/path/to/key";
+      "ofs://om-host.example.com:5678/path/to/key  OR " +
+      "ofs://[2001:db8::10]:9862/path/to/key";
+
+  private static final String UNBRACKETED_IPV6_EXCEPTION_TEXT =
+      "IPv6 literals in OFS authorities must be enclosed in brackets, for example " +
+      "ofs://[2001:db8::10]/ or ofs://[2001:db8::10]:9862/";
 
   private static final int PATH_DEPTH_TO_BUCKET = 2;
   private OzoneConfiguration ozoneConfiguration;
@@ -156,6 +162,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (authority == null) {
       // authority is null when fs.defaultFS is not a qualified ofs URI and
       // ofs:/// is passed to the client. matcher will NPE if authority is null
+      throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
+    }
+
+    if (authority.indexOf(':') != authority.lastIndexOf(':') && !authority.startsWith("[")) {
+      if (InetAddresses.isInetAddress(authority)) {
+        throw new IllegalArgumentException(UNBRACKETED_IPV6_EXCEPTION_TEXT);
+      }
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
