@@ -140,8 +140,8 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
               "%-50s %s%n" +
               "%-50s %s%n", "Key", "Value",
           "Threshold", formatPercent(thresholdRatio),
-          "Upper limit", formatPercent(snapshot.getUpperLimit()),
-          "Lower limit", formatPercent(snapshot.getLowerLimit()),
+          "Upper utilization limit", formatPercent(snapshot.getUpperLimit()),
+          "Lower utilization limit", formatPercent(snapshot.getLowerLimit()),
           "Eligible datanodes", "0 datanodes");
     }
     return String.format("%-50s %s%n" +
@@ -153,8 +153,8 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
             "%-50s %s%n" +
             "%-50s %s%n", "Key", "Value",
         "Threshold", formatPercent(thresholdRatio),
-        "Upper limit", formatPercent(snapshot.getUpperLimit()),
-        "Lower limit", formatPercent(snapshot.getLowerLimit()),
+        "Upper utilization limit", formatPercent(snapshot.getUpperLimit()),
+        "Lower utilization limit", formatPercent(snapshot.getLowerLimit()),
         "Drift", String.format(Locale.US, "%s (max utilization %s - min utilization %s)",
             formatPercent(snapshot.getImbalance()),
             formatPercent(snapshot.getMaxUtilization()),
@@ -216,6 +216,10 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
     return String.format(Locale.US, "%.1f%%", ratio * 100);
   }
 
+  private static double toJsonPercent(double ratio) {
+    return Double.parseDouble(String.format(Locale.US, "%.2f", ratio * 100));
+  }
+
   private static String formatCategory(ContainerBalancerClusterSnapshot snapshot) {
     return formatClusterSize(snapshot.getTotalEligibleDatanodes()) + ", "
         + formatImbalance(snapshot.getImbalance()) + ", "
@@ -260,13 +264,13 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
       throws IOException {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("totalEligibleDatanodes", snapshot.getTotalEligibleDatanodes());
-    result.put("thresholdPercentage", formatPercent(thresholdRatio));
-    result.put("clusterAvgUtilizationPercentage", formatPercent(snapshot.getClusterAvgUtilization()));
-    result.put("driftPercentage", formatPercent(snapshot.getImbalance()));
-    result.put("maxUtilizationPercentage", formatPercent(snapshot.getMaxUtilization()));
-    result.put("minUtilizationPercentage", formatPercent(snapshot.getMinUtilization()));
-    result.put("upperLimitPercentage", formatPercent(snapshot.getUpperLimit()));
-    result.put("lowerLimitPercentage", formatPercent(snapshot.getLowerLimit()));
+    result.put("thresholdPercentage", toJsonPercent(thresholdRatio));
+    result.put("clusterAvgUtilizationPercentage", toJsonPercent(snapshot.getClusterAvgUtilization()));
+    result.put("driftPercentage", toJsonPercent(snapshot.getImbalance()));
+    result.put("maxUtilizationPercentage", toJsonPercent(snapshot.getMaxUtilization()));
+    result.put("minUtilizationPercentage", toJsonPercent(snapshot.getMinUtilization()));
+    result.put("upperLimitPercentage", toJsonPercent(snapshot.getUpperLimit()));
+    result.put("lowerLimitPercentage", toJsonPercent(snapshot.getLowerLimit()));
 
     Map<String, Object> sourceNodes = new LinkedHashMap<>();
     sourceNodes.put("count", snapshot.getSourceCount());
@@ -274,7 +278,7 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
         .map(node -> {
           Map<String, Object> nodeMap = new LinkedHashMap<>();
           nodeMap.put("hostname", node.getHostname());
-          nodeMap.put("utilizationPercentage", formatPercent(node.getUtilization()));
+          nodeMap.put("utilizationPercentage", toJsonPercent(node.getUtilization()));
           return nodeMap;
         })
         .collect(Collectors.toList()));
@@ -286,7 +290,7 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
         .map(node -> {
           Map<String, Object> nodeMap = new LinkedHashMap<>();
           nodeMap.put("hostname", node.getHostname());
-          nodeMap.put("utilizationPercentage", formatPercent(node.getUtilization()));
+          nodeMap.put("utilizationPercentage", toJsonPercent(node.getUtilization()));
           return nodeMap;
         })
         .collect(Collectors.toList()));
@@ -294,8 +298,8 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
 
     double movementRatio = snapshot.getClusterCapacityBytes() == 0 ? 0
         : (double) snapshot.getBytesToMove() / snapshot.getClusterCapacityBytes();
-    result.put("bytesToMove", byteDesc(snapshot.getBytesToMove()));
-    result.put("movementRatioPercentage", formatPercent(movementRatio));
+    result.put("bytesToMove", snapshot.getBytesToMove());
+    result.put("movementRatioPercentage", toJsonPercent(movementRatio));
 
     System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(result));
   }
