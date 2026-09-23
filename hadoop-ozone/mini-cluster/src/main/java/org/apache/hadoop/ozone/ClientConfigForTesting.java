@@ -93,6 +93,24 @@ public final class ClientConfigForTesting {
   }
 
   public void applyTo(MutableConfigurationSource conf) {
+    applyTo(conf, false);
+  }
+
+  public void applyTo(MutableConfigurationSource conf, boolean onlyIfUnset) {
+    calculateUndefinedValues();
+
+    final MutableConfigurationSource target =
+        onlyIfUnset ? MutableConfigurationSource.ifUnsetWrapper(conf) : conf;
+    target.setFromObject(getClientConfig(conf, onlyIfUnset));
+
+    if (onlyIfUnset) {
+      setIfUnset(conf);
+    } else {
+      set(conf);
+    }
+  }
+
+  private void calculateUndefinedValues() {
     if (streamBufferSize == null) {
       streamBufferSize = chunkSize;
     }
@@ -114,18 +132,38 @@ public final class ClientConfigForTesting {
     if (blockSize == null) {
       blockSize = 2 * streamBufferMaxSize;
     }
+  }
 
+  private OzoneClientConfig getClientConfig(MutableConfigurationSource conf, boolean onlyIfUnset) {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setStreamBufferSize(streamBufferSize);
-    clientConfig.setStreamBufferMaxSize(streamBufferMaxSize);
-    clientConfig.setStreamBufferFlushSize(streamBufferFlushSize);
-    clientConfig.setDataStreamBufferFlushSize(dataStreamBufferFlushSize);
-    clientConfig.setDataStreamMinPacketSize(dataStreamMinPacketSize);
-    clientConfig.setStreamWindowSize(dataStreamWindowSize);
+    // Preserve related sizes together so partial overrides do not invalidate the caller's configuration.
+    if (!onlyIfUnset || (!conf.isExplicitlySet("ozone.client.stream.buffer.size")
+        && !conf.isExplicitlySet("ozone.client.stream.buffer.flush.size")
+        && !conf.isExplicitlySet("ozone.client.stream.buffer.max.size")
+        && !conf.isExplicitlySet("ozone.client.stream.buffer.increment"))) {
+      clientConfig.setStreamBufferSize(streamBufferSize);
+      clientConfig.setStreamBufferMaxSize(streamBufferMaxSize);
+      clientConfig.setStreamBufferFlushSize(streamBufferFlushSize);
+    }
+    if (!onlyIfUnset || (!conf.isExplicitlySet("ozone.client.datastream.buffer.flush.size")
+        && !conf.isExplicitlySet("ozone.client.datastream.min.packet.size")
+        && !conf.isExplicitlySet("ozone.client.datastream.window.size"))) {
+      clientConfig.setDataStreamBufferFlushSize(dataStreamBufferFlushSize);
+      clientConfig.setDataStreamMinPacketSize(dataStreamMinPacketSize);
+      clientConfig.setStreamWindowSize(dataStreamWindowSize);
+    }
+    return clientConfig;
+  }
 
-    conf.setFromObject(clientConfig);
+  private void set(MutableConfigurationSource conf) {
     conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, chunkSize, StorageUnit.BYTES);
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, blockSize, StorageUnit.BYTES);
+  }
+
+  private void setIfUnset(MutableConfigurationSource conf) {
+    final String suffix = StorageUnit.BYTES.getShortName();
+    conf.setIfUnset(OZONE_SCM_CHUNK_SIZE_KEY, chunkSize + suffix);
+    conf.setIfUnset(OZONE_SCM_BLOCK_SIZE, blockSize + suffix);
   }
 
   private long toBytes(long value) {
