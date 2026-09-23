@@ -1947,21 +1947,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public S3HeadObjectAttributes headS3ObjectAttributes(String bucketName, String keyName)
       throws IOException {
-    verifyBucketName(bucketName);
-    Objects.requireNonNull(keyName, "keyName == null");
-
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setSortDatanodesInPipeline(topologyAwareReadEnabled)
-        .setLatestVersionLocation(getLatestVersionLocation)
-        .setForceUpdateContainerCacheFromSCM(false)
-        .setHeadOp(true)
-        .build();
     KeyInfoWithVolumeContext keyInfoWithS3Context =
-        ozoneManagerClient.getKeyInfo(keyArgs, true);
-    keyInfoWithS3Context.getUserPrincipal().ifPresent(this::updateS3Principal);
+        getS3KeyInfoWithVolumeContext(bucketName, keyName, true);
     OmKeyInfo keyInfo = keyInfoWithS3Context.getKeyInfo();
     OmKeyLocationInfoGroup locationGroup = keyInfo.getLatestVersionLocations();
     NavigableMap<Integer, Long> partSizes = Collections.emptyNavigableMap();
@@ -2002,6 +1989,12 @@ public class RpcClient implements ClientProtocol {
   @Nonnull
   private OmKeyInfo getS3KeyInfo(
       String bucketName, String keyName, boolean isHeadOp) throws IOException {
+    return getS3KeyInfoWithVolumeContext(bucketName, keyName, isHeadOp).getKeyInfo();
+  }
+
+  @Nonnull
+  private KeyInfoWithVolumeContext getS3KeyInfoWithVolumeContext(
+      String bucketName, String keyName, boolean isHeadOp) throws IOException {
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
 
@@ -2019,7 +2012,7 @@ public class RpcClient implements ClientProtocol {
     KeyInfoWithVolumeContext keyInfoWithS3Context =
         ozoneManagerClient.getKeyInfo(keyArgs, true);
     keyInfoWithS3Context.getUserPrincipal().ifPresent(this::updateS3Principal);
-    return keyInfoWithS3Context.getKeyInfo();
+    return keyInfoWithS3Context;
   }
 
   @Nonnull
