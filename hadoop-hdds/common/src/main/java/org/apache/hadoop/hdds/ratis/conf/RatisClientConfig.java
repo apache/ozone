@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.ratis.client.RaftClientConfigKeys;
+import org.apache.ratis.netty.NettyConfigKeys;
 
 /**
  * Configuration related to Ratis Client. This is the config used in creating
@@ -248,6 +249,30 @@ public class RatisClientConfig {
 
     public void setRpcWatchRequestTimeout(Duration duration) {
       rpcWatchRequestTimeout = duration;
+    }
+  }
+
+  /**
+   * Configurations of the Ratis netty data stream client, which will be set in RaftProperties.
+   */
+  @ConfigGroup(prefix = RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY + "." + NettyConfigKeys.DataStream.Client.PREFIX)
+  public static class DataStreamClientConfig {
+    @Config(key = "hdds.ratis.raft.netty.dataStream.client.worker-group.size",
+        defaultValue = "16",
+        type = ConfigType.INT,
+        tags = { OZONE, CLIENT, PERFORMANCE },
+        description = "Number of netty event loop threads of the Ratis data stream client. Netty gives each event "
+            + "loop its own pooled buffer arena, which keeps the memory of its peak, and a client that reads many "
+            + "closed containers opens a connection per container, spread over all event loops. The Ratis default, "
+            + "2 x CPUs, can then reserve many GiB of direct memory that is almost all free.")
+    private int workerGroupSize = 16;
+
+    public int getWorkerGroupSize() {
+      return workerGroupSize;
+    }
+
+    public void setWorkerGroupSize(int workerGroupSize) {
+      this.workerGroupSize = workerGroupSize;
     }
   }
 }
