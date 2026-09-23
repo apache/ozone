@@ -166,13 +166,14 @@ public class OzoneClientConfig {
   private boolean ratisStreamReadBlock = false;
 
   @Config(key = "ozone.client.ratis.stream.read.window-size",
-      defaultValue = "268435456",
+      defaultValue = "8388608",
       type = ConfigType.LONG,
       tags = {ConfigTag.CLIENT},
-      description = "Target request window for sequential ReadBlock requests "
-          + "over Ratis data stream. Larger windows reduce data stream setup "
-          + "overhead for large reads.")
-  private long ratisStreamReadWindowSize = 256L << 20;
+      description = "Maximum bytes a sequential read over Ratis data stream requests ahead of the reader, sent as "
+          + "two pipelined ReadBlock requests of half this size. A datanode sends the whole range of a request "
+          + "even if the reader stops or seeks, so this bounds both the bytes read in vain and the memory each "
+          + "open block stream buffers.")
+  private long ratisStreamReadWindowSize = 8L << 20;
 
   @Config(key = "ozone.client.max.retries",
       defaultValue = "5",

@@ -21,7 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,6 +35,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -74,8 +77,7 @@ import org.mockito.stubbing.Answer;
  */
 class TestRatisDataStreamBlockInputStream {
   private static final long ONE_GB = 1L << 30;
-  private static final long READ_WINDOW = 256L << 20;
-  private static final long PRE_READ = 32L << 20;
+  private static final long READ_AHEAD_REQUEST = 4L << 20;
   private static final byte[] DATA = {1, 2, 3, 4};
 
   private final BlockID blockID = new BlockID(1L, 1L);
@@ -85,23 +87,84 @@ class TestRatisDataStreamBlockInputStream {
   private final PipelineID pipelineID = PipelineID.randomId();
 
   @Test
-  void readLengthUsesLargeWindowOnlyAfterSequentialStream() {
+  void requestLengthReadsAheadOnlyWhenSequential() {
     final int smallRead = 4 << 10;
 
     assertEquals(smallRead,
-        RatisDataStreamBlockInputStream.computeReadLength(
-            ONE_GB, 0, smallRead, true, false, PRE_READ, READ_WINDOW));
-    assertEquals(READ_WINDOW,
-        RatisDataStreamBlockInputStream.computeReadLength(
-            ONE_GB, PRE_READ + smallRead, smallRead, true, true, PRE_READ,
-            READ_WINDOW));
-    assertEquals(smallRead,
-        RatisDataStreamBlockInputStream.computeReadLength(
-            ONE_GB, 0, smallRead, false, true, PRE_READ, READ_WINDOW));
+        RatisDataStreamBlockInputStream.requestLength(ONE_GB, 0, smallRead, false, READ_AHEAD_REQUEST));
+    assertEquals(READ_AHEAD_REQUEST,
+        RatisDataStreamBlockInputStream.requestLength(ONE_GB, smallRead, smallRead, true, READ_AHEAD_REQUEST));
+    assertEquals(2 * READ_AHEAD_REQUEST, RatisDataStreamBlockInputStream.requestLength(
+        ONE_GB, smallRead, (int) (2 * READ_AHEAD_REQUEST), true, READ_AHEAD_REQUEST));
     assertEquals(1024,
-        RatisDataStreamBlockInputStream.computeReadLength(
-            ONE_GB, ONE_GB - 1024, smallRead, true, true, PRE_READ,
-            READ_WINDOW));
+        RatisDataStreamBlockInputStream.requestLength(ONE_GB, ONE_GB - 1024, smallRead, true, READ_AHEAD_REQUEST));
+  }
+
+  /**
+   * A sequential reader keeps one read-ahead request of half the window in flight after the one it consumes, so it
+   * never has more than the window requested ahead, and the requests cover the block without overlap.
+   */
+  @Test
+  void sequentialReadPipelinesBoundedRequests() throws Exception {
+    final byte[] block = block(64);
+    final Streams streams = new Streams(block);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    final ByteBuffer out = ByteBuffer.allocate(block.length);
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 16)) {
+      final ByteBuffer chunk = ByteBuffer.allocate(4);
+      while (in.read(chunk) > 0) {
+        chunk.flip();
+        out.put(chunk);
+        chunk.clear();
+      }
+    }
+
+    assertArrayEquals(block, out.array());
+    assertEquals(Arrays.asList("0+4", "4+8", "12+8", "20+8", "28+8", "36+8", "44+8", "52+8", "60+4"),
+        streams.ranges());
+    assertEquals(2, streams.maxOpen);
+    assertEquals(0, streams.open);
+  }
+
+  /** A seek closes the requests in flight, and the first read after it requests exactly what the caller asked for. */
+  @Test
+  void seekClosesReadAheadAndReadsExactly() throws Exception {
+    final byte[] block = block(64);
+    final Streams streams = new Streams(block);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 16)) {
+      final ByteBuffer chunk = ByteBuffer.allocate(4);
+      in.read(chunk);
+      chunk.clear();
+      in.read(chunk);
+      assertEquals(2, streams.open);
+
+      in.seek(40);
+      assertEquals(0, streams.open);
+      chunk.clear();
+      in.read(chunk);
+      assertArrayEquals(Arrays.copyOfRange(block, 40, 44), chunk.array());
+    }
+
+    assertEquals(Arrays.asList("0+4", "4+8", "12+8", "40+4"), streams.ranges());
+  }
+
+  /**
+   * A request is closed as soon as its data is consumed, without waiting for its terminal reply: the reply would
+   * otherwise keep the stream, and the netty buffer it was decoded from, until the next read or seek.
+   */
+  @Test
+  void closesRequestOnceItsDataIsConsumed() throws Exception {
+    final Streams streams = new Streams(DATA);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, DATA.length, 16)) {
+      assertArrayEquals(DATA, readAll(in));
+      assertEquals(0, streams.open);
+      verify(streams.inputs.get(0), times(1)).readAsync();
+    }
   }
 
   /**
@@ -172,9 +235,69 @@ class TestRatisDataStreamBlockInputStream {
   }
 
   private RatisDataStreamBlockInputStream newStream(Pipeline pipeline, XceiverClientFactory factory) {
+    return newStream(pipeline, factory, DATA.length, new OzoneClientConfig().getRatisStreamReadWindowSize());
+  }
+
+  private RatisDataStreamBlockInputStream newStream(Pipeline pipeline, XceiverClientFactory factory,
+      long blockLength, long window) {
     final OzoneClientConfig config = new OzoneClientConfig();
     config.setChecksumVerify(false);
-    return new RatisDataStreamBlockInputStream(blockID, DATA.length, pipeline, null, factory, config);
+    config.setRatisStreamReadWindowSize(window);
+    return new RatisDataStreamBlockInputStream(blockID, blockLength, pipeline, null, factory, config);
+  }
+
+  private static byte[] block(int length) {
+    final byte[] block = new byte[length];
+    for (int i = 0; i < length; i++) {
+      block[i] = (byte) i;
+    }
+    return block;
+  }
+
+  /** Read-only streams that each serve the requested range of a block, then a successful terminal reply. */
+  private final class Streams {
+    private final byte[] block;
+    private final List<ContainerCommandRequestProto> requests = new ArrayList<>();
+    private final List<DataStreamInput> inputs = new ArrayList<>();
+    private int open;
+    private int maxOpen;
+
+    Streams(byte[] block) {
+      this.block = block;
+    }
+
+    XceiverClientRatis client(Pipeline pipeline) throws Exception {
+      final DataStreamApi api = mock(DataStreamApi.class);
+      when(api.streamReadOnly(any(ByteBuffer.class))).thenAnswer(invocation -> newInput(invocation.getArgument(0)));
+      final XceiverClientRatis client = mock(XceiverClientRatis.class);
+      when(client.getPipeline()).thenReturn(pipeline);
+      when(client.getDataStreamApi()).thenReturn(api);
+      return client;
+    }
+
+    private DataStreamInput newInput(ByteBuffer header) throws Exception {
+      final ContainerCommandRequestProto request = toRequest(header);
+      requests.add(request);
+      final int offset = Math.toIntExact(request.getReadBlock().getOffset());
+      final int end = offset + Math.toIntExact(request.getReadBlock().getLength());
+      final Deque<DataStreamReply> replies = new ArrayDeque<>(Arrays.asList(
+          dataReply(offset, Arrays.copyOfRange(block, offset, end)), successReply()));
+      final DataStreamInput input = mock(DataStreamInput.class);
+      when(input.readAsync()).thenAnswer(invocation -> CompletableFuture.completedFuture(retained(replies.remove())));
+      doAnswer(invocation -> {
+        open--;
+        return null;
+      }).when(input).close();
+      inputs.add(input);
+      maxOpen = Math.max(maxOpen, ++open);
+      return input;
+    }
+
+    List<String> ranges() {
+      return requests.stream()
+          .map(r -> r.getReadBlock().getOffset() + "+" + r.getReadBlock().getLength())
+          .collect(Collectors.toList());
+    }
   }
 
   private static byte[] readAll(RatisDataStreamBlockInputStream in) throws Exception {
@@ -207,18 +330,33 @@ class TestRatisDataStreamBlockInputStream {
   }
 
   private DataStreamReply dataReply() {
+    return dataReply(0, DATA);
+  }
+
+  private static DataStreamReply dataReply(long offset, byte[] data) {
     final ContainerCommandResponseProto response = ContainerCommandResponseProto.newBuilder()
         .setCmdType(Type.ReadBlock)
         .setResult(Result.SUCCESS)
         .setReadBlock(ReadBlockResponseProto.newBuilder()
-            .setOffset(0)
+            .setOffset(offset)
             .setData(ByteString.EMPTY)
             .setChecksumData(ChecksumData.newBuilder().setType(ChecksumType.NONE).setBytesPerChecksum(0)))
         .build();
     final byte[] metadata = response.toByteArray();
-    final ByteBuffer frame = ByteBuffer.allocate(Integer.BYTES + metadata.length + DATA.length);
-    frame.putInt(metadata.length).put(metadata).put(DATA).flip();
+    final ByteBuffer frame = ByteBuffer.allocate(Integer.BYTES + metadata.length + data.length);
+    frame.putInt(metadata.length).put(metadata).put(data).flip();
     return reply(DataStreamPacketHeaderProto.Type.STREAM_DATA, frame, true);
+  }
+
+  private DataStreamReply successReply() {
+    final RaftClientReply reply = RaftClientReply.newBuilder()
+        .setClientId(ClientId.randomId())
+        .setServerId(RaftGroupMemberId.valueOf(RatisHelper.toRaftPeerId(dn1), RaftGroupId.valueOf(pipelineID.getId())))
+        .setCallId(1)
+        .setSuccess()
+        .build();
+    return reply(DataStreamPacketHeaderProto.Type.STREAM_HEADER,
+        ClientProtoUtils.toRaftClientReplyProto(reply).toByteString().asReadOnlyByteBuffer(), true);
   }
 
   private DataStreamReply notLeaderReply(DatanodeDetails follower, DatanodeDetails leader) {
