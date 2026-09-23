@@ -193,7 +193,7 @@ public class S3LifecycleConfiguration {
       return Integer.parseInt(value.trim());
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException("Invalid lifecycle configuration: Days value '" + value
-          + "' must be an integer between " + Integer.MIN_VALUE + " and " + Integer.MAX_VALUE, e);
+          + "' is not a valid integer", e);
     }
   }
 

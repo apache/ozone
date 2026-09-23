@@ -330,8 +330,7 @@ public class TestS3LifecycleConfigurationPut {
     assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
     assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
     assertEquals("Invalid lifecycle configuration: Days value "
-        + "'3323232323232323232323232323232323232323232' must be an integer between "
-        + Integer.MIN_VALUE + " and " + Integer.MAX_VALUE, ex.getErrorMessage());
+        + "'3323232323232323232323232323232323232323232' is not a valid integer", ex.getErrorMessage());
   }
 
   @Test
