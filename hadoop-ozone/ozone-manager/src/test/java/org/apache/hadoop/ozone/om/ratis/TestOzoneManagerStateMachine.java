@@ -419,19 +419,8 @@ public class TestOzoneManagerStateMachine {
   public void testRunCommandSetsAndClearsStsThreadLocal() throws Exception {
     when(om.isSecurityEnabled()).thenReturn(true);
 
-    final OzoneManagerProtocolProtos.S3Authentication s3Auth =
-        OzoneManagerProtocolProtos.S3Authentication.newBuilder()
-            .setAccessId("accessId")
-            .setSessionToken("sessionToken")
-            .setResolvedStsSessionPolicy("sessionPolicy")
-            .setResolvedStsRoleArn("roleArn")
-            .setResolvedStsOriginalAccessKeyId("originalAccessKeyId")
-            .setResolvedStsTempAccessKeyId("tempAccessKeyId")
-            .setResolvedStsSecretKeyId("secretKeyId")
-            .build();
-
     final OMRequest request = sampleWriteRequest().toBuilder()
-        .setS3Authentication(s3Auth)
+        .setS3Authentication(stsS3Authentication())
         .build();
     final TermIndex ti = TermIndex.valueOf(1, 5);
 
@@ -452,6 +441,8 @@ public class TestOzoneManagerStateMachine {
       assertEquals("originalAccessKeyId", OzoneManager.getStsTokenIdentifier().getOriginalAccessKeyId());
       assertEquals("roleArn", OzoneManager.getStsTokenIdentifier().getRoleArn());
       assertEquals("sessionPolicy", OzoneManager.getStsTokenIdentifier().getSessionPolicy());
+      assertEquals("assumedRoleId", OzoneManager.getStsTokenIdentifier().getAssumedRoleId());
+      assertEquals("assumedRoleUserArn", OzoneManager.getStsTokenIdentifier().getAssumedRoleUserArn());
       return clientResponse;
     }).when(handler).handleWriteRequest(eq(request), any(), eq(doubleBuffer));
 
@@ -1285,6 +1276,20 @@ public class TestOzoneManagerStateMachine {
     return OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
         .setClientId("test-client")
+        .build();
+  }
+
+  private OzoneManagerProtocolProtos.S3Authentication stsS3Authentication() {
+    return OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+        .setAccessId("accessId")
+        .setSessionToken("sessionToken")
+        .setResolvedStsSessionPolicy("sessionPolicy")
+        .setResolvedStsRoleArn("roleArn")
+        .setResolvedStsOriginalAccessKeyId("originalAccessKeyId")
+        .setResolvedStsTempAccessKeyId("tempAccessKeyId")
+        .setResolvedStsSecretKeyId("secretKeyId")
+        .setResolvedStsAssumedRoleId("assumedRoleId")
+        .setResolvedStsAssumedRoleUserArn("assumedRoleUserArn")
         .build();
   }
 
