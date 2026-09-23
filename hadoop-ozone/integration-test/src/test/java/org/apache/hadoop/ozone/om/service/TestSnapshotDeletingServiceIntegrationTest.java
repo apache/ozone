@@ -778,6 +778,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       sds.shutdown();
       GenericTestUtils.waitFor(kdsWaitStarted::get, 1000, 30000);
       client.getObjectStore().deleteSnapshot(volume, bucket, "snap" + snasphotDeleteIndex);
+      // SDS skips snapshots whose deletion transaction has not been flushed.
+      om.awaitDoubleBufferFlush();
       CompletableFuture<Void> sdsFuture = CompletableFuture.runAsync(() -> {
         try {
           sds.runPeriodicalTaskNow();
