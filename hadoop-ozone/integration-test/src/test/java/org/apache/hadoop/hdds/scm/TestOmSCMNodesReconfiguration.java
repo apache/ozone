@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -153,6 +154,11 @@ public class TestOmSCMNodesReconfiguration {
     assertEquals(expected, afterContainer);
     assertEquals(expected, afterBlock);
     assertFalse(afterContainer.contains(dropped));
+
+    // Comparing node ids alone would not catch a proxy that was stopped but
+    // left in use, so drive a live RPC through the rebuilt proxies.
+    assertNotNull(scmClient.getContainerClient().getScmInfo());
+    assertNotNull(scmClient.getBlockClient().getScmInfo());
   }
 
   /**
@@ -186,6 +192,74 @@ public class TestOmSCMNodesReconfiguration {
     assertResolvedHost(scmClient.getContainerProxyProvider(), nodeId,
         "127.0.0.2");
     assertResolvedHost(scmClient.getBlockProxyProvider(), nodeId, "127.0.0.2");
+  }
+
+  /**
+   * The reconfiguration-complete callback must reload the SCM proxies only when
+   * the batch touched the SCM node list or a per-node SCM address. A batch that
+   * reports only an unrelated key must leave the proxies untouched, even if the
+   * live SCM address configuration has drifted, so nothing is applied.
+   */
+  @Test
+  void testReloadScmProxiesOnReconfigIgnoresUnrelatedKey() {
+    OzoneManager om = cluster.getOzoneManager();
+    ScmClient scmClient = om.getScmClient();
+    String nodeId =
+        cluster.getStorageContainerManagers().get(0).getSCMNodeId();
+    String scmAddrKey = ConfUtils.addKeySuffixes(
+        OZONE_SCM_ADDRESS_KEY, scmServiceId, nodeId);
+
+    OzoneConfiguration conf = om.getConfiguration();
+    String original =
+        resolvedHost(scmClient.getContainerProxyProvider(), nodeId);
+
+    // Drift the live address, but report only an unrelated key as changed.
+    conf.set(scmAddrKey, "127.0.0.9");
+    Map<String, Boolean> changed = new HashMap<>();
+    changed.put("ozone.om.unrelated.key", true);
+    om.reloadScmProxiesOnReconfig(changed, conf);
+
+    // No reload fired, so both providers still resolve the original address.
+    assertEquals(original,
+        resolvedHost(scmClient.getContainerProxyProvider(), nodeId));
+    assertEquals(original,
+        resolvedHost(scmClient.getBlockProxyProvider(), nodeId));
+  }
+
+  /**
+   * A malformed per-node SCM address in a batch reported to the complete callback
+   * must not escape: the callback catches the resolution failure and only logs,
+   * leaving the previous proxies in place, so the reconfiguration-complete chain
+   * (tracing, logging) is not broken.
+   */
+  @Test
+  void testReloadScmProxiesOnReconfigCatchesMalformedAddress() {
+    OzoneManager om = cluster.getOzoneManager();
+    ScmClient scmClient = om.getScmClient();
+    String nodeId =
+        cluster.getStorageContainerManagers().get(0).getSCMNodeId();
+    String scmAddrKey = ConfUtils.addKeySuffixes(
+        OZONE_SCM_ADDRESS_KEY, scmServiceId, nodeId);
+
+    OzoneConfiguration conf = om.getConfiguration();
+    Set<String> before =
+        new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
+
+    // An address that already carries a port cannot be rebuilt into a valid
+    // host:port authority, so resolving the membership throws
+    // IllegalArgumentException.
+    conf.set(scmAddrKey, "127.0.0.1:9999");
+    Map<String, Boolean> changed = new HashMap<>();
+    changed.put(scmAddrKey, true);
+
+    // The callback must swallow the failure rather than break the chain.
+    assertDoesNotThrow(() -> om.reloadScmProxiesOnReconfig(changed, conf));
+
+    // The membership is left in place for both providers.
+    assertEquals(before,
+        new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds()));
+    assertEquals(before,
+        new HashSet<>(scmClient.getBlockProxyProvider().getSCMNodeIds()));
   }
 
   /**
@@ -311,15 +385,18 @@ public class TestOmSCMNodesReconfiguration {
   private static void assertResolvedHost(
       SCMFailoverProxyProviderBase<?> provider,
       String nodeId, String expectedHost) {
-    SCMProxyInfo info = null;
+    String host = resolvedHost(provider, nodeId);
+    assertNotNull(host);
+    assertEquals(expectedHost, host);
+  }
+
+  private static String resolvedHost(
+      SCMFailoverProxyProviderBase<?> provider, String nodeId) {
     for (SCMProxyInfo candidate : provider.getSCMProxyInfoList()) {
       if (candidate.getNodeId().equals(nodeId)) {
-        info = candidate;
-        break;
+        return candidate.getAddress().getAddress().getHostAddress();
       }
     }
-    assertNotNull(info);
-    assertEquals(expectedHost,
-        info.getAddress().getAddress().getHostAddress());
+    return null;
   }
 }

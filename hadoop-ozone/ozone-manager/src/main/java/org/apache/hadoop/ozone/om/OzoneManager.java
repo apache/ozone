@@ -6109,11 +6109,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * yet, the reload fails: the previous node list is restored and the exception
    * is rethrown so the reconfiguration is reported FAILED and can be retried.
    * This keeps the live configuration from holding an SCM node without a
-   * resolvable address (which would break {@code getServiceList()}). To add an
-   * SCM in a single {@code reconfig start}, set its address key together with
-   * the node list; the reconfiguration-complete callback
-   * ({@link #reloadScmProxiesOnReconfig}) applies the final membership once both
-   * are stored.
+   * resolvable address (which would break {@code getServiceList()}). Adding an
+   * SCM therefore needs its address key stored before the node list is applied:
+   * the per-property order within a {@code reconfig start} batch is not
+   * guaranteed, and if the node list is applied first this callback cannot
+   * resolve the new node, rolls the node list back, and the
+   * reconfiguration-complete callback ({@link #reloadScmProxiesOnReconfig}) then
+   * reloads the previous membership. In that case the new SCM is picked up only
+   * on a second {@code reconfig start}, once its address key is stored.
    *
    * Scope: only the block and container proxies are reloaded. The secure-mode
    * SCM security and secret-key proxy providers are not reloaded and continue to
@@ -6157,8 +6160,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * failover proxies once a batch that touched the SCM node list or any per-node
    * SCM address has been fully applied. Because it runs after every property in
    * the batch is stored, an address-only change takes effect (the per-property
-   * path only fires for the node list), and a node added with its address key
-   * listed before or after the node list is picked up in a single reconfiguration.
+   * path only fires for the node list). A newly added SCM is picked up here only
+   * when its address key was already stored as the node list was applied; if the
+   * node list was applied first {@link #reconfScmNodes} rolls it back, so this
+   * callback reloads the previous membership and the node is added on a later
+   * {@code reconfig start}.
    */
   @VisibleForTesting
   public void reloadScmProxiesOnReconfig(Map<String, Boolean> changedProperties,
