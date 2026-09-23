@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -13,20 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This workflow periodically applies labels for PRs.
-
-name: scheduled-label-pull-requests
-
-on:
-  # every 30 minutes; component labeling scans all open PRs, so keep the
-  # cadence moderate
-  schedule:
-    - cron: '*/30 * * * *'
-
-permissions:
-  contents: read
-  pull-requests: write
-
-jobs:
-  label:
-    uses: $/.github/workflows/label-pr.yml
+@test "junit_summary.py unit tests" {
+  cd "${BATS_TEST_DIRNAME}"
+  run python3 -m unittest test_junit_summary
+  [ "$status" -eq 0 ]
+}

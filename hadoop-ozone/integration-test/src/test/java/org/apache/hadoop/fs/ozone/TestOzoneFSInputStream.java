@@ -203,7 +203,13 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
          FSDataInputStream inputStream = fs.open(filePath)) {
       long currentPos = inputStream.getPos();
       ByteBuffer buffer = ByteBuffer.allocate(20);
-      assertEquals(-1, inputStream.read(position, buffer));
+      if (position < 0) {
+        // Negative position must throw EOFException (aligned with the byte-array PositionedReadable contract).
+        assertThrows(EOFException.class, () -> inputStream.read(position, buffer));
+      } else {
+        // Position at or past EOF must return -1.
+        assertEquals(-1, inputStream.read(position, buffer));
+      }
       // File position should not be changed
       assertEquals(currentPos, inputStream.getPos());
     }

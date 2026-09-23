@@ -69,9 +69,21 @@ updates:
           - ">=5.0.0" # requires Java 11
       - dependency-name: "org.rocksdb:*"
         update-types: ["version-update:semver-minor"]
+      - dependency-name: "software.amazon.awssdk:*"
     schedule:
       interval: "cron"
       cronjob: "0 5 * * 0,6"
+    cooldown:
+      default-days: 7
+    pull-request-branch-name:
+      separator: "-"
+  - package-ecosystem: maven
+    open-pull-requests-limit: 5
+    directory: "/hadoop-ozone/integration-test-s3"
+    allow:
+      - dependency-name: "software.amazon.awssdk:*"
+    schedule:
+      interval: "monthly"
     cooldown:
       default-days: 7
     pull-request-branch-name:
