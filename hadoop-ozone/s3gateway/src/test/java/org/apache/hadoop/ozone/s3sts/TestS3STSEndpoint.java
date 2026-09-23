@@ -78,6 +78,8 @@ public class TestS3STSEndpoint {
   private static final String STS_NS = "https://sts.amazonaws.com/doc/2011-06-15/";
   private static final String AWS_FAULT_NS = "http://webservices.amazon.com/AWSFault/2005-15-09";
   private static final String REQUEST_ID = "test-request-id";
+  private static final String DURATION_VALIDATION_ERROR_MESSAGE =
+      "Invalid Value: DurationSeconds must be a number between 900 and 43200 seconds";
 
   @BeforeEach
   public void setup() throws Exception {
@@ -133,7 +135,7 @@ public class TestS3STSEndpoint {
     setAssumeRoleQueryParameters("PolicyArns.member.1", "arn:aws:iam::123456789012:policy/test-policy");
 
     final OSTSException ex = assertThrows(
-        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(501, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -173,7 +175,7 @@ public class TestS3STSEndpoint {
         "DurationSeconds", "3600",
         "Version", "2011-06-15");
 
-    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null);
 
     assertEquals(200, response.getStatus());
     verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
@@ -195,7 +197,7 @@ public class TestS3STSEndpoint {
         "X-Amz-SignedHeaders", "host",
         "X-Amz-Signature", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
-    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null);
 
     assertEquals(200, response.getStatus());
     verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
@@ -207,7 +209,7 @@ public class TestS3STSEndpoint {
     setAssumeRoleQueryParameters("TotallyUnknownParam", "x");
 
     final OSTSException ex = assertThrows(
-        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -242,7 +244,7 @@ public class TestS3STSEndpoint {
     setAssumeRoleQueryParameters("", "x");
 
     final OSTSException ex = assertThrows(
-        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -308,7 +310,7 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsAssumeRoleValidForGetMethod() throws Exception {
-    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null);
 
     assertEquals(200, response.getStatus());
     verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
@@ -383,7 +385,7 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsNullAction() throws Exception {
-    final Response response = endpoint.get(null, ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+    final Response response = endpoint.get(null, ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null);
 
     assertEquals(400, response.getStatus());
     verifyNoInteractions(auditLogger);
@@ -414,7 +416,7 @@ public class TestS3STSEndpoint {
   @Test
   public void testStsUnsupportedActionWithVersionSupplied() throws Exception {
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("UnsupportedAction", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("UnsupportedAction", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verifyNoInteractions(auditLogger);
@@ -427,7 +429,7 @@ public class TestS3STSEndpoint {
   @Test
   public void testStsUnsupportedActionWithVersionNotSupplied() throws Exception {
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("UnsupportedAction", ROLE_ARN, ROLE_SESSION_NAME, 3600, null, null));
+        endpoint.get("UnsupportedAction", ROLE_ARN, ROLE_SESSION_NAME, "3600", null, null));
 
     assertEquals(400, ex.getHttpCode());
     verifyNoInteractions(auditLogger);
@@ -440,7 +442,7 @@ public class TestS3STSEndpoint {
   @Test
   public void testStsAssumeRoleWithInvalidVersion() throws Exception {
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2000-01-01", null));
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2000-01-01", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -454,7 +456,7 @@ public class TestS3STSEndpoint {
   @Test
   public void testStsInvalidDuration() throws Exception {
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, -1, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "-1", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -462,6 +464,102 @@ public class TestS3STSEndpoint {
 
     ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid Value: DurationSeconds");
+  }
+
+  @Test
+  public void testStsDurationOverflowForGetMethod() throws Exception {
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get(
+            "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "4320010000", "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", DURATION_VALIDATION_ERROR_MESSAGE);
+  }
+
+  @Test
+  public void testStsDurationOverflowForPostMethod() throws Exception {
+    setAssumeRoleFormParameters(
+        "Action", "AssumeRole", "RoleArn", ROLE_ARN, "RoleSessionName", ROLE_SESSION_NAME,
+        "DurationSeconds", "4320010000", "Version", "2011-06-15");
+
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", DURATION_VALIDATION_ERROR_MESSAGE);
+  }
+
+  @Test
+  public void testStsNonNumericDurationForGetMethod() throws Exception {
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get(
+            "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "abc", "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", DURATION_VALIDATION_ERROR_MESSAGE);
+  }
+
+  @Test
+  public void testStsNonNumericDurationForPostMethod() throws Exception {
+    setAssumeRoleFormParameters(
+        "Action", "AssumeRole", "RoleArn", ROLE_ARN, "RoleSessionName", ROLE_SESSION_NAME, "DurationSeconds", "abc",
+        "Version", "2011-06-15");
+
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", DURATION_VALIDATION_ERROR_MESSAGE);
+  }
+
+  @Test
+  public void testStsBlankDurationForGetMethod() throws Exception {
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get(
+            "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "     ", "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", DURATION_VALIDATION_ERROR_MESSAGE);
+  }
+
+  @Test
+  public void testStsBlankDurationForPostMethod() throws Exception {
+    setAssumeRoleFormParameters(
+        "Action", "AssumeRole", "RoleArn", ROLE_ARN, "RoleSessionName", ROLE_SESSION_NAME, "DurationSeconds", "     ",
+        "Version", "2011-06-15");
+
+    final OSTSException ex = assertThrows(OSTSException.class, () -> endpoint.post(formParameters).close());
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", DURATION_VALIDATION_ERROR_MESSAGE);
   }
 
   @Test
@@ -482,7 +580,7 @@ public class TestS3STSEndpoint {
     final String tooLargePolicy = RandomStringUtils.insecure().nextAlphanumeric(2049);
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", tooLargePolicy));
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", tooLargePolicy));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -498,7 +596,7 @@ public class TestS3STSEndpoint {
   public void testStsInvalidRoleArn() throws Exception {
     final String invalidRoleArn = "arn:awsNotValid::123456789012:role/test-role";
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -512,7 +610,7 @@ public class TestS3STSEndpoint {
   @Test
   public void testStsMissingRoleArn() throws Exception {
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", null, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", null, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -526,7 +624,7 @@ public class TestS3STSEndpoint {
   public void testStsInvalidRoleArnMissingRoleName() throws Exception {
     final String invalidRoleArn = "arn:aws:iam::123456789012:role/";
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     assertEquals("ValidationError", ex.getCode());
@@ -541,7 +639,7 @@ public class TestS3STSEndpoint {
   public void testStsInvalidRoleArnMissingAccountId() throws Exception {
     final String invalidRoleArn = "arn:aws:iam:::role/test-role";
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     assertEquals("ValidationError", ex.getCode());
@@ -556,7 +654,7 @@ public class TestS3STSEndpoint {
   @Test
   public void testStsWhenActionNotImplemented() throws Exception {
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("GetSessionToken", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("GetSessionToken", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(501, ex.getHttpCode());
     verifyNoInteractions(auditLogger);
@@ -588,7 +686,8 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsGetCallerIdentityIgnoresExtraParameters() throws Exception {
-    final Response response = endpoint.get("GetCallerIdentity", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+    final Response response = endpoint.get(
+        "GetCallerIdentity", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null);
 
     assertEquals(200, response.getStatus());
     verify(objectStore).getCallerIdentity();
@@ -642,7 +741,7 @@ public class TestS3STSEndpoint {
   @Test
   public void testStsMissingRoleSessionName() throws Exception {
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, null, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, null, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -656,7 +755,7 @@ public class TestS3STSEndpoint {
   public void testStsInvalidRoleSessionNameWithInvalidCharacter() throws Exception {
     final String invalidSession = "test/session";
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, invalidSession, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, invalidSession, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -673,7 +772,7 @@ public class TestS3STSEndpoint {
   public void testStsInvalidRoleSessionNameTooShort() throws Exception {
     final String invalidSession = "a";
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, invalidSession, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, invalidSession, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -690,7 +789,7 @@ public class TestS3STSEndpoint {
     // Resource type must be role, not user
     final String invalidRoleArn = "arn:aws:iam::123456789012:user/test-user";
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -706,7 +805,7 @@ public class TestS3STSEndpoint {
         .thenThrow(new RuntimeException("some unexpected error"));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(500, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -722,7 +821,7 @@ public class TestS3STSEndpoint {
         .thenThrow(new OMException("Permission denied", OMException.ResultCodes.ACCESS_DENIED));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(403, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -739,7 +838,7 @@ public class TestS3STSEndpoint {
         .thenThrow(new OMException("Operation is not supported", OMException.ResultCodes.NOT_SUPPORTED_OPERATION));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(501, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -755,7 +854,7 @@ public class TestS3STSEndpoint {
         .thenThrow(new OMException("Feature is not enabled", OMException.ResultCodes.FEATURE_NOT_ENABLED));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(501, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -771,7 +870,7 @@ public class TestS3STSEndpoint {
         .thenThrow(new OMException("Invalid request parameter", OMException.ResultCodes.INVALID_REQUEST));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -787,7 +886,7 @@ public class TestS3STSEndpoint {
         .thenThrow(new OMException("Malformed session policy", OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -804,7 +903,7 @@ public class TestS3STSEndpoint {
         .thenThrow(new IOException("An IO error occurred"));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "3600", "2011-06-15", null));
 
     assertEquals(500, ex.getHttpCode());
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
@@ -818,7 +917,7 @@ public class TestS3STSEndpoint {
   public void testStsMultipleValidationErrors() throws Exception {
     final String invalidRoleSessionName = "test/session";
     final String tooLargePolicy = RandomStringUtils.insecure().nextAlphanumeric(2049);
-    final int invalidDurationSeconds = -1;
+    final String invalidDurationSeconds = "-1";
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
         endpoint.get("AssumeRole", ROLE_ARN, invalidRoleSessionName, invalidDurationSeconds, "2011-06-15",

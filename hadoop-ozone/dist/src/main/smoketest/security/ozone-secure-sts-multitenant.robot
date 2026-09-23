@@ -188,7 +188,8 @@ Verify Role-Scoped Token Accesses
 
     # This token should be able to read from ${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET} but not ${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}
     # nor ${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}.  Also verify that it can write to ${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}.
-    Get Object Should Succeed     ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+    # Wait for all role policies to reach the Ranger plugin cache before checking the access matrix.
+    Wait Until Keyword Succeeds   60s   5s                      Get Object Should Succeed     ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
     Get Object Should Fail        ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Put Object Should Succeed     ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
@@ -207,7 +208,7 @@ Verify Role-Scoped Token Accesses
     # nor ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET} nor ${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}
     # nor ${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}.
     # Also verify that it can write to ${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}.
-    Get Object Should Succeed     ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+    Wait Until Keyword Succeeds   60s   5s                      Get Object Should Succeed     ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
     Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
     Get Object Should Fail        ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
@@ -220,7 +221,7 @@ Verify Role-Scoped Token Accesses
     # nor ${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET} nor ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
     # nor ${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}.
     # Also verify that it can write to ${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}.
-    Get Object Should Succeed     ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+    Wait Until Keyword Succeeds   60s   5s                      Get Object Should Succeed     ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
     Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket

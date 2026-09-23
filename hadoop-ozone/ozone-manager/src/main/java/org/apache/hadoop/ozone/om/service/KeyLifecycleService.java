@@ -202,7 +202,7 @@ public class KeyLifecycleService extends BackgroundService {
     List<OmLifecycleConfiguration> lifecycleConfigurationList = null;
     try {
       lifecycleConfigurationList = omMetadataManager.listLifecycleConfigurations();
-    } catch (OMException e) {
+    } catch (IOException e) {
       LOG.error("Failed to list lifecycle configurations", e);
       return queue;
     }

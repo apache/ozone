@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.scm.container.ContainerException;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.ozone.lib.service.FileSystemAccessException;
 import org.apache.ozone.lib.wsrs.ExceptionProvider;
 import org.slf4j.Logger;
@@ -45,6 +46,7 @@ public class HttpFSExceptionProvider extends ExceptionProvider {
    * Maps different exceptions thrown by HttpFSServer to HTTP status codes.
    * <ul>
    * <li>SecurityException : HTTP UNAUTHORIZED</li>
+   * <li>AccessControlException : HTTP UNAUTHORIZED</li>
    * <li>FileNotFoundException : HTTP NOT_FOUND</li>
    * <li>IOException : INTERNAL_HTTP SERVER_ERROR</li>
    * <li>UnsupporteOperationException : HTTP BAD_REQUEST</li>
@@ -64,7 +66,8 @@ public class HttpFSExceptionProvider extends ExceptionProvider {
     if (throwable instanceof ContainerException) {
       throwable = throwable.getCause();
     }
-    if (throwable instanceof SecurityException) {
+    if (throwable instanceof SecurityException
+        || throwable instanceof AccessControlException) {
       status = Response.Status.UNAUTHORIZED;
     } else if (throwable instanceof FileNotFoundException) {
       status = Response.Status.NOT_FOUND;
